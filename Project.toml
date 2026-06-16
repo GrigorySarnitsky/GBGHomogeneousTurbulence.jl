@@ -7,5 +7,5 @@ authors = ["Grigory Sarnitsky <grigory@sarnitsky.se>"]
 GBGPeriodicFields = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
 
 [compat]
-GBGPeriodicFields = "0.1"
+GBGPeriodicFields = "0.1.0"
 julia = "1.11"

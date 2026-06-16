@@ -1,5 +1,9 @@
 .ipynb_checkpoints/
+# The root Manifest is committed on purpose: it is the only place the unregistered
+# GBGPeriodicFields git URL + pinned commit are recorded, so it must travel with the
+# repo for a fresh clone / CI to resolve the dependency. Nested env Manifests stay ignored.
 Manifest.toml
+!/Manifest.toml
 docs/build/
 docs/site/
 
