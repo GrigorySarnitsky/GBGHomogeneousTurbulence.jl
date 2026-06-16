@@ -1,0 +1,7 @@
+.ipynb_checkpoints/
+Manifest.toml
+docs/build/
+docs/site/
+
+# Local-only reference material (theses, papers, notes) — never committed
+inspiration/

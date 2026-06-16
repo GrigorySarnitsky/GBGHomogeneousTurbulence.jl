@@ -1,0 +1,11 @@
+name = "GBGIsotropicTurbulence"
+uuid = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
+version = "0.1.0"
+authors = ["Grigory Sarnitsky <grigory@sarnitsky.se>"]
+
+[deps]
+GBGPeriodicFields = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
+
+[compat]
+GBGPeriodicFields = "0.1"
+julia = "1.11"
