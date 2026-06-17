@@ -68,8 +68,11 @@ using .Forcing:
   BandRescaling,
   Linear,
   ConstantPower,
+  StochasticOU,
   forcing_rate!,
-  apply_forcing!
+  apply_forcing!,
+  prepare_forcing!,
+  forcing_source!
 
 using .TimeIntegration:
   AbstractIntegrator,
@@ -105,8 +108,11 @@ export SpectralOperators,
        BandRescaling,
        Linear,
        ConstantPower,
+       StochasticOU,
        forcing_rate!,
        apply_forcing!,
+       prepare_forcing!,
+       forcing_source!,
        AbstractIntegrator,
        IFRK2,
        IFLowStorageRK3,

@@ -29,7 +29,8 @@ using GBGPeriodicFields
 using ..SimulationState: SpectralOperators, Workspace
 using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
                    scalar_to_physical!, scalar_nonlinear!
-using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!
+using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!,
+                 prepare_forcing!, forcing_source!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
        recommended_cfl, default_integrator, Physics
@@ -119,7 +120,9 @@ function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspac
   hu = ws.stage1                                                             # velocity accumulator
   hφ = ws.scalar_stage1                                                      # scalar accumulator
 
-  # linear forcing rates, computed once from the start-of-step state and folded into E_ν / E_κ
+  # per-step forcing state (OU advance) and linear rates, from the start-of-step state
+  prepare_forcing!(physics.velocity_forcing, uh, ops, ws, dt)
+  prepare_forcing!(physics.scalar_forcing, phih, ops, ws, dt)
   velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, uh, ops, ws) ? ws.velocity_rate : nothing
   scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, phih, ops, ws) ? ws.scalar_rate : nothing
 
@@ -133,7 +136,9 @@ function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspac
     scalar_to_physical!(ws.scalar_field, phih, ops, ws)                      # φ at the stage state
 
     velocity_nonlinear!(ws.nonlinear, velocity, vorticity, ops, ws)          # N̂_u
+    forcing_source!(physics.velocity_forcing, ws.nonlinear, ops, ws)         # + additive forcing (OU)
     scalar_nonlinear!(ws.scalar_nonlinear, velocity, ws.scalar_field, ops, ws)  # N̂_φ (reuses ws.lamb/ws.scratch)
+    forcing_source!(physics.scalar_forcing, ws.scalar_nonlinear, ops, ws)
 
     if i == 1
       field_data(hu) .= dt_T .* field_data(ws.nonlinear)                     # A₁ = 0
@@ -196,14 +201,18 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
   ν = physics.viscosity
   κ = physics.viscosity / physics.schmidt
 
-  # linear forcing rates, from the start-of-step state, folded into every E_ν / E_κ this step
+  # per-step forcing state (OU advance) and linear rates, from the start-of-step state
+  prepare_forcing!(physics.velocity_forcing, uh, ops, ws, dt)
+  prepare_forcing!(physics.scalar_forcing, phih, ops, ws, dt)
   velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, uh, ops, ws) ? ws.velocity_rate : nothing
   scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, phih, ops, ws) ? ws.scalar_rate : nothing
 
   # stage 1 — nonlinear terms at the start-of-step state
   scalar_to_physical!(ws.scalar_field, phih, ops, ws)
   velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, ops, ws)              # N̂_u,1
+  forcing_source!(physics.velocity_forcing, ws.stage1, ops, ws)
   scalar_nonlinear!(ws.scalar_stage1, ws.velocity, ws.scalar_field, ops, ws)            # N̂_φ,1
+  forcing_source!(physics.scalar_forcing, ws.scalar_stage1, ops, ws)
 
   # predictors û*, φ̂*
   integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)                 # E_ν
@@ -217,7 +226,9 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
   velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, ws.velocity_star_spectral, ops, ws)
   scalar_to_physical!(ws.scalar_field, ws.scalar_star_spectral, ops, ws)
   velocity_nonlinear!(ws.stage2, ws.velocity_star, ws.vorticity_physical, ops, ws)      # N̂_u,2
+  forcing_source!(physics.velocity_forcing, ws.stage2, ops, ws)
   scalar_nonlinear!(ws.scalar_stage2, ws.velocity_star, ws.scalar_field, ops, ws)       # N̂_φ,2
+  forcing_source!(physics.scalar_forcing, ws.scalar_stage2, ops, ws)
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
   integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)

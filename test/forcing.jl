@@ -85,4 +85,47 @@ using Test
     end
     @test scalar_variance(phih) > scalar_variance(phih0)
   end
+
+  @testset "StochasticOU stationary variance and solenoidality" begin
+    target_variance = 0.4
+    ou = StochasticOU(ops; variance = target_variance, correlation_time = 0.5,
+                      lowest_shell = 1, highest_shell = 2, seed = 123)
+    uh = spectral_vector(ops)                              # velocity reference ⇒ solenoidal forcing
+    samples = T[]
+    for n in 1:1000
+      prepare_forcing!(ou, uh, ops, ws, 0.01)
+      n > 500 && push!(samples, inner(ou.state, ou.state))
+    end
+    @test 0.6 * target_variance < sum(samples) / length(samples) < 1.6 * target_variance
+    rel_div = l2norm(divergence(ou.state, ops.multipliers)) / (l2norm(ou.state) + 1e-30)
+    @test rel_div < 1e-8                                   # the forcing state is divergence-free
+  end
+
+  @testset "StochasticOU reproducible from seed" begin
+    a = StochasticOU(ops; variance = 0.3, correlation_time = 0.4, seed = 7)
+    b = StochasticOU(ops; variance = 0.3, correlation_time = 0.4, seed = 7)
+    uh = spectral_vector(ops)
+    for n in 1:20
+      prepare_forcing!(a, uh, ops, ws, 0.01)
+      prepare_forcing!(b, uh, ops, ws, 0.01)
+    end
+    @test field_data(a.state) == field_data(b.state)
+  end
+
+  @testset "StochasticOU sustains velocity energy" begin
+    ou = StochasticOU(ops; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
+    physics = Physics(viscosity = ν, velocity_forcing = ou)
+    uh = spectral_vector(ops)
+    random_solenoidal_velocity!(uh, ops; energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    dealias!(uh, ops)
+    phih = scalar_spectral(ops)
+    for n in 1:200
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      dt = 0.4 * (L / N) / max(max_speed(ws.velocity), 1e-6)
+      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, dt)
+    end
+    @test isfinite(kinetic_energy(uh)) && kinetic_energy(uh) > 0.05   # forcing kept it from decaying away
+    rel_div = l2norm(divergence(uh, ops.multipliers)) / (l2norm(uh) + 1e-30)
+    @test rel_div < 1e-8
+  end
 end
