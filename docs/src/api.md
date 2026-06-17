@@ -8,7 +8,8 @@ public surface, so `using GBGIsotropicTurbulence` brings everything into scope.
 - [SimulationState](api/SimulationState.md): the spectral machinery (`SpectralOperators`), the preallocated buffers (`VelocityWorkspace`), the scratch allocators, and the random divergence-free initial condition.
 - [Equations](api/Equations.md): the rotational-form Navier–Stokes right-hand side (the de-aliased, Leray-projected nonlinear term and the exact viscous integrating factor) and the velocity diagnostics.
 - [Forcing](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing` (`NoForcing`, `BandRescaling`, `Linear`, `ConstantPower`, `StochasticOU`).
-- [TimeIntegration](api/TimeIntegration.md): the pluggable integrating-factor time-stepping schemes under `AbstractIntegrator` (`IFRK2`).
+- [TimeIntegration](api/TimeIntegration.md): the pluggable integrating-factor time-stepping schemes under `AbstractIntegrator` (`IFRK2`, `IFLowStorageRK3`).
+- [Particles](api/Particles.md): Lagrangian tracer tracking — `Tracers`, second-order `advect!` (Heun-in-time), and `sample!` for the Lagrangian statistics.
 
 ```@contents
 Pages = [
@@ -17,6 +18,7 @@ Pages = [
   "api/Equations.md",
   "api/Forcing.md",
   "api/TimeIntegration.md",
+  "api/Particles.md",
 ]
 Depth = 2
 ```

@@ -14,6 +14,7 @@ makedocs(
     GBGIsotropicTurbulence.Equations,
     GBGIsotropicTurbulence.Forcing,
     GBGIsotropicTurbulence.TimeIntegration,
+    GBGIsotropicTurbulence.Particles,
   ],
   format = Documenter.HTML(
     canonical     = "https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/stable",
@@ -30,6 +31,7 @@ makedocs(
       "Equations"              => "api/Equations.md",
       "Forcing"                => "api/Forcing.md",
       "TimeIntegration"        => "api/TimeIntegration.md",
+      "Particles"              => "api/Particles.md",
     ],
   ],
 )

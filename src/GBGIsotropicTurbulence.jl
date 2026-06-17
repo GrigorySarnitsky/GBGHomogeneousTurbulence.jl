@@ -37,6 +37,7 @@ include("SimulationState.jl")
 include("Equations.jl")
 include("Forcing.jl")
 include("TimeIntegration.jl")
+include("Particles.jl")
 
 
 using .SimulationState:
@@ -83,6 +84,16 @@ using .TimeIntegration:
   default_integrator,
   Physics
 
+using .Particles:
+  Tracers,
+  advect!,
+  sample!,
+  tracer_positions,
+  tracer_velocities,
+  ntracers,
+  velocity_buffer,
+  scalar_buffer
+
 
 export SpectralOperators,
        Workspace,
@@ -119,7 +130,15 @@ export SpectralOperators,
        step!,
        recommended_cfl,
        default_integrator,
-       Physics
+       Physics,
+       Tracers,
+       advect!,
+       sample!,
+       tracer_positions,
+       tracer_velocities,
+       ntracers,
+       velocity_buffer,
+       scalar_buffer
 
 
 end # module GBGIsotropicTurbulence

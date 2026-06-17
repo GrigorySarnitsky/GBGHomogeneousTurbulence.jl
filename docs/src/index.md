@@ -54,8 +54,8 @@ combination, and the quadratic product is de-aliased by the ``2/3`` rule.
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) — the default — and
     [`IFRK2`](@ref)), with the full forcing menu `NoForcing`, `BandRescaling`, `Linear`,
-    `ConstantPower`, and the stochastic `StochasticOU` (Eswaran–Pope). Lagrangian particle tracking
-    and the statistics are being added.
+    `ConstantPower`, and the stochastic `StochasticOU` (Eswaran–Pope), and Lagrangian particle
+    tracking ([`Tracers`](@ref)). The Eulerian and Lagrangian statistics are being added.
 
 ## Components
 
@@ -66,3 +66,5 @@ combination, and the quadratic product is de-aliased by the ``2/3`` rule.
 - [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
 - [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.
+- [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
+  sampling along trajectories, with a pluggable interpolation scheme.
