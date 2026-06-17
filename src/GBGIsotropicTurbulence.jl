@@ -41,20 +41,26 @@ include("TimeIntegration.jl")
 
 using .SimulationState:
   SpectralOperators,
-  VelocityWorkspace,
+  Workspace,
   spectral_vector,
   physical_vector,
   scalar_spectral,
+  scalar_physical,
   random_solenoidal_velocity!,
+  random_scalar!,
   dealias!
 
 using .Equations:
   velocity_vorticity!,
   velocity_nonlinear!,
   integrating_factor!,
+  scalar_to_physical!,
+  scalar_nonlinear!,
   kinetic_energy,
   dissipation,
-  max_speed
+  max_speed,
+  scalar_variance,
+  scalar_dissipation
 
 using .Forcing:
   AbstractForcing,
@@ -68,22 +74,29 @@ using .TimeIntegration:
   IFLowStorageRK3,
   step!,
   recommended_cfl,
-  default_integrator
+  default_integrator,
+  Physics
 
 
 export SpectralOperators,
-       VelocityWorkspace,
+       Workspace,
        spectral_vector,
        physical_vector,
        scalar_spectral,
+       scalar_physical,
        random_solenoidal_velocity!,
+       random_scalar!,
        dealias!,
        velocity_vorticity!,
        velocity_nonlinear!,
        integrating_factor!,
+       scalar_to_physical!,
+       scalar_nonlinear!,
        kinetic_energy,
        dissipation,
        max_speed,
+       scalar_variance,
+       scalar_dissipation,
        AbstractForcing,
        NoForcing,
        BandRescaling,
@@ -93,7 +106,8 @@ export SpectralOperators,
        IFLowStorageRK3,
        step!,
        recommended_cfl,
-       default_integrator
+       default_integrator,
+       Physics
 
 
 end # module GBGIsotropicTurbulence

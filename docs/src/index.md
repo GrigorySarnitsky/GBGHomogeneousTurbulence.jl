@@ -51,9 +51,10 @@ exactly through an integrating factor, the nonlinear term explicitly by a Runge�
 combination, and the quadratic product is de-aliased by the ``2/3`` rule.
 
 !!! note "Work in progress"
-    The package is being built in vertical slices. The velocity solver (forced HIT advanced by the
-    integrating-factor scheme) is in place; the passive scalar, the full forcing menu, the
-    low-storage RK3 integrator, Lagrangian particles, and the statistics are being added.
+    The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
+    place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) — the default — and
+    [`IFRK2`](@ref)); the full forcing menu (currently `NoForcing` and `BandRescaling`), Lagrangian
+    particle tracking, and the statistics are being added.
 
 ## Components
 

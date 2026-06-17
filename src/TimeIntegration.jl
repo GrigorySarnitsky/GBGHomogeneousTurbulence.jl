@@ -1,54 +1,79 @@
 # TimeIntegration — the pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
-# is advanced exactly through ℰ = exp(-ν|k|²Δt) (built in Equations), and the nonlinear term is
-# advanced explicitly by a Runge–Kutta stage combination. This treats viscosity without a stability
-# restriction, which is what keeps the schemes low-storage — the priority for GPU runs.
+# is advanced exactly through exp(-diffusivity·|k|²Δt) (built in Equations), and the nonlinear term is
+# advanced explicitly by a Runge–Kutta stage combination.
+#
+# `step!` advances the velocity û and the passive scalar φ̂ *together* through the same RK stages: the
+# scalar is passive, so the only time-accurate coupling is to evaluate both nonlinear terms at each
+# stage's state — the velocity rotated by its viscous integrating factor E_ν, the scalar by its
+# diffusive one E_κ (κ = ν/Sc), both reaching the same lab time each substep. Advancing velocity
+# fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
 # only marginally stable for advection (see its docstring). Each `step!` assumes the caller has
-# filled `ws.velocity` / `ws.vorticity_start` with the start-of-step physical velocity and vorticity
-# (via `velocity_vorticity!`) — they are reused for the first stage and for the diagnostics, so the
-# step recomputes nothing.
+# filled `ws.velocity` / `ws.vorticity_start` with the start-of-step physical velocity and vorticity.
 
 """
     TimeIntegration
 
 The pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes dispatched by
-[`step!`](@ref). All are of the integrating-factor family: the stiff diffusive part is advanced
-exactly by the integrating factor ``\\mathcal{E} = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)``
-and the nonlinear term explicitly by a Runge–Kutta stage combination. The default is
-[`IFLowStorageRK3`](@ref); [`recommended_cfl`](@ref) gives a scheme's advective-CFL ceiling.
+[`step!`](@ref), which advances the coupled velocity + passive-scalar state. All are of the
+integrating-factor family: the stiff diffusive part is advanced exactly and the nonlinear term
+explicitly by a Runge–Kutta stage combination. The default is [`IFLowStorageRK3`](@ref);
+[`recommended_cfl`](@ref) gives a scheme's advective-CFL ceiling; [`Physics`](@ref) bundles the
+problem parameters and forcings.
 """
 module TimeIntegration
 
 using GBGPeriodicFields
-using ..SimulationState: SpectralOperators, VelocityWorkspace
-using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!
-using ..Forcing: AbstractForcing, force!
+using ..SimulationState: SpectralOperators, Workspace
+using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
+                   scalar_to_physical!, scalar_nonlinear!
+using ..Forcing: AbstractForcing, NoForcing, force!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
-       recommended_cfl, default_integrator
+       recommended_cfl, default_integrator, Physics
+
+
+"""
+    Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+
+The problem definition consumed by [`step!`](@ref): the kinematic viscosity ``\\nu`` (`viscosity`),
+the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the scalar diffusivity is ``\\kappa = \\nu/\\mathrm{Sc}``),
+and the velocity and scalar forcing strategies (`velocity_forcing`, `scalar_forcing`, both
+`AbstractForcing`).
+"""
+struct Physics{VF<:AbstractForcing, SF<:AbstractForcing}
+  viscosity::Float64
+  schmidt::Float64
+  velocity_forcing::VF
+  scalar_forcing::SF
+end
+
+Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing()) =
+  Physics(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
 
 """
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, uh, ops, ws, forcing, viscosity, dt)`, advancing the velocity field
-`uh` (in spectral representation) by one timestep in place, and may specialize
+[`step!`](@ref)`(integrator, uh, phih, ops, ws, physics, dt)`, advancing the velocity `uh` and the
+scalar `phih` (both in spectral representation) by one timestep in place, and may specialize
 [`recommended_cfl`](@ref).
 """
 abstract type AbstractIntegrator end
 
 
 """
-    step!(integrator, uh, ops, ws, forcing, viscosity, dt)
+    step!(integrator, uh, phih, ops, ws, physics, dt)
 
-Advance the spectral velocity field `uh` by one timestep `dt` in place, using the scheme
-`integrator`, the operators `ops`, the workspace `ws`, the `forcing` strategy, and the kinematic
-`viscosity` ``\\nu``. Dispatches on the concrete `integrator` type (see `IFRK2`,
-`IFLowStorageRK3`). The caller must have filled `ws.velocity` and `ws.vorticity_start` with the
-start-of-step physical velocity and vorticity (via [`velocity_vorticity!`](@ref)).
+Advance the spectral velocity `uh` and passive scalar `phih` by one timestep `dt` in place, using the
+scheme `integrator`, the operators `ops`, the workspace `ws`, and the problem `physics` (a
+[`Physics`](@ref): viscosity, Schmidt number, and the two forcings). Dispatches on the concrete
+`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `ws.velocity` and
+`ws.vorticity_start` with the start-of-step physical velocity and vorticity (via
+[`velocity_vorticity!`](@ref)).
 """
 function step! end
 
@@ -57,79 +82,97 @@ function step! end
     IFLowStorageRK3()
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the per-substep
-integrating factor ``\\mathcal{E}(\\tau) = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\tau)`` and
-``\\widehat{\\mathbf{N}}`` the de-aliased Leray-projected nonlinearity (see
-[`velocity_nonlinear!`](@ref)), the step carries the state ``\\hat{\\mathbf{u}}`` and a single
-accumulator ``\\mathbf{h}`` through three stages ``i = 1,2,3``,
+integrating factor ``\\mathcal{E}_D(\\tau) = \\exp(-D\\lvert\\mathbf{k}\\rvert^{2}\\tau)`` (``D = \\nu``
+for the velocity, ``\\kappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\mathbf{N}}`` the
+de-aliased nonlinearity of each field, the step carries a state ``\\hat q`` and a single accumulator
+``\\mathbf{h}`` through three stages ``i = 1,2,3``,
 
 ```math
-\\mathbf{h} \\leftarrow A_i\\,\\mathbf{h} + \\Delta t\\,\\widehat{\\mathbf{N}}(\\hat{\\mathbf{u}}),
+\\mathbf{h} \\leftarrow A_i\\,\\mathbf{h} + \\Delta t\\,\\widehat{\\mathbf{N}}(\\hat q),
 \\qquad
-\\hat{\\mathbf{u}} \\leftarrow \\hat{\\mathbf{u}} + B_i\\,\\mathbf{h},
+\\hat q \\leftarrow \\hat q + B_i\\,\\mathbf{h},
 \\qquad
-\\hat{\\mathbf{u}} \\leftarrow \\mathcal{E}(d_i\\Delta t)\\,\\hat{\\mathbf{u}},
+\\hat q \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\hat q,
 \\quad
-\\mathbf{h} \\leftarrow \\mathcal{E}(d_i\\Delta t)\\,\\mathbf{h},
+\\mathbf{h} \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\mathbf{h},
 ```
 
-with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and the node increments
-``d = (1/3, 5/12, 1/4)`` (from the abscissae ``c = (0, 1/3, 3/4)``). The integrating-factor rotation
-by ``\\mathcal{E}(d_i\\Delta t)`` advances the diffusion exactly over each substep; setting
-``\\nu = 0`` recovers the bare Williamson scheme, and dropping the nonlinearity recovers exact
-diffusion ``\\mathcal{E}(\\Delta t)``. Three nonlinear evaluations per step, two field registers —
-the default workhorse: third-order and stable on the imaginary axis (limit
-``\\sqrt{3}``), unlike [`IFRK2`](@ref).
+with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
+``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
+lockstep (the same ``A,B,d``), each with its own diffusivity; setting ``D = 0`` recovers the bare
+Williamson scheme, and dropping the nonlinearity recovers exact diffusion ``\\mathcal{E}_D(\\Delta t)``.
+Three nonlinear evaluations per step, two field registers per field — the default workhorse:
+third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
-function step!(::IFLowStorageRK3, uh, ops::SpectralOperators, ws::VelocityWorkspace,
-               forcing::AbstractForcing, viscosity::Real, dt::Real)
+function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspace,
+               physics::Physics, dt::Real)
   T = real(eltype(field_data(uh)))
   dt_T = T(dt)
   a = (zero(T), T(-5 // 9), T(-153 // 128))
   b = (T(1 // 3), T(15 // 16), T(8 // 15))
   d = (T(1 // 3), T(5 // 12), T(1 // 4))
-  h = ws.stage1                                                              # the single 2N accumulator
+  ν = physics.viscosity
+  κ = physics.viscosity / physics.schmidt
+  hu = ws.stage1                                                             # velocity accumulator
+  hφ = ws.scalar_stage1                                                      # scalar accumulator
 
   for i in 1:3
     if i == 1
-      velocity_nonlinear!(ws.nonlinear, ws.velocity, ws.vorticity_start, ops, ws)        # N̂(ûₙ), cached start-of-step
-      field_data(h) .= dt_T .* field_data(ws.nonlinear)                                  # A₁ = 0
+      velocity, vorticity = ws.velocity, ws.vorticity_start                  # cached start-of-step
     else
       velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, uh, ops, ws)
-      velocity_nonlinear!(ws.nonlinear, ws.velocity_star, ws.vorticity_physical, ops, ws)
-      field_data(h) .= a[i] .* field_data(h) .+ dt_T .* field_data(ws.nonlinear)
+      velocity, vorticity = ws.velocity_star, ws.vorticity_physical
     end
-    field_data(uh) .+= b[i] .* field_data(h)
-    integrating_factor!(ws.integrating_factor, ops, viscosity, d[i] * dt)                # ℰ(dᵢΔt)
-    convolve!(uh, uh, ws.integrating_factor)                                             # rotate the state
-    i < 3 && convolve!(h, h, ws.integrating_factor)                                      # rotate the accumulator (unused after i=3)
+    scalar_to_physical!(ws.scalar_field, phih, ops, ws)                      # φ at the stage state
+
+    velocity_nonlinear!(ws.nonlinear, velocity, vorticity, ops, ws)          # N̂_u
+    scalar_nonlinear!(ws.scalar_nonlinear, velocity, ws.scalar_field, ops, ws)  # N̂_φ (reuses ws.lamb/ws.scratch)
+
+    if i == 1
+      field_data(hu) .= dt_T .* field_data(ws.nonlinear)                     # A₁ = 0
+      field_data(hφ) .= dt_T .* field_data(ws.scalar_nonlinear)
+    else
+      field_data(hu) .= a[i] .* field_data(hu) .+ dt_T .* field_data(ws.nonlinear)
+      field_data(hφ) .= a[i] .* field_data(hφ) .+ dt_T .* field_data(ws.scalar_nonlinear)
+    end
+    field_data(uh) .+= b[i] .* field_data(hu)
+    field_data(phih) .+= b[i] .* field_data(hφ)
+
+    integrating_factor!(ws.integrating_factor, ops, ν, d[i] * dt)            # E_ν(dᵢΔt)
+    convolve!(uh, uh, ws.integrating_factor)
+    i < 3 && convolve!(hu, hu, ws.integrating_factor)
+    integrating_factor!(ws.integrating_factor, ops, κ, d[i] * dt)            # E_κ(dᵢΔt)
+    convolve!(phih, phih, ws.integrating_factor)
+    i < 3 && convolve!(hφ, hφ, ws.integrating_factor)
   end
 
-  force!(forcing, uh, ops, ws.scratch)
-  return uh
+  force!(physics.velocity_forcing, uh, ops, ws.scratch)
+  force!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)            # scalar-spectral scratch (free here)
+  return uh, phih
 end
 
 
 """
     IFRK2()
 
-Integrating-factor second-order Runge–Kutta (Heun). With the integrating factor
-``\\mathcal{E} = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and ``\\widehat{\\mathbf{N}}``
-the de-aliased Leray-projected nonlinearity (see [`velocity_nonlinear!`](@ref)), one step of the
-velocity field ``\\hat{\\mathbf{u}}`` is
+Integrating-factor second-order Runge–Kutta (Heun). With the integrating factors
+``\\mathcal{E}_\\nu = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and
+``\\mathcal{E}_\\kappa = \\exp(-\\kappa\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and
+``\\widehat{\\mathbf{N}}`` each field's de-aliased nonlinearity, one step of a field ``\\hat q`` with
+integrating factor ``\\mathcal{E}`` is
 
 ```math
-\\begin{aligned}
-\\widehat{\\mathbf{N}}_1 &= \\widehat{\\mathbf{N}}(\\hat{\\mathbf{u}}_n), &
-\\hat{\\mathbf{u}}^{*} &= \\mathcal{E}\\,(\\hat{\\mathbf{u}}_n + \\Delta t\\,\\widehat{\\mathbf{N}}_1), \\\\
-\\widehat{\\mathbf{N}}_2 &= \\widehat{\\mathbf{N}}(\\hat{\\mathbf{u}}^{*}), &
-\\hat{\\mathbf{u}}_{n+1} &= \\mathcal{E}\\,\\hat{\\mathbf{u}}_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\mathbf{N}}_1 + \\widehat{\\mathbf{N}}_2\\big),
-\\end{aligned}
+\\hat q^{*} = \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\mathbf{N}}_1),
+\\qquad
+\\hat q_{n+1} = \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\mathbf{N}}_1 + \\widehat{\\mathbf{N}}_2\\big),
 ```
 
-after which the forcing is applied. Two nonlinear evaluations per step.
+with ``\\widehat{\\mathbf{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\mathbf{N}}_2`` at the predictor
+``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\kappa``
+respectively, then the forcings are applied. Two nonlinear evaluations per step.
 
 !!! note
     Every two-stage explicit Runge–Kutta has stability function ``R(z) = 1 + z + z^{2}/2``, for which
@@ -141,23 +184,48 @@ after which the forcing is applied. Two nonlinear evaluations per step.
 struct IFRK2 <: AbstractIntegrator end
 
 
-function step!(::IFRK2, uh, ops::SpectralOperators, ws::VelocityWorkspace,
-               forcing::AbstractForcing, viscosity::Real, dt::Real)
-  integrating_factor!(ws.integrating_factor, ops, viscosity, dt)                       # ℰ = exp(-ν|k|²Δt)
+function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
+               physics::Physics, dt::Real)
+  T = real(eltype(field_data(uh)))
+  dt_T = T(dt)
+  half = dt_T / 2
+  ν = physics.viscosity
+  κ = physics.viscosity / physics.schmidt
 
-  velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, ops, ws)             # N̂₁ = N̂(ûₙ)
-  field_data(ws.velocity_star_spectral) .= field_data(uh) .+ dt .* field_data(ws.stage1)
-  convolve!(ws.velocity_star_spectral, ws.velocity_star_spectral, ws.integrating_factor) # û* = ℰ(ûₙ + Δt N̂₁)
+  # stage 1 — nonlinear terms at the start-of-step state
+  scalar_to_physical!(ws.scalar_field, phih, ops, ws)
+  velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, ops, ws)              # N̂_u,1
+  scalar_nonlinear!(ws.scalar_stage1, ws.velocity, ws.scalar_field, ops, ws)            # N̂_φ,1
 
+  # predictors û*, φ̂*
+  integrating_factor!(ws.integrating_factor, ops, ν, dt)                                # E_ν
+  field_data(ws.velocity_star_spectral) .= field_data(uh) .+ dt_T .* field_data(ws.stage1)
+  convolve!(ws.velocity_star_spectral, ws.velocity_star_spectral, ws.integrating_factor)
+  integrating_factor!(ws.integrating_factor, ops, κ, dt)                                # E_κ
+  field_data(ws.scalar_star_spectral) .= field_data(phih) .+ dt_T .* field_data(ws.scalar_stage1)
+  convolve!(ws.scalar_star_spectral, ws.scalar_star_spectral, ws.integrating_factor)
+
+  # stage 2 — nonlinear terms at the predictor state
   velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, ws.velocity_star_spectral, ops, ws)
-  velocity_nonlinear!(ws.stage2, ws.velocity_star, ws.vorticity_physical, ops, ws)     # N̂₂ = N̂(û*)
+  scalar_to_physical!(ws.scalar_field, ws.scalar_star_spectral, ops, ws)
+  velocity_nonlinear!(ws.stage2, ws.velocity_star, ws.vorticity_physical, ops, ws)      # N̂_u,2
+  scalar_nonlinear!(ws.scalar_stage2, ws.velocity_star, ws.scalar_field, ops, ws)       # N̂_φ,2
 
-  convolve!(ws.stage1, ws.stage1, ws.integrating_factor)                                # ℰ N̂₁
-  convolve!(uh, uh, ws.integrating_factor)                                              # ℰ ûₙ
-  field_data(uh) .+= (dt / 2) .* (field_data(ws.stage1) .+ field_data(ws.stage2))      # ûₙ₊₁
+  # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
+  integrating_factor!(ws.integrating_factor, ops, ν, dt)
+  convolve!(ws.stage1, ws.stage1, ws.integrating_factor)
+  convolve!(uh, uh, ws.integrating_factor)
+  field_data(uh) .+= half .* (field_data(ws.stage1) .+ field_data(ws.stage2))
 
-  force!(forcing, uh, ops, ws.scratch)
-  return uh
+  # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
+  integrating_factor!(ws.integrating_factor, ops, κ, dt)
+  convolve!(ws.scalar_stage1, ws.scalar_stage1, ws.integrating_factor)
+  convolve!(phih, phih, ws.integrating_factor)
+  field_data(phih) .+= half .* (field_data(ws.scalar_stage1) .+ field_data(ws.scalar_stage2))
+
+  force!(physics.velocity_forcing, uh, ops, ws.scratch)
+  force!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)
+  return uh, phih
 end
 
 

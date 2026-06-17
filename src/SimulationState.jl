@@ -19,9 +19,9 @@ module SimulationState
 using GBGPeriodicFields
 using Random
 
-export SpectralOperators, VelocityWorkspace,
-       spectral_vector, physical_vector, scalar_spectral,
-       random_solenoidal_velocity!, dealias!
+export SpectralOperators, Workspace,
+       spectral_vector, physical_vector, scalar_spectral, scalar_physical,
+       random_solenoidal_velocity!, random_scalar!, dealias!
 
 
 """
@@ -121,16 +121,28 @@ scalar_spectral(ops::SpectralOperators) =
 
 
 """
-    VelocityWorkspace(ops)
+    scalar_physical(ops)
 
-Preallocated scratch for one integrating-factor velocity step: the spectral vorticity, the two
-Runge–Kutta stage slopes, the predictor field, a velocity copy (the in-place inverse transform
-consumes its source), a general spectral scratch, and the nonlinear-term buffer; the scalar
-integrating factor; and the physical velocity, vorticity, predictor, and Lamb-vector
-(``\\mathbf{u}\\times\\boldsymbol{\\omega}``) buffers. Sized so a step allocates no field-sized
-memory.
+Allocate a single zeroed scalar field in physical representation on `ops`'s backend and element type
+(used for the scalar ``\\varphi`` in physical space).
 """
-struct VelocityWorkspace{VS, SS, VP}
+scalar_physical(ops::SpectralOperators) =
+  ScalarFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(0))), ops.grid)
+
+
+"""
+    Workspace(ops)
+
+Preallocated scratch for one coupled integrating-factor step of the velocity and the passive scalar
+``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers, the
+predictor field, a velocity copy (the in-place inverse transform consumes its source), a general
+spectral scratch, the nonlinear-term buffer, and the physical velocity / vorticity / predictor /
+Lamb-vector (``\\mathbf{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage
+registers, a predictor, the nonlinear-term buffer, a copy, the shared integrating factor, and the
+physical scalar; the scalar flux ``\\mathbf{u}\\varphi`` reuses the physical and spectral velocity
+scratch. Sized so a step allocates no field-sized memory.
+"""
+struct Workspace{VS, SS, VP, SP}
   vorticity_spectral::VS
   stage1::VS
   stage2::VS
@@ -139,21 +151,29 @@ struct VelocityWorkspace{VS, SS, VP}
   scratch::VS
   nonlinear::VS
   integrating_factor::SS
+  scalar_stage1::SS
+  scalar_stage2::SS
+  scalar_star_spectral::SS
+  scalar_nonlinear::SS
+  scalar_copy::SS
   velocity::VP
   vorticity_start::VP
   vorticity_physical::VP
   velocity_star::VP
   lamb::VP
+  scalar_field::SP
 end
 
 
-function VelocityWorkspace(ops::SpectralOperators)
-  return VelocityWorkspace(
+function Workspace(ops::SpectralOperators)
+  return Workspace(
     spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
     spectral_vector(ops), spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
-    scalar_spectral(ops),
+    scalar_spectral(ops), scalar_spectral(ops), scalar_spectral(ops),
+    scalar_spectral(ops), scalar_spectral(ops), scalar_spectral(ops),
     physical_vector(ops), physical_vector(ops), physical_vector(ops),
     physical_vector(ops), physical_vector(ops),
+    scalar_physical(ops),
   )
 end
 
@@ -196,6 +216,37 @@ function random_solenoidal_velocity!(uh, ops::SpectralOperators;
   current_energy = 0.5 * inner(uh, uh)
   current_energy > 0 && (field_data(uh) .*= sqrt(T(energy) / current_energy))
   return uh
+end
+
+
+"""
+    random_scalar!(phih, ops; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
+
+Fill `phih` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
+concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\mathbf{k}\\rvert^{2}/k_p^{2}\\big)``
+(``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
+``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
+transform, so the ``\\mathbf{k}=\\mathbf 0`` (mean) mode vanishes.
+"""
+function random_scalar!(phih, ops::SpectralOperators;
+                        variance::Real = 1.0, peak_wavenumber::Real = 2.0,
+                        rng = Random.default_rng())
+  T = _real_type(ops)
+  noise = scalar_physical(ops)
+  data = randn(rng, T, physical_field_shape(ops.grid, Val(0))...)
+  data .-= sum(data) / length(data)                            # zero the spatial mean
+  copyto!(field_data(noise), data)
+  to_spectral!(phih, noise, ops.scalar_plans)
+
+  inverse_peak_squared = one(T) / T(peak_wavenumber)^2
+  envelope = scalar_spectral(ops)
+  field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
+  convolve!(phih, phih, envelope)
+  convolve!(phih, phih, ops.dealias)
+
+  current_variance = inner(phih, phih)                         # ⟨φ²⟩ for a mean-zero field
+  current_variance > 0 && (field_data(phih) .*= sqrt(T(variance) / current_variance))
+  return phih
 end
 
 
