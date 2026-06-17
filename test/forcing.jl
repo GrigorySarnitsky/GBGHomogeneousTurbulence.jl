@@ -1,0 +1,88 @@
+# Forcing tests for the linear (rate-folded-into-integrating-factor) strategies: Linear and
+# ConstantPower. Checks (1) the rate amplitudes are set correctly — Linear gives A on the band,
+# ConstantPower gives A = ε/(2E_band) so the injection rate equals the target; (2) the physical
+# effect — Linear injects energy, scalar Linear builds variance; (3) the forced velocity stays
+# divergence-free (the linear rate, folded into E_ν, preserves solenoidality).
+
+using GBGIsotropicTurbulence
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner
+using Random
+using Test
+
+
+@testset "forcing" begin
+  T = Float64
+  N = 24
+  L = 2π
+  ν = 0.05
+  ops = SpectralOperators(N, L; scalar_type = T)
+  ws = Workspace(ops)
+
+  uh0 = spectral_vector(ops)
+  random_solenoidal_velocity!(uh0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
+  dealias!(uh0, ops)
+
+  run_velocity(physics, nsteps; dt = 0.01) = begin
+    uh = spectral_vector(ops); copyto!(field_data(uh), field_data(uh0))
+    phih = scalar_spectral(ops)
+    for _ in 1:nsteps
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, dt)
+    end
+    uh
+  end
+
+  k0 = 2π / L
+  band = spectral_band(scalar_spectral(ops), ops.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
+  band_energy(field) = (tmp = spectral_vector(ops); convolve!(tmp, field, band); 0.5 * inner(tmp, tmp))
+
+  @testset "Linear rate amplitude" begin
+    A = 0.7
+    forcing = Linear(ops; rate = A, lowest_shell = 1, highest_shell = 2)
+    fill!(ws.velocity_rate, 0.0)
+    @test forcing_rate!(forcing, ws.velocity_rate, uh0, ops, ws)
+    @test maximum(ws.velocity_rate) ≈ A        # A on the band
+    @test minimum(ws.velocity_rate) == 0       # zero outside the band
+  end
+
+  @testset "ConstantPower sets injection rate = power" begin
+    power = 0.3
+    forcing = ConstantPower(ops; power = power, lowest_shell = 1, highest_shell = 2)
+    E_band = band_energy(uh0)
+    forcing_rate!(forcing, ws.velocity_rate, uh0, ops, ws)
+    A = maximum(ws.velocity_rate)
+    @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
+  end
+
+  @testset "Linear injects energy, stays solenoidal" begin
+    unforced = run_velocity(Physics(viscosity = ν), 60)
+    forced = run_velocity(Physics(viscosity = ν,
+                                  velocity_forcing = Linear(ops; rate = 1.0, lowest_shell = 1, highest_shell = 2)), 60)
+    @test kinetic_energy(forced) > kinetic_energy(unforced)
+    rel_div = l2norm(divergence(forced, ops.multipliers)) / (l2norm(forced) + 1e-30)
+    @test rel_div < 1e-8
+  end
+
+  @testset "ConstantPower bounded and solenoidal" begin
+    physics = Physics(viscosity = ν,
+                      velocity_forcing = ConstantPower(ops; power = 0.5, lowest_shell = 1, highest_shell = 2))
+    uh = run_velocity(physics, 100)
+    @test isfinite(kinetic_energy(uh)) && kinetic_energy(uh) > 0
+    rel_div = l2norm(divergence(uh, ops.multipliers)) / (l2norm(uh) + 1e-30)
+    @test rel_div < 1e-8
+  end
+
+  @testset "scalar Linear forcing builds variance" begin
+    uh_zero = spectral_vector(ops)             # no velocity ⇒ pure linear growth of the scalar band
+    phih0 = scalar_spectral(ops)
+    random_scalar!(phih0, ops; variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
+    physics = Physics(viscosity = ν,
+                      scalar_forcing = Linear(ops; rate = 1.0, lowest_shell = 1, highest_shell = 2))
+    phih = scalar_spectral(ops); copyto!(field_data(phih), field_data(phih0))
+    for _ in 1:40
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh_zero, ops, ws)
+      step!(IFLowStorageRK3(), uh_zero, phih, ops, ws, physics, 0.01)
+    end
+    @test scalar_variance(phih) > scalar_variance(phih0)
+  end
+end

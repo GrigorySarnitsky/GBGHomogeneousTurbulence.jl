@@ -142,7 +142,7 @@ registers, a predictor, the nonlinear-term buffer, a copy, the shared integratin
 physical scalar; the scalar flux ``\\mathbf{u}\\varphi`` reuses the physical and spectral velocity
 scratch. Sized so a step allocates no field-sized memory.
 """
-struct Workspace{VS, SS, VP, SP}
+struct Workspace{VS, SS, VP, SP, RK}
   vorticity_spectral::VS
   stage1::VS
   stage2::VS
@@ -162,10 +162,13 @@ struct Workspace{VS, SS, VP, SP}
   velocity_star::VP
   lamb::VP
   scalar_field::SP
+  velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
+  scalar_rate::RK                # per-mode linear forcing rate for φ, folded into E_κ
 end
 
 
 function Workspace(ops::SpectralOperators)
+  rate() = fill!(similar(ops.squared_wavenumber), zero(eltype(ops.squared_wavenumber)))
   return Workspace(
     spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
     spectral_vector(ops), spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
@@ -174,6 +177,7 @@ function Workspace(ops::SpectralOperators)
     physical_vector(ops), physical_vector(ops), physical_vector(ops),
     physical_vector(ops), physical_vector(ops),
     scalar_physical(ops),
+    rate(), rate(),
   )
 end
 

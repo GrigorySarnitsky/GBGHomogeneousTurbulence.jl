@@ -29,7 +29,7 @@ using GBGPeriodicFields
 using ..SimulationState: SpectralOperators, Workspace
 using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
                    scalar_to_physical!, scalar_nonlinear!
-using ..Forcing: AbstractForcing, NoForcing, force!
+using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
        recommended_cfl, default_integrator, Physics
@@ -119,6 +119,10 @@ function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspac
   hu = ws.stage1                                                             # velocity accumulator
   hφ = ws.scalar_stage1                                                      # scalar accumulator
 
+  # linear forcing rates, computed once from the start-of-step state and folded into E_ν / E_κ
+  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, uh, ops, ws) ? ws.velocity_rate : nothing
+  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, phih, ops, ws) ? ws.scalar_rate : nothing
+
   for i in 1:3
     if i == 1
       velocity, vorticity = ws.velocity, ws.vorticity_start                  # cached start-of-step
@@ -141,16 +145,16 @@ function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspac
     field_data(uh) .+= b[i] .* field_data(hu)
     field_data(phih) .+= b[i] .* field_data(hφ)
 
-    integrating_factor!(ws.integrating_factor, ops, ν, d[i] * dt)            # E_ν(dᵢΔt)
+    integrating_factor!(ws.integrating_factor, ops, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
     convolve!(uh, uh, ws.integrating_factor)
     i < 3 && convolve!(hu, hu, ws.integrating_factor)
-    integrating_factor!(ws.integrating_factor, ops, κ, d[i] * dt)            # E_κ(dᵢΔt)
+    integrating_factor!(ws.integrating_factor, ops, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
     convolve!(phih, phih, ws.integrating_factor)
     i < 3 && convolve!(hφ, hφ, ws.integrating_factor)
   end
 
-  force!(physics.velocity_forcing, uh, ops, ws.scratch)
-  force!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)            # scalar-spectral scratch (free here)
+  apply_forcing!(physics.velocity_forcing, uh, ops, ws.scratch)
+  apply_forcing!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)    # scalar-spectral scratch (free here)
   return uh, phih
 end
 
@@ -192,16 +196,20 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
   ν = physics.viscosity
   κ = physics.viscosity / physics.schmidt
 
+  # linear forcing rates, from the start-of-step state, folded into every E_ν / E_κ this step
+  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, uh, ops, ws) ? ws.velocity_rate : nothing
+  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, phih, ops, ws) ? ws.scalar_rate : nothing
+
   # stage 1 — nonlinear terms at the start-of-step state
   scalar_to_physical!(ws.scalar_field, phih, ops, ws)
   velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, ops, ws)              # N̂_u,1
   scalar_nonlinear!(ws.scalar_stage1, ws.velocity, ws.scalar_field, ops, ws)            # N̂_φ,1
 
   # predictors û*, φ̂*
-  integrating_factor!(ws.integrating_factor, ops, ν, dt)                                # E_ν
+  integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)                 # E_ν
   field_data(ws.velocity_star_spectral) .= field_data(uh) .+ dt_T .* field_data(ws.stage1)
   convolve!(ws.velocity_star_spectral, ws.velocity_star_spectral, ws.integrating_factor)
-  integrating_factor!(ws.integrating_factor, ops, κ, dt)                                # E_κ
+  integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)                   # E_κ
   field_data(ws.scalar_star_spectral) .= field_data(phih) .+ dt_T .* field_data(ws.scalar_stage1)
   convolve!(ws.scalar_star_spectral, ws.scalar_star_spectral, ws.integrating_factor)
 
@@ -212,19 +220,19 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
   scalar_nonlinear!(ws.scalar_stage2, ws.velocity_star, ws.scalar_field, ops, ws)       # N̂_φ,2
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
-  integrating_factor!(ws.integrating_factor, ops, ν, dt)
+  integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)
   convolve!(ws.stage1, ws.stage1, ws.integrating_factor)
   convolve!(uh, uh, ws.integrating_factor)
   field_data(uh) .+= half .* (field_data(ws.stage1) .+ field_data(ws.stage2))
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
-  integrating_factor!(ws.integrating_factor, ops, κ, dt)
+  integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)
   convolve!(ws.scalar_stage1, ws.scalar_stage1, ws.integrating_factor)
   convolve!(phih, phih, ws.integrating_factor)
   field_data(phih) .+= half .* (field_data(ws.scalar_stage1) .+ field_data(ws.scalar_stage2))
 
-  force!(physics.velocity_forcing, uh, ops, ws.scratch)
-  force!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)
+  apply_forcing!(physics.velocity_forcing, uh, ops, ws.scratch)
+  apply_forcing!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)
   return uh, phih
 end
 

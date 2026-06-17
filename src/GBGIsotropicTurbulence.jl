@@ -66,7 +66,10 @@ using .Forcing:
   AbstractForcing,
   NoForcing,
   BandRescaling,
-  force!
+  Linear,
+  ConstantPower,
+  forcing_rate!,
+  apply_forcing!
 
 using .TimeIntegration:
   AbstractIntegrator,
@@ -100,7 +103,10 @@ export SpectralOperators,
        AbstractForcing,
        NoForcing,
        BandRescaling,
-       force!,
+       Linear,
+       ConstantPower,
+       forcing_rate!,
+       apply_forcing!,
        AbstractIntegrator,
        IFRK2,
        IFLowStorageRK3,

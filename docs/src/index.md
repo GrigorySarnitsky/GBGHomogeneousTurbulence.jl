@@ -53,8 +53,9 @@ combination, and the quadratic product is de-aliased by the ``2/3`` rule.
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) — the default — and
-    [`IFRK2`](@ref)); the full forcing menu (currently `NoForcing` and `BandRescaling`), Lagrangian
-    particle tracking, and the statistics are being added.
+    [`IFRK2`](@ref)), with the deterministic forcings `NoForcing`, `BandRescaling`, `Linear`, and
+    `ConstantPower` (the stochastic Ornstein–Uhlenbeck forcing, Lagrangian particle tracking, and the
+    statistics are being added).
 
 ## Components
 

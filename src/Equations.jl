@@ -69,7 +69,7 @@ end
 
 
 """
-    integrating_factor!(factor, ops, diffusivity, dt)
+    integrating_factor!(factor, ops, diffusivity, dt, rate = nothing)
 
 Write the exact diffusive integrating factor into the scalar spectral buffer `factor`. Over a step
 ``\\Delta t`` the diffusion equation ``\\partial_t f = D\\nabla^{2} f`` is solved exactly in spectral
@@ -82,11 +82,19 @@ representation by the per-mode multiplier
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
 restriction). The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
 velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
+
+When a linear forcing rate ``A(\\mathbf{k})`` is supplied (`rate`, a real array; from the
+`forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
+``\\mathcal{E}(\\mathbf{k}) = \\exp\\!\\big((A(\\mathbf{k}) - D\\lvert\\mathbf{k}\\rvert^{2})\\,\\Delta t\\big)``
+— exact for the linear forcing, so the integrator keeps its order.
 """
-function integrating_factor!(factor, ops::SpectralOperators, diffusivity::Real, dt::Real)
+function integrating_factor!(factor, ops::SpectralOperators, diffusivity::Real, dt::Real, rate = nothing)
   T = real(eltype(field_data(factor)))
-  rate = T(-diffusivity * dt)                              # kept in the field's element type (Float32-clean)
-  field_data(factor) .= complex.(exp.(rate .* ops.squared_wavenumber))
+  if rate === nothing
+    field_data(factor) .= complex.(exp.(T(-diffusivity * dt) .* ops.squared_wavenumber))
+  else
+    field_data(factor) .= complex.(exp.(T(dt) .* (rate .- T(diffusivity) .* ops.squared_wavenumber)))
+  end
   return factor
 end
 
