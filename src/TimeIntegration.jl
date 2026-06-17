@@ -9,6 +9,14 @@
 # start-of-step physical velocity and vorticity (via `velocity_vorticity!`) — they are reused for the
 # first stage and for the diagnostics, so the step recomputes nothing.
 
+"""
+    TimeIntegration
+
+The pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes dispatched by
+[`step!`](@ref). All are of the integrating-factor family: the stiff diffusive part is advanced
+exactly by the integrating factor ``\\mathcal{E} = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)``
+and the nonlinear term explicitly by a Runge–Kutta stage combination.
+"""
 module TimeIntegration
 
 using GBGPeriodicFields
@@ -23,22 +31,49 @@ export AbstractIntegrator, IFRK2, step!
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-`step!(integrator, uh, ops, ws, forcing, viscosity, dt)`, advancing the spectral velocity `uh` by
-one timestep `dt` in place.
+[`step!`](@ref)`(integrator, uh, ops, ws, forcing, viscosity, dt)`, advancing the velocity field
+`uh` (in spectral representation) by one timestep in place.
 """
 abstract type AbstractIntegrator end
 
 
 """
+    step!(integrator, uh, ops, ws, forcing, viscosity, dt)
+
+Advance the spectral velocity field `uh` by one timestep `dt` in place, using the scheme
+`integrator`, the operators `ops`, the workspace `ws`, the `forcing` strategy, and the kinematic
+`viscosity` ``\\nu``. Dispatches on the concrete `integrator` type (see `IFRK2`). The caller must
+have filled `ws.velocity` and `ws.vorticity_start` with the start-of-step physical velocity and
+vorticity (via [`velocity_vorticity!`](@ref)).
+"""
+function step! end
+
+
+"""
     IFRK2()
 
-Integrating-factor second-order Runge–Kutta (Heun). With `ℰ = exp(-ν|k|²Δt)` and `N̂` the de-aliased
-Leray-projected nonlinearity,
+Integrating-factor second-order Runge–Kutta (Heun). With the integrating factor
+``\\mathcal{E} = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and ``\\widehat{\\mathbf{N}}``
+the de-aliased Leray-projected nonlinearity (see [`velocity_nonlinear!`](@ref)), one step of the
+velocity field ``\\hat{\\mathbf{u}}`` is
 
-    N̂₁ = N̂(ûₙ),   û* = ℰ(ûₙ + Δt N̂₁),   N̂₂ = N̂(û*),
-    ûₙ₊₁ = ℰ ûₙ + (Δt/2)(ℰ N̂₁ + N̂₂),
+```math
+\\begin{aligned}
+\\widehat{\\mathbf{N}}_1 &= \\widehat{\\mathbf{N}}(\\hat{\\mathbf{u}}_n), &
+\\hat{\\mathbf{u}}^{*} &= \\mathcal{E}\\,(\\hat{\\mathbf{u}}_n + \\Delta t\\,\\widehat{\\mathbf{N}}_1), \\\\
+\\widehat{\\mathbf{N}}_2 &= \\widehat{\\mathbf{N}}(\\hat{\\mathbf{u}}^{*}), &
+\\hat{\\mathbf{u}}_{n+1} &= \\mathcal{E}\\,\\hat{\\mathbf{u}}_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\mathbf{N}}_1 + \\widehat{\\mathbf{N}}_2\\big),
+\\end{aligned}
+```
 
-then the forcing is applied. Two nonlinear evaluations per step, minimal storage.
+after which the forcing is applied. Two nonlinear evaluations per step, minimal storage.
+
+!!! note
+    Every two-stage explicit Runge–Kutta has stability function ``R(z) = 1 + z + z^{2}/2``, for which
+    ``\\lvert R(iy)\\rvert^{2} = 1 + y^{4}/4 > 1``: the scheme is unstable on the imaginary axis, so
+    it is stable only where the viscous damping of the integrating factor dominates. It is adequate
+    for well-resolved, modest-Reynolds-number runs but not the workhorse — prefer the low-storage
+    RK3 for high Reynolds number or marginal resolution.
 """
 struct IFRK2 <: AbstractIntegrator end
 

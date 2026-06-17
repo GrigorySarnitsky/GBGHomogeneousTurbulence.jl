@@ -5,6 +5,7 @@
 # divergence-free to roundoff, and a step allocates no field-sized memory.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: divergence, l2norm, field_data   # field operators used only in the checks
 using Random
 using Test
 
@@ -37,6 +38,7 @@ using Test
 
   # the run stays finite and in a physically sane band (it does not blow up or decay away)
   @test all(isfinite, energies)
+  @test isfinite(kinetic_energy(uh))            # kinetic_energy accepts the spectral field (Parseval)
   @test 0.1 < energies[end] < 10.0
 
   # not catastrophically drifting between the two late windows (loose stationarity)

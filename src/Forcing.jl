@@ -3,11 +3,18 @@
 # methods are written through GBGPeriodicFields operators that are generic over tensor order, one
 # implementation serves both the velocity (a vector field) and the scalar φ (a scalar field) — for
 # velocity the caller composes the projection that keeps it solenoidal (the forcings here that only
-# rescale existing modes preserve `∇·u = 0` automatically).
+# rescale existing modes preserve ∇·u = 0 automatically).
 #
 # Slice 1 ships `NoForcing` and `BandRescaling`; the stochastic (Eswaran–Pope), linear (Lundgren),
 # and constant-power strategies are added in a later slice under the same interface.
 
+"""
+    Forcing
+
+The pluggable energy-injection strategies, as concrete `AbstractForcing` subtypes dispatched by
+[`force!`](@ref). One implementation serves both the velocity and the scalar ``\\varphi``, since the
+strategies are written through tensor-order-generic field operators.
+"""
 module Forcing
 
 using GBGPeriodicFields
@@ -20,16 +27,28 @@ export AbstractForcing, NoForcing, BandRescaling, force!
     AbstractForcing
 
 Supertype of the energy-injection strategies. A strategy implements
-`force!(forcing, field, ops, scratch)`, modifying `field` (a vector or scalar field in spectral
-representation) in place; `scratch` is a caller-provided spectral buffer of matching tensor order.
+[`force!`](@ref)`(forcing, field, ops, scratch)`, modifying `field` (a vector or scalar field in
+spectral representation) in place; `scratch` is a caller-provided spectral buffer of matching tensor
+order.
 """
 abstract type AbstractForcing end
 
 
 """
+    force!(forcing, field, ops, scratch)
+
+Apply the energy-injection strategy `forcing` to `field` (a velocity or scalar ``\\varphi`` field in
+spectral representation) in place, using the spectral `scratch` buffer (matching `field`'s tensor
+order) and the operators `ops`. Dispatches on the concrete `forcing` type; see `NoForcing` and
+`BandRescaling`.
+"""
+function force! end
+
+
+"""
     NoForcing()
 
-The unforced case: `force!` is a no-op (a freely decaying field).
+The unforced case: [`force!`](@ref) is a no-op (a freely decaying field).
 """
 struct NoForcing <: AbstractForcing end
 
@@ -39,10 +58,15 @@ force!(::NoForcing, field, ops::SpectralOperators, scratch) = field
 """
     BandRescaling(ops; energy, lowest_shell = 1, highest_shell = 2)
 
-Deterministic constant-energy forcing: each step, rescale the in-band Fourier modes
-(`lowest_shell ≤ |k| ≤ highest_shell`, in integer shells of `2π/L`) so the band holds the fixed
-energy `½⟨|·|²_band⟩ = energy`. Rescaling preserves the divergence-free constraint, so it needs no
-projection. This is the forcing of the `GBGPeriodicFields` `HIST_CPU` demo.
+Deterministic constant-energy forcing. Each step, the in-band Fourier modes
+(``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}``, in
+integer shells of ``2\\pi/L`` for a box of side ``L``) are rescaled by a single factor so the band
+holds the fixed energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}``
+(for the velocity this is band kinetic energy; for the scalar ``\\varphi``, band variance).
+
+Rescaling existing modes preserves the divergence-free constraint, so this forcing needs no
+projection. It is the forcing of the `GBGPeriodicFields` `HIST_CPU` demo; note it fixes the band
+*energy*, not the injection rate, so the total energy oscillates slowly about its mean.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)

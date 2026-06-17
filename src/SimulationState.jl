@@ -7,6 +7,13 @@
 # allocated through the field reference's array type, so a run is CPU/GPU-agnostic (pass
 # `array_type = ROCArray` for AMD).
 
+"""
+    SimulationState
+
+The spectral machinery and preallocated buffers a run advances: `SpectralOperators` (the read-only
+grid, transform plans, multipliers, squared-wavenumber field, and de-alias kernel), the scratch
+allocators, `VelocityWorkspace`, and the random divergence-free initial condition.
+"""
 module SimulationState
 
 using GBGPeriodicFields
@@ -21,10 +28,17 @@ export SpectralOperators, VelocityWorkspace,
     SpectralOperators(resolution, box = 2π; dealias_fraction = 2//3,
                       scalar_type = Float64, array_type = Array)
 
-The reusable, read-only spectral machinery for a cubic HIST run on a `resolution³` grid in a
-`box³` periodic domain: the `Grid3D`, the real-to-complex transform plans (vector and scalar),
-the `FieldSpectralMultipliers`, the `|k|²` array (the symbol of `-∇²`), and the isotropic sharp
-low-pass `dealias` kernel at `dealias_fraction · k_Nyquist` (the 2/3 rule by default).
+The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run on a grid
+of `resolution` points per side, in a periodic box of side `box`: the `Grid3D`, the real-to-complex transform
+plans (one for the velocity, a vector field; one for the scalar ``\\varphi``), the
+`FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\mathbf{k}\\rvert^{2}`` (with
+``\\mathbf{k}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``), and the de-alias kernel
+`dealias`.
+
+`dealias` is an isotropic sharp low-pass that keeps the modes
+``\\lvert\\mathbf{k}\\rvert \\le \\texttt{dealias\\_fraction}\\cdot k_{\\max}`` (``k_{\\max}`` the
+Nyquist wavenumber) — the ``2/3`` rule (`dealias_fraction = 2//3`) that removes the aliasing error
+of the quadratic nonlinearity.
 
 `array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
 `scalar_type` the real element type (`Float32` is GPU-friendly).
@@ -79,16 +93,29 @@ _blank(ops::SpectralOperators, ::Type{S}, dims) where {S} = fill!(similar(_refer
 
 """
     spectral_vector(ops)
-    physical_vector(ops)
-    scalar_spectral(ops)
 
-Allocate a single zeroed scratch field (vector in spectral representation, vector in physical
-representation, or scalar in spectral representation) on `ops`'s backend and element type.
+Allocate a single zeroed vector field in spectral representation on `ops`'s backend and element type
+(a scratch buffer for the time loop).
 """
 spectral_vector(ops::SpectralOperators) =
   VectorFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(1))), ops.grid)
+
+
+"""
+    physical_vector(ops)
+
+Allocate a single zeroed vector field in physical representation on `ops`'s backend and element type.
+"""
 physical_vector(ops::SpectralOperators) =
   VectorFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(1))), ops.grid)
+
+
+"""
+    scalar_spectral(ops)
+
+Allocate a single zeroed scalar field in spectral representation on `ops`'s backend and element type
+(used for the scalar ``\\varphi``, the integrating factor, and kernel scratch).
+"""
 scalar_spectral(ops::SpectralOperators) =
   ScalarFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(0))), ops.grid)
 
@@ -96,11 +123,12 @@ scalar_spectral(ops::SpectralOperators) =
 """
     VelocityWorkspace(ops)
 
-Preallocated scratch for one integrating-factor velocity step: the spectral vorticity, the two RK
-stage slopes, the predictor field, a velocity copy (transforms consume their source), a general
-spectral scratch, and the nonlinear-term buffer; the scalar integrating factor; and the physical
-velocity / vorticity / predictor / Lamb-vector (`u × ω`) buffers. Sized so a step allocates no
-field-sized memory.
+Preallocated scratch for one integrating-factor velocity step: the spectral vorticity, the two
+Runge–Kutta stage slopes, the predictor field, a velocity copy (the in-place inverse transform
+consumes its source), a general spectral scratch, and the nonlinear-term buffer; the scalar
+integrating factor; and the physical velocity, vorticity, predictor, and Lamb-vector
+(``\\mathbf{u}\\times\\boldsymbol{\\omega}``) buffers. Sized so a step allocates no field-sized
+memory.
 """
 struct VelocityWorkspace{VS, SS, VP}
   vorticity_spectral::VS
@@ -133,7 +161,8 @@ end
 """
     dealias!(field, ops)
 
-Apply the 2/3-rule low-pass `ops.dealias` to `field` in place (coefficientwise, alias-safe).
+Apply the ``2/3``-rule low-pass `ops.dealias` to `field` in place (a coefficientwise, alias-safe
+multiply by the de-alias kernel; `field` may be in vector or scalar spectral representation).
 """
 dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 
@@ -141,9 +170,12 @@ dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 """
     random_solenoidal_velocity!(uh, ops; energy = 0.5, peak_wavenumber = 2.0, rng = default_rng())
 
-Fill `uh` (a field in spectral representation) with a random, divergence-free velocity concentrated
-at large scales by the envelope `exp(-|k|²/k_p²)` (`k_p = peak_wavenumber`), de-aliased, and rescaled
-so its kinetic energy `½⟨|u|²⟩` equals `energy`. The Leray–Helmholtz projection makes it solenoidal.
+Fill `uh` (a velocity field in spectral representation) with a random, divergence-free velocity
+``\\mathbf{u}`` concentrated at large scales by the envelope
+``\\exp\\!\\big(-\\lvert\\mathbf{k}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
+de-aliased, and rescaled so the kinetic energy
+``\\tfrac12\\langle\\lvert\\mathbf{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
+projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\mathbf{u} = 0``.
 """
 function random_solenoidal_velocity!(uh, ops::SpectralOperators;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,

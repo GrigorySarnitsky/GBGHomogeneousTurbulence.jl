@@ -1,0 +1,66 @@
+# GBGIsotropicTurbulence.jl
+
+`GBGIsotropicTurbulence.jl` is a small, focused pseudospectral direct-numerical-simulation (DNS)
+package for homogeneous isotropic turbulence on a three-dimensional periodic domain: an incompressible
+velocity field ``\mathbf{u}`` together with a single passive scalar ``\varphi``, each optionally
+forced, advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle
+tracking and Eulerian + Lagrangian statistics.
+
+It is built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl), which
+supplies every field operation — transforms, spectral differential operators, convolution,
+interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
+package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
+and the statistics. The GPU is the primary target, so the time loop is in-place and allocation-free
+over a preallocated workspace.
+
+## Installation
+
+This is a private, unregistered package. With repository access:
+
+```julia
+using Pkg
+
+Pkg.add(url="https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl")
+```
+
+Then:
+
+```julia
+using GBGIsotropicTurbulence
+```
+
+## What it solves
+
+With ``\mathbf{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\mathbf{u}`` the vorticity,
+``\nu`` the kinematic viscosity, ``\mathbb{P}`` the Leray–Helmholtz projection onto divergence-free
+fields, and ``\mathbf{f}`` a forcing, the momentum equation is advanced in rotational form,
+
+```math
+\partial_t \mathbf{u} = \mathbb{P}\,(\mathbf{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\mathbf{u} + \mathbf{f},
+\qquad \nabla\cdot\mathbf{u} = 0,
+```
+
+and the passive scalar ``\varphi`` by the advection–diffusion equation
+
+```math
+\partial_t \varphi = -\nabla\cdot(\mathbf{u}\,\varphi) + \frac{\nu}{\mathrm{Sc}}\nabla^{2}\varphi + f_\varphi,
+```
+
+with ``\mathrm{Sc}`` the Schmidt number. In both equations the diffusive (stiff) term is integrated
+exactly through an integrating factor, the nonlinear term explicitly by a Runge–Kutta stage
+combination, and the quadratic product is de-aliased by the ``2/3`` rule.
+
+!!! note "Work in progress"
+    The package is being built in vertical slices. The velocity solver (forced HIT advanced by the
+    integrating-factor scheme) is in place; the passive scalar, the full forcing menu, the
+    low-storage RK3 integrator, Lagrangian particles, and the statistics are being added.
+
+## Components
+
+- [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SpectralOperators`),
+  the preallocated buffers (`VelocityWorkspace`), and the random divergence-free initial condition.
+- [`Equations`](api/Equations.md): the rotational-form Navier–Stokes right-hand side and the velocity
+  diagnostics (`kinetic_energy`, `dissipation`, `max_speed`).
+- [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
+- [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
+  `AbstractIntegrator`.

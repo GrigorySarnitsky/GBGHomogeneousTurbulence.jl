@@ -19,9 +19,9 @@
     GBGIsotropicTurbulence
 
 Tools for simulating and analysing homogeneous isotropic turbulence on three-dimensional periodic
-domains: a velocity field and a single passive scalar φ, each optionally forced, advanced by a
-choice of integrating-factor time-stepping scheme, with Lagrangian particle tracking and Eulerian +
-Lagrangian statistics.
+domains: a velocity field and a single passive scalar ``\\varphi``, each optionally forced, advanced
+by a choice of integrating-factor time-stepping scheme, with Lagrangian particle tracking and
+Eulerian + Lagrangian statistics.
 
 Built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl).
 
@@ -68,21 +68,6 @@ using .TimeIntegration:
   step!
 
 
-# A curated set of GBGPeriodicFields diagnostics/operators re-exported for convenience, so common
-# turbulence post-processing needs only `using GBGIsotropicTurbulence`.
-using GBGPeriodicFields:
-  inner,
-  l2norm,
-  divergence,
-  curl,
-  to_physical,
-  to_spectral,
-  radial_spectrum,
-  radial_correlation,
-  field_data,
-  field_grid
-
-
 export SpectralOperators,
        VelocityWorkspace,
        spectral_vector,
@@ -102,17 +87,7 @@ export SpectralOperators,
        force!,
        AbstractIntegrator,
        IFRK2,
-       step!,
-       inner,
-       l2norm,
-       divergence,
-       curl,
-       to_physical,
-       to_spectral,
-       radial_spectrum,
-       radial_correlation,
-       field_data,
-       field_grid
+       step!
 
 
 end # module GBGIsotropicTurbulence
