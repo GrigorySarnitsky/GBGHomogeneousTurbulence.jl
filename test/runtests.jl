@@ -5,3 +5,4 @@
 # on its own:  julia --project=. test/<module>.jl
 
 module VelocitySliceTests; include("velocity_slice.jl"); end
+module IntegratorsTests;   include("integrators.jl");    end

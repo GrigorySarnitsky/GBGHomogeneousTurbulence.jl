@@ -1,6 +1,9 @@
 # GBGIsotropicTurbulence.jl
 
-Tools for simulating and analysing isotropic turbulence on three-dimensional periodic domains.
+A small, focused pseudospectral DNS of homogeneous isotropic turbulence on three-dimensional periodic
+domains: an incompressible velocity field and a single passive scalar, each optionally forced,
+advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle tracking
+and Eulerian + Lagrangian statistics.
 
 This package builds on [`GBGPeriodicFields.jl`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl),
 which supplies the underlying field representations, FFT transforms, fiberwise algebra, spectral
@@ -24,3 +27,8 @@ Then:
 ```julia
 using GBGIsotropicTurbulence
 ```
+
+## Documentation
+
+Documentation with the full API reference is available at
+[https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/](https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/).

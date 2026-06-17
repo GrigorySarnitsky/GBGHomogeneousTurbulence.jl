@@ -65,7 +65,10 @@ using .Forcing:
 using .TimeIntegration:
   AbstractIntegrator,
   IFRK2,
-  step!
+  IFLowStorageRK3,
+  step!,
+  recommended_cfl,
+  default_integrator
 
 
 export SpectralOperators,
@@ -87,7 +90,10 @@ export SpectralOperators,
        force!,
        AbstractIntegrator,
        IFRK2,
-       step!
+       IFLowStorageRK3,
+       step!,
+       recommended_cfl,
+       default_integrator
 
 
 end # module GBGIsotropicTurbulence
