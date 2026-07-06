@@ -1,8 +1,9 @@
 # API overview
 
 The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules, in dependency
-order: `SimulationState` → `Equations` → `Forcing` → `TimeIntegration`. The umbrella re-exports their
-public surface, so `using GBGIsotropicTurbulence` brings everything into scope.
+order: `SimulationState` → `Equations` → `Forcing` → `TimeIntegration` → `Particles` → `Driver`. The
+umbrella re-exports their public surface, so `using GBGIsotropicTurbulence` brings everything into
+scope.
 
 - [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
 - [SimulationState](api/SimulationState.md): the spectral machinery (`SpectralOperators`), the preallocated buffers (`VelocityWorkspace`), the scratch allocators, and the random divergence-free initial condition.
@@ -10,6 +11,7 @@ public surface, so `using GBGIsotropicTurbulence` brings everything into scope.
 - [Forcing](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing` (`NoForcing`, `BandRescaling`, `Linear`, `ConstantPower`, `StochasticOU`).
 - [TimeIntegration](api/TimeIntegration.md): the pluggable integrating-factor time-stepping schemes under `AbstractIntegrator` (`IFRK2`, `IFLowStorageRK3`).
 - [Particles](api/Particles.md): Lagrangian tracer tracking — `Tracers`, second-order `advect!` (Heun-in-time), and `sample!` for the Lagrangian statistics.
+- [Driver](api/Driver.md): the ergonomic run layer — `Simulation` and the loop drivers `advance!`, `run!`, and `warmup!`.
 
 ```@contents
 Pages = [
@@ -19,6 +21,7 @@ Pages = [
   "api/Forcing.md",
   "api/TimeIntegration.md",
   "api/Particles.md",
+  "api/Driver.md",
 ]
 Depth = 2
 ```

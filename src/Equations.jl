@@ -21,7 +21,7 @@ using ..SimulationState: SpectralOperators, Workspace
 export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
        scalar_to_physical!, scalar_nonlinear!,
        kinetic_energy, dissipation, max_speed,
-       scalar_variance, scalar_dissipation
+       scalar_variance, scalar_dissipation, derivative_skewness
 
 
 """
@@ -186,6 +186,43 @@ The mean scalar-variance dissipation rate
 gradient `scalar_gradient` ``\\nabla\\varphi`` and the scalar `diffusivity` ``\\kappa = \\nu/\\mathrm{Sc}``.
 """
 scalar_dissipation(scalar_gradient, diffusivity::Real) = 2 * diffusivity * inner(scalar_gradient, scalar_gradient)
+
+
+"""
+    derivative_skewness(uh, ops, ws)
+
+The velocity-derivative skewness
+
+```math
+S = \\frac{\\big\\langle(\\partial_{x_i} u_i)^3\\big\\rangle}{\\big\\langle(\\partial_{x_i} u_i)^2\\big\\rangle^{3/2}},
+```
+
+averaged over the three diagonal components ``i = 1,2,3`` for isotropy, of the velocity `uh` (given in
+spectral representation). Each diagonal derivative ``\\partial_{x_i} u_i`` is formed spectrally
+(`gradient!`), transformed to physical space, and reduced to its second and third moments.
+
+``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has
+``S \\approx 0`` (a linear image of a Gaussian is Gaussian, hence symmetric), while fully developed
+isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov). Its plateau is the strict "real turbulence
+yet" gate of the warm-up detector. No field-sized allocation — reuses the workspace scratch
+(`ws.scratch`, `ws.velocity_star`).
+"""
+function derivative_skewness(uh, ops::SpectralOperators, ws::Workspace)
+  grad = ws.scratch                                                     # ∇uᵢ, spectral vector scratch
+  gradient_physical = ws.velocity_star                                  # ∇uᵢ, physical vector scratch
+  skew = 0.0
+  for i in 1:3
+    ui = ScalarFieldSpectral(selectdim(field_data(uh), 4, i), ops.grid) # ûᵢ (a component view)
+    gradient!(grad, ui, ops.multipliers)                               # ∇uᵢ in spectral representation
+    to_physical!(gradient_physical, grad, ops.velocity_plans)          # ∇uᵢ in physical space
+    g = selectdim(field_data(gradient_physical), 4, i)                 # ∂uᵢ/∂xᵢ (physical view)
+    n = length(g)
+    m2 = mapreduce(abs2, +, g) / n                                     # ⟨(∂ᵢuᵢ)²⟩
+    m3 = mapreduce(x -> x^3, +, g) / n                                 # ⟨(∂ᵢuᵢ)³⟩
+    m2 > 0 && (skew += m3 / m2^1.5)
+  end
+  return skew / 3
+end
 
 
 end # module Equations

@@ -12,15 +12,17 @@
 # solenoidal velocity solenoidal (per-mode scaling), so the velocity needs no projection here.
 #
 # The additive stochastic (Ornstein–Uhlenbeck / Eswaran–Pope) forcing — which adds a time-correlated
-# force field to the RHS — is a separate, stateful mechanism added in a later slice.
+# force field to the RHS — is a separate, stateful mechanism (`StochasticOU`), advanced once per step.
 
 """
     Forcing
 
 The pluggable energy-injection strategies, concrete `AbstractForcing` subtypes. A strategy hooks into
-the step through [`forcing_rate!`](@ref) (a linear rate folded into the integrating factor) and/or
-[`apply_forcing!`](@ref) (a post-step projection). `NoForcing`, `BandRescaling`, `Linear`, and
-`ConstantPower` are provided; one implementation serves both the velocity and the scalar ``\\varphi``.
+the step through up to four methods — [`forcing_rate!`](@ref) (a linear rate folded into the
+integrating factor), [`apply_forcing!`](@ref) (a post-step projection), [`prepare_forcing!`](@ref) (a
+per-step state advance), and [`forcing_source!`](@ref) (an additive per-stage source). `NoForcing`,
+`BandRescaling`, `Linear`, `ConstantPower`, and the stochastic `StochasticOU` are provided; one
+implementation serves both the velocity and the scalar ``\\varphi``.
 """
 module Forcing
 
@@ -28,18 +30,35 @@ using GBGPeriodicFields
 using Random
 using ..SimulationState: SpectralOperators, scalar_spectral, spectral_vector
 
-export AbstractForcing, NoForcing, BandRescaling, Linear, ConstantPower, StochasticOU,
+export AbstractForcing, ForcingSpec, NoForcing, BandRescaling, Linear, ConstantPower, StochasticOU,
        forcing_rate!, apply_forcing!, prepare_forcing!, forcing_source!
 
 
 """
     AbstractForcing
 
-Supertype of the energy-injection strategies. A strategy may implement [`forcing_rate!`](@ref) (a
-linear forcing rate folded into the integrating factor) and/or [`apply_forcing!`](@ref) (a post-step
-projection); both default to doing nothing.
+Supertype of the energy-injection strategies. A strategy may implement any of [`forcing_rate!`](@ref)
+(a linear forcing rate folded into the integrating factor), [`apply_forcing!`](@ref) (a post-step
+projection), [`prepare_forcing!`](@ref) (a per-step state advance), and [`forcing_source!`](@ref) (an
+additive per-stage source); all default to doing nothing.
 """
 abstract type AbstractForcing end
+
+
+"""
+    ForcingSpec
+
+A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`,
+`BandRescaling(; energy)`, and `StochasticOU(; variance, correlation_time)` — return a `ForcingSpec`
+capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
+`SpectralOperators` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
+ready-built `AbstractForcing` (from the `ops`-taking constructor) or a `ForcingSpec`.
+"""
+struct ForcingSpec{F}
+  build::F
+end
+
+(spec::ForcingSpec)(ops::SpectralOperators) = spec.build(ops)
 
 
 """
@@ -260,6 +279,23 @@ end
 
 forcing_source!(ou::StochasticOU, nonlinear, ops::SpectralOperators, ws) =
   (field_data(nonlinear) .+= field_data(ou.state); nonlinear)
+
+
+# Operator-free keyword constructors: capture the parameters now and build the forcing once the
+# operators exist (via `ForcingSpec`), so a case can name its forcing before the grid is built —
+# `ConstantPower(power = 0.1)` — with `Simulation` supplying the operators.
+Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  ForcingSpec(ops -> Linear(ops; rate, lowest_shell, highest_shell))
+
+ConstantPower(; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  ForcingSpec(ops -> ConstantPower(ops; power, lowest_shell, highest_shell))
+
+BandRescaling(; energy::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  ForcingSpec(ops -> BandRescaling(ops; energy, lowest_shell, highest_shell))
+
+StochasticOU(; variance::Real, correlation_time::Real,
+             lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
+  ForcingSpec(ops -> StochasticOU(ops; variance, correlation_time, lowest_shell, highest_shell, seed))
 
 
 end # module Forcing

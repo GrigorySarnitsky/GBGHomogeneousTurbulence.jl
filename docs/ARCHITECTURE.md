@@ -1,0 +1,504 @@
+# Architecture
+
+This is the design document for `GBGIsotropicTurbulence` — what the package is, how it is
+organised, and *why* it is shaped the way it is. It is the spec: read it before any structural
+change, and do not re-litigate a recorded decision (§10) without the user. `CLAUDE.md` is the
+terse working copy and defers here; the rendered symbol glossary is
+[`docs/src/notation.md`](notation.md).
+
+The document is self-contained — every symbol, mathematical or `code`, is introduced in plain
+language at first use — and reads top to bottom. Mathematics is written in the notation of the
+glossary (Pope's turbulence conventions: the wavenumber vector is ``\mathbf k`` with magnitude
+``\kappa = \lvert\mathbf k\rvert``; the turbulent kinetic energy is ``k``; the integrating factor is
+``\mathcal E``).
+
+---
+
+## 1. Identity
+
+> `GBGIsotropicTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS)
+> of homogeneous isotropic turbulence: one incompressible velocity field ``\mathbf u`` and one
+> passive scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable
+> integrating-factor time-stepping, with Lagrangian particle probes and Eulerian + Lagrangian
+> statistics. It is a **library of composable pieces with a thin ergonomic run layer on top**, built
+> as a *consumer* of [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl)
+> (the field/spectral machinery) and
+> [`GBGStreamingStatistics`](https://github.com/GrigorySarnitsky/GBGStreamingStatistics.jl) (the
+> statistics).
+>
+> It **is not** a general PDE or CFD framework, and not multi-physics: the physics is a **thin,
+> fixed core** — Navier–Stokes plus one passive scalar, no chemistry, phases, or processes. It is
+> **not dimensional** — control is by Reynolds and Schmidt number, never units. It is **not** a field
+> library (that is `GBGPeriodicFields`) or a statistics library (that is `GBGStreamingStatistics`),
+> and it is **not** built on a grand theory or a lattice of speculative extension points.
+
+The package inverts the richness of its sibling consumer `GBGCloudPhysics`: where Cloud has a rich
+constitutive physics over a thin numerical core, `GBGIsotropicTurbulence` has a **thin fixed physics
+over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains
+most of what follows.
+
+---
+
+## 2. Running a simulation
+
+The primary measure of this library's quality is how easily one sets up and runs a case — including
+**warm-up** to a statistically stationary state before any measurement. So the headline interface is
+a thin run layer that assembles the machinery with sensible defaults and owns the time loop:
+
+```julia
+using GBGIsotropicTurbulence
+
+# Assemble a forced case. Everything the run needs — operators, workspace, physics,
+# integrator, state, and initial condition — is built with defaults from a few numbers.
+sim = Simulation(resolution = 128, viscosity = 5e-3;
+                 velocity_forcing = ConstantPower(power = 0.1),
+                 scalar = true, schmidt = 1.0)
+
+# Spin past the transient: advance until the running dissipation ε(t) stops drifting
+# (k(t) is deliberately not used — a constant-energy forcing would clamp it flat).
+warmup!(sim)
+
+# Advance and measure. The callback fires on a fixed interval with the current state.
+run!(sim; turnovers = 20, every = 0.1) do s
+    accumulate_statistics!(my_stats, s)
+end
+```
+
+The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each step
+from the advective CFL condition (§4.4), refreshes the cached start-of-step fields the integrator
+needs, and defines **warm-up as a first-class verb**: by default `warmup!` advances until the running
+dissipation ``\varepsilon(t)`` stops drifting *and* the velocity-derivative skewness ``S(t)`` has
+plateaued — the decisive "real turbulence yet" gate, since ``S`` runs from ``0`` (a random-phase field)
+toward ``\approx -0.5`` — and, when the scalar is forced, until ``\langle\varphi^2\rangle`` does too,
+since the scalar reaches stationarity *after* the velocity; or a fixed turnover/time/step budget if one
+is passed. It reads ``\varepsilon`` (the small scales, which settle last), not the kinetic energy, which
+a constant-energy forcing clamps flat. A forced flow
+must reach statistical stationarity before a structure function or a PDF taken over it is meaningful.
+
+The composable pieces stay fully exposed — a study that needs to drive the loop by hand, swap a
+stage, or interleave a bespoke measurement drops straight to §4.1–§4.5. The run layer is a
+convenience over that machinery, never a wall in front of it.
+
+> **Status.** The run layer is implemented (module `Driver`) and covered by tests; the example above
+> runs as written — a forcing can be named operator-free (`ConstantPower(power = 0.1)`, a `ForcingSpec`)
+> and `warmup!` detects stationarity. The API may still evolve — setup ergonomics is the package's
+> primary quality target — but it is no longer a sketch.
+
+---
+
+## 3. The organising frame: specification × realization
+
+A run is fixed by two independent things: **what** continuous problem you pose, and **how** you
+realise it numerically.
+
+**Specification — what you solve.** Two parts:
+
+- The **System**: the flow scenario — forced homogeneous isotropic turbulence, freely decaying
+  turbulence, uniform-mean-gradient scalar mixing, and (a deferred frame, §7) homogeneous shear. A
+  System is a choice of forcing, initial condition, and the dimensionless parameters ``\mathrm{Re}``,
+  ``\mathrm{Sc}``.
+- The **Model**: the level of description. This is a *rung on a ladder of projections* — DNS resolves
+  every active scale; a large-eddy Model (LES) resolves the large scales and models the rest; a
+  filtered-density-function or moment Model carries statistics rather than fields. Today only the
+  finest rung, DNS, is realised (§7).
+
+**Realization — how you compute it.** The **Method**: the numerics. A Method has two layers that
+behave differently, so the package keeps them distinct:
+
+- A **Model-fibered family** — the choices that only make sense *for a given Model*: the time
+  integrator and its dealiasing for a field Model (§4.4), or the particle pushers and mixing model a
+  statistical Model would need. These are set by the Model.
+- **Model-agnostic knobs** — precision, memory footprint, and compute backend (§6), which cut across
+  every Model uniformly.
+
+Two research disciplines live on these two kinds of variation, and naming them apart is the reason
+the frame is *specification × realization* and not three co-equal axes:
+
+- **Method-independence.** Vary the realization, hold the specification fixed, and the answer must not
+  change (to discretisation error). Two integrators, two precisions, or two resolutions of the *same*
+  DNS must agree. Agreement is the correctness signal; the cheapest realization that still agrees is a
+  research finding, not merely a default.
+- **Statistical commutation.** Descend the Model ladder, hold the System fixed, and the coarse Model
+  must reproduce the fine Model's *statistics*. Filtered DNS versus LES of the same flow is the test;
+  it is a match in distribution, never pathwise (§8, Lenses). This is the closure question made
+  operational.
+
+Both disciplines are the *same comparison machine* — run a configuration against a reference and
+check chosen physical functionals (spectra, fluxes, conserved quantities, a target statistic) within
+tolerance — pointed at different axes. The functionals are exactly the diagnostics of §4.2.
+
+---
+
+## 4. Modules and types
+
+Each concern is its own module, included in dependency order by the umbrella
+`src/GBGIsotropicTurbulence.jl`. The types are motivated below by their *job*, not by theory.
+
+### 4.1 `SimulationState` — the machinery and the buffers
+
+- **`SpectralOperators`** is the reusable, read-only machinery for a cubic run: the `Grid3D`, the real–Fourier layout, the
+  real-to-complex transform plans (one for the velocity, one for ``\varphi``), the spectral
+  multipliers, the squared-wavenumber array ``\lvert\mathbf k\rvert^2`` (the symbol of ``-\nabla^2``),
+  and the ``2/3``-rule dealias kernel. It is the concrete realisation of the flow's *frame* — today a
+  fixed periodic box (a sheared frame is deferred, §7). **Precision and backend enter here and flow
+  everywhere from here**: `scalar_type` fixes the real element type (``\texttt{Float32}`` or
+  ``\texttt{Float64}``) and `array_type` the storage (`Array`, `CuArray`, `ROCArray`); every buffer is
+  allocated `similar` to this machinery, so a run is CPU/GPU-agnostic and single-precision or double
+  by construction.
+- **`Workspace`** preallocates *all* field-sized scratch a coupled velocity + scalar step writes into
+  — the spectral vorticity, the Runge–Kutta stage registers and predictor, the physical
+  velocity/vorticity/Lamb-vector buffers, the shared integrating factor, and the per-mode linear
+  forcing rates. It is sized so that **a step allocates no field-sized memory** (§8, invariant 4).
+- **Initial conditions** — `random_solenoidal_velocity!` fills a divergence-free velocity with a
+  large-scale spectral envelope, rescaled to a target ``k``; `random_scalar!` fills a mean-zero
+  ``\varphi`` to a target variance. These seed the state a run warms up from.
+
+### 4.2 `Equations` — the right-hand side and the diagnostics
+
+The incompressible momentum equation is advanced in **rotational (Lamb-vector) form**. Writing the
+convective term through the identity
+``(\mathbf u\cdot\nabla)\mathbf u = \nabla(\tfrac12\lvert\mathbf u\rvert^2) - \mathbf u\times\boldsymbol\omega``
+(with vorticity ``\boldsymbol\omega = \nabla\times\mathbf u``) and letting the Leray–Helmholtz
+projection ``\mathbb P`` onto divergence-free fields absorb the pressure and the kinetic-energy
+gradient, the equation becomes
+
+```math
+\partial_t\mathbf u = \mathbb P\,(\mathbf u\times\boldsymbol\omega) + \nu\nabla^2\mathbf u + \mathbf f .
+```
+
+- **`velocity_vorticity!`** and **`velocity_nonlinear!`** assemble ``\mathbb P\,(\mathbf u\times\boldsymbol\omega)``,
+  dealiased by the ``2/3`` rule to remove the aliasing of the quadratic product. The rotational form
+  is chosen because it is the cheap, energy-conserving way to compute the advection spectrally, and —
+  read through the geometric lens (§8) — it is the flow's *reversible* generator.
+- **`integrating_factor!`** builds the exact diffusive factor
+  ``\mathcal E(\mathbf k) = \exp\!\big((A(\mathbf k) - D\lvert\mathbf k\rvert^2)\,\Delta t\big)``, with
+  diffusivity ``D = \nu`` for the velocity and ``D = \nu/\mathrm{Sc}`` for the scalar, and an optional
+  per-mode linear forcing rate ``A(\mathbf k)`` folded in. Multiplying a field by ``\mathcal E``
+  advances its viscous/diffusive part *exactly*, with no stability restriction. This is the flow's
+  *irreversible* generator; keeping it exact is what the integrating-factor split buys.
+- **`scalar_to_physical!`** transforms ``\hat\varphi`` to the physical ``\varphi`` at each stage — the
+  scalar analogue of the velocity-side transform folded into `velocity_vorticity!`.
+- **`scalar_nonlinear!`** assembles the passive-scalar advection in conservative form
+  ``-\nabla\cdot(\mathbf u\varphi)`` (equal to ``-\mathbf u\cdot\nabla\varphi`` since
+  ``\nabla\cdot\mathbf u = 0``); the conservative form is used because, with the ``2/3`` rule, it
+  conserves the scalar mean exactly.
+- **Diagnostics** — `kinetic_energy` ``k = \tfrac12\langle\lvert\mathbf u\rvert^2\rangle``,
+  `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
+  CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
+  ``\chi = 2\kappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
+  ``S \approx -0.5`` of developed turbulence, from the diagonal ``\partial_{x_i} u_i``). These are not incidental: they are the
+  **fitness functionals** the comparison machine of §3 evaluates, and the stationarity signals
+  `warmup!` watches.
+
+### 4.3 `Forcing` — energy injection as a strategy
+
+`AbstractForcing` is the supertype of the injection strategies, hooking into the step through a small
+protocol whose four methods all default to doing nothing:
+
+- `forcing_rate!` — for a forcing *linear* in the field (``\mathbf f = A\,\mathbf u``): fill the
+  per-mode rate ``A(\mathbf k)``, folded into the integrating factor (exact, order-preserving).
+- `apply_forcing!` — a post-step projection or rescale.
+- `prepare_forcing!` — advance internal state once per step (a stochastic process).
+- `forcing_source!` — add an additive source at each Runge–Kutta stage.
+
+`NoForcing` (free decay), `BandRescaling` (hold a band's energy fixed), `Linear` and `ConstantPower`
+(negative-damping, folded into ``\mathcal E``), and `StochasticOU` (the Eswaran–Pope
+Ornstein–Uhlenbeck forcing) are provided. **One implementation serves both** the velocity (a vector
+field) and ``\varphi`` (a scalar), because the hooks are written through tensor-order-generic field
+operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
+alone. Each forcing has an operator-taking constructor and an operator-free keyword form
+(`ConstantPower(power = 0.1)`) that returns a `ForcingSpec`, materialised when `Simulation` builds the
+operators. This protocol is the System axis's realisation, and the one deliberately designed-in
+extension point.
+
+### 4.4 `TimeIntegration` — the Method for the field evolution
+
+- **`Physics`** bundles the problem parameters the step consumes: the viscosity ``\nu``, the Schmidt
+  number ``\mathrm{Sc}`` (scalar diffusivity ``\kappa = \nu/\mathrm{Sc}``), and the two forcings.
+- **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
+  advances the velocity ``\hat{\mathbf u}`` and scalar ``\hat\varphi`` **together** through the same
+  Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy needs
+  both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
+  afterwards would drop the substage velocities and degrade the coupling to first order.
+- **`IFLowStorageRK3`** (the Williamson 2N / RKW3 workhorse) is third-order and stable on the
+  imaginary axis; **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and
+  relies on viscous damping. `recommended_cfl` gives each scheme its conservative advective-CFL
+  ceiling ``C`` (for ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert``); the run layer uses it with
+  `max_speed` to choose ``\Delta t``. The integrator is the Model-fibered part of the Method (§3).
+
+### 4.5 `Particles` — instruments, with first-class numerics
+
+Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
+state-carrying trajectory object: today a tracer (position ``\mathbf x``); the deferred ladder is
+inertial (``\mathbf x, \mathbf v``) and oriented (``\mathbf x, \mathbf v, \mathbf L``) probes (§7).
+`Tracers` holds positions and a pluggable interpolation scheme; `advect!` pushes them Heun-in-time on
+the velocity at the start and end of the step (the fields the solver already produces); `sample!`
+reads any field along the trajectories for Lagrangian statistics.
+
+Their **numerics are first-class**, on the same footing as the field integrators. Two knobs matter and
+are fitness-tested: the trajectory integrator, and — the sampling-consistency knob — the interpolation
+scheme's order relative to the field's spectral accuracy (`CatmullRom` by default, higher-order
+`LalescuSpline`/`LagrangeSpline` available). When the inertial and oriented probes arrive, the
+integrating-factor split carries over for the *translational* stiff drag (field viscosity and a
+particle's linear/matrix drag are the same linear-exact move), while **orientation dynamics on the
+rotation group is a distinct geometric integrator** — the reversible generator of §8 — so the split
+does not naively unify all of it.
+
+### 4.6 The run layer (`Driver`) — the front door
+
+A `Simulation` value bundles the state a case advances: the `SpectralOperators`, the `Workspace`, the
+`Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\mathbf u}`` and
+``\hat\varphi``, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer for the Heun
+push, and a clock. Over it:
+
+- **`Simulation(...)`** — the assemble-with-defaults constructor: from a resolution, a viscosity, and
+  a forcing it builds every piece of §4.1–§4.5, seeds a divergence-free initial condition, and picks
+  the default integrator. Setup is a few numbers.
+- **`advance!(sim; dt)`** / **`run!(sim; ...)`** — own the time loop: choose ``\Delta t`` from the
+  scheme's CFL and the current `max_speed`, refresh the cached start-of-step velocity and vorticity,
+  `step!`, advect tracers, and fire a user callback on a fixed time interval.
+- **`warmup!(sim; ...)`** — advance to statistical stationarity: by default until the running
+  dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a
+  trailing-window flatness test) — reading ``\varepsilon`` (not the clampable ``k(t)``) and ``S`` (the
+  strict "real turbulence" gate) — and, when the scalar is forced, until ``\langle\varphi^2\rangle``
+  does too; or a fixed turnover/time/step budget if one is given.
+- **`current_time(sim)`** / **`current_step(sim)`**, and `kinetic_energy(sim)` / `dissipation(sim)` /
+  `scalar_variance(sim)` — the clock and the current-state diagnostics, for a callback to read.
+
+The layer wires §4.1–§4.5 together; it holds no physics or numerics of its own.
+
+### 4.7 Layout summary
+
+`SimulationState → Equations → Forcing → TimeIntegration → Particles → Driver`. Cross-module
+access is through explicit `using ..Module: name` lists. Statistics live consumer-side of this
+package too: the sampling in `Particles` and the diagnostics in `Equations` produce the *samples*; a
+statistics driver that feeds them to `GBGStreamingStatistics` is deferred (§7).
+
+---
+
+## 5. The consumer boundary — what belongs here, and what does not
+
+`GBGIsotropicTurbulence` owns the turbulence-specific glue and delegates everything domain-neutral.
+The dividing line is **domain-neutrality**, not "thinness":
+
+- **To `GBGPeriodicFields`** — every field operation: the transforms, `curl!`/`cross!`/`divergence!`,
+  the Leray projection `helmholtz_projection!` (``\mathbb P``), `convolve!` and the dealias/band
+  kernels, the reductions (`inner`, the radial spectrum and correlation), and grid↔point
+  interpolation. The rule *everything diagonal in Fourier is a `GBGPeriodicFields` operator* is
+  followed in the code.
+- **To `GBGStreamingStatistics`** — every estimator: histograms, densities, conditional means and
+  variances, conditional and transition densities.
+- **Owned here** — the Navier–Stokes and scalar nonlinear assembly, the integrating factor, the
+  forcing strategies, the coupled time-stepping, the particle tracking, the run layer, and the
+  turbulence-specific spectral glue a backend must not carry (the deferred sheared frame's
+  non-separable multipliers, §7).
+
+Two standing rules follow:
+
+1. **If a capability's true home is `GBGPeriodicFields` or `GBGStreamingStatistics`, raise it and
+   extend it *there* — do not reimplement it here.** Only genuinely *domain-neutral* capability
+   migrates out; a backend has an anti-accretion charter, so turbulence-specific glue stays here.
+2. **A deferred-by-design future is not a missing feature** (§7).
+
+---
+
+## 6. Precision and footprint as studied axes
+
+Precision and the memory-footprint/accuracy trade-off are **objects of study**, not fixed defaults —
+the numerical counterpart of the charter that the tool investigates the physics rather than assuming
+it (§8).
+
+- **Both precisions are supported equally, with no privileged default.** ``\texttt{Float32}`` is the
+  development and desktop precision; ``\texttt{Float64}`` is the production precision. The element type
+  ``T`` flows from the field (§4.1): no kernel silently fixes the arithmetic. (The `Physics` scalar
+  parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
+  commitment.)
+- **The footprint/accuracy trade-off is held at both ends** — low-storage integrators, the dealias
+  fraction, truncation — and the working point is chosen by *direct fitness test*, never decreed.
+  Which precision, order, or footprint suffices for a regime is a measured finding.
+- **The fitness arbiter is the comparison machine of §3** — the same one that adjudicates
+  method-independence and DNS-versus-LES statistical commutation. One machine ranges over
+  ``\{`` model fidelity, integrator, precision, footprint, closure ``\}``; the *sufficiency frontier*
+  (the cheapest realization that still passes) is a deliverable of the tool.
+
+This is why the `GBGPeriodicFields` element-type genericity and GPU-first, allocation-free discipline
+are load-bearing here: they are what make precision and backend free to vary. "Low footprint" is the
+default working point on a studied axis, not a universal law.
+
+---
+
+## 7. Deliberately deferred
+
+These are **named so they are not precluded, and deliberately left un-abstracted**: no extension
+point or generalisation is built for them until a second concrete case forces the abstraction. None
+is a gap.
+
+- **Inertial and oriented particles** — ``(\mathbf x,\mathbf v)`` with matrix drag, then
+  ``(\mathbf x,\mathbf v,\mathbf L)`` with torque. The translational drag reuses the
+  integrating-factor split; orientation needs a geometric integrator (§4.5, §8).
+- **The sheared frame (Rogallo).** A uniform mean velocity gradient makes the wavenumbers
+  time-dependent (``d\mathbf k/dt = -\mathsf A^{\!\top}\mathbf k``) and non-separable. This is the one
+  future with a concrete `GBGPeriodicFields` dependency: its separable per-axis multipliers cannot
+  hold a sheared lattice, so it is a bounded extension *there* (rule 1 of §5), not a job here.
+- **The Model ladder beyond DNS** — LES (filter the DNS, model the subgrid stress) and a
+  filtered-density-function / statistical Model (§8). Each is a coarser rung, discriminated from DNS
+  by statistical commutation; the canonical acceptance test is the relaxation of a two-mode scalar
+  distribution (a micromixing benchmark).
+- **The statistics driver** — the sampling-to-`GBGStreamingStatistics` bridge (Eulerian field
+  samples and Lagrangian trajectory samples in, streamed summaries out).
+
+---
+
+## 8. Lenses and prior art
+
+The package makes real theory legible, but **nothing in the code is load-bearing on it** — the code
+would be identical had these frameworks never been named. They organise *understanding* and set what
+the tool is built to *investigate*, not assume. Mori–Zwanzig is the central lens; the others are read
+through it.
+
+- **Mori–Zwanzig — the central lens.** The DNS/LES/statistical ladder is one dynamics under a ladder
+  of projections. Each Model is a projection ``P`` of the full state plus a closure of the residual it
+  discards; the exact projected dynamics carries a *memory* integral and a *noise* term, and every
+  closure is an approximation of those. DNS is simply the finest projection, not a thing apart. This
+  is what makes the Model axis a *ladder* (§3) rather than a list.
+- **The commuting square — the modeling ideal.** With ``\Pi`` a coarse-graining and ``S`` a flow map,
+  one would like ``\Pi\circ S_{\text{fine}} = S_{\text{coarse}}\circ\Pi``. It cannot hold pathwise:
+  the coarse state does not determine its own tendency (that is the Mori–Zwanzig memory and noise made
+  concrete), and turbulence is chaotic. The achievable ideal — and the design target of any Model —
+  is **statistical** commutation, agreement of the distributions and fluxes on the attractor. This is
+  exactly what the DNS-versus-LES comparison of §3 measures.
+- **Geometric mechanics (GENERIC) — the reversible/irreversible split.** The integrating-factor
+  method *is* a split into a reversible generator (the advection, computed in rotational form, §4.2)
+  and an irreversible one (the diffusion, integrated exactly). The lens says *why* the split is
+  structure-preserving and constrains closures to be net-dissipative.
+- **Renormalisation / scale invariance — a hypothesis, never a foundation.** Small-scale universality
+  is what makes closure constants transferable at all, but it is approximate (intermittency), it fails
+  for scalar small scales (persistent gradient anisotropy), and the unclosed terms are *conditional*
+  quantities that re-import the large scales. So the tool is built to *test* how universal a closure
+  is, per regime — not to assume it. This is the general charter: **the architecture investigates the
+  physics; it must not assume it** — the same discipline as the model-free statistics it consumes.
+
+---
+
+## 9. Invariants — the deliberate absences
+
+The public surface and these absences are the spec. Do not add a capability "for completeness"; a
+missing one usually encodes a decision.
+
+1. **No units.** Control is by ``\mathrm{Re}`` (through ``\nu``) and ``\mathrm{Sc}``; every diagnostic
+   is dimensionless.
+2. **No field or statistics machinery reimplemented.** Field operations come from
+   `GBGPeriodicFields`, estimators from `GBGStreamingStatistics` (§5).
+3. **No privileged precision or backend.** ``T`` and the array type flow from the field; both
+   precisions and CPU/GPU are first-class (§6).
+4. **Allocation-free stepping.** A time step allocates no field-sized memory over the preallocated
+   `Workspace` — load-bearing for GPU hot loops. (The one documented exception is `StochasticOU`
+   forcing, whose random increment is drawn host-side each step — portability-first, not yet tuned.)
+5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU
+   scope (inherited from `GBGPeriodicFields`).
+6. **No baked-in physical model, closure, or universality assumption.** The tool investigates these;
+   it does not assume them (§8).
+7. **A library, not a framework.** The run layer is a convenience over exposed pieces (§2, §4.6),
+   never a mandatory shell.
+8. **The scalar is ``\varphi``.** Never ``\theta`` — in code, mathematics, and prose.
+9. **Deferred futures are accounted for, not owed** (§7); no speculative extension points.
+
+---
+
+## 10. Conventions
+
+- **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
+  exact/ideal form, *then* the discrete realisation — as `integrating_factor!` leads with
+  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\mathbf k)``, and `velocity_nonlinear!` with the
+  Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
+  siblings' physical-form-first / estimand-first rules.
+- **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
+  rationale and the decision log. Mathematics is rendered LaTeX in the glossary's notation
+  ([`docs/src/notation.md`](notation.md)); a code identifier is always in `backticks` and never
+  inside a math span.
+- **Verification is by numerical oracle, not a formalization ledger.** Because the package introduces
+  no novel mathematical *objects* (they are `GBGPeriodicFields`' and `GBGStreamingStatistics`'), its
+  nontrivial claims are *dynamical* — the exactness of ``\mathcal E``, the order of the integrator,
+  imaginary-axis stability, mean conservation — and are pinned by numerical oracle tests (a
+  Taylor–Green order study, unforced energy decay, exact diffusion). This is why the package follows
+  the `GBGCloudPhysics` consumer pattern with **no `FORMALIZATION.md`**; a typed-statement ledger is a
+  backend's need. Revisit only if a built Model rung introduces genuinely package-specific formalism.
+- **Citations** follow author–year; the full references are §References. Never cite an inaccessible
+  source; the material under `inspiration/` is private and never referenced.
+
+---
+
+## 11. Decision log
+
+Append-only; each entry stands on its own. Dates in `YYYY-MM`.
+
+1. **(2026-06) Integrating-factor split with exact diffusion.** The stiff viscous/diffusive part is
+   integrated exactly by ``\mathcal E(\mathbf k)``; only the advection is explicit. Removes the
+   diffusive stability limit and preserves scheme order under linear forcing.
+2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
+   advection; the reversible generator of the geometric lens.
+3. **(2026-06) `IFLowStorageRK3` (Williamson 2N / RKW3) is the default; per-scheme CFL.** Third-order,
+   imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscively-stabilised
+   option.
+4. **(2026-06) One passive scalar ``\varphi``, coupled in-stage.** Velocity and scalar advance through
+   the same RK stages to keep the passive coupling time-accurate.
+5. **(2026-06) Lagrangian tracers by Heun-in-time; interpolation scheme is the accuracy knob.** The
+   pusher uses the start- and end-of-step velocities the solver already produces.
+6. **(2026-07) Statistics extracted to `GBGStreamingStatistics`.** The conditional/transition-density
+   machinery is domain-neutral and shared across turbulence, cloud microphysics, and molecular
+   dynamics; it is consumed, not owned (§5).
+7. **(2026-07) Organising frame is specification × realization, not three co-equal axes.** Method is
+   fibered over Model; the two research disciplines (method-independence, statistical commutation) map
+   onto the two kinds of variation (§3). *(Revised from an earlier "System × Model × Method" framing
+   after an adversarial review.)*
+8. **(2026-07) Mori–Zwanzig is the central lens, not a foundation.** The code does not depend on it;
+   it organises understanding and is demonstrated, not assumed. The other lenses (GENERIC, the
+   commuting square, RG) are read through it, and RG/universality is a hypothesis to test (§8).
+9. **(2026-07) Precision and footprint are studied axes.** Both precisions supported equally, the
+   working point chosen by fitness test; the sufficiency frontier is a deliverable (§6).
+10. **(2026-07) Particles are instruments with first-class numerics.** The role is a probe; the
+    trajectory integrator and sampling-consistency are fitness-tested Method work (§4.5).
+11. **(2026-07) The run + warm-up layer is a first-class, present concern.** Ease of setup and running
+    is the primary quality metric, so the ergonomic front door is built now, not deferred (§2, §4.6).
+12. **(2026-07) Single `ARCHITECTURE.md` (consumer archetype) + `docs/src/notation.md`; no
+    `FORMALIZATION.md`.** IT is an operator consumer; its claims are dynamical and pinned by tests
+    (§10).
+13. **(2026-07) `warmup!` detects stationarity on the dissipation ``\varepsilon`` and the
+    velocity-derivative skewness, not the kinetic energy.** ``\varepsilon(t)`` (the small scales, which
+    settle last) must stop drifting over a trailing window; ``k(t)`` is avoided because a constant-energy
+    forcing clamps it and a fixed-injection forcing makes it ring. The skewness ``S(t)``
+    (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the strict
+    "real turbulence yet" gate (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
+    forced, ``\langle\varphi^2\rangle`` must flatten too — the scalar reaches stationarity after the
+    velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the DNS warm-up
+    research review.)*
+14. **(2026-07) Operator-free forcing construction via `ForcingSpec`.** `ConstantPower(power = 0.1)`
+    (and the other banded forcings) return a `ForcingSpec` capturing the parameters, materialised into
+    the concrete `AbstractForcing` once `Simulation` builds the operators — so a case names its forcing
+    before the grid exists. The operator-taking constructor is unchanged.
+
+---
+
+## References
+
+Cited author–year above; full entries here. DOIs to be confirmed against the user's copies before the
+docs are published (they are not yet filled in, per the no-guessed-citation rule).
+
+- Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
+  large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
+- Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
+  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(Pseudospectral method; the ``2/3``
+  dealiasing rule, Orszag 1971.)*
+- Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(The
+  sheared-frame scheme, §7.)*
+- Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
+  turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. *(The
+  2N low-storage family; the third-order RKW3 coefficients.)*
+- Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. *(Notation; the
+  filtered-density-function Model and mixing models, §7–§8.)*
+- Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,
+  423–455; Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**,
+  215–220. *(The projection formalism, §8.)*
+- Öttinger, H. C. (2005). *Beyond Equilibrium Thermodynamics.* Wiley. *(GENERIC; the
+  reversible/irreversible split, §8.)*

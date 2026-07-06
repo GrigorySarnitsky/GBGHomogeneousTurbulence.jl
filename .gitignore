@@ -6,6 +6,9 @@ Manifest.toml
 !/Manifest.toml
 docs/build/
 docs/site/
+# Rationale doc copied into the Documenter source tree at build time (docs/make.jl); the
+# single source is docs/ARCHITECTURE.md.
+docs/src/architecture.md
 
 # Local-only reference material (theses, papers, notes) — never committed
 inspiration/

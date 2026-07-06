@@ -1,7 +1,7 @@
 # SimulationState — the spectral machinery and preallocated buffers a HIST run advances.
 #
 # `SpectralOperators` bundles the reusable, read-only machinery (grid, transform plans, spectral
-# multipliers, the |k|² field, and the 2/3-rule de-alias kernel). `VelocityWorkspace` holds the
+# multipliers, the |k|² field, and the 2/3-rule de-alias kernel). `Workspace` holds the
 # preallocated scratch the velocity time step writes into, so a step allocates no field-sized memory
 # — the GPU hot-loop discipline inherited from GBGPeriodicFields (its invariant 13). Everything is
 # allocated through the field reference's array type, so a run is CPU/GPU-agnostic (pass
@@ -12,7 +12,7 @@
 
 The spectral machinery and preallocated buffers a run advances: `SpectralOperators` (the read-only
 grid, transform plans, multipliers, squared-wavenumber field, and de-alias kernel), the scratch
-allocators, `VelocityWorkspace`, and the random divergence-free initial condition.
+allocators, `Workspace`, and the random divergence-free initial condition.
 """
 module SimulationState
 

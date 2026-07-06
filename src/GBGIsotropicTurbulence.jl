@@ -13,6 +13,8 @@
 #   Equations        — the Navier–Stokes RHS (rotational form) + diagnostics
 #   Forcing          — pluggable energy-injection strategies (AbstractForcing)
 #   TimeIntegration  — pluggable integrating-factor schemes (AbstractIntegrator)
+#   Particles        — Lagrangian tracer tracking (instruments)
+#   Driver           — the ergonomic run layer (Simulation + run!/warmup!/advance!)
 
 
 """
@@ -38,6 +40,7 @@ include("Equations.jl")
 include("Forcing.jl")
 include("TimeIntegration.jl")
 include("Particles.jl")
+include("Driver.jl")
 
 
 using .SimulationState:
@@ -61,10 +64,12 @@ using .Equations:
   dissipation,
   max_speed,
   scalar_variance,
-  scalar_dissipation
+  scalar_dissipation,
+  derivative_skewness
 
 using .Forcing:
   AbstractForcing,
+  ForcingSpec,
   NoForcing,
   BandRescaling,
   Linear,
@@ -94,6 +99,14 @@ using .Particles:
   velocity_buffer,
   scalar_buffer
 
+using .Driver:
+  Simulation,
+  advance!,
+  run!,
+  warmup!,
+  current_time,
+  current_step
+
 
 export SpectralOperators,
        Workspace,
@@ -114,7 +127,9 @@ export SpectralOperators,
        max_speed,
        scalar_variance,
        scalar_dissipation,
+       derivative_skewness,
        AbstractForcing,
+       ForcingSpec,
        NoForcing,
        BandRescaling,
        Linear,
@@ -138,7 +153,13 @@ export SpectralOperators,
        tracer_velocities,
        ntracers,
        velocity_buffer,
-       scalar_buffer
+       scalar_buffer,
+       Simulation,
+       advance!,
+       run!,
+       warmup!,
+       current_time,
+       current_step
 
 
 end # module GBGIsotropicTurbulence
