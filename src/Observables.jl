@@ -80,12 +80,16 @@ scalar_dissipation(scalar_gradient, diffusivity::Real) = 2 * diffusivity * inner
 The velocity-derivative skewness
 
 ```math
-S = \\frac{\\big\\langle(\\partial_{x_i} u_i)^3\\big\\rangle}{\\big\\langle(\\partial_{x_i} u_i)^2\\big\\rangle^{3/2}},
+S = \\frac{\\big\\langle(\\partial u_1/\\partial x_1)^3\\big\\rangle}{\\big\\langle(\\partial u_1/\\partial x_1)^2\\big\\rangle^{3/2}},
 ```
 
-averaged over the three diagonal components ``i = 1,2,3`` for isotropy, of the velocity `uh` (given in
-spectral representation). Each diagonal derivative ``\\partial_{x_i} u_i`` is formed spectrally
-(`gradient!`), transformed to physical space, and reduced to its second and third moments.
+the skewness of a **single** diagonal velocity gradient. The repeated index is *not* summed: this is
+``\\partial u_1/\\partial x_1`` for one direction, **not** the divergence
+``\\partial u_i/\\partial x_i = \\nabla\\cdot\\boldsymbol{u}``, which is identically zero for the
+incompressible field. By isotropy the three diagonal gradients — ``\\partial u_1/\\partial x_1``,
+``\\partial u_2/\\partial x_2``, ``\\partial u_3/\\partial x_3`` — share the same skewness, so the code
+forms each spectrally (`gradient!`), transforms it to physical space, reduces it to its second and
+third moments, and averages the three for better statistics.
 
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has
 ``S \\approx 0`` (a linear image of a Gaussian is Gaussian, hence symmetric), while fully developed
@@ -103,8 +107,8 @@ function derivative_skewness(uh, ops::SpectralOperators, ws::Workspace)
     to_physical!(gradient_physical, grad, ops.velocity_plans)          # ∇uᵢ in physical space
     g = selectdim(field_data(gradient_physical), 4, i)                 # ∂uᵢ/∂xᵢ (physical view)
     n = length(g)
-    m2 = mapreduce(abs2, +, g) / n                                     # ⟨(∂ᵢuᵢ)²⟩
-    m3 = mapreduce(x -> x^3, +, g) / n                                 # ⟨(∂ᵢuᵢ)³⟩
+    m2 = mapreduce(abs2, +, g) / n                                     # ⟨(∂uᵢ/∂xᵢ)²⟩ — i fixed, no sum
+    m3 = mapreduce(x -> x^3, +, g) / n                                 # ⟨(∂uᵢ/∂xᵢ)³⟩ — i fixed, no sum
     m2 > 0 && (skew += m3 / m2^1.5)
   end
   return skew / 3

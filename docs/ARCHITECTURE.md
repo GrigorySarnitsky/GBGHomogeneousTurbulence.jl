@@ -192,7 +192,7 @@ gradient, the equation becomes
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
-  ``S \approx -0.5`` of developed turbulence, from the diagonal ``\partial_{x_i} u_i``). These are not incidental: they are the
+  ``S \approx -0.5`` of developed turbulence, from a single diagonal velocity gradient ``\partial u_1/\partial x_1``, not the divergence). These are not incidental: they are the
   **fitness functionals** the comparison machine of §3 evaluates, and the stationarity signals
   `warmup!` watches.
 
