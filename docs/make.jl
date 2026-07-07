@@ -115,13 +115,13 @@ makedocs(
     "API"  => Any[
       "Overview"               => "api.md",
       "GBGIsotropicTurbulence" => "api/GBGIsotropicTurbulence.md",
+      "SimulationRun"          => "api/SimulationRun.md",
       "SimulationState"        => "api/SimulationState.md",
       "Dynamics"               => "api/Dynamics.md",
       "Observables"            => "api/Observables.md",
       "Forcing"                => "api/Forcing.md",
       "TimeIntegration"        => "api/TimeIntegration.md",
       "Particles"              => "api/Particles.md",
-      "SimulationRun"          => "api/SimulationRun.md",
     ],
     "Design & Internals" => Any[
       "Architecture" => "architecture.md",

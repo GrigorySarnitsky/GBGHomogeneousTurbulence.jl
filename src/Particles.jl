@@ -145,12 +145,18 @@ ntracers(tracers::Tracers) = size(tracers.positions, 1)
 
 """
     velocity_buffer(tracers)
-    scalar_buffer(tracers)
 
-Allocate a point-value buffer matching the tracers (a `VectorPointValues` of shape `(M, 3)`, or a
-`ScalarPointValues` of length `M`) for use as the `out` of [`sample!`](@ref).
+Allocate a `VectorPointValues` of shape `(M, 3)` matching the tracers, for use as the `out` of
+[`sample!`](@ref) when sampling the velocity along the trajectories.
 """
 velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
+
+"""
+    scalar_buffer(tracers)
+
+Allocate a `ScalarPointValues` of length `M` matching the tracers, for use as the `out` of
+[`sample!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
+"""
 scalar_buffer(tracers::Tracers) =
   ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), ntracers(tracers)))
 
