@@ -109,9 +109,6 @@ function _shell_band(ops::SpectralOperators, lowest::Integer, highest::Integer)
   return spectral_band(scalar_spectral(ops), ops.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
 end
 
-_band_scratch(::VectorFieldSpectral, ws) = ws.scratch
-_band_scratch(::ScalarFieldSpectral, ws) = ws.scalar_copy
-
 
 """
     NoForcing()
@@ -148,8 +145,7 @@ end
 
 
 function apply_forcing!(forcing::BandRescaling, field, ops::SpectralOperators, scratch)
-  convolve!(scratch, field, forcing.band)              # band-pass copy into scratch
-  band_energy = 0.5 * inner(scratch, scratch)          # ½⟨|·|²⟩ in the band
+  band_energy = 0.5 * weighted_inner(field, forcing.band)  # ½⟨|·|²⟩ in the band (fused; no band-pass copy)
   band_energy < 1e-12 && return field                  # nothing in the band yet (guard)
   # aim the band at: the target itself (:band), or what makes the *total* hit the target (:total)
   target_band = if forcing.target === :total
@@ -214,9 +210,7 @@ end
 
 function forcing_rate!(forcing::ConstantPower, rate, field, ops::SpectralOperators, ws)
   T = eltype(rate)
-  scratch = _band_scratch(field, ws)
-  convolve!(scratch, field, forcing.band)                       # band-pass copy
-  band_energy = 0.5 * inner(scratch, scratch)                   # E_band
+  band_energy = 0.5 * weighted_inner(field, forcing.band)       # E_band (fused; no band-pass copy)
   amplitude = band_energy > 1e-12 ? forcing.target_power / (2 * band_energy) : 0.0
   rate .= T(amplitude) .* forcing.mask
   return true
