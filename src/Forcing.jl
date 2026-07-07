@@ -281,17 +281,17 @@ function prepare_forcing!(ou::StochasticOU, field, ops::SpectralOperators, ws, d
   convolve!(noise_spectral, noise_spectral, ou.band)
   field isa VectorFieldSpectral && helmholtz_projection!(noise_spectral, noise_spectral, ops.multipliers)
   noise_variance = inner(noise_spectral, noise_spectral)
-  noise_variance > 0 && (field_data(noise_spectral) .*= one(T) / sqrt(T(noise_variance)))
+  noise_variance > 0 && multiply!(noise_spectral, one(T) / sqrt(T(noise_variance)), noise_spectral)
 
   # exact Ornstein–Uhlenbeck update
   θ = exp(-T(dt) / T(ou.correlation_time))
   s = sqrt(T(ou.variance) * (one(T) - θ^2))
-  field_data(ou.state) .= θ .* field_data(ou.state) .+ s .* field_data(noise_spectral)
+  combine!(ou.state, θ, ou.state, s, noise_spectral)                        # f̂ ← θ f̂ + √(σ²(1-θ²)) ξ
   return nothing
 end
 
 forcing_source!(ou::StochasticOU, nonlinear, ops::SpectralOperators, ws) =
-  (field_data(nonlinear) .+= field_data(ou.state); nonlinear)
+  add!(nonlinear, nonlinear, ou.state)
 
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the

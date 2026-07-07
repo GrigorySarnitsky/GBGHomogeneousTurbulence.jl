@@ -141,14 +141,14 @@ function step!(::IFLowStorageRK3, uh, phih, ops::SpectralOperators, ws::Workspac
     forcing_source!(physics.scalar_forcing, ws.scalar_nonlinear, ops, ws)
 
     if i == 1
-      field_data(hu) .= dt_T .* field_data(ws.nonlinear)                     # A₁ = 0
-      field_data(hφ) .= dt_T .* field_data(ws.scalar_nonlinear)
+      multiply!(hu, dt_T, ws.nonlinear)                                      # A₁ = 0
+      multiply!(hφ, dt_T, ws.scalar_nonlinear)
     else
-      field_data(hu) .= a[i] .* field_data(hu) .+ dt_T .* field_data(ws.nonlinear)
-      field_data(hφ) .= a[i] .* field_data(hφ) .+ dt_T .* field_data(ws.scalar_nonlinear)
+      combine!(hu, a[i], hu, dt_T, ws.nonlinear)                             # hu ← Aᵢ hu + Δt N̂_u
+      combine!(hφ, a[i], hφ, dt_T, ws.scalar_nonlinear)
     end
-    field_data(uh) .+= b[i] .* field_data(hu)
-    field_data(phih) .+= b[i] .* field_data(hφ)
+    combine!(uh, one(T), uh, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
+    combine!(phih, one(T), phih, b[i], hφ)
 
     integrating_factor!(ws.integrating_factor, ops, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
     convolve!(uh, uh, ws.integrating_factor)
@@ -216,10 +216,10 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
 
   # predictors û*, φ̂*
   integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)                 # E_ν
-  field_data(ws.velocity_star_spectral) .= field_data(uh) .+ dt_T .* field_data(ws.stage1)
+  combine!(ws.velocity_star_spectral, one(T), uh, dt_T, ws.stage1)                      # û* ← ûₙ + Δt N̂_u,1
   convolve!(ws.velocity_star_spectral, ws.velocity_star_spectral, ws.integrating_factor)
   integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)                   # E_κ
-  field_data(ws.scalar_star_spectral) .= field_data(phih) .+ dt_T .* field_data(ws.scalar_stage1)
+  combine!(ws.scalar_star_spectral, one(T), phih, dt_T, ws.scalar_stage1)               # φ̂* ← φ̂ₙ + Δt N̂_φ,1
   convolve!(ws.scalar_star_spectral, ws.scalar_star_spectral, ws.integrating_factor)
 
   # stage 2 — nonlinear terms at the predictor state
@@ -234,13 +234,15 @@ function step!(::IFRK2, uh, phih, ops::SpectralOperators, ws::Workspace,
   integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)
   convolve!(ws.stage1, ws.stage1, ws.integrating_factor)
   convolve!(uh, uh, ws.integrating_factor)
-  field_data(uh) .+= half .* (field_data(ws.stage1) .+ field_data(ws.stage2))
+  combine!(uh, one(T), uh, half, ws.stage1)                                             # ûₙ₊₁ += (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
+  combine!(uh, one(T), uh, half, ws.stage2)
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
   integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)
   convolve!(ws.scalar_stage1, ws.scalar_stage1, ws.integrating_factor)
   convolve!(phih, phih, ws.integrating_factor)
-  field_data(phih) .+= half .* (field_data(ws.scalar_stage1) .+ field_data(ws.scalar_stage2))
+  combine!(phih, one(T), phih, half, ws.scalar_stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
+  combine!(phih, one(T), phih, half, ws.scalar_stage2)
 
   apply_forcing!(physics.velocity_forcing, uh, ops, ws.scratch)
   apply_forcing!(physics.scalar_forcing, phih, ops, ws.scalar_nonlinear)
