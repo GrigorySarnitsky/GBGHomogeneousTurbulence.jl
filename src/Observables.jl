@@ -16,7 +16,7 @@ to a scalar.
 module Observables
 
 using GBGPeriodicFields
-using ..SimulationState: SpectralOperators, Workspace
+using ..SimulationState: SpectralOperators, tensor_physical, scalar_physical
 
 export kinetic_energy, dissipation, max_speed,
        scalar_variance, scalar_dissipation, derivative_skewness
@@ -80,44 +80,49 @@ scalar_dissipation(scalar, ops::SpectralOperators, diffusivity::Real) =
   2 * diffusivity * weighted_inner(scalar, ops.squared_wavenumber_kernel)
 
 
-"""
-    derivative_skewness(uh, ops, ws)
+# The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal
+# one: ⟨(∂u₁/∂x₁)³⟩/⟨(∂u₁/∂x₁)²⟩^{3/2} = C·⟨tr S³⟩/⟨S:S⟩^{3/2}, from ⟨tr S³⟩ = (105/8)⟨(∂u₁/∂x₁)³⟩ and
+# ⟨S:S⟩ = (15/2)⟨(∂u₁/∂x₁)²⟩ for isotropic incompressible turbulence (Betchov; verified numerically).
+const _SKEWNESS_ISOTROPY_CONSTANT = (4 / 7) * sqrt(15 / 2)              # ≈ 1.5649
 
-The velocity-derivative skewness
+
+"""
+    derivative_skewness(uh, ops)
+
+The velocity-derivative skewness, written coordinate-free as the normalized third invariant of the
+strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``:
 
 ```math
-S = \\frac{\\big\\langle(\\partial u_1/\\partial x_1)^3\\big\\rangle}{\\big\\langle(\\partial u_1/\\partial x_1)^2\\big\\rangle^{3/2}},
+S = C\\,\\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
+  = 3C\\,\\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}},
+\\qquad C = \\tfrac{4}{7}\\sqrt{\\tfrac{15}{2}} \\approx 1.5649.
 ```
 
-the skewness of a **single** diagonal velocity gradient. The repeated index is *not* summed: this is
-``\\partial u_1/\\partial x_1`` for one direction, **not** the divergence
-``\\partial u_i/\\partial x_i = \\nabla\\cdot\\boldsymbol{u}``, which is identically zero for the
-incompressible field. By isotropy the three diagonal gradients — ``\\partial u_1/\\partial x_1``,
-``\\partial u_2/\\partial x_2``, ``\\partial u_3/\\partial x_3`` — share the same skewness, so the code
-forms each spectrally (`gradient!`), transforms it to physical space, reduces it to its second and
-third moments, and averages the three for better statistics.
+Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, traceless,
+``\\operatorname{tr}\\boldsymbol{S}^{3} = 3\\det\\boldsymbol{S}``. By isotropy this equals the classical
+longitudinal skewness ``\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle / \\langle(\\partial u_1/\\partial x_1)^{2}\\rangle^{3/2}``;
+the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle``
+and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle``. So the
+reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
+invariant rather than an axis-dependent gradient.
 
-``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has
-``S \\approx 0`` (a linear image of a Gaussian is Gaussian, hence symmetric), while fully developed
-isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov). Its plateau is the strict "real turbulence
-yet" gate of the warm-up detector. No field-sized allocation — reuses the workspace scratch
-(`ws.scratch`, `ws.velocity_star`).
+The strain is formed directly with `symmetric_gradient` (skipping the full nine-component velocity
+gradient), transformed to physical space, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle``
+(`inner`) and ``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`). ``S`` is the classic marker of *developed*
+turbulence: a random-phase (Gaussian) field has ``S \\approx 0`` (all odd invariants vanish), while fully
+developed isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov) — the enstrophy-production /
+vortex-stretching signature. Its plateau is the strict "real turbulence yet" gate of the warm-up detector.
 """
-function derivative_skewness(uh, ops::SpectralOperators, ws::Workspace)
-  grad = ws.scratch                                                     # ∇uᵢ, spectral vector scratch
-  gradient_physical = ws.velocity_star                                  # ∇uᵢ, physical vector scratch
-  skew = 0.0
-  for i in 1:3
-    ui = ScalarFieldSpectral(selectdim(field_data(uh), 4, i), ops.grid) # ûᵢ (a component view)
-    gradient!(grad, ui, ops.multipliers)                               # ∇uᵢ in spectral representation
-    to_physical!(gradient_physical, grad, ops.velocity_plans)          # ∇uᵢ in physical space
-    g = selectdim(field_data(gradient_physical), 4, i)                 # ∂uᵢ/∂xᵢ (physical view)
-    n = length(g)
-    m2 = mapreduce(abs2, +, g) / n                                     # ⟨(∂uᵢ/∂xᵢ)²⟩ — i fixed, no sum
-    m3 = mapreduce(x -> x^3, +, g) / n                                 # ⟨(∂uᵢ/∂xᵢ)³⟩ — i fixed, no sum
-    m2 > 0 && (skew += m3 / m2^1.5)
-  end
-  return skew / 3
+function derivative_skewness(uh, ops::SpectralOperators)
+  strain = symmetric_gradient(uh, ops.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
+  strain_physical = tensor_physical(ops)
+  to_physical!(strain_physical, strain, ops.tensor_plans)            # S in physical space (Ŝ is consumed)
+  ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
+  ss <= 0 && return 0.0
+  det_field = scalar_physical(ops)
+  det!(det_field, strain_physical)                                   # det S at each grid point
+  mean_det = sum(field_data(det_field)) / length(field_data(det_field))   # ⟨det S⟩
+  return 3 * _SKEWNESS_ISOTROPY_CONSTANT * mean_det / ss^1.5         # C · 3⟨det S⟩/⟨S:S⟩^{3/2}
 end
 
 

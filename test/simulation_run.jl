@@ -147,8 +147,19 @@ using Test
     ws = Workspace(ops)
     uh = spectral_vector(ops)
     random_solenoidal_velocity!(uh, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
-    S0 = derivative_skewness(uh, ops, ws)
+    dealias!(uh, ops)
+    S0 = derivative_skewness(uh, ops)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
+
+    # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
+    phih = scalar_spectral(ops)
+    physics = Physics(viscosity = 0.02, velocity_forcing = ConstantPower(ops; power = 0.15))
+    for _ in 1:80
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, 0.012)
+    end
+    S = derivative_skewness(uh, ops)
+    @test isfinite(S) && -1.5 < S < -0.05
   end
 
   @testset "warmup! skewness gate runs" begin
@@ -157,7 +168,7 @@ using Test
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
-    @test isfinite(derivative_skewness(sim.velocity, sim.operators, sim.workspace))
+    @test isfinite(derivative_skewness(sim.velocity, sim.operators))
     @test current_step(sim) > 0
   end
 

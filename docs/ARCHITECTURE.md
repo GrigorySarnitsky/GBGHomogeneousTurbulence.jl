@@ -192,7 +192,7 @@ gradient, the equation becomes
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
-  ``S \approx -0.5`` of developed turbulence, from a single diagonal velocity gradient ``\partial u_1/\partial x_1``, not the divergence). These are not incidental: they are the
+  ``S \approx -0.5`` of developed turbulence, the coordinate-free strain invariant ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` — the classical longitudinal skewness rescaled by the exact isotropy constant ``C``). These are not incidental: they are the
   **fitness functionals** the comparison machine of §3 evaluates, and the stationarity signals
   `warmup!` watches.
 
@@ -494,6 +494,18 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     terms. `Equations` conflated the two and under-described; splitting it makes each concern its own
     module and its own name. Realization and infrastructure concerns keep job-names (`TimeIntegration`,
     `Forcing`, `SimulationState`, and the run layer `SimulationRun`, paired with `SimulationState`).
+17. **(2026-07) Consume `GBGPeriodicFields`'s fused ops; the velocity-derivative skewness becomes a
+    coordinate-free strain invariant.** Four fused operations were requested of, and shipped by, PF —
+    `combine!` (axpby), `weighted_inner`, `symmetric_gradient`, `det` — and wired in. `combine!` replaces
+    the hand-rolled RK/OU `field_data` broadcasts (charter invariant 2). `weighted_inner` fuses the
+    per-step band energy in the forcings and expresses `scalar_dissipation` as the Dirichlet energy, with
+    no ``\nabla\varphi`` materialized. And `derivative_skewness` becomes the normalized third invariant of
+    the strain rate ``\boldsymbol{S}``, ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}``,
+    with the exact isotropy constant ``C = \tfrac{4}{7}\sqrt{15/2}\approx 1.5649`` reproducing the classical
+    ``S\approx-0.5`` — the axis-picking longitudinal form was coordinate-dependent, the invariant is the
+    honest object, and `symmetric_gradient` forms the strain without the full velocity-gradient tensor.
+    The physical strain tensor is unavoidable (cubic ⇒ non-Parseval), so this diagnostic allocates its
+    rank-2 buffers per call (sampling cadence) rather than keeping them resident — footprint over compute.
 
 ---
 

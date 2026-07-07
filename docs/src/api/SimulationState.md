@@ -28,13 +28,16 @@ HouLi
 
 ## Scratch-field allocators
 
-Allocate one zeroed velocity or scalar field on the operators' backend and element type.
+Allocate one zeroed velocity, scalar, or second-order tensor field on the operators' backend and
+element type.
 
 ```@docs
 spectral_vector
 physical_vector
 scalar_spectral
 scalar_physical
+tensor_spectral
+tensor_physical
 ```
 
 ## De-alias filtering

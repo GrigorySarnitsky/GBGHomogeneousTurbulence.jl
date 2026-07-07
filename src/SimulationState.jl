@@ -21,6 +21,7 @@ using Random
 
 export SpectralOperators, Workspace,
        spectral_vector, physical_vector, scalar_spectral, scalar_physical,
+       tensor_spectral, tensor_physical,
        random_solenoidal_velocity!, random_scalar!, dealias!,
        DealiasingStrategy, TwoThirds, HouLi
 
@@ -91,11 +92,12 @@ sets the advective-CFL ceiling through `recommended_cfl`.
 `array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
 `scalar_type` the real element type (`Float32` is GPU-friendly).
 """
-struct SpectralOperators{G, L, VP, SP, M, K, SK, D, DS}
+struct SpectralOperators{G, L, VP, SP, TP, M, K, SK, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
   scalar_plans::SP
+  tensor_plans::TP                 # rank-2 transform plans (the strain-tensor diagnostic)
   multipliers::M
   squared_wavenumber::K            # |k|² as a real array
   squared_wavenumber_kernel::SK    # |k|² as a ScalarFieldSpectral — the Dirichlet-energy weight for `weighted_inner`
@@ -123,12 +125,15 @@ function SpectralOperators(resolution::Integer, box::Real = 2π;
 
   velocity_plans = FieldTransformPlans(velocity_physical, velocity_spectral)
   scalar_plans = FieldTransformPlans(scalar_physical, scalar_spectral_storage)
+  tensor_physical_template = TensorFieldPhysical(_zeros(array_type, T, physical_field_shape(grid, Val(2))), grid)
+  tensor_spectral_template = TensorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(2))), grid)
+  tensor_plans = FieldTransformPlans(tensor_physical_template, tensor_spectral_template)
   multipliers = FieldSpectralMultipliers(velocity_spectral)
   squared_wavenumber_kernel = squared_wavenumber_field(scalar_spectral_storage, multipliers)
   squared_wavenumber = real.(field_data(squared_wavenumber_kernel))
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, squared_wavenumber, N, L, T)
 
-  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
+  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
 end
 
 
@@ -190,6 +195,25 @@ Allocate a single zeroed scalar field in physical representation on `ops`'s back
 """
 scalar_physical(ops::SpectralOperators) =
   ScalarFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(0))), ops.grid)
+
+
+"""
+    tensor_spectral(ops)
+
+Allocate a single zeroed second-order tensor field in spectral representation (scratch for the
+strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``).
+"""
+tensor_spectral(ops::SpectralOperators) =
+  TensorFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(2))), ops.grid)
+
+
+"""
+    tensor_physical(ops)
+
+Allocate a single zeroed second-order tensor field in physical representation.
+"""
+tensor_physical(ops::SpectralOperators) =
+  TensorFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(2))), ops.grid)
 
 
 """

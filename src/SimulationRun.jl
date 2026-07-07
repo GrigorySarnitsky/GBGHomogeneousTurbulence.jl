@@ -339,7 +339,7 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   ε = dissipation(sim)
   φ2 = m.gate_scalar ? scalar_variance(sim) : 0.0
-  S = m.gate_skew ? derivative_skewness(sim.velocity, sim.operators, sim.workspace) : 0.0
+  S = m.gate_skew ? derivative_skewness(sim.velocity, sim.operators) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
