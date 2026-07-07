@@ -64,9 +64,9 @@ end
 """
     forcing_rate!(forcing, rate, field, ops, ws) -> Bool
 
-For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\mathbf{k})``
+For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A\\,\\texttt{field}``) and return `true`; the integrator folds it into the
-integrating factor as ``\\exp\\!\\big((A(\\mathbf{k}) - D\\lvert\\mathbf{k}\\rvert^{2})\\,\\tau\\big)``.
+integrating factor as ``\\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2})\\,\\tau\\big)``.
 Return `false` (the default) when the forcing contributes no linear rate. `field` is the
 start-of-step field in spectral representation.
 """
@@ -125,7 +125,7 @@ struct NoForcing <: AbstractForcing end
     BandRescaling(ops; energy, target = :band, lowest_shell = 1, highest_shell = 2)
 
 Deterministic constant-energy forcing (post-step). Each step the in-band Fourier modes (integer
-shells ``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}`` of
+shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
 ``2\\pi/L``) are rescaled by a single factor; `target` selects what is held fixed:
 
   * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, band variance for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
@@ -169,9 +169,9 @@ end
 
 Linear (negative-damping) forcing ``f = A\\,\\mathbf{u}`` in a low-wavenumber band (Lundgren-type),
 with the fixed rate ``A = \\texttt{rate}`` on shells
-``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}``. The rate is
+``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
-rate ``A - \\nu\\lvert\\mathbf{k}\\rvert^{2}``. A positive `rate` injects energy.
+rate ``A - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``. A positive `rate` injects energy.
 """
 struct Linear{M, T} <: AbstractForcing
   mask::M              # real array: the band indicator (1 in band, 0 outside)
@@ -227,7 +227,7 @@ end
     StochasticOU(ops; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 0)
 
 Stochastic (Eswaran–Pope) forcing: each forced Fourier mode in the band
-(``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}``) carries an
+(``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``) carries an
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
 
 ```math

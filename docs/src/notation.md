@@ -16,7 +16,7 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
 | Spatial average | ``\langle\,\cdot\,\rangle`` | The box average ``\frac1{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\mathbf x`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, `to_spectral(f)`. A field is one physical object; physical and spectral are two representations of it. |
-| Wavenumber clash | ``\mathbf k`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\mathbf k`` is the wavenumber *vector*, ``\kappa=\lvert\mathbf k\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*. |
+| Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*. The scalar diffusivity ``\varkappa`` (Parameters) is a fourth, deliberately distinct glyph. |
 
 ## Physical variables
 
@@ -35,23 +35,23 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 |---|---|---|
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `Physics.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `Physics.schmidt` |
-| ``\kappa_\varphi`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | ``\nu`` / `schmidt` |
+| ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
 | ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | — (dimensionless control) |
 
-*(The scalar diffusivity is written ``\kappa_\varphi`` where it must not be confused with the
-wavenumber magnitude ``\kappa``; docstrings use ``\kappa`` for it where context is unambiguous.)*
+*(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
+magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 ## Spectral representation and operators
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\mathbf k`` | wavenumber vector, components ``k_a`` | `FieldSpectralMultipliers` |
-| ``\kappa`` | wavenumber magnitude ``\lvert\mathbf k\rvert`` (spectrum coordinate) | — |
-| ``\lvert\mathbf k\rvert^2`` | squared wavenumber, the symbol of ``-\nabla^2`` | `ops.squared_wavenumber` |
+| ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | `FieldSpectralMultipliers` |
+| ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
+| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber, the symbol of ``-\nabla^2`` | `ops.squared_wavenumber` |
 | ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, `to_physical` |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | `curl`, `divergence` |
 | ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | `helmholtz_projection` |
-| ``\mathcal E(\mathbf k)`` | the diffusive integrating factor ``\exp\!\big((A(\mathbf k)-D\lvert\mathbf k\rvert^2)\Delta t\big)`` | `integrating_factor!` |
+| ``\mathcal E(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\big((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\Delta t\big)`` | `integrating_factor!` |
 | ``\star`` | periodic convolution (the dealias/band/envelope kernels) | `convolve` |
 
 ## Diagnostics
@@ -62,7 +62,7 @@ wavenumber magnitude ``\kappa``; docstrings use ``\kappa`` for it where context 
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
 | ``E(\kappa)`` | energy spectrum (energy per unit wavenumber) | `radial_spectrum` (from `GBGPeriodicFields`) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
-| ``\chi`` | scalar dissipation rate ``2\kappa_\varphi\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
+| ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
 
 ## Numerics
 
@@ -72,7 +72,7 @@ wavenumber magnitude ``\kappa``; docstrings use ``\kappa`` for it where context 
 | ``L`` | box side (``\Omega = [0,L)^3``) | `box` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
-| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` | `dealias_fraction` |
+| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
 | ``T`` | the real element type (``\texttt{Float32}`` / ``\texttt{Float64}``) | `scalar_type` |
 
@@ -80,7 +80,7 @@ wavenumber magnitude ``\kappa``; docstrings use ``\kappa`` for it where context 
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``A(\mathbf k)`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `forcing_rate!` |
+| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `forcing_rate!` |
 | ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(power=…)` |
 | ``T_L`` | forcing correlation time (Ornstein–Uhlenbeck) | `StochasticOU(correlation_time=…)` |
 | ``\sigma^2`` | stationary forcing variance ``\langle\lvert\mathbf f\rvert^2\rangle`` | `StochasticOU(variance=…)` |

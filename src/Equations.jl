@@ -76,16 +76,16 @@ Write the exact diffusive integrating factor into the scalar spectral buffer `fa
 representation by the per-mode multiplier
 
 ```math
-\\mathcal{E}(\\mathbf{k}) = \\exp\\!\\big(-D\\,\\lvert\\mathbf{k}\\rvert^{2}\\,\\Delta t\\big),
+\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big(-D\\,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\,\\Delta t\\big),
 ```
 
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
 restriction). The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
 velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
 
-When a linear forcing rate ``A(\\mathbf{k})`` is supplied (`rate`, a real array; from the
+When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
 `forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
-``\\mathcal{E}(\\mathbf{k}) = \\exp\\!\\big((A(\\mathbf{k}) - D\\lvert\\mathbf{k}\\rvert^{2})\\,\\Delta t\\big)``
+``\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2})\\,\\Delta t\\big)``
 — exact for the linear forcing, so the integrator keeps its order.
 """
 function integrating_factor!(factor, ops::SpectralOperators, diffusivity::Real, dt::Real, rate = nothing)
@@ -122,8 +122,8 @@ physical `velocity` ``\\mathbf{u}`` and physical `scalar` ``\\varphi``.
 In conservative form the advection is
 ``-\\nabla\\cdot(\\mathbf{u}\\varphi)`` (equal to ``-\\mathbf{u}\\cdot\\nabla\\varphi`` since
 ``\\nabla\\cdot\\mathbf{u} = 0``); the conservative form is used because, with the ``2/3`` rule, it
-conserves the scalar mean exactly (the divergence has no ``\\mathbf{k}=\\mathbf 0`` component). It is
-computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\mathbf{k}\\cdot\\widehat{\\mathbf{u}\\varphi}\\big)``.
+conserves the scalar mean exactly (the divergence has no ``\\boldsymbol{\\kappa}=\\mathbf 0`` component). It is
+computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\boldsymbol{\\kappa}\\cdot\\widehat{\\mathbf{u}\\varphi}\\big)``.
 The scalar flux ``\\mathbf{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
 function scalar_nonlinear!(nonlinear, velocity, scalar, ops::SpectralOperators, ws::Workspace)
@@ -182,8 +182,8 @@ scalar_variance(scalar) = inner(scalar, scalar)
     scalar_dissipation(scalar_gradient, diffusivity)
 
 The mean scalar-variance dissipation rate
-``\\chi = 2\\kappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the physical scalar
-gradient `scalar_gradient` ``\\nabla\\varphi`` and the scalar `diffusivity` ``\\kappa = \\nu/\\mathrm{Sc}``.
+``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the physical scalar
+gradient `scalar_gradient` ``\\nabla\\varphi`` and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 """
 scalar_dissipation(scalar_gradient, diffusivity::Real) = 2 * diffusivity * inner(scalar_gradient, scalar_gradient)
 

@@ -40,7 +40,7 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
     Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
 
 The problem definition consumed by [`step!`](@ref): the kinematic viscosity ``\\nu`` (`viscosity`),
-the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the scalar diffusivity is ``\\kappa = \\nu/\\mathrm{Sc}``),
+the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``),
 and the velocity and scalar forcing strategies (`velocity_forcing`, `scalar_forcing`, both
 `AbstractForcing`).
 """
@@ -83,8 +83,8 @@ function step! end
     IFLowStorageRK3()
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the per-substep
-integrating factor ``\\mathcal{E}_D(\\tau) = \\exp(-D\\lvert\\mathbf{k}\\rvert^{2}\\tau)`` (``D = \\nu``
-for the velocity, ``\\kappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\mathbf{N}}`` the
+integrating factor ``\\mathcal{E}_D(\\tau) = \\exp(-D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\tau)`` (``D = \\nu``
+for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\mathbf{N}}`` the
 de-aliased nonlinearity of each field, the step carries a state ``\\hat q`` and a single accumulator
 ``\\mathbf{h}`` through three stages ``i = 1,2,3``,
 
@@ -168,8 +168,8 @@ end
     IFRK2()
 
 Integrating-factor second-order Runge–Kutta (Heun). With the integrating factors
-``\\mathcal{E}_\\nu = \\exp(-\\nu\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and
-``\\mathcal{E}_\\kappa = \\exp(-\\kappa\\lvert\\mathbf{k}\\rvert^{2}\\Delta t)`` and
+``\\mathcal{E}_\\nu = \\exp(-\\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
+``\\mathcal{E}_\\varkappa = \\exp(-\\varkappa\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
 ``\\widehat{\\mathbf{N}}`` each field's de-aliased nonlinearity, one step of a field ``\\hat q`` with
 integrating factor ``\\mathcal{E}`` is
 
@@ -180,7 +180,7 @@ integrating factor ``\\mathcal{E}`` is
 ```
 
 with ``\\widehat{\\mathbf{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\mathbf{N}}_2`` at the predictor
-``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\kappa``
+``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa``
 respectively, then the forcings are applied. Two nonlinear evaluations per step.
 
 !!! note

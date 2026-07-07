@@ -44,7 +44,7 @@ abstract type DealiasingStrategy end
     TwoThirds()
 
 The sharp isotropic ``2/3``-rule truncation: keep the modes
-``\\lvert\\mathbf{k}\\rvert \\le \\tfrac23 k_{\\max}`` and zero the rest (``k_{\\max}`` the Nyquist
+``\\kappa \\le \\tfrac23 \\kappa_{\\max}`` and zero the rest (``\\kappa_{\\max}`` the Nyquist
 wavenumber). Exact de-aliasing of the quadratic nonlinearity, and the lean, GPU-friendly default.
 """
 struct TwoThirds <: DealiasingStrategy end
@@ -53,10 +53,10 @@ struct TwoThirds <: DealiasingStrategy end
     HouLi(; order = 36, strength = 36)
 
 The smooth Hou–Li spectral filter, transfer function
-``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\lvert\\mathbf{k}\\rvert/k_{\\max})^{\\texttt{order}}\\big)``
+``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\max})^{\\texttt{order}}\\big)``
 (defaults ``36, 36``, damping the Nyquist mode to ``\\mathrm{e}^{-36}\\approx`` machine epsilon). It
 keeps more modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
-stabilisation, hence an opt-in, not the default. Applied isotropically in ``\\lvert\\mathbf{k}\\rvert``
+stabilisation, hence an opt-in, not the default. Applied isotropically in ``\\kappa``
 (the filter TurTLE uses, there per-axis). Because it retains energy out to the Nyquist wavenumber it
 takes a proportionally smaller CFL step than the ``2/3`` rule — handled automatically by
 `recommended_cfl`.
@@ -79,8 +79,8 @@ _retained_nyquist_fraction(::HouLi) = 1 // 1
 The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run on a grid
 of `resolution` points per side, in a periodic box of side `box`: the `Grid3D`, the real-to-complex transform
 plans (one for the velocity, a vector field; one for the scalar ``\\varphi``), the
-`FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\mathbf{k}\\rvert^{2}`` (with
-``\\mathbf{k}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``), and the de-alias kernel
+`FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (with
+``\\boldsymbol{\\kappa}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``), and the de-alias kernel
 `dealias`.
 
 `dealias` is built by the `dealiasing` strategy — [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the
@@ -256,7 +256,7 @@ dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 
 Fill `uh` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\mathbf{u}`` concentrated at large scales by the envelope
-``\\exp\\!\\big(-\\lvert\\mathbf{k}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
 de-aliased, and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\mathbf{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\mathbf{u} = 0``.
@@ -287,10 +287,10 @@ end
     random_scalar!(phih, ops; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
 
 Fill `phih` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
-concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\mathbf{k}\\rvert^{2}/k_p^{2}\\big)``
+concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)``
 (``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
 ``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
-transform, so the ``\\mathbf{k}=\\mathbf 0`` (mean) mode vanishes.
+transform, so the ``\\boldsymbol{\\kappa}=\\mathbf 0`` (mean) mode vanishes.
 """
 function random_scalar!(phih, ops::SpectralOperators;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,

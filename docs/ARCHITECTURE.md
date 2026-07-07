@@ -8,8 +8,8 @@ terse working copy and defers here; the rendered symbol glossary is
 
 The document is self-contained — every symbol, mathematical or `code`, is introduced in plain
 language at first use — and reads top to bottom. Mathematics is written in the notation of the
-glossary (Pope's turbulence conventions: the wavenumber vector is ``\mathbf k`` with magnitude
-``\kappa = \lvert\mathbf k\rvert``; the turbulent kinetic energy is ``k``; the integrating factor is
+glossary (Pope's turbulence conventions: the wavenumber vector is ``\boldsymbol{\kappa}`` with magnitude
+``\kappa``; the turbulent kinetic energy is ``k``; the scalar diffusivity is ``\varkappa``; the integrating factor is
 ``\mathcal E``).
 
 ---
@@ -138,7 +138,7 @@ Each concern is its own module, included in dependency order by the umbrella
 
 - **`SpectralOperators`** is the reusable, read-only machinery for a cubic run: the `Grid3D`, the real–Fourier layout, the
   real-to-complex transform plans (one for the velocity, one for ``\varphi``), the spectral
-  multipliers, the squared-wavenumber array ``\lvert\mathbf k\rvert^2`` (the symbol of ``-\nabla^2``),
+  multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (the symbol of ``-\nabla^2``),
   and the ``2/3``-rule dealias kernel. It is the concrete realisation of the flow's *frame* — today a
   fixed periodic box (a sheared frame is deferred, §7). **Precision and backend enter here and flow
   everywhere from here**: `scalar_type` fixes the real element type (``\texttt{Float32}`` or
@@ -171,9 +171,9 @@ gradient, the equation becomes
   is chosen because it is the cheap, energy-conserving way to compute the advection spectrally, and —
   read through the geometric lens (§8) — it is the flow's *reversible* generator.
 - **`integrating_factor!`** builds the exact diffusive factor
-  ``\mathcal E(\mathbf k) = \exp\!\big((A(\mathbf k) - D\lvert\mathbf k\rvert^2)\,\Delta t\big)``, with
+  ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2)\,\Delta t\big)``, with
   diffusivity ``D = \nu`` for the velocity and ``D = \nu/\mathrm{Sc}`` for the scalar, and an optional
-  per-mode linear forcing rate ``A(\mathbf k)`` folded in. Multiplying a field by ``\mathcal E``
+  per-mode linear forcing rate ``A(\boldsymbol{\kappa})`` folded in. Multiplying a field by ``\mathcal E``
   advances its viscous/diffusive part *exactly*, with no stability restriction. This is the flow's
   *irreversible* generator; keeping it exact is what the integrating-factor split buys.
 - **`scalar_to_physical!`** transforms ``\hat\varphi`` to the physical ``\varphi`` at each stage — the
@@ -185,7 +185,7 @@ gradient, the equation becomes
 - **Diagnostics** — `kinetic_energy` ``k = \tfrac12\langle\lvert\mathbf u\rvert^2\rangle``,
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
-  ``\chi = 2\kappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
+  ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
   ``S \approx -0.5`` of developed turbulence, from the diagonal ``\partial_{x_i} u_i``). These are not incidental: they are the
   **fitness functionals** the comparison machine of §3 evaluates, and the stationarity signals
   `warmup!` watches.
@@ -196,7 +196,7 @@ gradient, the equation becomes
 protocol whose four methods all default to doing nothing:
 
 - `forcing_rate!` — for a forcing *linear* in the field (``\mathbf f = A\,\mathbf u``): fill the
-  per-mode rate ``A(\mathbf k)``, folded into the integrating factor (exact, order-preserving).
+  per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving).
 - `apply_forcing!` — a post-step projection or rescale.
 - `prepare_forcing!` — advance internal state once per step (a stochastic process).
 - `forcing_source!` — add an additive source at each Runge–Kutta stage.
@@ -214,7 +214,7 @@ extension point.
 ### 4.4 `TimeIntegration` — the Method for the field evolution
 
 - **`Physics`** bundles the problem parameters the step consumes: the viscosity ``\nu``, the Schmidt
-  number ``\mathrm{Sc}`` (scalar diffusivity ``\kappa = \nu/\mathrm{Sc}``), and the two forcings.
+  number ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings.
 - **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
   advances the velocity ``\hat{\mathbf u}`` and scalar ``\hat\varphi`` **together** through the same
   Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy needs
@@ -337,7 +337,7 @@ is a gap.
   ``(\mathbf x,\mathbf v,\mathbf L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.5, §8).
 - **The sheared frame (Rogallo).** A uniform mean velocity gradient makes the wavenumbers
-  time-dependent (``d\mathbf k/dt = -\mathsf A^{\!\top}\mathbf k``) and non-separable. This is the one
+  time-dependent (``d\boldsymbol{\kappa}/dt = -\mathsf A^{\!\top}\boldsymbol{\kappa}``) and non-separable. This is the one
   future with a concrete `GBGPeriodicFields` dependency: its separable per-axis multipliers cannot
   hold a sheared lattice, so it is a bounded extension *there* (rule 1 of §5), not a job here.
 - **The Model ladder beyond DNS** — LES (filter the DNS, model the subgrid stress) and a
@@ -409,7 +409,7 @@ missing one usually encodes a decision.
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
   exact/ideal form, *then* the discrete realisation — as `integrating_factor!` leads with
-  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\mathbf k)``, and `velocity_nonlinear!` with the
+  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_nonlinear!` with the
   Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
 - **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
@@ -433,7 +433,7 @@ missing one usually encodes a decision.
 Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 1. **(2026-06) Integrating-factor split with exact diffusion.** The stiff viscous/diffusive part is
-   integrated exactly by ``\mathcal E(\mathbf k)``; only the advection is explicit. Removes the
+   integrated exactly by ``\mathcal E(\boldsymbol{\kappa})``; only the advection is explicit. Removes the
    diffusive stability limit and preserves scheme order under linear forcing.
 2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
    advection; the reversible generator of the geometric lens.
