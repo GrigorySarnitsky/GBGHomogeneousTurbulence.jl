@@ -12,7 +12,7 @@ scope.
 - [Forcing](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing` (`NoForcing`, `BandRescaling`, `Linear`, `ConstantPower`, `StochasticOU`).
 - [TimeIntegration](api/TimeIntegration.md): the pluggable integrating-factor time-stepping schemes under `AbstractIntegrator` (`IFRK2`, `IFLowStorageRK3`).
 - [Particles](api/Particles.md): Lagrangian tracer tracking — `Tracers`, second-order `advect!` (Heun-in-time), and `sample!` for the Lagrangian statistics.
-- [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation` and the loop drivers `advance!`, `run!`, and `warmup!`.
+- [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation` and the functions that advance it: `advance!`, `run!`, and `warmup!`.
 
 ```@contents
 Pages = [

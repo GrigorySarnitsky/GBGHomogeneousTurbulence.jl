@@ -14,7 +14,8 @@
 The flow's equations of motion — the incompressible Navier–Stokes right-hand side in rotational form
 (the de-aliased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
 integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *generator of the full
-dynamics*; `Observables` are the functions of that state, and `TimeIntegration` the numerical propagator.
+dynamics* — it advances the flow state; `Observables` are the functions of that state, and
+`TimeIntegration` the numerical propagator.
 """
 module Dynamics
 

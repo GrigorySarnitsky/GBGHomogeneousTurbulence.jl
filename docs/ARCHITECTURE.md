@@ -278,7 +278,7 @@ The layer wires §4.1–§4.5 together; it holds no physics or numerics of its o
 `SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles → SimulationRun`. Cross-module
 access is through explicit `using ..Module: name` lists. Statistics live consumer-side of this
 package too: the sampling in `Particles` and the observables in `Observables` produce the *samples*; a
-statistics driver that feeds them to `GBGStreamingStatistics` is deferred (§7).
+statistics bridge that feeds them to `GBGStreamingStatistics` is deferred (§7).
 
 ---
 
@@ -350,7 +350,7 @@ is a gap.
   filtered-density-function / statistical Model (§8). Each is a coarser rung, discriminated from DNS
   by statistical commutation; the canonical acceptance test is the relaxation of a two-mode scalar
   distribution (a micromixing benchmark).
-- **The statistics driver** — the sampling-to-`GBGStreamingStatistics` bridge (Eulerian field
+- **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field
   samples and Lagrangian trajectory samples in, streamed summaries out).
 
 ---

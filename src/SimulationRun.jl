@@ -13,7 +13,7 @@
 """
     SimulationRun
 
-The run layer: [`Simulation`](@ref) (the assembled state of a case) and the loop drivers
+The run layer: [`Simulation`](@ref) (the assembled state of a case) and the functions that advance it —
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
 per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity). The observables
 `kinetic_energy`, `dissipation`, and `scalar_variance` accept a `Simulation` directly.
