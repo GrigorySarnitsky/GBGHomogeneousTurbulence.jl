@@ -10,16 +10,16 @@ using Random
 using Test
 
 
-# Integrate the velocity from a copy of `uh0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
-function integrate_fixed(integrator, ops, ws, uh0, physics, dt, nsteps)
-  uh = spectral_vector(ops)
-  copyto!(field_data(uh), field_data(uh0))
-  phih = scalar_spectral(ops)
+# Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
+function integrate_fixed(integrator, ops, ws, û0, physics, dt, nsteps)
+  û = spectral_vector(ops)
+  copyto!(field_data(û), field_data(û0))
+  φ̂ = scalar_spectral(ops)
   for _ in 1:nsteps
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
-    step!(integrator, uh, phih, ops, ws, physics, dt)
+    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
+    step!(integrator, û, φ̂, ops, ws, physics, dt)
   end
-  return uh
+  return û
 end
 
 diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
@@ -33,9 +33,9 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   ops = SpectralOperators(N, L; scalar_type = T)
   ws = Workspace(ops)
 
-  uh0 = spectral_vector(ops)
-  random_solenoidal_velocity!(uh0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
-  dealias!(uh0, ops)
+  û0 = spectral_vector(ops)
+  random_solenoidal_velocity!(û0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
+  dealias!(û0, ops)
 
   Tfinal = 0.5
   n = 8
@@ -43,15 +43,15 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "temporal convergence order" begin
     unforced = Physics(viscosity = ν)
     rk3 = IFLowStorageRK3()
-    u1 = integrate_fixed(rk3, ops, ws, uh0, unforced, Tfinal / n, n)
-    u2 = integrate_fixed(rk3, ops, ws, uh0, unforced, Tfinal / (2n), 2n)
-    u4 = integrate_fixed(rk3, ops, ws, uh0, unforced, Tfinal / (4n), 4n)
+    u1 = integrate_fixed(rk3, ops, ws, û0, unforced, Tfinal / n, n)
+    u2 = integrate_fixed(rk3, ops, ws, û0, unforced, Tfinal / (2n), 2n)
+    u4 = integrate_fixed(rk3, ops, ws, û0, unforced, Tfinal / (4n), 4n)
     rk3_ratio = diffnorm(u1, u2) / diffnorm(u2, u4)
 
     rk2 = IFRK2()
-    v1 = integrate_fixed(rk2, ops, ws, uh0, unforced, Tfinal / n, n)
-    v2 = integrate_fixed(rk2, ops, ws, uh0, unforced, Tfinal / (2n), 2n)
-    v4 = integrate_fixed(rk2, ops, ws, uh0, unforced, Tfinal / (4n), 4n)
+    v1 = integrate_fixed(rk2, ops, ws, û0, unforced, Tfinal / n, n)
+    v2 = integrate_fixed(rk2, ops, ws, û0, unforced, Tfinal / (2n), 2n)
+    v4 = integrate_fixed(rk2, ops, ws, û0, unforced, Tfinal / (4n), 4n)
     rk2_ratio = diffnorm(v1, v2) / diffnorm(v2, v4)
 
     @test 5.0 < rk3_ratio < 12.0      # third order ⇒ ≈ 8
@@ -63,28 +63,28 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     physics = Physics(viscosity = ν,
                       velocity_forcing = BandRescaling(ops; energy = 0.5, lowest_shell = 1, highest_shell = 2))
     integrator = IFLowStorageRK3()
-    uh = spectral_vector(ops)
-    copyto!(field_data(uh), field_data(uh0))
-    phih = scalar_spectral(ops)
+    û = spectral_vector(ops)
+    copyto!(field_data(û), field_data(û0))
+    φ̂ = scalar_spectral(ops)
     Δx = L / N
     cfl = recommended_cfl(integrator)
     energies = T[]
     for _ in 1:200
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
       dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
       push!(energies, kinetic_energy(ws.velocity))
-      step!(integrator, uh, phih, ops, ws, physics, dt)
+      step!(integrator, û, φ̂, ops, ws, physics, dt)
     end
     @test all(isfinite, energies)
     @test 0.05 < energies[end] < 10.0
-    rel_div = l2norm(divergence(uh, ops.multipliers)) / (l2norm(uh) + 1e-30)
+    rel_div = l2norm(divergence(û, ops.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
 
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
     dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
-    step!(integrator, uh, phih, ops, ws, physics, dt)                       # warm up
-    bytes = @allocated step!(integrator, uh, phih, ops, ws, physics, dt)
-    field_bytes = length(field_data(uh)) * sizeof(eltype(field_data(uh)))
+    step!(integrator, û, φ̂, ops, ws, physics, dt)                       # warm up
+    bytes = @allocated step!(integrator, û, φ̂, ops, ws, physics, dt)
+    field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
     @test bytes < field_bytes
   end
 

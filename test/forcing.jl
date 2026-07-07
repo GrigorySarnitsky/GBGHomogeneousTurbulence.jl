@@ -18,18 +18,18 @@ using Test
   ops = SpectralOperators(N, L; scalar_type = T)
   ws = Workspace(ops)
 
-  uh0 = spectral_vector(ops)
-  random_solenoidal_velocity!(uh0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
-  dealias!(uh0, ops)
+  û0 = spectral_vector(ops)
+  random_solenoidal_velocity!(û0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
+  dealias!(û0, ops)
 
   run_velocity(physics, nsteps; dt = 0.01) = begin
-    uh = spectral_vector(ops); copyto!(field_data(uh), field_data(uh0))
-    phih = scalar_spectral(ops)
+    û = spectral_vector(ops); copyto!(field_data(û), field_data(û0))
+    φ̂ = scalar_spectral(ops)
     for _ in 1:nsteps
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
-      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, dt)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
+      step!(IFLowStorageRK3(), û, φ̂, ops, ws, physics, dt)
     end
-    uh
+    û
   end
 
   k0 = 2π / L
@@ -40,7 +40,7 @@ using Test
     A = 0.7
     forcing = Linear(ops; rate = A, lowest_shell = 1, highest_shell = 2)
     fill!(ws.velocity_rate, 0.0)
-    @test forcing_rate!(forcing, ws.velocity_rate, uh0, ops, ws)
+    @test forcing_rate!(forcing, ws.velocity_rate, û0, ops, ws)
     @test maximum(ws.velocity_rate) ≈ A        # A on the band
     @test minimum(ws.velocity_rate) == 0       # zero outside the band
   end
@@ -48,8 +48,8 @@ using Test
   @testset "ConstantPower sets injection rate = power" begin
     power = 0.3
     forcing = ConstantPower(ops; power = power, lowest_shell = 1, highest_shell = 2)
-    E_band = band_energy(uh0)
-    forcing_rate!(forcing, ws.velocity_rate, uh0, ops, ws)
+    E_band = band_energy(û0)
+    forcing_rate!(forcing, ws.velocity_rate, û0, ops, ws)
     A = maximum(ws.velocity_rate)
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
   end
@@ -66,34 +66,34 @@ using Test
   @testset "ConstantPower bounded and solenoidal" begin
     physics = Physics(viscosity = ν,
                       velocity_forcing = ConstantPower(ops; power = 0.5, lowest_shell = 1, highest_shell = 2))
-    uh = run_velocity(physics, 100)
-    @test isfinite(kinetic_energy(uh)) && kinetic_energy(uh) > 0
-    rel_div = l2norm(divergence(uh, ops.multipliers)) / (l2norm(uh) + 1e-30)
+    û = run_velocity(physics, 100)
+    @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0
+    rel_div = l2norm(divergence(û, ops.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
   end
 
   @testset "scalar Linear forcing builds variance" begin
-    uh_zero = spectral_vector(ops)             # no velocity ⇒ pure linear growth of the scalar band
-    phih0 = scalar_spectral(ops)
-    random_scalar!(phih0, ops; variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
+    û_zero = spectral_vector(ops)             # no velocity ⇒ pure linear growth of the scalar band
+    φ̂0 = scalar_spectral(ops)
+    random_scalar!(φ̂0, ops; variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
     physics = Physics(viscosity = ν,
                       scalar_forcing = Linear(ops; rate = 1.0, lowest_shell = 1, highest_shell = 2))
-    phih = scalar_spectral(ops); copyto!(field_data(phih), field_data(phih0))
+    φ̂ = scalar_spectral(ops); copyto!(field_data(φ̂), field_data(φ̂0))
     for _ in 1:40
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh_zero, ops, ws)
-      step!(IFLowStorageRK3(), uh_zero, phih, ops, ws, physics, 0.01)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û_zero, ops, ws)
+      step!(IFLowStorageRK3(), û_zero, φ̂, ops, ws, physics, 0.01)
     end
-    @test scalar_variance(phih) > scalar_variance(phih0)
+    @test scalar_variance(φ̂) > scalar_variance(φ̂0)
   end
 
   @testset "StochasticOU stationary variance and solenoidality" begin
     target_variance = 0.4
     ou = StochasticOU(ops; variance = target_variance, correlation_time = 0.5,
                       lowest_shell = 1, highest_shell = 2, seed = 123)
-    uh = spectral_vector(ops)                              # velocity reference ⇒ solenoidal forcing
+    û = spectral_vector(ops)                              # velocity reference ⇒ solenoidal forcing
     samples = T[]
     for n in 1:1000
-      prepare_forcing!(ou, uh, ops, ws, 0.01)
+      prepare_forcing!(ou, û, ops, ws, 0.01)
       n > 500 && push!(samples, inner(ou.state, ou.state))
     end
     @test 0.6 * target_variance < sum(samples) / length(samples) < 1.6 * target_variance
@@ -104,10 +104,10 @@ using Test
   @testset "StochasticOU reproducible from seed" begin
     a = StochasticOU(ops; variance = 0.3, correlation_time = 0.4, seed = 7)
     b = StochasticOU(ops; variance = 0.3, correlation_time = 0.4, seed = 7)
-    uh = spectral_vector(ops)
+    û = spectral_vector(ops)
     for n in 1:20
-      prepare_forcing!(a, uh, ops, ws, 0.01)
-      prepare_forcing!(b, uh, ops, ws, 0.01)
+      prepare_forcing!(a, û, ops, ws, 0.01)
+      prepare_forcing!(b, û, ops, ws, 0.01)
     end
     @test field_data(a.state) == field_data(b.state)
   end
@@ -115,17 +115,17 @@ using Test
   @testset "StochasticOU sustains velocity energy" begin
     ou = StochasticOU(ops; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
     physics = Physics(viscosity = ν, velocity_forcing = ou)
-    uh = spectral_vector(ops)
-    random_solenoidal_velocity!(uh, ops; energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
-    dealias!(uh, ops)
-    phih = scalar_spectral(ops)
+    û = spectral_vector(ops)
+    random_solenoidal_velocity!(û, ops; energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    dealias!(û, ops)
+    φ̂ = scalar_spectral(ops)
     for n in 1:200
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
       dt = 0.4 * (L / N) / max(max_speed(ws.velocity), 1e-6)
-      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, dt)
+      step!(IFLowStorageRK3(), û, φ̂, ops, ws, physics, dt)
     end
-    @test isfinite(kinetic_energy(uh)) && kinetic_energy(uh) > 0.05   # forcing kept it from decaying away
-    rel_div = l2norm(divergence(uh, ops.multipliers)) / (l2norm(uh) + 1e-30)
+    @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away
+    rel_div = l2norm(divergence(û, ops.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
   end
 end

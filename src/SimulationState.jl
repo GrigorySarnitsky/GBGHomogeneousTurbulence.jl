@@ -278,47 +278,47 @@ dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 
 
 """
-    random_solenoidal_velocity!(uh, ops; energy = 0.5, peak_wavenumber = 2.0, rng = default_rng())
+    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0, rng = default_rng())
 
-Fill `uh` (a velocity field in spectral representation) with a random, divergence-free velocity
+Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` concentrated at large scales by the envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
 de-aliased, and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 """
-function random_solenoidal_velocity!(uh, ops::SpectralOperators;
+function random_solenoidal_velocity!(û, ops::SpectralOperators;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
                                      rng = Random.default_rng())
   T = _real_type(ops)
   noise = physical_vector(ops)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(ops.grid, Val(1))...))
-  to_spectral!(uh, noise, ops.velocity_plans)
+  to_spectral!(û, noise, ops.velocity_plans)
 
   inverse_peak_squared = one(T) / T(peak_wavenumber)^2
   envelope = scalar_spectral(ops)
   field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
-  convolve!(uh, uh, envelope)
+  convolve!(û, û, envelope)
 
-  helmholtz_projection!(uh, uh, ops.multipliers)
-  convolve!(uh, uh, ops.dealias)
+  helmholtz_projection!(û, û, ops.multipliers)
+  convolve!(û, û, ops.dealias)
 
-  current_energy = 0.5 * inner(uh, uh)
-  current_energy > 0 && (field_data(uh) .*= sqrt(T(energy) / current_energy))
-  return uh
+  current_energy = 0.5 * inner(û, û)
+  current_energy > 0 && (field_data(û) .*= sqrt(T(energy) / current_energy))
+  return û
 end
 
 
 """
-    random_scalar!(phih, ops; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
+    random_scalar!(φ̂, ops; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
 
-Fill `phih` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
+Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
 concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)``
 (``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
 ``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
 transform, so the ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 """
-function random_scalar!(phih, ops::SpectralOperators;
+function random_scalar!(φ̂, ops::SpectralOperators;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,
                         rng = Random.default_rng())
   T = _real_type(ops)
@@ -326,17 +326,17 @@ function random_scalar!(phih, ops::SpectralOperators;
   data = randn(rng, T, physical_field_shape(ops.grid, Val(0))...)
   data .-= sum(data) / length(data)                            # zero the spatial mean
   copyto!(field_data(noise), data)
-  to_spectral!(phih, noise, ops.scalar_plans)
+  to_spectral!(φ̂, noise, ops.scalar_plans)
 
   inverse_peak_squared = one(T) / T(peak_wavenumber)^2
   envelope = scalar_spectral(ops)
   field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
-  convolve!(phih, phih, envelope)
-  convolve!(phih, phih, ops.dealias)
+  convolve!(φ̂, φ̂, envelope)
+  convolve!(φ̂, φ̂, ops.dealias)
 
-  current_variance = inner(phih, phih)                         # ⟨φ²⟩ for a mean-zero field
-  current_variance > 0 && (field_data(phih) .*= sqrt(T(variance) / current_variance))
-  return phih
+  current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
+  current_variance > 0 && (field_data(φ̂) .*= sqrt(T(variance) / current_variance))
+  return φ̂
 end
 
 

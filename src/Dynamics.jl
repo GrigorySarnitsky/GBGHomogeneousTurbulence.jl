@@ -16,6 +16,10 @@ The flow's equations of motion — the incompressible Navier–Stokes right-hand
 integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *generator of the full
 dynamics* — it advances the flow state; `Observables` are the functions of that state, and
 `TimeIntegration` the numerical propagator.
+
+Every method here takes the operator bundle `ops` (a `SpectralOperators`: grid, transform plans,
+wavenumber multipliers, de-alias kernel) and the preallocated scratch `ws` (a `Workspace`) as its
+final two arguments.
 """
 module Dynamics
 
@@ -27,29 +31,29 @@ export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
 
 
 """
-    velocity_vorticity!(velocity, vorticity, uh, ops, ws)
+    velocity_vorticity!(u, ω, û, ops, ws)
 
 Compute the physical velocity ``\\boldsymbol{u}`` and vorticity
-``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` of the velocity field `uh` (given in spectral
-representation ``\\hat{\\boldsymbol{u}}``) into the buffers `velocity` and `vorticity`.
+``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` of the velocity field `û` (given in spectral
+representation ``\\hat{\\boldsymbol{u}}``) into the buffers `u` and `ω`.
 
-`uh` is preserved: the vorticity is transformed first, then a *copy* of `uh` is transformed — the
+`û` is preserved: the vorticity is transformed first, then a *copy* of `û` is transformed — the
 in-place inverse transform consumes its spectral source.
 """
-function velocity_vorticity!(velocity, vorticity, uh, ops::SpectralOperators, ws::Workspace)
-  curl!(ws.vorticity_spectral, uh, ops.multipliers)
-  to_physical!(vorticity, ws.vorticity_spectral, ops.velocity_plans)
-  copyto!(field_data(ws.velocity_copy), field_data(uh))
-  to_physical!(velocity, ws.velocity_copy, ops.velocity_plans)
-  return velocity, vorticity
+function velocity_vorticity!(u, ω, û, ops::SpectralOperators, ws::Workspace)
+  curl!(ws.vorticity_spectral, û, ops.multipliers)
+  to_physical!(ω, ws.vorticity_spectral, ops.velocity_plans)
+  copyto!(field_data(ws.velocity_copy), field_data(û))
+  to_physical!(u, ws.velocity_copy, ops.velocity_plans)
+  return u, ω
 end
 
 
 """
-    velocity_nonlinear!(nonlinear, velocity, vorticity, ops, ws)
+    velocity_nonlinear!(nonlinear, u, ω, ops, ws)
 
 Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
-from the physical `velocity` ``\\boldsymbol{u}`` and `vorticity` ``\\boldsymbol{\\omega}``.
+from the physical `u` ``\\boldsymbol{u}`` and `ω` ``\\boldsymbol{\\omega}``.
 
 In physical space the rotational form writes the convective term as the Lamb vector: with the
 identity ``(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega}``,
@@ -61,8 +65,8 @@ spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})`
 removing the aliasing of the quadratic product. Allocation-free (a destination distinct from its
 sources takes the no-alias path).
 """
-function velocity_nonlinear!(nonlinear, velocity, vorticity, ops::SpectralOperators, ws::Workspace)
-  cross!(ws.lamb, velocity, vorticity)
+function velocity_nonlinear!(nonlinear, u, ω, ops::SpectralOperators, ws::Workspace)
+  cross!(ws.lamb, u, ω)
   to_spectral!(ws.scratch, ws.lamb, ops.velocity_plans)
   helmholtz_projection!(nonlinear, ws.scratch, ops.multipliers)
   convolve!(nonlinear, nonlinear, ops.dealias)
@@ -102,24 +106,24 @@ end
 
 
 """
-    scalar_to_physical!(scalar, phih, ops, ws)
+    scalar_to_physical!(φ, φ̂, ops, ws)
 
-Compute the physical scalar `scalar` ``\\varphi`` from `phih` (the scalar in spectral representation
-``\\hat{\\varphi}``), preserving `phih` — a copy is transformed, since the in-place inverse transform
+Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectral representation
+``\\hat{\\varphi}``), preserving `φ̂` — a copy is transformed, since the in-place inverse transform
 consumes its source.
 """
-function scalar_to_physical!(scalar, phih, ops::SpectralOperators, ws::Workspace)
-  copyto!(field_data(ws.scalar_copy), field_data(phih))
-  to_physical!(scalar, ws.scalar_copy, ops.scalar_plans)
-  return scalar
+function scalar_to_physical!(φ, φ̂, ops::SpectralOperators, ws::Workspace)
+  copyto!(field_data(ws.scalar_copy), field_data(φ̂))
+  to_physical!(φ, ws.scalar_copy, ops.scalar_plans)
+  return φ
 end
 
 
 """
-    scalar_nonlinear!(nonlinear, velocity, scalar, ops, ws)
+    scalar_nonlinear!(nonlinear, u, φ, ops, ws)
 
 Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the
-physical `velocity` ``\\boldsymbol{u}`` and physical `scalar` ``\\varphi``.
+physical `u` ``\\boldsymbol{u}`` and physical `φ` ``\\varphi``.
 
 In conservative form the advection is
 ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
@@ -128,9 +132,9 @@ conserves the scalar mean exactly (the divergence has no ``\\boldsymbol{\\kappa}
 computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
-function scalar_nonlinear!(nonlinear, velocity, scalar, ops::SpectralOperators, ws::Workspace)
-  scalar_data = field_data(scalar)
-  field_data(ws.lamb) .= field_data(velocity) .* reshape(scalar_data, size(scalar_data)..., 1)  # flux uφ
+function scalar_nonlinear!(nonlinear, u, φ, ops::SpectralOperators, ws::Workspace)
+  φ_data = field_data(φ)
+  field_data(ws.lamb) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)  # flux uφ
   to_spectral!(ws.scratch, ws.lamb, ops.velocity_plans)        # (uφ)^
   divergence!(nonlinear, ws.scratch, ops.multipliers)          # i𝛋·(uφ)^ = ∇·(uφ)
   convolve!(nonlinear, nonlinear, ops.dealias, -1, 0)          # N_φ = -dealias(∇·(uφ))

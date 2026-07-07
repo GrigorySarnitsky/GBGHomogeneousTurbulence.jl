@@ -109,15 +109,15 @@ function Simulation(ops::SpectralOperators;
                     velocity_forcing = _resolve_forcing(velocity_forcing, ops),
                     scalar_forcing = _resolve_forcing(scalar_forcing, ops))
 
-  uh = spectral_vector(ops)
-  random_solenoidal_velocity!(uh, ops; energy, peak_wavenumber, rng)
-  phih = scalar_spectral(ops)
-  scalar && random_scalar!(phih, ops; variance = scalar_variance, peak_wavenumber, rng)
+  û = spectral_vector(ops)
+  random_solenoidal_velocity!(û, ops; energy, peak_wavenumber, rng)
+  φ̂ = scalar_spectral(ops)
+  scalar && random_scalar!(φ̂, ops; variance = scalar_variance, peak_wavenumber, rng)
 
   tracers = ntracers > 0 ? Tracers(ops, ntracers; scheme = tracer_scheme, rng) : nothing
   tracer_velocity = ntracers > 0 ? physical_vector(ops) : nothing
 
-  sim = Simulation(ops, ws, physics, integrator, uh, phih, tracers, tracer_velocity,
+  sim = Simulation(ops, ws, physics, integrator, û, φ̂, tracers, tracer_velocity,
                    Float64(cfl), Clock(0.0, 0))
   return _refresh_cached_fields!(sim)
 end

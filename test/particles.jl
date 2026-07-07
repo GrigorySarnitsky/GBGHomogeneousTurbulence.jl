@@ -94,20 +94,20 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     ws = Workspace(ops)
     physics = Physics(viscosity = 0.05,
                       velocity_forcing = BandRescaling(ops; energy = 0.5, lowest_shell = 1, highest_shell = 2))
-    uh = spectral_vector(ops)
-    random_solenoidal_velocity!(uh, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
-    dealias!(uh, ops)
-    phih = scalar_spectral(ops)
+    û = spectral_vector(ops)
+    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
+    dealias!(û, ops)
+    φ̂ = scalar_spectral(ops)
     tracers = Tracers(ops, 200; scheme = CatmullRom, rng = MersenneTwister(5))
     u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), ops.grid)
 
     Δx = L / N
     for _ in 1:50
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, uh, ops, ws)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
       dt = 0.4 * Δx / max(max_speed(ws.velocity), 1e-6)
       copyto!(field_data(u_start), field_data(ws.velocity))           # u(tₙ)
-      step!(IFLowStorageRK3(), uh, phih, ops, ws, physics, dt)
-      u_end = to_physical(uh, ops.velocity_plans)                     # u(tₙ₊₁)
+      step!(IFLowStorageRK3(), û, φ̂, ops, ws, physics, dt)
+      u_end = to_physical(û, ops.velocity_plans)                     # u(tₙ₊₁)
       advect!(tracers, u_start, u_end, ops, dt)
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)

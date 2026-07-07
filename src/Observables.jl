@@ -23,61 +23,61 @@ export kinetic_energy, dissipation, max_speed,
 
 
 """
-    kinetic_energy(velocity)
+    kinetic_energy(u)
 
 The turbulent kinetic energy ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
-velocity field `velocity`. Computed as ``\\tfrac12\\,\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
-the normalized inner product, so by Parseval's theorem it accepts `velocity` in either
+velocity field `u`. Computed as ``\\tfrac12\\,\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
+the normalized inner product, so by Parseval's theorem it accepts `u` in either
 representation.
 """
-kinetic_energy(velocity) = 0.5 * inner(velocity, velocity)
+kinetic_energy(u) = 0.5 * inner(u, u)
 
 
 """
-    dissipation(vorticity, viscosity)
+    dissipation(ω, viscosity)
 
 The mean kinetic-energy dissipation rate of a homogeneous flow,
 ``\\varepsilon = \\nu\\,\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, from the physical
-`vorticity` ``\\boldsymbol{\\omega}`` and the kinematic `viscosity` ``\\nu`` (the homogeneous
+`ω` ``\\boldsymbol{\\omega}`` and the kinematic `viscosity` ``\\nu`` (the homogeneous
 identity ``\\varepsilon = 2\\nu\\langle S_{ij}S_{ij}\\rangle = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``).
 """
-dissipation(vorticity, viscosity::Real) = viscosity * inner(vorticity, vorticity)
+dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
 
 
 """
-    max_speed(velocity)
+    max_speed(u)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert`` — an allocation-free
 reduction used to set the advective CFL timestep. It differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``
 by at most ``\\sqrt{3}``, well inside the CFL margin.
 """
-max_speed(velocity) = maximum(abs, field_data(velocity))
+max_speed(u) = maximum(abs, field_data(u))
 
 
 """
-    scalar_variance(scalar)
+    scalar_variance(φ)
 
-The scalar variance ``\\langle\\varphi^{2}\\rangle`` of the scalar field `scalar` (for a mean-zero
+The scalar variance ``\\langle\\varphi^{2}\\rangle`` of the scalar field `φ` (for a mean-zero
 ``\\varphi``). Computed as ``\\langle\\varphi,\\varphi\\rangle`` with the normalized inner product,
-so by Parseval's theorem it accepts `scalar` in either representation.
+so by Parseval's theorem it accepts `φ` in either representation.
 """
-scalar_variance(scalar) = inner(scalar, scalar)
+scalar_variance(φ) = inner(φ, φ)
 
 
 """
-    scalar_dissipation(scalar, ops, diffusivity)
+    scalar_dissipation(φ, ops, diffusivity)
 
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-`scalar` ``\\varphi`` (in spectral representation) and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
+`φ` ``\\varphi`` (in spectral representation) and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
 against the squared-wavenumber multiplier `ops.squared_wavenumber_kernel` — straight from the spectral
 coefficients, with no physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's
 cached ``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
 """
-scalar_dissipation(scalar, ops::SpectralOperators, diffusivity::Real) =
-  2 * diffusivity * weighted_inner(scalar, ops.squared_wavenumber_kernel)
+scalar_dissipation(φ, ops::SpectralOperators, diffusivity::Real) =
+  2 * diffusivity * weighted_inner(φ, ops.squared_wavenumber_kernel)
 
 
 # The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal
@@ -87,7 +87,7 @@ const _SKEWNESS_ISOTROPY_CONSTANT = (4 / 7) * sqrt(15 / 2)              # ≈ 1.
 
 
 """
-    derivative_skewness(uh, ops)
+    derivative_skewness(û, ops)
 
 The velocity-derivative skewness, written coordinate-free as the normalized third invariant of the
 strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``:
@@ -113,8 +113,8 @@ turbulence: a random-phase (Gaussian) field has ``S \\approx 0`` (all odd invari
 developed isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov) — the enstrophy-production /
 vortex-stretching signature. Its plateau is the strict "real turbulence yet" gate of the warm-up detector.
 """
-function derivative_skewness(uh, ops::SpectralOperators)
-  strain = symmetric_gradient(uh, ops.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
+function derivative_skewness(û, ops::SpectralOperators)
+  strain = symmetric_gradient(û, ops.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
   strain_physical = tensor_physical(ops)
   to_physical!(strain_physical, strain, ops.tensor_plans)            # S in physical space (Ŝ is consumed)
   ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
