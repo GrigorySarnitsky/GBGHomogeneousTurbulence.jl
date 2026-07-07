@@ -36,7 +36,7 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `Physics.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `Physics.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | — (no field; set through ``\nu``, ``\mathrm{Re}_\lambda`` measured) |
+| ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | `1 / ν` (``\mathrm{Re}_\lambda`` measured) |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
