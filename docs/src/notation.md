@@ -33,8 +33,8 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `Physics.viscosity` |
-| ``\mathrm{Sc}`` | Schmidt number | `Physics.schmidt` |
+| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `physics.viscosity` |
+| ``\mathrm{Sc}`` | Schmidt number | `physics.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
 | ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | `1 / ν` (``\mathrm{Re}_\lambda`` measured) |
 
