@@ -7,7 +7,7 @@
 #  3. Mean conservation: the conservative form -∇·(uφ) leaves the k = 0 (mean) mode untouched.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data
+using GBGPeriodicFields: field_data, gradient!, to_physical!, inner
 using Random
 using Test
 
@@ -83,5 +83,22 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
                       velocity_forcing = BandRescaling(ops; energy = 0.5, lowest_shell = 1, highest_shell = 2))
     _, phih = integrate_coupled(IFLowStorageRK3(), ops, ws, uh0, phih0, physics, 0.02, 30)
     @test field_data(phih)[1, 1, 1] ≈ mean_before
+  end
+
+  @testset "scalar dissipation = Dirichlet energy" begin
+    Sc = 0.7
+    κ = ν / Sc
+    phih = scalar_spectral(ops)
+    random_scalar!(phih, ops; variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
+
+    # ground truth: 2κ⟨|∇φ|²⟩ from the explicit physical gradient (the pre-fusion computation)
+    grad_spectral = spectral_vector(ops)
+    grad_physical = physical_vector(ops)
+    gradient!(grad_spectral, phih, ops.multipliers)
+    to_physical!(grad_physical, grad_spectral, ops.velocity_plans)
+    expected = 2 * κ * inner(grad_physical, grad_physical)
+
+    @test scalar_dissipation(phih, ops, κ) > 0
+    @test scalar_dissipation(phih, ops, κ) ≈ expected
   end
 end

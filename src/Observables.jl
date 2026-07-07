@@ -65,13 +65,19 @@ scalar_variance(scalar) = inner(scalar, scalar)
 
 
 """
-    scalar_dissipation(scalar_gradient, diffusivity)
+    scalar_dissipation(scalar, ops, diffusivity)
 
 The mean scalar-variance dissipation rate
-``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the physical scalar
-gradient `scalar_gradient` ``\\nabla\\varphi`` and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
+``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
+`scalar` ``\\varphi`` (in spectral representation) and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
+The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
+``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
+against the squared-wavenumber multiplier `ops.squared_wavenumber_kernel` — straight from the spectral
+coefficients, with no physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's
+cached ``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
 """
-scalar_dissipation(scalar_gradient, diffusivity::Real) = 2 * diffusivity * inner(scalar_gradient, scalar_gradient)
+scalar_dissipation(scalar, ops::SpectralOperators, diffusivity::Real) =
+  2 * diffusivity * weighted_inner(scalar, ops.squared_wavenumber_kernel)
 
 
 """

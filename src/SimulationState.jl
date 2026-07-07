@@ -80,8 +80,8 @@ The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-tur
 of `resolution` points per side, in a periodic box of side `box`: the `Grid3D`, the real-to-complex transform
 plans (one for the velocity, a vector field; one for the scalar ``\\varphi``), the
 `FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (with
-``\\boldsymbol{\\kappa}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``), and the de-alias kernel
-`dealias`.
+``\\boldsymbol{\\kappa}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``; kept both as a real array
+and as a scalar-field kernel for weighted spectral reductions), and the de-alias kernel `dealias`.
 
 `dealias` is built by the `dealiasing` strategy — [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the
 default) or [`HouLi`](@ref) (the smooth Hou–Li filter). Both are applied by [`dealias!`](@ref) as a
@@ -91,13 +91,14 @@ sets the advective-CFL ceiling through `recommended_cfl`.
 `array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
 `scalar_type` the real element type (`Float32` is GPU-friendly).
 """
-struct SpectralOperators{G, L, VP, SP, M, K, D, DS}
+struct SpectralOperators{G, L, VP, SP, M, K, SK, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
   scalar_plans::SP
   multipliers::M
   squared_wavenumber::K            # |k|² as a real array
+  squared_wavenumber_kernel::SK    # |k|² as a ScalarFieldSpectral — the Dirichlet-energy weight for `weighted_inner`
   dealias::D                       # isotropic low-pass kernel (ScalarFieldSpectral), built by `dealiasing`
   dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi)
 end
@@ -123,10 +124,11 @@ function SpectralOperators(resolution::Integer, box::Real = 2π;
   velocity_plans = FieldTransformPlans(velocity_physical, velocity_spectral)
   scalar_plans = FieldTransformPlans(scalar_physical, scalar_spectral_storage)
   multipliers = FieldSpectralMultipliers(velocity_spectral)
-  squared_wavenumber = real.(field_data(squared_wavenumber_field(velocity_spectral, multipliers)))
+  squared_wavenumber_kernel = squared_wavenumber_field(scalar_spectral_storage, multipliers)
+  squared_wavenumber = real.(field_data(squared_wavenumber_kernel))
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, squared_wavenumber, N, L, T)
 
-  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, multipliers, squared_wavenumber, dealias, dealiasing)
+  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
 end
 
 
