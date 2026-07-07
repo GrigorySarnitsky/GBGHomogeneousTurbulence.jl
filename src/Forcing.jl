@@ -22,7 +22,7 @@ the step through up to four methods — [`forcing_rate!`](@ref) (a linear rate f
 integrating factor), [`apply_forcing!`](@ref) (a post-step projection), [`prepare_forcing!`](@ref) (a
 per-step state advance), and [`forcing_source!`](@ref) (an additive per-stage source). `NoForcing`,
 `BandRescaling`, `Linear`, `ConstantPower`, and the stochastic `StochasticOU` are provided; one
-implementation serves both the velocity and the scalar ``\\varphi``.
+implementation serves both the velocity and the scalar.
 """
 module Forcing
 

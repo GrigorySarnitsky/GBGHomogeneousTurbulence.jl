@@ -1,7 +1,7 @@
 # GBGIsotropicTurbulence — umbrella module: it sets the include order and assembles the public API.
 #
-# This package is a small, focused pseudospectral DNS of homogeneous isotropic (scalar) turbulence —
-# a velocity field plus a single passive scalar φ on a periodic box — built on GBGPeriodicFields,
+# This package is a small, focused pseudospectral DNS of homogeneous isotropic turbulence —
+# a velocity field plus a single passive scalar on a periodic box — built on GBGPeriodicFields,
 # which supplies every field operation (transforms, spectral operators, convolution, interpolation,
 # reductions). GBGPeriodicFields is deliberately time- and particle-free (its invariant 12); this
 # package is the consumer that owns time integration, forcing, the scalar transport, particle
@@ -24,9 +24,9 @@
     GBGIsotropicTurbulence
 
 Tools for simulating and analysing homogeneous isotropic turbulence on three-dimensional periodic
-domains: a velocity field and a single passive scalar ``\\varphi``, each optionally forced, advanced
-by a choice of integrating-factor time-stepping scheme, with Lagrangian particle tracking and
-Eulerian + Lagrangian statistics.
+domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
+of integrating-factor time-stepping scheme, with Lagrangian particle tracking and Eulerian +
+Lagrangian statistics.
 
 Built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl).
 
