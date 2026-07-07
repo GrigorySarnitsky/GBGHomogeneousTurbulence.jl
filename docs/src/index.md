@@ -2,7 +2,7 @@
 
 `GBGIsotropicTurbulence.jl` is a small, focused pseudospectral direct-numerical-simulation (DNS)
 package for homogeneous isotropic turbulence on a three-dimensional periodic domain: an incompressible
-velocity field ``\mathbf{u}`` together with a single passive scalar ``\varphi``, each optionally
+velocity field ``\boldsymbol{u}`` together with a single passive scalar ``\varphi``, each optionally
 forced, advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle
 tracking and Eulerian + Lagrangian statistics.
 
@@ -31,19 +31,19 @@ using GBGIsotropicTurbulence
 
 ## What it solves
 
-With ``\mathbf{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\mathbf{u}`` the vorticity,
+With ``\boldsymbol{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` the vorticity,
 ``\nu`` the kinematic viscosity, ``\mathbb{P}`` the Leray–Helmholtz projection onto divergence-free
-fields, and ``\mathbf{f}`` a forcing, the momentum equation is advanced in rotational form,
+fields, and ``\boldsymbol{f}`` a forcing, the momentum equation is advanced in rotational form,
 
 ```math
-\partial_t \mathbf{u} = \mathbb{P}\,(\mathbf{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\mathbf{u} + \mathbf{f},
-\qquad \nabla\cdot\mathbf{u} = 0,
+\partial_t \boldsymbol{u} = \mathbb{P}\,(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
+\qquad \nabla\cdot\boldsymbol{u} = 0,
 ```
 
 and the passive scalar ``\varphi`` by the advection–diffusion equation
 
 ```math
-\partial_t \varphi = -\nabla\cdot(\mathbf{u}\,\varphi) + \frac{\nu}{\mathrm{Sc}}\nabla^{2}\varphi + f_\varphi,
+\partial_t \varphi = -\nabla\cdot(\boldsymbol{u}\,\varphi) + \frac{\nu}{\mathrm{Sc}}\nabla^{2}\varphi + f_\varphi,
 ```
 
 with ``\mathrm{Sc}`` the Schmidt number. In both equations the diffusive (stiff) term is integrated

@@ -197,9 +197,9 @@ Preallocated scratch for one coupled integrating-factor step of the velocity and
 ``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers, the
 predictor field, a velocity copy (the in-place inverse transform consumes its source), a general
 spectral scratch, the nonlinear-term buffer, and the physical velocity / vorticity / predictor /
-Lamb-vector (``\\mathbf{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage
+Lamb-vector (``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage
 registers, a predictor, the nonlinear-term buffer, a copy, the shared integrating factor, and the
-physical scalar; the scalar flux ``\\mathbf{u}\\varphi`` reuses the physical and spectral velocity
+physical scalar; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity
 scratch. Sized so a step allocates no field-sized memory.
 """
 struct Workspace{VS, SS, VP, SP, RK}
@@ -255,11 +255,11 @@ dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
     random_solenoidal_velocity!(uh, ops; energy = 0.5, peak_wavenumber = 2.0, rng = default_rng())
 
 Fill `uh` (a velocity field in spectral representation) with a random, divergence-free velocity
-``\\mathbf{u}`` concentrated at large scales by the envelope
+``\\boldsymbol{u}`` concentrated at large scales by the envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
 de-aliased, and rescaled so the kinetic energy
-``\\tfrac12\\langle\\lvert\\mathbf{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
-projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\mathbf{u} = 0``.
+``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
+projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 """
 function random_solenoidal_velocity!(uh, ops::SpectralOperators;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
@@ -290,7 +290,7 @@ Fill `phih` (the scalar ``\\varphi`` in spectral representation) with a random, 
 concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)``
 (``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
 ``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
-transform, so the ``\\boldsymbol{\\kappa}=\\mathbf 0`` (mean) mode vanishes.
+transform, so the ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 """
 function random_scalar!(phih, ops::SpectralOperators;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,

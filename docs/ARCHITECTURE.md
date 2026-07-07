@@ -17,7 +17,7 @@ glossary (Pope's turbulence conventions: the wavenumber vector is ``\boldsymbol{
 ## 1. Identity
 
 > `GBGIsotropicTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS)
-> of homogeneous isotropic turbulence: one incompressible velocity field ``\mathbf u`` and one
+> of homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol u`` and one
 > passive scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable
 > integrating-factor time-stepping, with Lagrangian particle probes and Eulerian + Lagrangian
 > statistics. It is a **library of composable pieces with a thin ergonomic run layer on top**, built
@@ -157,16 +157,16 @@ Each concern is its own module, included in dependency order by the umbrella
 
 The incompressible momentum equation is advanced in **rotational (Lamb-vector) form**. Writing the
 convective term through the identity
-``(\mathbf u\cdot\nabla)\mathbf u = \nabla(\tfrac12\lvert\mathbf u\rvert^2) - \mathbf u\times\boldsymbol\omega``
-(with vorticity ``\boldsymbol\omega = \nabla\times\mathbf u``) and letting the Leray–Helmholtz
+``(\boldsymbol u\cdot\nabla)\boldsymbol u = \nabla(\tfrac12\lvert\boldsymbol u\rvert^2) - \boldsymbol u\times\boldsymbol\omega``
+(with vorticity ``\boldsymbol\omega = \nabla\times\boldsymbol u``) and letting the Leray–Helmholtz
 projection ``\mathbb P`` onto divergence-free fields absorb the pressure and the kinetic-energy
 gradient, the equation becomes
 
 ```math
-\partial_t\mathbf u = \mathbb P\,(\mathbf u\times\boldsymbol\omega) + \nu\nabla^2\mathbf u + \mathbf f .
+\partial_t\boldsymbol u = \mathbb P\,(\boldsymbol u\times\boldsymbol\omega) + \nu\nabla^2\boldsymbol u + \boldsymbol f .
 ```
 
-- **`velocity_vorticity!`** and **`velocity_nonlinear!`** assemble ``\mathbb P\,(\mathbf u\times\boldsymbol\omega)``,
+- **`velocity_vorticity!`** and **`velocity_nonlinear!`** assemble ``\mathbb P\,(\boldsymbol u\times\boldsymbol\omega)``,
   dealiased by the ``2/3`` rule to remove the aliasing of the quadratic product. The rotational form
   is chosen because it is the cheap, energy-conserving way to compute the advection spectrally, and —
   read through the geometric lens (§8) — it is the flow's *reversible* generator.
@@ -179,10 +179,10 @@ gradient, the equation becomes
 - **`scalar_to_physical!`** transforms ``\hat\varphi`` to the physical ``\varphi`` at each stage — the
   scalar analogue of the velocity-side transform folded into `velocity_vorticity!`.
 - **`scalar_nonlinear!`** assembles the passive-scalar advection in conservative form
-  ``-\nabla\cdot(\mathbf u\varphi)`` (equal to ``-\mathbf u\cdot\nabla\varphi`` since
-  ``\nabla\cdot\mathbf u = 0``); the conservative form is used because, with the ``2/3`` rule, it
+  ``-\nabla\cdot(\boldsymbol u\varphi)`` (equal to ``-\boldsymbol u\cdot\nabla\varphi`` since
+  ``\nabla\cdot\boldsymbol u = 0``); the conservative form is used because, with the ``2/3`` rule, it
   conserves the scalar mean exactly.
-- **Diagnostics** — `kinetic_energy` ``k = \tfrac12\langle\lvert\mathbf u\rvert^2\rangle``,
+- **Diagnostics** — `kinetic_energy` ``k = \tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle``,
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
@@ -195,7 +195,7 @@ gradient, the equation becomes
 `AbstractForcing` is the supertype of the injection strategies, hooking into the step through a small
 protocol whose four methods all default to doing nothing:
 
-- `forcing_rate!` — for a forcing *linear* in the field (``\mathbf f = A\,\mathbf u``): fill the
+- `forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol f = A\,\boldsymbol u``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving).
 - `apply_forcing!` — a post-step projection or rescale.
 - `prepare_forcing!` — advance internal state once per step (a stochastic process).
@@ -216,7 +216,7 @@ extension point.
 - **`Physics`** bundles the problem parameters the step consumes: the viscosity ``\nu``, the Schmidt
   number ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings.
 - **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
-  advances the velocity ``\hat{\mathbf u}`` and scalar ``\hat\varphi`` **together** through the same
+  advances the velocity ``\hat{\boldsymbol u}`` and scalar ``\hat\varphi`` **together** through the same
   Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy needs
   both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterwards would drop the substage velocities and degrade the coupling to first order.
@@ -229,8 +229,8 @@ extension point.
 ### 4.5 `Particles` — instruments, with first-class numerics
 
 Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
-state-carrying trajectory object: today a tracer (position ``\mathbf x``); the deferred ladder is
-inertial (``\mathbf x, \mathbf v``) and oriented (``\mathbf x, \mathbf v, \mathbf L``) probes (§7).
+state-carrying trajectory object: today a tracer (position ``\boldsymbol x``); the deferred ladder is
+inertial (``\boldsymbol x, \boldsymbol v``) and oriented (``\boldsymbol x, \boldsymbol v, \boldsymbol L``) probes (§7).
 `Tracers` holds positions and a pluggable interpolation scheme; `advect!` pushes them Heun-in-time on
 the velocity at the start and end of the step (the fields the solver already produces); `sample!`
 reads any field along the trajectories for Lagrangian statistics.
@@ -247,7 +247,7 @@ does not naively unify all of it.
 ### 4.6 The run layer (`Driver`) — the front door
 
 A `Simulation` value bundles the state a case advances: the `SpectralOperators`, the `Workspace`, the
-`Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\mathbf u}`` and
+`Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and
 ``\hat\varphi``, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer for the Heun
 push, and a clock. Over it:
 
@@ -333,8 +333,8 @@ These are **named so they are not precluded, and deliberately left un-abstracted
 point or generalisation is built for them until a second concrete case forces the abstraction. None
 is a gap.
 
-- **Inertial and oriented particles** — ``(\mathbf x,\mathbf v)`` with matrix drag, then
-  ``(\mathbf x,\mathbf v,\mathbf L)`` with torque. The translational drag reuses the
+- **Inertial and oriented particles** — ``(\boldsymbol x,\boldsymbol v)`` with matrix drag, then
+  ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.5, §8).
 - **The sheared frame (Rogallo).** A uniform mean velocity gradient makes the wavenumbers
   time-dependent (``d\boldsymbol{\kappa}/dt = -\mathsf A^{\!\top}\boldsymbol{\kappa}``) and non-separable. This is the one
@@ -357,7 +357,7 @@ the tool is built to *investigate*, not assume. Mori–Zwanzig is the central le
 through it.
 
 - **Mori–Zwanzig — the central lens.** The DNS/LES/statistical ladder is one dynamics under a ladder
-  of projections. Each Model is a projection ``P`` of the full state plus a closure of the residual it
+  of projections. Each Model is a projection ``\mathcal P`` of the full state plus a closure of the residual it
   discards; the exact projected dynamics carries a *memory* integral and a *noise* term, and every
   closure is an approximation of those. DNS is simply the finest projection, not a thing apart. This
   is what makes the Model axis a *ladder* (§3) rather than a list.

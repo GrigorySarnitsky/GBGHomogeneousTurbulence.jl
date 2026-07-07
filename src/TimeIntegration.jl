@@ -84,18 +84,18 @@ function step! end
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the per-substep
 integrating factor ``\\mathcal{E}_D(\\tau) = \\exp(-D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\tau)`` (``D = \\nu``
-for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\mathbf{N}}`` the
+for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\boldsymbol{N}}`` the
 de-aliased nonlinearity of each field, the step carries a state ``\\hat q`` and a single accumulator
-``\\mathbf{h}`` through three stages ``i = 1,2,3``,
+``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
 ```math
-\\mathbf{h} \\leftarrow A_i\\,\\mathbf{h} + \\Delta t\\,\\widehat{\\mathbf{N}}(\\hat q),
+\\boldsymbol{h} \\leftarrow A_i\\,\\boldsymbol{h} + \\Delta t\\,\\widehat{\\boldsymbol{N}}(\\hat q),
 \\qquad
-\\hat q \\leftarrow \\hat q + B_i\\,\\mathbf{h},
+\\hat q \\leftarrow \\hat q + B_i\\,\\boldsymbol{h},
 \\qquad
 \\hat q \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\hat q,
 \\quad
-\\mathbf{h} \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\mathbf{h},
+\\boldsymbol{h} \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\boldsymbol{h},
 ```
 
 with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
@@ -170,16 +170,16 @@ end
 Integrating-factor second-order Runge–Kutta (Heun). With the integrating factors
 ``\\mathcal{E}_\\nu = \\exp(-\\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
 ``\\mathcal{E}_\\varkappa = \\exp(-\\varkappa\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
-``\\widehat{\\mathbf{N}}`` each field's de-aliased nonlinearity, one step of a field ``\\hat q`` with
+``\\widehat{\\boldsymbol{N}}`` each field's de-aliased nonlinearity, one step of a field ``\\hat q`` with
 integrating factor ``\\mathcal{E}`` is
 
 ```math
-\\hat q^{*} = \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\mathbf{N}}_1),
+\\hat q^{*} = \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\boldsymbol{N}}_1),
 \\qquad
-\\hat q_{n+1} = \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\mathbf{N}}_1 + \\widehat{\\mathbf{N}}_2\\big),
+\\hat q_{n+1} = \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2\\big),
 ```
 
-with ``\\widehat{\\mathbf{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\mathbf{N}}_2`` at the predictor
+with ``\\widehat{\\boldsymbol{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\boldsymbol{N}}_2`` at the predictor
 ``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa``
 respectively, then the forcings are applied. Two nonlinear evaluations per step.
 
@@ -265,7 +265,7 @@ A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 ``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
 
 The advective eigenvalues of the de-aliased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\max\\lvert\\mathbf{u}\\rvert``; stability needs this times ``C`` to stay within the
+``\\kappa_{\\max}\\max\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
 scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The one-argument form returns the value
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken

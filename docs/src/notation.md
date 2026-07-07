@@ -14,7 +14,7 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 |---|---|---|
 | Imaginary unit | ``\mathrm i`` | Upright, always — never bare italic `i`, never `\imath`. Writing it upright frees `i` for use as an index. |
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
-| Spatial average | ``\langle\,\cdot\,\rangle`` | The box average ``\frac1{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\mathbf x`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
+| Spatial average | ``\langle\,\cdot\,\rangle`` | The box average ``\frac1{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\boldsymbol x`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, `to_spectral(f)`. A field is one physical object; physical and spectral are two representations of it. |
 | Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*. The scalar diffusivity ``\varkappa`` (Parameters) is a fourth, deliberately distinct glyph. |
 
@@ -22,12 +22,12 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\mathbf u`` | the incompressible velocity field, ``\nabla\cdot\mathbf u = 0`` | the velocity state |
-| ``\boldsymbol\omega`` | the vorticity ``\nabla\times\mathbf u`` | `velocity_vorticity!` |
+| ``\boldsymbol u`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol u = 0`` | the velocity state |
+| ``\boldsymbol\omega`` | the vorticity ``\nabla\times\boldsymbol u`` | `velocity_vorticity!` |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray projection, never stored) | — |
-| ``\mathbf f`` | a body forcing on the momentum equation | `AbstractForcing` |
-| ``\mathbf x``, ``t`` | position in the box ``\Omega``; time | — |
+| ``\boldsymbol f`` | a body forcing on the momentum equation | `AbstractForcing` |
+| ``\boldsymbol x``, ``t`` | position in the box ``\Omega``; time | — |
 
 ## Parameters
 
@@ -36,7 +36,7 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `Physics.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `Physics.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | — (dimensionless control) |
+| ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | — (no field; set through ``\nu``, ``\mathrm{Re}_\lambda`` measured) |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
@@ -58,7 +58,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\mathbf u\rvert^2\rangle`` | `kinetic_energy` |
+| ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
 | ``E(\kappa)`` | energy spectrum (energy per unit wavenumber) | `radial_spectrum` (from `GBGPeriodicFields`) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
@@ -83,7 +83,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `forcing_rate!` |
 | ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(power=…)` |
 | ``T_L`` | forcing correlation time (Ornstein–Uhlenbeck) | `StochasticOU(correlation_time=…)` |
-| ``\sigma^2`` | stationary forcing variance ``\langle\lvert\mathbf f\rvert^2\rangle`` | `StochasticOU(variance=…)` |
+| ``\sigma^2`` | stationary forcing variance ``\langle\lvert\boldsymbol f\rvert^2\rangle`` | `StochasticOU(variance=…)` |
 
 ## Lens symbols
 
@@ -96,5 +96,5 @@ square, the filtered-density-function Model), not a type.
 | ``\Pi`` | a coarse-graining / filtering projection (the LES filter) |
 | ``\tau_{ij}`` | the subgrid stress ``\overline{u_i u_j}-\bar u_i\bar u_j`` |
 | ``S_{\text{fine}}``, ``S_{\text{coarse}}`` | the fine (DNS) and coarse (LES) flow maps |
-| ``F(\mathbf v;\mathbf x,t)`` | the velocity filtered density function (FDF) |
-| ``P`` | a Mori–Zwanzig projection onto resolved variables |
+| ``F(\boldsymbol v;\boldsymbol x,t)`` | the velocity filtered density function (FDF) |
+| ``\mathcal P`` | a Mori–Zwanzig projection onto resolved variables |

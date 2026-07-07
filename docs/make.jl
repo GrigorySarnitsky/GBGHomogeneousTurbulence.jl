@@ -65,8 +65,8 @@ function lint_notation_variants()
   banned = [
     (r"\\partial_[ijk]",
      "bare-index partial — write \\partial_{x_i} (subscript the coordinate, not the fiber index)"),
-    (r"\\mathbf ?\{?k\}?",
-     "\\mathbf k for the wavenumber — write \\boldsymbol{\\kappa} (vector) or \\kappa (magnitude)"),
+    (r"\\mathbf",
+     "upright-bold \\mathbf — vectors are bold italic \\boldsymbol (e.g. \\boldsymbol u, \\boldsymbol{\\kappa} for the wavenumber)"),
   ]
   srcs = _doc_lint_sources()
   problems = String[]

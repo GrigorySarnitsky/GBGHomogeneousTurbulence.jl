@@ -44,7 +44,7 @@ end
     Simulation
 
 A ready-to-run case: the [`SpectralOperators`](@ref) machinery, the [`Workspace`](@ref) scratch, the
-[`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\mathbf u}`` and passive scalar
+[`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. Build it with the
 constructors below and advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
 """

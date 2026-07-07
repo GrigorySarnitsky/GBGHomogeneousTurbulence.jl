@@ -27,9 +27,9 @@ export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
 """
     velocity_vorticity!(velocity, vorticity, uh, ops, ws)
 
-Compute the physical velocity ``\\mathbf{u}`` and vorticity
-``\\boldsymbol{\\omega} = \\nabla\\times\\mathbf{u}`` of the velocity field `uh` (given in spectral
-representation ``\\hat{\\mathbf{u}}``) into the buffers `velocity` and `vorticity`.
+Compute the physical velocity ``\\boldsymbol{u}`` and vorticity
+``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` of the velocity field `uh` (given in spectral
+representation ``\\hat{\\boldsymbol{u}}``) into the buffers `velocity` and `vorticity`.
 
 `uh` is preserved: the vorticity is transformed first, then a *copy* of `uh` is transformed — the
 in-place inverse transform consumes its spectral source.
@@ -47,15 +47,15 @@ end
     velocity_nonlinear!(nonlinear, velocity, vorticity, ops, ws)
 
 Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
-from the physical `velocity` ``\\mathbf{u}`` and `vorticity` ``\\boldsymbol{\\omega}``.
+from the physical `velocity` ``\\boldsymbol{u}`` and `vorticity` ``\\boldsymbol{\\omega}``.
 
 In physical space the rotational form writes the convective term as the Lamb vector: with the
-identity ``(\\mathbf{u}\\cdot\\nabla)\\mathbf{u} = \\nabla\\big(\\tfrac12\\lvert\\mathbf{u}\\rvert^{2}\\big) - \\mathbf{u}\\times\\boldsymbol{\\omega}``,
+identity ``(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega}``,
 the divergence-free momentum equation becomes
-``\\partial_t\\mathbf{u} = \\mathbb{P}\\,(\\mathbf{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\mathbf{u} + \\mathbf{f}``,
+``\\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}``,
 where the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbs the pressure
-and the ``\\nabla(\\tfrac12\\lvert\\mathbf{u}\\rvert^{2})`` gradient. The term computed here is the
-spectral image of ``\\mathbb{P}\\,(\\mathbf{u}\\times\\boldsymbol{\\omega})``, with the ``2/3`` rule
+and the ``\\nabla(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient. The term computed here is the
+spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``, with the ``2/3`` rule
 removing the aliasing of the quadratic product. Allocation-free (a destination distinct from its
 sources takes the no-alias path).
 """
@@ -117,14 +117,14 @@ end
     scalar_nonlinear!(nonlinear, velocity, scalar, ops, ws)
 
 Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the
-physical `velocity` ``\\mathbf{u}`` and physical `scalar` ``\\varphi``.
+physical `velocity` ``\\boldsymbol{u}`` and physical `scalar` ``\\varphi``.
 
 In conservative form the advection is
-``-\\nabla\\cdot(\\mathbf{u}\\varphi)`` (equal to ``-\\mathbf{u}\\cdot\\nabla\\varphi`` since
-``\\nabla\\cdot\\mathbf{u} = 0``); the conservative form is used because, with the ``2/3`` rule, it
-conserves the scalar mean exactly (the divergence has no ``\\boldsymbol{\\kappa}=\\mathbf 0`` component). It is
-computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\boldsymbol{\\kappa}\\cdot\\widehat{\\mathbf{u}\\varphi}\\big)``.
-The scalar flux ``\\mathbf{u}\\varphi`` reuses the physical and spectral velocity scratch.
+``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
+``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form is used because, with the ``2/3`` rule, it
+conserves the scalar mean exactly (the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component). It is
+computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
+The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
 function scalar_nonlinear!(nonlinear, velocity, scalar, ops::SpectralOperators, ws::Workspace)
   scalar_data = field_data(scalar)
@@ -139,8 +139,8 @@ end
 """
     kinetic_energy(velocity)
 
-The turbulent kinetic energy ``\\tfrac12\\langle\\lvert\\mathbf{u}\\rvert^{2}\\rangle`` of the
-velocity field `velocity`. Computed as ``\\tfrac12\\,\\langle\\mathbf{u},\\mathbf{u}\\rangle`` with
+The turbulent kinetic energy ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
+velocity field `velocity`. Computed as ``\\tfrac12\\,\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
 the normalized inner product, so by Parseval's theorem it accepts `velocity` in either
 representation.
 """
@@ -162,7 +162,7 @@ dissipation(vorticity, viscosity::Real) = viscosity * inner(vorticity, vorticity
     max_speed(velocity)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert`` — an allocation-free
-reduction used to set the advective CFL timestep. It differs from the true ``\\sup\\lvert\\mathbf{u}\\rvert``
+reduction used to set the advective CFL timestep. It differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``
 by at most ``\\sqrt{3}``, well inside the CFL margin.
 """
 max_speed(velocity) = maximum(abs, field_data(velocity))

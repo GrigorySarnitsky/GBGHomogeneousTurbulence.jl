@@ -167,7 +167,7 @@ end
 """
     Linear(ops; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\mathbf{u}`` in a low-wavenumber band (Lundgren-type),
+Linear (negative-damping) forcing ``f = A\\,\\boldsymbol{u}`` in a low-wavenumber band (Lundgren-type),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
@@ -193,8 +193,8 @@ end
 """
     ConstantPower(ops; power, lowest_shell = 1, highest_shell = 2)
 
-Constant-power forcing: a banded linear forcing ``f = A\\,\\mathbf{u}`` whose rate is set each step so
-the energy-injection rate ``\\langle\\mathbf{u}\\cdot f\\rangle = A\\,(2E_{\\mathrm{band}})`` equals
+Constant-power forcing: a banded linear forcing ``f = A\\,\\boldsymbol{u}`` whose rate is set each step so
+the energy-injection rate ``\\langle\\boldsymbol{u}\\cdot f\\rangle = A\\,(2E_{\\mathrm{band}})`` equals
 the target ``\\varepsilon = \\texttt{power}`` — i.e. ``A = \\varepsilon / (2E_{\\mathrm{band}})`` with
 ``E_{\\mathrm{band}} = \\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}}`` of the
 start-of-step field. The rate is folded into the integrating factor; like `Linear`, it preserves a

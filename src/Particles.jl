@@ -71,21 +71,21 @@ end
     advect!(tracers, velocity_start, velocity_end, ops, dt) -> tracers
 
 Advance the tracer positions by one step of size `dt`, in place, by Heun-in-time on the physical
-velocity fields at the start (`velocity_start` ``= \\mathbf{u}(t_n)``) and end
-(`velocity_end` ``= \\mathbf{u}(t_{n+1})``) of the step:
+velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and end
+(`velocity_end` ``= \\boldsymbol{u}(t_{n+1})``) of the step:
 
 ```math
-\\mathbf{v}_1 = \\mathbf{u}(t_n, \\mathbf{X}),
+\\boldsymbol{v}_1 = \\boldsymbol{u}(t_n, \\boldsymbol{X}),
 \\quad
-\\mathbf{X}^{*} = \\mathbf{X} + \\Delta t\\,\\mathbf{v}_1,
+\\boldsymbol{X}^{*} = \\boldsymbol{X} + \\Delta t\\,\\boldsymbol{v}_1,
 \\quad
-\\mathbf{v}_2 = \\mathbf{u}(t_{n+1}, \\mathbf{X}^{*}),
+\\boldsymbol{v}_2 = \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}),
 \\quad
-\\mathbf{X} \\leftarrow \\mathbf{X} + \\tfrac{\\Delta t}{2}(\\mathbf{v}_1 + \\mathbf{v}_2),
+\\boldsymbol{X} \\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
 ```
 
 with positions wrapped into ``[0, L)``. This is second-order accurate in time. The start-of-step
-velocity ``\\mathbf{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
+velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
 the Lagrangian statistics.
 """
 function advect!(tracers::Tracers, velocity_start, velocity_end, ops::SpectralOperators, dt::Real)
@@ -129,7 +129,7 @@ tracer_positions(tracers::Tracers) = tracers.positions
 """
     tracer_velocities(tracers)
 
-The `(M, 3)` array of the most recent trajectory velocities ``\\mathbf{u}(t_n, \\mathbf{X})`` (set by
+The `(M, 3)` array of the most recent trajectory velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` (set by
 [`advect!`](@ref)).
 """
 tracer_velocities(tracers::Tracers) = point_values(tracers.velocity1)
