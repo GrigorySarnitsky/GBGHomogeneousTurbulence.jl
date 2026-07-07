@@ -160,4 +160,22 @@ using Test
     @test isfinite(derivative_skewness(sim.velocity, sim.operators, sim.workspace))
     @test current_step(sim) > 0
   end
+
+  @testset "BandRescaling target = :total pins total energy" begin
+    # :total rescales the band to make the whole-field energy equal the target each step
+    sim = Simulation(resolution = 16, viscosity = 0.05;
+                     velocity_forcing = BandRescaling(energy = 0.8, target = :total),
+                     scalar = false, energy = 0.5, rng = MersenneTwister(40))
+    advance!(sim; dt = 0.01)
+    @test kinetic_energy(sim) ≈ 0.8 rtol = 1e-3
+    # :band (default) holds the band energy; the total is free to float
+    simb = Simulation(resolution = 16, viscosity = 0.05;
+                      velocity_forcing = BandRescaling(energy = 0.3, target = :band),
+                      scalar = false, energy = 0.5, rng = MersenneTwister(40))
+    advance!(simb; dt = 0.01)
+    @test isfinite(kinetic_energy(simb)) && kinetic_energy(simb) > 0
+    # the target symbol is validated at construction
+    ops = SpectralOperators(16, 2π; scalar_type = Float64)
+    @test_throws ArgumentError BandRescaling(ops; energy = 0.5, target = :bogus)
+  end
 end

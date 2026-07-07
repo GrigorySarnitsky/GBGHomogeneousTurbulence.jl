@@ -201,7 +201,7 @@ protocol whose four methods all default to doing nothing:
 - `prepare_forcing!` — advance internal state once per step (a stochastic process).
 - `forcing_source!` — add an additive source at each Runge–Kutta stage.
 
-`NoForcing` (free decay), `BandRescaling` (hold a band's energy fixed), `Linear` and `ConstantPower`
+`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), `Linear` and `ConstantPower`
 (negative-damping, folded into ``\mathcal E``), and `StochasticOU` (the Eswaran–Pope
 Ornstein–Uhlenbeck forcing) are provided. **One implementation serves both** the velocity (a vector
 field) and ``\varphi`` (a scalar), because the hooks are written through tensor-order-generic field
@@ -476,6 +476,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (and the other banded forcings) return a `ForcingSpec` capturing the parameters, materialised into
     the concrete `AbstractForcing` once `Simulation` builds the operators — so a case names its forcing
     before the grid exists. The operator-taking constructor is unchanged.
+15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`target = :band | :total`).**
+    `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
+    to pin the whole-field energy — hence ``u'`` and ``\mathrm{Re}_\lambda`` — matching TurTLE's
+    constant-energy convention. A modeling choice with two defensible answers, so it is a selectable
+    option rather than a fixed default.
 
 ---
 

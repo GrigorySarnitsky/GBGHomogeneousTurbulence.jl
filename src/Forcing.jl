@@ -5,7 +5,7 @@
 #     that is folded into the integrating factor, so the linear operator becomes A(k) - D|k|². This
 #     is exact for the linear forcing and preserves the integrator's order (no operator splitting).
 #     `Linear` (fixed A) and `ConstantPower` (A set each step so the injection rate is ε_target) use it.
-#   * `apply_forcing!` — a post-step projection/rescale. `BandRescaling` (hold band energy fixed) uses it.
+#   * `apply_forcing!` — a post-step projection/rescale. `BandRescaling` (hold band or total energy fixed) uses it.
 #
 # One implementation serves both the velocity (a vector field) and the scalar φ (a scalar field),
 # since the hooks are written through tensor-order-generic field operators. A linear rate keeps a
@@ -122,30 +122,43 @@ struct NoForcing <: AbstractForcing end
 
 
 """
-    BandRescaling(ops; energy, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(ops; energy, target = :band, lowest_shell = 1, highest_shell = 2)
 
-Deterministic constant-energy forcing (post-step). Each step the in-band Fourier modes
-(``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}``, in
-integer shells of ``2\\pi/L``) are rescaled by a single factor so the band holds the fixed energy
-``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic
-energy for the velocity, band variance for the scalar ``\\varphi``). Rescaling preserves the
-divergence-free constraint. It fixes the band energy, not the injection rate, so the total energy
-oscillates slowly about its mean.
+Deterministic constant-energy forcing (post-step). Each step the in-band Fourier modes (integer
+shells ``\\texttt{lowest\\_shell} \\le \\lvert\\mathbf{k}\\rvert \\le \\texttt{highest\\_shell}`` of
+``2\\pi/L``) are rescaled by a single factor; `target` selects what is held fixed:
+
+  * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, band variance for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
+  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{energy}``, which directly pins ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `energy`, the band is zeroed (the closest reachable state).
+
+Rescaling preserves the divergence-free constraint either way.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
-  target_energy::T     # the energy ½⟨|·|²⟩ held in the band
+  target_energy::T     # the energy ½⟨|·|²⟩ to hold (in the band, or the total)
+  target::Symbol       # :band (hold the band energy) or :total (hold the total energy)
 end
 
-BandRescaling(ops::SpectralOperators; energy::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  BandRescaling(_shell_band(ops, lowest_shell, highest_shell), float(energy))
+function BandRescaling(ops::SpectralOperators; energy::Real, target::Symbol = :band,
+                       lowest_shell::Integer = 1, highest_shell::Integer = 2)
+  target in (:band, :total) ||
+    throw(ArgumentError("BandRescaling `target` must be :band or :total; got :$target"))
+  return BandRescaling(_shell_band(ops, lowest_shell, highest_shell), float(energy), target)
+end
 
 
 function apply_forcing!(forcing::BandRescaling, field, ops::SpectralOperators, scratch)
   convolve!(scratch, field, forcing.band)              # band-pass copy into scratch
-  band_energy = 0.5 * inner(scratch, scratch)          # ½⟨|·|²_band⟩
+  band_energy = 0.5 * inner(scratch, scratch)          # ½⟨|·|²⟩ in the band
   band_energy < 1e-12 && return field                  # nothing in the band yet (guard)
-  scale = sqrt(forcing.target_energy / band_energy)
+  # aim the band at: the target itself (:band), or what makes the *total* hit the target (:total)
+  target_band = if forcing.target === :total
+    total_energy = 0.5 * inner(field, field)           # ½⟨|·|²⟩ over the whole field
+    max(zero(band_energy), forcing.target_energy - total_energy + band_energy)
+  else
+    forcing.target_energy
+  end
+  scale = sqrt(target_band / band_energy)
   convolve!(field, field, forcing.band, scale - 1, 1)  # rescale in-band modes (α/β accumulate)
   return field
 end
@@ -290,8 +303,8 @@ Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
 ConstantPower(; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   ForcingSpec(ops -> ConstantPower(ops; power, lowest_shell, highest_shell))
 
-BandRescaling(; energy::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  ForcingSpec(ops -> BandRescaling(ops; energy, lowest_shell, highest_shell))
+BandRescaling(; energy::Real, target::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  ForcingSpec(ops -> BandRescaling(ops; energy, target, lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
