@@ -52,7 +52,10 @@ using .SimulationState:
   scalar_physical,
   random_solenoidal_velocity!,
   random_scalar!,
-  dealias!
+  dealias!,
+  DealiasingStrategy,
+  TwoThirds,
+  HouLi
 
 using .Equations:
   velocity_vorticity!,
@@ -117,6 +120,9 @@ export SpectralOperators,
        random_solenoidal_velocity!,
        random_scalar!,
        dealias!,
+       DealiasingStrategy,
+       TwoThirds,
+       HouLi,
        velocity_vorticity!,
        velocity_nonlinear!,
        integrating_factor!,

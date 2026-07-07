@@ -21,11 +21,59 @@ using Random
 
 export SpectralOperators, Workspace,
        spectral_vector, physical_vector, scalar_spectral, scalar_physical,
-       random_solenoidal_velocity!, random_scalar!, dealias!
+       random_solenoidal_velocity!, random_scalar!, dealias!,
+       DealiasingStrategy, TwoThirds, HouLi
+
+
+# ── De-aliasing strategies ────────────────────────────────────────────────────────────────────────
+# How the aliasing of the quadratic nonlinearity is controlled. Each strategy builds the `ops.dealias`
+# kernel (applied by `dealias!`/`convolve!`) and declares the Nyquist fraction it keeps energetic,
+# which sets the advective-CFL ceiling (see `recommended_cfl`).
+
+"""
+    DealiasingStrategy
+
+How the aliasing of the quadratic nonlinearity is controlled. A [`SpectralOperators`](@ref) is built
+with one; it fixes the `ops.dealias` kernel and, through `recommended_cfl`, the advective-CFL
+ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default) and
+[`HouLi`](@ref) (the smooth Hou–Li filter).
+"""
+abstract type DealiasingStrategy end
+
+"""
+    TwoThirds()
+
+The sharp isotropic ``2/3``-rule truncation: keep the modes
+``\\lvert\\mathbf{k}\\rvert \\le \\tfrac23 k_{\\max}`` and zero the rest (``k_{\\max}`` the Nyquist
+wavenumber). Exact de-aliasing of the quadratic nonlinearity, and the lean, GPU-friendly default.
+"""
+struct TwoThirds <: DealiasingStrategy end
+
+"""
+    HouLi(; order = 36, strength = 36)
+
+The smooth Hou–Li spectral filter, transfer function
+``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\lvert\\mathbf{k}\\rvert/k_{\\max})^{\\texttt{order}}\\big)``
+(defaults ``36, 36``, damping the Nyquist mode to ``\\mathrm{e}^{-36}\\approx`` machine epsilon). It
+keeps more modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
+stabilisation, hence an opt-in, not the default. Applied isotropically in ``\\lvert\\mathbf{k}\\rvert``
+(the filter TurTLE uses, there per-axis). Because it retains energy out to the Nyquist wavenumber it
+takes a proportionally smaller CFL step than the ``2/3`` rule — handled automatically by
+`recommended_cfl`.
+"""
+struct HouLi <: DealiasingStrategy
+  order::Int
+  strength::Float64
+end
+HouLi(; order::Integer = 36, strength::Real = 36) = HouLi(Int(order), Float64(strength))
+
+# The fraction of the Nyquist wavenumber a strategy keeps energetic — sets κ_max for the advective CFL.
+_retained_nyquist_fraction(::TwoThirds) = 2 // 3
+_retained_nyquist_fraction(::HouLi) = 1 // 1
 
 
 """
-    SpectralOperators(resolution, box = 2π; dealias_fraction = 2//3,
+    SpectralOperators(resolution, box = 2π; dealiasing = TwoThirds(),
                       scalar_type = Float64, array_type = Array)
 
 The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run on a grid
@@ -35,22 +83,23 @@ plans (one for the velocity, a vector field; one for the scalar ``\\varphi``), t
 ``\\mathbf{k}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``), and the de-alias kernel
 `dealias`.
 
-`dealias` is an isotropic sharp low-pass that keeps the modes
-``\\lvert\\mathbf{k}\\rvert \\le \\texttt{dealias\\_fraction}\\cdot k_{\\max}`` (``k_{\\max}`` the
-Nyquist wavenumber) — the ``2/3`` rule (`dealias_fraction = 2//3`) that removes the aliasing error
-of the quadratic nonlinearity.
+`dealias` is built by the `dealiasing` strategy — [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the
+default) or [`HouLi`](@ref) (the smooth Hou–Li filter). Both are applied by [`dealias!`](@ref) as a
+coefficientwise multiply to control the aliasing error of the quadratic nonlinearity; the choice also
+sets the advective-CFL ceiling through `recommended_cfl`.
 
 `array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
 `scalar_type` the real element type (`Float32` is GPU-friendly).
 """
-struct SpectralOperators{G, L, VP, SP, M, K, D}
+struct SpectralOperators{G, L, VP, SP, M, K, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
   scalar_plans::SP
   multipliers::M
   squared_wavenumber::K            # |k|² as a real array
-  dealias::D                       # 2/3-rule isotropic low-pass kernel (ScalarFieldSpectral)
+  dealias::D                       # isotropic low-pass kernel (ScalarFieldSpectral), built by `dealiasing`
+  dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi)
 end
 
 
@@ -58,7 +107,7 @@ _zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef
 
 
 function SpectralOperators(resolution::Integer, box::Real = 2π;
-                           dealias_fraction::Real = 2 // 3,
+                           dealiasing::DealiasingStrategy = TwoThirds(),
                            scalar_type::Type{T} = Float64,
                            array_type = Array) where {T<:AbstractFloat}
   N = Int(resolution)
@@ -75,10 +124,21 @@ function SpectralOperators(resolution::Integer, box::Real = 2π;
   scalar_plans = FieldTransformPlans(scalar_physical, scalar_spectral_storage)
   multipliers = FieldSpectralMultipliers(velocity_spectral)
   squared_wavenumber = real.(field_data(squared_wavenumber_field(velocity_spectral, multipliers)))
-  k_cutoff = T(dealias_fraction) * (N / 2) * (2π / L)
-  dealias = spectral_cutoff(velocity_spectral, multipliers, k_cutoff)
+  dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, squared_wavenumber, N, L, T)
 
-  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, multipliers, squared_wavenumber, dealias)
+  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, multipliers, squared_wavenumber, dealias, dealiasing)
+end
+
+
+# Build the `ops.dealias` kernel (a scalar low-pass in spectral representation) for a strategy.
+_build_dealias(::TwoThirds, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T} =
+  spectral_cutoff(reference, multipliers, T(2 // 3) * (N / 2) * (2π / L))
+
+function _build_dealias(strategy::HouLi, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T}
+  kernel = spectral_cutoff(reference, multipliers, T(2) * (N / 2) * (2π / L))    # all-pass ⇒ correct shape/backend
+  k_nyquist = T((N / 2) * (2π / L))
+  field_data(kernel) .= Complex{T}.(exp.(-T(strategy.strength) .* (sqrt.(squared_wavenumber) ./ k_nyquist) .^ strategy.order))
+  return kernel
 end
 
 

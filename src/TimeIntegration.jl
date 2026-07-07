@@ -26,7 +26,7 @@ problem parameters and forcings.
 module TimeIntegration
 
 using GBGPeriodicFields
-using ..SimulationState: SpectralOperators, Workspace
+using ..SimulationState: SpectralOperators, Workspace, _retained_nyquist_fraction
 using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
                    scalar_to_physical!, scalar_nonlinear!
 using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!,
@@ -259,21 +259,32 @@ default_integrator() = IFLowStorageRK3()
 
 """
     recommended_cfl(integrator)
+    recommended_cfl(integrator, ops)
 
 A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 ``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
 
 The advective eigenvalues of the de-aliased system are imaginary, of magnitude up to
-``k_{\\max}\\max\\lvert\\mathbf{u}\\rvert`` with ``k_{\\max} = \\tfrac{2}{3}\\,\\tfrac{N}{2}\\,\\tfrac{2\\pi}{L}``,
-so ``k_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``; stability needs this times ``C`` to stay within the
-scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. For [`IFLowStorageRK3`](@ref)
-``y_{\\mathrm{s}} = \\sqrt{3} \\approx 1.73`` (so ``C \\lesssim 0.83``), giving the conservative
-``0.5``; [`IFRK2`](@ref) has ``y_{\\mathrm{s}} = 0`` (imaginary-axis unstable, relying on viscous
-damping), so a small ``0.25``. These are defaults — override for a specific run.
+``\\kappa_{\\max}\\max\\lvert\\mathbf{u}\\rvert``; stability needs this times ``C`` to stay within the
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The one-argument form returns the value
+calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
+[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
+conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
+relying on viscous damping), so a small ``0.25``.
+
+The two-argument form scales that ceiling by the operators' de-aliasing: a strategy that keeps modes
+to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses.
+Override either for a specific run.
 """
 recommended_cfl(::AbstractIntegrator) = 0.3
 recommended_cfl(::IFRK2) = 0.25
 recommended_cfl(::IFLowStorageRK3) = 0.5
+
+# Scale the base (2/3-calibrated) ceiling by the active de-aliasing: factor = (2/3)/f, f the retained
+# Nyquist fraction (1 for TwoThirds ⇒ unchanged, 2/3 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
+recommended_cfl(integrator::AbstractIntegrator, ops::SpectralOperators) =
+  recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(ops.dealiasing)
 
 
 end # module TimeIntegration

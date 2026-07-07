@@ -23,7 +23,8 @@ module Driver
 using GBGPeriodicFields
 using Random
 using ..SimulationState: SpectralOperators, Workspace, spectral_vector, scalar_spectral,
-                         physical_vector, random_solenoidal_velocity!, random_scalar!
+                         physical_vector, random_solenoidal_velocity!, random_scalar!,
+                         DealiasingStrategy, TwoThirds
 using ..Equations: velocity_vorticity!, max_speed, derivative_skewness
 import ..Equations: kinetic_energy, dissipation, scalar_variance
 using ..Forcing: AbstractForcing, NoForcing
@@ -70,7 +71,7 @@ _resolve_forcing(f, ops::SpectralOperators) = f(ops)
 
 """
     Simulation(operators; viscosity, kwargs...)
-    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64, array_type = Array, kwargs...)
+    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64, array_type = Array, dealiasing = TwoThirds(), kwargs...)
 
 Assemble a ready-to-run case. The second form is the front door: from a `resolution` and a
 `viscosity` it builds the `SpectralOperators` (in the box `box`, on element type `scalar_type` and
@@ -83,8 +84,10 @@ and (unless `scalar = false`) a mean-zero scalar ``\\varphi``, and returns a `Si
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a factory `ops -> AbstractForcing`
   (e.g. `ops -> ConstantPower(ops; power = 0.1)`); default `NoForcing()` (free decay).
-- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator)` — the scheme and its
-  advective-CFL ceiling.
+- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the scheme and its
+  advective-CFL ceiling (the ceiling adapts to `dealiasing`).
+- `dealiasing = TwoThirds()` — the de-aliasing strategy (`TwoThirds` sharp ``2/3``, or `HouLi`
+  smooth); it also sets ``\\kappa_{\\max}`` and hence the CFL step.
 - `scalar = true`, `energy = 0.5`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to seed
   the scalar, the initial kinetic energy ``k`` and scalar variance, and the large-scale spectral peak.
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian tracers and their
@@ -95,7 +98,7 @@ function Simulation(ops::SpectralOperators;
                     viscosity::Real, schmidt::Real = 1.0,
                     velocity_forcing = NoForcing(), scalar_forcing = NoForcing(),
                     integrator::AbstractIntegrator = default_integrator(),
-                    cfl::Real = recommended_cfl(integrator),
+                    cfl::Real = recommended_cfl(integrator, ops),
                     scalar::Bool = true, energy::Real = 0.5, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0,
                     ntracers::Integer = 0, tracer_scheme = CatmullRom,
@@ -119,8 +122,9 @@ function Simulation(ops::SpectralOperators;
 end
 
 function Simulation(; resolution::Integer, box::Real = 2π,
-                    scalar_type::Type = Float64, array_type = Array, kwargs...)
-  return Simulation(SpectralOperators(resolution, box; scalar_type, array_type); kwargs...)
+                    scalar_type::Type = Float64, array_type = Array,
+                    dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
+  return Simulation(SpectralOperators(resolution, box; dealiasing, scalar_type, array_type); kwargs...)
 end
 
 
