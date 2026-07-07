@@ -10,4 +10,4 @@ module IntegratorsTests;   include("integrators.jl");    end
 module ScalarTests;        include("scalar.jl");         end
 module ForcingTests;       include("forcing.jl");        end
 module ParticlesTests;     include("particles.jl");      end
-module DriverTests;        include("driver.jl");         end
+module SimulationRunTests; include("simulation_run.jl"); end

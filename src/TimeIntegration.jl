@@ -1,6 +1,6 @@
 # TimeIntegration — the pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
-# is advanced exactly through exp(-diffusivity·|k|²Δt) (built in Equations), and the nonlinear term is
+# is advanced exactly through exp(-diffusivity·|k|²Δt) (built in Dynamics), and the nonlinear term is
 # advanced explicitly by a Runge–Kutta stage combination.
 #
 # `step!` advances the velocity û and the passive scalar φ̂ *together* through the same RK stages: the
@@ -27,8 +27,8 @@ module TimeIntegration
 
 using GBGPeriodicFields
 using ..SimulationState: SpectralOperators, Workspace, _retained_nyquist_fraction
-using ..Equations: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
-                   scalar_to_physical!, scalar_nonlinear!
+using ..Dynamics: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
+                  scalar_to_physical!, scalar_nonlinear!
 using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!,
                  prepare_forcing!, forcing_source!
 

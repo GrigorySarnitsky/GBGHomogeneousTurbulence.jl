@@ -60,9 +60,11 @@ combination, and the quadratic product is de-aliased by the ``2/3`` rule.
 ## Components
 
 - [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SpectralOperators`),
-  the preallocated buffers (`VelocityWorkspace`), and the random divergence-free initial condition.
-- [`Equations`](api/Equations.md): the rotational-form Navier–Stokes right-hand side and the velocity
-  diagnostics (`kinetic_energy`, `dissipation`, `max_speed`).
+  the preallocated buffers (`Workspace`), and the random divergence-free initial condition.
+- [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes
+  right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
+- [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
+  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`).
 - [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
 - [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.

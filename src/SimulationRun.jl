@@ -1,8 +1,8 @@
-# Driver — the ergonomic run layer. A `Simulation` bundles the operators, workspace, physics,
+# SimulationRun — the ergonomic run layer. A `Simulation` bundles the operators, workspace, physics,
 # integrator, spectral state (û, φ̂), and any tracers; `advance!`/`run!`/`warmup!` own the
 # CFL-adaptive time loop. It holds no physics or numerics of its own — it wires the pieces of
-# SimulationState/Equations/Forcing/TimeIntegration/Particles so a case is a few lines to set up and
-# run, warm-up included, while every piece stays reachable for a hand-driven loop.
+# SimulationState/Dynamics/Observables/Forcing/TimeIntegration/Particles so a case is a few lines to
+# set up and run, warm-up included, while every piece stays reachable for a hand-driven loop.
 #
 # The loop maintains one invariant: on entry to a step, `ws.velocity` / `ws.vorticity_start` hold the
 # current physical u / ω — the start-of-step fields `step!` needs and the diagnostics read. A step
@@ -11,22 +11,23 @@
 # cached fields, so they survive the step and the saved copy is exact.
 
 """
-    Driver
+    SimulationRun
 
 The run layer: [`Simulation`](@ref) (the assembled state of a case) and the loop drivers
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
-per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity). The diagnostics
+per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity). The observables
 `kinetic_energy`, `dissipation`, and `scalar_variance` accept a `Simulation` directly.
 """
-module Driver
+module SimulationRun
 
 using GBGPeriodicFields
 using Random
 using ..SimulationState: SpectralOperators, Workspace, spectral_vector, scalar_spectral,
                          physical_vector, random_solenoidal_velocity!, random_scalar!,
                          DealiasingStrategy, TwoThirds
-using ..Equations: velocity_vorticity!, max_speed, derivative_skewness
-import ..Equations: kinetic_energy, dissipation, scalar_variance
+using ..Dynamics: velocity_vorticity!
+using ..Observables: max_speed, derivative_skewness
+import ..Observables: kinetic_energy, dissipation, scalar_variance
 using ..Forcing: AbstractForcing, NoForcing
 using ..TimeIntegration: AbstractIntegrator, Physics, step!, recommended_cfl, default_integrator
 using ..Particles: Tracers, advect!
@@ -135,7 +136,7 @@ _refresh_cached_fields!(sim::Simulation) =
                        sim.velocity, sim.operators, sim.workspace); sim)
 
 
-# Diagnostics on a `Simulation`'s current (cached) state — extend the `Equations` generics, so
+# Observables on a `Simulation`'s current (cached) state — extend the `Observables` generics, so
 # `kinetic_energy(sim)` (``k``), `dissipation(sim)` (``\varepsilon``), and `scalar_variance(sim)`
 # (``\langle\varphi^2\rangle``) read from the workspace fields (valid between steps).
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.workspace.velocity)
@@ -386,4 +387,4 @@ function warmup!(sim::Simulation; turnovers = nothing, time = nothing, steps = n
 end
 
 
-end # module Driver
+end # module SimulationRun

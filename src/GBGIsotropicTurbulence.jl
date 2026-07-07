@@ -8,13 +8,16 @@
 # tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
 # allocation-free over a preallocated workspace.
 #
-# Module layout (each concern its own file, mirroring the edifice):
+# Module layout (each concern its own file, mirroring the edifice). Physics concerns take their names
+# from the Mori–Zwanzig lens — the dynamics and its observables; realization and infrastructure
+# concerns are named by their job.
 #   SimulationState  — the operator/plan bundle + preallocated buffers + initial conditions
-#   Equations        — the Navier–Stokes RHS (rotational form) + diagnostics
+#   Dynamics         — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor
+#   Observables      — the measured functions of state (energy, dissipation, skewness, …)
 #   Forcing          — pluggable energy-injection strategies (AbstractForcing)
 #   TimeIntegration  — pluggable integrating-factor schemes (AbstractIntegrator)
 #   Particles        — Lagrangian tracer tracking (instruments)
-#   Driver           — the ergonomic run layer (Simulation + run!/warmup!/advance!)
+#   SimulationRun    — the ergonomic run layer (Simulation + run!/warmup!/advance!)
 
 
 """
@@ -36,11 +39,12 @@ using GBGPeriodicFields
 
 
 include("SimulationState.jl")
-include("Equations.jl")
+include("Dynamics.jl")
+include("Observables.jl")
 include("Forcing.jl")
 include("TimeIntegration.jl")
 include("Particles.jl")
-include("Driver.jl")
+include("SimulationRun.jl")
 
 
 using .SimulationState:
@@ -57,12 +61,14 @@ using .SimulationState:
   TwoThirds,
   HouLi
 
-using .Equations:
+using .Dynamics:
   velocity_vorticity!,
   velocity_nonlinear!,
   integrating_factor!,
   scalar_to_physical!,
-  scalar_nonlinear!,
+  scalar_nonlinear!
+
+using .Observables:
   kinetic_energy,
   dissipation,
   max_speed,
@@ -102,7 +108,7 @@ using .Particles:
   velocity_buffer,
   scalar_buffer
 
-using .Driver:
+using .SimulationRun:
   Simulation,
   advance!,
   run!,

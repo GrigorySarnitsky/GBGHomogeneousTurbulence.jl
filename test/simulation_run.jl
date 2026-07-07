@@ -9,7 +9,7 @@ using Random
 using Test
 
 
-@testset "driver" begin
+@testset "simulation run" begin
   L = 2π
 
   @testset "assemble, warm up, run (forced) with tracers" begin
@@ -89,7 +89,7 @@ using Test
   end
 
   @testset "stationarity detector (unit)" begin
-    D = GBGIsotropicTurbulence.Driver
+    D = GBGIsotropicTurbulence.SimulationRun
     turn = collect(0.0:0.1:10.0)
     @test D._is_flat(turn, fill(2.0, length(turn)) .+ 0.001 .* sin.(turn), 10.0, 4.0, 0.05)  # flat
     @test !D._is_flat(turn, 1.0 .+ 0.1 .* turn, 10.0, 4.0, 0.05)                              # drifting
@@ -129,7 +129,7 @@ using Test
   end
 
   @testset "warmup! gates on the scalar" begin
-    D = GBGIsotropicTurbulence.Driver
+    D = GBGIsotropicTurbulence.SimulationRun
     forced = Simulation(resolution = 16, viscosity = 0.03;
                         velocity_forcing = ConstantPower(power = 0.1),
                         scalar_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3),

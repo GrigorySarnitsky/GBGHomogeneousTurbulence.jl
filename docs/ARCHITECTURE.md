@@ -79,7 +79,7 @@ The composable pieces stay fully exposed — a study that needs to drive the loo
 stage, or interleave a bespoke measurement drops straight to §4.1–§4.5. The run layer is a
 convenience over that machinery, never a wall in front of it.
 
-> **Status.** The run layer is implemented (module `Driver`) and covered by tests; the example above
+> **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example above
 > runs as written — a forcing can be named operator-free (`ConstantPower(power = 0.1)`, a `ForcingSpec`)
 > and `warmup!` detects stationarity. The API may still evolve — setup ergonomics is the package's
 > primary quality target — but it is no longer a sketch.
@@ -125,7 +125,7 @@ the frame is *specification × realization* and not three co-equal axes:
 
 Both disciplines are the *same comparison machine* — run a configuration against a reference and
 check chosen physical functionals (spectra, fluxes, conserved quantities, a target statistic) within
-tolerance — pointed at different axes. The functionals are exactly the diagnostics of §4.2.
+tolerance — pointed at different axes. The functionals are exactly the observables of §4.2.
 
 ---
 
@@ -153,9 +153,15 @@ Each concern is its own module, included in dependency order by the umbrella
   large-scale spectral envelope, rescaled to a target ``k``; `random_scalar!` fills a mean-zero
   ``\varphi`` to a target variance. These seed the state a run warms up from.
 
-### 4.2 `Equations` — the right-hand side and the diagnostics
+### 4.2 `Dynamics` and `Observables` — the flow's evolution and its observables
 
-The incompressible momentum equation is advanced in **rotational (Lamb-vector) form**. Writing the
+Two modules, named from the Mori–Zwanzig lens (§8): **`Dynamics`** is the generator of the evolution
+— the right-hand side the integrators advance — and **`Observables`** are the functions of that state
+that are measured. This is the naming rule the whole package follows: *physics concerns take their
+names from the central lens; realization and infrastructure concerns are named by their job* (hence
+`TimeIntegration`, `Forcing`, `SimulationState`, `SimulationRun`).
+
+**`Dynamics`.** The incompressible momentum equation is advanced in **rotational (Lamb-vector) form**. Writing the
 convective term through the identity
 ``(\boldsymbol u\cdot\nabla)\boldsymbol u = \nabla(\tfrac12\lvert\boldsymbol u\rvert^2) - \boldsymbol u\times\boldsymbol\omega``
 (with vorticity ``\boldsymbol\omega = \nabla\times\boldsymbol u``) and letting the Leray–Helmholtz
@@ -182,7 +188,7 @@ gradient, the equation becomes
   ``-\nabla\cdot(\boldsymbol u\varphi)`` (equal to ``-\boldsymbol u\cdot\nabla\varphi`` since
   ``\nabla\cdot\boldsymbol u = 0``); the conservative form is used because, with the ``2/3`` rule, it
   conserves the scalar mean exactly.
-- **Diagnostics** — `kinetic_energy` ``k = \tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle``,
+- **`Observables`** (the measured functions of the state) — `kinetic_energy` ``k = \tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle``,
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
@@ -244,7 +250,7 @@ particle's linear/matrix drag are the same linear-exact move), while **orientati
 rotation group is a distinct geometric integrator** — the reversible generator of §8 — so the split
 does not naively unify all of it.
 
-### 4.6 The run layer (`Driver`) — the front door
+### 4.6 The run layer (`SimulationRun`) — the front door
 
 A `Simulation` value bundles the state a case advances: the `SpectralOperators`, the `Workspace`, the
 `Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and
@@ -269,9 +275,9 @@ The layer wires §4.1–§4.5 together; it holds no physics or numerics of its o
 
 ### 4.7 Layout summary
 
-`SimulationState → Equations → Forcing → TimeIntegration → Particles → Driver`. Cross-module
+`SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles → SimulationRun`. Cross-module
 access is through explicit `using ..Module: name` lists. Statistics live consumer-side of this
-package too: the sampling in `Particles` and the diagnostics in `Equations` produce the *samples*; a
+package too: the sampling in `Particles` and the observables in `Observables` produce the *samples*; a
 statistics driver that feeds them to `GBGStreamingStatistics` is deferred (§7).
 
 ---
@@ -481,6 +487,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     to pin the whole-field energy — hence ``u'`` and ``\mathrm{Re}_\lambda`` — matching TurTLE's
     constant-energy convention. A modeling choice with two defensible answers, so it is a selectable
     option rather than a fixed default.
+16. **(2026-07) Modules named from the Mori–Zwanzig lens; `Equations` split into `Dynamics` +
+    `Observables`; `Driver` → `SimulationRun`.** Since MZ is the central lens (§8), the physics concerns
+    take their names from it — the **dynamics** (the generator/RHS) and its **observables** (the measured
+    functions of state) — rather than from production-DNS convention (`rhs`/`stats`) or generic software
+    terms. `Equations` conflated the two and under-described; splitting it makes each concern its own
+    module and its own name. Realization and infrastructure concerns keep job-names (`TimeIntegration`,
+    `Forcing`, `SimulationState`, and the run layer `SimulationRun`, paired with `SimulationState`).
 
 ---
 

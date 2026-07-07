@@ -1,14 +1,14 @@
-# Equations
+# SimulationRun
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Equations]
+Modules = [GBGIsotropicTurbulence.SimulationRun]
 Order   = [:module]
 ```
 
 ## Public API
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Equations]
+Modules = [GBGIsotropicTurbulence.SimulationRun]
 Public  = true
 Private = false
 Order   = [:type, :function]
