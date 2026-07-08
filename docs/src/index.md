@@ -69,7 +69,9 @@ de-aliased by the ``2/3`` rule.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
   `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
   `max_speed`, and the `energy_spectrum` / `integral_scale`).
-- [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
+- [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`,
+  chosen independently for the velocity and the scalar (`Physics(; velocity_forcing, scalar_forcing)`)
+  — commonly a forced velocity with a freely-decaying scalar.
 - [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field

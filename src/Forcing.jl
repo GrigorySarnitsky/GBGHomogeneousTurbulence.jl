@@ -26,8 +26,12 @@ Every step hook takes the operator bundle `ops` (a [`SpectralOperators`](@ref)) 
 `prepare_forcing!`, and `forcing_source!` additionally take the preallocated scratch `ws` (a
 [`Workspace`](@ref GBGIsotropicTurbulence.SimulationState.Workspace)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
 `BandRescaling`, `Linear`, `ConstantPower`, and the stochastic `StochasticOU` are provided; one
-implementation serves both the velocity and the scalar. An operator-free keyword constructor returns
-a [`ForcingSpec`](@ref), a deferred forcing that `Simulation` materialises once the operators exist.
+implementation serves both the velocity and the scalar, and the two are forced **independently** —
+`Physics` takes a separate `velocity_forcing` and `scalar_forcing` (each an `AbstractForcing`, each
+defaulting to `NoForcing()`), so a run can force the velocity while the scalar decays freely, force
+both (with the same or different strategies), or leave either unforced. An operator-free keyword
+constructor returns a [`ForcingSpec`](@ref), a deferred forcing that `Simulation` materialises once
+the operators exist.
 """
 module Forcing
 
