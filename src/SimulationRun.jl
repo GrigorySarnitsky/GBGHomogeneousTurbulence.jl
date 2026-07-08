@@ -2,7 +2,7 @@
 # integrator, spectral state (û, φ̂), and any tracers; `advance!`/`run!`/`warmup!` own the
 # CFL-adaptive time loop. It holds no physics or numerics of its own — it wires the pieces of
 # SimulationState/Dynamics/Observables/Forcing/TimeIntegration/Particles so a case is a few lines to
-# set up and run, warm-up included, while every piece stays reachable for a hand-driven loop.
+# set up and run, warm-up included, while every piece stays reachable for a hand-run loop.
 #
 # The loop maintains one invariant: on entry to a step, `ws.velocity` / `ws.vorticity_start` hold the
 # current physical u / ω — the start-of-step fields `step!` needs and the diagnostics read. A step
@@ -46,12 +46,34 @@ end
 
 
 """
-    Simulation
+    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64,
+                 array_type = Array, dealiasing = TwoThirds(), kwargs...)
+    Simulation(operators; viscosity, kwargs...)
 
-A ready-to-run case: the [`SpectralOperators`](@ref) machinery, the [`Workspace`](@ref) scratch, the
+A ready-to-run case — the [`SpectralOperators`](@ref) machinery, the [`Workspace`](@ref) scratch, the
 [`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
-``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. Build it with the
-constructors below and advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
+``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock.
+
+The first form is the **front door**: from a `resolution` and a `viscosity` it builds every piece with
+sensible defaults, seeds a divergence-free velocity and (unless `scalar = false`) a mean-zero scalar
+``\\varphi``, and returns a `Simulation` at ``t = 0``; the second form takes a `SpectralOperators` you
+built yourself. Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
+
+# Keywords
+- `viscosity` — the kinematic viscosity ``\\nu`` (sets the Reynolds number); required.
+- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
+- `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a `ForcingSpec` from an operator-free
+  constructor (e.g. `ConstantPower(; power = 0.1)`); default `NoForcing()` (free decay). The velocity
+  and scalar are forced independently.
+- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the scheme and its
+  advective-CFL ceiling (the ceiling adapts to `dealiasing`).
+- `dealiasing = TwoThirds()` — the de-aliasing strategy (`TwoThirds` sharp ``2/3``, or `HouLi` smooth);
+  it also sets ``\\kappa_{\\max}`` and hence the CFL step.
+- `scalar = true`, `energy = 0.5`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to seed
+  the scalar, the initial kinetic energy ``k`` and scalar variance, and the large-scale spectral peak.
+- `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian tracers and their
+  interpolation scheme.
+- `rng` — the random stream for the initial condition and the tracer seeding.
 """
 struct Simulation{OPS, WS, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH, TR, TV}
   operators::OPS
@@ -74,32 +96,6 @@ _resolve_forcing(f::AbstractForcing, ::SpectralOperators) = f
 _resolve_forcing(f, ops::SpectralOperators) = f(ops)
 
 
-"""
-    Simulation(operators; viscosity, kwargs...)
-    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64,
-                 array_type = Array, dealiasing = TwoThirds(), kwargs...)
-
-Assemble a ready-to-run case. The second form is the front door: from a `resolution` and a
-`viscosity` it builds the `SpectralOperators` (in the box `box`, on element type `scalar_type` and
-backend `array_type`) and every other piece with sensible defaults, seeds a divergence-free velocity
-and (unless `scalar = false`) a mean-zero scalar ``\\varphi``, and returns a `Simulation` at
-``t = 0``. The first form takes operators you built yourself.
-
-# Keywords
-- `viscosity` — the kinematic viscosity ``\\nu`` (sets the Reynolds number); required.
-- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
-- `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a `ForcingSpec` from an
-  operator-free constructor (e.g. `ConstantPower(; power = 0.1)`); default `NoForcing()` (free decay).
-- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the scheme and its
-  advective-CFL ceiling (the ceiling adapts to `dealiasing`).
-- `dealiasing = TwoThirds()` — the de-aliasing strategy (`TwoThirds` sharp ``2/3``, or `HouLi`
-  smooth); it also sets ``\\kappa_{\\max}`` and hence the CFL step.
-- `scalar = true`, `energy = 0.5`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to seed
-  the scalar, the initial kinetic energy ``k`` and scalar variance, and the large-scale spectral peak.
-- `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian tracers and their
-  interpolation scheme.
-- `rng` — the random stream for the initial condition and the tracer seeding.
-"""
 function Simulation(ops::SpectralOperators;
                     viscosity::Real, schmidt::Real = 1.0,
                     velocity_forcing = NoForcing(), scalar_forcing = NoForcing(),
@@ -260,7 +256,7 @@ end
 
 # Shared loop: advance until the single stopping condition is met, firing `callback(sim)` after each
 # step (or once per `every` time units, if given).
-function _drive!(sim::Simulation, callback; turnovers = nothing, time = nothing,
+function _run_loop!(sim::Simulation, callback; turnovers = nothing, time = nothing,
                  steps = nothing, every = nothing, stop = nothing)
   if stop === nothing
     count(!isnothing, (turnovers, time, steps)) == 1 ||
@@ -307,8 +303,8 @@ and return it. A callback (the `do` block, or a first positional function) fires
 `Simulation` after every step, or once per `every` units of simulation time if `every` is given —
 the hook for streaming statistics along the run.
 """
-run!(sim::Simulation; kwargs...) = _drive!(sim, nothing; kwargs...)
-run!(callback, sim::Simulation; kwargs...) = _drive!(sim, callback; kwargs...)
+run!(sim::Simulation; kwargs...) = _run_loop!(sim, nothing; kwargs...)
+run!(callback, sim::Simulation; kwargs...) = _run_loop!(sim, callback; kwargs...)
 
 
 # Stationarity detector. Warm-up completes when the running dissipation ``ε(t)`` — and, for a forced
@@ -430,12 +426,12 @@ function warmup!(sim::Simulation; turnovers = nothing, time = nothing, steps = n
                  window_turnovers::Real = 4, tol::Real = 0.05, skew_floor::Real = 0.1,
                  max_turnovers::Real = 60)
   if turnovers !== nothing || time !== nothing || steps !== nothing
-    return _drive!(sim, nothing; turnovers, time, steps)
+    return _run_loop!(sim, nothing; turnovers, time, steps)
   end
   monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
                                 gate_scalar = gate_scalar && _scalar_forced(sim),
                                 gate_skew = gate_skewness, skew_floor)
-  _drive!(sim, nothing; turnovers = Float64(max_turnovers),
+  _run_loop!(sim, nothing; turnovers = Float64(max_turnovers),
           stop = (s, et) -> _observe_and_test!(monitor, s, et))
   monitor.converged ||
     @warn "warmup!: hit the max_turnovers = $(max_turnovers) cap without detecting stationarity"

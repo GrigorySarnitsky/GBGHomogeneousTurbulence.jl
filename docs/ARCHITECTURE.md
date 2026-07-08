@@ -75,7 +75,7 @@ is passed. It reads ``\varepsilon`` (the small scales, which settle last), not t
 a constant-energy forcing clamps flat. A forced flow
 must reach statistical stationarity before a structure function or a PDF taken over it is meaningful.
 
-The composable pieces stay fully exposed — a study that needs to drive the loop by hand, swap a
+The composable pieces stay fully exposed — a study that needs to run the loop by hand, swap a
 stage, or interleave a bespoke measurement drops straight to §4.1–§4.5. The run layer is a
 convenience over that machinery, never a wall in front of it.
 

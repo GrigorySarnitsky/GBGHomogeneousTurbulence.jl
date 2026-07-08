@@ -15,7 +15,7 @@ and `scalar_variance` also accept a `Simulation` directly.
 Simulation
 ```
 
-## Driving the run
+## Advancing the run
 
 Advance one step, run to a stopping condition (with an optional per-interval callback), then spin up
 to statistical stationarity.

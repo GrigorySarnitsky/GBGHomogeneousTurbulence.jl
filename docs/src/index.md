@@ -77,7 +77,7 @@ de-aliased by the ``2/3`` rule.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a pluggable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
-  drives it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
+  runs it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
   stationarity), and validates a run against the reference laws (`flow_parameters` /
   `validate_spectrum`).
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
