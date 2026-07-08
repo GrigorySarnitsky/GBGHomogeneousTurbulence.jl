@@ -83,6 +83,17 @@ parameter or a local) is named by its symbol: physical velocity / vorticity / sc
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
 
+**Naming — public API is user-facing, unambiguous, and precise.** Name a public type, function, or
+argument for **what it means to the user**, not how it is built at the backend, and make each name
+unambiguous (one reading) and precise (the exact thing, not an approximate cover word). The user is a
+**physicist** — hence also a mathematician and computer scientist, but *not* a software engineer fluent
+in startup idiom — so names speak physics, mathematics, and computational science, preferring the precise
+meaningful word to a terse handle or an implementation term. Name the object the user reasons about, not
+the machinery inside it: `SimulationDomain` (the discretized box the run lives on), never
+`SpectralOperators` (its backend contents — the transform plans and wavenumber multipliers);
+`grid_resolution` / `box_size`, never the ambiguous `resolution` / `box`. This is the naming counterpart
+of the physical-meaning-first documentation rule.
+
 **Docstrings vs comments.** Prefer docstrings; reserve plain `#` comments for non-intuitive *why* (the
 destructive-transform copy, the rotational-form Lamb vector, the per-call tensor allocation for an
 occasional diagnostic). One docstring per operation, on the bare binding (`function f end` for
