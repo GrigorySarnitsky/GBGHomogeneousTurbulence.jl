@@ -1,0 +1,41 @@
+using Test
+using GBGIsotropicTurbulence
+using GBGIsotropicTurbulence.Phenomenology
+using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
+
+# one short forced run, shared across the validation checks
+const SIM = Simulation(resolution = 32, viscosity = 0.02, velocity_forcing = ConstantPower(power = 0.1))
+for _ in 1:20
+  advance!(SIM)
+end
+
+
+@testset "energy_spectrum — Parseval consistency" begin
+  κ, E = energy_spectrum(SIM)
+  @test length(κ) == length(E)
+  @test all(≥(0), E)                                          # a power spectrum is non-negative
+  @test isapprox(sum(E), kinetic_energy(SIM); rtol = 1e-5)    # Σ E(κ) = k
+  @test integral_scale(SIM) > 0
+end
+
+
+@testset "flow_parameters — the measured-state bridge" begin
+  fp = flow_parameters(SIM)
+  @test fp isa FlowParameters
+  @test fp.viscosity == 0.02
+  @test fp.dissipation ≈ dissipation(SIM)
+  @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM) / 3)
+  @test fp.integral_scale ≈ integral_scale(SIM)
+  @test taylor_reynolds(fp) > 0
+end
+
+
+@testset "validate_spectrum — measured vs predicted" begin
+  v = validate_spectrum(SIM, Pope2000())
+  @test length(v.wavenumbers) == length(v.measured) == length(v.predicted)
+  @test isfinite(v.relative_error) && v.relative_error ≥ 0
+  # the prediction is the model evaluated at the run's own flow parameters
+  fp = flow_parameters(SIM)
+  i = findfirst(>(0), v.wavenumbers)
+  @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp)
+end

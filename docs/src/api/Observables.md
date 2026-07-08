@@ -39,3 +39,13 @@ invariant.
 ```@docs
 max_speed
 ```
+
+## Spectrum and length scale
+
+The measured energy spectrum and the integral scale — the measured counterparts of a
+[`Phenomenology`](../phenomenology.md) model spectrum, for validation.
+
+```@docs
+energy_spectrum
+integral_scale
+```

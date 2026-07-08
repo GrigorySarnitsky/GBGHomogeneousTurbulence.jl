@@ -67,8 +67,8 @@ de-aliased by the ``2/3`` rule.
 - [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
-  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, and the CFL helper
-  `max_speed`).
+  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
+  `max_speed`, and the `energy_spectrum` / `integral_scale`).
 - [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
 - [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.
@@ -76,7 +76,8 @@ de-aliased by the ``2/3`` rule.
   sampling along trajectories, with a pluggable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
   drives it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
-  stationarity).
+  stationarity), and validates a run against the reference laws (`flow_parameters` /
+  `validate_spectrum`).
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
   the umbrella), designed to be extractable into a standalone package.

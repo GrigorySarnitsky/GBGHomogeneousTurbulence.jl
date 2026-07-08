@@ -81,7 +81,9 @@ using .Observables:
   max_speed,
   scalar_variance,
   scalar_dissipation,
-  derivative_skewness
+  derivative_skewness,
+  energy_spectrum,
+  integral_scale
 
 using .Forcing:
   AbstractForcing,
@@ -121,7 +123,9 @@ using .SimulationRun:
   run!,
   warmup!,
   current_time,
-  current_step
+  current_step,
+  flow_parameters,
+  validate_spectrum
 
 
 export SpectralOperators,
@@ -149,6 +153,8 @@ export SpectralOperators,
        scalar_variance,
        scalar_dissipation,
        derivative_skewness,
+       energy_spectrum,
+       integral_scale,
        AbstractForcing,
        ForcingSpec,
        NoForcing,
@@ -180,7 +186,9 @@ export SpectralOperators,
        run!,
        warmup!,
        current_time,
-       current_step
+       current_step,
+       flow_parameters,
+       validate_spectrum
 
 
 end # module GBGIsotropicTurbulence

@@ -8,10 +8,11 @@
     Observables
 
 The functions of the flow state that are measured — kinetic energy, dissipation, the velocity-
-derivative skewness, the scalar variance and its dissipation, and the maximum component speed. In the
-Mori–Zwanzig reading (design doc §8) these are the *observables* of the `Dynamics`: their plateaus gate
-warm-up (`warmup!`), and their statistics are to be tracked by `GBGStreamingStatistics`. Each reduces a field
-to a scalar.
+derivative skewness, the scalar variance and its dissipation, the maximum component speed, the energy
+spectrum, and the integral scale. In the Mori–Zwanzig reading (design doc §8) these are the *observables*
+of the `Dynamics`: their plateaus gate warm-up (`warmup!`), and their statistics are to be tracked by
+`GBGStreamingStatistics`. Each reduces a field to a scalar, or — the energy spectrum — to a distribution
+over wavenumber.
 """
 module Observables
 
@@ -19,7 +20,8 @@ using GBGPeriodicFields
 using ..SimulationState: SpectralOperators, tensor_physical, scalar_physical
 
 export kinetic_energy, dissipation, max_speed,
-       scalar_variance, scalar_dissipation, derivative_skewness
+       scalar_variance, scalar_dissipation, derivative_skewness,
+       energy_spectrum, integral_scale
 
 
 """
@@ -129,6 +131,48 @@ function derivative_skewness(û, ops::SpectralOperators)
   det!(det_field, strain_physical)                                   # det S at each grid point
   mean_det = sum(field_data(det_field)) / length(field_data(det_field))   # ⟨det S⟩
   return 3 * _SKEWNESS_ISOTROPY_CONSTANT * mean_det / ss^1.5         # C · 3⟨det S⟩/⟨S:S⟩^{3/2}
+end
+
+
+"""
+    energy_spectrum(û, ops)
+
+The measured kinetic-energy spectrum ``E(\\kappa)`` of the velocity field `û` (in spectral
+representation) — the turbulent kinetic energy resolved over wavenumber-magnitude shells,
+``k = \\sum_\\kappa E(\\kappa)``. Returns `(κ, E)`: the shell-center wavenumber magnitudes and the energy
+in each shell (brought to the host, an occasional diagnostic). It is the `GBGPeriodicFields` radial
+spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol u}\\rvert^2`` while the
+kinetic energy carries the ``\\tfrac12``. `ops` (a [`SpectralOperators`](@ref)) supplies the wavenumber
+multipliers. This is the measured counterpart of a `Phenomenology` model spectrum, for validation.
+"""
+function energy_spectrum(û, ops::SpectralOperators)
+  shells, spec = radial_spectrum(û, ops.multipliers)
+  return Array(shells), Array(0.5 .* spec)
+end
+
+
+"""
+    integral_scale(û, ops)
+
+The longitudinal integral length scale of the velocity field `û`, measured from its
+[`energy_spectrum`](@ref) ``E(\\kappa)``,
+
+```math
+L = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
+```
+
+`L` is the large-eddy scale — the one flow parameter a `Phenomenology` model spectrum needs that the
+small scales do not fix. `ops` (a [`SpectralOperators`](@ref)) supplies the wavenumber multipliers.
+"""
+function integral_scale(û, ops::SpectralOperators)
+  κ, E = energy_spectrum(û, ops)
+  weighted = zero(eltype(E))
+  total = zero(eltype(E))
+  for i in eachindex(κ, E)
+    total += E[i]
+    κ[i] > 0 && (weighted += E[i] / κ[i])
+  end
+  return (3 * π / 4) * weighted / total
 end
 
 

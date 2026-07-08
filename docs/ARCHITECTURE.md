@@ -596,6 +596,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     precedent): a dependency-light leaf — no `GBGPeriodicFields`, `GBGStreamingStatistics`, or dynamics
     dependency — that the umbrella does *not* re-export, with its own doc and API group. Extract when a
     second consumer appears.
+19. **(2026-07) The measured-vs-predicted validation harness — the first `Phenomenology` consumer.** The
+    velocity energy spectrum is measured from a run (`energy_spectrum`, the halved `GBGPeriodicFields`
+    radial spectrum) and the integral scale `integral_scale` from it; `flow_parameters` bridges a
+    `Simulation` to a `Phenomenology` `FlowParameters` (``\nu``, ``\varepsilon``, ``u'``, ``L`` from the
+    measured state), and `validate_spectrum(sim, model)` compares the measured spectrum against a model
+    spectrum evaluated at that state, returning the relative L² discrepancy. This realizes the
+    comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
+    no `GBGStreamingStatistics` bridge is needed for it. The structure-function and scaling-constant
+    paths (via `radial_correlation` and the scalar diagnostics) share the shape and are deferred.
 
 ---
 

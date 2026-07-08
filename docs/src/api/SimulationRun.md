@@ -34,3 +34,13 @@ The elapsed simulation time and the step count.
 current_time
 current_step
 ```
+
+## Validation against reference laws
+
+Bridge the run's measured state to a [`Phenomenology`](../phenomenology.md) `FlowParameters`, and
+compare the measured energy spectrum against a model spectrum.
+
+```@docs
+flow_parameters
+validate_spectrum
+```

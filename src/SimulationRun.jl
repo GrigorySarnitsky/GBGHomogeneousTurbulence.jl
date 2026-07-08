@@ -28,12 +28,15 @@ using ..SimulationState: SpectralOperators, Workspace, spectral_vector, scalar_s
                          DealiasingStrategy, TwoThirds
 using ..Dynamics: velocity_vorticity!
 using ..Observables: max_speed, derivative_skewness
-import ..Observables: kinetic_energy, dissipation, scalar_variance
+import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
 using ..Forcing: AbstractForcing, NoForcing
 using ..TimeIntegration: AbstractIntegrator, Physics, step!, recommended_cfl, default_integrator
 using ..Particles: Tracers, advect!
+using ..Phenomenology: FlowParameters
+using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 
-export Simulation, advance!, run!, warmup!, current_time, current_step
+export Simulation, advance!, run!, warmup!, current_time, current_step, flow_parameters,
+       validate_spectrum
 
 
 mutable struct Clock
@@ -144,6 +147,56 @@ _refresh_cached_fields!(sim::Simulation) =
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.workspace.velocity)
 dissipation(sim::Simulation) = dissipation(sim.workspace.vorticity_start, sim.physics.viscosity)
 scalar_variance(sim::Simulation) = scalar_variance(sim.scalar)
+energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.operators)
+integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.operators)
+
+
+"""
+    flow_parameters(sim)
+
+The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
+`Phenomenology` reference law be evaluated at the run's measured state. The viscosity ``\\nu`` and the
+Schmidt number are read from `sim.physics`; the dissipation ``\\varepsilon``, the r.m.s. velocity
+``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the integral scale ``L`` are measured from the
+current velocity field.
+"""
+function flow_parameters(sim::Simulation)
+  k = kinetic_energy(sim)
+  FlowParameters(; viscosity = sim.physics.viscosity, dissipation = dissipation(sim),
+                 rms_velocity = sqrt(2k / 3), integral_scale = integral_scale(sim),
+                 schmidt = sim.physics.schmidt)
+end
+
+
+"""
+    validate_spectrum(sim, model)
+
+Compare the measured energy spectrum of `sim` against a `Phenomenology` model spectrum `model` (an
+`EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). Returns a named
+tuple `(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the
+measured and predicted ``E(\\kappa)``, and the relative L² discrepancy over the resolved (non-empty)
+shells.
+
+!!! note
+    A developed, well-resolved run agrees with a good model across the inertial range; at low Reynolds
+    number or coarse resolution the inertial range is narrow, so a large discrepancy is expected and
+    reflects the run, not the model.
+"""
+function validate_spectrum(sim::Simulation, model::EnergySpectrum)
+  fp = flow_parameters(sim)
+  κ, measured = energy_spectrum(sim)
+  predicted = similar(measured)
+  num = zero(eltype(measured))
+  den = zero(eltype(measured))
+  for i in eachindex(κ, measured)
+    predicted[i] = κ[i] > 0 ? spectrum(model, κ[i], fp) : zero(eltype(measured))
+    if measured[i] > 0
+      num += (measured[i] - predicted[i])^2
+      den += measured[i]^2
+    end
+  end
+  return (; wavenumbers = κ, measured, predicted, relative_error = sqrt(num / den))
+end
 
 
 """
