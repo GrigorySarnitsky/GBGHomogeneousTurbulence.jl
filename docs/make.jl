@@ -85,6 +85,12 @@ lint_notation_variants()
 
 using Documenter
 using GBGIsotropicTurbulence
+# Phenomenology is deliberately not re-exported by the umbrella (ARCHITECTURE §4.7); bring its
+# submodule names into scope here so the docs pages can reference them by bare name, as the DNS API is.
+using GBGIsotropicTurbulence.Phenomenology
+using GBGIsotropicTurbulence.Phenomenology.Spectra
+using GBGIsotropicTurbulence.Phenomenology.StructureFunctions
+using GBGIsotropicTurbulence.Phenomenology.Scalings
 
 # Make `using GBGIsotropicTurbulence` available to any `jldoctest` examples (recursive covers the
 # submodules). Doctests are off for now (no runnable examples yet); flip `doctest = true` once added.
@@ -102,6 +108,10 @@ makedocs(
     GBGIsotropicTurbulence.TimeIntegration,
     GBGIsotropicTurbulence.Particles,
     GBGIsotropicTurbulence.SimulationRun,
+    GBGIsotropicTurbulence.Phenomenology,
+    GBGIsotropicTurbulence.Phenomenology.Spectra,
+    GBGIsotropicTurbulence.Phenomenology.StructureFunctions,
+    GBGIsotropicTurbulence.Phenomenology.Scalings,
   ],
   format = Documenter.HTML(
     canonical     = "https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/stable",
@@ -122,6 +132,13 @@ makedocs(
       "Forcing"                => "api/Forcing.md",
       "TimeIntegration"        => "api/TimeIntegration.md",
       "Particles"              => "api/Particles.md",
+    ],
+    "Phenomenology" => Any[
+      "Overview"           => "phenomenology.md",
+      "Reference laws"     => "api/phenomenology/Phenomenology.md",
+      "Spectra"            => "api/phenomenology/Spectra.md",
+      "StructureFunctions" => "api/phenomenology/StructureFunctions.md",
+      "Scalings"           => "api/phenomenology/Scalings.md",
     ],
     "Design & Internals" => Any[
       "Architecture" => "architecture.md",

@@ -11,3 +11,4 @@ module ScalarTests;        include("scalar.jl");         end
 module ForcingTests;       include("forcing.jl");        end
 module ParticlesTests;     include("particles.jl");      end
 module SimulationRunTests; include("simulation_run.jl"); end
+module PhenomenologyTests;  include("phenomenology.jl");  end

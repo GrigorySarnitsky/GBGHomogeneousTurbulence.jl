@@ -1,0 +1,223 @@
+# Phenomenology — reference turbulence laws (model spectra, structure-function laws, scaling
+# constants), each an author-year parametrization of an abstract law family per quantity. The
+# *predicted* counterpart to `Observables`: a provider the validation layer reads, never a comparer.
+#
+# Extraction-bound (docs/ARCHITECTURE.md §4.7, decision 18): this module depends on no field or
+# statistics backend and no dynamics — a law is a scalar function — and the umbrella does NOT
+# re-export it, so it can be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite.
+
+
+"""
+    Phenomenology
+
+Reference turbulence phenomenology — the fitted scalings, model spectra, and structure-function laws
+that theory and experiment have established, each an author-year parametrization of an abstract law
+family. This is the *predicted* counterpart to the measured `Observables`: a provider the validation
+layer reads to compare a run against, never a comparer itself and never assumed by the dynamics.
+
+A law family is an abstract type; each parametrization is a concrete subtype carrying its fitted
+coefficients and its provenance. Choosing a law is choosing the subtype (the published fit is the
+default); a name is disambiguated by its **submodule** (the quantity), its **author-year** (the paper),
+and a trailing letter (a same-year collision).
+
+**The flow state a law reads:**
+- [`FlowParameters`](@ref) — the dimensionless flow-state bundle a law evaluates against, with the
+  derived scales [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
+  [`taylor_reynolds`](@ref), and [`scalar_diffusivity`](@ref) as helpers.
+- [`provenance`](@ref) — a law's citation and validity range (a [`Reference`](@ref)); [`fit`](@ref)
+  is the (future) seam for fitting a parametrization to measured data.
+
+**The law families, one submodule per representation:**
+- [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra) — model energy spectra, functions of wavenumber, evaluated
+  by [`spectrum`](@ref).
+- [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions) — the inertial-range laws, functions
+  of separation, evaluated by [`structure_function`](@ref).
+- [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) — the dimensionless constants and their Reynolds-number
+  trends, evaluated by [`scaling`](@ref).
+
+!!! note "Extraction-bound"
+    Built inside `GBGIsotropicTurbulence` but designed to be cut into a standalone
+    `GBGTurbulencePhenomenology` with no rewrite: it takes no field/statistics/dynamics dependency, and
+    the umbrella does not re-export it — reach the laws opt-in through `Phenomenology`
+    (`using GBGIsotropicTurbulence.Phenomenology.Spectra`). See `docs/ARCHITECTURE.md` §4.7.
+"""
+module Phenomenology
+
+
+export TurbulenceLaw, FlowParameters, Reference, provenance, spectrum, structure_function,
+       scaling, fit, kolmogorov_length, kolmogorov_time, taylor_microscale, taylor_reynolds,
+       scalar_diffusivity
+
+
+"""
+    TurbulenceLaw
+
+Supertype of every reference law — a model spectrum, a structure-function law, or a scaling constant.
+A concrete law is a parametrization: it holds its fitted coefficients, reports its [`provenance`](@ref),
+and implements the evaluator for its family ([`spectrum`](@ref), [`structure_function`](@ref), or
+[`scaling`](@ref)), all against a [`FlowParameters`](@ref) bundle.
+"""
+abstract type TurbulenceLaw end
+
+
+"""
+    FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale,
+                     schmidt = 1.0, scalar_dissipation = NaN)
+
+The dimensionless flow-state bundle a law is evaluated against — the analogue of `Physics` and
+`SpectralOperators` on the phenomenology side. It carries the independent groups of a homogeneous
+isotropic state; the small scales and the Taylor-scale Reynolds number are [derived](@ref
+taylor_reynolds) from them, not stored.
+
+Fields (all keyword; a homogeneous-isotropic state fixes the rest):
+
+  * `viscosity` — the kinematic viscosity ``\\nu``.
+  * `dissipation` — the mean dissipation rate ``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol\\omega\\rvert^2\\rangle``.
+  * `rms_velocity` — the single-component r.m.s. velocity ``u'`` (so the turbulent kinetic energy is
+    ``k = \\tfrac32 u'^2``).
+  * `integral_scale` — the integral length ``L`` (a large-scale quantity, independent of ``\\nu`` and
+    ``\\varepsilon``; it fixes the energy-containing range).
+  * `schmidt` — the Schmidt number ``\\mathrm{Sc}`` (the scalar diffusivity is
+    ``\\varkappa = \\nu/\\mathrm{Sc}``); default `1.0`.
+  * `scalar_dissipation` — the scalar dissipation rate ``\\varepsilon_\\varphi`` (only scalar laws read
+    it); default `NaN` (unset).
+"""
+struct FlowParameters
+  viscosity::Float64
+  dissipation::Float64
+  rms_velocity::Float64
+  integral_scale::Float64
+  schmidt::Float64
+  scalar_dissipation::Float64
+end
+
+FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale,
+                 schmidt = 1.0, scalar_dissipation = NaN) =
+  FlowParameters(viscosity, dissipation, rms_velocity, integral_scale, schmidt, scalar_dissipation)
+
+
+"""
+    kolmogorov_length(fp) -> Float64
+
+The Kolmogorov (dissipation) length ``\\eta = (\\nu^3/\\varepsilon)^{1/4}`` of the state `fp` (a
+[`FlowParameters`](@ref)) — the scale at which viscosity terminates the cascade.
+"""
+kolmogorov_length(fp::FlowParameters) = (fp.viscosity^3 / fp.dissipation)^(1//4)
+
+
+"""
+    kolmogorov_time(fp) -> Float64
+
+The Kolmogorov time ``\\tau_\\eta = (\\nu/\\varepsilon)^{1/2}`` of the state `fp` (a
+[`FlowParameters`](@ref)) — the turnover time of the smallest eddies.
+"""
+kolmogorov_time(fp::FlowParameters) = sqrt(fp.viscosity / fp.dissipation)
+
+
+"""
+    taylor_microscale(fp) -> Float64
+
+The Taylor microscale ``\\lambda = \\sqrt{15\\,\\nu\\,u'^2/\\varepsilon}`` of the state `fp` (a
+[`FlowParameters`](@ref)) — the intermediate scale set by the isotropic relation
+``\\varepsilon = 15\\,\\nu\\,u'^2/\\lambda^2``.
+"""
+taylor_microscale(fp::FlowParameters) =
+  sqrt(15 * fp.viscosity * fp.rms_velocity^2 / fp.dissipation)
+
+
+"""
+    taylor_reynolds(fp) -> Float64
+
+The Taylor-scale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of the state `fp` (a
+[`FlowParameters`](@ref)) — the standard measure of how developed the turbulence is, and the argument
+of every [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) trend. Equivalently
+``\\mathrm{Re}_\\lambda = u'^2\\sqrt{15/(\\nu\\varepsilon)}``.
+"""
+taylor_reynolds(fp::FlowParameters) = fp.rms_velocity * taylor_microscale(fp) / fp.viscosity
+
+
+"""
+    scalar_diffusivity(fp) -> Float64
+
+The scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` of the state `fp` (a
+[`FlowParameters`](@ref)) — the diffusivity of the passive scalar ``\\varphi``, set by the Schmidt
+number.
+"""
+scalar_diffusivity(fp::FlowParameters) = fp.viscosity / fp.schmidt
+
+
+"""
+    Reference(citation; valid_Reλ = (0.0, Inf))
+
+The provenance of a law: a `citation` string (verbatim-consistent with `docs/ARCHITECTURE.md`
+§References) and the Taylor-scale-Reynolds-number range `valid_Reλ = (lo, hi)` over which the fit is
+meant to hold. A comparison reads `valid_Reλ` so a law is not judged outside its stated domain.
+"""
+struct Reference
+  citation::String
+  valid_Reλ::Tuple{Float64,Float64}
+end
+
+Reference(citation; valid_Reλ = (0.0, Inf)) = Reference(citation, (Float64(valid_Reλ[1]), Float64(valid_Reλ[2])))
+
+
+"""
+    provenance(law) -> Reference
+
+The [`Reference`](@ref) of a `law` (a [`TurbulenceLaw`](@ref)) — its citation and stated
+Reynolds-number validity range. Every parametrization implements it; it is the single source of the
+law's attribution.
+"""
+function provenance end
+
+
+"""
+    spectrum(law, κ, fp) -> Float64
+
+The reference energy spectrum ``E(\\kappa)`` predicted by a model `law` (an
+[`EnergySpectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.EnergySpectrum)) at wavenumber `κ` for the state `fp` (a
+[`FlowParameters`](@ref)) — the density in wavenumber of the turbulent kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,d\\kappa``.
+Its home and the composed form are in [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
+"""
+function spectrum end
+
+
+"""
+    structure_function(law, r, fp; order) -> Float64
+
+The reference velocity structure function ``D_{L\\dots}(r) = \\langle(\\delta u)^{\\text{order}}\\rangle``
+predicted by a `law` (a [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction))
+at separation `r` for the state `fp` (a [`FlowParameters`](@ref)) — the moment of the longitudinal
+velocity increment ``\\delta u`` across a distance `r`. Its home is
+[`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+"""
+function structure_function end
+
+
+"""
+    scaling(law, fp) -> Float64
+
+The reference dimensionless constant predicted by a scaling `law` (a
+[`DissipationScaling`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings.DissipationScaling)) for the state `fp` (a
+[`FlowParameters`](@ref)) — a single number or its Reynolds-number trend (e.g. the normalized
+dissipation ``C_\\varepsilon``). Its home is [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings).
+"""
+function scaling end
+
+
+"""
+    fit(::Type{L}, ...) -> L
+
+Fit a parametrization of law family `L` to measured data — the seam by which a run's own measurements
+become a parametrization sitting beside the literature. No methods are defined yet; it is the recorded
+extension point (`docs/ARCHITECTURE.md` §4.7).
+"""
+function fit end
+
+
+include("phenomenology/Spectra.jl")
+include("phenomenology/StructureFunctions.jl")
+include("phenomenology/Scalings.jl")
+
+
+end # module Phenomenology

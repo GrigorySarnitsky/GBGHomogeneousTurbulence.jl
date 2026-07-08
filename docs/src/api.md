@@ -14,6 +14,10 @@ scope.
 - [Particles](api/Particles.md): Lagrangian tracer tracking — `Tracers`, second-order `advect!` (Heun-in-time), and `sample!` for the Lagrangian statistics.
 - [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation` and the functions that advance it: `advance!`, `run!`, and `warmup!`.
 
+The reference turbulence laws (model spectra, structure-function laws, scaling constants) live in a
+separate, opt-in [Phenomenology](phenomenology.md) group — not re-exported by the umbrella, and designed
+to be extractable into a standalone package.
+
 ```@contents
 Pages = [
   "api/GBGIsotropicTurbulence.md",

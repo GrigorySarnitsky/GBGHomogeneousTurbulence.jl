@@ -38,6 +38,11 @@ module GBGIsotropicTurbulence
 using GBGPeriodicFields
 
 
+# Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.7): it is
+# deliberately NOT re-exported below — reach the reference laws opt-in through the submodule namespace,
+# e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra`.
+include("Phenomenology.jl")
+
 include("SimulationState.jl")
 include("Dynamics.jl")
 include("Observables.jl")
