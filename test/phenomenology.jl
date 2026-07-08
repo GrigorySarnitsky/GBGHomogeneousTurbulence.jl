@@ -64,8 +64,47 @@ end
   @test scaling(Sreenivasan1998(asymptote = 0.4), FP) == 0.4
   @test scaling(Sreenivasan1998(correction = 100.0), FP) ≈ 0.5 * (1 + 100.0 / taylor_reynolds(FP))
   @test Sreenivasan1995() isa ScalingLaw
-  @test scaling(Sreenivasan1995(), FP) == 1.6                    # Kolmogorov constant, Re-independent
-  @test scaling(Sreenivasan1995(C_K = 1.5), FP) == 1.5
+  @test scaling(Sreenivasan1995(), FP) == 1.5                    # Kolmogorov constant, Re-independent
+  @test scaling(Sreenivasan1995(C_K = 1.6), FP) == 1.6
+end
+
+
+@testset "Spectra — Pao1965 and dissipation factors" begin
+  pao = Pao1965()
+  @test pao isa ModelSpectrum
+  comp(κ) = spectrum(pao, κ, FP) * κ^(5 / 3) / 0.1^(2 / 3)
+  @test isapprox(comp(1.0), 1.5; atol = 0.05)                             # ≈ C_K in the inertial range
+  @test spectrum(pao, 10.0, FP) > spectrum(pao, 100.0, FP) > 0            # inertial then cutoff
+  @test isapprox(dissipation_factor(PaoDissipation(1.5), 1e-6), 1.0; atol = 1e-3)
+  @test large_scale_factor(UnitLargeScale(), 3.0) == 1.0
+  # closure-predicted exponential cutoff: f_η → 1 in the inertial range, decays with κη
+  @test isapprox(dissipation_factor(ExponentialDissipation(0.6), 1e-8), 1.0; atol = 1e-6)
+  @test dissipation_factor(ExponentialDissipation(0.6), 5.0) <
+        dissipation_factor(ExponentialDissipation(0.6), 1.0)
+end
+
+
+@testset "StructureFunctions — K62 log-normal exponents" begin
+  k62 = Kolmogorov1962()
+  @test scaling_exponent(k62, 3) ≈ 1.0                                    # exact at p = 3
+  @test scaling_exponent(k62, 6) ≈ 2 - 0.25                               # ζ_6 = 2 − μ
+  @test scaling_exponent(k62, 2) ≈ 2 / 3 - (0.25 / 18) * 2 * (2 - 3)
+  @test scaling_exponent(k62, 6) < scaling_exponent(Kolmogorov1941(), 6)  # bends below p/3
+end
+
+
+@testset "StructureFunctions — Yaglom 4/3 and Lundgren finite-Re 4/5" begin
+  fpφ = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
+                       integral_scale = 1.0, scalar_dissipation = 0.05)
+  r = 0.05
+  @test structure_function(Yaglom1949(), r, fpφ; order = 3) ≈ -(4 / 3) * 0.05 * r   # exact 4/3 law
+  @test_throws ArgumentError structure_function(Yaglom1949(), r, FP; order = 3)     # no scalar dissipation
+  @test_throws ArgumentError structure_function(Yaglom1949(), r, fpφ; order = 2)
+  # Lundgren's finite-Re 4/5 law, reduced from the exact -4/5 εr at finite Re_λ
+  @test structure_function(Lundgren2002(), r, FP; order = 3) ≈
+        -(4 / 5 - 8.45 / taylor_reynolds(FP)^(2 / 3)) * 0.1 * r
+  @test abs(structure_function(Lundgren2002(), r, FP; order = 3)) <
+        abs(structure_function(Kolmogorov1941(), r, FP; order = 3))
 end
 
 

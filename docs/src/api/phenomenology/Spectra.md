@@ -24,7 +24,10 @@ DissipationFactor
 PopeLargeScale
 PopeDissipation
 VonKarmanLarge
+UnitLargeScale
 UnitDissipation
+PaoDissipation
+ExponentialDissipation
 ```
 
 The factor evaluators, extended by each roll-off form.
@@ -41,6 +44,7 @@ The named velocity-spectrum presets of the composed [`ModelSpectrum`](@ref).
 ```@docs
 Pope2000
 VonKarman1948
+Pao1965
 ```
 
 ## Scalar spectra

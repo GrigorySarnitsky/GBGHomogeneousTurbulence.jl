@@ -6,15 +6,18 @@ function ``D_{L\\dots}(r)``, evaluated by [`structure_function`](@ref).
 
 - [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
   self-similar exponents (via [`scaling_exponent`](@ref)).
-- [`SheLeveque1994`](@ref) — the She–Lévêque intermittency model: the anomalous scaling exponents
-  ``\\zeta_p`` (via [`scaling_exponent`](@ref)).
+- [`Kolmogorov1962`](@ref) / [`SheLeveque1994`](@ref) — the K62 log-normal and She–Lévêque
+  intermittency models: the anomalous scaling exponents ``\\zeta_p`` (via [`scaling_exponent`](@ref)).
+- [`Yaglom1949`](@ref) — the exact 4/3 law for the mixed velocity–scalar structure function.
+- [`Lundgren2002`](@ref) — the finite-Reynolds-number correction to the 4/5 law.
 """
 module StructureFunctions
 
-using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference
+using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference, taylor_reynolds
 import ..Phenomenology: structure_function, scaling_exponent, provenance
 
-export StructureFunction, Kolmogorov1941, SheLeveque1994, structure_function, scaling_exponent
+export StructureFunction, Kolmogorov1941, Kolmogorov1962, SheLeveque1994, Yaglom1949, Lundgren2002,
+       structure_function, scaling_exponent
 
 
 """
@@ -86,6 +89,90 @@ struct SheLeveque1994 <: StructureFunction end
 scaling_exponent(::SheLeveque1994, order::Real) = order / 9 + 2 * (1 - (2 / 3)^(order / 3))
 
 provenance(::SheLeveque1994) = _SHELEVEQUE
+
+
+const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82"; valid_Reλ = (200.0, Inf))
+
+"""
+    Kolmogorov1962(; μ = 0.25)
+
+The Kolmogorov (1962) log-normal (refined-similarity) intermittency model. Its
+[`scaling_exponent`](@ref)`(law, p)` gives
+
+```math
+\\zeta_p = \\frac{p}{3} - \\frac{\\mu}{18}\\,p\\,(p - 3),
+```
+
+with `μ` the intermittency exponent (``\\approx 0.25``). Like [`SheLeveque1994`](@ref) it is exact at
+``\\zeta_3 = 1`` and bends below the self-similar ``p/3`` for ``p > 3``, but as a quadratic in ``p`` (the
+log-normal ansatz) rather than She–Lévêque's log-Poisson form.
+"""
+struct Kolmogorov1962 <: StructureFunction
+  μ::Float64
+end
+
+Kolmogorov1962(; μ = 0.25) = Kolmogorov1962(μ)
+
+scaling_exponent(m::Kolmogorov1962, order::Real) = order / 3 - (m.μ / 18) * order * (order - 3)
+
+provenance(::Kolmogorov1962) = _K62
+
+
+const _YAGLOM = Reference("Yaglom (1949), *Dokl. Akad. Nauk SSSR* **69**, 743"; valid_Reλ = (100.0, Inf))
+
+"""
+    Yaglom1949()
+
+The Yaglom (1949) 4/3 law — the exact inertial-range scaling of the mixed third-order velocity–scalar
+structure function,
+
+```math
+\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle(r) = -\\tfrac{4}{3}\\,\\varepsilon_\\varphi\\,r,
+```
+
+the passive-scalar analogue of the 4/5 law (a consequence of the Yaglom relation); it carries no free
+constant. [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar
+dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order`
+throws.
+"""
+struct Yaglom1949 <: StructureFunction end
+
+function structure_function(::Yaglom1949, r, fp::FlowParameters; order::Integer = 3)
+  order == 3 || throw(ArgumentError("Yaglom1949 gives only the 3rd-order (4/3) mixed law; got order=$order"))
+  isnan(fp.scalar_dissipation) && throw(ArgumentError(
+    "Yaglom1949 needs the scalar dissipation rate — set `scalar_dissipation` in FlowParameters"))
+  return -(4//3) * fp.scalar_dissipation * r
+end
+
+provenance(::Yaglom1949) = _YAGLOM
+
+
+const _LUNDGREN2002 = Reference("Lundgren (2002), *Phys. Fluids* **14**, 638"; valid_Reλ = (50.0, Inf))
+
+"""
+    Lundgren2002()
+
+The finite-Reynolds-number correction to the 4/5 law for the third-order longitudinal velocity
+structure function,
+
+```math
+D_{LLL}(r) = -\\left(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\right)\\varepsilon\\,r,
+```
+
+which relaxes to the exact ``-\\tfrac45\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
+``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
+asymptotic 4/5 slope (Lundgren 2002; Sagaut & Cambon 2018, Table 4.5).
+[`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading ``\\mathrm{Re}_\\lambda`` from
+`fp` via [`taylor_reynolds`](@ref); any other `order` throws.
+"""
+struct Lundgren2002 <: StructureFunction end
+
+function structure_function(::Lundgren2002, r, fp::FlowParameters; order::Integer = 3)
+  order == 3 || throw(ArgumentError("Lundgren2002 gives only the 3rd-order (finite-Re 4/5) law; got order=$order"))
+  return -(4 // 5 - 8.45 / taylor_reynolds(fp)^(2 // 3)) * fp.dissipation * r
+end
+
+provenance(::Lundgren2002) = _LUNDGREN2002
 
 
 end # module StructureFunctions

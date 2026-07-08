@@ -11,8 +11,10 @@ dissipation-range roll-off, each swappable.
 - [`LargeScaleFactor`](@ref) / [`DissipationFactor`](@ref) — the swappable roll-off pieces, evaluated by
   [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /
   [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^4`` energy
-  range, and [`UnitDissipation`](@ref) is no cutoff.
-- [`Pope2000`](@ref) / [`VonKarman1948`](@ref) — named velocity-spectrum presets of
+  range, [`PaoDissipation`](@ref) Pao's cutoff, [`ExponentialDissipation`](@ref) the closure-predicted
+  exponential cutoff, and [`UnitLargeScale`](@ref) / [`UnitDissipation`](@ref) are the trivial
+  (no-roll-off) factors.
+- [`Pope2000`](@ref) / [`VonKarman1948`](@ref) / [`Pao1965`](@ref) — named velocity-spectrum presets of
   [`ModelSpectrum`](@ref).
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
@@ -23,8 +25,9 @@ using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference, kolmogorov_leng
 import ..Phenomenology: spectrum, provenance
 
 export EnergySpectrum, ScalarSpectrum, LargeScaleFactor, DissipationFactor, PopeLargeScale,
-       PopeDissipation, VonKarmanLarge, UnitDissipation, ModelSpectrum, large_scale_factor,
-       dissipation_factor, Pope2000, VonKarman1948, ObukhovCorrsin1949, spectrum
+       PopeDissipation, VonKarmanLarge, UnitLargeScale, UnitDissipation, PaoDissipation,
+       ExponentialDissipation, ModelSpectrum, large_scale_factor, dissipation_factor, Pope2000,
+       VonKarman1948, Pao1965, ObukhovCorrsin1949, spectrum
 
 
 """
@@ -138,6 +141,48 @@ dissipation_factor(::UnitDissipation, κη) = one(κη)
 
 
 """
+    UnitLargeScale()
+
+The trivial large-scale factor ``f_L \\equiv 1`` — no energy-containing roll-off, for a spectrum defined
+only over the inertial and dissipation ranges (the [`Pao1965`](@ref) form).
+"""
+struct UnitLargeScale <: LargeScaleFactor end
+
+large_scale_factor(::UnitLargeScale, κL) = one(κL)
+
+
+"""
+    PaoDissipation(α)
+
+Pao's dissipation-range roll-off
+``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\tfrac32\\,\\alpha\\,(\\kappa\\eta)^{4/3}\\big)``, from the
+hypothesis that the spectral energy flux stays constant through the dissipation range; `α` is the
+Kolmogorov constant ``C_K`` (Pao 1965).
+"""
+struct PaoDissipation <: DissipationFactor
+  α::Float64
+end
+
+dissipation_factor(f::PaoDissipation, κη) = exp(-1.5 * f.α * κη^(4//3))
+
+
+"""
+    ExponentialDissipation(β)
+
+The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta\\,\\kappa\\eta)``
+— the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
+spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). `β` is
+fit-dependent — of order `0.6` in high-Reynolds-number DNS (Ishihara et al. 2005) — and the factor
+tends to `1` in the inertial range (``\\kappa\\eta \\to 0``).
+"""
+struct ExponentialDissipation <: DissipationFactor
+  β::Float64
+end
+
+dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
+
+
+"""
     ModelSpectrum(C_K, large_scale, dissipation, ref)
 
 The composed model energy spectrum
@@ -152,6 +197,11 @@ an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-o
 mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
 [`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and ``L`` from `fp` and forms
 ``\\eta`` with [`kolmogorov_length`](@ref).
+
+This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000; Meyers &
+Meneveau 2008); the large-scale roll-off sets the low-wavenumber slope
+``E(\\kappa\\to 0)\\propto\\kappa^\\sigma`` — ``\\sigma = 2`` (Saffman-type, the [`PopeLargeScale`](@ref)
+default) or ``\\sigma = 4`` (Batchelor-type, [`VonKarmanLarge`](@ref)).
 """
 struct ModelSpectrum{L<:LargeScaleFactor, D<:DissipationFactor} <: EnergySpectrum
   C_K::Float64
@@ -207,6 +257,27 @@ is the Kolmogorov constant; `c_L` fixes the peak scale.
 """
 VonKarman1948(; C_K = 1.5, c_L = 1.0) =
   ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN2000)
+
+
+const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063"; valid_Reλ = (0.0, Inf))
+
+"""
+    Pao1965(; C_K = 1.5)
+
+The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no energy-containing roll-off
+([`UnitLargeScale`](@ref)) and the [`PaoDissipation`](@ref) cutoff:
+
+```math
+E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,
+             \\exp\\!\\big(-\\tfrac32\\,C_K\\,(\\kappa\\eta)^{4/3}\\big),
+```
+
+covering the inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
+constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
+(unlike [`Pope2000`](@ref)). It has no energy-containing range; use [`Pope2000`](@ref) or
+[`VonKarman1948`](@ref) when the large scales matter.
+"""
+Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K), _PAO1965)
 
 
 """
