@@ -275,7 +275,7 @@ end
 _ou_state(::VectorFieldSpectral, domain) = spectral_vector(domain)
 _ou_state(::ScalarFieldSpectral, domain) = scalar_spectral(domain)
 _ou_buffers(::VectorFieldSpectral, buffers, domain) = (buffers.lamb, buffers.scratch, domain.velocity_plans)
-_ou_buffers(::ScalarFieldSpectral, buffers, domain) = (buffers.scalar_field, buffers.scalar_copy, domain.scalar_plans)
+_ou_buffers(::ScalarFieldSpectral, buffers, domain) = (buffers.scalar.field, buffers.scalar.copy, domain.scalar_plans)
 
 
 function prepare_forcing!(ou::StochasticOU, field, domain::SimulationDomain, buffers, dt::Real)

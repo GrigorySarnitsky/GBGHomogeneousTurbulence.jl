@@ -245,22 +245,37 @@ tensor_physical(domain::SimulationDomain) =
   TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid)
 
 
-"""
-    FieldBuffers(domain)
+# The passive-scalar step buffers — held by `FieldBuffers` only when a scalar is evolved, `nothing`
+# otherwise (so a velocity-only run allocates none of them).
+struct ScalarBuffers{SS, SP, RK}
+  stage1::SS
+  stage2::SS
+  star_spectral::SS
+  nonlinear::SS
+  copy::SS
+  field::SP
+  rate::RK                       # per-mode linear forcing rate for φ, folded into E_κ
+end
 
-Preallocated scratch for one coupled integrating-factor step of the velocity and the passive scalar
-``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers
-(buffers holding a stage's state and accumulator), the predictor field, a velocity copy (the in-place
-inverse transform consumes its source), a general spectral scratch, the nonlinear-term buffer, and the
-physical velocity / start-of-step vorticity / per-stage vorticity / predictor / Lamb-vector
-(``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage registers, a
-predictor, the nonlinear-term buffer, a copy, the shared integrating factor, and the physical scalar;
-the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch. Two
-real per-mode linear-forcing-rate arrays ``A(\\boldsymbol{\\kappa})`` — one for the velocity, one for
-``\\varphi`` — are folded into the integrating factor. Sized so a step allocates no field-sized
-memory.
+
 """
-struct FieldBuffers{VS, SS, VP, SP, RK}
+    FieldBuffers(domain; scalar = true)
+
+Preallocated scratch for one integrating-factor step, sized so a step allocates no field-sized memory.
+The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers (buffers holding a
+stage's state and accumulator), the predictor field, a velocity copy (the in-place inverse transform
+consumes its source), a general spectral scratch, the nonlinear-term buffer, and the physical velocity /
+start-of-step vorticity / per-stage vorticity / predictor / Lamb-vector
+(``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``); the shared integrating factor and the velocity's
+per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})`` complete them.
+
+When `scalar = true` a `ScalarBuffers` bundle is allocated for the passive scalar ``\\varphi`` (two stage
+registers, a predictor, the nonlinear-term buffer, a copy, the physical scalar, and its forcing-rate
+array; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the velocity scratch). When `scalar = false`
+the run evolves no scalar, so `buffers.scalar` is `nothing` and none of those field-sized buffers are
+allocated.
+"""
+struct FieldBuffers{VS, SS, VP, RK, SB}
   vorticity_spectral::VS
   stage1::VS
   stage2::VS
@@ -269,33 +284,35 @@ struct FieldBuffers{VS, SS, VP, SP, RK}
   scratch::VS
   nonlinear::VS
   integrating_factor::SS
-  scalar_stage1::SS
-  scalar_stage2::SS
-  scalar_star_spectral::SS
-  scalar_nonlinear::SS
-  scalar_copy::SS
   velocity::VP
   vorticity_start::VP
   vorticity_physical::VP
   velocity_star::VP
   lamb::VP
-  scalar_field::SP
   velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
-  scalar_rate::RK                # per-mode linear forcing rate for φ, folded into E_κ
+  scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
 end
 
 
-function FieldBuffers(domain::SimulationDomain)
-  rate() = fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+_forcing_rate(domain::SimulationDomain) =
+  fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+
+ScalarBuffers(domain::SimulationDomain) = ScalarBuffers(
+  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
+  scalar_spectral(domain), scalar_spectral(domain),
+  scalar_physical(domain),
+  _forcing_rate(domain),
+)
+
+function FieldBuffers(domain::SimulationDomain; scalar::Bool = true)
   return FieldBuffers(
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
-    scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
-    scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
+    scalar_spectral(domain),
     physical_vector(domain), physical_vector(domain), physical_vector(domain),
     physical_vector(domain), physical_vector(domain),
-    scalar_physical(domain),
-    rate(), rate(),
+    _forcing_rate(domain),
+    scalar ? ScalarBuffers(domain) : nothing,
   )
 end
 

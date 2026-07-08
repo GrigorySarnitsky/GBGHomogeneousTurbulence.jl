@@ -146,7 +146,7 @@ function Simulation(domain::SimulationDomain;
     ν = Float64(viscosity)
   end
 
-  buffers = FieldBuffers(domain)
+  buffers = FieldBuffers(domain; scalar)
   physics = Physics(; viscosity = ν, schmidt,
                     velocity_forcing = _resolve_forcing(velocity_forcing, domain),
                     scalar_forcing = _resolve_forcing(scalar_forcing, domain))
@@ -161,7 +161,7 @@ function Simulation(domain::SimulationDomain;
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
   random_solenoidal_velocity!(û, domain; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  φ̂ = scalar_spectral(domain)
+  φ̂ = scalar ? scalar_spectral(domain) : nothing         # `nothing` ⇒ no scalar is evolved (its buffers go unallocated)
   scalar && random_scalar!(φ̂, domain; variance = scalar_variance, peak_wavenumber, rng)
 
   tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
@@ -191,7 +191,7 @@ _refresh_cached_fields!(sim::Simulation) =
 # the cached buffer fields (valid between steps).
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.buffers.velocity)
 dissipation(sim::Simulation) = dissipation(sim.buffers.vorticity_start, sim.physics.viscosity)
-scalar_variance(sim::Simulation) = scalar_variance(sim.scalar)
+scalar_variance(sim::Simulation) = sim.scalar === nothing ? NaN : scalar_variance(sim.scalar)
 energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.domain)
 integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.domain)
 
@@ -443,7 +443,7 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
-_scalar_forced(sim::Simulation) = !(sim.physics.scalar_forcing isa NoForcing)
+_scalar_forced(sim::Simulation) = sim.scalar !== nothing && !(sim.physics.scalar_forcing isa NoForcing)
 
 
 """

@@ -120,13 +120,17 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::SimulationDomain, buffers::F
   ν = physics.viscosity
   κ = physics.viscosity / physics.schmidt
   hu = buffers.stage1                                                             # velocity accumulator
-  hφ = buffers.scalar_stage1                                                      # scalar accumulator
+  sb = buffers.scalar                                                             # ScalarBuffers, or nothing
+  has_scalar = φ̂ !== nothing
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
   prepare_forcing!(physics.velocity_forcing, û, domain, buffers, dt)
-  prepare_forcing!(physics.scalar_forcing, φ̂, domain, buffers, dt)
   velocity_rate = forcing_rate!(physics.velocity_forcing, buffers.velocity_rate, û, domain, buffers) ? buffers.velocity_rate : nothing
-  scalar_rate = forcing_rate!(physics.scalar_forcing, buffers.scalar_rate, φ̂, domain, buffers) ? buffers.scalar_rate : nothing
+  scalar_rate = nothing
+  if has_scalar
+    prepare_forcing!(physics.scalar_forcing, φ̂, domain, buffers, dt)
+    scalar_rate = forcing_rate!(physics.scalar_forcing, sb.rate, φ̂, domain, buffers) ? sb.rate : nothing
+  end
 
   for i in 1:3
     if i == 1
@@ -135,33 +139,40 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::SimulationDomain, buffers::F
       velocity_vorticity!(buffers.velocity_star, buffers.vorticity_physical, û, domain, buffers)
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
-    scalar_to_physical!(buffers.scalar_field, φ̂, domain, buffers)                      # φ at the stage state
 
     velocity_nonlinear!(buffers.nonlinear, u, ω, domain, buffers)          # N̂_u
     forcing_source!(physics.velocity_forcing, buffers.nonlinear, domain, buffers)         # + additive forcing (OU)
-    scalar_nonlinear!(buffers.scalar_nonlinear, u, buffers.scalar_field, domain, buffers)  # N̂_φ (reuses buffers.lamb/buffers.scratch)
-    forcing_source!(physics.scalar_forcing, buffers.scalar_nonlinear, domain, buffers)
-
     if i == 1
       multiply!(hu, dt_T, buffers.nonlinear)                                      # A₁ = 0
-      multiply!(hφ, dt_T, buffers.scalar_nonlinear)
     else
       combine!(hu, a[i], hu, dt_T, buffers.nonlinear)                             # hu ← Aᵢ hu + Δt N̂_u
-      combine!(hφ, a[i], hφ, dt_T, buffers.scalar_nonlinear)
     end
     combine!(û, one(T), û, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
-    combine!(φ̂, one(T), φ̂, b[i], hφ)
-
     integrating_factor!(buffers.integrating_factor, domain, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
     convolve!(û, û, buffers.integrating_factor)
     i < 3 && convolve!(hu, hu, buffers.integrating_factor)
-    integrating_factor!(buffers.integrating_factor, domain, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
-    convolve!(φ̂, φ̂, buffers.integrating_factor)
-    i < 3 && convolve!(hφ, hφ, buffers.integrating_factor)
+
+    # The passive scalar rides the same stages (skipped, with its buffers unallocated, when absent).
+    # `u` and `φ̂` are untouched above, so this is bit-identical to advancing them together.
+    if has_scalar
+      hφ = sb.stage1                                                              # scalar accumulator
+      scalar_to_physical!(sb.field, φ̂, domain, buffers)                          # φ at the stage state
+      scalar_nonlinear!(sb.nonlinear, u, sb.field, domain, buffers)               # N̂_φ (reuses buffers.lamb/buffers.scratch)
+      forcing_source!(physics.scalar_forcing, sb.nonlinear, domain, buffers)
+      if i == 1
+        multiply!(hφ, dt_T, sb.nonlinear)
+      else
+        combine!(hφ, a[i], hφ, dt_T, sb.nonlinear)
+      end
+      combine!(φ̂, one(T), φ̂, b[i], hφ)
+      integrating_factor!(buffers.integrating_factor, domain, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
+      convolve!(φ̂, φ̂, buffers.integrating_factor)
+      i < 3 && convolve!(hφ, hφ, buffers.integrating_factor)
+    end
   end
 
   apply_forcing!(physics.velocity_forcing, û, domain, buffers.scratch)
-  apply_forcing!(physics.scalar_forcing, φ̂, domain, buffers.scalar_nonlinear)    # scalar-spectral scratch (free here)
+  has_scalar && apply_forcing!(physics.scalar_forcing, φ̂, domain, sb.nonlinear)   # scalar-spectral scratch (free here)
   return û, φ̂
 end
 
@@ -205,35 +216,46 @@ function step!(::IFRK2, û, φ̂, domain::SimulationDomain, buffers::FieldBuffer
   half = dt_T / 2
   ν = physics.viscosity
   κ = physics.viscosity / physics.schmidt
+  sb = buffers.scalar                                                            # ScalarBuffers, or nothing
+  has_scalar = φ̂ !== nothing
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
   prepare_forcing!(physics.velocity_forcing, û, domain, buffers, dt)
-  prepare_forcing!(physics.scalar_forcing, φ̂, domain, buffers, dt)
   velocity_rate = forcing_rate!(physics.velocity_forcing, buffers.velocity_rate, û, domain, buffers) ? buffers.velocity_rate : nothing
-  scalar_rate = forcing_rate!(physics.scalar_forcing, buffers.scalar_rate, φ̂, domain, buffers) ? buffers.scalar_rate : nothing
+  scalar_rate = nothing
+  if has_scalar
+    prepare_forcing!(physics.scalar_forcing, φ̂, domain, buffers, dt)
+    scalar_rate = forcing_rate!(physics.scalar_forcing, sb.rate, φ̂, domain, buffers) ? sb.rate : nothing
+  end
 
   # stage 1 — nonlinear terms at the start-of-step state
-  scalar_to_physical!(buffers.scalar_field, φ̂, domain, buffers)
   velocity_nonlinear!(buffers.stage1, buffers.velocity, buffers.vorticity_start, domain, buffers)              # N̂_u,1
   forcing_source!(physics.velocity_forcing, buffers.stage1, domain, buffers)
-  scalar_nonlinear!(buffers.scalar_stage1, buffers.velocity, buffers.scalar_field, domain, buffers)            # N̂_φ,1
-  forcing_source!(physics.scalar_forcing, buffers.scalar_stage1, domain, buffers)
+  if has_scalar
+    scalar_to_physical!(sb.field, φ̂, domain, buffers)
+    scalar_nonlinear!(sb.stage1, buffers.velocity, sb.field, domain, buffers)            # N̂_φ,1
+    forcing_source!(physics.scalar_forcing, sb.stage1, domain, buffers)
+  end
 
   # predictors û*, φ̂*
   integrating_factor!(buffers.integrating_factor, domain, ν, dt, velocity_rate)                 # E_ν
   combine!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1)                      # û* ← ûₙ + Δt N̂_u,1
   convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, buffers.integrating_factor)
-  integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)                   # E_κ
-  combine!(buffers.scalar_star_spectral, one(T), φ̂, dt_T, buffers.scalar_stage1)               # φ̂* ← φ̂ₙ + Δt N̂_φ,1
-  convolve!(buffers.scalar_star_spectral, buffers.scalar_star_spectral, buffers.integrating_factor)
+  if has_scalar
+    integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)                 # E_κ
+    combine!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1)                                       # φ̂* ← φ̂ₙ + Δt N̂_φ,1
+    convolve!(sb.star_spectral, sb.star_spectral, buffers.integrating_factor)
+  end
 
   # stage 2 — nonlinear terms at the predictor state
   velocity_vorticity!(buffers.velocity_star, buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers)
-  scalar_to_physical!(buffers.scalar_field, buffers.scalar_star_spectral, domain, buffers)
   velocity_nonlinear!(buffers.stage2, buffers.velocity_star, buffers.vorticity_physical, domain, buffers)      # N̂_u,2
   forcing_source!(physics.velocity_forcing, buffers.stage2, domain, buffers)
-  scalar_nonlinear!(buffers.scalar_stage2, buffers.velocity_star, buffers.scalar_field, domain, buffers)       # N̂_φ,2
-  forcing_source!(physics.scalar_forcing, buffers.scalar_stage2, domain, buffers)
+  if has_scalar
+    scalar_to_physical!(sb.field, sb.star_spectral, domain, buffers)
+    scalar_nonlinear!(sb.stage2, buffers.velocity_star, sb.field, domain, buffers)       # N̂_φ,2
+    forcing_source!(physics.scalar_forcing, sb.stage2, domain, buffers)
+  end
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
   integrating_factor!(buffers.integrating_factor, domain, ν, dt, velocity_rate)
@@ -243,14 +265,16 @@ function step!(::IFRK2, û, φ̂, domain::SimulationDomain, buffers::FieldBuffer
   combine!(û, one(T), û, half, buffers.stage2)
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
-  integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)
-  convolve!(buffers.scalar_stage1, buffers.scalar_stage1, buffers.integrating_factor)
-  convolve!(φ̂, φ̂, buffers.integrating_factor)
-  combine!(φ̂, one(T), φ̂, half, buffers.scalar_stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
-  combine!(φ̂, one(T), φ̂, half, buffers.scalar_stage2)
+  if has_scalar
+    integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)
+    convolve!(sb.stage1, sb.stage1, buffers.integrating_factor)
+    convolve!(φ̂, φ̂, buffers.integrating_factor)
+    combine!(φ̂, one(T), φ̂, half, sb.stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
+    combine!(φ̂, one(T), φ̂, half, sb.stage2)
+  end
 
   apply_forcing!(physics.velocity_forcing, û, domain, buffers.scratch)
-  apply_forcing!(physics.scalar_forcing, φ̂, domain, buffers.scalar_nonlinear)
+  has_scalar && apply_forcing!(physics.scalar_forcing, φ̂, domain, sb.nonlinear)
   return û, φ̂
 end
 

@@ -122,8 +122,8 @@ Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectra
 consumes its source.
 """
 function scalar_to_physical!(φ, φ̂, domain::SimulationDomain, buffers::FieldBuffers)
-  copyto!(field_data(buffers.scalar_copy), field_data(φ̂))
-  to_physical!(φ, buffers.scalar_copy, domain.scalar_plans)
+  copyto!(field_data(buffers.scalar.copy), field_data(φ̂))
+  to_physical!(φ, buffers.scalar.copy, domain.scalar_plans)
   return φ
 end
 
