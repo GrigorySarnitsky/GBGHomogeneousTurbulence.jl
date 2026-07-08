@@ -5,14 +5,14 @@ Modules = [GBGIsotropicTurbulence.SimulationState]
 Order   = [:module]
 ```
 
-## The simulation domain and workspace
+## The simulation domain and field buffers
 
 The read-only spectral machinery every buffer is allocated from — the `SimulationDomain` — and the
 preallocated per-step scratch a run advances.
 
 ```@docs
 SimulationDomain
-Workspace
+FieldBuffers
 ```
 
 ## De-aliasing strategies

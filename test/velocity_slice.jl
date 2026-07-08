@@ -16,7 +16,7 @@ using Test
   ν = 5.0e-2
 
   domain = SimulationDomain(N, L; scalar_type = T)
-  ws = Workspace(domain)
+  buffers = FieldBuffers(domain)
   physics = Physics(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; energy = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()
@@ -31,10 +31,10 @@ using Test
   nsteps = 300
   energies = T[]
   for n in 1:nsteps
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
-    dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
-    push!(energies, kinetic_energy(ws.velocity))
-    step!(integrator, û, φ̂, domain, ws, physics, dt)
+    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
+    push!(energies, kinetic_energy(buffers.velocity))
+    step!(integrator, û, φ̂, domain, buffers, physics, dt)
   end
 
   @test all(isfinite, energies)
@@ -50,10 +50,10 @@ using Test
 
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
-  velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
-  dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
-  step!(integrator, û, φ̂, domain, ws, physics, dt)                            # warm up
-  step_bytes = @allocated step!(integrator, û, φ̂, domain, ws, physics, dt)
+  velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+  dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
+  step!(integrator, û, φ̂, domain, buffers, physics, dt)                            # warm up
+  step_bytes = @allocated step!(integrator, û, φ̂, domain, buffers, physics, dt)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes < field_bytes
 end

@@ -12,14 +12,14 @@ using Random
 using Test
 
 
-function integrate_coupled(integrator, domain, ws, û0, φ̂0, physics, dt, nsteps)
+function integrate_coupled(integrator, domain, buffers, û0, φ̂0, physics, dt, nsteps)
   û = spectral_vector(domain)
   φ̂ = scalar_spectral(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   for _ in 1:nsteps
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
-    step!(integrator, û, φ̂, domain, ws, physics, dt)
+    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    step!(integrator, û, φ̂, domain, buffers, physics, dt)
   end
   return û, φ̂
 end
@@ -33,7 +33,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = SimulationDomain(N, L; scalar_type = T)
-  ws = Workspace(domain)
+  buffers = FieldBuffers(domain)
 
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7
@@ -45,7 +45,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     dt = 0.02
     nsteps = 25
     total_time = dt * nsteps
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, ws, û0, φ̂0, physics, dt, nsteps)
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, physics, dt, nsteps)
 
     expected = field_data(φ̂0) .* complex.(exp.(-κ .* domain.squared_wavenumber .* total_time))
     relative_error = sqrt(sum(abs2, field_data(φ̂) .- expected)) / sqrt(sum(abs2, expected))
@@ -63,9 +63,9 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     rk3 = IFLowStorageRK3()
     Tfinal = 0.4
     n = 8
-    _, p1 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / n, n)
-    _, p2 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / (2n), 2n)
-    _, p4 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / (4n), 4n)
+    _, p1 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / n, n)
+    _, p2 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / (2n), 2n)
+    _, p4 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / (4n), 4n)
     ratio = diffnorm(p1, p2) / diffnorm(p2, p4)
     @test 5.0 < ratio < 12.0
   end
@@ -81,7 +81,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
     physics = Physics(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, ws, û0, φ̂0, physics, 0.02, 30)
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, physics, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end
 

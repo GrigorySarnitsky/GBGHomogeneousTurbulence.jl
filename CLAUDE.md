@@ -5,7 +5,7 @@ isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` a
 ``\varphi`` on a triple-periodic box, each optionally forced, advanced by interchangeable
 integrating-factor time-stepping, with Lagrangian particle tracking and Eulerian + Lagrangian
 statistics. **GPU is the primary target**: the time loop is in-place and allocation-free over a
-preallocated workspace, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
+preallocated buffers, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
 
 Built on two sibling backends: **GBGPeriodicFields** ("PF", the field mathematics) and
 **GBGStreamingStatistics** ("SS", the online statistics). The division is exact — **PF is all field
@@ -28,7 +28,7 @@ the **Mori–Zwanzig lens** — the *dynamics* (the generator / RHS) and its *ob
 functions of state); **realization / infrastructure** concerns are named by their job.
 
 - `SimulationState` — the operator + transform-plan bundle (`SimulationDomain`), the preallocated
-  `Workspace` buffers, and the random initial conditions.
+  `FieldBuffers`, and the random initial conditions.
 - `Dynamics` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor. The MZ *generator*.
 - `Observables` — the measured functions of state (energy, dissipation, derivative skewness, scalar
@@ -61,7 +61,7 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
    omission; "for symmetry", "for completeness", or "it's convenient" is never a valid justification (a
    missing capability encodes a decision — the PF / SS discipline).
 4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free over the
-   preallocated `Workspace`; storage is generic `AbstractArray` (no scalar indexing of device arrays).
+   preallocated `FieldBuffers`; storage is generic `AbstractArray` (no scalar indexing of device arrays).
    **Minimal memory footprint trumps compute cost** — prefer low-storage integrators, and per-call
    allocation of an *occasional* diagnostic over resident scratch. Precision (`Float32` / `Float64`)
    and footprint are **studied fitness axes**, not afterthoughts.
@@ -78,7 +78,7 @@ inverse. Operators and extended Base functions are imported before being extende
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
-`ws.velocity`, `ws.vorticity_start`, `sim.velocity`, `Tracers.velocity1` — as do function names
+`buffers.velocity`, `buffers.vorticity_start`, `sim.velocity`, `Tracers.velocity1` — as do function names
 (`velocity_vorticity!`), `Physics.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
@@ -188,7 +188,7 @@ instance is a *sample of a class* — fix the class, not the line.
    derivation; the diagnostic consistent with the physical quantity it claims to measure.
 2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
    every signature argument documented** — enumerated *from the signature* (positional + keyword), each
-   its own entry, so an "obvious" `domain` or `dt` cannot be skipped (this is how `domain` / `ws` once
+   its own entry, so an "obvious" `domain` or `dt` cannot be skipped (this is how `domain` / `buffers` once
    slipped past). A **term of art** naming a package concept is explained or `@ref`-linked, not left
    correct only to a reader who already knows the code — the **cold read** (the docstring parsed with
    the module source withheld) is the test.

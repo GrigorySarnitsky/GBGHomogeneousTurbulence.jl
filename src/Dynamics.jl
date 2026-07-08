@@ -25,20 +25,20 @@ multiplier.
 
 Every field-transforming or nonlinear-assembly method takes the operator bundle `domain` (a
 `SimulationDomain`: grid, transform plans, wavenumber multipliers, de-alias kernel) and the
-preallocated scratch `ws` (a `Workspace`) as its final two arguments; `integrating_factor!` takes
-`domain` alone (no `ws`).
+preallocated scratch `buffers` (a `FieldBuffers`) as its final two arguments; `integrating_factor!` takes
+`domain` alone (no `buffers`).
 """
 module Dynamics
 
 using GBGPeriodicFields
-using ..SimulationState: SimulationDomain, Workspace
+using ..SimulationState: SimulationDomain, FieldBuffers
 
 export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
        scalar_to_physical!, scalar_nonlinear!
 
 
 """
-    velocity_vorticity!(u, ω, û, domain, ws)
+    velocity_vorticity!(u, ω, û, domain, buffers)
 
 Compute the physical velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` of the velocity field `û` (given in spectral
@@ -47,17 +47,17 @@ representation ``\\hat{\\boldsymbol{u}}``) into the buffers `u` and `ω`.
 `û` is preserved: the vorticity is transformed first, then a *copy* of `û` is transformed — the
 in-place inverse transform consumes its spectral source.
 """
-function velocity_vorticity!(u, ω, û, domain::SimulationDomain, ws::Workspace)
-  curl!(ws.vorticity_spectral, û, domain.multipliers)
-  to_physical!(ω, ws.vorticity_spectral, domain.velocity_plans)
-  copyto!(field_data(ws.velocity_copy), field_data(û))
-  to_physical!(u, ws.velocity_copy, domain.velocity_plans)
+function velocity_vorticity!(u, ω, û, domain::SimulationDomain, buffers::FieldBuffers)
+  curl!(buffers.vorticity_spectral, û, domain.multipliers)
+  to_physical!(ω, buffers.vorticity_spectral, domain.velocity_plans)
+  copyto!(field_data(buffers.velocity_copy), field_data(û))
+  to_physical!(u, buffers.velocity_copy, domain.velocity_plans)
   return u, ω
 end
 
 
 """
-    velocity_nonlinear!(nonlinear, u, ω, domain, ws)
+    velocity_nonlinear!(nonlinear, u, ω, domain, buffers)
 
 Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
 from the physical `u` ``\\boldsymbol{u}`` and `ω` ``\\boldsymbol{\\omega}``.
@@ -72,10 +72,10 @@ spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})`
 kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of the quadratic
 product. Allocation-free (a destination distinct from its sources needs no internal scratch).
 """
-function velocity_nonlinear!(nonlinear, u, ω, domain::SimulationDomain, ws::Workspace)
-  cross!(ws.lamb, u, ω)
-  to_spectral!(ws.scratch, ws.lamb, domain.velocity_plans)
-  helmholtz_projection!(nonlinear, ws.scratch, domain.multipliers)
+function velocity_nonlinear!(nonlinear, u, ω, domain::SimulationDomain, buffers::FieldBuffers)
+  cross!(buffers.lamb, u, ω)
+  to_spectral!(buffers.scratch, buffers.lamb, domain.velocity_plans)
+  helmholtz_projection!(nonlinear, buffers.scratch, domain.multipliers)
   convolve!(nonlinear, nonlinear, domain.dealias)
   return nonlinear
 end
@@ -115,21 +115,21 @@ end
 
 
 """
-    scalar_to_physical!(φ, φ̂, domain, ws)
+    scalar_to_physical!(φ, φ̂, domain, buffers)
 
 Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectral representation
 ``\\hat{\\varphi}``), preserving `φ̂` — a copy is transformed, since the in-place inverse transform
 consumes its source.
 """
-function scalar_to_physical!(φ, φ̂, domain::SimulationDomain, ws::Workspace)
-  copyto!(field_data(ws.scalar_copy), field_data(φ̂))
-  to_physical!(φ, ws.scalar_copy, domain.scalar_plans)
+function scalar_to_physical!(φ, φ̂, domain::SimulationDomain, buffers::FieldBuffers)
+  copyto!(field_data(buffers.scalar_copy), field_data(φ̂))
+  to_physical!(φ, buffers.scalar_copy, domain.scalar_plans)
   return φ
 end
 
 
 """
-    scalar_nonlinear!(nonlinear, u, φ, domain, ws)
+    scalar_nonlinear!(nonlinear, u, φ, domain, buffers)
 
 Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the
 physical `u` ``\\boldsymbol{u}`` and physical `φ` ``\\varphi``.
@@ -143,11 +143,11 @@ pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa
 the kernel controlling the aliasing of the quadratic product.
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
-function scalar_nonlinear!(nonlinear, u, φ, domain::SimulationDomain, ws::Workspace)
+function scalar_nonlinear!(nonlinear, u, φ, domain::SimulationDomain, buffers::FieldBuffers)
   φ_data = field_data(φ)
-  field_data(ws.lamb) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)  # flux uφ
-  to_spectral!(ws.scratch, ws.lamb, domain.velocity_plans)        # (uφ)^
-  divergence!(nonlinear, ws.scratch, domain.multipliers)          # i𝛋·(uφ)^ = ∇·(uφ)
+  field_data(buffers.lamb) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)  # flux uφ
+  to_spectral!(buffers.scratch, buffers.lamb, domain.velocity_plans)        # (uφ)^
+  divergence!(nonlinear, buffers.scratch, domain.multipliers)          # i𝛋·(uφ)^ = ∇·(uφ)
   convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)          # N_φ = -dealias(∇·(uφ))
   return nonlinear
 end

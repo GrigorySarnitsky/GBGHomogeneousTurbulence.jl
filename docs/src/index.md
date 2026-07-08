@@ -11,7 +11,7 @@ supplies every field operation — transforms, spectral differential operators, 
 interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
 package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
 and the statistics. The GPU is the primary target, so the time loop is in-place and allocation-free
-over a preallocated workspace.
+over a preallocated buffers.
 
 ## Installation
 
@@ -62,7 +62,7 @@ de-aliased by the ``2/3`` rule.
 ## Components
 
 - [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SimulationDomain`),
-  the preallocated buffers (`Workspace`), and the random initial conditions — a divergence-free
+  the preallocated buffers (`FieldBuffers`), and the random initial conditions — a divergence-free
   velocity and a mean-zero scalar ``\varphi``.
 - [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.

@@ -176,7 +176,7 @@ using Test
 
   @testset "derivative skewness" begin
     domain = SimulationDomain(24, 2π; scalar_type = Float64)
-    ws = Workspace(domain)
+    buffers = FieldBuffers(domain)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)
@@ -187,8 +187,8 @@ using Test
     φ̂ = scalar_spectral(domain)
     physics = Physics(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
     for _ in 1:80
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
-      step!(IFLowStorageRK3(), û, φ̂, domain, ws, physics, 0.012)
+      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, physics, 0.012)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05

@@ -48,7 +48,7 @@ a thin run layer that assembles the machinery with sensible defaults and owns th
 ```julia
 using GBGIsotropicTurbulence
 
-# Assemble a forced case. Everything the run needs — the domain, workspace, physics,
+# Assemble a forced case. Everything the run needs — the domain, buffers, physics,
 # integrator, state, and initial condition — is built with defaults from a few numbers.
 sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  velocity_forcing = ConstantPower(power = 0.1),
@@ -147,7 +147,7 @@ Each concern is its own module, included in dependency order by the umbrella
   ``\texttt{Float64}``) and `array_type` the storage (`Array`, `CuArray`, `ROCArray`); every buffer is
   allocated `similar` to this machinery, so a run is CPU/GPU-agnostic and single-precision or double
   by construction.
-- **`Workspace`** preallocates *all* field-sized scratch a coupled velocity + scalar step writes into
+- **`FieldBuffers`** preallocates *all* field-sized scratch a coupled velocity + scalar step writes into
   — the spectral vorticity, the Runge–Kutta stage registers and predictor, the physical
   velocity/vorticity/Lamb-vector buffers, the shared integrating factor, and the per-mode linear
   forcing rates. It is sized so that **a step allocates no field-sized memory** (§9, invariant 4).
@@ -256,7 +256,7 @@ does not naively unify all of it.
 
 ### 4.6 The run layer (`SimulationRun`) — the front door
 
-A `Simulation` value bundles the state a case advances: the `SimulationDomain`, the `Workspace`, the
+A `Simulation` value bundles the state a case advances: the `SimulationDomain`, the `FieldBuffers`, the
 `Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and
 ``\hat\varphi``, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer for the Heun
 push, and a clock. Over it:
@@ -477,7 +477,7 @@ missing one usually encodes a decision.
 3. **No privileged precision or backend.** ``T`` and the array type flow from the field; both
    precisions and CPU/GPU are first-class (§6).
 4. **Allocation-free stepping.** A time step allocates no field-sized memory over the preallocated
-   `Workspace` — load-bearing for GPU hot loops. (The one documented exception is `StochasticOU`
+   `FieldBuffers` — load-bearing for GPU hot loops. (The one documented exception is `StochasticOU`
    forcing, whose random increment is drawn host-side each step — portability-first, not yet tuned.)
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU
    scope (inherited from `GBGPeriodicFields`).

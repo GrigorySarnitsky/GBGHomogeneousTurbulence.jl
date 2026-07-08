@@ -1,7 +1,7 @@
 # SimulationState — the spectral machinery and preallocated buffers a HIST run advances.
 #
 # `SimulationDomain` bundles the reusable, read-only machinery (grid, transform plans, spectral
-# multipliers, the |k|² field, and the de-alias kernel). `Workspace` holds the
+# multipliers, the |k|² field, and the de-alias kernel). `FieldBuffers` holds the
 # preallocated scratch the velocity time step writes into, so a step allocates no field-sized memory
 # — the GPU hot-loop discipline inherited from GBGPeriodicFields (its invariant 13). Everything is
 # allocated through the field reference's array type, so a run is CPU/GPU-agnostic (pass
@@ -13,7 +13,7 @@
 The spectral machinery and preallocated buffers a run advances: [`SimulationDomain`](@ref) (the
 read-only grid, transform plans, multipliers, squared-wavenumber field, and the de-alias kernel built
 by a [`DealiasingStrategy`](@ref) — [`TwoThirds`](@ref) or [`HouLi`](@ref)), the scratch allocators,
-[`Workspace`](@ref), and the random initial conditions ([`random_solenoidal_velocity!`](@ref) for the
+[`FieldBuffers`](@ref), and the random initial conditions ([`random_solenoidal_velocity!`](@ref) for the
 divergence-free velocity, [`random_scalar!`](@ref) for the mean-zero scalar ``\\varphi``).
 [`dealias!`](@ref) applies the de-alias kernel to a spectral field in place.
 """
@@ -22,7 +22,7 @@ module SimulationState
 using GBGPeriodicFields
 using Random
 
-export SimulationDomain, Workspace,
+export SimulationDomain, FieldBuffers,
        spectral_vector, physical_vector, scalar_spectral, scalar_physical,
        tensor_spectral, tensor_physical,
        random_solenoidal_velocity!, random_scalar!, dealias!,
@@ -246,7 +246,7 @@ tensor_physical(domain::SimulationDomain) =
 
 
 """
-    Workspace(domain)
+    FieldBuffers(domain)
 
 Preallocated scratch for one coupled integrating-factor step of the velocity and the passive scalar
 ``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers
@@ -260,7 +260,7 @@ real per-mode linear-forcing-rate arrays ``A(\\boldsymbol{\\kappa})`` — one fo
 ``\\varphi`` — are folded into the integrating factor. Sized so a step allocates no field-sized
 memory.
 """
-struct Workspace{VS, SS, VP, SP, RK}
+struct FieldBuffers{VS, SS, VP, SP, RK}
   vorticity_spectral::VS
   stage1::VS
   stage2::VS
@@ -285,9 +285,9 @@ struct Workspace{VS, SS, VP, SP, RK}
 end
 
 
-function Workspace(domain::SimulationDomain)
+function FieldBuffers(domain::SimulationDomain)
   rate() = fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
-  return Workspace(
+  return FieldBuffers(
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
     scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
