@@ -23,7 +23,7 @@ StochasticOU
 ## Deferred forcing spec
 
 The operator-free deferred form a strategy's constructor returns, materialised into a concrete forcing
-once the operators exist.
+once the domain exists.
 
 ```@docs
 ForcingSpec

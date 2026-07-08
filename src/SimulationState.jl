@@ -1,6 +1,6 @@
 # SimulationState — the spectral machinery and preallocated buffers a HIST run advances.
 #
-# `SpectralOperators` bundles the reusable, read-only machinery (grid, transform plans, spectral
+# `SimulationDomain` bundles the reusable, read-only machinery (grid, transform plans, spectral
 # multipliers, the |k|² field, and the de-alias kernel). `Workspace` holds the
 # preallocated scratch the velocity time step writes into, so a step allocates no field-sized memory
 # — the GPU hot-loop discipline inherited from GBGPeriodicFields (its invariant 13). Everything is
@@ -10,7 +10,7 @@
 """
     SimulationState
 
-The spectral machinery and preallocated buffers a run advances: [`SpectralOperators`](@ref) (the
+The spectral machinery and preallocated buffers a run advances: [`SimulationDomain`](@ref) (the
 read-only grid, transform plans, multipliers, squared-wavenumber field, and the de-alias kernel built
 by a [`DealiasingStrategy`](@ref) — [`TwoThirds`](@ref) or [`HouLi`](@ref)), the scratch allocators,
 [`Workspace`](@ref), and the random initial conditions ([`random_solenoidal_velocity!`](@ref) for the
@@ -22,7 +22,7 @@ module SimulationState
 using GBGPeriodicFields
 using Random
 
-export SpectralOperators, Workspace,
+export SimulationDomain, Workspace,
        spectral_vector, physical_vector, scalar_spectral, scalar_physical,
        tensor_spectral, tensor_physical,
        random_solenoidal_velocity!, random_scalar!, dealias!,
@@ -30,15 +30,15 @@ export SpectralOperators, Workspace,
 
 
 # ── De-aliasing strategies ────────────────────────────────────────────────────────────────────────
-# How the aliasing of the quadratic nonlinearity is controlled. Each strategy builds the `ops.dealias`
+# How the aliasing of the quadratic nonlinearity is controlled. Each strategy builds the `domain.dealias`
 # kernel (applied by `dealias!`/`convolve!`) and declares the Nyquist fraction it keeps energetic,
 # which sets the advective-CFL ceiling (see `recommended_cfl`).
 
 """
     DealiasingStrategy
 
-How the aliasing of the quadratic nonlinearity is controlled. A [`SpectralOperators`](@ref) is built
-with one; it fixes the `ops.dealias` kernel and, through `recommended_cfl`, the advective-CFL
+How the aliasing of the quadratic nonlinearity is controlled. A [`SimulationDomain`](@ref) is built
+with one; it fixes the `domain.dealias` kernel and, through `recommended_cfl`, the advective-CFL
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default) and
 [`HouLi`](@ref) (the smooth Hou–Li filter).
 """
@@ -81,11 +81,11 @@ _retained_nyquist_fraction(::HouLi) = 1 // 1
 
 
 """
-    SpectralOperators(resolution, box = 2π; dealiasing = TwoThirds(),
+    SimulationDomain(grid_points_per_axis, side_length = 2π; dealiasing = TwoThirds(),
                       scalar_type = Float64, array_type = Array)
 
-The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run on a grid
-of `resolution` points per side, in a periodic box of side `box`: the `Grid3D`, the real-to-complex transform
+The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run — a periodic
+box of side length `side_length` sampled with `grid_points_per_axis` points along each side: the `Grid3D`, the real-to-complex transform
 plans (one for the velocity, a vector field; one for the scalar ``\\varphi``; and one for the rank-2
 strain tensor of the derivative-skewness diagnostic), the
 `FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (with
@@ -100,7 +100,7 @@ sets the advective-CFL ceiling through `recommended_cfl`.
 `array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
 `scalar_type` the real element type (`Float32` is GPU-friendly).
 """
-struct SpectralOperators{G, L, VP, SP, TP, M, K, SK, D, DS}
+struct SimulationDomain{G, L, VP, SP, TP, M, K, SK, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
@@ -117,12 +117,12 @@ end
 _zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef, dims...), zero(S))
 
 
-function SpectralOperators(resolution::Integer, box::Real = 2π;
+function SimulationDomain(grid_points_per_axis::Integer, side_length::Real = 2π;
                            dealiasing::DealiasingStrategy = TwoThirds(),
                            scalar_type::Type{T} = Float64,
                            array_type = Array) where {T<:AbstractFloat}
-  N = Int(resolution)
-  L = T(box)
+  N = Int(grid_points_per_axis)
+  L = T(side_length)
   grid = Grid3D((N, N, N), (L, L, L))
   layout = RealFourierLayout()
 
@@ -141,11 +141,11 @@ function SpectralOperators(resolution::Integer, box::Real = 2π;
   squared_wavenumber = real.(field_data(squared_wavenumber_kernel))
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, squared_wavenumber, N, L, T)
 
-  return SpectralOperators(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
+  return SimulationDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
 end
 
 
-# Build the `ops.dealias` kernel (a scalar low-pass in spectral representation) for a strategy.
+# Build the `domain.dealias` kernel (a scalar low-pass in spectral representation) for a strategy.
 _build_dealias(::TwoThirds, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T} =
   spectral_cutoff(reference, multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
@@ -160,16 +160,16 @@ end
 # Internal: the array type and element types are read off the de-alias kernel's storage, so every
 # scratch buffer lands on the same backend (CPU/GPU) — the GBGPeriodicFields `similar(field_data(ref), …)`
 # allocation discipline (its invariant 6).
-_reference(ops::SpectralOperators) = field_data(ops.dealias)
-_real_type(ops::SpectralOperators) = real(eltype(_reference(ops)))
-_complex_type(ops::SpectralOperators) = complex(_real_type(ops))
-_blank(ops::SpectralOperators, ::Type{S}, dims) where {S} = fill!(similar(_reference(ops), S, dims), zero(S))
+_reference(domain::SimulationDomain) = field_data(domain.dealias)
+_real_type(domain::SimulationDomain) = real(eltype(_reference(domain)))
+_complex_type(domain::SimulationDomain) = complex(_real_type(domain))
+_blank(domain::SimulationDomain, ::Type{S}, dims) where {S} = fill!(similar(_reference(domain), S, dims), zero(S))
 
 
 """
-    max_wavenumber(ops)
+    max_wavenumber(domain)
 
-The highest wavenumber magnitude the operators `ops` actually evolve — the de-aliasing cutoff
+The highest wavenumber magnitude that `domain` actually evolves — the de-aliasing cutoff
 
 ```math
 \\kappa_{\\max} = f\\,\\frac N2\\,\\frac{2\\pi}{L},
@@ -181,72 +181,72 @@ de-aliasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` it
 zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
 ``\\kappa_{\\max}\\eta`` that a run is set up to meet.
 """
-function max_wavenumber(ops::SpectralOperators)
-  N = physical_field_shape(ops.grid, Val(0))[1]
-  return _retained_nyquist_fraction(ops.dealiasing) * (N / 2) * (2π / ops.grid.domain_size[1])
+function max_wavenumber(domain::SimulationDomain)
+  N = physical_field_shape(domain.grid, Val(0))[1]
+  return _retained_nyquist_fraction(domain.dealiasing) * (N / 2) * (2π / domain.grid.domain_size[1])
 end
 
 
 """
-    spectral_vector(ops)
+    spectral_vector(domain)
 
-Allocate a single zeroed vector field in spectral representation on `ops`'s backend and element type
+Allocate a single zeroed vector field in spectral representation on `domain`'s backend and element type
 (a scratch buffer for the time loop).
 """
-spectral_vector(ops::SpectralOperators) =
-  VectorFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(1))), ops.grid)
+spectral_vector(domain::SimulationDomain) =
+  VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid)
 
 
 """
-    physical_vector(ops)
+    physical_vector(domain)
 
-Allocate a single zeroed vector field in physical representation on `ops`'s backend and element type.
+Allocate a single zeroed vector field in physical representation on `domain`'s backend and element type.
 """
-physical_vector(ops::SpectralOperators) =
-  VectorFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(1))), ops.grid)
+physical_vector(domain::SimulationDomain) =
+  VectorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(1))), domain.grid)
 
 
 """
-    scalar_spectral(ops)
+    scalar_spectral(domain)
 
-Allocate a single zeroed scalar field in spectral representation on `ops`'s backend and element type
+Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type
 (used for the scalar ``\\varphi``, the integrating factor, and kernel scratch).
 """
-scalar_spectral(ops::SpectralOperators) =
-  ScalarFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(0))), ops.grid)
+scalar_spectral(domain::SimulationDomain) =
+  ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid)
 
 
 """
-    scalar_physical(ops)
+    scalar_physical(domain)
 
-Allocate a single zeroed scalar field in physical representation on `ops`'s backend and element type
+Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type
 (used for the scalar ``\\varphi`` in physical space).
 """
-scalar_physical(ops::SpectralOperators) =
-  ScalarFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(0))), ops.grid)
+scalar_physical(domain::SimulationDomain) =
+  ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid)
 
 
 """
-    tensor_spectral(ops)
+    tensor_spectral(domain)
 
 Allocate a single zeroed second-order tensor field in spectral representation (scratch for the
 strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``).
 """
-tensor_spectral(ops::SpectralOperators) =
-  TensorFieldSpectral(_blank(ops, _complex_type(ops), spectral_field_shape(ops.grid, ops.layout, Val(2))), ops.grid)
+tensor_spectral(domain::SimulationDomain) =
+  TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid)
 
 
 """
-    tensor_physical(ops)
+    tensor_physical(domain)
 
 Allocate a single zeroed second-order tensor field in physical representation.
 """
-tensor_physical(ops::SpectralOperators) =
-  TensorFieldPhysical(_blank(ops, _real_type(ops), physical_field_shape(ops.grid, Val(2))), ops.grid)
+tensor_physical(domain::SimulationDomain) =
+  TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid)
 
 
 """
-    Workspace(ops)
+    Workspace(domain)
 
 Preallocated scratch for one coupled integrating-factor step of the velocity and the passive scalar
 ``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers
@@ -285,35 +285,35 @@ struct Workspace{VS, SS, VP, SP, RK}
 end
 
 
-function Workspace(ops::SpectralOperators)
-  rate() = fill!(similar(ops.squared_wavenumber), zero(eltype(ops.squared_wavenumber)))
+function Workspace(domain::SimulationDomain)
+  rate() = fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
   return Workspace(
-    spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
-    spectral_vector(ops), spectral_vector(ops), spectral_vector(ops), spectral_vector(ops),
-    scalar_spectral(ops), scalar_spectral(ops), scalar_spectral(ops),
-    scalar_spectral(ops), scalar_spectral(ops), scalar_spectral(ops),
-    physical_vector(ops), physical_vector(ops), physical_vector(ops),
-    physical_vector(ops), physical_vector(ops),
-    scalar_physical(ops),
+    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
+    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
+    scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
+    scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
+    physical_vector(domain), physical_vector(domain), physical_vector(domain),
+    physical_vector(domain), physical_vector(domain),
+    scalar_physical(domain),
     rate(), rate(),
   )
 end
 
 
 """
-    dealias!(field, ops)
+    dealias!(field, domain)
 
-Apply the run's de-alias low-pass `ops.dealias` to `field` in place — a coefficientwise multiply that
+Apply the run's de-alias low-pass `domain.dealias` to `field` in place — a coefficientwise multiply that
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact de-aliasing)
 or the smooth [`HouLi`](@ref) filter (which only damps the aliasing). `field` may be a vector or
 scalar field in spectral representation.
 """
-dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
+dealias!(field, domain::SimulationDomain) = convolve!(field, field, domain.dealias)
 
 
 """
-    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0,
+    random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0,
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
@@ -329,31 +329,31 @@ spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``
 shell's mode count) and the overall amplitude is fixed by the `energy` rescaling. The run layer bridges
 a `Phenomenology` model spectrum into this function.
 
-`ops` is the [`SpectralOperators`](@ref) supplying the grid, backend, wavenumber multipliers, and
+`domain` is the [`SimulationDomain`](@ref) supplying the grid, backend, wavenumber multipliers, and
 de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
-function random_solenoidal_velocity!(û, ops::SpectralOperators;
+function random_solenoidal_velocity!(û, domain::SimulationDomain;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
                                      spectrum = nothing, rng = Random.default_rng())
-  T = _real_type(ops)
-  noise = physical_vector(ops)
-  copyto!(field_data(noise), randn(rng, T, physical_field_shape(ops.grid, Val(1))...))
-  to_spectral!(û, noise, ops.velocity_plans)
+  T = _real_type(domain)
+  noise = physical_vector(domain)
+  copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(1))...))
+  to_spectral!(û, noise, domain.velocity_plans)
 
-  envelope = scalar_spectral(ops)
+  envelope = scalar_spectral(domain)
   if isnothing(spectrum)
     inverse_peak_squared = one(T) / T(peak_wavenumber)^2
-    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
+    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
   else
     # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
     # spectrum ∝ κ²·(√E/κ)² = E(κ) (the κ² is the shell's mode count); the DC mode stays at 0.
     shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
-    field_data(envelope) .= complex.(shape.(ops.squared_wavenumber))
+    field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
   end
   convolve!(û, û, envelope)
 
-  helmholtz_projection!(û, û, ops.multipliers)
-  convolve!(û, û, ops.dealias)
+  helmholtz_projection!(û, û, domain.multipliers)
+  convolve!(û, û, domain.dealias)
 
   current_energy = 0.5 * inner(û, û)
   current_energy > 0 && (field_data(û) .*= sqrt(T(energy) / current_energy))
@@ -362,7 +362,7 @@ end
 
 
 """
-    random_scalar!(φ̂, ops; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
+    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
 concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)``
@@ -370,24 +370,24 @@ concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbo
 ``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
 transform, so the ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 
-`ops` is the [`SpectralOperators`](@ref) supplying the grid, backend, wavenumber multipliers, and
+`domain` is the [`SimulationDomain`](@ref) supplying the grid, backend, wavenumber multipliers, and
 de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
-function random_scalar!(φ̂, ops::SpectralOperators;
+function random_scalar!(φ̂, domain::SimulationDomain;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,
                         rng = Random.default_rng())
-  T = _real_type(ops)
-  noise = scalar_physical(ops)
-  data = randn(rng, T, physical_field_shape(ops.grid, Val(0))...)
+  T = _real_type(domain)
+  noise = scalar_physical(domain)
+  data = randn(rng, T, physical_field_shape(domain.grid, Val(0))...)
   data .-= sum(data) / length(data)                            # zero the spatial mean
   copyto!(field_data(noise), data)
-  to_spectral!(φ̂, noise, ops.scalar_plans)
+  to_spectral!(φ̂, noise, domain.scalar_plans)
 
   inverse_peak_squared = one(T) / T(peak_wavenumber)^2
-  envelope = scalar_spectral(ops)
-  field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
+  envelope = scalar_spectral(domain)
+  field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
   convolve!(φ̂, φ̂, envelope)
-  convolve!(φ̂, φ̂, ops.dealias)
+  convolve!(φ̂, φ̂, domain.dealias)
 
   current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
   current_variance > 0 && (field_data(φ̂) .*= sqrt(T(variance) / current_variance))

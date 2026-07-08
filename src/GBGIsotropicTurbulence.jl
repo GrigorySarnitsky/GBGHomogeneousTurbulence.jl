@@ -53,7 +53,7 @@ include("SimulationRun.jl")
 
 
 using .SimulationState:
-  SpectralOperators,
+  SimulationDomain,
   Workspace,
   spectral_vector,
   physical_vector,
@@ -129,7 +129,7 @@ using .SimulationRun:
   validate_spectrum
 
 
-export SpectralOperators,
+export SimulationDomain,
        Workspace,
        spectral_vector,
        physical_vector,

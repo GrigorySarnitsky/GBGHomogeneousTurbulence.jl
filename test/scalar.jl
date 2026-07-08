@@ -12,14 +12,14 @@ using Random
 using Test
 
 
-function integrate_coupled(integrator, ops, ws, û0, φ̂0, physics, dt, nsteps)
-  û = spectral_vector(ops)
-  φ̂ = scalar_spectral(ops)
+function integrate_coupled(integrator, domain, ws, û0, φ̂0, physics, dt, nsteps)
+  û = spectral_vector(domain)
+  φ̂ = scalar_spectral(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   for _ in 1:nsteps
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
-    step!(integrator, û, φ̂, ops, ws, physics, dt)
+    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
+    step!(integrator, û, φ̂, domain, ws, physics, dt)
   end
   return û, φ̂
 end
@@ -32,73 +32,73 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  ops = SpectralOperators(N, L; scalar_type = T)
-  ws = Workspace(ops)
+  domain = SimulationDomain(N, L; scalar_type = T)
+  ws = Workspace(domain)
 
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7
     κ = ν / Sc
-    û0 = spectral_vector(ops)                                   # zero velocity
-    φ̂0 = scalar_spectral(ops)
-    random_scalar!(φ̂0, ops; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    û0 = spectral_vector(domain)                                   # zero velocity
+    φ̂0 = scalar_spectral(domain)
+    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     physics = Physics(viscosity = ν, schmidt = Sc)               # unforced
     dt = 0.02
     nsteps = 25
     total_time = dt * nsteps
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), ops, ws, û0, φ̂0, physics, dt, nsteps)
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, ws, û0, φ̂0, physics, dt, nsteps)
 
-    expected = field_data(φ̂0) .* complex.(exp.(-κ .* ops.squared_wavenumber .* total_time))
+    expected = field_data(φ̂0) .* complex.(exp.(-κ .* domain.squared_wavenumber .* total_time))
     relative_error = sqrt(sum(abs2, field_data(φ̂) .- expected)) / sqrt(sum(abs2, expected))
     @test relative_error < 1e-10
   end
 
   @testset "temporal convergence (RK3, coupled)" begin
-    û0 = spectral_vector(ops)
-    random_solenoidal_velocity!(û0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
-    dealias!(û0, ops)
-    φ̂0 = scalar_spectral(ops)
-    random_scalar!(φ̂0, ops; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    û0 = spectral_vector(domain)
+    random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    dealias!(û0, domain)
+    φ̂0 = scalar_spectral(domain)
+    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     physics = Physics(viscosity = ν)                             # Sc = 1, unforced
 
     rk3 = IFLowStorageRK3()
     Tfinal = 0.4
     n = 8
-    _, p1 = integrate_coupled(rk3, ops, ws, û0, φ̂0, physics, Tfinal / n, n)
-    _, p2 = integrate_coupled(rk3, ops, ws, û0, φ̂0, physics, Tfinal / (2n), 2n)
-    _, p4 = integrate_coupled(rk3, ops, ws, û0, φ̂0, physics, Tfinal / (4n), 4n)
+    _, p1 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / n, n)
+    _, p2 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / (2n), 2n)
+    _, p4 = integrate_coupled(rk3, domain, ws, û0, φ̂0, physics, Tfinal / (4n), 4n)
     ratio = diffnorm(p1, p2) / diffnorm(p2, p4)
     @test 5.0 < ratio < 12.0
   end
 
   @testset "mean conservation (conservative form)" begin
-    û0 = spectral_vector(ops)
-    random_solenoidal_velocity!(û0, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
-    dealias!(û0, ops)
-    φ̂0 = scalar_spectral(ops)
-    random_scalar!(φ̂0, ops; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
+    û0 = spectral_vector(domain)
+    random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
+    dealias!(û0, domain)
+    φ̂0 = scalar_spectral(domain)
+    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
     field_data(φ̂0)[1, 1, 1] = 3.0 + 0.0im                    # impose a nonzero mean (the k=0 mode)
     mean_before = field_data(φ̂0)[1, 1, 1]
 
     physics = Physics(viscosity = ν,
-                      velocity_forcing = BandRescaling(ops; energy = 0.5, lowest_shell = 1, highest_shell = 2))
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), ops, ws, û0, φ̂0, physics, 0.02, 30)
+                      velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, ws, û0, φ̂0, physics, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end
 
   @testset "scalar dissipation = Dirichlet energy" begin
     Sc = 0.7
     κ = ν / Sc
-    φ̂ = scalar_spectral(ops)
-    random_scalar!(φ̂, ops; variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
+    φ̂ = scalar_spectral(domain)
+    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
 
     # ground truth: 2κ⟨|∇φ|²⟩ from the explicit physical gradient (the pre-fusion computation)
-    grad_spectral = spectral_vector(ops)
-    grad_physical = physical_vector(ops)
-    gradient!(grad_spectral, φ̂, ops.multipliers)
-    to_physical!(grad_physical, grad_spectral, ops.velocity_plans)
+    grad_spectral = spectral_vector(domain)
+    grad_physical = physical_vector(domain)
+    gradient!(grad_spectral, φ̂, domain.multipliers)
+    to_physical!(grad_physical, grad_spectral, domain.velocity_plans)
     expected = 2 * κ * inner(grad_physical, grad_physical)
 
-    @test scalar_dissipation(φ̂, ops, κ) > 0
-    @test scalar_dissipation(φ̂, ops, κ) ≈ expected
+    @test scalar_dissipation(φ̂, domain, κ) > 0
+    @test scalar_dissipation(φ̂, domain, κ) ≈ expected
   end
 end

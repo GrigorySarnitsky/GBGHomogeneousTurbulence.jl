@@ -48,9 +48,9 @@ a thin run layer that assembles the machinery with sensible defaults and owns th
 ```julia
 using GBGIsotropicTurbulence
 
-# Assemble a forced case. Everything the run needs — operators, workspace, physics,
+# Assemble a forced case. Everything the run needs — the domain, workspace, physics,
 # integrator, state, and initial condition — is built with defaults from a few numbers.
-sim = Simulation(resolution = 128, viscosity = 5e-3;
+sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  velocity_forcing = ConstantPower(power = 0.1),
                  scalar = true, schmidt = 1.0)
 
@@ -136,7 +136,7 @@ Each concern is its own module, included in dependency order by the umbrella
 
 ### 4.1 `SimulationState` — the machinery and the buffers
 
-- **`SpectralOperators`** is the reusable, read-only machinery for a cubic run: the `Grid3D`, the real–Fourier layout, the
+- **`SimulationDomain`** is the reusable, read-only machinery for a cubic run: the `Grid3D`, the real–Fourier layout, the
   real-to-complex transform plans (one for the velocity, one for ``\varphi``, one for the rank-2 strain
   tensor of the skewness diagnostic), the spectral
   multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (the symbol of ``-\nabla^2``),
@@ -256,7 +256,7 @@ does not naively unify all of it.
 
 ### 4.6 The run layer (`SimulationRun`) — the front door
 
-A `Simulation` value bundles the state a case advances: the `SpectralOperators`, the `Workspace`, the
+A `Simulation` value bundles the state a case advances: the `SimulationDomain`, the `Workspace`, the
 `Physics`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and
 ``\hat\varphi``, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer for the Heun
 push, and a clock. Over it:
@@ -325,7 +325,7 @@ Three now — enough for the validation checklist — capping near six: `PDFs`, 
 and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries every
 dimensionless group a law might read (``\mathrm{Re}_\lambda``, ``\varepsilon``, ``\nu``, ``L``, ``u'``,
 ``\mathrm{Sc}``, ``\varepsilon_\varphi``), the derived scales (``\eta``, ``\tau_\eta``, ``k``,
-``\lambda``) as helpers — the analogue of the `Physics` and `SpectralOperators` bundles.
+``\lambda``) as helpers — the analogue of the `Physics` and `SimulationDomain` bundles.
 
 The laws are **consumed to build runs**, not only compared against: an initial-condition or forcing
 spectrum drawn from `Spectra`, and the reference curves the validation harness reads, all from one
@@ -559,7 +559,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     research review.)*
 14. **(2026-07) Operator-free forcing construction via `ForcingSpec`.** `ConstantPower(power = 0.1)`
     (and the other banded forcings) return a `ForcingSpec` capturing the parameters, materialised into
-    the concrete `AbstractForcing` once `Simulation` builds the operators — so a case names its forcing
+    the concrete `AbstractForcing` once `Simulation` builds the domain — so a case names its forcing
     before the grid exists. The operator-taking constructor is unchanged.
 15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`target = :band | :total`).**
     `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
@@ -573,7 +573,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     terms. `Equations` conflated the two and under-described; splitting it makes each concern its own
     module and its own name. Realization and infrastructure concerns keep job-names (`TimeIntegration`,
     `Forcing`, `SimulationState`, and the run layer `SimulationRun`, paired with `SimulationState`).
-17. **(2026-07) Consume `GBGPeriodicFields`'s fused ops; the velocity-derivative skewness becomes a
+17. **(2026-07) Consume `GBGPeriodicFields`'s fused domain; the velocity-derivative skewness becomes a
     coordinate-free strain invariant.** Four fused operations were requested of, and shipped by, PF —
     `combine!` (axpby), `weighted_inner`, `symmetric_gradient`, `det` — and wired in. `combine!` replaces
     the hand-rolled RK/OU `field_data` broadcasts (charter invariant 2). `weighted_inner` fuses the

@@ -23,18 +23,18 @@ module Particles
 
 using GBGPeriodicFields
 using Random
-using ..SimulationState: SpectralOperators
+using ..SimulationState: SimulationDomain
 
 export Tracers, advect!, sample!,
        tracer_positions, tracer_velocities, ntracers, velocity_buffer, scalar_buffer
 
 
 """
-    Tracers(ops, count; scheme = CatmullRom, rng = default_rng())
+    Tracers(domain, count; scheme = CatmullRom, rng = default_rng())
     Tracers(positions; scheme = CatmullRom)
 
 A set of Lagrangian tracers. The first form seeds `count` tracers uniformly at random in the periodic
-box of `ops` (on the operators' backend and element type); the second wraps a given `(M, 3)` position
+box of `domain` (on the domain's backend and element type); the second wraps a given `(M, 3)` position
 array. `scheme` is the `GBGPeriodicFields` interpolation scheme used to evaluate the velocity (and any
 sampled field) at the tracer positions — `CatmullRom` (the default), `LalescuSpline(n, m)`, or
 `LagrangeSpline(n)`. `rng` (first form only) is the random stream seeding the uniformly-random
@@ -63,17 +63,17 @@ function Tracers(positions::AbstractMatrix; scheme = CatmullRom)
                  scheme)
 end
 
-function Tracers(ops::SpectralOperators, count::Integer; scheme = CatmullRom, rng = Random.default_rng())
-  T = real(eltype(field_data(ops.dealias)))
-  L = T(ops.grid.domain_size[1])
-  positions = similar(ops.squared_wavenumber, T, (Int(count), 3))
+function Tracers(domain::SimulationDomain, count::Integer; scheme = CatmullRom, rng = Random.default_rng())
+  T = real(eltype(field_data(domain.dealias)))
+  L = T(domain.grid.domain_size[1])
+  positions = similar(domain.squared_wavenumber, T, (Int(count), 3))
   copyto!(positions, L .* rand(rng, T, Int(count), 3))
   return Tracers(positions; scheme)
 end
 
 
 """
-    advect!(tracers, velocity_start, velocity_end, ops, dt) -> tracers
+    advect!(tracers, velocity_start, velocity_end, domain, dt) -> tracers
 
 Advance the tracer positions by one step of size `dt`, in place, by Heun-in-time on the physical
 velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and end
@@ -89,13 +89,13 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 \\boldsymbol{X} \\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
 ```
 
-with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `ops` (a
-[`SpectralOperators`](@ref)). This is second-order accurate in time. The start-of-step
+with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `domain` (a
+[`SimulationDomain`](@ref)). This is second-order accurate in time. The start-of-step
 velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
 the Lagrangian statistics.
 """
-function advect!(tracers::Tracers, velocity_start, velocity_end, ops::SpectralOperators, dt::Real)
-  L = real(eltype(tracers.positions))(ops.grid.domain_size[1])
+function advect!(tracers::Tracers, velocity_start, velocity_end, domain::SimulationDomain, dt::Real)
+  L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
   Δt = real(eltype(tracers.positions))(dt)
   X = tracers.positions
   Xstar = tracers.predictor

@@ -47,7 +47,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | `FieldSpectralMultipliers` |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
-| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber, the symbol of ``-\nabla^2`` | `ops.squared_wavenumber` |
+| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber, the symbol of ``-\nabla^2`` | `domain.squared_wavenumber` |
 | ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, `to_physical` |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | `curl`, `divergence` |
 | ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | `helmholtz_projection` |
@@ -68,8 +68,8 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``N`` | grid points per side | `resolution` |
-| ``L`` | box side (``\Omega = [0,L)^3``) | `box` |
+| ``N`` | grid points per side | `grid_points_per_axis` |
+| ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |

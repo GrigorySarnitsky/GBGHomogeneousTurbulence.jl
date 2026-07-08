@@ -7,8 +7,8 @@ Order   = [:module]
 
 ## The simulation
 
-The assembled, ready-to-run case — the front-door `Simulation(; resolution, viscosity, …)` and the
-operators-taking `Simulation(ops; …)` constructors. The observables `kinetic_energy`, `dissipation`,
+The assembled, ready-to-run case — the front-door `Simulation(; grid_points_per_axis, viscosity, …)` and the
+domain-taking `Simulation(domain; …)` constructors. The observables `kinetic_energy`, `dissipation`,
 and `scalar_variance` also accept a `Simulation` directly.
 
 ```@docs

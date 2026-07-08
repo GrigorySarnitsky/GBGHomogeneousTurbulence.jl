@@ -1,4 +1,4 @@
-# SimulationRun — the ergonomic run layer. A `Simulation` bundles the operators, workspace, physics,
+# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, workspace, physics,
 # integrator, spectral state (û, φ̂), and any tracers; `advance!`/`run!`/`warmup!` own the
 # CFL-adaptive time loop. It holds no physics or numerics of its own — it wires the pieces of
 # SimulationState/Dynamics/Observables/Forcing/TimeIntegration/Particles so a case is a few lines to
@@ -23,7 +23,7 @@ module SimulationRun
 
 using GBGPeriodicFields
 using Random
-using ..SimulationState: SpectralOperators, Workspace, spectral_vector, scalar_spectral,
+using ..SimulationState: SimulationDomain, Workspace, spectral_vector, scalar_spectral,
                          physical_vector, random_solenoidal_velocity!, random_scalar!,
                          DealiasingStrategy, TwoThirds, max_wavenumber
 using ..Dynamics: velocity_vorticity!
@@ -47,16 +47,16 @@ end
 
 
 """
-    Simulation(; resolution, k_max_η = 2, energy = 1.5, box = 2π, scalar_type = Float64,
+    Simulation(; grid_points_per_axis, k_max_η = 2, energy = 1.5, side_length = 2π, scalar_type = Float64,
                  array_type = Array, dealiasing = TwoThirds(), kwargs...)
-    Simulation(operators; k_max_η = 2, energy = 1.5, kwargs...)
+    Simulation(domain; k_max_η = 2, energy = 1.5, kwargs...)
 
-A ready-to-run case — the [`SpectralOperators`](@ref) machinery, the [`Workspace`](@ref) scratch, the
+A ready-to-run case — the [`SimulationDomain`](@ref), the [`Workspace`](@ref) scratch, the
 [`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. The first form is the
-**front door**: from a `resolution` it builds every piece with sensible defaults, seeds a
+**front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
-`Simulation` at ``t = 0``; the second takes a `SpectralOperators` you built yourself. Advance it with
+`Simulation` at ``t = 0``; the second takes a `SimulationDomain` you built yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
 
 # Setting the Reynolds number
@@ -67,22 +67,22 @@ and the viscosity is chosen from the grid rather than supplied:
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number the grid resolves.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `energy` the kinetic energy ``k`` and
-    `box` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
+    `side_length` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
-    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `energy` and `box` fix
+    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control.
 
 # Keywords
-- `resolution` — grid points per side ``N`` (front door only); required.
+- `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
 - `energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
-- `box = 2π` — the box side ``L`` (front door only).
+- `side_length = 2π` — the box side ``L`` (front door only).
 - `scalar_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, or `HouLi` smooth); it
   sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
@@ -96,14 +96,14 @@ and the viscosity is chosen from the grid rather than supplied:
 - `initial_spectrum = nothing` — a `Phenomenology` `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
   run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `energy`.
-- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the
+- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
   interpolation scheme.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 """
-struct Simulation{OPS, WS, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH, TR, TV}
-  operators::OPS
+struct Simulation{DOM, WS, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH, TR, TV}
+  domain::DOM
   workspace::WS
   physics::Physics{VF, SF}
   integrator::IG
@@ -116,42 +116,42 @@ struct Simulation{OPS, WS, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH,
 end
 
 
-# A forcing may be given ready-built (an `AbstractForcing`) or as a factory `ops -> AbstractForcing`
-# — the latter lets a banded forcing be named before the operators exist (`ops -> ConstantPower(ops;
-# power)`), since a forcing precomputes its band from `ops`.
-_resolve_forcing(f::AbstractForcing, ::SpectralOperators) = f
-_resolve_forcing(f, ops::SpectralOperators) = f(ops)
+# A forcing may be given ready-built (an `AbstractForcing`) or as a factory `domain -> AbstractForcing`
+# — the latter lets a banded forcing be named before the domain exists (`domain -> ConstantPower(domain;
+# power)`), since a forcing precomputes its band from `domain`.
+_resolve_forcing(f::AbstractForcing, ::SimulationDomain) = f
+_resolve_forcing(f, domain::SimulationDomain) = f(domain)
 
 
-function Simulation(ops::SpectralOperators;
+function Simulation(domain::SimulationDomain;
                     energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = BandRescaling(ops; energy, target = :total),
+                    velocity_forcing = BandRescaling(domain; energy, target = :total),
                     scalar_forcing = NoForcing(),
                     integrator::AbstractIntegrator = default_integrator(),
-                    cfl::Real = recommended_cfl(integrator, ops),
+                    cfl::Real = recommended_cfl(integrator, domain),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     ntracers::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modelled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
-  box = ops.grid.domain_size[1]
-  ε = stationary_dissipation(Li2008(), energy, box)
+  side_length = domain.grid.domain_size[1]
+  ε = stationary_dissipation(Li2008(), energy, side_length)
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
-    ν = ε^(1//3) * (k_max_η / max_wavenumber(ops))^(4//3)
+    ν = ε^(1//3) * (k_max_η / max_wavenumber(domain))^(4//3)
     reλ = (2 * energy / 3) * sqrt(15 / (ε * ν))
     @info "Simulation: grid-resolved at κ_max·η = $(k_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
   else
     ν = Float64(viscosity)
   end
 
-  ws = Workspace(ops)
+  ws = Workspace(domain)
   physics = Physics(; viscosity = ν, schmidt,
-                    velocity_forcing = _resolve_forcing(velocity_forcing, ops),
-                    scalar_forcing = _resolve_forcing(scalar_forcing, ops))
+                    velocity_forcing = _resolve_forcing(velocity_forcing, domain),
+                    scalar_forcing = _resolve_forcing(scalar_forcing, domain))
 
-  û = spectral_vector(ops)
+  û = spectral_vector(domain)
   ic_spectrum = nothing
   if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
     fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * energy / 3),
@@ -160,22 +160,22 @@ function Simulation(ops::SpectralOperators;
   elseif !isnothing(initial_spectrum)
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
-  random_solenoidal_velocity!(û, ops; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  φ̂ = scalar_spectral(ops)
-  scalar && random_scalar!(φ̂, ops; variance = scalar_variance, peak_wavenumber, rng)
+  random_solenoidal_velocity!(û, domain; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
+  φ̂ = scalar_spectral(domain)
+  scalar && random_scalar!(φ̂, domain; variance = scalar_variance, peak_wavenumber, rng)
 
-  tracers = ntracers > 0 ? Tracers(ops, ntracers; scheme = tracer_scheme, rng) : nothing
-  tracer_velocity = ntracers > 0 ? physical_vector(ops) : nothing
+  tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
+  tracer_velocity = ntracers > 0 ? physical_vector(domain) : nothing
 
-  sim = Simulation(ops, ws, physics, integrator, û, φ̂, tracers, tracer_velocity,
+  sim = Simulation(domain, ws, physics, integrator, û, φ̂, tracers, tracer_velocity,
                    Float64(cfl), Clock(0.0, 0))
   return _refresh_cached_fields!(sim)
 end
 
-function Simulation(; resolution::Integer, box::Real = 2π,
+function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     scalar_type::Type = Float64, array_type = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
-  return Simulation(SpectralOperators(resolution, box; dealiasing, scalar_type, array_type); kwargs...)
+  return Simulation(SimulationDomain(grid_points_per_axis, side_length; dealiasing, scalar_type, array_type); kwargs...)
 end
 
 
@@ -183,7 +183,7 @@ end
 # the next `step!` reads and the diagnostics use. Preserves û (the allocating-style transform copies).
 _refresh_cached_fields!(sim::Simulation) =
   (velocity_vorticity!(sim.workspace.velocity, sim.workspace.vorticity_start,
-                       sim.velocity, sim.operators, sim.workspace); sim)
+                       sim.velocity, sim.domain, sim.workspace); sim)
 
 
 # Observables on a `Simulation`'s current (cached) state — extend the `Observables` generics, so
@@ -192,8 +192,8 @@ _refresh_cached_fields!(sim::Simulation) =
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.workspace.velocity)
 dissipation(sim::Simulation) = dissipation(sim.workspace.vorticity_start, sim.physics.viscosity)
 scalar_variance(sim::Simulation) = scalar_variance(sim.scalar)
-energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.operators)
-integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.operators)
+energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.domain)
+integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.domain)
 
 
 """
@@ -271,7 +271,7 @@ end
 # makes diffusion exact, so only the advective limit applies).
 function cfl_timestep(sim::Simulation)
   N = size(field_data(sim.workspace.velocity), 1)
-  Δx = Float64(sim.operators.grid.domain_size[1]) / N
+  Δx = Float64(sim.domain.grid.domain_size[1]) / N
   speed = Float64(max_speed(sim.workspace.velocity))
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
   return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
@@ -289,13 +289,13 @@ function advance!(sim::Simulation; dt = nothing)
   ws = sim.workspace
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  step!(sim.integrator, sim.velocity, sim.scalar, sim.operators, ws, sim.physics, Δt)
+  step!(sim.integrator, sim.velocity, sim.scalar, sim.domain, ws, sim.physics, Δt)
 
   # u(tₙ) is still cached (step! only reads it); save it, refresh to u(tₙ₊₁), then Heun-advect.
   sim.tracers === nothing || copyto!(field_data(sim.tracer_velocity), field_data(ws.velocity))
   _refresh_cached_fields!(sim)
   sim.tracers === nothing ||
-    advect!(sim.tracers, sim.tracer_velocity, ws.velocity, sim.operators, Δt)
+    advect!(sim.tracers, sim.tracer_velocity, ws.velocity, sim.domain, Δt)
 
   sim.clock.time += Δt
   sim.clock.step += 1
@@ -439,7 +439,7 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   ε = dissipation(sim)
   φ2 = m.gate_scalar ? scalar_variance(sim) : 0.0
-  S = m.gate_skew ? derivative_skewness(sim.velocity, sim.operators) : 0.0
+  S = m.gate_skew ? derivative_skewness(sim.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 

@@ -5,19 +5,19 @@ Modules = [GBGIsotropicTurbulence.SimulationState]
 Order   = [:module]
 ```
 
-## Spectral operators and workspace
+## The simulation domain and workspace
 
-The read-only spectral machinery every buffer is allocated from, and the preallocated per-step scratch
-a run advances.
+The read-only spectral machinery every buffer is allocated from — the `SimulationDomain` — and the
+preallocated per-step scratch a run advances.
 
 ```@docs
-SpectralOperators
+SimulationDomain
 Workspace
 ```
 
 ## De-aliasing strategies
 
-The aliasing-control strategy passed to `SpectralOperators` — the supertype, then the sharp 2/3-rule
+The aliasing-control strategy passed to `SimulationDomain` — the supertype, then the sharp 2/3-rule
 default and the smooth Hou–Li filter.
 
 ```@docs
@@ -26,7 +26,7 @@ TwoThirds
 HouLi
 ```
 
-The de-aliasing cutoff it sets — the highest wavenumber the operators evolve, and the resolution
+The de-aliasing cutoff it sets — the highest wavenumber the domain evolves, and the resolution
 criterion ``\kappa_{\max}\eta`` a run is built to meet.
 
 ```@docs
@@ -35,7 +35,7 @@ max_wavenumber
 
 ## Scratch-field allocators
 
-Allocate one zeroed velocity, scalar, or second-order tensor field on the operators' backend and
+Allocate one zeroed velocity, scalar, or second-order tensor field on the domain's backend and
 element type.
 
 ```@docs
@@ -49,7 +49,7 @@ tensor_physical
 
 ## De-alias filtering
 
-Apply the operators' de-alias low-pass kernel to a spectral field in place.
+Apply the domain's de-alias low-pass kernel to a spectral field in place.
 
 ```@docs
 dealias!

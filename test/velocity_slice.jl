@@ -15,26 +15,26 @@ using Test
   L = 2π
   ν = 5.0e-2
 
-  ops = SpectralOperators(N, L; scalar_type = T)
-  ws = Workspace(ops)
+  domain = SimulationDomain(N, L; scalar_type = T)
+  ws = Workspace(domain)
   physics = Physics(viscosity = ν,
-                    velocity_forcing = BandRescaling(ops; energy = 0.6, lowest_shell = 1, highest_shell = 2))
+                    velocity_forcing = BandRescaling(domain; energy = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()
 
-  û = spectral_vector(ops)
-  random_solenoidal_velocity!(û, ops; energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
-  dealias!(û, ops)
-  φ̂ = scalar_spectral(ops)                          # zero scalar (passive ⇒ stays zero)
+  û = spectral_vector(domain)
+  random_solenoidal_velocity!(û, domain; energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
+  dealias!(û, domain)
+  φ̂ = scalar_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
 
   Δx = L / N
   cfl = 0.5
   nsteps = 300
   energies = T[]
   for n in 1:nsteps
-    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
+    velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
     dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
     push!(energies, kinetic_energy(ws.velocity))
-    step!(integrator, û, φ̂, ops, ws, physics, dt)
+    step!(integrator, û, φ̂, domain, ws, physics, dt)
   end
 
   @test all(isfinite, energies)
@@ -45,15 +45,15 @@ using Test
   late = sum(@view energies[201:300]) / 100
   @test abs(late - early) / early < 1.0
 
-  relative_divergence = l2norm(divergence(û, ops.multipliers)) / (l2norm(û) + 1e-30)
+  relative_divergence = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
   @test relative_divergence < 1e-8
 
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
-  velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
+  velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
   dt = cfl * Δx / max(max_speed(ws.velocity), 1e-6)
-  step!(integrator, û, φ̂, ops, ws, physics, dt)                            # warm up
-  step_bytes = @allocated step!(integrator, û, φ̂, ops, ws, physics, dt)
+  step!(integrator, û, φ̂, domain, ws, physics, dt)                            # warm up
+  step_bytes = @allocated step!(integrator, û, φ̂, domain, ws, physics, dt)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes < field_bytes
 end

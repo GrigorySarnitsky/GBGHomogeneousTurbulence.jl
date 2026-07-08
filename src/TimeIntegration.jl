@@ -27,7 +27,7 @@ advective-CFL ceiling; [`Physics`](@ref) bundles the problem parameters and forc
 module TimeIntegration
 
 using GBGPeriodicFields
-using ..SimulationState: SpectralOperators, Workspace, _retained_nyquist_fraction
+using ..SimulationState: SimulationDomain, Workspace, _retained_nyquist_fraction
 using ..Dynamics: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
                   scalar_to_physical!, scalar_nonlinear!
 using ..Forcing: AbstractForcing, NoForcing, forcing_rate!, apply_forcing!,
@@ -61,7 +61,7 @@ Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forci
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, û, φ̂, ops, ws, physics, dt)`, advancing the velocity `û` and the
+[`step!`](@ref)`(integrator, û, φ̂, domain, ws, physics, dt)`, advancing the velocity `û` and the
 scalar `φ̂` (both in spectral representation) by one timestep in place, and may specialize
 [`recommended_cfl`](@ref).
 """
@@ -69,10 +69,10 @@ abstract type AbstractIntegrator end
 
 
 """
-    step!(integrator, û, φ̂, ops, ws, physics, dt)
+    step!(integrator, û, φ̂, domain, ws, physics, dt)
 
 Advance the spectral velocity `û` and passive scalar `φ̂` by one timestep `dt` in place, using the
-scheme `integrator`, the operators `ops`, the workspace `ws`, and the problem `physics` (a
+scheme `integrator`, the domain `domain`, the workspace `ws`, and the problem `physics` (a
 [`Physics`](@ref): viscosity, Schmidt number, and the two forcings). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `ws.velocity` and
 `ws.vorticity_start` with the start-of-step physical velocity and vorticity (via
@@ -110,7 +110,7 @@ third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFR
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
-function step!(::IFLowStorageRK3, û, φ̂, ops::SpectralOperators, ws::Workspace,
+function step!(::IFLowStorageRK3, û, φ̂, domain::SimulationDomain, ws::Workspace,
                physics::Physics, dt::Real)
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -123,24 +123,24 @@ function step!(::IFLowStorageRK3, û, φ̂, ops::SpectralOperators, ws::Workspac
   hφ = ws.scalar_stage1                                                      # scalar accumulator
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(physics.velocity_forcing, û, ops, ws, dt)
-  prepare_forcing!(physics.scalar_forcing, φ̂, ops, ws, dt)
-  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, û, ops, ws) ? ws.velocity_rate : nothing
-  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, φ̂, ops, ws) ? ws.scalar_rate : nothing
+  prepare_forcing!(physics.velocity_forcing, û, domain, ws, dt)
+  prepare_forcing!(physics.scalar_forcing, φ̂, domain, ws, dt)
+  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, û, domain, ws) ? ws.velocity_rate : nothing
+  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, φ̂, domain, ws) ? ws.scalar_rate : nothing
 
   for i in 1:3
     if i == 1
       u, ω = ws.velocity, ws.vorticity_start                  # cached start-of-step
     else
-      velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, û, ops, ws)
+      velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, û, domain, ws)
       u, ω = ws.velocity_star, ws.vorticity_physical
     end
-    scalar_to_physical!(ws.scalar_field, φ̂, ops, ws)                      # φ at the stage state
+    scalar_to_physical!(ws.scalar_field, φ̂, domain, ws)                      # φ at the stage state
 
-    velocity_nonlinear!(ws.nonlinear, u, ω, ops, ws)          # N̂_u
-    forcing_source!(physics.velocity_forcing, ws.nonlinear, ops, ws)         # + additive forcing (OU)
-    scalar_nonlinear!(ws.scalar_nonlinear, u, ws.scalar_field, ops, ws)  # N̂_φ (reuses ws.lamb/ws.scratch)
-    forcing_source!(physics.scalar_forcing, ws.scalar_nonlinear, ops, ws)
+    velocity_nonlinear!(ws.nonlinear, u, ω, domain, ws)          # N̂_u
+    forcing_source!(physics.velocity_forcing, ws.nonlinear, domain, ws)         # + additive forcing (OU)
+    scalar_nonlinear!(ws.scalar_nonlinear, u, ws.scalar_field, domain, ws)  # N̂_φ (reuses ws.lamb/ws.scratch)
+    forcing_source!(physics.scalar_forcing, ws.scalar_nonlinear, domain, ws)
 
     if i == 1
       multiply!(hu, dt_T, ws.nonlinear)                                      # A₁ = 0
@@ -152,16 +152,16 @@ function step!(::IFLowStorageRK3, û, φ̂, ops::SpectralOperators, ws::Workspac
     combine!(û, one(T), û, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
     combine!(φ̂, one(T), φ̂, b[i], hφ)
 
-    integrating_factor!(ws.integrating_factor, ops, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
+    integrating_factor!(ws.integrating_factor, domain, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
     convolve!(û, û, ws.integrating_factor)
     i < 3 && convolve!(hu, hu, ws.integrating_factor)
-    integrating_factor!(ws.integrating_factor, ops, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
+    integrating_factor!(ws.integrating_factor, domain, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
     convolve!(φ̂, φ̂, ws.integrating_factor)
     i < 3 && convolve!(hφ, hφ, ws.integrating_factor)
   end
 
-  apply_forcing!(physics.velocity_forcing, û, ops, ws.scratch)
-  apply_forcing!(physics.scalar_forcing, φ̂, ops, ws.scalar_nonlinear)    # scalar-spectral scratch (free here)
+  apply_forcing!(physics.velocity_forcing, û, domain, ws.scratch)
+  apply_forcing!(physics.scalar_forcing, φ̂, domain, ws.scalar_nonlinear)    # scalar-spectral scratch (free here)
   return û, φ̂
 end
 
@@ -198,7 +198,7 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
 struct IFRK2 <: AbstractIntegrator end
 
 
-function step!(::IFRK2, û, φ̂, ops::SpectralOperators, ws::Workspace,
+function step!(::IFRK2, û, φ̂, domain::SimulationDomain, ws::Workspace,
                physics::Physics, dt::Real)
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -207,50 +207,50 @@ function step!(::IFRK2, û, φ̂, ops::SpectralOperators, ws::Workspace,
   κ = physics.viscosity / physics.schmidt
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(physics.velocity_forcing, û, ops, ws, dt)
-  prepare_forcing!(physics.scalar_forcing, φ̂, ops, ws, dt)
-  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, û, ops, ws) ? ws.velocity_rate : nothing
-  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, φ̂, ops, ws) ? ws.scalar_rate : nothing
+  prepare_forcing!(physics.velocity_forcing, û, domain, ws, dt)
+  prepare_forcing!(physics.scalar_forcing, φ̂, domain, ws, dt)
+  velocity_rate = forcing_rate!(physics.velocity_forcing, ws.velocity_rate, û, domain, ws) ? ws.velocity_rate : nothing
+  scalar_rate = forcing_rate!(physics.scalar_forcing, ws.scalar_rate, φ̂, domain, ws) ? ws.scalar_rate : nothing
 
   # stage 1 — nonlinear terms at the start-of-step state
-  scalar_to_physical!(ws.scalar_field, φ̂, ops, ws)
-  velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, ops, ws)              # N̂_u,1
-  forcing_source!(physics.velocity_forcing, ws.stage1, ops, ws)
-  scalar_nonlinear!(ws.scalar_stage1, ws.velocity, ws.scalar_field, ops, ws)            # N̂_φ,1
-  forcing_source!(physics.scalar_forcing, ws.scalar_stage1, ops, ws)
+  scalar_to_physical!(ws.scalar_field, φ̂, domain, ws)
+  velocity_nonlinear!(ws.stage1, ws.velocity, ws.vorticity_start, domain, ws)              # N̂_u,1
+  forcing_source!(physics.velocity_forcing, ws.stage1, domain, ws)
+  scalar_nonlinear!(ws.scalar_stage1, ws.velocity, ws.scalar_field, domain, ws)            # N̂_φ,1
+  forcing_source!(physics.scalar_forcing, ws.scalar_stage1, domain, ws)
 
   # predictors û*, φ̂*
-  integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)                 # E_ν
+  integrating_factor!(ws.integrating_factor, domain, ν, dt, velocity_rate)                 # E_ν
   combine!(ws.velocity_star_spectral, one(T), û, dt_T, ws.stage1)                      # û* ← ûₙ + Δt N̂_u,1
   convolve!(ws.velocity_star_spectral, ws.velocity_star_spectral, ws.integrating_factor)
-  integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)                   # E_κ
+  integrating_factor!(ws.integrating_factor, domain, κ, dt, scalar_rate)                   # E_κ
   combine!(ws.scalar_star_spectral, one(T), φ̂, dt_T, ws.scalar_stage1)               # φ̂* ← φ̂ₙ + Δt N̂_φ,1
   convolve!(ws.scalar_star_spectral, ws.scalar_star_spectral, ws.integrating_factor)
 
   # stage 2 — nonlinear terms at the predictor state
-  velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, ws.velocity_star_spectral, ops, ws)
-  scalar_to_physical!(ws.scalar_field, ws.scalar_star_spectral, ops, ws)
-  velocity_nonlinear!(ws.stage2, ws.velocity_star, ws.vorticity_physical, ops, ws)      # N̂_u,2
-  forcing_source!(physics.velocity_forcing, ws.stage2, ops, ws)
-  scalar_nonlinear!(ws.scalar_stage2, ws.velocity_star, ws.scalar_field, ops, ws)       # N̂_φ,2
-  forcing_source!(physics.scalar_forcing, ws.scalar_stage2, ops, ws)
+  velocity_vorticity!(ws.velocity_star, ws.vorticity_physical, ws.velocity_star_spectral, domain, ws)
+  scalar_to_physical!(ws.scalar_field, ws.scalar_star_spectral, domain, ws)
+  velocity_nonlinear!(ws.stage2, ws.velocity_star, ws.vorticity_physical, domain, ws)      # N̂_u,2
+  forcing_source!(physics.velocity_forcing, ws.stage2, domain, ws)
+  scalar_nonlinear!(ws.scalar_stage2, ws.velocity_star, ws.scalar_field, domain, ws)       # N̂_φ,2
+  forcing_source!(physics.scalar_forcing, ws.scalar_stage2, domain, ws)
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
-  integrating_factor!(ws.integrating_factor, ops, ν, dt, velocity_rate)
+  integrating_factor!(ws.integrating_factor, domain, ν, dt, velocity_rate)
   convolve!(ws.stage1, ws.stage1, ws.integrating_factor)
   convolve!(û, û, ws.integrating_factor)
   combine!(û, one(T), û, half, ws.stage1)                                             # ûₙ₊₁ += (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
   combine!(û, one(T), û, half, ws.stage2)
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
-  integrating_factor!(ws.integrating_factor, ops, κ, dt, scalar_rate)
+  integrating_factor!(ws.integrating_factor, domain, κ, dt, scalar_rate)
   convolve!(ws.scalar_stage1, ws.scalar_stage1, ws.integrating_factor)
   convolve!(φ̂, φ̂, ws.integrating_factor)
   combine!(φ̂, one(T), φ̂, half, ws.scalar_stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
   combine!(φ̂, one(T), φ̂, half, ws.scalar_stage2)
 
-  apply_forcing!(physics.velocity_forcing, û, ops, ws.scratch)
-  apply_forcing!(physics.scalar_forcing, φ̂, ops, ws.scalar_nonlinear)
+  apply_forcing!(physics.velocity_forcing, û, domain, ws.scratch)
+  apply_forcing!(physics.scalar_forcing, φ̂, domain, ws.scalar_nonlinear)
   return û, φ̂
 end
 
@@ -266,7 +266,7 @@ default_integrator() = IFLowStorageRK3()
 
 """
     recommended_cfl(integrator)
-    recommended_cfl(integrator, ops)
+    recommended_cfl(integrator, domain)
 
 A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 ``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
@@ -279,7 +279,7 @@ calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2
 conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), so a small ``0.25``.
 
-The two-argument form scales that ceiling by the operators' de-aliasing: a strategy that keeps modes
+The two-argument form scales that ceiling by the domain's de-aliasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
 proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses.
 Override either for a specific run.
@@ -290,8 +290,8 @@ recommended_cfl(::IFLowStorageRK3) = 0.5
 
 # Scale the base (2/3-calibrated) ceiling by the active de-aliasing: factor = (2/3)/f, f the retained
 # Nyquist fraction (1 for TwoThirds ⇒ unchanged, 2/3 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
-recommended_cfl(integrator::AbstractIntegrator, ops::SpectralOperators) =
-  recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(ops.dealiasing)
+recommended_cfl(integrator::AbstractIntegrator, domain::SimulationDomain) =
+  recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
 
 
 end # module TimeIntegration

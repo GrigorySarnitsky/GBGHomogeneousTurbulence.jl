@@ -65,7 +65,7 @@ abstract type TurbulenceLaw end
                      schmidt = 1.0, scalar_dissipation = NaN)
 
 The dimensionless flow-state bundle a law is evaluated against — the analogue of `Physics` and
-`SpectralOperators` on the phenomenology side. It carries the independent groups of a homogeneous
+`SimulationDomain` on the phenomenology side. It carries the independent groups of a homogeneous
 isotropic state; the small scales and the Taylor-scale Reynolds number are [derived](@ref
 taylor_reynolds) from them, not stored.
 

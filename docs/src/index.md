@@ -61,7 +61,7 @@ de-aliased by the ``2/3`` rule.
 
 ## Components
 
-- [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SpectralOperators`),
+- [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SimulationDomain`),
   the preallocated buffers (`Workspace`), and the random initial conditions — a divergence-free
   velocity and a mean-zero scalar ``\varphi``.
 - [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes

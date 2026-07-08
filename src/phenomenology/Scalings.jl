@@ -8,7 +8,7 @@ Dimensionless turbulence constants and their Reynolds-number trends, evaluated b
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
 - [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted)
-  predicts the dissipation a stationary run sustains from its energy and box size.
+  predicts the dissipation a stationary run sustains from its energy and box side length.
 """
 module Scalings
 
@@ -31,11 +31,11 @@ abstract type ScalingLaw <: TurbulenceLaw end
 
 
 """
-    stationary_dissipation(law, energy, box)
+    stationary_dissipation(law, energy, side_length)
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
 dissipation `law` from the turbulent kinetic energy `energy` (``k``) and the periodic-box side length
-`box` (``L``) — the inverse of the law's [`scaling`](@ref) group. For [`Li2008`](@ref),
+`side_length` (``L``) — the inverse of the law's [`scaling`](@ref) group. For [`Li2008`](@ref),
 ``\\varepsilon = (k/G)^{3/2}/L`` with ``G`` the group constant. This is the seam by which a run's
 viscosity can be set from its grid and target energy, rather than the reverse.
 """
@@ -129,7 +129,7 @@ Li2008(; constant = 0.9) = Li2008(constant)
 
 scaling(m::Li2008, ::FlowParameters) = m.constant
 
-stationary_dissipation(m::Li2008, energy::Real, box::Real) = (energy / m.constant)^(3//2) / box
+stationary_dissipation(m::Li2008, energy::Real, side_length::Real) = (energy / m.constant)^(3//2) / side_length
 
 provenance(::Li2008) = _LI2008
 

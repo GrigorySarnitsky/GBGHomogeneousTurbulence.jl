@@ -27,7 +27,7 @@ Each concern is its own file (`docs/ARCHITECTURE.md` §4). **Physics** concerns 
 the **Mori–Zwanzig lens** — the *dynamics* (the generator / RHS) and its *observables* (the measured
 functions of state); **realization / infrastructure** concerns are named by their job.
 
-- `SimulationState` — the operator + transform-plan bundle (`SpectralOperators`), the preallocated
+- `SimulationState` — the operator + transform-plan bundle (`SimulationDomain`), the preallocated
   `Workspace` buffers, and the random initial conditions.
 - `Dynamics` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor. The MZ *generator*.
@@ -90,9 +90,10 @@ unambiguous (one reading) and precise (the exact thing, not an approximate cover
 in startup idiom — so names speak physics, mathematics, and computational science, preferring the precise
 meaningful word to a terse handle or an implementation term. Name the object the user reasons about, not
 the machinery inside it: `SimulationDomain` (the discretized box the run lives on), never
-`SpectralOperators` (its backend contents — the transform plans and wavenumber multipliers);
-`grid_resolution` / `box_size`, never the ambiguous `resolution` / `box`. This is the naming counterpart
-of the physical-meaning-first documentation rule.
+`SpectralOperators` (its backend contents — the transform plans and wavenumber multipliers); and
+`grid_points_per_axis` / `side_length` (each a single per-side scalar), never the ambiguous
+`resolution` / `box` (is it the count or the `N³` grid? the side or the `L³` volume?). This is the
+naming counterpart of the physical-meaning-first documentation rule.
 
 **Docstrings vs comments.** Prefer docstrings; reserve plain `#` comments for non-intuitive *why* (the
 destructive-transform copy, the rotational-form Lamb vector, the per-call tensor allocation for an
@@ -187,7 +188,7 @@ instance is a *sample of a class* — fix the class, not the line.
    derivation; the diagnostic consistent with the physical quantity it claims to measure.
 2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
    every signature argument documented** — enumerated *from the signature* (positional + keyword), each
-   its own entry, so an "obvious" `ops` or `dt` cannot be skipped (this is how `ops` / `ws` once
+   its own entry, so an "obvious" `domain` or `dt` cannot be skipped (this is how `domain` / `ws` once
    slipped past). A **term of art** naming a package concept is explained or `@ref`-linked, not left
    correct only to a reader who already knows the code — the **cold read** (the docstring parsed with
    the module source withheld) is the test.

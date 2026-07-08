@@ -6,7 +6,7 @@ umbrella re-exports their public surface, so `using GBGIsotropicTurbulence` brin
 scope.
 
 - [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
-- [SimulationState](api/SimulationState.md): the spectral machinery (`SpectralOperators`, incl. the pluggable `DealiasingStrategy`), the preallocated buffers (`Workspace`), the scratch allocators, and the random initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
+- [SimulationState](api/SimulationState.md): the spectral machinery (`SimulationDomain`, incl. the pluggable `DealiasingStrategy`), the preallocated buffers (`Workspace`), the scratch allocators, and the random initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
 - [Dynamics](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes right-hand side (de-aliased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous integrating factor.
 - [Observables](api/Observables.md): the measured functions of state — kinetic energy, dissipation, the velocity-derivative skewness, the scalar variance and dissipation, the maximum velocity component that sets the CFL step (`max_speed`), and the measured energy spectrum and integral scale.
 - [Forcing](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing` (`NoForcing`, `BandRescaling`, `Linear`, `ConstantPower`, `StochasticOU`), chosen independently for the velocity and the scalar via `Physics(; velocity_forcing, scalar_forcing)` (each defaulting to `NoForcing()`, so a forced velocity with a freely-decaying scalar is just a `velocity_forcing`).

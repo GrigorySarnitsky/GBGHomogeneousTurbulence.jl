@@ -17,8 +17,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   T = Float64
   N = 16
   L = 2π
-  ops = SpectralOperators(N, L; scalar_type = T)
-  uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), ops.grid)
+  domain = SimulationDomain(N, L; scalar_type = T)
+  uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "uniform field advects exactly" begin
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0; 2.0 3.0 4.0]
@@ -27,7 +27,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     set_uniform_x!(uniform, c)
     nsteps, dt = 20, 0.005
     for _ in 1:nsteps
-      advect!(tracers, uniform, uniform, ops, dt)
+      advect!(tracers, uniform, uniform, domain, dt)
     end
     X = tracer_positions(tracers)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
@@ -43,13 +43,13 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
     final_x(nsteps) = begin
       tracers = Tracers(copy(X0); scheme = CatmullRom)
-      u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), ops.grid)
-      u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), ops.grid)
+      u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
+      u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       dt = Tfinal / nsteps
       for n in 0:nsteps-1
         set_uniform_x!(u_start, cos(ω * n * dt))
         set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
-        advect!(tracers, u_start, u_end, ops, dt)
+        advect!(tracers, u_start, u_end, domain, dt)
       end
       tracer_positions(tracers)[1, 1]
     end
@@ -64,7 +64,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     tracers = Tracers(copy(X0); scheme = CatmullRom)
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
-      advect!(tracers, uniform, uniform, ops, 0.02)
+      advect!(tracers, uniform, uniform, domain, 0.02)
     end
     X = tracer_positions(tracers)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
@@ -73,9 +73,9 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "pluggable scheme" begin
     set_uniform_x!(uniform, 0.3)
     for scheme in (CatmullRom, LagrangeSpline(2))
-      tracers = Tracers(ops, 50; scheme = scheme, rng = MersenneTwister(1))
+      tracers = Tracers(domain, 50; scheme = scheme, rng = MersenneTwister(1))
       for _ in 1:10
-        advect!(tracers, uniform, uniform, ops, 0.01)
+        advect!(tracers, uniform, uniform, domain, 0.01)
       end
       X = tracer_positions(tracers)
       @test all(isfinite, X) && all(0 .<= X .< L)
@@ -83,38 +83,38 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   end
 
   @testset "sample! reads a field along trajectories" begin
-    tracers = Tracers(ops, 40; scheme = CatmullRom, rng = MersenneTwister(2))
-    constant = ScalarFieldPhysical((x, y, z) -> 2.5, ops.grid)
+    tracers = Tracers(domain, 40; scheme = CatmullRom, rng = MersenneTwister(2))
+    constant = ScalarFieldPhysical((x, y, z) -> 2.5, domain.grid)
     samples = scalar_buffer(tracers)
     sample!(samples, constant, tracers)
     @test all(≈(2.5), point_values(samples))                  # a constant field samples exactly
   end
 
   @testset "advect in a real HIT velocity field" begin
-    ws = Workspace(ops)
+    ws = Workspace(domain)
     physics = Physics(viscosity = 0.05,
-                      velocity_forcing = BandRescaling(ops; energy = 0.5, lowest_shell = 1, highest_shell = 2))
-    û = spectral_vector(ops)
-    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
-    dealias!(û, ops)
-    φ̂ = scalar_spectral(ops)
-    tracers = Tracers(ops, 200; scheme = CatmullRom, rng = MersenneTwister(5))
-    u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), ops.grid)
+                      velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
+    û = spectral_vector(domain)
+    random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
+    dealias!(û, domain)
+    φ̂ = scalar_spectral(domain)
+    tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
+    u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
     Δx = L / N
     for _ in 1:50
-      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, ops, ws)
+      velocity_vorticity!(ws.velocity, ws.vorticity_start, û, domain, ws)
       dt = 0.4 * Δx / max(max_speed(ws.velocity), 1e-6)
       copyto!(field_data(u_start), field_data(ws.velocity))           # u(tₙ)
-      step!(IFLowStorageRK3(), û, φ̂, ops, ws, physics, dt)
-      u_end = to_physical(û, ops.velocity_plans)                     # u(tₙ₊₁)
-      advect!(tracers, u_start, u_end, ops, dt)
+      step!(IFLowStorageRK3(), û, φ̂, domain, ws, physics, dt)
+      u_end = to_physical(û, domain.velocity_plans)                     # u(tₙ₊₁)
+      advect!(tracers, u_start, u_end, domain, dt)
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)
     @test all(isfinite, tracer_velocities(tracers))
 
     # allocation-free advection step
-    bytes = @allocated advect!(tracers, u_start, u_start, ops, 0.001)
+    bytes = @allocated advect!(tracers, u_start, u_start, domain, 0.001)
     @test bytes < 4096
   end
 end
