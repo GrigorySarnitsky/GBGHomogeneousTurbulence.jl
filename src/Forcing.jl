@@ -20,9 +20,14 @@
 The pluggable energy-injection strategies, concrete `AbstractForcing` subtypes. A strategy hooks into
 the step through up to four methods — [`forcing_rate!`](@ref) (a linear rate folded into the
 integrating factor), [`apply_forcing!`](@ref) (a post-step projection), [`prepare_forcing!`](@ref) (a
-per-step state advance), and [`forcing_source!`](@ref) (an additive per-stage source). `NoForcing`,
+per-step state advance), and [`forcing_source!`](@ref) (an additive per-stage source).
+Every step hook takes the operator bundle `ops` (a [`SpectralOperators`](@ref)) — as do the
+`ops`-taking forcing constructors, which build their band kernels from it; `forcing_rate!`,
+`prepare_forcing!`, and `forcing_source!` additionally take the preallocated scratch `ws` (a
+[`Workspace`](@ref GBGIsotropicTurbulence.SimulationState.Workspace)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
 `BandRescaling`, `Linear`, `ConstantPower`, and the stochastic `StochasticOU` are provided; one
-implementation serves both the velocity and the scalar.
+implementation serves both the velocity and the scalar. An operator-free keyword constructor returns
+a [`ForcingSpec`](@ref), a deferred forcing that `Simulation` materialises once the operators exist.
 """
 module Forcing
 
@@ -65,10 +70,11 @@ end
     forcing_rate!(forcing, rate, field, ops, ws) -> Bool
 
 For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
-(the forcing ``f = A\\,\\texttt{field}``) and return `true`; the integrator folds it into the
-integrating factor as ``\\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2})\\,\\tau\\big)``.
-Return `false` (the default) when the forcing contributes no linear rate. `field` is the
-start-of-step field in spectral representation.
+(the forcing ``f = A\\,\\texttt{field}``) and return `true`; the integrator folds it into the diffusive
+integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_factor!`](@ref GBGIsotropicTurbulence.Dynamics.integrating_factor!)), so the
+forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
+(``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
+rate. `field` is the start-of-step field in spectral representation.
 """
 forcing_rate!(::AbstractForcing, rate, field, ops::SpectralOperators, ws) = false
 
@@ -113,7 +119,7 @@ end
 """
     NoForcing()
 
-The unforced case: both hooks do nothing (a freely decaying field).
+The unforced case: all four hooks keep their defaults (do nothing) — a freely decaying field.
 """
 struct NoForcing <: AbstractForcing end
 
@@ -125,8 +131,8 @@ Deterministic constant-energy forcing (post-step). Each step the in-band Fourier
 shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
 ``2\\pi/L``) are rescaled by a single factor; `target` selects what is held fixed:
 
-  * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, band variance for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
-  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{energy}``, which directly pins ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `energy`, the band is zeroed (the closest reachable state).
+  * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, half the band scalar variance ``\\tfrac12\\langle\\varphi^{2}\\rangle_{\\mathrm{band}}`` for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
+  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{energy}``, which directly pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `energy`, the band is zeroed (the closest reachable state).
 
 Rescaling preserves the divergence-free constraint either way.
 """
@@ -163,7 +169,7 @@ end
 """
     Linear(ops; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\boldsymbol{u}`` in a low-wavenumber band (Lundgren-type),
+Linear (negative-damping) forcing ``f = A\\,\\boldsymbol{u}`` in a low-wavenumber band (Lundgren 2003),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
@@ -189,8 +195,10 @@ end
 """
     ConstantPower(ops; power, lowest_shell = 1, highest_shell = 2)
 
-Constant-power forcing: a banded linear forcing ``f = A\\,\\boldsymbol{u}`` whose rate is set each step so
-the energy-injection rate ``\\langle\\boldsymbol{u}\\cdot f\\rangle = A\\,(2E_{\\mathrm{band}})`` equals
+Constant-power forcing: a banded linear forcing ``f = A\\,\\boldsymbol{u}`` on integer shells
+``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of ``2\\pi/L`` (default 1–2),
+whose rate is set each step so the energy-injection rate
+``\\langle\\boldsymbol{u}\\cdot f\\rangle = A\\,(2E_{\\mathrm{band}})`` equals
 the target ``\\varepsilon = \\texttt{power}`` — i.e. ``A = \\varepsilon / (2E_{\\mathrm{band}})`` with
 ``E_{\\mathrm{band}} = \\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}}`` of the
 start-of-step field. The rate is folded into the integrating factor; like `Linear`, it preserves a
@@ -218,7 +226,8 @@ end
 
 
 """
-    StochasticOU(ops; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 0)
+    StochasticOU(ops; variance, correlation_time, lowest_shell = 1, highest_shell = 2,
+                 seed = 0)
 
 Stochastic (Eswaran–Pope) forcing: each forced Fourier mode in the band
 (``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``) carries an
@@ -235,7 +244,8 @@ with correlation time ``T_L = \\texttt{correlation\\_time}``, stationary forcing
 physical field, transformed, and band-limited — guaranteeing a valid real field with no
 Hermitian-symmetry bookkeeping — and, when forcing the velocity (a vector field), Leray-projected so
 the forcing is divergence-free. The frozen ``\\hat f`` is added to the right-hand side at each stage
-(see [`forcing_source!`](@ref)), so it integrates at the scheme's order.
+(see [`forcing_source!`](@ref)), so it integrates at the scheme's order. The `seed` (default 0) fixes
+the random stream, so a forced run is reproducible.
 
 The same type forces either the velocity or the scalar ``\\varphi``: it adapts to the field it is
 given (a vector or scalar state, projected only for the velocity), allocated on first use.

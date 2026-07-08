@@ -15,8 +15,9 @@
 
 The run layer: [`Simulation`](@ref) (the assembled state of a case) and the functions that advance it —
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
-per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity). The observables
-`kinetic_energy`, `dissipation`, and `scalar_variance` accept a `Simulation` directly.
+per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
+[`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count, and the
+observables `kinetic_energy`, `dissipation`, and `scalar_variance` accept a `Simulation` directly.
 """
 module SimulationRun
 
@@ -72,7 +73,8 @@ _resolve_forcing(f, ops::SpectralOperators) = f(ops)
 
 """
     Simulation(operators; viscosity, kwargs...)
-    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64, array_type = Array, dealiasing = TwoThirds(), kwargs...)
+    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64,
+                 array_type = Array, dealiasing = TwoThirds(), kwargs...)
 
 Assemble a ready-to-run case. The second form is the front door: from a `resolution` and a
 `viscosity` it builds the `SpectralOperators` (in the box `box`, on element type `scalar_type` and
@@ -83,8 +85,8 @@ and (unless `scalar = false`) a mean-zero scalar ``\\varphi``, and returns a `Si
 # Keywords
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets the Reynolds number); required.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
-- `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a factory `ops -> AbstractForcing`
-  (e.g. `ops -> ConstantPower(ops; power = 0.1)`); default `NoForcing()` (free decay).
+- `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a `ForcingSpec` from an
+  operator-free constructor (e.g. `ConstantPower(; power = 0.1)`); default `NoForcing()` (free decay).
 - `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the scheme and its
   advective-CFL ceiling (the ceiling adapts to `dealiasing`).
 - `dealiasing = TwoThirds()` — the de-aliasing strategy (`TwoThirds` sharp ``2/3``, or `HouLi`
@@ -137,8 +139,8 @@ _refresh_cached_fields!(sim::Simulation) =
 
 
 # Observables on a `Simulation`'s current (cached) state — extend the `Observables` generics, so
-# `kinetic_energy(sim)` (``k``), `dissipation(sim)` (``\varepsilon``), and `scalar_variance(sim)`
-# (``\langle\varphi^2\rangle``) read from the workspace fields (valid between steps).
+# `kinetic_energy(sim)` (k), `dissipation(sim)` (ε), and `scalar_variance(sim)` (⟨φ²⟩) read from
+# the workspace fields (valid between steps).
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.workspace.velocity)
 dissipation(sim::Simulation) = dissipation(sim.workspace.vorticity_start, sim.physics.viscosity)
 scalar_variance(sim::Simulation) = scalar_variance(sim.scalar)
@@ -347,8 +349,8 @@ _scalar_forced(sim::Simulation) = !(sim.physics.scalar_forcing isa NoForcing)
 
 
 """
-    warmup!(sim; gate_scalar = true, gate_skewness = true, min_turnovers = 5, window_turnovers = 4,
-            tol = 0.05, skew_floor = 0.1, max_turnovers = 60)
+    warmup!(sim; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
+            window_turnovers = 4, tol = 0.05, skew_floor = 0.1, max_turnovers = 60)
     warmup!(sim; turnovers | time | steps)
 
 Spin `sim` up to a statistically stationary state before measurement, and return it. By default it
@@ -360,9 +362,10 @@ than the kinetic energy, which a constant-energy forcing clamps flat and a fixed
 makes ring.
 
 Two stricter gates are on by default. With `gate_skewness`, the velocity-derivative skewness
-([`derivative_skewness`](@ref)) must also have plateaued *and* reached ``\\lvert S\\rvert \\ge``
-`skew_floor` — the decisive "real turbulence yet" signal, since a random-phase field starts at
-``S \\approx 0`` and only a developed cascade reaches ``S \\approx -0.5``. With `gate_scalar`, when the
+([`derivative_skewness`](@ref)) must also have plateaued *and* reached
+``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal, since a
+random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches ``S \\approx -0.5``.
+With `gate_scalar`, when the
 scalar is forced, the scalar variance ``\\langle\\varphi^2\\rangle`` must be flat too (the scalar
 reaches stationarity after the velocity); an unforced scalar has no stationary state and is not gated.
 

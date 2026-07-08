@@ -2,7 +2,7 @@
 
 This is the design document for `GBGIsotropicTurbulence` — what the package is, how it is
 organised, and *why* it is shaped the way it is. It is the spec: read it before any structural
-change, and do not re-litigate a recorded decision (§10) without the user. `CLAUDE.md` is the
+change, and do not re-litigate a recorded decision (§11) without the user. `CLAUDE.md` is the
 terse working copy and defers here; the rendered symbol glossary is
 [`docs/src/notation.md`](notation.md).
 
@@ -108,7 +108,7 @@ behave differently, so the package keeps them distinct:
 - A **Model-fibered family** — the choices that only make sense *for a given Model*: the time
   integrator and its dealiasing for a field Model (§4.4), or the particle pushers and mixing model a
   statistical Model would need. These are set by the Model.
-- **Model-agnostic knobs** — precision, memory footprint, and compute backend (§6), which cut across
+- **Model-agnostic axes** — precision, memory footprint, and compute backend (§6), which cut across
   every Model uniformly.
 
 Two research disciplines live on these two kinds of variation, and naming them apart is the reason
@@ -137,9 +137,11 @@ Each concern is its own module, included in dependency order by the umbrella
 ### 4.1 `SimulationState` — the machinery and the buffers
 
 - **`SpectralOperators`** is the reusable, read-only machinery for a cubic run: the `Grid3D`, the real–Fourier layout, the
-  real-to-complex transform plans (one for the velocity, one for ``\varphi``), the spectral
+  real-to-complex transform plans (one for the velocity, one for ``\varphi``, one for the rank-2 strain
+  tensor of the skewness diagnostic), the spectral
   multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (the symbol of ``-\nabla^2``),
-  and the ``2/3``-rule dealias kernel. It is the concrete realisation of the flow's *frame* — today a
+  and the de-alias kernel built by the run's pluggable de-aliasing strategy (the sharp ``2/3`` rule by
+  default, or the smooth Hou–Li filter). It is the concrete realisation of the flow's *frame* — today a
   fixed periodic box (a sheared frame is deferred, §7). **Precision and backend enter here and flow
   everywhere from here**: `scalar_type` fixes the real element type (``\texttt{Float32}`` or
   ``\texttt{Float64}``) and `array_type` the storage (`Array`, `CuArray`, `ROCArray`); every buffer is
@@ -148,7 +150,7 @@ Each concern is its own module, included in dependency order by the umbrella
 - **`Workspace`** preallocates *all* field-sized scratch a coupled velocity + scalar step writes into
   — the spectral vorticity, the Runge–Kutta stage registers and predictor, the physical
   velocity/vorticity/Lamb-vector buffers, the shared integrating factor, and the per-mode linear
-  forcing rates. It is sized so that **a step allocates no field-sized memory** (§8, invariant 4).
+  forcing rates. It is sized so that **a step allocates no field-sized memory** (§9, invariant 4).
 - **Initial conditions** — `random_solenoidal_velocity!` fills a divergence-free velocity with a
   large-scale spectral envelope, rescaled to a target ``k``; `random_scalar!` fills a mean-zero
   ``\varphi`` to a target variance. These seed the state a run warms up from.
@@ -173,7 +175,8 @@ gradient, the equation becomes
 ```
 
 - **`velocity_vorticity!`** and **`velocity_nonlinear!`** assemble ``\mathbb P\,(\boldsymbol u\times\boldsymbol\omega)``,
-  dealiased by the ``2/3`` rule to remove the aliasing of the quadratic product. The rotational form
+  dealiased by the ``2/3`` rule to remove the aliasing of the quadratic product (the pseudospectral
+  method; Orszag & Patterson 1972, the ``2/3`` rule Orszag 1971). The rotational form
   is chosen because it is the cheap, energy-conserving way to compute the advection spectrally, and —
   read through the geometric lens (§8) — it is the flow's *reversible* generator.
 - **`integrating_factor!`** builds the exact diffusive factor
@@ -192,7 +195,7 @@ gradient, the equation becomes
   `dissipation` ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``, `max_speed` (for the
   CFL), `scalar_variance` ``\langle\varphi^2\rangle``, `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``, and `derivative_skewness` (the K41 marker
-  ``S \approx -0.5`` of developed turbulence, the coordinate-free strain invariant ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` — the classical longitudinal skewness rescaled by the exact isotropy constant ``C``). These are not incidental: they are the
+  ``S \approx -0.5`` of developed turbulence, computed coordinate-free as ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact isotropy constant ``C = \tfrac47\sqrt{15/2}``, which reproduces the classical longitudinal skewness). These are not incidental: they are the
   **fitness functionals** the comparison machine of §3 evaluates, and the stationarity signals
   `warmup!` watches.
 
@@ -241,8 +244,9 @@ inertial (``\boldsymbol x, \boldsymbol v``) and oriented (``\boldsymbol x, \bold
 the velocity at the start and end of the step (the fields the solver already produces); `sample!`
 reads any field along the trajectories for Lagrangian statistics.
 
-Their **numerics are first-class**, on the same footing as the field integrators. Two knobs matter and
-are fitness-tested: the trajectory integrator, and — the sampling-consistency knob — the interpolation
+Their **numerics are first-class**, on the same footing as the field integrators. Two axes matter: the
+trajectory integrator — today a single second-order Heun push, with higher-order pushers the studied
+future axis — and the fitness-tested sampling-consistency axis, the interpolation
 scheme's order relative to the field's spectral accuracy (`CatmullRom` by default, higher-order
 `LalescuSpline`/`LagrangeSpline` available). When the inertial and oriented probes arrive, the
 integrating-factor split carries over for the *translational* stiff drag (field viscosity and a
@@ -343,7 +347,7 @@ is a gap.
   ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.5, §8).
 - **The sheared frame (Rogallo).** A uniform mean velocity gradient makes the wavenumbers
-  time-dependent (``d\boldsymbol{\kappa}/dt = -\mathsf A^{\!\top}\boldsymbol{\kappa}``) and non-separable. This is the one
+  time-dependent (``d\boldsymbol{\kappa}/dt = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``) and non-separable. This is the one
   future with a concrete `GBGPeriodicFields` dependency: its separable per-axis multipliers cannot
   hold a sheared lattice, so it is a bounded extension *there* (rule 1 of §5), not a job here.
 - **The Model ladder beyond DNS** — LES (filter the DNS, model the subgrid stress) and a
@@ -444,11 +448,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
    advection; the reversible generator of the geometric lens.
 3. **(2026-06) `IFLowStorageRK3` (Williamson 2N / RKW3) is the default; per-scheme CFL.** Third-order,
-   imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscively-stabilised
+   imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscously-stabilised
    option.
 4. **(2026-06) One passive scalar ``\varphi``, coupled in-stage.** Velocity and scalar advance through
    the same RK stages to keep the passive coupling time-accurate.
-5. **(2026-06) Lagrangian tracers by Heun-in-time; interpolation scheme is the accuracy knob.** The
+5. **(2026-06) Lagrangian tracers by Heun-in-time; interpolation scheme is the accuracy axis.** The
    pusher uses the start- and end-of-step velocities the solver already produces.
 6. **(2026-07) Statistics extracted to `GBGStreamingStatistics`.** The conditional/transition-density
    machinery is domain-neutral and shared across turbulence, cloud microphysics, and molecular
@@ -484,8 +488,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     before the grid exists. The operator-taking constructor is unchanged.
 15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`target = :band | :total`).**
     `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
-    to pin the whole-field energy — hence ``u'`` and ``\mathrm{Re}_\lambda`` — matching TurTLE's
-    constant-energy convention. A modeling choice with two defensible answers, so it is a selectable
+    to pin the whole-field energy — hence the r.m.s. velocity ``u'`` and ``\mathrm{Re}_\lambda`` — the
+    constant-total-energy forcing convention. A modeling choice with two defensible answers, so it is a selectable
     option rather than a fixed default.
 16. **(2026-07) Modules named from the Mori–Zwanzig lens; `Equations` split into `Dynamics` +
     `Observables`; `Driver` → `SimulationRun`.** Since MZ is the central lens (§8), the physics concerns
@@ -516,6 +520,8 @@ docs are published (they are not yet filled in, per the no-guessed-citation rule
 
 - Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
   large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
+- Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
+  *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy relations behind the strain-skewness constant, §4.2.)*
 - Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
   isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(Pseudospectral method; the ``2/3``
   dealiasing rule, Orszag 1971.)*
@@ -523,6 +529,8 @@ docs are published (they are not yet filled in, per the no-guessed-citation rule
   sheared-frame scheme, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.
+  *(The linear negative-damping forcing.)*
 - Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. *(The
   2N low-storage family; the third-order RKW3 coefficients.)*
 - Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. *(Notation; the

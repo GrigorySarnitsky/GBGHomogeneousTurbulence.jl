@@ -51,7 +51,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, `to_physical` |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | `curl`, `divergence` |
 | ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | `helmholtz_projection` |
-| ``\mathcal E(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\big((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\Delta t\big)`` | `integrating_factor!` |
+| ``\mathcal E(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\big((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\Delta t\big)`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | `integrating_factor!` |
 | ``\star`` | periodic convolution (the dealias/band/envelope kernels) | `convolve` |
 
 ## Diagnostics

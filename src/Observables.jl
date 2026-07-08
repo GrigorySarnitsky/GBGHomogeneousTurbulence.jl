@@ -1,7 +1,7 @@
 # Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
 # velocity-derivative skewness, the scalar variance and its dissipation, and the maximum component
 # speed (which feeds the CFL). In the Mori–Zwanzig reading (ARCHITECTURE §8) these are the observables
-# of the `Dynamics`: their plateaus gate warm-up and their statistics are tracked by
+# of the `Dynamics`: their plateaus gate warm-up and their statistics are to be tracked by
 # GBGStreamingStatistics. Each reduces a field to a scalar — a GBGPeriodicFields inner product or moment.
 
 """
@@ -10,7 +10,7 @@
 The functions of the flow state that are measured — kinetic energy, dissipation, the velocity-
 derivative skewness, the scalar variance and its dissipation, and the maximum component speed. In the
 Mori–Zwanzig reading (design doc §8) these are the *observables* of the `Dynamics`: their plateaus gate
-warm-up (`warmup!`), and their statistics are tracked by `GBGStreamingStatistics`. Each reduces a field
+warm-up (`warmup!`), and their statistics are to be tracked by `GBGStreamingStatistics`. Each reduces a field
 to a scalar.
 """
 module Observables
@@ -39,7 +39,8 @@ kinetic_energy(u) = 0.5 * inner(u, u)
 The mean kinetic-energy dissipation rate of a homogeneous flow,
 ``\\varepsilon = \\nu\\,\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, from the physical
 `ω` ``\\boldsymbol{\\omega}`` and the kinematic `viscosity` ``\\nu`` (the homogeneous
-identity ``\\varepsilon = 2\\nu\\langle S_{ij}S_{ij}\\rangle = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``).
+identity ``\\varepsilon = 2\\nu\\langle S_{ij}S_{ij}\\rangle = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``,
+with the strain-rate tensor ``S_{ij} = \\tfrac12(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``).
 """
 dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
 
@@ -69,7 +70,8 @@ scalar_variance(φ) = inner(φ, φ)
 
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-`φ` ``\\varphi`` (in spectral representation) and the scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
+`φ` ``\\varphi`` (in spectral representation), the [`SpectralOperators`](@ref) bundle `ops`, and the
+scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
 against the squared-wavenumber multiplier `ops.squared_wavenumber_kernel` — straight from the spectral
@@ -89,8 +91,9 @@ const _SKEWNESS_ISOTROPY_CONSTANT = (4 / 7) * sqrt(15 / 2)              # ≈ 1.
 """
     derivative_skewness(û, ops)
 
-The velocity-derivative skewness, written coordinate-free as the normalized third invariant of the
-strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``:
+The velocity-derivative skewness ``S``, written coordinate-free as the normalized third invariant of
+the strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}`` (the italic ``S``
+is the scalar skewness, the bold ``\\boldsymbol{S}`` the strain-rate tensor):
 
 ```math
 S = C\\,\\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
@@ -102,16 +105,19 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 ``\\operatorname{tr}\\boldsymbol{S}^{3} = 3\\det\\boldsymbol{S}``. By isotropy this equals the classical
 longitudinal skewness ``\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle / \\langle(\\partial u_1/\\partial x_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle``
-and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle``. So the
+and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle`` (Betchov). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 
-The strain is formed directly with `symmetric_gradient` (skipping the full nine-component velocity
-gradient), transformed to physical space, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle``
-(`inner`) and ``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`). ``S`` is the classic marker of *developed*
-turbulence: a random-phase (Gaussian) field has ``S \\approx 0`` (all odd invariants vanish), while fully
-developed isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov) — the enstrophy-production /
-vortex-stretching signature. Its plateau is the strict "real turbulence yet" gate of the warm-up detector.
+From the velocity field `û` in spectral representation, the strain is formed directly with
+`symmetric_gradient` and the wavenumber `multipliers` of the [`SpectralOperators`](@ref) bundle `ops`
+(skipping the full nine-component velocity gradient), carried to physical space by its rank-2 tensor
+transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
+``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`); `ops` also sizes the per-call tensor and scalar scratch.
+``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
+(all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov)
+— the enstrophy-production / vortex-stretching signature. Its plateau is the strict "real turbulence yet"
+gate of the warm-up detector.
 """
 function derivative_skewness(û, ops::SpectralOperators)
   strain = symmetric_gradient(û, ops.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)

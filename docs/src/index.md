@@ -46,9 +46,10 @@ and the passive scalar ``\varphi`` by the advection–diffusion equation
 \partial_t \varphi = -\nabla\cdot(\boldsymbol{u}\,\varphi) + \frac{\nu}{\mathrm{Sc}}\nabla^{2}\varphi + f_\varphi,
 ```
 
-with ``\mathrm{Sc}`` the Schmidt number. In both equations the diffusive (stiff) term is integrated
-exactly through an integrating factor, the nonlinear term explicitly by a Runge–Kutta stage
-combination, and the quadratic product is de-aliased by the ``2/3`` rule.
+with ``\mathrm{Sc}`` the Schmidt number and ``f_\varphi`` a forcing on the scalar. In both
+equations the diffusive (stiff) term is integrated exactly through an integrating factor, the
+nonlinear term explicitly by a Runge–Kutta stage combination, and the quadratic product is
+de-aliased by the ``2/3`` rule.
 
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
@@ -60,13 +61,18 @@ combination, and the quadratic product is de-aliased by the ``2/3`` rule.
 ## Components
 
 - [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SpectralOperators`),
-  the preallocated buffers (`Workspace`), and the random divergence-free initial condition.
+  the preallocated buffers (`Workspace`), and the random initial conditions — a divergence-free
+  velocity and a mean-zero scalar ``\varphi``.
 - [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
-  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`).
+  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, and the CFL helper
+  `max_speed`).
 - [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`.
 - [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a pluggable interpolation scheme.
+- [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
+  drives it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
+  stationarity).

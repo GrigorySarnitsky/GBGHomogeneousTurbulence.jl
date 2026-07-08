@@ -1,7 +1,7 @@
 # SimulationState — the spectral machinery and preallocated buffers a HIST run advances.
 #
 # `SpectralOperators` bundles the reusable, read-only machinery (grid, transform plans, spectral
-# multipliers, the |k|² field, and the 2/3-rule de-alias kernel). `Workspace` holds the
+# multipliers, the |k|² field, and the de-alias kernel). `Workspace` holds the
 # preallocated scratch the velocity time step writes into, so a step allocates no field-sized memory
 # — the GPU hot-loop discipline inherited from GBGPeriodicFields (its invariant 13). Everything is
 # allocated through the field reference's array type, so a run is CPU/GPU-agnostic (pass
@@ -10,9 +10,12 @@
 """
     SimulationState
 
-The spectral machinery and preallocated buffers a run advances: `SpectralOperators` (the read-only
-grid, transform plans, multipliers, squared-wavenumber field, and de-alias kernel), the scratch
-allocators, `Workspace`, and the random divergence-free initial condition.
+The spectral machinery and preallocated buffers a run advances: [`SpectralOperators`](@ref) (the
+read-only grid, transform plans, multipliers, squared-wavenumber field, and the de-alias kernel built
+by a [`DealiasingStrategy`](@ref) — [`TwoThirds`](@ref) or [`HouLi`](@ref)), the scratch allocators,
+[`Workspace`](@ref), and the random initial conditions ([`random_solenoidal_velocity!`](@ref) for the
+divergence-free velocity, [`random_scalar!`](@ref) for the mean-zero scalar ``\\varphi``).
+[`dealias!`](@ref) applies the de-alias kernel to a spectral field in place.
 """
 module SimulationState
 
@@ -45,8 +48,10 @@ abstract type DealiasingStrategy end
     TwoThirds()
 
 The sharp isotropic ``2/3``-rule truncation: keep the modes
-``\\kappa \\le \\tfrac23 \\kappa_{\\max}`` and zero the rest (``\\kappa_{\\max}`` the Nyquist
-wavenumber). Exact de-aliasing of the quadratic nonlinearity, and the lean, GPU-friendly default.
+``\\kappa \\le \\kappa_{\\max} = \\tfrac23\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
+``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
+``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact de-aliasing
+of the quadratic nonlinearity, and the lean, GPU-friendly default.
 """
 struct TwoThirds <: DealiasingStrategy end
 
@@ -54,13 +59,15 @@ struct TwoThirds <: DealiasingStrategy end
     HouLi(; order = 36, strength = 36)
 
 The smooth Hou–Li spectral filter, transfer function
-``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\max})^{\\texttt{order}}\\big)``
-(defaults ``36, 36``, damping the Nyquist mode to ``\\mathrm{e}^{-36}\\approx`` machine epsilon). It
-keeps more modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
-stabilisation, hence an opt-in, not the default. Applied isotropically in ``\\kappa``
-(the filter TurTLE uses, there per-axis). Because it retains energy out to the Nyquist wavenumber it
-takes a proportionally smaller CFL step than the ``2/3`` rule — handled automatically by
-`recommended_cfl`.
+``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
+with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. `order`
+sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); `strength` sets the
+damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}`` (defaults
+``36, 36``, so that mode falls to ``\\mathrm{e}^{-36}\\approx`` machine epsilon). It keeps more modes
+than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilisation,
+hence an opt-in, not the default. Applied isotropically in ``\\kappa`` (the filter TurTLE uses, there
+per-axis). Because it retains energy out to the Nyquist wavenumber it takes a proportionally smaller
+CFL step than the ``2/3`` rule — handled automatically by `recommended_cfl`.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
@@ -79,7 +86,8 @@ _retained_nyquist_fraction(::HouLi) = 1 // 1
 
 The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run on a grid
 of `resolution` points per side, in a periodic box of side `box`: the `Grid3D`, the real-to-complex transform
-plans (one for the velocity, a vector field; one for the scalar ``\\varphi``), the
+plans (one for the velocity, a vector field; one for the scalar ``\\varphi``; and one for the rank-2
+strain tensor of the derivative-skewness diagnostic), the
 `FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (with
 ``\\boldsymbol{\\kappa}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``; kept both as a real array
 and as a scalar-field kernel for weighted spectral reductions), and the de-alias kernel `dealias`.
@@ -220,13 +228,16 @@ tensor_physical(ops::SpectralOperators) =
     Workspace(ops)
 
 Preallocated scratch for one coupled integrating-factor step of the velocity and the passive scalar
-``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers, the
-predictor field, a velocity copy (the in-place inverse transform consumes its source), a general
-spectral scratch, the nonlinear-term buffer, and the physical velocity / vorticity / predictor /
-Lamb-vector (``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage
-registers, a predictor, the nonlinear-term buffer, a copy, the shared integrating factor, and the
-physical scalar; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity
-scratch. Sized so a step allocates no field-sized memory.
+``\\varphi``. The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers
+(buffers holding a stage's state and accumulator), the predictor field, a velocity copy (the in-place
+inverse transform consumes its source), a general spectral scratch, the nonlinear-term buffer, and the
+physical velocity / start-of-step vorticity / per-stage vorticity / predictor / Lamb-vector
+(``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``). The scalar buffers are two stage registers, a
+predictor, the nonlinear-term buffer, a copy, the shared integrating factor, and the physical scalar;
+the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch. Two
+real per-mode linear-forcing-rate arrays ``A(\\boldsymbol{\\kappa})`` — one for the velocity, one for
+``\\varphi`` — are folded into the integrating factor. Sized so a step allocates no field-sized
+memory.
 """
 struct Workspace{VS, SS, VP, SP, RK}
   vorticity_spectral::VS
@@ -271,14 +282,18 @@ end
 """
     dealias!(field, ops)
 
-Apply the ``2/3``-rule low-pass `ops.dealias` to `field` in place (a coefficientwise, alias-safe
-multiply by the de-alias kernel; `field` may be in vector or scalar spectral representation).
+Apply the run's de-alias low-pass `ops.dealias` to `field` in place — a coefficientwise multiply that
+controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
+[`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact de-aliasing)
+or the smooth [`HouLi`](@ref) filter (which only damps the aliasing). `field` may be a vector or
+scalar field in spectral representation.
 """
 dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 
 
 """
-    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0, rng = default_rng())
+    random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0,
+                                rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` concentrated at large scales by the envelope
@@ -286,6 +301,9 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 de-aliased, and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
+
+`ops` is the [`SpectralOperators`](@ref) supplying the grid, backend, wavenumber multipliers, and
+de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, ops::SpectralOperators;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
@@ -317,6 +335,9 @@ concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbo
 (``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
 ``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
 transform, so the ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
+
+`ops` is the [`SpectralOperators`](@ref) supplying the grid, backend, wavenumber multipliers, and
+de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, ops::SpectralOperators;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,

@@ -17,9 +17,16 @@ integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *
 dynamics* — it advances the flow state; `Observables` are the functions of that state, and
 `TimeIntegration` the numerical propagator.
 
-Every method here takes the operator bundle `ops` (a `SpectralOperators`: grid, transform plans,
-wavenumber multipliers, de-alias kernel) and the preallocated scratch `ws` (a `Workspace`) as its
-final two arguments.
+The module has five operations — [`velocity_vorticity!`](@ref) recovers the physical velocity and
+vorticity, and [`scalar_to_physical!`](@ref) the physical scalar, from their spectral representations;
+[`velocity_nonlinear!`](@ref) and [`scalar_nonlinear!`](@ref) assemble the de-aliased momentum and
+scalar nonlinear terms; and [`integrating_factor!`](@ref) builds the exact viscous/diffusive spectral
+multiplier.
+
+Every field-transforming or nonlinear-assembly method takes the operator bundle `ops` (a
+`SpectralOperators`: grid, transform plans, wavenumber multipliers, de-alias kernel) and the
+preallocated scratch `ws` (a `Workspace`) as its final two arguments; `integrating_factor!` takes
+`ops` alone (no `ws`).
 """
 module Dynamics
 
@@ -61,9 +68,9 @@ the divergence-free momentum equation becomes
 ``\\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}``,
 where the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbs the pressure
 and the ``\\nabla(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient. The term computed here is the
-spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``, with the ``2/3`` rule
-removing the aliasing of the quadratic product. Allocation-free (a destination distinct from its
-sources takes the no-alias path).
+spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``, with the de-alias
+kernel `ops.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of the quadratic
+product. Allocation-free (a destination distinct from its sources needs no internal scratch).
 """
 function velocity_nonlinear!(nonlinear, u, ω, ops::SpectralOperators, ws::Workspace)
   cross!(ws.lamb, u, ω)
@@ -78,7 +85,7 @@ end
     integrating_factor!(factor, ops, diffusivity, dt, rate = nothing)
 
 Write the exact diffusive integrating factor into the scalar spectral buffer `factor`. Over a step
-``\\Delta t`` the diffusion equation ``\\partial_t f = D\\nabla^{2} f`` is solved exactly in spectral
+``\\Delta t`` (`dt`) the diffusion equation ``\\partial_t f = D\\nabla^{2} f`` is solved exactly in spectral
 representation by the per-mode multiplier
 
 ```math
@@ -86,7 +93,9 @@ representation by the per-mode multiplier
 ```
 
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
-restriction). The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
+restriction). The operator bundle `ops` (a `SpectralOperators`) supplies the squared-wavenumber
+field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (`ops.squared_wavenumber`), the symbol of
+``-\\nabla^{2}``. The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
 velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
 
 When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
@@ -127,9 +136,11 @@ physical `u` ``\\boldsymbol{u}`` and physical `φ` ``\\varphi``.
 
 In conservative form the advection is
 ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
-``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form is used because, with the ``2/3`` rule, it
-conserves the scalar mean exactly (the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component). It is
-computed pseudospectrally as ``-\\,\\mathrm{dealias}\\big(i\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
+``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form is used because it conserves the scalar mean
+exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component, and the de-alias
+kernel `ops.dealias` (the sharp ``2/3`` rule by default) leaves that mode untouched. It is computed
+pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
+the kernel controlling the aliasing of the quadratic product.
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
 function scalar_nonlinear!(nonlinear, u, φ, ops::SpectralOperators, ws::Workspace)

@@ -14,6 +14,10 @@
 Lagrangian tracer tracking: `Tracers` (positions + a pluggable interpolation scheme), the
 second-order [`advect!`](@ref) (Heun-in-time on the start- and end-of-step velocity), and
 [`sample!`](@ref) for reading a field along the trajectories.
+
+Trajectory readouts are [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
+[`ntracers`](@ref); [`velocity_buffer`](@ref) / [`scalar_buffer`](@ref) allocate the
+`out` buffers for [`sample!`](@ref).
 """
 module Particles
 
@@ -33,7 +37,8 @@ A set of Lagrangian tracers. The first form seeds `count` tracers uniformly at r
 box of `ops` (on the operators' backend and element type); the second wraps a given `(M, 3)` position
 array. `scheme` is the `GBGPeriodicFields` interpolation scheme used to evaluate the velocity (and any
 sampled field) at the tracer positions — `CatmullRom` (the default), `LalescuSpline(n, m)`, or
-`LagrangeSpline(n)`.
+`LagrangeSpline(n)`. `rng` (first form only) is the random stream seeding the uniformly-random
+tracer positions; it defaults to `Random.default_rng()`.
 
 The struct preallocates the predictor positions and the point-value buffers, so [`advect!`](@ref)
 allocates no per-step memory.
@@ -84,7 +89,8 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 \\boldsymbol{X} \\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
 ```
 
-with positions wrapped into ``[0, L)``. This is second-order accurate in time. The start-of-step
+with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `ops` (a
+[`SpectralOperators`](@ref)). This is second-order accurate in time. The start-of-step
 velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
 the Lagrangian statistics.
 """

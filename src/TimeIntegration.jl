@@ -20,8 +20,9 @@ The pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes d
 [`step!`](@ref), which advances the coupled velocity + passive-scalar state. All are of the
 integrating-factor family: the stiff diffusive part is advanced exactly and the nonlinear term
 explicitly by a Runge–Kutta stage combination. The default is [`IFLowStorageRK3`](@ref);
-[`recommended_cfl`](@ref) gives a scheme's advective-CFL ceiling; [`Physics`](@ref) bundles the
-problem parameters and forcings.
+[`IFRK2`](@ref) (Heun) is a cheaper two-stage alternative, imaginary-axis unstable;
+[`default_integrator`](@ref) returns the default; [`recommended_cfl`](@ref) gives a scheme's
+advective-CFL ceiling; [`Physics`](@ref) bundles the problem parameters and forcings.
 """
 module TimeIntegration
 
@@ -37,7 +38,8 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
 
 
 """
-    Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+    Physics(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(),
+            scalar_forcing = NoForcing())
 
 The problem definition consumed by [`step!`](@ref): the kinematic viscosity ``\\nu`` (`viscosity`),
 the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``),
@@ -82,20 +84,20 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the per-substep
-integrating factor ``\\mathcal{E}_D(\\tau) = \\exp(-D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\tau)`` (``D = \\nu``
-for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and ``\\widehat{\\boldsymbol{N}}`` the
-de-aliased nonlinearity of each field, the step carries a state ``\\hat q`` and a single accumulator
+Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the diffusive
+integrating factor ``\\mathcal{E}_D(\\tau)`` built by [`integrating_factor!`](@ref) over a substep
+interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar)
+and ``\\widehat{\\boldsymbol{N}}`` the de-aliased nonlinearity of each field, the step carries a state
+``\\hat q`` and a single accumulator
 ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
 ```math
-\\boldsymbol{h} \\leftarrow A_i\\,\\boldsymbol{h} + \\Delta t\\,\\widehat{\\boldsymbol{N}}(\\hat q),
-\\qquad
-\\hat q \\leftarrow \\hat q + B_i\\,\\boldsymbol{h},
-\\qquad
-\\hat q \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\hat q,
-\\quad
-\\boldsymbol{h} \\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\boldsymbol{h},
+\\begin{aligned}
+\\boldsymbol{h} &\\leftarrow A_i\\,\\boldsymbol{h} + \\Delta t\\,\\widehat{\\boldsymbol{N}}(\\hat q), \\\\
+\\hat q &\\leftarrow \\hat q + B_i\\,\\boldsymbol{h}, \\\\
+\\hat q &\\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\hat q, \\\\
+\\boldsymbol{h} &\\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\boldsymbol{h},
+\\end{aligned}
 ```
 
 with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
@@ -167,16 +169,18 @@ end
 """
     IFRK2()
 
-Integrating-factor second-order Runge–Kutta (Heun). With the integrating factors
-``\\mathcal{E}_\\nu = \\exp(-\\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
-``\\mathcal{E}_\\varkappa = \\exp(-\\varkappa\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\Delta t)`` and
-``\\widehat{\\boldsymbol{N}}`` each field's de-aliased nonlinearity, one step of a field ``\\hat q`` with
+Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
+factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the diffusive kernel of
+[`integrating_factor!`](@ref) at ``D = \\nu`` and ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
+``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's de-aliased nonlinearity, one step of a
+field ``\\hat q`` with
 integrating factor ``\\mathcal{E}`` is
 
 ```math
-\\hat q^{*} = \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\boldsymbol{N}}_1),
-\\qquad
-\\hat q_{n+1} = \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2\\big),
+\\begin{aligned}
+\\hat q^{*} &= \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\boldsymbol{N}}_1), \\\\
+\\hat q_{n+1} &= \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2\\big),
+\\end{aligned}
 ```
 
 with ``\\widehat{\\boldsymbol{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\boldsymbol{N}}_2`` at the predictor
@@ -184,9 +188,10 @@ with ``\\widehat{\\boldsymbol{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\boldsym
 respectively, then the forcings are applied. Two nonlinear evaluations per step.
 
 !!! note
-    Every two-stage explicit Runge–Kutta has stability function ``R(z) = 1 + z + z^{2}/2``, for which
-    ``\\lvert R(iy)\\rvert^{2} = 1 + y^{4}/4 > 1``: the scheme is unstable on the imaginary axis, so
-    it is stable only where the viscous damping of the integrating factor dominates. It is adequate
+    Every second-order two-stage explicit Runge–Kutta has stability function
+    ``R(z) = 1 + z + z^{2}/2``, for which ``\\lvert R(\\mathrm{i}y)\\rvert^{2} = 1 + y^{4}/4 > 1``: the
+    scheme is unstable on the imaginary axis, so it is stable only where the viscous damping of the
+    integrating factor dominates. It is adequate
     for well-resolved, modest-Reynolds-number runs but is **not** the default — prefer
     [`IFLowStorageRK3`](@ref) for high Reynolds number or marginal resolution.
 """
