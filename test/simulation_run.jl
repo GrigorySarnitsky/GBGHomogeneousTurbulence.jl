@@ -4,6 +4,7 @@
 # it; and the bring-your-own-operators constructor and fixed-`dt` `advance!` work.
 
 using GBGIsotropicTurbulence
+using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using GBGPeriodicFields: field_data
 using Random
 using Test
@@ -37,12 +38,27 @@ using Test
   end
 
   @testset "free decay loses energy" begin
-    sim = Simulation(resolution = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(2))
+    sim = Simulation(resolution = 16, viscosity = 0.05;
+                     scalar = false, velocity_forcing = NoForcing(), rng = MersenneTwister(2))
     k0 = kinetic_energy(sim)
     run!(sim; steps = 40)
     @test current_step(sim) == 40
     @test isfinite(kinetic_energy(sim))
     @test kinetic_energy(sim) < k0                             # unforced ⇒ decays
+  end
+
+  @testset "grid-resolved viscosity (grid mode)" begin
+    # No `viscosity`: ν is chosen so the grid resolves κ_max·η = k_max_η, forced-and-stationary.
+    sim = Simulation(resolution = 32; rng = MersenneTwister(3))
+    ν = sim.physics.viscosity
+    ε = stationary_dissipation(Li2008(), 1.5, L)               # energy = 1.5, box = L
+    η = (ν^3 / ε)^(1 / 4)
+    @test isapprox(max_wavenumber(sim.operators) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
+    @test sim.physics.velocity_forcing isa BandRescaling        # forced by default
+    @test ν > 0
+
+    @test Simulation(resolution = 32, k_max_η = 3; rng = MersenneTwister(3)).physics.viscosity > ν
+    @test Simulation(resolution = 32, viscosity = 0.01, k_max_η = 5).physics.viscosity == 0.01
   end
 
   @testset "callback fires every step without `every`" begin

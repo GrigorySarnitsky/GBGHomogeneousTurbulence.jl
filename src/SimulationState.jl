@@ -26,7 +26,7 @@ export SpectralOperators, Workspace,
        spectral_vector, physical_vector, scalar_spectral, scalar_physical,
        tensor_spectral, tensor_physical,
        random_solenoidal_velocity!, random_scalar!, dealias!,
-       DealiasingStrategy, TwoThirds, HouLi
+       DealiasingStrategy, TwoThirds, HouLi, max_wavenumber
 
 
 # ── De-aliasing strategies ────────────────────────────────────────────────────────────────────────
@@ -164,6 +164,27 @@ _reference(ops::SpectralOperators) = field_data(ops.dealias)
 _real_type(ops::SpectralOperators) = real(eltype(_reference(ops)))
 _complex_type(ops::SpectralOperators) = complex(_real_type(ops))
 _blank(ops::SpectralOperators, ::Type{S}, dims) where {S} = fill!(similar(_reference(ops), S, dims), zero(S))
+
+
+"""
+    max_wavenumber(ops)
+
+The highest wavenumber magnitude the operators `ops` actually evolve — the de-aliasing cutoff
+
+```math
+\\kappa_{\\max} = f\\,\\frac N2\\,\\frac{2\\pi}{L},
+```
+
+with ``N`` the resolution, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
+[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`). It is the cutoff the
+de-aliasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` itself; the modes above it are
+zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
+``\\kappa_{\\max}\\eta`` that a run is set up to meet.
+"""
+function max_wavenumber(ops::SpectralOperators)
+  N = physical_field_shape(ops.grid, Val(0))[1]
+  return _retained_nyquist_fraction(ops.dealiasing) * (N / 2) * (2π / ops.grid.domain_size[1])
+end
 
 
 """

@@ -26,6 +26,13 @@ TwoThirds
 HouLi
 ```
 
+The de-aliasing cutoff it sets — the highest wavenumber the operators evolve, and the resolution
+criterion ``\kappa_{\max}\eta`` a run is built to meet.
+
+```@docs
+max_wavenumber
+```
+
 ## Scratch-field allocators
 
 Allocate one zeroed velocity, scalar, or second-order tensor field on the operators' backend and

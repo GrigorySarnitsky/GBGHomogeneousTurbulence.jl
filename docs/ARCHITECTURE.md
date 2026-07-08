@@ -605,6 +605,21 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
     no `GBGStreamingStatistics` bridge is needed for it. The structure-function and scaling-constant
     paths (via `radial_correlation` and the scalar diagnostics) share the shape and are deferred.
+20. **(2026-07) Resolution-based `viscosity` — the run layer *consumes* a `Phenomenology` law to build a
+    run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
+    dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
+    (``k/(L\varepsilon)^{2/3} \approx 0.9``, the dissipation anomaly in box variables, calibrated to
+    JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
+    option (default `2`) — the highest Reynolds number the grid resolves. This is the **construction**
+    half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to validate them.
+    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at `energy`,
+    default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. It does **not**
+    breach the extraction boundary — `Li2008` stays a pure scalar law with no `GBGPeriodicFields` /
+    `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
+    sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
+    wavenumber), not ``\eta/\Delta x`` (geometric): the former is dealiasing-aware through
+    ``\kappa_{\max} = f\,\tfrac N2\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
+    accuracy itself depends on the dealiasing.
 
 ---
 

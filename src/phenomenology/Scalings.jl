@@ -7,13 +7,15 @@ Dimensionless turbulence constants and their Reynolds-number trends, evaluated b
   a high-Reynolds-number plateau with an optional finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
+- [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted)
+  predicts the dissipation a stationary run sustains from its energy and box size.
 """
 module Scalings
 
 using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference, taylor_reynolds
 import ..Phenomenology: scaling, provenance
 
-export ScalingLaw, Sreenivasan1998, Sreenivasan1995, scaling
+export ScalingLaw, Sreenivasan1998, Sreenivasan1995, Li2008, scaling, stationary_dissipation
 
 
 """
@@ -26,6 +28,18 @@ the derivative skewness, …), possibly Reynolds-number-dependent. A law predict
 against measurement.
 """
 abstract type ScalingLaw <: TurbulenceLaw end
+
+
+"""
+    stationary_dissipation(law, energy, box)
+
+The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
+dissipation `law` from the turbulent kinetic energy `energy` (``k``) and the periodic-box side length
+`box` (``L``) — the inverse of the law's [`scaling`](@ref) group. For [`Li2008`](@ref),
+``\\varepsilon = (k/G)^{3/2}/L`` with ``G`` the group constant. This is the seam by which a run's
+viscosity can be set from its grid and target energy, rather than the reverse.
+"""
+function stationary_dissipation end
 
 
 const _SREENIVASAN = Reference("Sreenivasan (1998), *Phys. Fluids* **10**, 528"; valid_Reλ = (50.0, Inf))
@@ -80,6 +94,44 @@ Sreenivasan1995(; C_K = 1.5) = Sreenivasan1995(C_K)
 scaling(m::Sreenivasan1995, ::FlowParameters) = m.C_K
 
 provenance(::Sreenivasan1995) = _SREENIVASAN1995
+
+
+const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB); dissipation-anomaly lineage Taylor 1935 / Sreenivasan 1998 / Kaneda et al. 2003";
+                          valid_Reλ = (100.0, Inf))
+
+"""
+    Li2008(; constant = 0.9)
+
+The box-normalized dissipation group
+
+```math
+\\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
+```
+
+relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the dissipation
+rate ``\\varepsilon`` — nearly Reynolds-number-independent across the JHTDB isotropic datasets
+(``\\mathrm{Re}_\\lambda \\approx 400\\text{–}2500``) and comparable box DNS. It is the dissipation
+anomaly / normalized-dissipation law ``C_\\varepsilon = \\varepsilon L/u'^3`` (Taylor 1935; Sreenivasan
+1998; Kaneda et al. 2003 for the periodic box) written with the **box side** in place of the integral
+scale, which folds the setup-dependent integral-scale-to-box ratio into the constant (``\\approx 0.5``
+becomes ``\\approx 0.9``).
+
+`constant` is the group value ``G`` (default `0.9`). [`scaling`](@ref)`(law, fp)` returns it;
+inverted, [`stationary_dissipation`](@ref)`(law, k, L)` predicts the dissipation a stationary run of
+energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the run layer uses to
+set the viscosity from the grid and target energy.
+"""
+struct Li2008 <: ScalingLaw
+  constant::Float64
+end
+
+Li2008(; constant = 0.9) = Li2008(constant)
+
+scaling(m::Li2008, ::FlowParameters) = m.constant
+
+stationary_dissipation(m::Li2008, energy::Real, box::Real) = (energy / m.constant)^(3//2) / box
+
+provenance(::Li2008) = _LI2008
 
 
 end # module Scalings

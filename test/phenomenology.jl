@@ -66,6 +66,13 @@ end
   @test Sreenivasan1995() isa ScalingLaw
   @test scaling(Sreenivasan1995(), FP) == 1.5                    # Kolmogorov constant, Re-independent
   @test scaling(Sreenivasan1995(C_K = 1.6), FP) == 1.6
+
+  @test Li2008() isa ScalingLaw
+  @test scaling(Li2008(), FP) == 0.9                             # the box-normalized group value G
+  let k = 1.5, L = 2π, ε = stationary_dissipation(Li2008(), k, L)
+    @test k / (L * ε)^(2 / 3) ≈ 0.9                              # stationary_dissipation inverts k/(Lε)^{2/3}=G
+  end
+  @test stationary_dissipation(Li2008(constant = 1.0), 1.0, 1.0) == 1.0   # ε = (k/G)^{3/2}/L
 end
 
 

@@ -66,7 +66,8 @@ using .SimulationState:
   dealias!,
   DealiasingStrategy,
   TwoThirds,
-  HouLi
+  HouLi,
+  max_wavenumber
 
 using .Dynamics:
   velocity_vorticity!,
@@ -142,6 +143,7 @@ export SpectralOperators,
        DealiasingStrategy,
        TwoThirds,
        HouLi,
+       max_wavenumber,
        velocity_vorticity!,
        velocity_nonlinear!,
        integrating_factor!,

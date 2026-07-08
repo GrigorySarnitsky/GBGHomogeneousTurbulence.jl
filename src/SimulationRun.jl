@@ -25,15 +25,16 @@ using GBGPeriodicFields
 using Random
 using ..SimulationState: SpectralOperators, Workspace, spectral_vector, scalar_spectral,
                          physical_vector, random_solenoidal_velocity!, random_scalar!,
-                         DealiasingStrategy, TwoThirds
+                         DealiasingStrategy, TwoThirds, max_wavenumber
 using ..Dynamics: velocity_vorticity!
 using ..Observables: max_speed, derivative_skewness
 import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
-using ..Forcing: AbstractForcing, NoForcing
+using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..TimeIntegration: AbstractIntegrator, Physics, step!, recommended_cfl, default_integrator
 using ..Particles: Tracers, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
+using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
 export Simulation, advance!, run!, warmup!, current_time, current_step, flow_parameters,
        validate_spectrum
@@ -46,32 +47,55 @@ end
 
 
 """
-    Simulation(; resolution, viscosity, box = 2π, scalar_type = Float64,
+    Simulation(; resolution, k_max_η = 2, energy = 1.5, box = 2π, scalar_type = Float64,
                  array_type = Array, dealiasing = TwoThirds(), kwargs...)
-    Simulation(operators; viscosity, kwargs...)
+    Simulation(operators; k_max_η = 2, energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`SpectralOperators`](@ref) machinery, the [`Workspace`](@ref) scratch, the
 [`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
-``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock.
+``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. The first form is the
+**front door**: from a `resolution` it builds every piece with sensible defaults, seeds a
+divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
+`Simulation` at ``t = 0``; the second takes a `SpectralOperators` you built yourself. Advance it with
+[`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
 
-The first form is the **front door**: from a `resolution` and a `viscosity` it builds every piece with
-sensible defaults, seeds a divergence-free velocity and (unless `scalar = false`) a mean-zero scalar
-``\\varphi``, and returns a `Simulation` at ``t = 0``; the second form takes a `SpectralOperators` you
-built yourself. Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
+# Setting the Reynolds number
+
+By default the run is **forced and stationary** — a `BandRescaling` holds the total energy at `energy` —
+and the viscosity is chosen from the grid rather than supplied:
+
+  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number the grid resolves.
+    It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
+    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `energy` the kinetic energy ``k`` and
+    `box` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
+    resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
+    **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
+    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `energy` and `box` fix
+    the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
+    ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
+  * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
+    run (`velocity_forcing = NoForcing()`) or manual control.
 
 # Keywords
-- `viscosity` — the kinematic viscosity ``\\nu`` (sets the Reynolds number); required.
+- `resolution` — grid points per side ``N`` (front door only); required.
+- `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
+  ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
+- `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
+- `energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
+- `box = 2π` — the box side ``L`` (front door only).
+- `scalar_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
+- `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, or `HouLi` smooth); it
+  sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
-- `velocity_forcing`, `scalar_forcing` — an `AbstractForcing`, or a `ForcingSpec` from an operator-free
-  constructor (e.g. `ConstantPower(; power = 0.1)`); default `NoForcing()` (free decay). The velocity
-  and scalar are forced independently.
-- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the scheme and its
-  advective-CFL ceiling (the ceiling adapts to `dealiasing`).
-- `dealiasing = TwoThirds()` — the de-aliasing strategy (`TwoThirds` sharp ``2/3``, or `HouLi` smooth);
-  it also sets ``\\kappa_{\\max}`` and hence the CFL step.
-- `scalar = true`, `energy = 0.5`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to seed
-  the scalar, the initial kinetic energy ``k`` and scalar variance, and the large-scale spectral peak.
-- `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian tracers and their
+- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `ForcingSpec` from an
+  operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total energy
+  at `energy`, `scalar_forcing` to `NoForcing()`. The velocity and scalar are forced independently.
+- `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
+  scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
+  initial condition.
+- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the
+  [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
+- `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
   interpolation scheme.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 """
@@ -97,16 +121,29 @@ _resolve_forcing(f, ops::SpectralOperators) = f(ops)
 
 
 function Simulation(ops::SpectralOperators;
-                    viscosity::Real, schmidt::Real = 1.0,
-                    velocity_forcing = NoForcing(), scalar_forcing = NoForcing(),
+                    energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
+                    schmidt::Real = 1.0,
+                    velocity_forcing = BandRescaling(ops; energy, target = :total),
+                    scalar_forcing = NoForcing(),
                     integrator::AbstractIntegrator = default_integrator(),
                     cfl::Real = recommended_cfl(integrator, ops),
-                    scalar::Bool = true, energy::Real = 0.5, scalar_variance::Real = 1.0,
+                    scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0,
                     ntracers::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
+  # Grid mode (no explicit `viscosity`): choose the highest Re the grid resolves — ε from the
+  # box-normalized dissipation law (`Li2008`), then ν so that κ_max·η = `k_max_η`.
+  if isnothing(viscosity)
+    ε = stationary_dissipation(Li2008(), energy, ops.grid.domain_size[1])
+    ν = ε^(1//3) * (k_max_η / max_wavenumber(ops))^(4//3)
+    reλ = (2 * energy / 3) * sqrt(15 / (ε * ν))
+    @info "Simulation: grid-resolved at κ_max·η = $(k_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
+  else
+    ν = Float64(viscosity)
+  end
+
   ws = Workspace(ops)
-  physics = Physics(; viscosity, schmidt,
+  physics = Physics(; viscosity = ν, schmidt,
                     velocity_forcing = _resolve_forcing(velocity_forcing, ops),
                     scalar_forcing = _resolve_forcing(scalar_forcing, ops))
 
