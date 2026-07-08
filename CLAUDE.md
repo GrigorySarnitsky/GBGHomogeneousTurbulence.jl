@@ -41,6 +41,13 @@ functions of state); **realization / infrastructure** concerns are named by thei
 Include order: `SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles →
 SimulationRun`. Cross-module access only through explicit `using ..Module: name` — never a bare `using`.
 
+A **`Phenomenology`** submodule — the reference turbulence laws (model spectra, structure-function laws,
+dimensionless-constant fits), each an author-year parametrization of one abstract law family per quantity
+— is planned as a dependency-light, **extraction-bound** leaf: it takes **no** `GBGPeriodicFields` /
+`GBGStreamingStatistics` / dynamics dependency, is **not** re-exported by the umbrella, and is designed to
+be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite. Do not add such dependencies to it.
+See `docs/ARCHITECTURE.md` §4.7 and decision 18.
+
 ## Core invariants — do not violate
 
 1. **Thin physics, rich numerics + statistics.** This package owns only the physics — the equations,

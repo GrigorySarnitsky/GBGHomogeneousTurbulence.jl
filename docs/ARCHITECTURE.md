@@ -277,12 +277,80 @@ push, and a clock. Over it:
 
 The layer wires §4.1–§4.5 together; it holds no physics or numerics of its own.
 
-### 4.7 Layout summary
+### 4.7 `Phenomenology` — the reference laws (extraction-bound)
 
-`SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles → SimulationRun`. Cross-module
-access is through explicit `using ..Module: name` lists. Statistics live consumer-side of this
-package too: the sampling in `Particles` and the observables in `Observables` produce the *samples*; a
-statistics bridge that feeds them to `GBGStreamingStatistics` is deferred (§7).
+`Phenomenology` is the library of **reference turbulence phenomenology**: the fitted scalings, model
+spectra, structure-function laws, and dimensionless constants that theory and experiment have
+established. It is the **symmetric counterpart to `Observables`** — those are the *measured* functions of
+the DNS state, these are the *predicted* values of the same functions. The DNS measures, the laws
+predict, and the comparison machine of §3 sets them side by side. Two properties follow, both instances
+of the charter *investigate the physics, do not assume it*:
+
+- **A provider, not a comparer.** A law evaluates itself from the flow parameters; it knows nothing of
+  the DNS. The comparison lives consumer-side (the validation layer), which reads both.
+- **No parametrization is privileged.** A published fit and one of our own are the same kind of object —
+  subtypes of one law family, discovered and validated alike, never baked in as truth.
+
+**The abstraction is the strategy pattern** already used for `AbstractForcing` / `AbstractIntegrator` /
+`DealiasingStrategy`: **a law family is an abstract type, each parametrization a concrete subtype**
+carrying its fitted coefficients and provenance, implementing one small interface — evaluate the law at
+its argument (``\kappa``, ``r``, ``\mathrm{Re}_\lambda``) given a `FlowParameters` bundle; report its
+`provenance` (the citation and validity range); and eventually `fit` itself to data. Choosing a law is
+choosing the subtype (`Pope2000` versus `VonKarman1948`) and optionally overriding its coefficients
+(`Pope2000(; C_K = 1.6)`, the published fit being the default). Provenance is first-class — the
+comparison needs a law's validity range to be fair, and it is the single source of the citation.
+
+**Naming is a three-level handle**, because one author publishes many models across years and
+quantities: the **quantity is the submodule** (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the
+**paper is the author-year type** (`Pope2000`, first author's surname, the full list in `provenance`),
+and a **same author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The
+validating case is Kolmogorov 1941, in two submodules at once — `Spectra.Kolmogorov1941` (the ``-5/3``
+spectrum) and `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5 laws) — separated by the submodule
+alone. The full handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by
+construction.
+
+**Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
+
+- **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
+  **composed**: an inertial core ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
+  factor ``f_L(\kappa L)`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named type fixing a
+  published triple.
+- **`StructureFunctions`** — functions of ``r`` (the ``S_p(r)`` laws and the two-point correlations,
+  which share the representation).
+- **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends (``C_K``, the
+  dissipation constant ``C_\varepsilon``, the derivative skewness ``S``, the flatness, the
+  Obukhov–Corrsin constant, the Lagrangian ``C_0``, the mechanical-to-scalar timescale ratio).
+
+Three now — enough for the validation checklist — capping near six: `PDFs`, `Decay` (``k \sim t^{-n}``),
+and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries every
+dimensionless group a law might read (``\mathrm{Re}_\lambda``, ``\varepsilon``, ``\nu``, ``L``, ``u'``,
+``\mathrm{Sc}``, ``\varepsilon_\varphi``), the derived scales (``\eta``, ``\tau_\eta``, ``k``,
+``\lambda``) as helpers — the analogue of the `Physics` and `SpectralOperators` bundles.
+
+The laws are **consumed to build runs**, not only compared against: an initial-condition or forcing
+spectrum drawn from `Spectra`, and the reference curves the validation harness reads, all from one
+library. And the loop closes — measure (this package and SS), `fit` a parametrization to the
+measurement, and our fit lands beside the literature to be validated against the next run.
+
+**Extraction requirement (recorded).** `Phenomenology` is built inside this package for now but is
+**designed to be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite** — the demand-driven
+path that extracted `GBGStreamingStatistics`. The requirement constrains the design. It is a
+**dependency-light leaf**, depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no
+field math) *nor* `GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor*
+this package's dynamics — first in the include order, importing nothing turbulence-dynamical. And it is a
+**self-contained namespace**: the umbrella does *not* re-export it (`using GBGIsotropicTurbulence` brings
+the DNS API only; the laws are reached opt-in through `Phenomenology`), and its notation and API pages
+form their own group, separable from the DNS surface. Extract when a second consumer appears; until then
+the seam is real but uncrossed (decision 18).
+
+### 4.8 Layout summary
+
+`SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles → SimulationRun`.
+Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.7), once built,
+leads this order as the dependency-light leaf the initial-condition, forcing, and validation consumers
+read. Statistics live consumer-side of this package too: the sampling in `Particles` and the observables
+in `Observables` produce the *samples*; a statistics bridge that feeds them to `GBGStreamingStatistics`
+is deferred (§7).
 
 ---
 
@@ -510,6 +578,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     honest object, and `symmetric_gradient` forms the strain without the full velocity-gradient tensor.
     The physical strain tensor is unavoidable (cubic ⇒ non-Parseval), so this diagnostic allocates its
     rank-2 buffers per call (sampling cadence) rather than keeping them resident — footprint over compute.
+18. **(2026-07) `Phenomenology` — a reference-law library, author-year naming, extraction-bound.** A new
+    submodule (§4.7) collecting the established turbulence phenomenology — model spectra, structure-function
+    laws, dimensionless-constant fits — as one strategy family per quantity: each law family an abstract
+    type, each parametrization an author-year subtype (`Spectra.Pope2000`), disambiguated on three axes
+    (quantity → submodule, paper → author-year, same-year collision → a trailing letter). It is the
+    predicted counterpart to `Observables` — a provider the validation layer reads, not a comparer — and
+    holds our own fits beside the literature on equal footing. **Built inside this package but designed to
+    be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite** (the `GBGStreamingStatistics`
+    precedent): a dependency-light leaf — no `GBGPeriodicFields`, `GBGStreamingStatistics`, or dynamics
+    dependency — that the umbrella does *not* re-export, with its own doc and API group. Extract when a
+    second consumer appears.
 
 ---
 
