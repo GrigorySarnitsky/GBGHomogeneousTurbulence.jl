@@ -12,8 +12,8 @@ dissipation-range roll-off, each swappable.
   [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /
   [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^4`` energy
   range, [`PaoDissipation`](@ref) Pao's cutoff, [`ExponentialDissipation`](@ref) the closure-predicted
-  exponential cutoff, and [`UnitLargeScale`](@ref) / [`UnitDissipation`](@ref) are the trivial
-  (no-roll-off) factors.
+  exponential cutoff, [`SaffmanDissipation`](@ref) a Gaussian cutoff, and [`UnitLargeScale`](@ref) /
+  [`UnitDissipation`](@ref) are the trivial (no-roll-off) factors.
 - [`Pope2000`](@ref) / [`VonKarman1948`](@ref) / [`Pao1965`](@ref) — named velocity-spectrum presets of
   [`ModelSpectrum`](@ref).
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
@@ -26,8 +26,8 @@ import ..Phenomenology: spectrum, provenance
 
 export EnergySpectrum, ScalarSpectrum, LargeScaleFactor, DissipationFactor, PopeLargeScale,
        PopeDissipation, VonKarmanLarge, UnitLargeScale, UnitDissipation, PaoDissipation,
-       ExponentialDissipation, ModelSpectrum, large_scale_factor, dissipation_factor, Pope2000,
-       VonKarman1948, Pao1965, ObukhovCorrsin1949, spectrum
+       ExponentialDissipation, SaffmanDissipation, ModelSpectrum, large_scale_factor,
+       dissipation_factor, Pope2000, VonKarman1948, Pao1965, ObukhovCorrsin1949, spectrum
 
 
 """
@@ -57,6 +57,12 @@ Supertype of the dimensionless **dissipation-range roll-off** factors ``f_\\eta(
 composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near the Kolmogorov scale, with
 ``f_\\eta \\to 1`` as ``\\kappa\\eta \\to 0``. Evaluated by [`dissipation_factor`](@ref);
 [`PopeDissipation`](@ref) is Pope's form.
+
+!!! note "Bottleneck models deferred"
+    These factors are inertial-normalized cutoffs. Models of the near-dissipation *bottleneck* — a bump
+    before the cutoff (Qian 1984; Ishihara et al. 2005; Kraichnan 1959, all of the form
+    ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma < 0``) — do not satisfy
+    ``f_\\eta\\to 1`` and need a richer spectrum structure; they are deliberately deferred.
 """
 abstract type DissipationFactor end
 
@@ -180,6 +186,17 @@ struct ExponentialDissipation <: DissipationFactor
 end
 
 dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
+
+
+"""
+    SaffmanDissipation()
+
+Saffman's Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)``
+(Saffman 1963) — a simple, parameter-free cutoff that tends to `1` in the inertial range.
+"""
+struct SaffmanDissipation <: DissipationFactor end
+
+dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 
 
 """

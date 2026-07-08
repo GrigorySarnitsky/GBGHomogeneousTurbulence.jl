@@ -332,6 +332,13 @@ spectrum drawn from `Spectra`, and the reference curves the validation harness r
 library. And the loop closes — measure (this package and SS), `fit` a parametrization to the
 measurement, and our fit lands beside the literature to be validated against the next run.
 
+**Formula verification.** A transcribed law is checked not against a reference implementation — none is
+authoritative, and cross-checking against another code merely moves the trust — but against the physical
+relations it *must* satisfy: the asymptotic slopes (the ``\kappa^{-5/3}`` inertial range, the
+low-wavenumber ``\kappa^\sigma``, the dissipation cutoff), the ``\zeta_3 = 1`` constraint on every
+intermittency model, and the roll-off limits ``f_L, f_\eta \to 1``. This self-consistency battery lives
+in the test suite and catches a wrong exponent, coefficient, or sign without trusting a second source.
+
 **Extraction requirement (recorded).** `Phenomenology` is built inside this package for now but is
 **designed to be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite** — the demand-driven
 path that extracted `GBGStreamingStatistics`. The requirement constrains the design. It is a

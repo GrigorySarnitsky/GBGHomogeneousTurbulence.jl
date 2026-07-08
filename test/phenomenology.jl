@@ -81,6 +81,41 @@ end
   @test isapprox(dissipation_factor(ExponentialDissipation(0.6), 1e-8), 1.0; atol = 1e-6)
   @test dissipation_factor(ExponentialDissipation(0.6), 5.0) <
         dissipation_factor(ExponentialDissipation(0.6), 1.0)
+  @test isapprox(dissipation_factor(SaffmanDissipation(), 1e-6), 1.0; atol = 1e-6)   # Gaussian cutoff → 1
+  @test dissipation_factor(SaffmanDissipation(), 2.0) < dissipation_factor(SaffmanDissipation(), 1.0)
+end
+
+
+# Physical self-consistency verification: check every model against the relations it MUST satisfy
+# (asymptotic slopes, factor limits, structure-function exponents) — catches wrong exponents /
+# coefficients / signs without a reference library. See the discussion in ARCHITECTURE §4.7.
+@testset "Physical self-consistency — spectrum slopes and exponents" begin
+  # very high Reynolds number ⇒ a wide inertial range (L/η ≈ 3×10⁴), so slopes are clean
+  hi = FlowParameters(viscosity = 1e-7, dissipation = 0.1, rms_velocity = 1.0,
+                      integral_scale = 1.0, scalar_dissipation = 0.05)
+  sl(g, x) = (log(g(x * 1.001)) - log(g(x / 1.001))) / (log(x * 1.001) - log(x / 1.001))
+
+  # every model spectrum has the Kolmogorov -5/3 inertial slope
+  for m in (Pope2000(), VonKarman1948(), Pao1965(), ObukhovCorrsin1949())
+    @test sl(κ -> spectrum(m, κ, hi), 100.0) ≈ -5 / 3 atol = 0.02
+  end
+  # the low-wavenumber slope is the energy-containing exponent σ
+  @test sl(κ -> spectrum(Pope2000(), κ, hi), 1e-4) ≈ 2.0 atol = 0.01     # Saffman-type σ = 2
+  @test sl(κ -> spectrum(VonKarman1948(), κ, hi), 1e-4) ≈ 4.0 atol = 0.01 # Batchelor-type σ = 4
+
+  # every roll-off factor tends to 1 in the inertial range
+  @test large_scale_factor(PopeLargeScale(6.78, 2.0), 1e8) ≈ 1.0 atol = 1e-4
+  @test large_scale_factor(VonKarmanLarge(1.0), 1e8) ≈ 1.0 atol = 1e-4
+  for d in (PopeDissipation(0.4, 5.2), PaoDissipation(1.5), ExponentialDissipation(0.6), SaffmanDissipation())
+    @test dissipation_factor(d, 1e-8) ≈ 1.0 atol = 1e-6
+  end
+
+  # every intermittency model is exact at ζ_3 = 1 and bends below the self-similar p/3 for p > 3
+  for m in (Kolmogorov1941(), Kolmogorov1962(), SheLeveque1994())
+    @test scaling_exponent(m, 3) ≈ 1.0
+    @test scaling_exponent(m, 6) ≤ 2.0 + 1e-9
+    @test scaling_exponent(m, 2) ≥ 2 / 3 - 1e-9
+  end
 end
 
 
