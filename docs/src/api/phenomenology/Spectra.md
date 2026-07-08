@@ -23,6 +23,8 @@ LargeScaleFactor
 DissipationFactor
 PopeLargeScale
 PopeDissipation
+VonKarmanLarge
+UnitDissipation
 ```
 
 The factor evaluators, extended by each roll-off form.
@@ -32,10 +34,20 @@ large_scale_factor
 dissipation_factor
 ```
 
-## Models
+## Velocity models
 
-The named model spectra — presets of the composed [`ModelSpectrum`](@ref).
+The named velocity-spectrum presets of the composed [`ModelSpectrum`](@ref).
 
 ```@docs
 Pope2000
+VonKarman1948
+```
+
+## Scalar spectra
+
+The passive-scalar spectrum models.
+
+```@docs
+ScalarSpectrum
+ObukhovCorrsin1949
 ```

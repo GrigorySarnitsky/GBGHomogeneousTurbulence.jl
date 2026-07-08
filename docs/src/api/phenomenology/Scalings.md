@@ -10,6 +10,7 @@ Order   = [:module]
 The dimensionless scaling constants and their Reynolds-number trends, evaluated by [`scaling`](@ref).
 
 ```@docs
-DissipationScaling
+ScalingLaw
 Sreenivasan1998
+Sreenivasan1995
 ```

@@ -1,24 +1,30 @@
 """
     Phenomenology.Spectra
 
-Model energy spectra — parametrizations of the reference velocity spectrum ``E(\\kappa)``, evaluated
-by [`spectrum`](@ref). A model is **composed**: an inertial-range core ``C_K\\varepsilon^{2/3}\\kappa^{-5/3}``
-times a large-scale roll-off and a dissipation-range roll-off, each swappable.
+Model spectra — parametrizations of the reference velocity spectrum ``E(\\kappa)`` and the scalar
+spectrum ``E_\\varphi(\\kappa)``, evaluated by [`spectrum`](@ref). A velocity model is **composed**: an
+inertial-range core ``C_K\\varepsilon^{2/3}\\kappa^{-5/3}`` times a large-scale roll-off and a
+dissipation-range roll-off, each swappable.
 
-- [`ModelSpectrum`](@ref) — the composed spectrum: a Kolmogorov constant, a [`LargeScaleFactor`](@ref),
-  and a [`DissipationFactor`](@ref).
-- [`LargeScaleFactor`](@ref) / [`DissipationFactor`](@ref) — the swappable roll-off pieces, evaluated
-  by [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref); [`PopeLargeScale`](@ref) and
-  [`PopeDissipation`](@ref) are Pope's forms.
-- [`Pope2000`](@ref) — the Pope (2000) model spectrum, a preset of [`ModelSpectrum`](@ref).
+- [`ModelSpectrum`](@ref) — the composed velocity spectrum: a Kolmogorov constant, a
+  [`LargeScaleFactor`](@ref), and a [`DissipationFactor`](@ref).
+- [`LargeScaleFactor`](@ref) / [`DissipationFactor`](@ref) — the swappable roll-off pieces, evaluated by
+  [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /
+  [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^4`` energy
+  range, and [`UnitDissipation`](@ref) is no cutoff.
+- [`Pope2000`](@ref) / [`VonKarman1948`](@ref) — named velocity-spectrum presets of
+  [`ModelSpectrum`](@ref).
+- [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
+  inertial-convective range.
 """
 module Spectra
 
 using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference, kolmogorov_length
 import ..Phenomenology: spectrum, provenance
 
-export EnergySpectrum, LargeScaleFactor, DissipationFactor, PopeLargeScale, PopeDissipation,
-       ModelSpectrum, large_scale_factor, dissipation_factor, Pope2000, spectrum
+export EnergySpectrum, ScalarSpectrum, LargeScaleFactor, DissipationFactor, PopeLargeScale,
+       PopeDissipation, VonKarmanLarge, UnitDissipation, ModelSpectrum, large_scale_factor,
+       dissipation_factor, Pope2000, VonKarman1948, ObukhovCorrsin1949, spectrum
 
 
 """
@@ -106,6 +112,32 @@ dissipation_factor(f::PopeDissipation, κη) = exp(-f.β * ((κη^4 + f.c_η^4)^
 
 
 """
+    VonKarmanLarge(c_L)
+
+The von Kármán large-scale roll-off
+``f_L(\\kappa L) = \\left(\\dfrac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6}``, which tends to `1`
+in the inertial range and produces the classic ``\\kappa^4`` energy-containing range at low wavenumber
+(``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^4``); `c_L` fixes the peak scale (von Kármán 1948).
+"""
+struct VonKarmanLarge <: LargeScaleFactor
+  c_L::Float64
+end
+
+large_scale_factor(f::VonKarmanLarge, κL) = (κL^2 / (κL^2 + f.c_L))^(17//6)
+
+
+"""
+    UnitDissipation()
+
+The trivial dissipation-range factor ``f_\\eta \\equiv 1`` — no viscous cutoff, for a spectrum defined
+only over the energy-containing and inertial ranges (the classic [`VonKarman1948`](@ref) form).
+"""
+struct UnitDissipation <: DissipationFactor end
+
+dissipation_factor(::UnitDissipation, κη) = one(κη)
+
+
+"""
     ModelSpectrum(C_K, large_scale, dissipation, ref)
 
 The composed model energy spectrum
@@ -154,6 +186,69 @@ and `β = 5.2`. Override any coefficient to re-fit. Evaluate with [`spectrum`](@
 """
 Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2) =
   ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β), _POPE2000)
+
+
+const _VONKARMAN2000 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530"; valid_Reλ = (0.0, Inf))
+
+"""
+    VonKarman1948(; C_K = 1.5, c_L = 1.0)
+
+The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) with the
+[`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
+
+```math
+E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}
+             \\left(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6},
+```
+
+the classic interpolation between the ``\\kappa^4`` energy-containing range and the ``\\kappa^{-5/3}``
+inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters). `C_K`
+is the Kolmogorov constant; `c_L` fixes the peak scale.
+"""
+VonKarman1948(; C_K = 1.5, c_L = 1.0) =
+  ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN2000)
+
+
+"""
+    ScalarSpectrum <: TurbulenceLaw
+
+Supertype of the passive-scalar spectrum models — parametrizations of ``E_\\varphi(\\kappa)``, the
+density in wavenumber of the scalar variance ``\\langle\\varphi^2\\rangle``, evaluated by
+[`spectrum`](@ref). [`ObukhovCorrsin1949`](@ref) is the inertial-convective range.
+"""
+abstract type ScalarSpectrum <: TurbulenceLaw end
+
+
+const _OBUKHOVCORRSIN = Reference("Obukhov (1949) / Corrsin (1951)"; valid_Reλ = (50.0, Inf))
+
+"""
+    ObukhovCorrsin1949(; C_OC = 0.67)
+
+The Obukhov–Corrsin inertial-convective scalar spectrum
+
+```math
+E_\\varphi(\\kappa) = C_{OC}\\,\\varepsilon_\\varphi\\,\\varepsilon^{-1/3}\\,\\kappa^{-5/3},
+```
+
+the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
+inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
+constant (``\\approx 0.67`` for the three-dimensional spectrum). [`spectrum`](@ref) reads the scalar
+dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
+kinetic-energy dissipation ``\\varepsilon`` from `fp`.
+"""
+struct ObukhovCorrsin1949 <: ScalarSpectrum
+  C_OC::Float64
+end
+
+ObukhovCorrsin1949(; C_OC = 0.67) = ObukhovCorrsin1949(C_OC)
+
+function spectrum(m::ObukhovCorrsin1949, κ, fp::FlowParameters)
+  isnan(fp.scalar_dissipation) && throw(ArgumentError(
+    "ObukhovCorrsin1949 needs the scalar dissipation rate — set `scalar_dissipation` in FlowParameters"))
+  return m.C_OC * fp.scalar_dissipation * fp.dissipation^(-1//3) * κ^(-5//3)
+end
+
+provenance(::ObukhovCorrsin1949) = _OBUKHOVCORRSIN
 
 
 end # module Spectra

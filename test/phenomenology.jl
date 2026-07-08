@@ -58,11 +58,43 @@ end
 end
 
 
-@testset "Scalings — Sreenivasan1998 dissipation constant" begin
-  @test Sreenivasan1998() isa DissipationScaling
+@testset "Scalings — dissipation constant and Kolmogorov constant" begin
+  @test Sreenivasan1998() isa ScalingLaw
   @test scaling(Sreenivasan1998(), FP) == 0.5                    # plateau, no finite-Re correction
   @test scaling(Sreenivasan1998(asymptote = 0.4), FP) == 0.4
   @test scaling(Sreenivasan1998(correction = 100.0), FP) ≈ 0.5 * (1 + 100.0 / taylor_reynolds(FP))
+  @test Sreenivasan1995() isa ScalingLaw
+  @test scaling(Sreenivasan1995(), FP) == 1.6                    # Kolmogorov constant, Re-independent
+  @test scaling(Sreenivasan1995(C_K = 1.5), FP) == 1.5
+end
+
+
+@testset "Spectra — VonKarman1948 and ObukhovCorrsin1949" begin
+  vk = VonKarman1948()
+  @test vk isa EnergySpectrum && vk isa ModelSpectrum
+  # von Kármán gives the κ⁴ energy-containing range at low κ: E/κ⁴ → const
+  @test spectrum(vk, 0.005, FP) / 0.005^4 ≈ spectrum(vk, 0.010, FP) / 0.010^4 rtol = 0.02
+  @test dissipation_factor(UnitDissipation(), 3.0) == 1.0                  # no viscous cutoff
+  @test large_scale_factor(VonKarmanLarge(1.0), 1e6) ≈ 1.0 atol = 1e-3     # f_L → 1 in the inertial range
+
+  fpφ = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
+                       integral_scale = 1.0, scalar_dissipation = 0.05)
+  oc = ObukhovCorrsin1949()
+  @test oc isa ScalarSpectrum
+  @test spectrum(oc, 10.0, fpφ) ≈ 0.67 * 0.05 * 0.1^(-1 / 3) * 10.0^(-5 / 3)
+  @test_throws ArgumentError spectrum(oc, 10.0, FP)                        # FP has no scalar dissipation
+end
+
+
+@testset "StructureFunctions — She–Lévêque intermittency exponents" begin
+  sl, k41 = SheLeveque1994(), Kolmogorov1941()
+  @test sl isa StructureFunction
+  @test scaling_exponent(sl, 3) ≈ 1.0                           # exact at p = 3 (the 4/5 law)
+  @test scaling_exponent(k41, 3) ≈ 1.0
+  @test scaling_exponent(k41, 2) ≈ 2 / 3                        # K41 self-similar ζ_p = p/3
+  @test scaling_exponent(sl, 2) ≈ 2 / 9 + 2 * (1 - (2 / 3)^(2 / 3))
+  @test scaling_exponent(sl, 6) < scaling_exponent(k41, 6)      # intermittency bends p > 3 down
+  @test provenance(sl).valid_Reλ == (200.0, Inf)
 end
 
 

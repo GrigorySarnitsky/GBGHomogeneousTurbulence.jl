@@ -38,6 +38,7 @@ The evaluators — one per representation, plus the fitting seam.
 provenance
 spectrum
 structure_function
+scaling_exponent
 scaling
 fit
 ```

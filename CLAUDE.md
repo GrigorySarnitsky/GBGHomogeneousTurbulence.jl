@@ -204,8 +204,10 @@ with no notation that drifts across the pair.
 - Load: `julia --project -e 'using GBGIsotropicTurbulence'`.
 - Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green.
 - Docs build: `julia --project=docs docs/make.jl` — `checkdocs = :exports` plus the two build lints
-  (`lint_inline_math`, `lint_notation_variants`) must be clean. After a build,
-  `git checkout docs/Project.toml` (CI does its own `Pkg.develop`).
+  (`lint_inline_math`, `lint_notation_variants`) must be clean. After a build, revert the transient
+  dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list `docs/Manifest.toml`,
+  which aborts the checkout and lets the dev entry slip into a commit (it broke the Docs CI once). CI
+  does its own `Pkg.develop`.
 - Consult `Project.toml` for dependencies and versions; do not assume.
 
 ## Working agreements

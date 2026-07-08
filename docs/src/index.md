@@ -56,7 +56,8 @@ de-aliased by the ``2/3`` rule.
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) — the default — and
     [`IFRK2`](@ref)), with the full forcing menu `NoForcing`, `BandRescaling`, `Linear`,
     `ConstantPower`, and the stochastic `StochasticOU` (Eswaran–Pope), and Lagrangian particle
-    tracking ([`Tracers`](@ref)). The Eulerian and Lagrangian statistics are being added.
+    tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
+    are scaffolded; the Eulerian and Lagrangian statistics are being added.
 
 ## Components
 
@@ -76,3 +77,6 @@ de-aliased by the ``2/3`` rule.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
   drives it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
   stationarity).
+- [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
+  laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
+  the umbrella), designed to be extractable into a standalone package.

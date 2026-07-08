@@ -28,10 +28,10 @@ and a trailing letter (a same-year collision).
   is the (future) seam for fitting a parametrization to measured data.
 
 **The law families, one submodule per representation:**
-- [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra) — model energy spectra, functions of wavenumber, evaluated
-  by [`spectrum`](@ref).
-- [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions) — the inertial-range laws, functions
-  of separation, evaluated by [`structure_function`](@ref).
+- [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra) — model velocity and scalar spectra, functions of
+  wavenumber, evaluated by [`spectrum`](@ref).
+- [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions) — the inertial-range laws and their
+  intermittency exponents, evaluated by [`structure_function`](@ref) and [`scaling_exponent`](@ref).
 - [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) — the dimensionless constants and their Reynolds-number
   trends, evaluated by [`scaling`](@ref).
 
@@ -45,8 +45,8 @@ module Phenomenology
 
 
 export TurbulenceLaw, FlowParameters, Reference, provenance, spectrum, structure_function,
-       scaling, fit, kolmogorov_length, kolmogorov_time, taylor_microscale, taylor_reynolds,
-       scalar_diffusivity
+       scaling_exponent, scaling, fit, kolmogorov_length, kolmogorov_time, taylor_microscale,
+       taylor_reynolds, scalar_diffusivity
 
 
 """
@@ -174,12 +174,24 @@ function provenance end
 """
     spectrum(law, κ, fp) -> Float64
 
-The reference energy spectrum ``E(\\kappa)`` predicted by a model `law` (an
-[`EnergySpectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.EnergySpectrum)) at wavenumber `κ` for the state `fp` (a
-[`FlowParameters`](@ref)) — the density in wavenumber of the turbulent kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,d\\kappa``.
-Its home and the composed form are in [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
+The reference spectrum predicted by a model `law` at wavenumber `κ` for the state `fp` (a
+[`FlowParameters`](@ref)) — the velocity energy spectrum ``E(\\kappa)`` for an `EnergySpectrum` (the
+density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,d\\kappa``), or the scalar
+spectrum ``E_\\varphi(\\kappa)`` for a `ScalarSpectrum`. Its home and the composed form are in
+[`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
 """
 function spectrum end
+
+
+"""
+    scaling_exponent(law, order) -> Float64
+
+The inertial-range scaling exponent ``\\zeta_p`` of the order-``p`` longitudinal velocity structure
+function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, predicted by a `law` (a `StructureFunction`) — the
+self-similar ``\\zeta_p = p/3`` of K41, or the anomalous exponent of an intermittency model. Its home is
+[`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+"""
+function scaling_exponent end
 
 
 """
@@ -197,10 +209,10 @@ function structure_function end
 """
     scaling(law, fp) -> Float64
 
-The reference dimensionless constant predicted by a scaling `law` (a
-[`DissipationScaling`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings.DissipationScaling)) for the state `fp` (a
-[`FlowParameters`](@ref)) — a single number or its Reynolds-number trend (e.g. the normalized
-dissipation ``C_\\varepsilon``). Its home is [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings).
+The reference dimensionless constant predicted by a scaling `law` (a `ScalingLaw`) for the state `fp`
+(a [`FlowParameters`](@ref)) — a single number or its Reynolds-number trend (e.g. the normalized
+dissipation ``C_\\varepsilon`` or the Kolmogorov constant ``C_K``). Its home is
+[`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings).
 """
 function scaling end
 

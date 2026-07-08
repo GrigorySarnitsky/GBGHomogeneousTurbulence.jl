@@ -12,4 +12,5 @@ The inertial-range structure-function laws, evaluated by [`structure_function`](
 ```@docs
 StructureFunction
 Kolmogorov1941
+SheLeveque1994
 ```

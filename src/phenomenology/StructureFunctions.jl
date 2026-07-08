@@ -4,14 +4,17 @@
 Inertial-range structure-function laws — parametrizations of the longitudinal velocity structure
 function ``D_{L\\dots}(r)``, evaluated by [`structure_function`](@ref).
 
-- [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law and the 2/3 law.
+- [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
+  self-similar exponents (via [`scaling_exponent`](@ref)).
+- [`SheLeveque1994`](@ref) — the She–Lévêque intermittency model: the anomalous scaling exponents
+  ``\\zeta_p`` (via [`scaling_exponent`](@ref)).
 """
 module StructureFunctions
 
 using ..Phenomenology: TurbulenceLaw, FlowParameters, Reference
-import ..Phenomenology: structure_function, provenance
+import ..Phenomenology: structure_function, scaling_exponent, provenance
 
-export StructureFunction, Kolmogorov1941, structure_function
+export StructureFunction, Kolmogorov1941, SheLeveque1994, structure_function, scaling_exponent
 
 
 """
@@ -57,6 +60,32 @@ function structure_function(m::Kolmogorov1941, r, fp::FlowParameters; order::Int
 end
 
 provenance(::Kolmogorov1941) = _K41
+
+scaling_exponent(::Kolmogorov1941, order::Real) = order / 3    # self-similar K41 exponent ζ_p = p/3
+
+
+const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**, 336"; valid_Reλ = (200.0, Inf))
+
+"""
+    SheLeveque1994()
+
+The She–Lévêque (1994) intermittency model for the inertial-range scaling exponents. Its
+[`scaling_exponent`](@ref)`(law, p)` gives the anomalous exponent
+
+```math
+\\zeta_p = \\frac{p}{9} + 2\\left[1 - \\left(\\tfrac{2}{3}\\right)^{p/3}\\right]
+```
+
+of the ``p``-th-order longitudinal structure function ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``. It is
+parameter-free, exact at ``\\zeta_3 = 1`` (the 4/5 law), and bends below the self-similar ``p/3`` for
+``p > 3`` — the signature of small-scale intermittency. It predicts exponents, not amplitudes, so it
+implements [`scaling_exponent`](@ref) but not [`structure_function`](@ref).
+"""
+struct SheLeveque1994 <: StructureFunction end
+
+scaling_exponent(::SheLeveque1994, order::Real) = order / 9 + 2 * (1 - (2 / 3)^(order / 3))
+
+provenance(::SheLeveque1994) = _SHELEVEQUE
 
 
 end # module StructureFunctions
