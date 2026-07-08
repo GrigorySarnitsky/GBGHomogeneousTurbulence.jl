@@ -5,6 +5,7 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
 using Random
 using Test
@@ -59,6 +60,21 @@ using Test
 
     @test Simulation(resolution = 32, k_max_η = 3; rng = MersenneTwister(3)).physics.viscosity > ν
     @test Simulation(resolution = 32, viscosity = 0.01, k_max_η = 5).physics.viscosity == 0.01
+  end
+
+  @testset "initial condition from a spectrum" begin
+    sim = Simulation(resolution = 48, viscosity = 0.01,
+                     initial_spectrum = VonKarman1948(), rng = MersenneTwister(4))
+    κ, E = energy_spectrum(sim)
+    @test all(≥(0), E)
+    @test isapprox(sum(E), kinetic_energy(sim); rtol = 1e-5)   # shape normalized to `energy`
+    @test κ[argmax(E)] < κ[end] / 2                            # energy concentrated at large scales
+
+    # a raw κ -> E(κ) function is also accepted
+    sim2 = Simulation(resolution = 32, viscosity = 0.02,
+                      initial_spectrum = κ -> κ^4 * exp(-κ), rng = MersenneTwister(4))
+    @test kinetic_energy(sim2) > 0
+    @test isapprox(sum(last(energy_spectrum(sim2))), kinetic_energy(sim2); rtol = 1e-5)
   end
 
   @testset "callback fires every step without `every`" begin

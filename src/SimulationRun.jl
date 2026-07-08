@@ -93,6 +93,9 @@ and the viscosity is chosen from the grid rather than supplied:
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
   scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
   initial condition.
+- `initial_spectrum = nothing` — a `Phenomenology` `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
+  initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
+  run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `energy`.
 - `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, ops)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
@@ -128,13 +131,14 @@ function Simulation(ops::SpectralOperators;
                     integrator::AbstractIntegrator = default_integrator(),
                     cfl::Real = recommended_cfl(integrator, ops),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
-                    peak_wavenumber::Real = 2.0,
+                    peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     ntracers::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
-  # Grid mode (no explicit `viscosity`): choose the highest Re the grid resolves — ε from the
-  # box-normalized dissipation law (`Li2008`), then ν so that κ_max·η = `k_max_η`.
-  if isnothing(viscosity)
-    ε = stationary_dissipation(Li2008(), energy, ops.grid.domain_size[1])
+  # The stationary dissipation the box sustains (`Li2008`) — a modelled estimate, not a measurement.
+  # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
+  box = ops.grid.domain_size[1]
+  ε = stationary_dissipation(Li2008(), energy, box)
+  if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
     ν = ε^(1//3) * (k_max_η / max_wavenumber(ops))^(4//3)
     reλ = (2 * energy / 3) * sqrt(15 / (ε * ν))
     @info "Simulation: grid-resolved at κ_max·η = $(k_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
@@ -148,7 +152,15 @@ function Simulation(ops::SpectralOperators;
                     scalar_forcing = _resolve_forcing(scalar_forcing, ops))
 
   û = spectral_vector(ops)
-  random_solenoidal_velocity!(û, ops; energy, peak_wavenumber, rng)
+  ic_spectrum = nothing
+  if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
+    fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * energy / 3),
+                        integral_scale = inv(peak_wavenumber), schmidt)
+    ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
+  elseif !isnothing(initial_spectrum)
+    ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
+  end
+  random_solenoidal_velocity!(û, ops; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
   φ̂ = scalar_spectral(ops)
   scalar && random_scalar!(φ̂, ops; variance = scalar_variance, peak_wavenumber, rng)
 

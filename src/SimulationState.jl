@@ -314,29 +314,42 @@ dealias!(field, ops::SpectralOperators) = convolve!(field, field, ops.dealias)
 
 """
     random_solenoidal_velocity!(û, ops; energy = 0.5, peak_wavenumber = 2.0,
-                                rng = default_rng())
+                                spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
-``\\boldsymbol{u}`` concentrated at large scales by the envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`),
-de-aliased, and rescaled so the kinetic energy
+``\\boldsymbol{u}`` of a chosen energy spectrum, de-aliased and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
+
+By default (`spectrum = nothing`) the velocity is concentrated at large scales by the Gaussian envelope
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`).
+Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
+seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
+spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
+shell's mode count) and the overall amplitude is fixed by the `energy` rescaling. The run layer bridges
+a `Phenomenology` model spectrum into this function.
 
 `ops` is the [`SpectralOperators`](@ref) supplying the grid, backend, wavenumber multipliers, and
 de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, ops::SpectralOperators;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
-                                     rng = Random.default_rng())
+                                     spectrum = nothing, rng = Random.default_rng())
   T = _real_type(ops)
   noise = physical_vector(ops)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(ops.grid, Val(1))...))
   to_spectral!(û, noise, ops.velocity_plans)
 
-  inverse_peak_squared = one(T) / T(peak_wavenumber)^2
   envelope = scalar_spectral(ops)
-  field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
+  if isnothing(spectrum)
+    inverse_peak_squared = one(T) / T(peak_wavenumber)^2
+    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* ops.squared_wavenumber))
+  else
+    # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
+    # spectrum ∝ κ²·(√E/κ)² = E(κ) (the κ² is the shell's mode count); the DC mode stays at 0.
+    shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
+    field_data(envelope) .= complex.(shape.(ops.squared_wavenumber))
+  end
   convolve!(û, û, envelope)
 
   helmholtz_projection!(û, û, ops.multipliers)
