@@ -91,7 +91,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   end
 
   @testset "advect in a real HIT velocity field" begin
-    buffers = FieldBuffers(domain)
+    buffers = FieldBuffers(domain; scalar = true)
     physics = Physics(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
     û = spectral_vector(domain)

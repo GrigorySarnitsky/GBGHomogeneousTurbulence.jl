@@ -16,7 +16,7 @@ using Test
   ν = 5.0e-2
 
   domain = SimulationDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain)
+  buffers = FieldBuffers(domain; scalar = true)
   physics = Physics(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; energy = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()

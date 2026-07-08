@@ -16,7 +16,7 @@ using Test
   L = 2π
   ν = 0.05
   domain = SimulationDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain)
+  buffers = FieldBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))

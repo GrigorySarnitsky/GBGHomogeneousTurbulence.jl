@@ -259,7 +259,7 @@ end
 
 
 """
-    FieldBuffers(domain; scalar = true)
+    FieldBuffers(domain; scalar = false)
 
 Preallocated scratch for one integrating-factor step, sized so a step allocates no field-sized memory.
 The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers (buffers holding a
@@ -304,7 +304,7 @@ ScalarBuffers(domain::SimulationDomain) = ScalarBuffers(
   _forcing_rate(domain),
 )
 
-function FieldBuffers(domain::SimulationDomain; scalar::Bool = true)
+function FieldBuffers(domain::SimulationDomain; scalar::Bool = false)
   return FieldBuffers(
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),

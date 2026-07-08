@@ -33,7 +33,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = SimulationDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain)
+  buffers = FieldBuffers(domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7

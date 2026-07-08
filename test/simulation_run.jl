@@ -176,7 +176,7 @@ using Test
 
   @testset "derivative skewness" begin
     domain = SimulationDomain(24, 2π; scalar_type = Float64)
-    buffers = FieldBuffers(domain)
+    buffers = FieldBuffers(domain; scalar = true)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)

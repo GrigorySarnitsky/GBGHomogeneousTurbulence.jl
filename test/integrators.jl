@@ -31,7 +31,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = SimulationDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain)
+  buffers = FieldBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
