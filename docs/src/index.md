@@ -54,8 +54,8 @@ de-aliased by the ``2/3`` rule.
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) — the default — and
-    [`IFRK2`](@ref)), with the full forcing menu `NoForcing`, `BandRescaling`, `Linear`,
-    `ConstantPower`, and the stochastic `StochasticOU` (Eswaran–Pope), and Lagrangian particle
+    [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `BandRescaling`, `Linear`, and
+    `ConstantPower`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     are scaffolded; the Eulerian and Lagrangian statistics are being added.
 

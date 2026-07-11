@@ -210,9 +210,8 @@ protocol whose four methods all default to doing nothing:
 - `prepare_forcing!` — advance internal state once per step (a stochastic process).
 - `forcing_source!` — add an additive source at each Runge–Kutta stage.
 
-`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), `Linear` and `ConstantPower`
-(negative-damping, folded into ``\mathcal E``), and `StochasticOU` (the Eswaran–Pope
-Ornstein–Uhlenbeck forcing) are provided. **One implementation serves both** the velocity (a vector
+`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), and `Linear` and `ConstantPower`
+(negative-damping, folded into ``\mathcal E``) are provided (a stochastic Eswaran–Pope OU forcing is archived, §7). **One implementation serves both** the velocity (a vector
 field) and ``\varphi`` (a scalar), because the hooks are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
 alone. Each forcing has an operator-taking constructor and an operator-free keyword form
@@ -418,6 +417,10 @@ These are **named so they are not precluded, and deliberately left un-abstracted
 point or generalisation is built for them until a second concrete case forces the abstraction. None
 is a gap.
 
+- **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
+  added to the RHS. *Built and validated, then archived* from the public surface (un-exported,
+  undocumented) to be re-added; its host-side random increment is the one allocation-free exception
+  (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
 - **Inertial and oriented particles** — ``(\boldsymbol x,\boldsymbol v)`` with matrix drag, then
   ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.5, §8).
@@ -477,8 +480,7 @@ missing one usually encodes a decision.
 3. **No privileged precision or backend.** ``T`` and the array type flow from the field; both
    precisions and CPU/GPU are first-class (§6).
 4. **Allocation-free stepping.** A time step allocates no field-sized memory over the preallocated
-   `FieldBuffers` — load-bearing for GPU hot loops. (The one documented exception is `StochasticOU`
-   forcing, whose random increment is drawn host-side each step — portability-first, not yet tuned.)
+   `FieldBuffers` — load-bearing for GPU hot loops.
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU
    scope (inherited from `GBGPeriodicFields`).
 6. **No baked-in physical model, closure, or universality assumption.** The tool investigates these;

@@ -82,8 +82,6 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `forcing_rate!` |
 | ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(power=…)` |
-| ``T_L`` | forcing correlation time (Ornstein–Uhlenbeck) | `StochasticOU(correlation_time=…)` |
-| ``\sigma^2`` | stationary forcing variance ``\langle\lvert\boldsymbol f\rvert^2\rangle`` | `StochasticOU(variance=…)` |
 
 ## Lens symbols
 

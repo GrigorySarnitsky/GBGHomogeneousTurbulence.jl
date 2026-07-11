@@ -4,6 +4,7 @@
 # it; and the bring-your-own-domain constructor and fixed-`dt` `advance!` work.
 
 using GBGIsotropicTurbulence
+using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data

@@ -5,6 +5,7 @@
 # divergence-free (the linear rate, folded into E_ν, preserves solenoidality).
 
 using GBGIsotropicTurbulence
+using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
 using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner
 using Random
 using Test

@@ -25,7 +25,7 @@ Every step hook takes the operator bundle `domain` (a [`SimulationDomain`](@ref)
 `domain`-taking forcing constructors, which build their band kernels from it; `forcing_rate!`,
 `prepare_forcing!`, and `forcing_source!` additionally take the preallocated scratch `buffers` (a
 [`FieldBuffers`](@ref GBGIsotropicTurbulence.SimulationState.FieldBuffers)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
-`BandRescaling`, `Linear`, `ConstantPower`, and the stochastic `StochasticOU` are provided; one
+`BandRescaling`, `Linear`, and `ConstantPower` are provided; one
 implementation serves both the velocity and the scalar, and the two are forced **independently** —
 `Physics` takes a separate `velocity_forcing` and `scalar_forcing` (each an `AbstractForcing`, each
 defaulting to `NoForcing()`), so a run can force the velocity while the scalar decays freely, force
@@ -39,7 +39,7 @@ using GBGPeriodicFields
 using Random
 using ..SimulationState: SimulationDomain, scalar_spectral, spectral_vector
 
-export AbstractForcing, ForcingSpec, NoForcing, BandRescaling, Linear, ConstantPower, StochasticOU,
+export AbstractForcing, ForcingSpec, NoForcing, BandRescaling, Linear, ConstantPower,
        forcing_rate!, apply_forcing!, prepare_forcing!, forcing_source!
 
 
@@ -57,8 +57,8 @@ abstract type AbstractForcing end
 """
     ForcingSpec
 
-A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`,
-`BandRescaling(; energy)`, and `StochasticOU(; variance, correlation_time)` — return a `ForcingSpec`
+A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`, and
+`BandRescaling(; energy)` — return a `ForcingSpec`
 capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
 `SimulationDomain` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `ForcingSpec`.
@@ -97,8 +97,7 @@ apply_forcing!(::AbstractForcing, field, domain::SimulationDomain, scratch) = fi
     prepare_forcing!(forcing, field, domain, buffers, dt) -> nothing
 
 Update a forcing's internal state once per step, before the Runge–Kutta stages, from the
-start-of-step `field` (in spectral representation) and the timestep `dt`. The default does nothing;
-the stochastic forcing advances its Ornstein–Uhlenbeck process here (see `StochasticOU`).
+start-of-step `field` (in spectral representation) and the timestep `dt`. The default does nothing.
 """
 prepare_forcing!(::AbstractForcing, field, domain::SimulationDomain, buffers, dt::Real) = nothing
 
@@ -108,7 +107,7 @@ prepare_forcing!(::AbstractForcing, field, domain::SimulationDomain, buffers, dt
 
 Add an additive forcing source to the de-aliased nonlinear-term buffer `nonlinear` at each Runge–Kutta
 stage (the source is held fixed over the step, so it integrates at the scheme's order). The default
-does nothing; see `StochasticOU`.
+does nothing.
 """
 forcing_source!(::AbstractForcing, nonlinear, domain::SimulationDomain, buffers) = nonlinear
 

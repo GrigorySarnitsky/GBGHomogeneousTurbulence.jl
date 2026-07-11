@@ -8,7 +8,7 @@ Order   = [:module]
 ## Forcing strategies
 
 The forcing supertype and its concrete strategies: the unforced baseline, deterministic band rescaling,
-the two linear-rate forcings, and the stochastic Ornstein–Uhlenbeck injection. One implementation serves
+and the two linear-rate forcings. One implementation serves
 either the velocity or the scalar.
 
 ```@docs
@@ -17,7 +17,6 @@ NoForcing
 BandRescaling
 Linear
 ConstantPower
-StochasticOU
 ```
 
 ## Deferred forcing spec
