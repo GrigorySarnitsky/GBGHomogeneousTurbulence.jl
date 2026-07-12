@@ -75,7 +75,8 @@ using .State:
   random_scalar!
 
 using .Generator:
-  velocity_vorticity!,
+  velocity_to_physical!,
+  vorticity_to_physical!,
   velocity_nonlinear!,
   integrating_factor!,
   scalar_to_physical!,
@@ -94,7 +95,7 @@ using .Observables:
 
 using .Forcing:
   AbstractForcing,
-  ForcingSpec,
+  DeferredForcing,
   NoForcing,
   BandRescaling,
   Linear,
@@ -148,7 +149,8 @@ export FixedDomain,
        TwoThirds,
        HouLi,
        max_wavenumber,
-       velocity_vorticity!,
+       velocity_to_physical!,
+       vorticity_to_physical!,
        velocity_nonlinear!,
        integrating_factor!,
        scalar_to_physical!,
@@ -162,7 +164,7 @@ export FixedDomain,
        energy_spectrum,
        integral_scale,
        AbstractForcing,
-       ForcingSpec,
+       DeferredForcing,
        NoForcing,
        BandRescaling,
        Linear,

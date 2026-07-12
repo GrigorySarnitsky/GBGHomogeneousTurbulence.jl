@@ -16,7 +16,8 @@ function integrate_fixed(integrator, domain, buffers, û0, conditions, dt, nstep
   copyto!(field_data(û), field_data(û0))
   φ̂ = scalar_spectral(domain)
   for _ in 1:nsteps
-    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    velocity_to_physical!(buffers.velocity, û, domain, buffers)
+    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
   return û
@@ -70,7 +71,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     cfl = recommended_cfl(integrator)
     energies = T[]
     for _ in 1:200
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
       dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
       push!(energies, kinetic_energy(buffers.velocity))
       step!(integrator, û, φ̂, domain, buffers, conditions, dt)
@@ -80,7 +82,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
 
-    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    velocity_to_physical!(buffers.velocity, û, domain, buffers)
+    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
     dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)                       # warm up
     bytes = @allocated step!(integrator, û, φ̂, domain, buffers, conditions, dt)

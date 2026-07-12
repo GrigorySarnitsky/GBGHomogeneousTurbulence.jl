@@ -30,7 +30,7 @@ implementation serves both the velocity and the scalar, and the two are forced *
 `FlowConditions` takes a separate `velocity_forcing` and `scalar_forcing` (each an `AbstractForcing`, each
 defaulting to `NoForcing()`), so a run can force the velocity while the scalar decays freely, force
 both (with the same or different strategies), or leave either unforced. An operator-free keyword
-constructor returns a [`ForcingSpec`](@ref), a deferred forcing that `Simulation` materialises once
+constructor returns a [`DeferredForcing`](@ref), a deferred forcing that `Simulation` materialises once
 the domain exists.
 """
 module Forcing
@@ -39,7 +39,7 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, scalar_spectral, spectral_vector
 
-export AbstractForcing, ForcingSpec, NoForcing, BandRescaling, Linear, ConstantPower,
+export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,
        set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 
@@ -55,19 +55,19 @@ abstract type AbstractForcing end
 
 
 """
-    ForcingSpec
+    DeferredForcing
 
 A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`, and
-`BandRescaling(; energy)` — return a `ForcingSpec`
+`BandRescaling(; energy)` — return a `DeferredForcing`
 capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
 `FixedDomain` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
-ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `ForcingSpec`.
+ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
 """
-struct ForcingSpec{F}
+struct DeferredForcing{F}
   build::F
 end
 
-(spec::ForcingSpec)(domain::FixedDomain) = spec.build(domain)
+(deferred::DeferredForcing)(domain::FixedDomain) = deferred.build(domain)
 
 
 """
@@ -302,20 +302,20 @@ add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain, buffers) =
 
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
-# domain exists (via `ForcingSpec`), so a case can name its forcing before the grid is built —
+# domain exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
 # `ConstantPower(power = 0.1)` — with `Simulation` supplying the domain.
 Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  ForcingSpec(domain -> Linear(domain; rate, lowest_shell, highest_shell))
+  DeferredForcing(domain -> Linear(domain; rate, lowest_shell, highest_shell))
 
 ConstantPower(; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  ForcingSpec(domain -> ConstantPower(domain; power, lowest_shell, highest_shell))
+  DeferredForcing(domain -> ConstantPower(domain; power, lowest_shell, highest_shell))
 
 BandRescaling(; energy::Real, target::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  ForcingSpec(domain -> BandRescaling(domain; energy, target, lowest_shell, highest_shell))
+  DeferredForcing(domain -> BandRescaling(domain; energy, target, lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
-  ForcingSpec(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
+  DeferredForcing(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
 
 
 end # module Forcing

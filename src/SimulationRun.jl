@@ -26,7 +26,7 @@ using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: FieldBuffers, random_solenoidal_velocity!, random_scalar!
-using ..Generator: velocity_vorticity!
+using ..Generator: velocity_to_physical!, vorticity_to_physical!
 using ..Observables: max_speed, derivative_skewness
 import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
@@ -87,7 +87,7 @@ and the viscosity is chosen from the grid rather than supplied:
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, or `HouLi` smooth); it
   sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
-- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `ForcingSpec` from an
+- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `DeferredForcing` from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total energy
   at `energy`, `scalar_forcing` to `NoForcing()`. The velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
@@ -182,8 +182,8 @@ end
 # Recompute the cached physical velocity and vorticity from the current û — the start-of-step fields
 # the next `step!` reads and the diagnostics use. Preserves û (the allocating-style transform copies).
 _refresh_cached_fields!(sim::Simulation) =
-  (velocity_vorticity!(sim.buffers.velocity, sim.buffers.vorticity_start,
-                       sim.velocity, sim.domain, sim.buffers); sim)
+  (velocity_to_physical!(sim.buffers.velocity, sim.velocity, sim.domain, sim.buffers);
+   vorticity_to_physical!(sim.buffers.vorticity_start, sim.velocity, sim.domain, sim.buffers); sim)
 
 
 # Observables on a `Simulation`'s current (cached) state — extend the `Observables` generics, so

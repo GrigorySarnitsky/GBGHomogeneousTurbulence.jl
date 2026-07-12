@@ -111,7 +111,7 @@ using Test
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(power = 0.1), Linear(rate = 0.5),
                  BandRescaling(energy = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
-      @test spec isa ForcingSpec
+      @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
@@ -188,7 +188,8 @@ using Test
     φ̂ = scalar_spectral(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
     for _ in 1:80
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, 0.012)
     end
     S = derivative_skewness(û, domain)

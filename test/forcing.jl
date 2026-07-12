@@ -27,7 +27,8 @@ using Test
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
     φ̂ = scalar_spectral(domain)
     for _ in 1:nsteps
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end
     û
@@ -81,7 +82,8 @@ using Test
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2))
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     for _ in 1:40
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û_zero, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û_zero, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û_zero, domain, buffers)
       step!(IFLowStorageRK3(), û_zero, φ̂, domain, buffers, conditions, 0.01)
     end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
@@ -121,7 +123,8 @@ using Test
     dealias!(û, domain)
     φ̂ = scalar_spectral(domain)
     for n in 1:200
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
       dt = 0.4 * (L / N) / max(max_speed(buffers.velocity), 1e-6)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end

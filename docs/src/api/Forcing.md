@@ -25,7 +25,7 @@ The operator-free deferred form a strategy's constructor returns, materialised i
 once the domain exists.
 
 ```@docs
-ForcingSpec
+DeferredForcing
 ```
 
 ## Forcing hooks

@@ -145,20 +145,28 @@ end
 
 
 """
-    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 2.0, rng = default_rng())
+    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 2.0,
+                   spectrum = nothing, rng = default_rng())
 
-Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar
-concentrated at large scales by the envelope ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)``
-(``k_p`` is `peak_wavenumber`), de-aliased, and rescaled so the variance
-``\\langle\\varphi^{2}\\rangle`` equals `variance`. The physical noise is made mean-zero before the
-transform, so the ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
+Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
+chosen spectrum, de-aliased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
+`variance`. The physical noise is made mean-zero before the transform, so the
+``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
+
+By default (`spectrum = nothing`) the scalar is concentrated at large scales by the Gaussian envelope
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`).
+Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
+scalar-variance spectrum, to seed that shape instead: each mode is scaled by
+``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed
+spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `variance` rescaling —
+e.g. an Obukhov–Corrsin form from `Phenomenology`.
 
 `domain` is the [`FixedDomain`](@ref) supplying the grid, backend, wavenumber multipliers, and
 de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, domain::FixedDomain;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,
-                        rng = Random.default_rng())
+                        spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = scalar_physical(domain)
   data = randn(rng, T, physical_field_shape(domain.grid, Val(0))...)
@@ -166,9 +174,15 @@ function random_scalar!(φ̂, domain::FixedDomain;
   copyto!(field_data(noise), data)
   to_spectral!(φ̂, noise, domain.scalar_plans)
 
-  inverse_peak_squared = one(T) / T(peak_wavenumber)^2
   envelope = scalar_spectral(domain)
-  field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
+  if isnothing(spectrum)
+    inverse_peak_squared = one(T) / T(peak_wavenumber)^2
+    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
+  else
+    # Match a target radial scalar spectrum E_φ(κ): amplitude √(E_φ(κ))/κ ⇒ shell sum ∝ E_φ(κ).
+    shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
+    field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
+  end
   convolve!(φ̂, φ̂, envelope)
   convolve!(φ̂, φ̂, domain.dealias)
 

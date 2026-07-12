@@ -17,8 +17,9 @@ integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *
 dynamics* — it advances the flow state; `Observables` are the functions of that state, and
 `Propagator` the numerical propagator.
 
-The module has five operations — [`velocity_vorticity!`](@ref) recovers the physical velocity and
-vorticity, and [`scalar_to_physical!`](@ref) the physical scalar, from their spectral representations;
+The module has six operations — [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)
+recover the physical velocity and vorticity, and [`scalar_to_physical!`](@ref) the physical scalar, from
+their spectral representations;
 [`velocity_nonlinear!`](@ref) and [`scalar_nonlinear!`](@ref) assemble the de-aliased momentum and
 scalar nonlinear terms; and [`integrating_factor!`](@ref) builds the exact viscous/diffusive spectral
 multiplier.
@@ -35,7 +36,7 @@ using ..SimulationDomain: FixedDomain
 using ..State: FieldBuffers
 using ..Forcing: AbstractForcing, NoForcing
 
-export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
+export velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
        scalar_to_physical!, scalar_nonlinear!, FlowConditions
 
 
@@ -60,21 +61,31 @@ FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scala
 
 
 """
-    velocity_vorticity!(u, ω, û, domain, buffers)
+    velocity_to_physical!(u, û, domain, buffers)
 
-Compute the physical velocity ``\\boldsymbol{u}`` and vorticity
-``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` of the velocity field `û` (given in spectral
-representation ``\\hat{\\boldsymbol{u}}``) into the buffers `u` and `ω`.
-
-`û` is preserved: the vorticity is transformed first, then a *copy* of `û` is transformed — the
-in-place inverse transform consumes its spectral source.
+Compute the physical velocity ``\\boldsymbol{u}`` from the velocity field `û` (given in spectral
+representation ``\\hat{\\boldsymbol{u}}``) into the buffer `u`, preserving `û` — a copy is transformed,
+since the in-place inverse transform consumes its source.
 """
-function velocity_vorticity!(u, ω, û, domain::FixedDomain, buffers::FieldBuffers)
-  curl!(buffers.vorticity_spectral, û, domain.multipliers)
-  to_physical!(ω, buffers.vorticity_spectral, domain.velocity_plans)
+function velocity_to_physical!(u, û, domain::FixedDomain, buffers::FieldBuffers)
   copyto!(field_data(buffers.velocity_copy), field_data(û))
   to_physical!(u, buffers.velocity_copy, domain.velocity_plans)
-  return u, ω
+  return u
+end
+
+
+"""
+    vorticity_to_physical!(ω, û, domain, buffers)
+
+Compute the physical vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` from the
+velocity field `û` (given in spectral representation ``\\hat{\\boldsymbol{u}}``) into the buffer `ω` —
+the spectral vorticity ``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in
+scratch and transformed, leaving `û` untouched.
+"""
+function vorticity_to_physical!(ω, û, domain::FixedDomain, buffers::FieldBuffers)
+  curl!(buffers.vorticity_spectral, û, domain.multipliers)
+  to_physical!(ω, buffers.vorticity_spectral, domain.velocity_plans)
+  return ω
 end
 
 

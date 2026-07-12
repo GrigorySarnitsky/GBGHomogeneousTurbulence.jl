@@ -77,7 +77,7 @@ never a wall in front of it.
 
 > **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example
 > above runs as written — a forcing can be named operator-free (`ConstantPower(power = 0.1)`, a
-> `ForcingSpec`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
+> `DeferredForcing`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
 > the package's primary quality target, but it is no longer a sketch.
 
 ---
@@ -211,7 +211,7 @@ the equation becomes
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
 
-- **The reversible term.** `velocity_vorticity!` recovers the physical velocity and vorticity from
+- **The reversible term.** `velocity_to_physical!` and `vorticity_to_physical!` recover the physical velocity and vorticity from
   ``\hat{\boldsymbol u}``; `velocity_nonlinear!` then assembles
   ``\mathbb P\,(\boldsymbol u\times\boldsymbol\omega)``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
@@ -286,7 +286,7 @@ Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
 alone. Each forcing has an operator-taking constructor and an operator-free keyword form
-(`ConstantPower(power = 0.1)`, a `ForcingSpec`) materialised when `Simulation` builds the frame, so a case
+(`ConstantPower(power = 0.1)`, a `DeferredForcing`) materialised when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
 ### 4.5 `Propagator` — the map that advances the state in time
@@ -785,6 +785,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the deferred **`ShearedDomain`** (the Rogallo moving frame, §7) varies — fixed versus sheared, separable
     versus time-dependent — so the two type names read as one family. `FlowConditions` needs no such care: a
     type, not a module, it cannot collide.
+25. **(2026-07) Design-review batch: the recovery split, `ForcingSpec` → `DeferredForcing`, a scalar
+    spectrum IC, and precision-aware Hou–Li damping.** Four refinements settled on a reading of the API.
+    (a) The fused `velocity_vorticity!` is split into the sibling recoveries **`velocity_to_physical!`**
+    and **`vorticity_to_physical!`**: its two halves share no intermediate — curl-then-transform for the
+    vorticity, copy-then-transform for the velocity, over separate buffers — so the split carries no
+    compute or memory penalty and reads as one convention with `scalar_to_physical!` (`X_to_physical!`
+    produces the physical `X`, its source shown in the signature). (b) **`ForcingSpec` is renamed
+    `DeferredForcing`**, naming the object by its meaning — a forcing specified before the domain exists
+    and materialised once it does — rather than the `spec` abbreviation (superseding the name minted in
+    decision 14). (c) **`random_scalar!` gains a `spectrum` keyword** mirroring
+    `random_solenoidal_velocity!`, seeding the scalar from a target radial scalar-variance spectrum (an
+    Obukhov–Corrsin form from `Phenomenology`) for spectrum-matched initial conditions and faster
+    warm-up. (d) **`HouLi`'s `strength` defaults to `nothing`, meaning auto**: resolved at kernel-build
+    time to ``-\log`` of the element type's machine epsilon (``\approx 36`` for `Float64`,
+    ``\approx 16`` for `Float32`), so the Nyquist mode always damps to that precision's epsilon —
+    precision as a studied axis (invariant 4); an explicit `strength` overrides.
 
 ---
 

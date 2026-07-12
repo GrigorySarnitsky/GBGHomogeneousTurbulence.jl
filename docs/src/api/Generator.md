@@ -16,11 +16,12 @@ FlowConditions
 
 ## Physical-field evaluation
 
-Inverse-transform the spectral state to the physical velocity and vorticity, and the physical scalar φ,
-that the nonlinear terms consume (the spectral sources are preserved).
+Recover the physical velocity, vorticity, and scalar φ that the nonlinear terms consume from the
+spectral state (the spectral sources are preserved).
 
 ```@docs
-velocity_vorticity!
+velocity_to_physical!
+vorticity_to_physical!
 scalar_to_physical!
 ```
 

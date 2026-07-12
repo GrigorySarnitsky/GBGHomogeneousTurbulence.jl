@@ -18,7 +18,8 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   for _ in 1:nsteps
-    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    velocity_to_physical!(buffers.velocity, û, domain, buffers)
+    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
   return û, φ̂

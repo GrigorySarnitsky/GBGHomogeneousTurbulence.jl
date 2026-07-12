@@ -103,7 +103,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
     Δx = L / N
     for _ in 1:50
-      velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
       dt = 0.4 * Δx / max(max_speed(buffers.velocity), 1e-6)
       copyto!(field_data(u_start), field_data(buffers.velocity))           # u(tₙ)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)

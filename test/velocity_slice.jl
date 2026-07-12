@@ -31,7 +31,8 @@ using Test
   nsteps = 300
   energies = T[]
   for n in 1:nsteps
-    velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+    velocity_to_physical!(buffers.velocity, û, domain, buffers)
+    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
     dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
     push!(energies, kinetic_energy(buffers.velocity))
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
@@ -50,7 +51,8 @@ using Test
 
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
-  velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
+  velocity_to_physical!(buffers.velocity, û, domain, buffers)
+  vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
   dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
   step!(integrator, û, φ̂, domain, buffers, conditions, dt)                            # warm up
   step_bytes = @allocated step!(integrator, û, φ̂, domain, buffers, conditions, dt)

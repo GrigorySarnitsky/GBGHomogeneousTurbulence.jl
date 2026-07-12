@@ -51,14 +51,16 @@ of the quadratic nonlinearity, and the lean, GPU-friendly default.
 struct TwoThirds <: DealiasingStrategy end
 
 """
-    HouLi(; order = 36, strength = 36)
+    HouLi(; order = 36, strength = nothing)
 
 The smooth Hou–Li spectral filter, transfer function
 ``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); `strength` sets the
-damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}`` (defaults
-``36, 36``, so that mode falls to ``\\mathrm{e}^{-36}\\approx`` machine epsilon). It keeps more modes
+damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
+(`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
+epsilon — ``\\approx 36`` for `Float64`, ``\\approx 16`` for `Float32` — so the Nyquist mode always damps
+to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilisation,
 hence an opt-in, not the default. Applied isotropically in ``\\kappa`` (the filter TurTLE uses, there
 per-axis). Because it retains energy out to the Nyquist wavenumber it takes a proportionally smaller
@@ -66,9 +68,10 @@ CFL step than the ``2/3`` rule — handled automatically by `recommended_cfl`.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
-  strength::Float64
+  strength::Union{Float64, Nothing}
 end
-HouLi(; order::Integer = 36, strength::Real = 36) = HouLi(Int(order), Float64(strength))
+HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
+  HouLi(Int(order), isnothing(strength) ? nothing : Float64(strength))
 
 # The fraction of the Nyquist wavenumber a strategy keeps energetic — sets κ_max for the advective CFL.
 _retained_nyquist_fraction(::TwoThirds) = 2 // 3
@@ -147,7 +150,8 @@ _build_dealias(::TwoThirds, reference, multipliers, squared_wavenumber, N, L, ::
 function _build_dealias(strategy::HouLi, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T}
   kernel = spectral_cutoff(reference, multipliers, T(2) * (N / 2) * (2π / L))    # all-pass ⇒ correct shape/backend
   k_nyquist = T((N / 2) * (2π / L))
-  field_data(kernel) .= Complex{T}.(exp.(-T(strategy.strength) .* (sqrt.(squared_wavenumber) ./ k_nyquist) .^ strategy.order))
+  strength = isnothing(strategy.strength) ? -log(eps(T)) : strategy.strength
+  field_data(kernel) .= Complex{T}.(exp.(-T(strength) .* (sqrt.(squared_wavenumber) ./ k_nyquist) .^ strategy.order))
   return kernel
 end
 

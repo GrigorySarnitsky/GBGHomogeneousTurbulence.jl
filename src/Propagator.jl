@@ -29,7 +29,7 @@ module Propagator
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction
 using ..State: FieldBuffers
-using ..Generator: velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
+using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
                   scalar_to_physical!, scalar_nonlinear!, FlowConditions
 using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
 
@@ -56,7 +56,7 @@ scheme `integrator`, the domain `domain`, the buffers `buffers`, and the problem
 [`FlowConditions`](@ref): viscosity, Schmidt number, and the two forcings). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `buffers.velocity` and
 `buffers.vorticity_start` with the start-of-step physical velocity and vorticity (via
-[`velocity_vorticity!`](@ref)).
+[`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)).
 """
 function step! end
 
@@ -116,7 +116,8 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::FieldB
     if i == 1
       u, ω = buffers.velocity, buffers.vorticity_start                  # cached start-of-step
     else
-      velocity_vorticity!(buffers.velocity_star, buffers.vorticity_physical, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity_star, û, domain, buffers)
+      vorticity_to_physical!(buffers.vorticity_physical, û, domain, buffers)
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
@@ -228,7 +229,8 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
   end
 
   # stage 2 — nonlinear terms at the predictor state
-  velocity_vorticity!(buffers.velocity_star, buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers)
+  velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, buffers)
+  vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers)
   velocity_nonlinear!(buffers.stage2, buffers.velocity_star, buffers.vorticity_physical, domain, buffers)      # N̂_u,2
   add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain, buffers)
   if has_scalar
