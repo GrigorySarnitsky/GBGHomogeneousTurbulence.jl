@@ -52,15 +52,15 @@ using Test
   @testset "grid-resolved viscosity (grid mode)" begin
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = k_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
-    ν = sim.physics.viscosity
+    ν = sim.conditions.viscosity
     ε = stationary_dissipation(Li2008(), 1.5, L)               # energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
-    @test sim.physics.velocity_forcing isa BandRescaling        # forced by default
+    @test sim.conditions.velocity_forcing isa BandRescaling        # forced by default
     @test ν > 0
 
-    @test Simulation(grid_points_per_axis = 32, k_max_η = 3; rng = MersenneTwister(3)).physics.viscosity > ν
-    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, k_max_η = 5).physics.viscosity == 0.01
+    @test Simulation(grid_points_per_axis = 32, k_max_η = 3; rng = MersenneTwister(3)).conditions.viscosity > ν
+    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, k_max_η = 5).conditions.viscosity == 0.01
   end
 
   @testset "initial condition from a spectrum" begin
@@ -88,7 +88,7 @@ using Test
   end
 
   @testset "bring-your-own domain + fixed dt" begin
-    domain = SimulationDomain(16, L; scalar_type = Float64)
+    domain = FixedDomain(16, L; scalar_type = Float64)
     sim = Simulation(domain; viscosity = 0.02, rng = MersenneTwister(3))
     advance!(sim; dt = 0.001)
     @test current_step(sim) == 1
@@ -176,7 +176,7 @@ using Test
   end
 
   @testset "derivative skewness" begin
-    domain = SimulationDomain(24, 2π; scalar_type = Float64)
+    domain = FixedDomain(24, 2π; scalar_type = Float64)
     buffers = FieldBuffers(domain; scalar = true)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
@@ -186,10 +186,10 @@ using Test
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     φ̂ = scalar_spectral(domain)
-    physics = Physics(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
+    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
     for _ in 1:80
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, physics, 0.012)
+      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, 0.012)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05
@@ -219,7 +219,7 @@ using Test
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb)) && kinetic_energy(simb) > 0
     # the target symbol is validated at construction
-    domain = SimulationDomain(16, 2π; scalar_type = Float64)
+    domain = FixedDomain(16, 2π; scalar_type = Float64)
     @test_throws ArgumentError BandRescaling(domain; energy = 0.5, target = :bogus)
   end
 end

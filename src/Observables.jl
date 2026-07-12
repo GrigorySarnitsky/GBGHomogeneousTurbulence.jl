@@ -1,7 +1,7 @@
 # Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
 # velocity-derivative skewness, the scalar variance and its dissipation, and the maximum component
 # speed (which feeds the CFL). In the Mori–Zwanzig reading (ARCHITECTURE §8) these are the observables
-# of the `Dynamics`: their plateaus gate warm-up and their statistics are to be tracked by
+# of the `Generator`: their plateaus gate warm-up and their statistics are to be tracked by
 # GBGStreamingStatistics. Each reduces a field to a scalar — a GBGPeriodicFields inner product or moment.
 
 """
@@ -10,14 +10,14 @@
 The functions of the flow state that are measured — kinetic energy, dissipation, the velocity-
 derivative skewness, the scalar variance and its dissipation, the maximum component speed, the energy
 spectrum, and the integral scale. In the Mori–Zwanzig reading (design doc §8) these are the *observables*
-of the `Dynamics`: their plateaus gate warm-up (`warmup!`), and their statistics are to be tracked by
+of the `Generator`: their plateaus gate warm-up (`warmup!`), and their statistics are to be tracked by
 `GBGStreamingStatistics`. Each reduces a field to a scalar, or — the energy spectrum — to a distribution
 over wavenumber.
 """
 module Observables
 
 using GBGPeriodicFields
-using ..SimulationState: SimulationDomain, tensor_physical, scalar_physical
+using ..SimulationDomain: FixedDomain, tensor_physical, scalar_physical
 
 export kinetic_energy, dissipation, max_speed,
        scalar_variance, scalar_dissipation, derivative_skewness,
@@ -72,7 +72,7 @@ scalar_variance(φ) = inner(φ, φ)
 
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-`φ` ``\\varphi`` (in spectral representation), the [`SimulationDomain`](@ref) bundle `domain`, and the
+`φ` ``\\varphi`` (in spectral representation), the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
@@ -80,7 +80,7 @@ against the squared-wavenumber multiplier `domain.squared_wavenumber_kernel` —
 coefficients, with no physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's
 cached ``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
 """
-scalar_dissipation(φ, domain::SimulationDomain, diffusivity::Real) =
+scalar_dissipation(φ, domain::FixedDomain, diffusivity::Real) =
   2 * diffusivity * weighted_inner(φ, domain.squared_wavenumber_kernel)
 
 
@@ -112,7 +112,7 @@ reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but 
 invariant rather than an axis-dependent gradient.
 
 From the velocity field `û` in spectral representation, the strain is formed directly with
-`symmetric_gradient` and the wavenumber `multipliers` of the [`SimulationDomain`](@ref) bundle `domain`
+`symmetric_gradient` and the wavenumber `multipliers` of the [`FixedDomain`](@ref) bundle `domain`
 (skipping the full nine-component velocity gradient), carried to physical space by its rank-2 tensor
 transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
 ``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`); `domain` also sizes the per-call tensor and scalar scratch.
@@ -121,7 +121,7 @@ transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangl
 — the enstrophy-production / vortex-stretching signature. Its plateau is the strict "real turbulence yet"
 gate of the warm-up detector.
 """
-function derivative_skewness(û, domain::SimulationDomain)
+function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
   strain_physical = tensor_physical(domain)
   to_physical!(strain_physical, strain, domain.tensor_plans)            # S in physical space (Ŝ is consumed)
@@ -142,10 +142,10 @@ representation) — the turbulent kinetic energy resolved over wavenumber-magnit
 ``k = \\sum_\\kappa E(\\kappa)``. Returns `(κ, E)`: the shell-center wavenumber magnitudes and the energy
 in each shell (brought to the host, an occasional diagnostic). It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol u}\\rvert^2`` while the
-kinetic energy carries the ``\\tfrac12``. `domain` (a [`SimulationDomain`](@ref)) supplies the wavenumber
+kinetic energy carries the ``\\tfrac12``. `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a `Phenomenology` model spectrum, for validation.
 """
-function energy_spectrum(û, domain::SimulationDomain)
+function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
   return Array(shells), Array(0.5 .* spec)
 end
@@ -162,9 +162,9 @@ L = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\k
 ```
 
 `L` is the large-eddy scale — the one flow parameter a `Phenomenology` model spectrum needs that the
-small scales do not fix. `domain` (a [`SimulationDomain`](@ref)) supplies the wavenumber multipliers.
+small scales do not fix. `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 """
-function integral_scale(û, domain::SimulationDomain)
+function integral_scale(û, domain::FixedDomain)
   κ, E = energy_spectrum(û, domain)
   weighted = zero(eltype(E))
   total = zero(eltype(E))

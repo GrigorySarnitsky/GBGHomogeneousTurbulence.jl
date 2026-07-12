@@ -1,24 +1,23 @@
-# SimulationState
+# SimulationDomain
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.SimulationState]
+Modules = [GBGIsotropicTurbulence.SimulationDomain]
 Order   = [:module]
 ```
 
-## The simulation domain and field buffers
+## The discretised box
 
-The read-only spectral machinery every buffer is allocated from — the `SimulationDomain` — and the
-preallocated per-step scratch a run advances.
+The reusable, read-only frame every buffer is allocated from — the `FixedDomain`, a fixed, unsheared
+periodic cube (a sheared frame is deferred).
 
 ```@docs
-SimulationDomain
-FieldBuffers
+FixedDomain
 ```
 
 ## De-aliasing strategies
 
-The aliasing-control strategy passed to `SimulationDomain` — the supertype, then the sharp 2/3-rule
-default and the smooth Hou–Li filter.
+The aliasing-control strategy passed to `FixedDomain` — the supertype, then the sharp 2/3-rule default
+and the smooth Hou–Li filter.
 
 ```@docs
 DealiasingStrategy
@@ -53,13 +52,4 @@ Apply the domain's de-alias low-pass kernel to a spectral field in place.
 
 ```@docs
 dealias!
-```
-
-## Random initial conditions
-
-Seed a large-scale-peaked, de-aliased, rescaled random solenoidal velocity, or a mean-zero scalar φ.
-
-```@docs
-random_solenoidal_velocity!
-random_scalar!
 ```

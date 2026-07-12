@@ -80,7 +80,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `forcing_rate!` |
+| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `set_forcing_rate!` |
 | ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(power=…)` |
 
 ## Lens symbols

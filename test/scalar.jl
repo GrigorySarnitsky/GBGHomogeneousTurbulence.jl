@@ -12,14 +12,14 @@ using Random
 using Test
 
 
-function integrate_coupled(integrator, domain, buffers, û0, φ̂0, physics, dt, nsteps)
+function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
   û = spectral_vector(domain)
   φ̂ = scalar_spectral(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   for _ in 1:nsteps
     velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
-    step!(integrator, û, φ̂, domain, buffers, physics, dt)
+    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
   return û, φ̂
 end
@@ -32,7 +32,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = SimulationDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; scalar_type = T)
   buffers = FieldBuffers(domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
@@ -41,11 +41,11 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     û0 = spectral_vector(domain)                                   # zero velocity
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
-    physics = Physics(viscosity = ν, schmidt = Sc)               # unforced
+    conditions = FlowConditions(viscosity = ν, schmidt = Sc)               # unforced
     dt = 0.02
     nsteps = 25
     total_time = dt * nsteps
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, physics, dt, nsteps)
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, dt, nsteps)
 
     expected = field_data(φ̂0) .* complex.(exp.(-κ .* domain.squared_wavenumber .* total_time))
     relative_error = sqrt(sum(abs2, field_data(φ̂) .- expected)) / sqrt(sum(abs2, expected))
@@ -58,14 +58,14 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     dealias!(û0, domain)
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
-    physics = Physics(viscosity = ν)                             # Sc = 1, unforced
+    conditions = FlowConditions(viscosity = ν)                             # Sc = 1, unforced
 
     rk3 = IFLowStorageRK3()
     Tfinal = 0.4
     n = 8
-    _, p1 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / n, n)
-    _, p2 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / (2n), 2n)
-    _, p4 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, physics, Tfinal / (4n), 4n)
+    _, p1 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, conditions, Tfinal / n, n)
+    _, p2 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, conditions, Tfinal / (2n), 2n)
+    _, p4 = integrate_coupled(rk3, domain, buffers, û0, φ̂0, conditions, Tfinal / (4n), 4n)
     ratio = diffnorm(p1, p2) / diffnorm(p2, p4)
     @test 5.0 < ratio < 12.0
   end
@@ -79,9 +79,9 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     field_data(φ̂0)[1, 1, 1] = 3.0 + 0.0im                    # impose a nonzero mean (the k=0 mode)
     mean_before = field_data(φ̂0)[1, 1, 1]
 
-    physics = Physics(viscosity = ν,
+    conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
-    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, physics, 0.02, 30)
+    _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end
 

@@ -1,7 +1,7 @@
-# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, physics,
+# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, conditions,
 # integrator, spectral state (û, φ̂), and any tracers; `advance!`/`run!`/`warmup!` own the
 # CFL-adaptive time loop. It holds no physics or numerics of its own — it wires the pieces of
-# SimulationState/Dynamics/Observables/Forcing/TimeIntegration/Particles so a case is a few lines to
+# SimulationDomain/State/Generator/Observables/Forcing/Propagator/Particles so a case is a few lines to
 # set up and run, warm-up included, while every piece stays reachable for a hand-run loop.
 #
 # The loop maintains one invariant: on entry to a step, `buffers.velocity` / `buffers.vorticity_start` hold the
@@ -23,14 +23,14 @@ module SimulationRun
 
 using GBGPeriodicFields
 using Random
-using ..SimulationState: SimulationDomain, FieldBuffers, spectral_vector, scalar_spectral,
-                         physical_vector, random_solenoidal_velocity!, random_scalar!,
-                         DealiasingStrategy, TwoThirds, max_wavenumber
-using ..Dynamics: velocity_vorticity!
+using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
+                          DealiasingStrategy, TwoThirds, max_wavenumber
+using ..State: FieldBuffers, random_solenoidal_velocity!, random_scalar!
+using ..Generator: velocity_vorticity!
 using ..Observables: max_speed, derivative_skewness
 import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
-using ..TimeIntegration: AbstractIntegrator, Physics, step!, recommended_cfl, default_integrator
+using ..Propagator: AbstractIntegrator, FlowConditions, step!, recommended_cfl, default_integrator
 using ..Particles: Tracers, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -51,12 +51,12 @@ end
                  array_type = Array, dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; k_max_η = 2, energy = 1.5, kwargs...)
 
-A ready-to-run case — the [`SimulationDomain`](@ref), the [`FieldBuffers`](@ref), the
-[`Physics`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
+A ready-to-run case — the [`FixedDomain`](@ref), the [`FieldBuffers`](@ref), the
+[`FlowConditions`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
-`Simulation` at ``t = 0``; the second takes a `SimulationDomain` you built yourself. Advance it with
+`Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
 
 # Setting the Reynolds number
@@ -105,7 +105,7 @@ and the viscosity is chosen from the grid rather than supplied:
 struct Simulation{DOM, FB, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH, TR, TV}
   domain::DOM
   buffers::FB
-  physics::Physics{VF, SF}
+  conditions::FlowConditions{VF, SF}
   integrator::IG
   velocity::UH             # û in spectral representation
   scalar::PH               # φ̂ in spectral representation
@@ -119,11 +119,11 @@ end
 # A forcing may be given ready-built (an `AbstractForcing`) or as a factory `domain -> AbstractForcing`
 # — the latter lets a banded forcing be named before the domain exists (`domain -> ConstantPower(domain;
 # power)`), since a forcing precomputes its band from `domain`.
-_resolve_forcing(f::AbstractForcing, ::SimulationDomain) = f
-_resolve_forcing(f, domain::SimulationDomain) = f(domain)
+_resolve_forcing(f::AbstractForcing, ::FixedDomain) = f
+_resolve_forcing(f, domain::FixedDomain) = f(domain)
 
 
-function Simulation(domain::SimulationDomain;
+function Simulation(domain::FixedDomain;
                     energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
                     schmidt::Real = 1.0,
                     velocity_forcing = BandRescaling(domain; energy, target = :total),
@@ -147,7 +147,7 @@ function Simulation(domain::SimulationDomain;
   end
 
   buffers = FieldBuffers(domain; scalar)
-  physics = Physics(; viscosity = ν, schmidt,
+  conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = _resolve_forcing(velocity_forcing, domain),
                     scalar_forcing = _resolve_forcing(scalar_forcing, domain))
 
@@ -167,7 +167,7 @@ function Simulation(domain::SimulationDomain;
   tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
   tracer_velocity = ntracers > 0 ? physical_vector(domain) : nothing
 
-  sim = Simulation(domain, buffers, physics, integrator, û, φ̂, tracers, tracer_velocity,
+  sim = Simulation(domain, buffers, conditions, integrator, û, φ̂, tracers, tracer_velocity,
                    Float64(cfl), Clock(0.0, 0))
   return _refresh_cached_fields!(sim)
 end
@@ -175,7 +175,7 @@ end
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     scalar_type::Type = Float64, array_type = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
-  return Simulation(SimulationDomain(grid_points_per_axis, side_length; dealiasing, scalar_type, array_type); kwargs...)
+  return Simulation(FixedDomain(grid_points_per_axis, side_length; dealiasing, scalar_type, array_type); kwargs...)
 end
 
 
@@ -190,7 +190,7 @@ _refresh_cached_fields!(sim::Simulation) =
 # `kinetic_energy(sim)` (k), `dissipation(sim)` (ε), and `scalar_variance(sim)` (⟨φ²⟩) read from
 # the cached buffer fields (valid between steps).
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.buffers.velocity)
-dissipation(sim::Simulation) = dissipation(sim.buffers.vorticity_start, sim.physics.viscosity)
+dissipation(sim::Simulation) = dissipation(sim.buffers.vorticity_start, sim.conditions.viscosity)
 scalar_variance(sim::Simulation) = sim.scalar === nothing ? NaN : scalar_variance(sim.scalar)
 energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.domain)
 integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.domain)
@@ -201,15 +201,15 @@ integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.domain)
 
 The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
 `Phenomenology` reference law be evaluated at the run's measured state. The viscosity ``\\nu`` and the
-Schmidt number are read from `sim.physics`; the dissipation ``\\varepsilon``, the r.m.s. velocity
+Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the integral scale ``L`` are measured from the
 current velocity field.
 """
 function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim)
-  FlowParameters(; viscosity = sim.physics.viscosity, dissipation = dissipation(sim),
+  FlowParameters(; viscosity = sim.conditions.viscosity, dissipation = dissipation(sim),
                  rms_velocity = sqrt(2k / 3), integral_scale = integral_scale(sim),
-                 schmidt = sim.physics.schmidt)
+                 schmidt = sim.conditions.schmidt)
 end
 
 
@@ -289,7 +289,7 @@ function advance!(sim::Simulation; dt = nothing)
   buffers = sim.buffers
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  step!(sim.integrator, sim.velocity, sim.scalar, sim.domain, buffers, sim.physics, Δt)
+  step!(sim.integrator, sim.velocity, sim.scalar, sim.domain, buffers, sim.conditions, Δt)
 
   # u(tₙ) is still cached (step! only reads it); save it, refresh to u(tₙ₊₁), then Heun-advect.
   sim.tracers === nothing || copyto!(field_data(sim.tracer_velocity), field_data(buffers.velocity))
@@ -443,7 +443,7 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
-_scalar_forced(sim::Simulation) = sim.scalar !== nothing && !(sim.physics.scalar_forcing isa NoForcing)
+_scalar_forced(sim::Simulation) = sim.scalar !== nothing && !(sim.conditions.scalar_forcing isa NoForcing)
 
 
 """

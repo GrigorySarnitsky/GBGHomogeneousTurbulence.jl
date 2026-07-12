@@ -1,8 +1,17 @@
-# Dynamics
+# Generator
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Dynamics]
+Modules = [GBGIsotropicTurbulence.Generator]
 Order   = [:module]
+```
+
+## Flow conditions
+
+The physical conditions the generator is built from — viscosity, Schmidt number, and the velocity and
+scalar forcings — that `step!` consumes.
+
+```@docs
+FlowConditions
 ```
 
 ## Physical-field evaluation

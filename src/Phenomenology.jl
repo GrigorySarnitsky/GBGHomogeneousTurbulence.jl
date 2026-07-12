@@ -64,8 +64,8 @@ abstract type TurbulenceLaw end
     FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale,
                      schmidt = 1.0, scalar_dissipation = NaN)
 
-The dimensionless flow-state bundle a law is evaluated against — the analogue of `Physics` and
-`SimulationDomain` on the phenomenology side. It carries the independent groups of a homogeneous
+The dimensionless flow-state bundle a law is evaluated against — the analogue of `FlowConditions` and
+`FixedDomain` on the phenomenology side. It carries the independent groups of a homogeneous
 isotropic state; the small scales and the Taylor-scale Reynolds number are [derived](@ref
 taylor_reynolds) from them, not stored.
 

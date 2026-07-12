@@ -11,13 +11,13 @@ using Test
 
 
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
-function integrate_fixed(integrator, domain, buffers, û0, physics, dt, nsteps)
+function integrate_fixed(integrator, domain, buffers, û0, conditions, dt, nsteps)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
   φ̂ = scalar_spectral(domain)
   for _ in 1:nsteps
     velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
-    step!(integrator, û, φ̂, domain, buffers, physics, dt)
+    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
   return û
 end
@@ -30,7 +30,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = SimulationDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; scalar_type = T)
   buffers = FieldBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
@@ -41,7 +41,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   n = 8
 
   @testset "temporal convergence order" begin
-    unforced = Physics(viscosity = ν)
+    unforced = FlowConditions(viscosity = ν)
     rk3 = IFLowStorageRK3()
     u1 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / n, n)
     u2 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / (2n), 2n)
@@ -60,7 +60,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   end
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
-    physics = Physics(viscosity = ν,
+    conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
     integrator = IFLowStorageRK3()
     û = spectral_vector(domain)
@@ -73,7 +73,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
       dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
       push!(energies, kinetic_energy(buffers.velocity))
-      step!(integrator, û, φ̂, domain, buffers, physics, dt)
+      step!(integrator, û, φ̂, domain, buffers, conditions, dt)
     end
     @test all(isfinite, energies)
     @test 0.05 < energies[end] < 10.0
@@ -82,8 +82,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
     velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
     dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
-    step!(integrator, û, φ̂, domain, buffers, physics, dt)                       # warm up
-    bytes = @allocated step!(integrator, û, φ̂, domain, buffers, physics, dt)
+    step!(integrator, û, φ̂, domain, buffers, conditions, dt)                       # warm up
+    bytes = @allocated step!(integrator, û, φ̂, domain, buffers, conditions, dt)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
     @test bytes < field_bytes
   end

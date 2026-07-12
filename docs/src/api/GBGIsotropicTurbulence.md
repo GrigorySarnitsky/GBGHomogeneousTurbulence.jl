@@ -10,5 +10,5 @@ Order   = [:module]
 ## Index
 
 ```@index
-Modules = [GBGIsotropicTurbulence.SimulationState, GBGIsotropicTurbulence.Dynamics, GBGIsotropicTurbulence.Observables, GBGIsotropicTurbulence.Forcing, GBGIsotropicTurbulence.TimeIntegration, GBGIsotropicTurbulence.Particles, GBGIsotropicTurbulence.SimulationRun]
+Modules = [GBGIsotropicTurbulence.SimulationDomain, GBGIsotropicTurbulence.State, GBGIsotropicTurbulence.Generator, GBGIsotropicTurbulence.Observables, GBGIsotropicTurbulence.Forcing, GBGIsotropicTurbulence.Propagator, GBGIsotropicTurbulence.Particles, GBGIsotropicTurbulence.SimulationRun]
 ```

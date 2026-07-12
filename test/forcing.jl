@@ -16,19 +16,19 @@ using Test
   N = 24
   L = 2π
   ν = 0.05
-  domain = SimulationDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; scalar_type = T)
   buffers = FieldBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
   dealias!(û0, domain)
 
-  run_velocity(physics, nsteps; dt = 0.01) = begin
+  run_velocity(conditions, nsteps; dt = 0.01) = begin
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
     φ̂ = scalar_spectral(domain)
     for _ in 1:nsteps
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, physics, dt)
+      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end
     û
   end
@@ -41,7 +41,7 @@ using Test
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
     fill!(buffers.velocity_rate, 0.0)
-    @test forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
+    @test set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
     @test maximum(buffers.velocity_rate) ≈ A        # A on the band
     @test minimum(buffers.velocity_rate) == 0       # zero outside the band
   end
@@ -50,14 +50,14 @@ using Test
     power = 0.3
     forcing = ConstantPower(domain; power = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
+    set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
     A = maximum(buffers.velocity_rate)
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
   end
 
   @testset "Linear injects energy, stays solenoidal" begin
-    unforced = run_velocity(Physics(viscosity = ν), 60)
-    forced = run_velocity(Physics(viscosity = ν,
+    unforced = run_velocity(FlowConditions(viscosity = ν), 60)
+    forced = run_velocity(FlowConditions(viscosity = ν,
                                   velocity_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2)), 60)
     @test kinetic_energy(forced) > kinetic_energy(unforced)
     rel_div = l2norm(divergence(forced, domain.multipliers)) / (l2norm(forced) + 1e-30)
@@ -65,9 +65,9 @@ using Test
   end
 
   @testset "ConstantPower bounded and solenoidal" begin
-    physics = Physics(viscosity = ν,
+    conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = ConstantPower(domain; power = 0.5, lowest_shell = 1, highest_shell = 2))
-    û = run_velocity(physics, 100)
+    û = run_velocity(conditions, 100)
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
@@ -77,12 +77,12 @@ using Test
     û_zero = spectral_vector(domain)             # no velocity ⇒ pure linear growth of the scalar band
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
-    physics = Physics(viscosity = ν,
+    conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2))
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     for _ in 1:40
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û_zero, domain, buffers)
-      step!(IFLowStorageRK3(), û_zero, φ̂, domain, buffers, physics, 0.01)
+      step!(IFLowStorageRK3(), û_zero, φ̂, domain, buffers, conditions, 0.01)
     end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
   end
@@ -115,7 +115,7 @@ using Test
 
   @testset "StochasticOU sustains velocity energy" begin
     ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
-    physics = Physics(viscosity = ν, velocity_forcing = ou)
+    conditions = FlowConditions(viscosity = ν, velocity_forcing = ou)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     dealias!(û, domain)
@@ -123,7 +123,7 @@ using Test
     for n in 1:200
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
       dt = 0.4 * (L / N) / max(max_speed(buffers.velocity), 1e-6)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, physics, dt)
+      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)

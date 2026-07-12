@@ -23,7 +23,7 @@ module Particles
 
 using GBGPeriodicFields
 using Random
-using ..SimulationState: SimulationDomain
+using ..SimulationDomain: FixedDomain
 
 export Tracers, advect!, sample!,
        tracer_positions, tracer_velocities, ntracers, velocity_buffer, scalar_buffer
@@ -63,7 +63,7 @@ function Tracers(positions::AbstractMatrix; scheme = CatmullRom)
                  scheme)
 end
 
-function Tracers(domain::SimulationDomain, count::Integer; scheme = CatmullRom, rng = Random.default_rng())
+function Tracers(domain::FixedDomain, count::Integer; scheme = CatmullRom, rng = Random.default_rng())
   T = real(eltype(field_data(domain.dealias)))
   L = T(domain.grid.domain_size[1])
   positions = similar(domain.squared_wavenumber, T, (Int(count), 3))
@@ -90,11 +90,11 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 ```
 
 with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `domain` (a
-[`SimulationDomain`](@ref)). This is second-order accurate in time. The start-of-step
+[`FixedDomain`](@ref)). This is second-order accurate in time. The start-of-step
 velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
 the Lagrangian statistics.
 """
-function advect!(tracers::Tracers, velocity_start, velocity_end, domain::SimulationDomain, dt::Real)
+function advect!(tracers::Tracers, velocity_start, velocity_end, domain::FixedDomain, dt::Real)
   L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
   Δt = real(eltype(tracers.positions))(dt)
   X = tracers.positions

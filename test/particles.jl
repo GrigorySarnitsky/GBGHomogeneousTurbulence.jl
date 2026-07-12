@@ -17,7 +17,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   T = Float64
   N = 16
   L = 2π
-  domain = SimulationDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; scalar_type = T)
   uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "uniform field advects exactly" begin
@@ -92,7 +92,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "advect in a real HIT velocity field" begin
     buffers = FieldBuffers(domain; scalar = true)
-    physics = Physics(viscosity = 0.05,
+    conditions = FlowConditions(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
@@ -106,7 +106,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
       dt = 0.4 * Δx / max(max_speed(buffers.velocity), 1e-6)
       copyto!(field_data(u_start), field_data(buffers.velocity))           # u(tₙ)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, physics, dt)
+      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
       u_end = to_physical(û, domain.velocity_plans)                     # u(tₙ₊₁)
       advect!(tracers, u_start, u_end, domain, dt)
     end

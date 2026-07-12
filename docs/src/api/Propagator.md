@@ -1,7 +1,7 @@
-# TimeIntegration
+# Propagator
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.TimeIntegration]
+Modules = [GBGIsotropicTurbulence.Propagator]
 Order   = [:module]
 ```
 
@@ -14,14 +14,6 @@ then the cheaper, marginally-stable second-order Heun.
 AbstractIntegrator
 IFLowStorageRK3
 IFRK2
-```
-
-## Problem parameters
-
-The viscosity, Schmidt number, and velocity/scalar forcings that `step!` consumes.
-
-```@docs
-Physics
 ```
 
 ## Time stepping

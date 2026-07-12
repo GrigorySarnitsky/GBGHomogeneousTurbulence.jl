@@ -8,14 +8,16 @@
 # tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
 # allocation-free over a preallocated buffers.
 #
-# Module layout (each concern its own file, mirroring the edifice). Physics concerns take their names
-# from the Mori–Zwanzig lens — the dynamics and its observables; realization and infrastructure
-# concerns are named by their job.
-#   SimulationState  — the operator/plan bundle + preallocated buffers + initial conditions
-#   Dynamics         — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor
+# Module layout (each concern its own file). Physics concerns take their names from the Mori–Zwanzig
+# lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
+# the instruments, the run layer, and the reference laws are named by their job.
+#   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
+#   State            — the field buffers + initial conditions (the MZ State role)
+#   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor;
+#                      holds FlowConditions (ν, Sc, the forcings) — the physical conditions it is built from
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …)
-#   Forcing          — pluggable energy-injection strategies (AbstractForcing)
-#   TimeIntegration  — pluggable integrating-factor schemes (AbstractIntegrator)
+#   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
+#   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
 #   Particles        — Lagrangian tracer tracking (instruments)
 #   SimulationRun    — the ergonomic run layer (Simulation + run!/warmup!/advance!)
 
@@ -43,38 +45,42 @@ using GBGPeriodicFields
 # e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra`.
 include("Phenomenology.jl")
 
-include("SimulationState.jl")
-include("Dynamics.jl")
-include("Observables.jl")
+include("SimulationDomain.jl")
+include("State.jl")
 include("Forcing.jl")
-include("TimeIntegration.jl")
+include("Generator.jl")
+include("Observables.jl")
+include("Propagator.jl")
 include("Particles.jl")
 include("SimulationRun.jl")
 
 
-using .SimulationState:
-  SimulationDomain,
-  FieldBuffers,
+using .SimulationDomain:
+  FixedDomain,
   spectral_vector,
   physical_vector,
   scalar_spectral,
   scalar_physical,
   tensor_spectral,
   tensor_physical,
-  random_solenoidal_velocity!,
-  random_scalar!,
   dealias!,
   DealiasingStrategy,
   TwoThirds,
   HouLi,
   max_wavenumber
 
-using .Dynamics:
+using .State:
+  FieldBuffers,
+  random_solenoidal_velocity!,
+  random_scalar!
+
+using .Generator:
   velocity_vorticity!,
   velocity_nonlinear!,
   integrating_factor!,
   scalar_to_physical!,
-  scalar_nonlinear!
+  scalar_nonlinear!,
+  FlowConditions
 
 using .Observables:
   kinetic_energy,
@@ -93,19 +99,18 @@ using .Forcing:
   BandRescaling,
   Linear,
   ConstantPower,
-  forcing_rate!,
+  set_forcing_rate!,
   apply_forcing!,
   prepare_forcing!,
-  forcing_source!
+  add_forcing_source!
 
-using .TimeIntegration:
+using .Propagator:
   AbstractIntegrator,
   IFRK2,
   IFLowStorageRK3,
   step!,
   recommended_cfl,
-  default_integrator,
-  Physics
+  default_integrator
 
 using .Particles:
   Tracers,
@@ -128,7 +133,7 @@ using .SimulationRun:
   validate_spectrum
 
 
-export SimulationDomain,
+export FixedDomain,
        FieldBuffers,
        spectral_vector,
        physical_vector,
@@ -162,17 +167,17 @@ export SimulationDomain,
        BandRescaling,
        Linear,
        ConstantPower,
-       forcing_rate!,
+       set_forcing_rate!,
        apply_forcing!,
        prepare_forcing!,
-       forcing_source!,
+       add_forcing_source!,
        AbstractIntegrator,
        IFRK2,
        IFLowStorageRK3,
        step!,
        recommended_cfl,
        default_integrator,
-       Physics,
+       FlowConditions,
        Tracers,
        advect!,
        sample!,

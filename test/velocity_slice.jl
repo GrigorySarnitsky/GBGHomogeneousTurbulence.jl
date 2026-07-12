@@ -1,5 +1,5 @@
 # Slice 1 — the velocity vertical slice: forced HIT advanced by IF-RK2, carrying an inert (zero)
-# passive scalar. Checks the core physics and the GPU-relevant discipline — finite/bounded energy,
+# passive scalar. Checks the core conditions and the GPU-relevant discipline — finite/bounded energy,
 # divergence-free to roundoff, no field-sized per-step allocation — and that the passive scalar stays
 # exactly zero (it must not perturb the velocity).
 
@@ -15,9 +15,9 @@ using Test
   L = 2π
   ν = 5.0e-2
 
-  domain = SimulationDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; scalar_type = T)
   buffers = FieldBuffers(domain; scalar = true)
-  physics = Physics(viscosity = ν,
+  conditions = FlowConditions(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; energy = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()
 
@@ -34,7 +34,7 @@ using Test
     velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
     dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
     push!(energies, kinetic_energy(buffers.velocity))
-    step!(integrator, û, φ̂, domain, buffers, physics, dt)
+    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
 
   @test all(isfinite, energies)
@@ -52,8 +52,8 @@ using Test
 
   velocity_vorticity!(buffers.velocity, buffers.vorticity_start, û, domain, buffers)
   dt = cfl * Δx / max(max_speed(buffers.velocity), 1e-6)
-  step!(integrator, û, φ̂, domain, buffers, physics, dt)                            # warm up
-  step_bytes = @allocated step!(integrator, û, φ̂, domain, buffers, physics, dt)
+  step!(integrator, û, φ̂, domain, buffers, conditions, dt)                            # warm up
+  step_bytes = @allocated step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes < field_bytes
 end

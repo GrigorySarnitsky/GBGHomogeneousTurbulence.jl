@@ -61,18 +61,19 @@ de-aliased by the ``2/3`` rule.
 
 ## Components
 
-- [`SimulationState`](api/SimulationState.md): the reusable spectral machinery (`SimulationDomain`),
-  the preallocated buffers (`FieldBuffers`), and the random initial conditions — a divergence-free
-  velocity and a mean-zero scalar ``\varphi``.
-- [`Dynamics`](api/Dynamics.md): the flow's equations of motion — the rotational-form Navier–Stokes
+- [`SimulationDomain`](api/SimulationDomain.md): the discretised periodic box a run lives on — the
+  `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
+- [`State`](api/State.md): the preallocated buffers (`FieldBuffers`) a step advances, and the random
+  initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
+- [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
   `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
   `max_speed`, and the `energy_spectrum` / `integral_scale`).
 - [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`,
-  chosen independently for the velocity and the scalar (`Physics(; velocity_forcing, scalar_forcing)`)
+  chosen independently for the velocity and the scalar (`FlowConditions(; velocity_forcing, scalar_forcing)`)
   — commonly a forced velocity with a freely-decaying scalar.
-- [`TimeIntegration`](api/TimeIntegration.md): the pluggable integrating-factor schemes under
+- [`Propagator`](api/Propagator.md): the pluggable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a pluggable interpolation scheme.

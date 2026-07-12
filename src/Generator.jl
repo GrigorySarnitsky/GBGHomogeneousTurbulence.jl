@@ -1,21 +1,21 @@
-# Dynamics — the flow's equations of motion: the incompressible Navier–Stokes right-hand side in
+# Generator — the flow's equations of motion: the incompressible Navier–Stokes right-hand side in
 # rotational form, the passive-scalar advection, and the exact viscous/diffusive integrating factor.
 # In the Mori–Zwanzig reading (ARCHITECTURE §8) this is the generator of the full dynamics — the RHS
-# the numerical propagator (TimeIntegration) advances; the `Observables` are the functions of that state.
+# the numerical propagator (Propagator) advances; the `Observables` are the functions of that state.
 #
 # The momentum equation is advanced as ∂û/∂t = ℙ(u×ω)^ − ν|k|²û (+ forcing), with the viscous term
 # integrated exactly through the integrating factor ℰ = exp(-ν|k|²Δt) (built here, applied in
-# TimeIntegration). This module owns the nonlinear-term assembly and the integrating factor;
+# Propagator). This module owns the nonlinear-term assembly and the integrating factor;
 # everything diagonal-in-Fourier is a GBGPeriodicFields operator.
 
 """
-    Dynamics
+    Generator
 
 The flow's equations of motion — the incompressible Navier–Stokes right-hand side in rotational form
 (the de-aliased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
 integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *generator of the full
 dynamics* — it advances the flow state; `Observables` are the functions of that state, and
-`TimeIntegration` the numerical propagator.
+`Propagator` the numerical propagator.
 
 The module has five operations — [`velocity_vorticity!`](@ref) recovers the physical velocity and
 vorticity, and [`scalar_to_physical!`](@ref) the physical scalar, from their spectral representations;
@@ -24,17 +24,39 @@ scalar nonlinear terms; and [`integrating_factor!`](@ref) builds the exact visco
 multiplier.
 
 Every field-transforming or nonlinear-assembly method takes the operator bundle `domain` (a
-`SimulationDomain`: grid, transform plans, wavenumber multipliers, de-alias kernel) and the
+`FixedDomain`: grid, transform plans, wavenumber multipliers, de-alias kernel) and the
 preallocated scratch `buffers` (a `FieldBuffers`) as its final two arguments; `integrating_factor!` takes
 `domain` alone (no `buffers`).
 """
-module Dynamics
+module Generator
 
 using GBGPeriodicFields
-using ..SimulationState: SimulationDomain, FieldBuffers
+using ..SimulationDomain: FixedDomain
+using ..State: FieldBuffers
+using ..Forcing: AbstractForcing, NoForcing
 
 export velocity_vorticity!, velocity_nonlinear!, integrating_factor!,
-       scalar_to_physical!, scalar_nonlinear!
+       scalar_to_physical!, scalar_nonlinear!, FlowConditions
+
+
+"""
+    FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(),
+                   scalar_forcing = NoForcing())
+
+The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
+the Reynolds number is ``\\mathrm{Re} = 1/\\nu``), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
+scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
+(`velocity_forcing`, `scalar_forcing`, both `AbstractForcing`). Consumed by the time step (`step!`).
+"""
+struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
+  viscosity::Float64
+  schmidt::Float64
+  velocity_forcing::VF
+  scalar_forcing::SF
+end
+
+FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing()) =
+  FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
 
 """
@@ -47,7 +69,7 @@ representation ``\\hat{\\boldsymbol{u}}``) into the buffers `u` and `ω`.
 `û` is preserved: the vorticity is transformed first, then a *copy* of `û` is transformed — the
 in-place inverse transform consumes its spectral source.
 """
-function velocity_vorticity!(u, ω, û, domain::SimulationDomain, buffers::FieldBuffers)
+function velocity_vorticity!(u, ω, û, domain::FixedDomain, buffers::FieldBuffers)
   curl!(buffers.vorticity_spectral, û, domain.multipliers)
   to_physical!(ω, buffers.vorticity_spectral, domain.velocity_plans)
   copyto!(field_data(buffers.velocity_copy), field_data(û))
@@ -72,7 +94,7 @@ spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})`
 kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of the quadratic
 product. Allocation-free (a destination distinct from its sources needs no internal scratch).
 """
-function velocity_nonlinear!(nonlinear, u, ω, domain::SimulationDomain, buffers::FieldBuffers)
+function velocity_nonlinear!(nonlinear, u, ω, domain::FixedDomain, buffers::FieldBuffers)
   cross!(buffers.lamb, u, ω)
   to_spectral!(buffers.scratch, buffers.lamb, domain.velocity_plans)
   helmholtz_projection!(nonlinear, buffers.scratch, domain.multipliers)
@@ -93,17 +115,17 @@ representation by the per-mode multiplier
 ```
 
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
-restriction). The operator bundle `domain` (a `SimulationDomain`) supplies the squared-wavenumber
+restriction). The operator bundle `domain` (a `FixedDomain`) supplies the squared-wavenumber
 field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (`domain.squared_wavenumber`), the symbol of
 ``-\\nabla^{2}``. The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
 velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
 
 When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
-`forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
+`set_forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
 ``\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2})\\,\\Delta t\\big)``
 — exact for the linear forcing, so the integrator keeps its order.
 """
-function integrating_factor!(factor, domain::SimulationDomain, diffusivity::Real, dt::Real, rate = nothing)
+function integrating_factor!(factor, domain::FixedDomain, diffusivity::Real, dt::Real, rate = nothing)
   T = real(eltype(field_data(factor)))
   if rate === nothing
     field_data(factor) .= complex.(exp.(T(-diffusivity * dt) .* domain.squared_wavenumber))
@@ -121,7 +143,7 @@ Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectra
 ``\\hat{\\varphi}``), preserving `φ̂` — a copy is transformed, since the in-place inverse transform
 consumes its source.
 """
-function scalar_to_physical!(φ, φ̂, domain::SimulationDomain, buffers::FieldBuffers)
+function scalar_to_physical!(φ, φ̂, domain::FixedDomain, buffers::FieldBuffers)
   copyto!(field_data(buffers.scalar.copy), field_data(φ̂))
   to_physical!(φ, buffers.scalar.copy, domain.scalar_plans)
   return φ
@@ -143,7 +165,7 @@ pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa
 the kernel controlling the aliasing of the quadratic product.
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the physical and spectral velocity scratch.
 """
-function scalar_nonlinear!(nonlinear, u, φ, domain::SimulationDomain, buffers::FieldBuffers)
+function scalar_nonlinear!(nonlinear, u, φ, domain::FixedDomain, buffers::FieldBuffers)
   φ_data = field_data(φ)
   field_data(buffers.lamb) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)  # flux uφ
   to_spectral!(buffers.scratch, buffers.lamb, domain.velocity_plans)        # (uφ)^
@@ -153,4 +175,4 @@ function scalar_nonlinear!(nonlinear, u, φ, domain::SimulationDomain, buffers::
 end
 
 
-end # module Dynamics
+end # module Generator

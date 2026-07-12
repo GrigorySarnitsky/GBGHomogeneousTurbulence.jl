@@ -35,7 +35,7 @@ fires them.
 
 ```@docs
 prepare_forcing!
-forcing_rate!
-forcing_source!
+set_forcing_rate!
+add_forcing_source!
 apply_forcing!
 ```

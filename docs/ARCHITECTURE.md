@@ -168,12 +168,14 @@ structure is legible at a glance, and no piece of plain machinery is dressed in 
 
 Two modules separate *what evolves* from the *frame it evolves on*.
 
-- **`SimulationDomain`** is the discretised periodic box the run lives on — the reusable, read-only frame,
-  realised by the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
+- **`SimulationDomain`** provides the discretised periodic box the run lives on — the reusable,
+  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube, realised by
+  the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
   velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
   spectral multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (in spectral
   space, ``-\nabla^2`` acts as multiplication by ``\lvert\boldsymbol{\kappa}\rvert^2``), and the dealias
-  kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default). A sheared frame is deferred (§7). **Precision and backend enter here and flow everywhere
+  kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default). The name marks what can vary: a `FixedDomain` has time-independent,
+  separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `scalar_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
@@ -324,7 +326,7 @@ integrator** — the reversible generator of §8 again — so the split does not
 
 ### 4.7 `SimulationRun` — the front door
 
-A `Simulation` value bundles what a case advances: the `SimulationDomain`, the `FieldBuffers`, the
+A `Simulation` value bundles what a case advances: the `FixedDomain`, the `FieldBuffers`, the
 `FlowConditions`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and ``\hat\varphi``
 (the live State the generator acts on), any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
 for the Heun push, and a clock. Over it:
@@ -392,7 +394,7 @@ Three exist now — enough for the validation checklist — and the count caps n
 and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries every
 dimensionless group a law might read (``\mathrm{Re}_\lambda``, ``\varepsilon``, ``\nu``, ``L``, ``u'``,
 ``\mathrm{Sc}``, ``\varepsilon_\varphi``), the derived scales (``\eta``, ``\tau_\eta``, ``k``, ``\lambda``)
-as helpers — the analogue of the `FlowConditions` and `SimulationDomain` bundles.
+as helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
 The laws are **consumed to build runs**, not only compared against: an initial-condition or forcing
 spectrum drawn from `Spectra`, and the reference curves the validation harness reads, all from one library.
@@ -491,8 +493,9 @@ generalisation is built for them until a second concrete case forces the abstrac
 - **Inertial and oriented particles** — ``(\boldsymbol x,\boldsymbol v)`` with matrix drag, then
   ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.6, §8).
-- **The sheared frame (Rogallo).** A uniform mean velocity gradient makes the wavenumbers time-dependent
-  (``d\boldsymbol{\kappa}/dt = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``) and non-separable. This is
+- **The sheared frame (Rogallo), a `ShearedDomain`.** A uniform mean velocity gradient makes the
+  wavenumbers time-dependent (``d\boldsymbol{\kappa}/dt = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)
+  and non-separable — the `SimulationDomain` counterpart to `FixedDomain` (§4.1). This is
   the one future with a concrete `GBGPeriodicFields` dependency: its separable per-axis multipliers cannot
   hold a sheared lattice, so it is a bounded extension *there* (rule 1 of §5), not a job here.
 - **The Model ladder beyond DNS** — a large-eddy Model (filter the DNS, model the subgrid stress) and a
@@ -770,6 +773,18 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     **Markovian surrogate on the system's own side** — a `modelled` slot on the one `State`, never a separate
     'environment state' — so a stateful forcing's internal state homes there when `StochasticOU` is
     de-archived, and no type is minted now (invariant 9).
+24. **(2026-07) The domain module is `SimulationDomain`, its concrete type `FixedDomain`.** Decision 22
+    split the frame into a `SimulationDomain` module; naming its concrete type took one more cut, because
+    Julia will not let a module cleanly re-export a type of its *own* name — `using ..SimulationDomain:
+    SimulationDomain` binds the module and shadows the type, so a bare `SimulationDomain(...)` constructor
+    call stops resolving (verified empirically). The module keeps the user-facing concern name
+    `SimulationDomain` (the discretised box a run lives on); its type takes a name for *what it is among the
+    alternatives*. Weighed against `SimpleDomain` (relational and vague — simple next to what?) and
+    `PeriodicCube` (a property the deferred sheared frame *also* has), the choice is **`FixedDomain`**: the
+    fixed, unsheared, orthogonal cube with time-independent, separable wavenumbers. It names the very axis
+    the deferred **`ShearedDomain`** (the Rogallo moving frame, §7) varies — fixed versus sheared, separable
+    versus time-dependent — so the two type names read as one family. `FlowConditions` needs no such care: a
+    type, not a module, it cannot collide.
 
 ---
 
