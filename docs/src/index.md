@@ -63,8 +63,8 @@ de-aliased by the ``2/3`` rule.
 
 - [`SimulationDomain`](api/SimulationDomain.md): the discretised periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
-- [`State`](api/State.md): the preallocated buffers (`FieldBuffers`) a step advances, and the random
-  initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
+- [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
+  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,

@@ -17,7 +17,7 @@ using Test
   L = 2π
   ν = 0.05
   domain = FixedDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain; scalar = true)
+  buffers = IntegratorBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
@@ -27,8 +27,8 @@ using Test
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
     φ̂ = scalar_spectral(domain)
     for _ in 1:nsteps
-      velocity_to_physical!(buffers.velocity, û, domain, buffers)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end
     û
@@ -82,8 +82,8 @@ using Test
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2))
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     for _ in 1:40
-      velocity_to_physical!(buffers.velocity, û_zero, domain, buffers)
-      vorticity_to_physical!(buffers.vorticity_start, û_zero, domain, buffers)
+      velocity_to_physical!(buffers.velocity_physical, û_zero, domain, buffers.velocity_copy)
+      vorticity_to_physical!(buffers.vorticity_start, û_zero, domain, buffers.vorticity_spectral)
       step!(IFLowStorageRK3(), û_zero, φ̂, domain, buffers, conditions, 0.01)
     end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
@@ -123,9 +123,9 @@ using Test
     dealias!(û, domain)
     φ̂ = scalar_spectral(domain)
     for n in 1:200
-      velocity_to_physical!(buffers.velocity, û, domain, buffers)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
-      dt = 0.4 * (L / N) / max(max_speed(buffers.velocity), 1e-6)
+      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
+      dt = 0.4 * (L / N) / max(max_speed(buffers.velocity_physical), 1e-6)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
     end
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away

@@ -70,7 +70,7 @@ using .SimulationDomain:
   max_wavenumber
 
 using .State:
-  FieldBuffers,
+  ResolvedFields,
   random_solenoidal_velocity!,
   random_scalar!
 
@@ -109,6 +109,8 @@ using .Propagator:
   AbstractIntegrator,
   IFRK2,
   IFLowStorageRK3,
+  IntegratorBuffers,
+  allocate_buffers,
   step!,
   recommended_cfl,
   default_integrator
@@ -135,7 +137,7 @@ using .SimulationRun:
 
 
 export FixedDomain,
-       FieldBuffers,
+       ResolvedFields,
        spectral_vector,
        physical_vector,
        scalar_spectral,
@@ -176,6 +178,8 @@ export FixedDomain,
        AbstractIntegrator,
        IFRK2,
        IFLowStorageRK3,
+       IntegratorBuffers,
+       allocate_buffers,
        step!,
        recommended_cfl,
        default_integrator,

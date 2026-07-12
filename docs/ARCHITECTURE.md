@@ -179,16 +179,19 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   from here**: `scalar_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
-- **`State`** owns the DNS realisation of the Mori–Zwanzig State role — the representation of the field the
-  dynamics acts on, and its seeding. `FieldBuffers` preallocates *only* the field-sized scratch the configured run needs — sized so that
-  **a step allocates no field-sized memory** (§9, invariant 4), and nothing is over-provisioned: the
-  spectral vorticity, the Runge–Kutta stage registers and predictor, the physical velocity, vorticity, and
-  Lamb-vector buffers, the shared integrating factor, and the per-mode linear forcing rates, with the
-  scalar's buffers allocated only when the run carries a scalar (GPU memory is tight). The
-  initial conditions seed it: `random_solenoidal_velocity!` fills a divergence-free velocity with a
-  large-scale spectral envelope, rescaled to a target ``k``, and `random_scalar!` fills a mean-zero
-  scalar to a target variance. The live spectral fields it defines are held in the run's
-  `Simulation` value (§4.7), where the time loop advances them in place.
+- **`State`** owns the DNS realisation of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
+  record of the evolving spectral fields — the velocity ``\hat{\boldsymbol u}`` and, when the run carries
+  one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
+  scalar are derived from it on demand and never stored, so the state cannot go stale. No operation hangs
+  on it; the generator advances it and the observables read it, both as external functions of
+  ``(\hat{\boldsymbol u}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
+  carrier so the arrows stay primary (§11 decision 26). Its initial conditions seed it:
+  `random_solenoidal_velocity!` fills a divergence-free velocity with a large-scale spectral envelope,
+  rescaled to a target ``k``, and `random_scalar!` fills a mean-zero scalar to a target variance. The
+  per-step scratch is **not** state: it lives with the integrator that owns it (`IntegratorBuffers` in
+  `Propagator`, §4.5), preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
+  to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
+  composes the `ResolvedFields`, and the time loop advances it in place.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -305,6 +308,13 @@ Method (§3).
   damping. `recommended_cfl` gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
+- **`IntegratorBuffers`** is the per-step scratch the propagator owns and writes into — the shared
+  right-hand-side working fields (the physical-recovery copies, the `product_physical`/`product_spectral`
+  that carry the quadratic products, the physical registers, the integrating factor, the linear forcing
+  rates) plus the scheme's Runge–Kutta stage registers — built by `allocate_buffers` dispatching on the
+  concrete scheme, so each allocates exactly its working set. Because the generator's operators take their
+  scratch fields individually (naming no bundle), this scratch belongs to the propagator's realization,
+  not upstream with the state; it is decidedly *not* the state (§11 decision 26).
 
 ### 4.6 `Particles` — Lagrangian instruments
 
@@ -326,9 +336,9 @@ integrator** — the reversible generator of §8 again — so the split does not
 
 ### 4.7 `SimulationRun` — the front door
 
-A `Simulation` value bundles what a case advances: the `FixedDomain`, the `FieldBuffers`, the
-`FlowConditions`, the chosen `AbstractIntegrator`, the spectral fields ``\hat{\boldsymbol u}`` and ``\hat\varphi``
-(the live State the generator acts on), any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
+A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
+spectral fields ``\hat{\boldsymbol u}`` and ``\hat\varphi`` the generator acts on), the `IntegratorBuffers`
+scratch, the `FlowConditions`, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
 for the Heun push, and a clock. Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
@@ -569,7 +579,7 @@ one usually encodes a decision.
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
    and CPU/GPU are first-class (§6).
 4. **Allocation-free stepping over a compile-time state.** A time step allocates no field-sized memory over
-   the preallocated `FieldBuffers` — load-bearing for GPU hot loops. The evolving state is a **compile-time
+   the preallocated `IntegratorBuffers` — load-bearing for GPU hot loops. The evolving state is a **compile-time
    product of concretely-typed buffers** (a parametrised record the compiler specialises), never a
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
    that lets the state grow (a scalar today, a coarser Model's extra fields tomorrow) to more slots at no
@@ -801,6 +811,32 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     time to ``-\log`` of the element type's machine epsilon (``\approx 36`` for `Float64`,
     ``\approx 16`` for `Float32`), so the Nyquist mode always damps to that precision's epsilon —
     precision as a studied axis (invariant 4); an explicit `strength` overrides.
+26. **(2026-07) The state reified as `ResolvedFields`; the per-step scratch relocated to `Propagator`.**
+    The DNS state — the evolving spectral velocity ``\hat{\boldsymbol u}`` and optional scalar
+    ``\hat\varphi`` — is made first-class as **`ResolvedFields`** (module `State`), completing the
+    Mori–Zwanzig triad whose State leg had been missing: the fields were scattered across the `Simulation`
+    value while the diagnostics read the physical *scratch* as if it were state (`kinetic_energy(sim)` read
+    `buffers.velocity`). It is a **bare, inert record with every operation external** — the panel's ruling,
+    which adopts the category lens's guardrail (arrows primary, no methods on the carrier) and rejects its
+    dissolution. **`ResolvedFields` holds only the spectral truth** (``\hat{\boldsymbol u}``,
+    ``\hat\varphi``); the physical velocity, vorticity, and scalar are a Method-side derived view, never
+    stored, so the state cannot go stale — and because the physical chart is rung-specific (EDQNM has no
+    phases to invert), keeping it out of the state keeps the record fit to lift, unchanged, to one slot of
+    the future product-of-slots `State` (§7, abstraction-ready, not built). The observables become **thin
+    functions of the natural representation** with no `State` dependency:
+    `kinetic_energy`/`scalar_variance`/`derivative_skewness`/`energy_spectrum` are Parseval reductions of
+    ``\hat{\boldsymbol u}``/``\hat\varphi``, `dissipation` curls into scratch and reduces, and the run layer
+    prepares what each needs — the mirror of the generator, both now thin externals over bare fields.
+    Consequently the monolithic `FieldBuffers` is dissolved: the generator's operators take their
+    **individual scratch fields** (naming no bundle), so the scratch is free to live with the integrator
+    that owns it as **`IntegratorBuffers`** (module `Propagator`), built by `allocate_buffers` dispatching
+    on the concrete scheme; `ScalarBuffers` stays a nested optional sub-bundle. The name `ResolvedFields`
+    (over `ResolvedState` / `DNSState` / `FieldState`) follows the `FixedDomain` axis-lesson taken to the
+    slot level: the module `State` carries the level-agnostic role, so the concrete slot is named for its
+    representation — the *resolved fields* — with `FilteredFields` (LES/FDF) and a spectrum record (EDQNM)
+    its eventual siblings in the product. A six-lens naming panel with an adversarial pass fixed the slate
+    (`IntegratorBuffers`, and the scratch-field names `product_physical`/`product_spectral` over the
+    velocity-only `lamb`).
 
 ---
 

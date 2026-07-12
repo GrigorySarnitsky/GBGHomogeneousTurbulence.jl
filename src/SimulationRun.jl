@@ -4,7 +4,7 @@
 # SimulationDomain/State/Generator/Observables/Forcing/Propagator/Particles so a case is a few lines to
 # set up and run, warm-up included, while every piece stays reachable for a hand-run loop.
 #
-# The loop maintains one invariant: on entry to a step, `buffers.velocity` / `buffers.vorticity_start` hold the
+# The loop maintains one invariant: on entry to a step, `buffers.velocity_physical` / `buffers.vorticity_start` hold the
 # current physical u / ω — the start-of-step fields `step!` needs and the diagnostics read. A step
 # advances û, φ̂ and then refreshes those cached fields from the new û; the refreshed velocity is also
 # the end-of-step field used to advect the tracers (Heun on u(tₙ), u(tₙ₊₁)). `step!` only reads the
@@ -25,12 +25,13 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
-using ..State: FieldBuffers, random_solenoidal_velocity!, random_scalar!
+using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
 using ..Generator: velocity_to_physical!, vorticity_to_physical!
 using ..Observables: max_speed, derivative_skewness
 import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
-using ..Propagator: AbstractIntegrator, FlowConditions, step!, recommended_cfl, default_integrator
+using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
+                    recommended_cfl, default_integrator
 using ..Particles: Tracers, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -51,9 +52,9 @@ end
                  array_type = Array, dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; k_max_η = 2, energy = 1.5, kwargs...)
 
-A ready-to-run case — the [`FixedDomain`](@ref), the [`FieldBuffers`](@ref), the
-[`FlowConditions`](@ref), the chosen integrator, the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
-``\\hat\\varphi`` in spectral representation, any [`Tracers`](@ref), and a clock. The first form is the
+A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
+[`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the spectral velocity
+``\\hat{\\boldsymbol u}`` and passive scalar ``\\hat\\varphi``), any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
@@ -102,13 +103,12 @@ and the viscosity is chosen from the grid rather than supplied:
   interpolation scheme.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 """
-struct Simulation{DOM, FB, IG, VF<:AbstractForcing, SF<:AbstractForcing, UH, PH, TR, TV}
+struct Simulation{DOM, FB, IG, VF<:AbstractForcing, SF<:AbstractForcing, RF, TR, TV}
   domain::DOM
   buffers::FB
   conditions::FlowConditions{VF, SF}
   integrator::IG
-  velocity::UH             # û in spectral representation
-  scalar::PH               # φ̂ in spectral representation
+  state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   tracers::TR              # Tracers, or nothing
   tracer_velocity::TV      # physical buffer holding u(tₙ) for the Heun advect, or nothing
   cfl::Float64
@@ -146,12 +146,12 @@ function Simulation(domain::FixedDomain;
     ν = Float64(viscosity)
   end
 
-  buffers = FieldBuffers(domain; scalar)
+  buffers = allocate_buffers(integrator, domain; scalar)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = _resolve_forcing(velocity_forcing, domain),
                     scalar_forcing = _resolve_forcing(scalar_forcing, domain))
 
-  û = spectral_vector(domain)
+  state = ResolvedFields(domain; scalar)
   ic_spectrum = nothing
   if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
     fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * energy / 3),
@@ -160,14 +160,13 @@ function Simulation(domain::FixedDomain;
   elseif !isnothing(initial_spectrum)
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
-  random_solenoidal_velocity!(û, domain; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  φ̂ = scalar ? scalar_spectral(domain) : nothing         # `nothing` ⇒ no scalar is evolved (its buffers go unallocated)
-  scalar && random_scalar!(φ̂, domain; variance = scalar_variance, peak_wavenumber, rng)
+  random_solenoidal_velocity!(state.velocity, domain; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
+  scalar && random_scalar!(state.scalar, domain; variance = scalar_variance, peak_wavenumber, rng)
 
   tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
   tracer_velocity = ntracers > 0 ? physical_vector(domain) : nothing
 
-  sim = Simulation(domain, buffers, conditions, integrator, û, φ̂, tracers, tracer_velocity,
+  sim = Simulation(domain, buffers, conditions, integrator, state, tracers, tracer_velocity,
                    Float64(cfl), Clock(0.0, 0))
   return _refresh_cached_fields!(sim)
 end
@@ -182,18 +181,21 @@ end
 # Recompute the cached physical velocity and vorticity from the current û — the start-of-step fields
 # the next `step!` reads and the diagnostics use. Preserves û (the allocating-style transform copies).
 _refresh_cached_fields!(sim::Simulation) =
-  (velocity_to_physical!(sim.buffers.velocity, sim.velocity, sim.domain, sim.buffers);
-   vorticity_to_physical!(sim.buffers.vorticity_start, sim.velocity, sim.domain, sim.buffers); sim)
+  (velocity_to_physical!(sim.buffers.velocity_physical, sim.state.velocity, sim.domain, sim.buffers.velocity_copy);
+   vorticity_to_physical!(sim.buffers.vorticity_start, sim.state.velocity, sim.domain, sim.buffers.vorticity_spectral); sim)
 
 
-# Observables on a `Simulation`'s current (cached) state — extend the `Observables` generics, so
-# `kinetic_energy(sim)` (k), `dissipation(sim)` (ε), and `scalar_variance(sim)` (⟨φ²⟩) read from
-# the cached buffer fields (valid between steps).
-kinetic_energy(sim::Simulation) = kinetic_energy(sim.buffers.velocity)
-dissipation(sim::Simulation) = dissipation(sim.buffers.vorticity_start, sim.conditions.viscosity)
-scalar_variance(sim::Simulation) = sim.scalar === nothing ? NaN : scalar_variance(sim.scalar)
-energy_spectrum(sim::Simulation) = energy_spectrum(sim.velocity, sim.domain)
-integral_scale(sim::Simulation) = integral_scale(sim.velocity, sim.domain)
+# Observables on a `Simulation` — thin wrappers extending the `Observables` generics by reading the
+# spectral state `sim.state` directly: `kinetic_energy`/`scalar_variance`/`energy_spectrum`/`integral_scale`
+# are Parseval reductions of û/φ̂; `dissipation` curls û into the spectral-vorticity scratch (used as a
+# workspace) and reduces it. None reads the physical scratch as state.
+kinetic_energy(sim::Simulation) = kinetic_energy(sim.state.velocity)
+dissipation(sim::Simulation) =
+  (curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers);
+   dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity))
+scalar_variance(sim::Simulation) = sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)
+energy_spectrum(sim::Simulation) = energy_spectrum(sim.state.velocity, sim.domain)
+integral_scale(sim::Simulation) = integral_scale(sim.state.velocity, sim.domain)
 
 
 """
@@ -270,9 +272,9 @@ end
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
 # makes diffusion exact, so only the advective limit applies).
 function cfl_timestep(sim::Simulation)
-  N = size(field_data(sim.buffers.velocity), 1)
+  N = size(field_data(sim.buffers.velocity_physical), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
-  speed = Float64(max_speed(sim.buffers.velocity))
+  speed = Float64(max_speed(sim.buffers.velocity_physical))
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
   return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
 end
@@ -289,13 +291,13 @@ function advance!(sim::Simulation; dt = nothing)
   buffers = sim.buffers
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  step!(sim.integrator, sim.velocity, sim.scalar, sim.domain, buffers, sim.conditions, Δt)
+  step!(sim.integrator, sim.state.velocity, sim.state.scalar, sim.domain, buffers, sim.conditions, Δt)
 
   # u(tₙ) is still cached (step! only reads it); save it, refresh to u(tₙ₊₁), then Heun-advect.
-  sim.tracers === nothing || copyto!(field_data(sim.tracer_velocity), field_data(buffers.velocity))
+  sim.tracers === nothing || copyto!(field_data(sim.tracer_velocity), field_data(buffers.velocity_physical))
   _refresh_cached_fields!(sim)
   sim.tracers === nothing ||
-    advect!(sim.tracers, sim.tracer_velocity, buffers.velocity, sim.domain, Δt)
+    advect!(sim.tracers, sim.tracer_velocity, buffers.velocity_physical, sim.domain, Δt)
 
   sim.clock.time += Δt
   sim.clock.step += 1
@@ -439,11 +441,11 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   ε = dissipation(sim)
   φ2 = m.gate_scalar ? scalar_variance(sim) : 0.0
-  S = m.gate_skew ? derivative_skewness(sim.velocity, sim.domain) : 0.0
+  S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
-_scalar_forced(sim::Simulation) = sim.scalar !== nothing && !(sim.conditions.scalar_forcing isa NoForcing)
+_scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.conditions.scalar_forcing isa NoForcing)
 
 
 """

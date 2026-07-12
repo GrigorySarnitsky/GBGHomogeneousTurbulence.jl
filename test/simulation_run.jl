@@ -177,7 +177,7 @@ using Test
 
   @testset "derivative skewness" begin
     domain = FixedDomain(24, 2π; scalar_type = Float64)
-    buffers = FieldBuffers(domain; scalar = true)
+    buffers = IntegratorBuffers(domain; scalar = true)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)
@@ -188,8 +188,8 @@ using Test
     φ̂ = scalar_spectral(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
     for _ in 1:80
-      velocity_to_physical!(buffers.velocity, û, domain, buffers)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
+      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
       step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, 0.012)
     end
     S = derivative_skewness(û, domain)
@@ -202,7 +202,7 @@ using Test
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
-    @test isfinite(derivative_skewness(sim.velocity, sim.domain))
+    @test isfinite(derivative_skewness(sim.state.velocity, sim.domain))
     @test current_step(sim) > 0
   end
 

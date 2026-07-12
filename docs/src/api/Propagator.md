@@ -16,6 +16,16 @@ IFLowStorageRK3
 IFRK2
 ```
 
+## Step scratch
+
+The preallocated per-step working set the integrator writes into — built per concrete scheme, sized so
+a step allocates no field-sized memory.
+
+```@docs
+IntegratorBuffers
+allocate_buffers
+```
+
 ## Time stepping
 
 One in-place step of the coupled velocity and passive scalar together through the shared RK stages.

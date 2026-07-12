@@ -23,8 +23,8 @@ integrating factor), [`apply_forcing!`](@ref) (a post-step projection), [`prepar
 per-step state advance), and [`add_forcing_source!`](@ref) (an additive per-stage source).
 Every step hook takes the operator bundle `domain` (a [`FixedDomain`](@ref)) — as do the
 `domain`-taking forcing constructors, which build their band kernels from it; `set_forcing_rate!`,
-`prepare_forcing!`, and `add_forcing_source!` additionally take the preallocated scratch `buffers` (a
-[`FieldBuffers`](@ref GBGIsotropicTurbulence.State.FieldBuffers)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
+`prepare_forcing!`, and `add_forcing_source!` additionally take the preallocated scratch `buffers` (an
+[`IntegratorBuffers`](@ref GBGIsotropicTurbulence.Propagator.IntegratorBuffers)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
 `BandRescaling`, `Linear`, and `ConstantPower` are provided; one
 implementation serves both the velocity and the scalar, and the two are forced **independently** —
 `FlowConditions` takes a separate `velocity_forcing` and `scalar_forcing` (each an `AbstractForcing`, each
@@ -273,7 +273,7 @@ end
 
 _ou_state(::VectorFieldSpectral, domain) = spectral_vector(domain)
 _ou_state(::ScalarFieldSpectral, domain) = scalar_spectral(domain)
-_ou_buffers(::VectorFieldSpectral, buffers, domain) = (buffers.lamb, buffers.scratch, domain.velocity_plans)
+_ou_buffers(::VectorFieldSpectral, buffers, domain) = (buffers.product_physical, buffers.product_spectral, domain.velocity_plans)
 _ou_buffers(::ScalarFieldSpectral, buffers, domain) = (buffers.scalar.field, buffers.scalar.copy, domain.scalar_plans)
 
 

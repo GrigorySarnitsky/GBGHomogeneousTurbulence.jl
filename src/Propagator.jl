@@ -11,7 +11,7 @@
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
 # only marginally stable for advection (see its docstring). Each `step!` assumes the caller has
-# filled `buffers.velocity` / `buffers.vorticity_start` with the start-of-step physical velocity and vorticity.
+# filled `buffers.velocity_physical` / `buffers.vorticity_start` with the start-of-step physical velocity and vorticity.
 
 """
     Propagator
@@ -27,13 +27,13 @@ advective-CFL ceiling; [`FlowConditions`](@ref) bundles the problem parameters a
 module Propagator
 
 using GBGPeriodicFields
-using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction
-using ..State: FieldBuffers
+using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
+                          spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
                   scalar_to_physical!, scalar_nonlinear!, FlowConditions
 using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
 
-export AbstractIntegrator, IFRK2, IFLowStorageRK3, step!,
+export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
        recommended_cfl, default_integrator
 
 
@@ -48,13 +48,97 @@ scalar `φ̂` (both in spectral representation) by one timestep in place, and ma
 abstract type AbstractIntegrator end
 
 
+# The passive-scalar step buffers — held by `IntegratorBuffers` only when a scalar is evolved,
+# `nothing` otherwise (so a velocity-only run allocates none of them).
+struct ScalarBuffers{SS, SP, RK}
+  stage1::SS
+  stage2::SS
+  star_spectral::SS
+  nonlinear::SS
+  copy::SS
+  field::SP
+  rate::RK                       # per-mode linear forcing rate for φ, folded into E_κ
+end
+
+
+"""
+    IntegratorBuffers(domain; scalar = false)
+
+The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
+memory. It holds the shared right-hand-side scratch every scheme needs — the velocity copy and the
+spectral vorticity the physical-field recovery consumes, the physical `product_physical` and spectral
+`product_spectral` that hold the quadratic products (the Lamb vector and the scalar flux), the physical
+velocity/vorticity registers, the shared integrating factor, and the velocity's per-mode
+linear-forcing-rate array ``A(\\boldsymbol{\\kappa})`` — together with the Runge–Kutta stage registers.
+Build it per scheme with [`allocate_buffers`](@ref), which dispatches on the concrete `integrator`.
+
+When `scalar = true` a nested `ScalarBuffers` bundle is allocated for the passive scalar ``\\varphi``
+(its stage registers, predictor, nonlinear-term buffer, a copy, the physical scalar, and its
+forcing-rate array; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses `product_physical` /
+`product_spectral`). When `scalar = false` the run evolves no scalar, so `buffers.scalar` is `nothing`
+and none of those field-sized buffers are allocated.
+"""
+struct IntegratorBuffers{VS, SS, VP, RK, SB}
+  vorticity_spectral::VS
+  stage1::VS
+  stage2::VS
+  velocity_star_spectral::VS
+  velocity_copy::VS
+  product_spectral::VS
+  nonlinear::VS
+  integrating_factor::SS
+  velocity_physical::VP
+  vorticity_start::VP
+  vorticity_physical::VP
+  velocity_star::VP
+  product_physical::VP
+  velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
+  scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
+end
+
+
+_forcing_rate(domain::FixedDomain) =
+  fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+
+ScalarBuffers(domain::FixedDomain) = ScalarBuffers(
+  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
+  scalar_spectral(domain), scalar_spectral(domain),
+  scalar_physical(domain),
+  _forcing_rate(domain),
+)
+
+function IntegratorBuffers(domain::FixedDomain; scalar::Bool = false)
+  return IntegratorBuffers(
+    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
+    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
+    scalar_spectral(domain),
+    physical_vector(domain), physical_vector(domain), physical_vector(domain),
+    physical_vector(domain), physical_vector(domain),
+    _forcing_rate(domain),
+    scalar ? ScalarBuffers(domain) : nothing,
+  )
+end
+
+
+"""
+    allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
+
+Allocate the [`IntegratorBuffers`](@ref) a step needs, dispatching on the concrete `integrator` so each
+scheme allocates exactly its working set (currently the same for every scheme). The run layer calls this
+when assembling a `Simulation`; to build buffers directly, use the `IntegratorBuffers(domain; scalar)`
+constructor.
+"""
+allocate_buffers(::AbstractIntegrator, domain::FixedDomain; scalar::Bool = false) =
+  IntegratorBuffers(domain; scalar)
+
+
 """
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
 
 Advance the spectral velocity `û` and passive scalar `φ̂` by one timestep `dt` in place, using the
 scheme `integrator`, the domain `domain`, the buffers `buffers`, and the problem `conditions` (a
 [`FlowConditions`](@ref): viscosity, Schmidt number, and the two forcings). Dispatches on the concrete
-`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `buffers.velocity` and
+`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `buffers.velocity_physical` and
 `buffers.vorticity_start` with the start-of-step physical velocity and vorticity (via
 [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)).
 """
@@ -90,7 +174,7 @@ third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFR
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
-function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
+function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffers,
                conditions::FlowConditions, dt::Real)
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -114,14 +198,14 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::FieldB
 
   for i in 1:3
     if i == 1
-      u, ω = buffers.velocity, buffers.vorticity_start                  # cached start-of-step
+      u, ω = buffers.velocity_physical, buffers.vorticity_start                  # cached start-of-step
     else
-      velocity_to_physical!(buffers.velocity_star, û, domain, buffers)
-      vorticity_to_physical!(buffers.vorticity_physical, û, domain, buffers)
+      velocity_to_physical!(buffers.velocity_star, û, domain, buffers.velocity_copy)
+      vorticity_to_physical!(buffers.vorticity_physical, û, domain, buffers.vorticity_spectral)
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
-    velocity_nonlinear!(buffers.nonlinear, u, ω, domain, buffers)          # N̂_u
+    velocity_nonlinear!(buffers.nonlinear, u, ω, domain, buffers.product_physical, buffers.product_spectral)          # N̂_u
     add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain, buffers)         # + additive forcing (OU)
     if i == 1
       multiply!(hu, dt_T, buffers.nonlinear)                                      # A₁ = 0
@@ -137,8 +221,8 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::FieldB
     # `u` and `φ̂` are untouched above, so this is bit-identical to advancing them together.
     if has_scalar
       hφ = sb.stage1                                                              # scalar accumulator
-      scalar_to_physical!(sb.field, φ̂, domain, buffers)                          # φ at the stage state
-      scalar_nonlinear!(sb.nonlinear, u, sb.field, domain, buffers)               # N̂_φ (reuses buffers.lamb/buffers.scratch)
+      scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
+      scalar_nonlinear!(sb.nonlinear, u, sb.field, domain, buffers.product_physical, buffers.product_spectral)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral)
       add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain, buffers)
       if i == 1
         multiply!(hφ, dt_T, sb.nonlinear)
@@ -152,7 +236,7 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::FieldB
     end
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.scratch)
+  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)   # scalar-spectral scratch (free here)
   return û, φ̂
 end
@@ -190,7 +274,7 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
 struct IFRK2 <: AbstractIntegrator end
 
 
-function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
+function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffers,
                conditions::FlowConditions, dt::Real)
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -210,11 +294,11 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
   end
 
   # stage 1 — nonlinear terms at the start-of-step state
-  velocity_nonlinear!(buffers.stage1, buffers.velocity, buffers.vorticity_start, domain, buffers)              # N̂_u,1
+  velocity_nonlinear!(buffers.stage1, buffers.velocity_physical, buffers.vorticity_start, domain, buffers.product_physical, buffers.product_spectral)              # N̂_u,1
   add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain, buffers)
   if has_scalar
-    scalar_to_physical!(sb.field, φ̂, domain, buffers)
-    scalar_nonlinear!(sb.stage1, buffers.velocity, sb.field, domain, buffers)            # N̂_φ,1
+    scalar_to_physical!(sb.field, φ̂, domain, sb.copy)
+    scalar_nonlinear!(sb.stage1, buffers.velocity_physical, sb.field, domain, buffers.product_physical, buffers.product_spectral)            # N̂_φ,1
     add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain, buffers)
   end
 
@@ -229,13 +313,13 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
   end
 
   # stage 2 — nonlinear terms at the predictor state
-  velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, buffers)
-  vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers)
-  velocity_nonlinear!(buffers.stage2, buffers.velocity_star, buffers.vorticity_physical, domain, buffers)      # N̂_u,2
+  velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, buffers.velocity_copy)
+  vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers.vorticity_spectral)
+  velocity_nonlinear!(buffers.stage2, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral)      # N̂_u,2
   add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain, buffers)
   if has_scalar
-    scalar_to_physical!(sb.field, sb.star_spectral, domain, buffers)
-    scalar_nonlinear!(sb.stage2, buffers.velocity_star, sb.field, domain, buffers)       # N̂_φ,2
+    scalar_to_physical!(sb.field, sb.star_spectral, domain, sb.copy)
+    scalar_nonlinear!(sb.stage2, buffers.velocity_star, sb.field, domain, buffers.product_physical, buffers.product_spectral)       # N̂_φ,2
     add_forcing_source!(conditions.scalar_forcing, sb.stage2, domain, buffers)
   end
 
@@ -255,7 +339,7 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::FieldBuffers,
     combine!(φ̂, one(T), φ̂, half, sb.stage2)
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.scratch)
+  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)
   return û, φ̂
 end

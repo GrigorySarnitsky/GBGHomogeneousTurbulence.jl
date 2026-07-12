@@ -5,13 +5,14 @@ Modules = [GBGIsotropicTurbulence.State]
 Order   = [:module]
 ```
 
-## Field buffers
+## The state
 
-The preallocated per-step scratch a run advances — allocated only for what the configured run needs (no
-scalar scratch when the run carries no scalar).
+The inert record of the evolving spectral fields a run advances — the single source of truth (velocity
+`û` and, optionally, scalar `φ̂`); the physical velocity, vorticity, and scalar are derived on demand,
+never stored.
 
 ```@docs
-FieldBuffers
+ResolvedFields
 ```
 
 ## Random initial conditions

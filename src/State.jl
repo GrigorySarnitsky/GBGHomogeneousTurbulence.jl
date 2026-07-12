@@ -1,16 +1,17 @@
-# State — the DNS realisation of the Mori–Zwanzig State role: the preallocated field buffers a step
-# writes into (allocated only for what the configured run needs — no scalar scratch when scalar = false)
-# and the random initial conditions that seed a run. Everything is sized to a `FixedDomain` from
-# `SimulationDomain`.
+# State — the DNS realisation of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
+# velocity and scalar — the single source of truth; the physical fields are derived, never stored) and
+# the random initial conditions that seed a run. The per-step scratch lives with the integrator
+# (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
 
 """
     State
 
-The DNS realisation of the Mori–Zwanzig State role — the field the dynamics acts on, as stored and seeded:
-[`FieldBuffers`](@ref), the preallocated scratch a coupled velocity + scalar step writes into (only what the
-configured run needs; no scalar buffers when the run carries no scalar), and the random initial conditions
-[`random_solenoidal_velocity!`](@ref) (the divergence-free velocity) and [`random_scalar!`](@ref) (the
-mean-zero scalar ``\\varphi``). All sized to a [`FixedDomain`](@ref).
+The DNS realisation of the Mori–Zwanzig State role — the field the dynamics acts on and how it is
+seeded: [`ResolvedFields`](@ref), the inert record of the evolving spectral velocity and scalar (the
+single source of truth — the physical fields are derived, never stored), and the random initial
+conditions [`random_solenoidal_velocity!`](@ref) (the divergence-free velocity) and
+[`random_scalar!`](@ref) (the mean-zero scalar ``\\varphi``) that seed it. All sized to a
+[`FixedDomain`](@ref).
 """
 module State
 
@@ -19,80 +20,26 @@ using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, physical_vector,
                           scalar_spectral, scalar_physical, _real_type
 
-export FieldBuffers, random_solenoidal_velocity!, random_scalar!
-
-
-# The passive-scalar step buffers — held by `FieldBuffers` only when a scalar is evolved, `nothing`
-# otherwise (so a velocity-only run allocates none of them).
-struct ScalarBuffers{SS, SP, RK}
-  stage1::SS
-  stage2::SS
-  star_spectral::SS
-  nonlinear::SS
-  copy::SS
-  field::SP
-  rate::RK                       # per-mode linear forcing rate for φ, folded into E_κ
-end
+export ResolvedFields, random_solenoidal_velocity!, random_scalar!
 
 
 """
-    FieldBuffers(domain; scalar = false)
+    ResolvedFields(domain; scalar = false)
 
-Preallocated scratch for one integrating-factor step, sized so a step allocates no field-sized memory.
-The velocity buffers are the spectral vorticity, two Runge–Kutta stage registers (buffers holding a
-stage's state and accumulator), the predictor field, a velocity copy (the in-place inverse transform
-consumes its source), a general spectral scratch, the nonlinear-term buffer, and the physical velocity /
-start-of-step vorticity / per-stage vorticity / predictor / Lamb-vector
-(``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``); the shared integrating factor and the velocity's
-per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})`` complete them.
-
-When `scalar = true` a `ScalarBuffers` bundle is allocated for the passive scalar ``\\varphi`` (two stage
-registers, a predictor, the nonlinear-term buffer, a copy, the physical scalar, and its forcing-rate
-array; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses the velocity scratch). When `scalar = false`
-the run evolves no scalar, so `buffers.scalar` is `nothing` and none of those field-sized buffers are
-allocated.
+The inert record of the evolving spectral fields a run advances — the Mori–Zwanzig state, and the single
+source of truth: the spectral velocity ``\\hat{\\boldsymbol u}`` (`velocity`) and, when the run carries a
+passive scalar, the spectral scalar ``\\hat\\varphi`` (`scalar`; `nothing` otherwise). The physical
+velocity, vorticity, and scalar are *derived* from these on demand, never stored here — so the state
+cannot go stale. No operation hangs on this record: the generator advances it and the observables read it
+as external functions of ``(\\hat{\\boldsymbol u}, \\hat\\varphi)``. Allocated on a [`FixedDomain`](@ref).
 """
-struct FieldBuffers{VS, SS, VP, RK, SB}
-  vorticity_spectral::VS
-  stage1::VS
-  stage2::VS
-  velocity_star_spectral::VS
-  velocity_copy::VS
-  scratch::VS
-  nonlinear::VS
-  integrating_factor::SS
-  velocity::VP
-  vorticity_start::VP
-  vorticity_physical::VP
-  velocity_star::VP
-  lamb::VP
-  velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
-  scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
+struct ResolvedFields{UH, PH}
+  velocity::UH                   # û (spectral) — the resolved velocity, the single source of truth
+  scalar::PH                     # φ̂ (spectral), or nothing when the run carries no scalar
 end
 
-
-_forcing_rate(domain::FixedDomain) =
-  fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
-
-ScalarBuffers(domain::FixedDomain) = ScalarBuffers(
-  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
-  scalar_spectral(domain), scalar_spectral(domain),
-  scalar_physical(domain),
-  _forcing_rate(domain),
-)
-
-function FieldBuffers(domain::FixedDomain; scalar::Bool = false)
-  return FieldBuffers(
-    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
-    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
-    scalar_spectral(domain),
-    physical_vector(domain), physical_vector(domain), physical_vector(domain),
-    physical_vector(domain), physical_vector(domain),
-    _forcing_rate(domain),
-    scalar ? ScalarBuffers(domain) : nothing,
-  )
-end
-
+ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
+  ResolvedFields(spectral_vector(domain), scalar ? scalar_spectral(domain) : nothing)
 
 
 """

@@ -18,8 +18,8 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   for _ in 1:nsteps
-    velocity_to_physical!(buffers.velocity, û, domain, buffers)
-    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers)
+    velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
+    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
   end
   return û, φ̂
@@ -34,7 +34,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = FixedDomain(N, L; scalar_type = T)
-  buffers = FieldBuffers(domain; scalar = true)
+  buffers = IntegratorBuffers(domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7
