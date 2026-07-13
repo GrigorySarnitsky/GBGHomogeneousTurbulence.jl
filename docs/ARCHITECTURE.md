@@ -628,7 +628,17 @@ one usually encodes a decision.
 - **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
   rationale and the decision log. Mathematics is rendered LaTeX in the glossary's notation
   ([`docs/src/notation.md`](notation.md)); a code identifier is always in `backticks` and never inside a
-  math span.
+  math span; each code object is bound to its mathematical symbol on first mention — rendered as one
+  LaTeX span, ``\texttt{dissipation} \equiv \varepsilon``.
+- **No dead references on the user-facing surface.** A rendered docstring — and a thrown error — must
+  read complete at the REPL, where cross-links are dead: it cites no section number (`§4.5`),
+  decision-log entry, or repo path. Design rationale and section citations stay in `#` comments and this
+  document.
+- **Cross-referencing is discriminating-minimalist.** A link earns its place: promote a backticked
+  identifier to `@ref` / `@extref` only for a genuine jump with one clear destination; link a target at
+  most once per docstring; never link the docstring's own binding, its arguments, or bare `Base` names —
+  except the storage-backend / element types and `GBGPeriodicFields` objects, which `@extref` to their
+  own package docs (the `DocumenterInterLinks` setup).
 - **Verification is by numerical oracle, not a formalization ledger.** Because the package introduces no
   novel mathematical *objects* (they are `GBGPeriodicFields`' and `GBGStreamingStatistics`'), its
   nontrivial claims are *dynamical* — the exactness of ``\mathcal E``, the order of the integrator,
@@ -639,8 +649,23 @@ one usually encodes a decision.
   against a relational-logic model (`docs/architecture.als`, decisions 21–22); that model carries no
   dynamics, so it complements the oracle rather than becoming the ledger. Revisit only if a built Model
   rung introduces genuinely package-specific formalism.
+- **Category/type errors are their own correctness class.** A claim can be perfectly formatted and read
+  true yet conflate two *kinds* of object — a field with its representation (physical vs spectral); a
+  diagnostic scalar with the field it reduces (the rate ``\varepsilon``, a number, vs a dissipation
+  field; ``k`` vs the spectrum ``E(\kappa)``); an operator with its parameter (``\mathcal E`` vs ``\nu``;
+  ``\mathbb P`` vs ``\mathcal P``); a rate with its time-integral; a spectral density ``E(\kappa)`` with an
+  energy. Type each object from the code and expand the statement — the physics mirror of the sibling
+  backends' type-error guard (`GBGStreamingStatistics`' density-vs-measure, estimator-vs-estimand).
+- **The `/check-docs` battery.** Documentation quality is enforced by a full matrix — (Correct /
+  Self-contained / Notation / Formatted / Current / Cited / variant-pairs) × (every surface:
+  `ARCHITECTURE.md`, every `src/*.jl` docstring, every `docs/src` page) — run to completion in one pass
+  (`.claude/commands/check-docs.md`). *Correct* extends to physical-formula and normalization checking
+  (the ``1/N``, the ``2\varkappa``, the ``\tfrac12`` in the energy, Parseval factors) and to the
+  category/type-error class above. Two build lints (`lint_inline_math`, `lint_notation_variants`) and
+  `checkdocs = :exports` are the mechanical backstop.
 - **Citations** follow author–year; the full references are §References. Never cite an inaccessible source;
-  the material under `inspiration/` is private and never referenced.
+  the material under `inspiration/` is private and never referenced. A reference *block* of two or more
+  citations is a bullet list — one citation per line — never a semicolon-joined paragraph.
 
 ---
 

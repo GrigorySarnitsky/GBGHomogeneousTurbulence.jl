@@ -27,23 +27,27 @@ Each concern is its own file (`docs/ARCHITECTURE.md` §4). **Physics** concerns 
 the **Mori–Zwanzig lens** — the *dynamics* (the generator / RHS) and its *observables* (the measured
 functions of state); **realization / infrastructure** concerns are named by their job.
 
-- `SimulationState` — the operator + transform-plan bundle (`SimulationDomain`), the preallocated
-  `FieldBuffers`, and the random initial conditions.
-- `Dynamics` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
+- `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
+  (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
+- `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
+  spectral representation, the single source of truth) and the random initial conditions.
+- `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor. The MZ *generator*.
-- `Observables` — the measured functions of state (energy, dissipation, derivative skewness, scalar
-  variance and dissipation, max speed). The MZ *observables*.
+- `Observables` — the measured functions of state (kinetic energy, dissipation, derivative skewness,
+  scalar variance and dissipation, max speed, energy spectrum, integral scale). The MZ *observables*.
 - `Forcing` — pluggable energy-injection strategies (`AbstractForcing`).
-- `TimeIntegration` — pluggable integrating-factor schemes (`AbstractIntegrator`).
-- `Particles` — Lagrangian tracer tracking.
+- `Propagator` — pluggable integrating-factor schemes (`AbstractIntegrator`) and the per-step scratch
+  (`IntegratorBuffers`).
+- `Particles` — Lagrangian tracer tracking (`Tracers`).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
-Include order: `SimulationState → Dynamics → Observables → Forcing → TimeIntegration → Particles →
-SimulationRun`. Cross-module access only through explicit `using ..Module: name` — never a bare `using`.
+Include order: `SimulationDomain → State → Forcing → Generator → Observables → Propagator → Particles →
+SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
+only through explicit `using ..Module: name` — never a bare `using`.
 
 A **`Phenomenology`** submodule — the reference turbulence laws (model spectra, structure-function laws,
 dimensionless-constant fits), each an author-year parametrization of one abstract law family per quantity
-— is planned as a dependency-light, **extraction-bound** leaf: it takes **no** `GBGPeriodicFields` /
+— is a dependency-light, **extraction-bound** leaf (scaffolded, with reference laws and oracle tests in place): it takes **no** `GBGPeriodicFields` /
 `GBGStreamingStatistics` / dynamics dependency, is **not** re-exported by the umbrella, and is designed to
 be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite. Do not add such dependencies to it.
 See `docs/ARCHITECTURE.md` §4.7 and decision 18.
@@ -140,6 +144,23 @@ the formula and the kernel, listed first); the allocating form is a thin `@ref`-
 second copy of the formula and no notation that drifts across the pair (`\partial_i` vs
 `\partial_{x_i}`).
 
+**Cross-referencing — a link earns its place.** Backtick every code identifier; promote to `@ref` (or
+`@extref` for an external / cross-package object) only where a reader would genuinely jump and there is
+**one** clear destination. (1) Link a target **at most once per docstring** — its first genuine mention.
+(2) **Never** link the docstring's own binding, its argument names, option / `Symbol` tokens, or struct
+fields. (3) A **family** of related built-ins is **one** catalogue destination, not five (a glossary
+table is the exception — it maps each symbol to its own object). (4) **At-home test** — if a sentence
+would sit equally well in the *target's* own docstring, cut it and link. The storage-backend and element
+types (`Array` / `CuArray` / `ROCArray`, `Float32` / `Float64`) and the `GBGPeriodicFields` types are the
+deliberate `@extref` exception to "don't link `Base`": the GPU-backend and dependency story makes them
+worth the jump.
+
+**No dead references on the user-facing surface.** A rendered docstring — and a thrown error message —
+must read **complete at the REPL**, where cross-links are dead: never cite an `ARCHITECTURE.md` section
+number (`§4.5`), a decision-log entry, or a repo path (`src/…`, `inspiration/…`) there. A cross-reference
+adds depth one hop away; it never carries a fact the reader needs. (Design rationale and section
+citations stay in `#` comments and `ARCHITECTURE.md`.)
+
 **API pages are logically grouped.** Group public objects under hand-written `## Header` sections via
 explicit `@docs` blocks (never `@autodocs`, which cannot express a semantic group); each object appears
 **once**; keep an `f` / `f!` pair together with the `!` home first; a `@docs` block stays homogeneous
@@ -156,6 +177,12 @@ bare-index ``\partial_i``, build-enforced**); the imaginary unit is upright ``\m
 projection is ``\mathbb P``, a Mori–Zwanzig projection ``\mathcal P``. The Reynolds number is set
 through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a field — ``\mathrm{Re}_\lambda`` is measured.
 
+**Bind each code object to its symbol on first mention** — write the correspondence explicitly so it is
+never left implicit: `dissipation` ``\equiv \varepsilon``, `kinetic_energy` ``\equiv k``, `curl`
+``\equiv \nabla\times``, a field in spectral representation ``\hat f``. In a *rendered* docstring make the
+binding **one** LaTeX span — ``\texttt{dissipation} \equiv \varepsilon`` — never a `` `code` `` span
+abutting a math span (silent-rendering rule (b) below).
+
 **Silent-rendering micro-rules — markup KaTeX / Documenter render *wrong without failing the build*.**
 (a) A code identifier never sits inside a ``…`` / ```math``` span (it renders as a product of italic
 single letters — backtick it, or ``\texttt{}``-wrap it inside a formula). (b) A formula is one LaTeX
@@ -164,7 +191,10 @@ ONE source line** — a wrapped continuation beginning with a CommonMark list / 
 (`- ` / `* ` / `> ` / `1.`) is parsed as a new list item and silently drops the span out of math mode
 (`docs/make.jl`'s `lint_inline_math()` fails the build on it). (d) No horizontal scroll — hand-wrap a
 long docstring signature with a hanging indent under the first argument; break a wide display formula
-with `aligned` / `gathered` / `split` (neither a code block nor display math auto-wraps).
+with `aligned` / `gathered` / `split` (neither a code block nor display math auto-wraps). (e) A backtick
+span holds only **well-formed Julia** — a name, type, call, or expression; math that merely looks
+code-ish (a half-open interval `[a, b)`, an inequality `κ ≥ 2`, a lone `≤` / `·` / `−` glyph) is LaTeX,
+not backticks.
 
 **Correctness is verified, not asserted.** Check every formula, normalization (the ``1/N``, the
 ``2\varkappa``, the ``\tfrac12`` in the energy, Parseval / spectral factors), and every "X is just Y"
@@ -172,6 +202,18 @@ equivalence by expanding it against the code — a plausible claim is false unti
 Two examples from this codebase: the derivative-skewness "divergence" bug (a repeated index read as
 ``\nabla\cdot\boldsymbol u = 0``), and the coordinate-free skewness constant
 ``C = \tfrac47\sqrt{15/2}`` (numerically verified, a competing value ruled out).
+
+**Category/type errors are their own class** — distinct from a normalization slip and invisible to a
+value-check: a sentence can be perfectly formatted and read true yet conflate two *kinds* of object.
+Guard against conflating a **field** with its **representation** (the physical object vs its spectral
+coefficients — say "field in spectral representation", never "spectral field"); a **diagnostic scalar**
+with the **field** it reduces (the rate ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``,
+a number, vs a dissipation field; the kinetic energy ``k`` vs the spectrum ``E(\kappa)``); an **operator**
+with its **parameter** (the integrating factor ``\mathcal E`` vs ``\nu``; the Leray projection ``\mathbb P``
+vs a Mori–Zwanzig ``\mathcal P``); a **rate** with its **time-integral**; a per-unit-wavenumber **spectral
+density** ``E(\kappa)`` with an **energy**; and a dimensionally-incomplete reference law (a bare
+``\kappa^{-5/3}`` slope vs ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}``). Type every object from the code and
+expand it — the physics mirror of the sibling backends' type-error guard.
 
 **Prose is grammatical.** Every sentence has a subject and a verb; no verbless fragments, noun-stacks,
 `label:`-colon tags, or comma splices. Concise means few words, not missing verbs.
@@ -190,7 +232,9 @@ instance is a *sample of a class* — fix the class, not the line.
 
 1. **Correct** — every formula, normalization, conservation / adjoint relation, and quantifier
    (*exact / all / never*) true and precise, verified against `src/` (quote the decisive line) or by
-   derivation; the diagnostic consistent with the physical quantity it claims to measure.
+   derivation; the diagnostic consistent with the physical quantity it claims to measure; and free of
+   **category/type errors** (a field vs its representation, an operator vs its parameter, a rate vs its
+   time-integral — type each object from the code).
 2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
    every signature argument documented** — enumerated *from the signature* (positional + keyword), each
    its own entry, so an "obvious" `domain` or `dt` cannot be skipped (this is how `domain` / `buffers` once

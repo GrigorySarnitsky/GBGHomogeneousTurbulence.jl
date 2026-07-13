@@ -11,9 +11,10 @@ checklist) holds the authoritative definitions; this command runs all of them.
 ## Surfaces (ALL of them)
 
 1. `docs/ARCHITECTURE.md` — every section and §References.
-2. Every docstring in `src/*.jl` — `SimulationState`, `Dynamics`, `Observables`, `Forcing`,
-   `TimeIntegration`, `Particles`, `SimulationRun`, and the umbrella `GBGIsotropicTurbulence.jl` (module
-   **and** function docstrings; `#` comments are exempt — not rendered).
+2. Every docstring in `src/*.jl` — `SimulationDomain`, `State`, `Generator`, `Observables`, `Forcing`,
+   `Propagator`, `Particles`, `SimulationRun`, `Phenomenology` (and its `Spectra` / `StructureFunctions` /
+   `Scalings` submodules), and the umbrella `GBGIsotropicTurbulence.jl` (module **and** function
+   docstrings; `#` comments are exempt — not rendered).
 3. Every page in `docs/src/` — `index.md`, `notation.md`, `api.md`, and all `docs/src/api/*.md`
    (hand-written prose and `@docs` groupings; skip the `@autodocs` / `@example` / `@repl` / `@index`
    blocks themselves).
@@ -30,8 +31,16 @@ read-through, so passive reading is not a check.
    quote the decisive line) or by derivation. Confirm the **diagnostic is consistent with the physical
    quantity it claims to measure** (the estimator computes what the leading formula states). Flag false /
    imprecise / overclaim. For a nontrivial statement the sharpest method is to write it formally on scratch
-   (types from the code) and expand it. Cross-check a load-bearing claim against `ARCHITECTURE.md` (its
-   decision log and the physics) and against the enforcing test.
+   (types from the code) and expand it. **Also flag the category/type-error class** — invisible to a
+   value-check (a sentence can be perfectly formatted and read true yet conflate two *kinds* of object): a
+   **field** conflated with its **representation** (physical vs spectral — "field in spectral
+   representation", not "spectral field"); a **diagnostic scalar** with the **field** it reduces (the
+   dissipation *rate* `ε = ν⟨|ω|²⟩`, a number, vs a dissipation field; `k` vs the spectrum `E(κ)`); an
+   **operator** with its **parameter** (the integrating factor vs `ν`; the Leray projection `ℙ` vs a
+   Mori–Zwanzig `𝒫`); a **rate** vs its **time-integral**; a per-`κ` **spectral density** `E(κ)` vs a bulk
+   **energy**; a dimensionally-incomplete reference law (a bare `κ^-5/3` slope vs `C_K ε^2/3 κ^-5/3`). Type
+   every object from the code. Cross-check a load-bearing claim against `ARCHITECTURE.md` (its decision log
+   and the physics) and against the enforcing test.
 2. **Self-contained** — enumerate every symbol, sub / superscript, operator name, and bold / blackboard
    letter; cite the clause (on the page or in `notation.md`) that binds each; flag any unbound.
    (Universally standard math — `∇`, `Δ`, `∫`, `⟨·⟩`, `π`, the imaginary unit — needs no binding.) **And,
@@ -87,7 +96,12 @@ read-through, so passive reading is not a check.
   of a multi-method generic over-flags things documented centrally or on a sibling method, so **verify
   every cold-reader finding against source before fixing**.
 - Run the deterministic grep guards below, plus a bare-module-name scan and a glyph-vs-backtick scan
-  (Unicode math *outside* a backtick span).
+  (Unicode math *outside* a backtick span), a **code-in-math scan** (a 2+-letter lowercase run *inside* a
+  ``…`` span that is neither a `\command` nor `\texttt`/`\mathrm`-wrapped — it renders as a letter-product),
+  a **split-formula scan** (a ``…`` math span abutting a `` `code` `` span — the silent rule-(b) failure),
+  and a deterministic **argument-coverage** backstop: a short Julia helper that splits each `"""…"""`,
+  parses the signature's positional + keyword parameters, and flags any never mentioned as a backticked
+  `` `arg` `` in the body (then triage).
 
 ```bash
 grep -rnE '^[[:space:]]+\|[-:| ]+\|' docs                              # tables top-level only — must be empty
@@ -98,6 +112,8 @@ grep -rnE '\\partial_[ijk]' src/*.jl docs/*.md docs/src                # bare-in
 grep -rnE '\\mathbf' src/*.jl docs/*.md docs/src                       # upright bold → \boldsymbol; build-enforced, must be empty
 grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.velocity|_forcing|_spectral|_physical|_field|_copy|_star|_start|_rate|_nonlinear|_plans|velocity_|vorticity_|`|the |physical |a velocity'  # stale math-variable names (triage: keep struct fields / function names / prose)
 awk '/^"""/{d=!d;s=d;next} s&&/^[^ ]/{s=0} s&&/^    [A-Za-z_].*\(/&&length>88{print FILENAME":"FNR}' src/*.jl  # wide docstring signatures — FNR (per-file)
+grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring: a §-number / design-doc path (drop #-comment hits) — must be empty
+grep -rnzE 'References?:[^"]*;' src/*.jl                                # crammed citation block (two citations joined by `;`) → one per bullet line
 ```
 
 - Triage (drop false positives — universally standard math; the real Julia operators `×` / `⋅` / `≈`;
