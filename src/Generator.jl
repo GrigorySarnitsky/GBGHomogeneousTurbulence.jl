@@ -17,17 +17,17 @@ integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *
 dynamics* — it advances the flow state; `Observables` are the functions of that state, and
 `Propagator` the numerical propagator.
 
-The module has six operations — [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)
-recover the physical velocity and vorticity, and [`scalar_to_physical!`](@ref) the physical scalar, from
-their spectral representations;
-[`velocity_nonlinear!`](@ref) and [`scalar_nonlinear!`](@ref) assemble the de-aliased momentum and
-scalar nonlinear terms; and [`integrating_factor!`](@ref) builds the exact viscous/diffusive spectral
-multiplier.
+Its six operations (each formula lives in the operation's own docstring):
+- [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
+  recover the physical velocity, vorticity, and scalar from their spectral representations.
+- [`velocity_nonlinear!`](@ref), [`scalar_nonlinear!`](@ref) — assemble the de-aliased, Leray-projected
+  momentum and scalar nonlinear terms (the reversible advection).
+- [`integrating_factor!`](@ref) — build the exact viscous/diffusive spectral multiplier for the linear
+  diffusion term.
 
-Every field-transforming or nonlinear-assembly method takes the operator bundle `domain` (a
-`FixedDomain`: grid, transform plans, wavenumber multipliers, de-alias kernel) and the individual
-preallocated scratch field(s) it needs as its final argument(s) — so this module names no buffer bundle;
-`integrating_factor!` takes `domain` alone.
+Each field-transforming or nonlinear-assembly operation takes the `domain` (a [`FixedDomain`](@ref)) and
+the individual preallocated scratch field(s) it writes into as its final argument(s), so the module names
+no buffer bundle; [`integrating_factor!`](@ref) takes `domain` alone.
 """
 module Generator
 
@@ -63,11 +63,11 @@ FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scala
     velocity_to_physical!(u, û, domain, velocity_copy)
 
 Compute the physical velocity ``\\boldsymbol{u}`` from the velocity field `û` (given in spectral
-representation ``\\hat{\\boldsymbol{u}}``) into `u`, preserving `û`: the scratch `velocity_copy` (a
-spectral vector field) receives a copy that the in-place inverse transform consumes instead of `û`.
+representation ``\\hat{\\boldsymbol{u}}``) into `u`, leaving `û` unchanged. The scratch `velocity_copy` (a
+spectral vector field) is the working space.
 """
 function velocity_to_physical!(u, û, domain::FixedDomain, velocity_copy)
-  copyto!(field_data(velocity_copy), field_data(û))
+  copyto!(field_data(velocity_copy), field_data(û))  # copy û first — the in-place inverse transform consumes its spectral source
   to_physical!(u, velocity_copy, domain.velocity_plans)
   return u
 end
@@ -92,18 +92,27 @@ end
     velocity_nonlinear!(nonlinear, u, ω, domain, product_physical, product_spectral)
 
 Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
-from the physical `u` ``\\boldsymbol{u}`` and `ω` ``\\boldsymbol{\\omega}``.
+from the physical velocity `u` ``\\boldsymbol{u}`` and vorticity `ω` ``\\boldsymbol{\\omega}``.
 
-In physical space the rotational form writes the convective term as the Lamb vector: with the
-identity ``(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega}``,
-the divergence-free momentum equation becomes
-``\\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}``,
-where the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbs the pressure
-and the ``\\nabla(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient. The term computed here is the
-spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``, with the de-alias
-kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of the quadratic
-product. The Lamb vector is held in the scratch `product_physical` (a physical vector field) and its
-transform in `product_spectral` (a spectral vector field), so the operation allocates nothing.
+In physical space the rotational form writes the convective term as the Lamb vector, through the identity
+
+```math
+(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
+```
+
+so that, with the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbing the
+pressure and the ``\\nabla(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient, the momentum equation
+becomes
+
+```math
+\\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
+```
+
+The term computed here is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
+with the de-alias kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of
+the quadratic product. The Lamb vector is held in the scratch `product_physical` (a physical vector
+field) and its transform in `product_spectral` (a spectral vector field), so the operation allocates
+nothing.
 """
 function velocity_nonlinear!(nonlinear, u, ω, domain::FixedDomain, product_physical, product_spectral)
   cross!(product_physical, u, ω)
@@ -126,9 +135,9 @@ representation by the per-mode multiplier
 ```
 
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
-restriction). The operator bundle `domain` (a `FixedDomain`) supplies the squared-wavenumber
-field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (`domain.squared_wavenumber`), the symbol of
-``-\\nabla^{2}``. The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
+restriction). The `domain` (a `FixedDomain`) supplies the squared-wavenumber
+field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (`domain.squared_wavenumber`); in spectral
+representation ``-\\nabla^{2}`` acts as multiplication by it. The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
 velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
 
 When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
@@ -151,11 +160,11 @@ end
     scalar_to_physical!(φ, φ̂, domain, scalar_copy)
 
 Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectral representation
-``\\hat{\\varphi}``) into `φ`, preserving `φ̂`: the scratch `scalar_copy` (a spectral scalar field)
-receives a copy that the in-place inverse transform consumes instead of `φ̂`.
+``\\hat{\\varphi}``) into `φ`, leaving `φ̂` unchanged. The scratch `scalar_copy` (a spectral scalar
+field) is the working space.
 """
 function scalar_to_physical!(φ, φ̂, domain::FixedDomain, scalar_copy)
-  copyto!(field_data(scalar_copy), field_data(φ̂))
+  copyto!(field_data(scalar_copy), field_data(φ̂))  # copy φ̂ first — the in-place inverse transform consumes its spectral source
   to_physical!(φ, scalar_copy, domain.scalar_plans)
   return φ
 end

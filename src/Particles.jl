@@ -1,5 +1,5 @@
 # Particles — Lagrangian tracer tracking. Tracers are advected by the velocity through the package's
-# grid→point interpolation (a pluggable `GBGPeriodicFields` spline scheme; `CatmullRom` by default,
+# grid→point interpolation (a selectable `GBGPeriodicFields` spline scheme; `CatmullRom` by default,
 # `LalescuSpline`/`LagrangeSpline` for higher order), and any physical field can be sampled along the
 # trajectories for the Lagrangian statistics.
 #
@@ -11,7 +11,7 @@
 """
     Particles
 
-Lagrangian tracer tracking: `Tracers` (positions + a pluggable interpolation scheme), the
+Lagrangian tracer tracking: `Tracers` (positions + a selectable interpolation `scheme`), the
 second-order [`advect!`](@ref) (Heun-in-time on the start- and end-of-step velocity), and
 [`sample!`](@ref) for reading a field along the trajectories.
 
@@ -35,13 +35,14 @@ export Tracers, advect!, sample!,
 
 A set of Lagrangian tracers. The first form seeds `count` tracers uniformly at random in the periodic
 box of `domain` (on the domain's backend and element type); the second wraps a given `(M, 3)` position
-array. `scheme` is the `GBGPeriodicFields` interpolation scheme used to evaluate the velocity (and any
-sampled field) at the tracer positions — `CatmullRom` (the default), `LalescuSpline(n, m)`, or
-`LagrangeSpline(n)`. `rng` (first form only) is the random stream seeding the uniformly-random
+array. The `scheme` is the `GBGPeriodicFields` interpolation scheme used to evaluate the velocity (and
+any sampled field) at the tracer positions — `CatmullRom` (the default), `LalescuSpline(n, m)`, or
+`LagrangeSpline(n)`. The `rng` (first form only) is the random stream seeding the uniformly-random
 tracer positions; it defaults to `Random.default_rng()`.
 
-The struct preallocates the predictor positions and the point-value buffers, so [`advect!`](@ref)
-allocates no per-step memory.
+Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
+[`ntracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
+[`advect!`](@ref) allocates no per-step memory.
 """
 struct Tracers{P, PSX, PSP, VV, S}
   positions::P              # (M, 3)

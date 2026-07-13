@@ -6,9 +6,10 @@ re-litigate a recorded decision (§11) without the user. `CLAUDE.md` is the ters
 here; the rendered symbol glossary is [`docs/src/notation.md`](notation.md).
 
 The document is self-contained — every symbol, mathematical or `code`, is introduced in plain language at
-first use — and reads top to bottom. Mathematics follows the glossary's notation (Pope's turbulence
-conventions: the wavenumber vector is ``\boldsymbol{\kappa}`` with magnitude ``\kappa``; the turbulent
-kinetic energy is ``k``; the scalar diffusivity is ``\varkappa``; the integrating factor is ``\mathcal E``).
+first use — and reads top to bottom. Mathematics follows the glossary's notation: the wavenumber vector
+is ``\boldsymbol{\kappa}`` with magnitude ``\kappa``; the turbulent kinetic energy is ``k``; the scalar
+diffusivity is ``\varkappa``; the integrating factor is ``\mathcal E``. Pope (2000) is a standard
+reference for turbulence notation (§References).
 
 ---
 

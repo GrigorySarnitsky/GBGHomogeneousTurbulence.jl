@@ -17,7 +17,8 @@ The run layer: [`Simulation`](@ref) (the assembled state of a case) and the func
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
 per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
 [`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count, and the
-observables `kinetic_energy`, `dissipation`, and `scalar_variance` accept a `Simulation` directly.
+observables (`kinetic_energy`, `dissipation`, `scalar_variance`, `energy_spectrum`, `integral_scale`)
+accept a `Simulation` directly.
 """
 module SimulationRun
 
@@ -58,7 +59,9 @@ A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@re
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
-[`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref).
+[`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state with the observables
+([`kinetic_energy`](@ref), [`dissipation`](@ref), …) and [`flow_parameters`](@ref), and its progress
+with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
@@ -78,6 +81,10 @@ and the viscosity is chosen from the grid rather than supplied:
     run (`velocity_forcing = NoForcing()`) or manual control.
 
 # Keywords
+
+The keywords marked *(front door only)* configure the `FixedDomain` and are consumed by the first form;
+the rest are forwarded to the `Simulation(domain; …)` form.
+
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
@@ -352,7 +359,17 @@ Advance `sim` until exactly one stopping condition is met — a number of eddy-t
 (`turnovers`, in units of ``k/\\varepsilon``), a span of simulation `time`, or a number of `steps` —
 and return it. A callback (the `do` block, or a first positional function) fires with the current
 `Simulation` after every step, or once per `every` units of simulation time if `every` is given —
-the hook for streaming statistics along the run.
+the place to stream statistics along the run.
+
+# Examples
+```julia
+run!(sim; turnovers = 10)                        # advance ten eddy-turnover times
+
+energy = Float64[]                               # sample the kinetic energy every 0.1 time units
+run!(sim; time = 5.0, every = 0.1) do s
+    push!(energy, kinetic_energy(s))
+end
+```
 """
 run!(sim::Simulation; kwargs...) = _run_loop!(sim, nothing; kwargs...)
 run!(callback, sim::Simulation; kwargs...) = _run_loop!(sim, callback; kwargs...)

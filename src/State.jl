@@ -10,7 +10,7 @@ The DNS realisation of the Mori–Zwanzig State role — the field the dynamics 
 seeded: [`ResolvedFields`](@ref), the inert record of the evolving spectral velocity and scalar (the
 single source of truth — the physical fields are derived, never stored), and the random initial
 conditions [`random_solenoidal_velocity!`](@ref) (the divergence-free velocity) and
-[`random_scalar!`](@ref) (the mean-zero scalar ``\\varphi``) that seed it. All sized to a
+[`random_scalar!`](@ref) (the mean-zero scalar) that seed it. All sized to a
 [`FixedDomain`](@ref).
 """
 module State
@@ -56,11 +56,11 @@ By default (`spectrum = nothing`) the velocity is concentrated at large scales b
 Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
-shell's mode count) and the overall amplitude is fixed by the `energy` rescaling. The run layer bridges
-a `Phenomenology` model spectrum into this function.
+shell's mode count) and the overall amplitude is fixed by the `energy` rescaling — e.g. a von Kármán or
+Pope form from the `Phenomenology` submodule's model spectra, which the run layer can wire in for you.
 
-`domain` is the [`FixedDomain`](@ref) supplying the grid, backend, wavenumber multipliers, and
-de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
+`domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
+(defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
                                      energy::Real = 0.5, peak_wavenumber::Real = 2.0,
@@ -108,8 +108,8 @@ scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `variance` rescaling —
 e.g. an Obukhov–Corrsin form from `Phenomenology`.
 
-`domain` is the [`FixedDomain`](@ref) supplying the grid, backend, wavenumber multipliers, and
-de-alias kernel; `rng` is the random stream (defaults to `Random.default_rng()`).
+`domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
+(defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, domain::FixedDomain;
                         variance::Real = 1.0, peak_wavenumber::Real = 2.0,

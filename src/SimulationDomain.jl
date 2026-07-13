@@ -82,21 +82,30 @@ _retained_nyquist_fraction(::HouLi) = 1 // 1
     FixedDomain(grid_points_per_axis, side_length = 2π; dealiasing = TwoThirds(),
                       scalar_type = Float64, array_type = Array)
 
-The reusable, read-only spectral machinery for a cubic homogeneous-isotropic-turbulence run — a periodic
-box of side length `side_length` sampled with `grid_points_per_axis` points along each side: the `Grid3D`, the real-to-complex transform
-plans (one for the velocity, a vector field; one for the scalar ``\\varphi``; and one for the rank-2
-strain tensor of the derivative-skewness diagnostic), the
-`FieldSpectralMultipliers`, the squared-wavenumber array ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (with
-``\\boldsymbol{\\kappa}`` the wavenumber vector — the symbol of ``-\\nabla^{2}``; kept both as a real array
-and as a scalar-field kernel for weighted spectral reductions), and the de-alias kernel `dealias`.
+The discretised periodic box a run lives on — the reusable, read-only frame: a cube of side length
+`side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
+pseudospectral method needs on that box.
 
-`dealias` is built by the `dealiasing` strategy — [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the
-default) or [`HouLi`](@ref) (the smooth Hou–Li filter). Both are applied by [`dealias!`](@ref) as a
-coefficientwise multiply to control the aliasing error of the quadratic nonlinearity; the choice also
-sets the advective-CFL ceiling through `recommended_cfl`.
+Its fields:
+- `grid`, `layout` — the `Grid3D` and its real–Fourier memory layout.
+- `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex transform plans, one per field
+  rank: the velocity (a vector field), the scalar ``\\varphi``, and the rank-2 strain tensor the
+  derivative-skewness diagnostic needs.
+- `multipliers` — the `FieldSpectralMultipliers`, the spectral first-derivative operators.
+- `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
+  spectral space ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as a
+  scalar-field kernel for weighted spectral reductions.
+- `dealias`, `dealiasing` — the de-alias kernel and the [`DealiasingStrategy`](@ref) that built it.
 
-`array_type` selects the storage backend (`Array` for CPU, `ROCArray`/`CuArray` for GPU) and
-`scalar_type` the real element type (`Float32` is GPU-friendly).
+# Arguments
+- `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
+- `side_length = 2π` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
+- `dealiasing = TwoThirds()` — the de-aliasing strategy, [`TwoThirds`](@ref) (the sharp ``2/3`` rule,
+  the default) or [`HouLi`](@ref) (the smooth Hou–Li filter), applied by [`dealias!`](@ref) as a
+  coefficientwise multiply to control the aliasing of the quadratic nonlinearity; it also sets the
+  advective-CFL ceiling through `recommended_cfl`.
+- `scalar_type = Float64` — the real element type (`Float32` is GPU-friendly).
+- `array_type = Array` — the storage backend: `Array` (CPU) or `CuArray` / `ROCArray` (GPU).
 """
 struct FixedDomain{G, L, VP, SP, TP, M, K, SK, D, DS}
   grid::G

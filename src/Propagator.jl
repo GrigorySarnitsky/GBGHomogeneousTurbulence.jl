@@ -1,4 +1,4 @@
-# Propagator — the pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes
+# Propagator — the interchangeable time-marching schemes, as concrete `AbstractIntegrator` subtypes
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
 # is advanced exactly through exp(-diffusivity·|k|²Δt) (built in Generator), and the nonlinear term is
 # advanced explicitly by a Runge–Kutta stage combination.
@@ -16,8 +16,9 @@
 """
     Propagator
 
-The pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes dispatched by
-[`step!`](@ref), which advances the coupled velocity + passive-scalar state. All are of the
+The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes dispatched by
+[`step!`](@ref), which advances the coupled velocity + passive-scalar state; a run chooses one as the
+`integrator` of its `Simulation`. All are of the
 integrating-factor family: the stiff diffusive part is advanced exactly and the nonlinear term
 explicitly by a Runge–Kutta stage combination. The default is [`IFLowStorageRK3`](@ref);
 [`IFRK2`](@ref) (Heun) is a cheaper two-stage alternative, imaginary-axis unstable;
@@ -65,18 +66,24 @@ end
     IntegratorBuffers(domain; scalar = false)
 
 The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
-memory. It holds the shared right-hand-side scratch every scheme needs — the velocity copy and the
-spectral vorticity the physical-field recovery consumes, the physical `product_physical` and spectral
-`product_spectral` that hold the quadratic products (the Lamb vector and the scalar flux), the physical
-velocity/vorticity registers, the shared integrating factor, and the velocity's per-mode
-linear-forcing-rate array ``A(\\boldsymbol{\\kappa})`` — together with the Runge–Kutta stage registers.
-Build it per scheme with [`allocate_buffers`](@ref), which dispatches on the concrete `integrator`.
+memory. Build it per scheme with [`allocate_buffers`](@ref), which dispatches on the concrete `integrator`.
 
-When `scalar = true` a nested `ScalarBuffers` bundle is allocated for the passive scalar ``\\varphi``
-(its stage registers, predictor, nonlinear-term buffer, a copy, the physical scalar, and its
-forcing-rate array; the scalar flux ``\\boldsymbol{u}\\varphi`` reuses `product_physical` /
-`product_spectral`). When `scalar = false` the run evolves no scalar, so `buffers.scalar` is `nothing`
-and none of those field-sized buffers are allocated.
+Its fields — the shared right-hand-side scratch every scheme needs:
+- `velocity_copy`, `vorticity_spectral` — spectral working space the physical velocity/vorticity
+  recovery consumes.
+- `product_physical`, `product_spectral` — the physical and spectral quadratic products (the Lamb
+  vector, and the scalar flux ``\\boldsymbol{u}\\varphi``).
+- `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star`,
+  `velocity_star_spectral` — the start-of-step and substage physical velocity/vorticity registers.
+- `nonlinear`, `integrating_factor`, `velocity_rate` — the assembled nonlinear term, the shared viscous
+  integrating factor, and the velocity's per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
+- `stage1`, `stage2` — the Runge–Kutta stage registers.
+- `scalar` — a nested `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else
+  `nothing`; when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the buffers are sized (`similar`) to.
+- `scalar = false` — whether to allocate the nested `ScalarBuffers` for a passive scalar.
 """
 struct IntegratorBuffers{VS, SS, VP, RK, SB}
   vorticity_spectral::VS
@@ -148,7 +155,7 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta (Williamson 2N). With the diffusive
+Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` built by [`integrating_factor!`](@ref) over a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar)
 and ``\\widehat{\\boldsymbol{N}}`` the de-aliased nonlinearity of each field, the step carries a state
@@ -166,8 +173,7 @@ and ``\\widehat{\\boldsymbol{N}}`` the de-aliased nonlinearity of each field, th
 
 with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
 ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
-lockstep (the same ``A,B,d``), each with its own diffusivity; setting ``D = 0`` recovers the bare
-Williamson scheme, and dropping the nonlinearity recovers exact diffusion ``\\mathcal{E}_D(\\Delta t)``.
+lockstep (the same ``A,B,d``), each with its own diffusivity.
 Three nonlinear evaluations per step, two field registers per field — the default workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """

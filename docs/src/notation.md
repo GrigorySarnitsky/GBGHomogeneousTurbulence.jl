@@ -5,8 +5,9 @@ denotes. All mathematics is rendered LaTeX; a code identifier always appears in 
 inside a math span. This page is the single reference — a docstring introduces a symbol on first use
 and need not repeat the convention.
 
-The physical conventions follow Pope, *Turbulent Flows*; the field and spectral conventions follow
-[`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl).
+The physical conventions are standard turbulence usage — see Pope, *Turbulent Flows*; the field and
+spectral conventions follow [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl),
+a direct dependency.
 
 ## Conventions
 
@@ -23,7 +24,7 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 | Symbol | Meaning | Code |
 |---|---|---|
 | ``\boldsymbol u`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol u = 0`` | the velocity state |
-| ``\boldsymbol\omega`` | the vorticity ``\nabla\times\boldsymbol u`` | `velocity_vorticity!` |
+| ``\boldsymbol\omega`` | the vorticity ``\nabla\times\boldsymbol u`` | `vorticity_to_physical!` |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray projection, never stored) | — |
 | ``\boldsymbol f`` | a body forcing on the momentum equation | `AbstractForcing` |
@@ -33,8 +34,8 @@ The physical conventions follow Pope, *Turbulent Flows*; the field and spectral 
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `physics.viscosity` |
-| ``\mathrm{Sc}`` | Schmidt number | `physics.schmidt` |
+| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `conditions.viscosity` |
+| ``\mathrm{Sc}`` | Schmidt number | `conditions.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
 | ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | `1 / ν` (``\mathrm{Re}_\lambda`` measured) |
 
@@ -47,7 +48,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | `FieldSpectralMultipliers` |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
-| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber, the symbol of ``-\nabla^2`` | `domain.squared_wavenumber` |
+| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^2`` acts as multiplication by it | `domain.squared_wavenumber` |
 | ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, `to_physical` |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | `curl`, `divergence` |
 | ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | `helmholtz_projection` |
@@ -74,7 +75,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
-| ``T`` | the real element type (``\texttt{Float32}`` / ``\texttt{Float64}``) | `scalar_type` |
+| ``T`` | the real element type (`Float32` / `Float64`) | `scalar_type` |
 
 ## Forcing
 

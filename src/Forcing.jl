@@ -1,5 +1,5 @@
-# Forcing — the pluggable energy-injection strategies, concrete `AbstractForcing` subtypes that hook
-# into the time step in one of two ways:
+# Forcing — the interchangeable energy-injection strategies, concrete `AbstractForcing` subtypes that act
+# on the time step in one of two ways:
 #
 #   * `set_forcing_rate!` — for forcings LINEAR in the field (`f = A·field`): fill a per-mode rate A(k)
 #     that is folded into the integrating factor, so the linear operator becomes A(k) - D|k|². This
@@ -8,7 +8,7 @@
 #   * `apply_forcing!` — a post-step projection/rescale. `BandRescaling` (hold band or total energy fixed) uses it.
 #
 # One implementation serves both the velocity (a vector field) and the scalar φ (a scalar field),
-# since the hooks are written through tensor-order-generic field operators. A linear rate keeps a
+# since the methods are written through tensor-order-generic field operators. A linear rate keeps a
 # solenoidal velocity solenoidal (per-mode scaling), so the velocity needs no projection here.
 #
 # The additive stochastic (Ornstein–Uhlenbeck / Eswaran–Pope) forcing — which adds a time-correlated
@@ -17,21 +17,22 @@
 """
     Forcing
 
-The pluggable energy-injection strategies, concrete `AbstractForcing` subtypes. A strategy hooks into
-the step through up to four methods — [`set_forcing_rate!`](@ref) (a linear rate folded into the
-integrating factor), [`apply_forcing!`](@ref) (a post-step projection), [`prepare_forcing!`](@ref) (a
-per-step state advance), and [`add_forcing_source!`](@ref) (an additive per-stage source).
-Every step hook takes the operator bundle `domain` (a [`FixedDomain`](@ref)) — as do the
-`domain`-taking forcing constructors, which build their band kernels from it; `set_forcing_rate!`,
-`prepare_forcing!`, and `add_forcing_source!` additionally take the preallocated scratch `buffers` (an
-[`IntegratorBuffers`](@ref GBGIsotropicTurbulence.Propagator.IntegratorBuffers)), while `apply_forcing!` takes a spectral `scratch` buffer. `NoForcing`,
-`BandRescaling`, `Linear`, and `ConstantPower` are provided; one
-implementation serves both the velocity and the scalar, and the two are forced **independently** —
-`FlowConditions` takes a separate `velocity_forcing` and `scalar_forcing` (each an `AbstractForcing`, each
-defaulting to `NoForcing()`), so a run can force the velocity while the scalar decays freely, force
-both (with the same or different strategies), or leave either unforced. An operator-free keyword
-constructor returns a [`DeferredForcing`](@ref), a deferred forcing that `Simulation` materialises once
-the domain exists.
+The interchangeable energy-injection strategies, concrete `AbstractForcing` subtypes. A strategy acts on
+the step through up to four methods, each defaulting to doing nothing:
+- [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor.
+- [`apply_forcing!`](@ref) — a post-step projection or rescale.
+- [`prepare_forcing!`](@ref) — a per-step internal-state advance.
+- [`add_forcing_source!`](@ref) — an additive per-stage source.
+
+The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
+[`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
+scalar field), through tensor-order-generic field operators. The velocity and scalar are forced
+**independently**: `FlowConditions` takes a separate `velocity_forcing` and `scalar_forcing`
+(each an `AbstractForcing`, each defaulting to `NoForcing()`), so a run can force the velocity while the
+scalar decays freely, force both, or leave either unforced.
+
+An operator-free keyword constructor (`BandRescaling(; …)`, `Linear(; …)`, `ConstantPower(; …)`) returns
+a [`DeferredForcing`](@ref) that a `Simulation` materialises once the domain exists.
 """
 module Forcing
 
@@ -122,7 +123,7 @@ end
 """
     NoForcing()
 
-The unforced case: all four hooks keep their defaults (do nothing) — a freely decaying field.
+The unforced case: all four methods keep their defaults (do nothing) — a freely decaying field.
 """
 struct NoForcing <: AbstractForcing end
 

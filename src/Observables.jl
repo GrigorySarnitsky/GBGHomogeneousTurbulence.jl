@@ -12,7 +12,8 @@ derivative skewness, the scalar variance and its dissipation, the maximum compon
 spectrum, and the integral scale. In the Mori–Zwanzig reading (design doc §8) these are the *observables*
 of the `Generator`: their plateaus gate warm-up (`warmup!`), and their statistics are to be tracked by
 `GBGStreamingStatistics`. Each reduces a field to a scalar, or — the energy spectrum — to a distribution
-over wavenumber.
+over wavenumber. None de-aliases first: a reduction to a scalar is Parseval-exact, and the run already
+keeps the field de-aliased, so a physical-space reduction is exact too.
 """
 module Observables
 
@@ -86,7 +87,7 @@ scalar_dissipation(φ, domain::FixedDomain, diffusivity::Real) =
 
 # The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal
 # one: ⟨(∂u₁/∂x₁)³⟩/⟨(∂u₁/∂x₁)²⟩^{3/2} = C·⟨tr S³⟩/⟨S:S⟩^{3/2}, from ⟨tr S³⟩ = (105/8)⟨(∂u₁/∂x₁)³⟩ and
-# ⟨S:S⟩ = (15/2)⟨(∂u₁/∂x₁)²⟩ for isotropic incompressible turbulence (Betchov; verified numerically).
+# ⟨S:S⟩ = (15/2)⟨(∂u₁/∂x₁)²⟩ for isotropic incompressible turbulence (Betchov 1956; verified numerically).
 const _SKEWNESS_ISOTROPY_CONSTANT = (4 / 7) * sqrt(15 / 2)              # ≈ 1.5649
 
 
@@ -107,7 +108,7 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 ``\\operatorname{tr}\\boldsymbol{S}^{3} = 3\\det\\boldsymbol{S}``. By isotropy this equals the classical
 longitudinal skewness ``\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle / \\langle(\\partial u_1/\\partial x_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle``
-and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle`` (Betchov). So the
+and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle`` (Betchov 1956). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 
