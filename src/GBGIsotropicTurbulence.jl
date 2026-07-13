@@ -112,8 +112,7 @@ using .Propagator:
   IntegratorBuffers,
   allocate_buffers,
   step!,
-  recommended_cfl,
-  default_integrator
+  recommended_cfl
 
 using .Particles:
   Tracers,
@@ -182,7 +181,6 @@ export FixedDomain,
        allocate_buffers,
        step!,
        recommended_cfl,
-       default_integrator,
        FlowConditions,
        Tracers,
        advect!,

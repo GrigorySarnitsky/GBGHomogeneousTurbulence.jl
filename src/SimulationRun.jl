@@ -31,7 +31,7 @@ using ..Observables: max_speed, derivative_skewness
 import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
-                    recommended_cfl, default_integrator
+                    recommended_cfl, IFLowStorageRK3
 using ..Particles: Tracers, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -97,7 +97,7 @@ and the viscosity is chosen from the grid rather than supplied:
 - `initial_spectrum = nothing` — a `Phenomenology` `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
   run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `energy`.
-- `integrator = default_integrator()`, `cfl = recommended_cfl(integrator, domain)` — the
+- `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
   interpolation scheme.
@@ -128,7 +128,7 @@ function Simulation(domain::FixedDomain;
                     schmidt::Real = 1.0,
                     velocity_forcing = BandRescaling(domain; energy, target = :total),
                     scalar_forcing = NoForcing(),
-                    integrator::AbstractIntegrator = default_integrator(),
+                    integrator::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(integrator, domain),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,

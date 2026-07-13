@@ -21,7 +21,7 @@ The pluggable time-marching schemes, as concrete `AbstractIntegrator` subtypes d
 integrating-factor family: the stiff diffusive part is advanced exactly and the nonlinear term
 explicitly by a Runge–Kutta stage combination. The default is [`IFLowStorageRK3`](@ref);
 [`IFRK2`](@ref) (Heun) is a cheaper two-stage alternative, imaginary-axis unstable;
-[`default_integrator`](@ref) returns the default; [`recommended_cfl`](@ref) gives a scheme's
+[`recommended_cfl`](@ref) gives a scheme's
 advective-CFL ceiling; [`FlowConditions`](@ref) bundles the problem parameters and forcings.
 """
 module Propagator
@@ -34,7 +34,7 @@ using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonli
 using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
-       recommended_cfl, default_integrator
+       recommended_cfl
 
 
 """
@@ -343,15 +343,6 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffer
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)
   return û, φ̂
 end
-
-
-"""
-    default_integrator()
-
-The recommended default scheme, [`IFLowStorageRK3`](@ref) — third-order, low-storage, and stable on
-the imaginary axis (unlike [`IFRK2`](@ref)).
-"""
-default_integrator() = IFLowStorageRK3()
 
 
 """

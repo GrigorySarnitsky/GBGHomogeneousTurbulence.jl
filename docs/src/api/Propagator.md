@@ -34,11 +34,10 @@ One in-place step of the coupled velocity and passive scalar together through th
 step!
 ```
 
-## Scheme and timestep defaults
+## Timestep ceiling
 
-The default-scheme factory, and a scheme's advective-CFL ceiling.
+A scheme's advective-CFL ceiling.
 
 ```@docs
-default_integrator
 recommended_cfl
 ```

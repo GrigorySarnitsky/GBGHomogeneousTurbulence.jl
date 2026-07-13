@@ -91,10 +91,9 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     @test bytes < field_bytes
   end
 
-  @testset "recommended_cfl / default" begin
+  @testset "recommended_cfl" begin
     @test recommended_cfl(IFLowStorageRK3()) > recommended_cfl(IFRK2())
     @test 0 < recommended_cfl(IFRK2()) < 1
     @test 0 < recommended_cfl(IFLowStorageRK3()) < 1
-    @test default_integrator() isa IFLowStorageRK3
   end
 end

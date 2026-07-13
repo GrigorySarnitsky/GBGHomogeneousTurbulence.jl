@@ -515,6 +515,22 @@ generalisation is built for them until a second concrete case forces the abstrac
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark).
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
   Lagrangian trajectory samples in, streamed summaries out).
+- **Alternative dealiasing and nonlinear forms.** `DealiasingStrategy` today supplies a *kernel* applied
+  coefficient-wise *after* the nonlinear term is assembled — which carries the sharp ``2/3`` rule and the
+  smooth Hou–Li filter, but not ``3/2`` zero-padding or phase-shifting (which restructure how the
+  nonlinear product is *computed*, not merely filter its output), nor the **skew-symmetric** momentum form
+  (which reorganises how the quadratic product is assembled, to conserve energy in the discrete equations).
+  Their common generalisation is a single strategy that *owns the de-aliased nonlinear assembly* —
+  ``\hat{\boldsymbol u}`` and ``\hat\varphi`` in, the de-aliased product out — with the present
+  kernel-multiply one realisation and padding, phase-shift, and skew-symmetric its siblings. It touches
+  only the `Generator`'s nonlinear assembly and its scratch, never the State (§4.1); deferred, with the
+  rotational form + spherical ``2/3`` the recorded lean default.
+- **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
+  stability-calibrated, conservative ceiling with a manual `cfl` override — and nothing adapts it to a
+  target *temporal* accuracy. An embedded-error or PI step controller, distinct in purpose from the
+  stability CFL, would make temporal accuracy a studied fitness axis beside precision and footprint (§5).
+  Deferred: HIT runs are typically stability-limited near the CFL ceiling, so a fixed step at the CFL is
+  rarely the accuracy bottleneck.
 
 ---
 
