@@ -258,7 +258,7 @@ tensor_physical(domain::FixedDomain) =
 Apply the run's de-alias low-pass `domain.dealias` to `field` in place — a coefficientwise multiply that
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact de-aliasing)
-or the smooth [`HouLi`](@ref) filter (which only damps the aliasing). `field` may be a vector or
+or the smooth [`HouLi`](@ref) filter (which only damps the aliasing). The `field` may be a vector or
 scalar field in spectral representation.
 """
 dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)

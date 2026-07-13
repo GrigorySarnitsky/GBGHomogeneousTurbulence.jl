@@ -16,14 +16,15 @@
 """
     Propagator
 
-The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes dispatched by
-[`step!`](@ref), which advances the coupled velocity + passive-scalar state; a run chooses one as the
-`integrator` of its `Simulation`. All are of the
-integrating-factor family: the stiff diffusive part is advanced exactly and the nonlinear term
-explicitly by a Runge–Kutta stage combination. The default is [`IFLowStorageRK3`](@ref);
-[`IFRK2`](@ref) (Heun) is a cheaper two-stage alternative, imaginary-axis unstable;
-[`recommended_cfl`](@ref) gives a scheme's
-advective-CFL ceiling; [`FlowConditions`](@ref) bundles the problem parameters and forcings.
+The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
+the `integrator` of its `Simulation`. All are of the integrating-factor family: the stiff diffusive part
+is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
+
+- [`IFLowStorageRK3`](@ref) (the default), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
+  cheaper two-stage alternative, imaginary-axis unstable).
+- [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
+- [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
+- [`recommended_cfl`](@ref) — a scheme's advective-CFL ceiling.
 """
 module Propagator
 
@@ -144,11 +145,11 @@ allocate_buffers(::AbstractIntegrator, domain::FixedDomain; scalar::Bool = false
 """
     step!(integrator, û, φ̂, domain, buffers, conditions, dt)
 
-Advance the spectral velocity `û` and passive scalar `φ̂` by one timestep `dt` in place, using the
-scheme `integrator`, the domain `domain`, the buffers `buffers`, and the problem `conditions` (a
-[`FlowConditions`](@ref): viscosity, Schmidt number, and the two forcings). Dispatches on the concrete
-`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled `buffers.velocity_physical` and
-`buffers.vorticity_start` with the start-of-step physical velocity and vorticity (via
+Advance the velocity `û` and passive scalar `φ̂` (in spectral representation) by one timestep `dt` in
+place, using the `integrator`, `domain`, `buffers`, and the problem `conditions` (a
+[`FlowConditions`](@ref)). Dispatches on the concrete `integrator` type (see `IFRK2`,
+`IFLowStorageRK3`). The caller must have filled `buffers.velocity_physical` and `buffers.vorticity_start`
+with the start-of-step velocity and vorticity in physical representation (via
 [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)).
 """
 function step! end

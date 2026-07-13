@@ -16,8 +16,8 @@ FlowConditions
 
 ## Physical-field evaluation
 
-Recover the physical velocity, vorticity, and scalar φ that the nonlinear terms consume from the
-spectral state (the spectral sources are preserved).
+Recover the velocity, vorticity, and scalar in physical representation that the nonlinear terms consume,
+from the state in spectral representation (the sources are preserved).
 
 ```@docs
 velocity_to_physical!

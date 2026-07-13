@@ -82,18 +82,4 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | Symbol | Meaning | Code |
 |---|---|---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal E`` | `set_forcing_rate!` |
-| ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(power=…)` |
-
-## Lens symbols
-
-Interpretive symbols from the design document's *Lenses* section. They are not realised in code — they
-name the framework the package is understood and validated through (Mori–Zwanzig, the commuting
-square, the filtered-density-function Model), not a type.
-
-| Symbol | Meaning |
-|---|---|
-| ``\Pi`` | a coarse-graining / filtering projection (the LES filter) |
-| ``\tau_{ij}`` | the subgrid stress ``\overline{u_i u_j}-\bar u_i\bar u_j`` |
-| ``S_{\text{fine}}``, ``S_{\text{coarse}}`` | the fine (DNS) and coarse (LES) flow maps |
-| ``F(\boldsymbol v;\boldsymbol x,t)`` | the velocity filtered density function (FDF) |
-| ``\mathcal P`` | a Mori–Zwanzig projection onto resolved variables |
+| ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |

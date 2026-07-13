@@ -149,7 +149,7 @@ representation) — the turbulent kinetic energy resolved over wavenumber-magnit
 ``k = \\sum_\\kappa E(\\kappa)``. Returns `(κ, E)`: the shell-center wavenumber magnitudes and the energy
 in each shell (brought to the host, an occasional diagnostic). It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol u}\\rvert^2`` while the
-kinetic energy carries the ``\\tfrac12``. `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
+kinetic energy carries the ``\\tfrac12``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a `Phenomenology` model spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
@@ -169,7 +169,7 @@ L = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\k
 ```
 
 `L` is the large-eddy scale — the one flow parameter a `Phenomenology` model spectrum needs that the
-small scales do not fix. `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 """
 function integral_scale(û, domain::FixedDomain)
   κ, E = energy_spectrum(û, domain)

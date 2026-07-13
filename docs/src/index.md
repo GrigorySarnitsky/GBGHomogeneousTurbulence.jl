@@ -71,8 +71,7 @@ de-aliased by the default ``2/3`` rule (other strategies are available).
   `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
   `max_speed`, and the `energy_spectrum` / `integral_scale`).
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
-  chosen independently for the velocity and the scalar (`FlowConditions(; velocity_forcing, scalar_forcing)`)
-  — commonly a forced velocity with a freely-decaying scalar.
+  chosen independently for the velocity and the scalar.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field

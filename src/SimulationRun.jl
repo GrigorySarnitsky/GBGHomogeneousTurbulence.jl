@@ -54,8 +54,9 @@ end
     Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
-[`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the spectral velocity
-``\\hat{\\boldsymbol u}`` and passive scalar ``\\hat\\varphi``), any [`Tracers`](@ref), and a clock. The first form is the
+[`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the velocity
+``\\hat{\\boldsymbol u}`` and passive scalar ``\\hat\\varphi`` in spectral representation), any
+[`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
@@ -74,7 +75,7 @@ and the viscosity is chosen from the grid rather than supplied:
     `side_length` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
-    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `kinetic_energy` and `side_length` fix
+    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. The `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
@@ -109,6 +110,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
   interpolation scheme.
 - `rng` — the random stream for the initial condition and the tracer seeding.
+
+# Fields
+- `domain`, `buffers`, `conditions`, `integrator` — the [`FixedDomain`](@ref), [`IntegratorBuffers`](@ref),
+  [`FlowConditions`](@ref), and the chosen scheme.
+- `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
+- `tracers`, `tracer_velocity` — the [`Tracers`](@ref) (or `nothing`), and the buffer holding the velocity
+  in physical representation for the Heun tracer push.
+- `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
 struct Simulation{DOM, FB, IG, VF<:AbstractForcing, SF<:AbstractForcing, RF, TR, TV}
   domain::DOM

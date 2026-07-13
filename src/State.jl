@@ -101,7 +101,7 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, de-aliased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-`scalar_variance`. The physical noise is made mean-zero before the transform, so the
+`scalar_variance`. The noise is made mean-zero in physical space before the transform, so the
 ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by the Gaussian envelope

@@ -7,9 +7,7 @@ Order   = [:module]
 
 ## The state
 
-The inert record of the evolving spectral fields a run advances — the single source of truth (velocity
-`û` and, optionally, scalar `φ̂`); the physical velocity, vorticity, and scalar are derived on demand,
-never stored.
+The evolving fields a run advances, in spectral representation — the single source of truth.
 
 ```@docs
 ResolvedFields
@@ -17,7 +15,7 @@ ResolvedFields
 
 ## Random initial conditions
 
-Seed a large-scale-peaked, de-aliased, rescaled random solenoidal velocity, or a mean-zero scalar φ.
+Seed a large-scale-peaked, de-aliased, rescaled random solenoidal velocity, or a mean-zero scalar.
 
 ```@docs
 random_solenoidal_velocity!

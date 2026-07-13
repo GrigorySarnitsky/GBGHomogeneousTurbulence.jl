@@ -79,7 +79,7 @@ For a forcing linear in the field, fill the real per-mode rate array `rate` with
 integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_factor!`](@ref GBGIsotropicTurbulence.Generator.integrating_factor!)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
-rate. `field` is the start-of-step field in spectral representation.
+rate. The `field` is the start-of-step field in spectral representation.
 """
 set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain, buffers) = false
 
@@ -141,12 +141,12 @@ Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed
 Fourier modes (integer shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
 ``2\\pi/L``) are rescaled by a single factor to hold the `target`.
 
-`target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
+The `target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
 energy** ``\\tfrac12\\langle\\lvert\\boldsymbol u\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
 the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` (`scalar_variance`) for the scalar — the field's
 L² observable, carrying the ½ only for the vector.
 
-`over` selects where the target applies:
+The `over` keyword selects where the target applies:
   * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
     about its mean as the band feeds the cascade.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
