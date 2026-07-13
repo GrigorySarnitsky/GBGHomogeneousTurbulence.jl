@@ -19,7 +19,7 @@ Linear
 ConstantPower
 ```
 
-## Deferred forcing spec
+## Deferred forcing
 
 The operator-free deferred form a strategy's constructor returns, materialised into a concrete forcing
 once the domain exists.
@@ -28,9 +28,9 @@ once the domain exists.
 DeferredForcing
 ```
 
-## Forcing hooks
+## Forcing methods
 
-The four step hooks a strategy may implement (each a no-op by default), listed in the order `step!`
+The four step methods a strategy may implement (each a no-op by default), listed in the order `step!`
 fires them.
 
 ```@docs

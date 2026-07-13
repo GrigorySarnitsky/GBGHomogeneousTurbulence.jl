@@ -6,7 +6,7 @@ velocity field ``\boldsymbol{u}`` together with a single passive scalar ``\varph
 forced, advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle
 tracking and Eulerian + Lagrangian statistics.
 
-It is built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl), which
+It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
 supplies every field operation — transforms, spectral differential operators, convolution,
 interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
 package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
@@ -49,7 +49,7 @@ and the passive scalar ``\varphi`` by the advection–diffusion equation
 with ``\mathrm{Sc}`` the Schmidt number and ``f_\varphi`` a forcing on the scalar. In both
 equations the diffusive (stiff) term is integrated exactly through an integrating factor, the
 nonlinear term explicitly by a Runge–Kutta stage combination, and the quadratic product is
-de-aliased by the ``2/3`` rule.
+de-aliased by the default ``2/3`` rule (other strategies are available).
 
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
@@ -64,23 +64,23 @@ de-aliased by the ``2/3`` rule.
 - [`SimulationDomain`](api/SimulationDomain.md): the discretised periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
-  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar ``\varphi``.
+  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
   `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
   `max_speed`, and the `energy_spectrum` / `integral_scale`).
-- [`Forcing`](api/Forcing.md): the pluggable energy-injection strategies under `AbstractForcing`,
+- [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar (`FlowConditions(; velocity_forcing, scalar_forcing)`)
   — commonly a forced velocity with a freely-decaying scalar.
-- [`Propagator`](api/Propagator.md): the pluggable integrating-factor schemes under
+- [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
-  sampling along trajectories, with a pluggable interpolation scheme.
+  sampling along trajectories, with a selectable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
   runs it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
-  stationarity), and validates a run against the reference laws (`flow_parameters` /
-  `validate_spectrum`).
+  stationarity); it reports the dimensionless flow state (`flow_parameters`) and compares the measured
+  energy spectrum to a `Phenomenology` model (`validate_spectrum`).
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
   the umbrella), designed to be extractable into a standalone package.
