@@ -264,7 +264,8 @@ states the physical quantity first, then the reduction that computes it:
 - `derivative_skewness`, the K41 marker ``S \approx -0.5`` of developed turbulence, computed
   coordinate-free as the normalised third invariant of the strain rate ``\boldsymbol S``,
   ``3C\langle\det\boldsymbol S\rangle/\langle\boldsymbol S:\boldsymbol S\rangle^{3/2}`` with the exact
-  isotropy constant ``C = \tfrac47\sqrt{15/2}`` (which reproduces the classical longitudinal skewness);
+  isotropy constant ``C = \tfrac47\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
+  skewness);
 - `energy_spectrum` ``E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
   derived from it.
 
@@ -285,7 +286,7 @@ step through a small interface whose four methods each default to doing nothing:
 - `apply_forcing!` — apply a post-step projection or rescale.
 
 `NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), and `Linear` and
-`ConstantPower` (negative-damping, folded into ``\mathcal E``) are provided; a stochastic Eswaran–Pope
+`ConstantPower` (negative-damping, Lundgren 2003, folded into ``\mathcal E``) are provided; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
@@ -306,7 +307,7 @@ Method (§3).
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
-  damping. `recommended_cfl` gives each scheme its conservative advective-CFL ceiling ``C`` (for
+  damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **`IntegratorBuffers`** is the per-step scratch the propagator owns and writes into — the shared
@@ -353,8 +354,9 @@ for the Heun push, and a clock. Over it:
   ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a trailing-window
   flatness test), reading ``\varepsilon`` rather than the clampable ``k(t)``, and, when the scalar is
   forced, until ``\langle\varphi^2\rangle`` settles too; or a fixed turnover, time, or step budget.
-- **`current_time(sim)`** and **`current_step(sim)`** report the clock, and `kinetic_energy(sim)` /
-  `dissipation(sim)` / `scalar_variance(sim)` the current-state diagnostics, for a callback to read.
+- **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables
+  (`kinetic_energy(sim)`, `dissipation(sim)`, `scalar_variance(sim)`, `energy_spectrum(sim)`,
+  `integral_scale(sim)`) the current-state diagnostics, for a callback to read.
 
 The layer wires §4.1–§4.6 together and holds no physics or numerics of its own.
 
@@ -385,8 +387,9 @@ needs a law's validity range to be fair, and it is the single source of the cita
 the **quantity is the submodule** (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the **paper is the
 author-year type** (`Pope2000`, first author's surname, the full list in `provenance`), and a **same
 author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The validating case
-is Kolmogorov 1941, in two submodules at once — `Spectra.Kolmogorov1941` (the ``-5/3`` spectrum) and
-`StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5 laws) — separated by the submodule alone. The full
+would be Kolmogorov 1941 across two submodules — `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5
+laws) and a spectrum counterpart `Spectra.Kolmogorov1941`, were one added — separated by the submodule
+alone. The full
 handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction.
 
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
@@ -402,10 +405,10 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
   Obukhov–Corrsin constant, the Lagrangian ``C_0``, the mechanical-to-scalar timescale ratio).
 
 Three exist now — enough for the validation checklist — and the count caps near six: `PDFs`, `Decay` (``k \sim t^{-n}``),
-and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries every
-dimensionless group a law might read (``\mathrm{Re}_\lambda``, ``\varepsilon``, ``\nu``, ``L``, ``u'``,
-``\mathrm{Sc}``, ``\varepsilon_\varphi``), the derived scales (``\eta``, ``\tau_\eta``, ``k``, ``\lambda``)
-as helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
+and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries the
+quantities a law reads (``\varepsilon``, ``\nu``, ``L``, ``u'``, ``\mathrm{Sc}``, ``\varepsilon_\varphi``),
+with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
+helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
 The laws are **consumed to build runs**, not only compared against: an initial-condition or forcing
 spectrum drawn from `Spectra`, and the reference curves the validation harness reads, all from one library.
@@ -432,7 +435,7 @@ seam is real but uncrossed (decision 18).
 
 ### 4.9 Layout summary
 
-`SimulationDomain → State → Generator → Observables → Forcing → Propagator → Particles → SimulationRun`.
+`SimulationDomain → State → Forcing → Generator → Observables → Propagator → Particles → SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
 order as the dependency-light leaf the initial-condition, forcing, and validation consumers read.
 Statistics live consumer-side of this package too: the sampling in `Particles` and the observables in
@@ -731,8 +734,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `Forcing`, `SimulationState`, and the run layer `SimulationRun`, paired with `SimulationState`).
 17. **(2026-07) Consume `GBGPeriodicFields`'s fused domain; the velocity-derivative skewness becomes a
     coordinate-free strain invariant.** Four fused operations were requested of, and shipped by, PF —
-    `combine!` (axpby), `weighted_inner`, `symmetric_gradient`, `det` — and wired in. `combine!` replaces
-    the hand-rolled RK/OU `field_data` broadcasts (charter invariant 2). `weighted_inner` fuses the
+    `combine!` (axpby), `weighted_inner`, `symmetric_gradient`, `det` — and wired in. The `combine!` op replaces
+    the hand-rolled RK/OU `field_data` broadcasts (charter invariant 2). The `weighted_inner` op fuses the
     per-step band energy in the forcings and expresses `scalar_dissipation` as the Dirichlet energy, with
     no ``\nabla\varphi`` materialized. And `derivative_skewness` becomes the normalized third invariant of
     the strain rate ``\boldsymbol{S}``, ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}``,

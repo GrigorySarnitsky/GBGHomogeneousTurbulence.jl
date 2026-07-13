@@ -56,7 +56,7 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by the Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`).
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` (``\\kappa_p`` is `peak_wavenumber`).
 Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
@@ -106,7 +106,7 @@ chosen spectrum, de-aliased and rescaled so the variance ``\\langle\\varphi^{2}\
 ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by the Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/k_p^{2}\\big)`` (``k_p`` is `peak_wavenumber`).
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` (``\\kappa_p`` is `peak_wavenumber`).
 Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
 scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 ``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed

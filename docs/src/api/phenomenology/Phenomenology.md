@@ -32,7 +32,8 @@ TurbulenceLaw
 Reference
 ```
 
-The evaluators — one per representation, plus the fitting seam.
+The per-family evaluators — `spectrum`, `structure_function` / `scaling_exponent`, and `scaling` — a
+law's `provenance`, and the `fit` seam.
 
 ```@docs
 provenance

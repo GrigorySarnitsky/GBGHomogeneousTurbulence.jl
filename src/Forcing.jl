@@ -61,7 +61,7 @@ abstract type AbstractForcing end
 A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; target)`, and
 `BandRescaling(; target)` — return a `DeferredForcing`
 capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
-`FixedDomain` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
+`FixedDomain` exists (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
 """
 struct DeferredForcing{F}
@@ -79,7 +79,9 @@ For a forcing linear in the field, fill the real per-mode rate array `rate` with
 integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_factor!`](@ref GBGIsotropicTurbulence.Generator.integrating_factor!)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
-rate. The `field` is the start-of-step field in spectral representation.
+rate. The `field` is the start-of-step field in spectral representation; `domain` is the
+[`FixedDomain`](@ref), and `buffers` the shared per-step scratch (unused by the linear forcings, present
+for interface uniformity).
 """
 set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain, buffers) = false
 
@@ -88,8 +90,8 @@ set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain, buffers) 
     apply_forcing!(forcing, field, domain, scratch) -> field
 
 Apply a post-step forcing to `field` (a velocity or scalar ``\\varphi`` field in spectral
-representation) in place, using the spectral `scratch` buffer. The default does nothing; see
-`BandRescaling`.
+representation) in place, on the [`FixedDomain`](@ref) `domain`, using the spectral `scratch` buffer. The
+default does nothing; see `BandRescaling`.
 """
 apply_forcing!(::AbstractForcing, field, domain::FixedDomain, scratch) = field
 
@@ -98,7 +100,8 @@ apply_forcing!(::AbstractForcing, field, domain::FixedDomain, scratch) = field
     prepare_forcing!(forcing, field, domain, buffers, dt) -> nothing
 
 Update a forcing's internal state once per step, before the Runge–Kutta stages, from the
-start-of-step `field` (in spectral representation) and the timestep `dt`. The default does nothing.
+start-of-step `field` (in spectral representation) and the timestep `dt`, on the [`FixedDomain`](@ref)
+`domain` with the shared per-step scratch `buffers`. The default does nothing.
 """
 prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, buffers, dt::Real) = nothing
 
@@ -107,8 +110,8 @@ prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, buffers, dt::Rea
     add_forcing_source!(forcing, nonlinear, domain, buffers) -> nonlinear
 
 Add an additive forcing source to the de-aliased nonlinear-term buffer `nonlinear` at each Runge–Kutta
-stage (the source is held fixed over the step, so it integrates at the scheme's order). The default
-does nothing.
+stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
+[`FixedDomain`](@ref) `domain` with the shared per-step scratch `buffers`. The default does nothing.
 """
 add_forcing_source!(::AbstractForcing, nonlinear, domain::FixedDomain, buffers) = nonlinear
 
@@ -189,7 +192,7 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\text{field}`` in a low-wavenumber band (Lundgren 2003),
+Linear (negative-damping) forcing ``f = A\\,\\texttt{field}`` in a low-wavenumber band (Lundgren 2003),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
@@ -216,7 +219,7 @@ end
 """
     ConstantPower(domain; target, lowest_shell = 1, highest_shell = 2)
 
-Constant-injection-rate forcing: a banded linear forcing ``f = A\\,\\text{field}`` on integer shells
+Constant-injection-rate forcing: a banded linear forcing ``f = A\\,\\texttt{field}`` on integer shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of ``2\\pi/L`` (default 1–2),
 whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
 injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
@@ -246,8 +249,8 @@ end
 
 
 """
-    StochasticOU(domain; variance, correlation_time, lowest_shell = 1, highest_shell = 2,
-                 seed = 0)
+    StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
+                 highest_shell = 2, seed = 0)
 
 Stochastic (Eswaran–Pope) forcing: each forced Fourier mode in the band
 (``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``) carries an

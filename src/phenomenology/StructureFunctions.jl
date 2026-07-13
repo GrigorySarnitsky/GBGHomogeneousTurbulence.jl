@@ -44,8 +44,8 @@ The Kolmogorov (1941) inertial-range structure-function laws for the longitudina
     increment; this one is *exact* (a consequence of the Kármán–Howarth–Monin relation), carrying no
     free constant.
 
-Both hold in the inertial range ``\\eta \\ll r \\ll L``. `fp` (a [`FlowParameters`](@ref)) supplies the
-dissipation rate ``\\varepsilon``. Any other `order` throws — K41 fixes only these two longitudinal
+Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`FlowParameters`](@ref))
+supplies the dissipation rate ``\\varepsilon``. Any other `order` throws — K41 fixes only these two longitudinal
 moments universally.
 """
 struct Kolmogorov1941 <: StructureFunction

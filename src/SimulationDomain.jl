@@ -191,7 +191,7 @@ The highest wavenumber magnitude that `domain` actually evolves — the de-alias
 \\kappa_{\\max} = f\\,\\frac N2\\,\\frac{2\\pi}{L},
 ```
 
-with ``N`` the resolution, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
+with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`). It is the cutoff the
 de-aliasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` itself; the modes above it are
 zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion

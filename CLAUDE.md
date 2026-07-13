@@ -4,7 +4,7 @@ Julia package: a small, focused **pseudospectral direct numerical simulation (DN
 isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
 ``\varphi`` on a triple-periodic box, each optionally forced, advanced by interchangeable
 integrating-factor time-stepping, with Lagrangian particle tracking and Eulerian + Lagrangian
-statistics. **GPU is the primary target**: the time loop is in-place and allocation-free over a
+statistics. **GPU is the primary target**: the time loop is in-place and allocation-free over
 preallocated buffers, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
 
 Built on two sibling backends: **GBGPeriodicFields** ("PF", the field mathematics) and

@@ -7,8 +7,9 @@ Dimensionless turbulence constants and their Reynolds-number trends, evaluated b
   a high-Reynolds-number plateau with an optional finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
-- [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted)
-  predicts the dissipation a stationary run sustains from its energy and box side length.
+- [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted,
+  via [`stationary_dissipation`](@ref)) predicts the dissipation a stationary run sustains from its energy
+  and box side length.
 """
 module Scalings
 
@@ -35,8 +36,8 @@ abstract type ScalingLaw <: TurbulenceLaw end
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
 dissipation `law` from the turbulent kinetic energy `energy` (``k``) and the periodic-box side length
-`side_length` (``L``) — the inverse of the law's [`scaling`](@ref) group. For [`Li2008`](@ref),
-``\\varepsilon = (k/G)^{3/2}/L`` with ``G`` the group constant. This is the seam by which a run's
+`side_length` (``L``) — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
+[`Li2008`](@ref) gives the ``(k/G)^{3/2}/L`` form). This is the seam by which a run's
 viscosity can be set from its grid and target energy, rather than the reverse.
 """
 function stationary_dissipation end
@@ -116,7 +117,7 @@ anomaly / normalized-dissipation law ``C_\\varepsilon = \\varepsilon L/u'^3`` (T
 scale, which folds the setup-dependent integral-scale-to-box ratio into the constant (``\\approx 0.5``
 becomes ``\\approx 0.9``).
 
-`constant` is the group value ``G`` (default `0.9`). [`scaling`](@ref)`(law, fp)` returns it;
+The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
 inverted, [`stationary_dissipation`](@ref)`(law, k, L)` predicts the dissipation a stationary run of
 energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the run layer uses to
 set the viscosity from the grid and target energy.

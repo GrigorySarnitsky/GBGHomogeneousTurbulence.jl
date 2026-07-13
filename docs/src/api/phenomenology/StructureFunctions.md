@@ -7,7 +7,8 @@ Order   = [:module]
 
 ## Laws
 
-The inertial-range structure-function laws, evaluated by [`structure_function`](@ref).
+The inertial-range structure-function laws, evaluated by [`structure_function`](@ref) (amplitudes) or
+[`scaling_exponent`](@ref) (the intermittency exponents, for `SheLeveque1994` and `Kolmogorov1962`).
 
 ```@docs
 StructureFunction

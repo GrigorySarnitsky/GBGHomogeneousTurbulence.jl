@@ -6,7 +6,7 @@
 # reductions). GBGPeriodicFields is deliberately time- and particle-free (its invariant 12); this
 # package is the consumer that owns time integration, forcing, the scalar transport, particle
 # tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
-# allocation-free over a preallocated buffers.
+# allocation-free over preallocated buffers.
 #
 # Module layout (each concern its own file). Physics concerns take their names from the Mori–Zwanzig
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,

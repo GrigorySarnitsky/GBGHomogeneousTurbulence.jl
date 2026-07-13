@@ -78,10 +78,11 @@ The shared right-hand-side scratch every scheme needs:
 - `velocity_copy`, `vorticity_spectral` — working space in spectral representation that the
   velocity/vorticity recovery consumes.
 - `product_physical`, `product_spectral` — the quadratic products in physical and spectral representation
-  (the Lamb vector, and the scalar flux ``\\boldsymbol{u}\\varphi``).
-- `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star`,
-  `velocity_star_spectral` — the start-of-step and substage velocity/vorticity registers in physical
-  representation.
+  (the Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, and the scalar flux ``\\boldsymbol{u}\\varphi``).
+- `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star` — the start-of-step and
+  substage velocity/vorticity registers in physical representation.
+- `velocity_star_spectral` — the substage velocity predictor ``\\hat{\\boldsymbol{u}}^{*}`` in spectral
+  representation (the `IFRK2` update writes it before the inverse transform).
 - `nonlinear`, `integrating_factor`, `velocity_rate` — the assembled nonlinear term, the shared viscous
   integrating factor, and the velocity's per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
 - `stage1`, `stage2` — the Runge–Kutta stage registers.
@@ -379,7 +380,7 @@ recommended_cfl(::IFRK2) = 0.25
 recommended_cfl(::IFLowStorageRK3) = 0.5
 
 # Scale the base (2/3-calibrated) ceiling by the active de-aliasing: factor = (2/3)/f, f the retained
-# Nyquist fraction (1 for TwoThirds ⇒ unchanged, 2/3 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
+# Nyquist fraction (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
 recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
   recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
 

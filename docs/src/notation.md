@@ -61,16 +61,27 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
-| ``E(\kappa)`` | energy spectrum (energy per unit wavenumber) | [`radial_spectrum`](@extref GBGPeriodicFields GBGPeriodicFields.Reductions.radial_spectrum) (from `GBGPeriodicFields`) |
+| ``E(\kappa)`` | energy spectrum (energy per unit wavenumber), ``k = \sum_\kappa E(\kappa)`` | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
+
+## Derived scales
+
+Measured from the resolved state, or derived from it through a `FlowParameters` bundle and its helpers.
+
+| Symbol | Meaning | Code |
+|---|---|---|
+| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | `flow_parameters` |
+| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
+| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15\,\nu\,u'^2/\varepsilon}`` | `taylor_microscale` |
 
 ## Numerics
 
 | Symbol | Meaning | Code |
 |---|---|---|
 | ``N`` | grid points per side | `grid_points_per_axis` |
-| ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
+| ``L`` | box side (``\Omega = [0,L)^3``); **also** the integral length scale in turbulence diagnostics (`integral_scale`, the model-spectrum roll-off ``f_L(\kappa L)``), which the box side only approximates | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |

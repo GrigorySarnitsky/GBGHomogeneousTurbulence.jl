@@ -9,7 +9,7 @@ Order   = [:module]
 
 The assembled, ready-to-run case — the front-door `Simulation(; grid_points_per_axis, viscosity, …)` and the
 domain-taking `Simulation(domain; …)` constructors. The observables `kinetic_energy`, `dissipation`,
-and `scalar_variance` also accept a `Simulation` directly.
+`scalar_variance`, `energy_spectrum`, and `integral_scale` also accept a `Simulation` directly.
 
 ```@docs
 Simulation

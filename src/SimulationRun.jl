@@ -18,7 +18,9 @@ The run layer: [`Simulation`](@ref) (the assembled state of a case) and the func
 per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
 [`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count, and the
 observables (`kinetic_energy`, `dissipation`, `scalar_variance`, `energy_spectrum`, `integral_scale`)
-accept a `Simulation` directly.
+accept a `Simulation` directly. [`flow_parameters`](@ref) reports the run's dimensionless flow state (a
+`Phenomenology` `FlowParameters`), and [`validate_spectrum`](@ref) compares its measured energy spectrum
+against a `Phenomenology` model.
 """
 module SimulationRun
 
@@ -49,8 +51,9 @@ end
 
 
 """
-    Simulation(; grid_points_per_axis, k_max_η = 2, kinetic_energy = 1.5, side_length = 2π, scalar_type = Float64,
-                 array_type = Array, dealiasing = TwoThirds(), kwargs...)
+    Simulation(; grid_points_per_axis, k_max_η = 2, kinetic_energy = 1.5,
+                 side_length = 2π, scalar_type = Float64, array_type = Array,
+                 dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
@@ -71,8 +74,9 @@ and the viscosity is chosen from the grid rather than supplied:
 
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number the grid resolves.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
-    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy ``k`` and
-    `side_length` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
+    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
+    ``k``, `side_length` the side ``L``, and ``G`` the box-normalization group constant (``\\approx 0.9``),
+    then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. The `kinetic_energy` and `side_length` fix
@@ -135,7 +139,7 @@ end
 
 # A forcing may be given ready-built (an `AbstractForcing`) or as a factory `domain -> AbstractForcing`
 # — the latter lets a banded forcing be named before the domain exists (`domain -> ConstantPower(domain;
-# power)`), since a forcing precomputes its band from `domain`.
+# target)`), since a forcing precomputes its band from `domain`.
 _resolve_forcing(f::AbstractForcing, ::FixedDomain) = f
 _resolve_forcing(f, domain::FixedDomain) = f(domain)
 

@@ -11,7 +11,7 @@ supplies every field operation — transforms, spectral differential operators, 
 interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
 package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
 and the statistics. The GPU is the primary target, so the time loop is in-place and allocation-free
-over a preallocated buffers.
+over preallocated buffers.
 
 ## Installation
 

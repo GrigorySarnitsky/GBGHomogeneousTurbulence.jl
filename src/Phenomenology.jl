@@ -39,7 +39,7 @@ and a trailing letter (a same-year collision).
     Built inside `GBGIsotropicTurbulence` but designed to be cut into a standalone
     `GBGTurbulencePhenomenology` with no rewrite: it takes no field/statistics/dynamics dependency, and
     the umbrella does not re-export it — reach the laws opt-in through `Phenomenology`
-    (`using GBGIsotropicTurbulence.Phenomenology.Spectra`). See `docs/ARCHITECTURE.md` §4.7.
+    (`using GBGIsotropicTurbulence.Phenomenology.Spectra`).
 """
 module Phenomenology
 
@@ -149,8 +149,8 @@ scalar_diffusivity(fp::FlowParameters) = fp.viscosity / fp.schmidt
 """
     Reference(citation; valid_Reλ = (0.0, Inf))
 
-The provenance of a law: a `citation` string (verbatim-consistent with `docs/ARCHITECTURE.md`
-§References) and the Taylor-scale-Reynolds-number range `valid_Reλ = (lo, hi)` over which the fit is
+The provenance of a law: a `citation` string (a full author–year reference) and the
+Taylor-scale-Reynolds-number range `valid_Reλ = (lo, hi)` over which the fit is
 meant to hold. A comparison reads `valid_Reλ` so a law is not judged outside its stated domain.
 """
 struct Reference
@@ -197,7 +197,7 @@ function scaling_exponent end
 """
     structure_function(law, r, fp; order) -> Float64
 
-The reference velocity structure function ``D_{L\\dots}(r) = \\langle(\\delta u)^{\\text{order}}\\rangle``
+The reference velocity structure function ``D_{L\\dots}(r) = \\langle(\\delta u)^{\\texttt{order}}\\rangle``
 predicted by a `law` (a [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction))
 at separation `r` for the state `fp` (a [`FlowParameters`](@ref)) — the moment of the longitudinal
 velocity increment ``\\delta u`` across a distance `r`. Its home is
@@ -222,7 +222,7 @@ function scaling end
 
 Fit a parametrization of law family `L` to measured data — the seam by which a run's own measurements
 become a parametrization sitting beside the literature. No methods are defined yet; it is the recorded
-extension point (`docs/ARCHITECTURE.md` §4.7).
+extension point for fitting a run's own measurements to a parametrization.
 """
 function fit end
 
