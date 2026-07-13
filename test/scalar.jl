@@ -41,7 +41,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     κ = ν / Sc
     û0 = spectral_vector(domain)                                   # zero velocity
     φ̂0 = scalar_spectral(domain)
-    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     conditions = FlowConditions(viscosity = ν, schmidt = Sc)               # unforced
     dt = 0.02
     nsteps = 25
@@ -55,10 +55,10 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "temporal convergence (RK3, coupled)" begin
     û0 = spectral_vector(domain)
-    random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
     dealias!(û0, domain)
     φ̂0 = scalar_spectral(domain)
-    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = ν)                             # Sc = 1, unforced
 
     rk3 = IFLowStorageRK3()
@@ -73,15 +73,15 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "mean conservation (conservative form)" begin
     û0 = spectral_vector(domain)
-    random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
+    random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
     dealias!(û0, domain)
     φ̂0 = scalar_spectral(domain)
-    random_scalar!(φ̂0, domain; variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
+    random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
     field_data(φ̂0)[1, 1, 1] = 3.0 + 0.0im                    # impose a nonzero mean (the k=0 mode)
     mean_before = field_data(φ̂0)[1, 1, 1]
 
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; kinetic_energy = 0.5, lowest_shell = 1, highest_shell = 2))
     _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end
@@ -90,7 +90,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     Sc = 0.7
     κ = ν / Sc
     φ̂ = scalar_spectral(domain)
-    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
+    random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
 
     # ground truth: 2κ⟨|∇φ|²⟩ from the explicit physical gradient (the pre-fusion computation)
     grad_spectral = spectral_vector(domain)

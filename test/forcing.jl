@@ -20,7 +20,7 @@ using Test
   buffers = IntegratorBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
-  random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
+  random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
   dealias!(û0, domain)
 
   run_velocity(conditions, nsteps; dt = 0.01) = begin
@@ -77,7 +77,7 @@ using Test
   @testset "scalar Linear forcing builds variance" begin
     û_zero = spectral_vector(domain)             # no velocity ⇒ pure linear growth of the scalar band
     φ̂0 = scalar_spectral(domain)
-    random_scalar!(φ̂0, domain; variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
+    random_scalar!(φ̂0, domain; scalar_variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
     conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2))
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
@@ -119,7 +119,7 @@ using Test
     ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
     conditions = FlowConditions(viscosity = ν, velocity_forcing = ou)
     û = spectral_vector(domain)
-    random_solenoidal_velocity!(û, domain; energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     dealias!(û, domain)
     φ̂ = scalar_spectral(domain)
     for n in 1:200

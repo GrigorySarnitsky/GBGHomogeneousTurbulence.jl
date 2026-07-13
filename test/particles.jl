@@ -93,9 +93,9 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "advect in a real HIT velocity field" begin
     buffers = IntegratorBuffers(domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.05,
-                      velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; kinetic_energy = 0.5, lowest_shell = 1, highest_shell = 2))
     û = spectral_vector(domain)
-    random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
+    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)
     φ̂ = scalar_spectral(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))

@@ -59,7 +59,7 @@ abstract type AbstractForcing end
     DeferredForcing
 
 A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`, and
-`BandRescaling(; energy)` — return a `DeferredForcing`
+`BandRescaling(; kinetic_energy)` — return a `DeferredForcing`
 capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
 `FixedDomain` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
@@ -129,14 +129,14 @@ struct NoForcing <: AbstractForcing end
 
 
 """
-    BandRescaling(domain; energy, target = :band, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(domain; kinetic_energy, target = :band, lowest_shell = 1, highest_shell = 2)
 
 Deterministic constant-energy forcing (post-step). Each step the in-band Fourier modes (integer
 shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
 ``2\\pi/L``) are rescaled by a single factor; `target` selects what is held fixed:
 
   * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, half the band scalar variance ``\\tfrac12\\langle\\varphi^{2}\\rangle_{\\mathrm{band}}`` for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
-  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{energy}``, which directly pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `energy`, the band is zeroed (the closest reachable state).
+  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{kinetic\\_energy}``, which directly pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `kinetic_energy`, the band is zeroed (the closest reachable state).
 
 Rescaling preserves the divergence-free constraint either way.
 """
@@ -146,11 +146,11 @@ struct BandRescaling{K, T} <: AbstractForcing
   target::Symbol       # :band (hold the band energy) or :total (hold the total energy)
 end
 
-function BandRescaling(domain::FixedDomain; energy::Real, target::Symbol = :band,
+function BandRescaling(domain::FixedDomain; kinetic_energy::Real, target::Symbol = :band,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
   target in (:band, :total) ||
     throw(ArgumentError("BandRescaling `target` must be :band or :total; got :$target"))
-  return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(energy), target)
+  return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(kinetic_energy), target)
 end
 
 
@@ -311,8 +311,8 @@ Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
 ConstantPower(; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> ConstantPower(domain; power, lowest_shell, highest_shell))
 
-BandRescaling(; energy::Real, target::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  DeferredForcing(domain -> BandRescaling(domain; energy, target, lowest_shell, highest_shell))
+BandRescaling(; kinetic_energy::Real, target::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> BandRescaling(domain; kinetic_energy, target, lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =

@@ -49,9 +49,9 @@ end
 
 
 """
-    Simulation(; grid_points_per_axis, k_max_η = 2, energy = 1.5, side_length = 2π, scalar_type = Float64,
+    Simulation(; grid_points_per_axis, k_max_η = 2, kinetic_energy = 1.5, side_length = 2π, scalar_type = Float64,
                  array_type = Array, dealiasing = TwoThirds(), kwargs...)
-    Simulation(domain; k_max_η = 2, energy = 1.5, kwargs...)
+    Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the spectral velocity
@@ -65,16 +65,16 @@ with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
-By default the run is **forced and stationary** — a `BandRescaling` holds the total energy at `energy` —
+By default the run is **forced and stationary** — a `BandRescaling` holds the total energy at `kinetic_energy` —
 and the viscosity is chosen from the grid rather than supplied:
 
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number the grid resolves.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
-    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `energy` the kinetic energy ``k`` and
+    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy ``k`` and
     `side_length` the side ``L``, then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
-    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `energy` and `side_length` fix
+    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
@@ -89,7 +89,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
-- `energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
+- `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
 - `scalar_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, or `HouLi` smooth); it
@@ -97,13 +97,13 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `DeferredForcing` from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total energy
-  at `energy`, `scalar_forcing` to `NoForcing()`. The velocity and scalar are forced independently.
+  at `kinetic_energy`, `scalar_forcing` to `NoForcing()`. The velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
   scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
   initial condition.
 - `initial_spectrum = nothing` — a `Phenomenology` `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
-  run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `energy`.
+  run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `kinetic_energy`.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
@@ -131,9 +131,9 @@ _resolve_forcing(f, domain::FixedDomain) = f(domain)
 
 
 function Simulation(domain::FixedDomain;
-                    energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
+                    kinetic_energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = BandRescaling(domain; energy, target = :total),
+                    velocity_forcing = BandRescaling(domain; kinetic_energy, target = :total),
                     scalar_forcing = NoForcing(),
                     integrator::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(integrator, domain),
@@ -144,10 +144,10 @@ function Simulation(domain::FixedDomain;
   # The stationary dissipation the box sustains (`Li2008`) — a modelled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
   side_length = domain.grid.domain_size[1]
-  ε = stationary_dissipation(Li2008(), energy, side_length)
+  ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
     ν = ε^(1//3) * (k_max_η / max_wavenumber(domain))^(4//3)
-    reλ = (2 * energy / 3) * sqrt(15 / (ε * ν))
+    reλ = (2 * kinetic_energy / 3) * sqrt(15 / (ε * ν))
     @info "Simulation: grid-resolved at κ_max·η = $(k_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
   else
     ν = Float64(viscosity)
@@ -161,14 +161,14 @@ function Simulation(domain::FixedDomain;
   state = ResolvedFields(domain; scalar)
   ic_spectrum = nothing
   if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
-    fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * energy / 3),
+    fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * kinetic_energy / 3),
                         integral_scale = inv(peak_wavenumber), schmidt)
     ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
   elseif !isnothing(initial_spectrum)
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
-  random_solenoidal_velocity!(state.velocity, domain; energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  scalar && random_scalar!(state.scalar, domain; variance = scalar_variance, peak_wavenumber, rng)
+  random_solenoidal_velocity!(state.velocity, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
+  scalar && random_scalar!(state.scalar, domain; scalar_variance, peak_wavenumber, rng)
 
   tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
   tracer_velocity = ntracers > 0 ? physical_vector(domain) : nothing
@@ -365,9 +365,9 @@ the place to stream statistics along the run.
 ```julia
 run!(sim; turnovers = 10)                        # advance ten eddy-turnover times
 
-energy = Float64[]                               # sample the kinetic energy every 0.1 time units
+history = Float64[]                              # sample the kinetic energy every 0.1 time units
 run!(sim; time = 5.0, every = 0.1) do s
-    push!(energy, kinetic_energy(s))
+    push!(history, kinetic_energy(s))
 end
 ```
 """

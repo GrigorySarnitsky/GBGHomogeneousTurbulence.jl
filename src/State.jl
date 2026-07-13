@@ -43,12 +43,12 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 
 """
-    random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0,
+    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0,
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, de-aliased and rescaled so the kinetic energy
-``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `energy`. The Leray–Helmholtz
+``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by the Gaussian envelope
@@ -56,14 +56,14 @@ By default (`spectrum = nothing`) the velocity is concentrated at large scales b
 Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
-shell's mode count) and the overall amplitude is fixed by the `energy` rescaling — e.g. a von Kármán or
+shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or
 Pope form from the `Phenomenology` submodule's model spectra, which the run layer can wire in for you.
 
 `domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
 (defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
-                                     energy::Real = 0.5, peak_wavenumber::Real = 2.0,
+                                     kinetic_energy::Real = 0.5, peak_wavenumber::Real = 2.0,
                                      spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = physical_vector(domain)
@@ -86,18 +86,18 @@ function random_solenoidal_velocity!(û, domain::FixedDomain;
   convolve!(û, û, domain.dealias)
 
   current_energy = 0.5 * inner(û, û)
-  current_energy > 0 && (field_data(û) .*= sqrt(T(energy) / current_energy))
+  current_energy > 0 && (field_data(û) .*= sqrt(T(kinetic_energy) / current_energy))
   return û
 end
 
 
 """
-    random_scalar!(φ̂, domain; variance = 1.0, peak_wavenumber = 2.0,
+    random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0,
                    spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, de-aliased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-`variance`. The physical noise is made mean-zero before the transform, so the
+`scalar_variance`. The physical noise is made mean-zero before the transform, so the
 ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by the Gaussian envelope
@@ -105,14 +105,14 @@ By default (`spectrum = nothing`) the scalar is concentrated at large scales by 
 Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
 scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 ``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed
-spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `variance` rescaling —
+spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `scalar_variance` rescaling —
 e.g. an Obukhov–Corrsin form from `Phenomenology`.
 
 `domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
 (defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, domain::FixedDomain;
-                        variance::Real = 1.0, peak_wavenumber::Real = 2.0,
+                        scalar_variance::Real = 1.0, peak_wavenumber::Real = 2.0,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = scalar_physical(domain)
@@ -134,7 +134,7 @@ function random_scalar!(φ̂, domain::FixedDomain;
   convolve!(φ̂, φ̂, domain.dealias)
 
   current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
-  current_variance > 0 && (field_data(φ̂) .*= sqrt(T(variance) / current_variance))
+  current_variance > 0 && (field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance))
   return φ̂
 end
 

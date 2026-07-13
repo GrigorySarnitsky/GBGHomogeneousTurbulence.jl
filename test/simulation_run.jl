@@ -53,7 +53,7 @@ using Test
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = k_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
     ν = sim.conditions.viscosity
-    ε = stationary_dissipation(Li2008(), 1.5, L)               # energy = 1.5, side_length = L
+    ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
     @test sim.conditions.velocity_forcing isa BandRescaling        # forced by default
@@ -110,7 +110,7 @@ using Test
 
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(power = 0.1), Linear(rate = 0.5),
-                 BandRescaling(energy = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
+                 BandRescaling(kinetic_energy = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
@@ -179,7 +179,7 @@ using Test
     domain = FixedDomain(24, 2π; scalar_type = Float64)
     buffers = IntegratorBuffers(domain; scalar = true)
     û = spectral_vector(domain)
-    random_solenoidal_velocity!(û, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
+    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)
     S0 = derivative_skewness(û, domain)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
@@ -209,18 +209,18 @@ using Test
   @testset "BandRescaling target = :total pins total energy" begin
     # :total rescales the band to make the whole-field energy equal the target each step
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                     velocity_forcing = BandRescaling(energy = 0.8, target = :total),
-                     scalar = false, energy = 0.5, rng = MersenneTwister(40))
+                     velocity_forcing = BandRescaling(kinetic_energy = 0.8, target = :total),
+                     scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(sim; dt = 0.01)
     @test kinetic_energy(sim) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
     simb = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                      velocity_forcing = BandRescaling(energy = 0.3, target = :band),
-                      scalar = false, energy = 0.5, rng = MersenneTwister(40))
+                      velocity_forcing = BandRescaling(kinetic_energy = 0.3, target = :band),
+                      scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb)) && kinetic_energy(simb) > 0
     # the target symbol is validated at construction
     domain = FixedDomain(16, 2π; scalar_type = Float64)
-    @test_throws ArgumentError BandRescaling(domain; energy = 0.5, target = :bogus)
+    @test_throws ArgumentError BandRescaling(domain; kinetic_energy = 0.5, target = :bogus)
   end
 end

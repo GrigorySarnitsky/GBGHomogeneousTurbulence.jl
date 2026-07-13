@@ -35,7 +35,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   buffers = IntegratorBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
-  random_solenoidal_velocity!(û0, domain; energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
+  random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
   dealias!(û0, domain)
 
   Tfinal = 0.5
@@ -62,7 +62,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; energy = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; kinetic_energy = 0.5, lowest_shell = 1, highest_shell = 2))
     integrator = IFLowStorageRK3()
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))

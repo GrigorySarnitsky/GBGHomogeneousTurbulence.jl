@@ -125,8 +125,7 @@ representation must still **state what it does to the real physical quantity fir
 formula — then give the spectral form it uses.** `dissipation` is the reference: lead with
 ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` (the physical dissipation rate), then
 the reduction that computes it. Give the physical formula **whenever a clean one exists**; where it
-does not (the integrating factor is a spectral multiplier; `squared_wavenumber_field` is the symbol of
-``-\nabla^2``), say so briefly rather than forcing it. **Every diagnostic states the physical quantity
+does not (the integrating factor is a spectral multiplier), say so briefly rather than forcing it. **Every diagnostic states the physical quantity
 it measures before the numerical method** — the physics-first mirror of PF's rule.
 
 **One concept, one home.** One docstring per operation, on the bare binding; a generic carries **one**

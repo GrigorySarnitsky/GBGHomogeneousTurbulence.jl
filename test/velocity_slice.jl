@@ -18,11 +18,11 @@ using Test
   domain = FixedDomain(N, L; scalar_type = T)
   buffers = IntegratorBuffers(domain; scalar = true)
   conditions = FlowConditions(viscosity = ν,
-                    velocity_forcing = BandRescaling(domain; energy = 0.6, lowest_shell = 1, highest_shell = 2))
+                    velocity_forcing = BandRescaling(domain; kinetic_energy = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()
 
   û = spectral_vector(domain)
-  random_solenoidal_velocity!(û, domain; energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
+  random_solenoidal_velocity!(û, domain; kinetic_energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
   dealias!(û, domain)
   φ̂ = scalar_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
 
