@@ -7,13 +7,19 @@
 """
     Observables
 
-The functions of the flow state that are measured — kinetic energy, dissipation, the velocity-
-derivative skewness, the scalar variance and its dissipation, the maximum component speed, the energy
-spectrum, and the integral scale. In the Mori–Zwanzig reading (design doc §8) these are the *observables*
-of the `Generator`: their plateaus gate warm-up (`warmup!`), and their statistics are to be tracked by
-`GBGStreamingStatistics`. Each reduces a field to a scalar, or — the energy spectrum — to a distribution
-over wavenumber. None de-aliases first: a reduction to a scalar is Parseval-exact, and the run already
-keeps the field de-aliased, so a physical-space reduction is exact too.
+The measured functions of the flow state:
+- [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
+  variance.
+- [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
+- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the K41 marker of developed
+  turbulence.
+- [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step.
+- [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
+  length scale derived from it.
+
+Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
+distribution over wavenumber); none de-aliases first — a reduction is Parseval-exact and the run keeps
+the field de-aliased, so a reduction in physical representation is exact too.
 """
 module Observables
 

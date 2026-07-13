@@ -42,7 +42,7 @@ using Test
   @testset "a HouLi simulation runs and stays finite" begin
     domain = FixedDomain(N, L; dealiasing = HouLi())
     sim = Simulation(domain; viscosity = 0.03,
-                     velocity_forcing = ConstantPower(power = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(7))
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3()) * 2 / 3        # the domain-aware CFL flowed in
     run!(sim; steps = 10)

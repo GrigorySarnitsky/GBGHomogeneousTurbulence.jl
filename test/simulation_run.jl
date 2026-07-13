@@ -17,7 +17,7 @@ using Test
 
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
-                     velocity_forcing = domain -> ConstantPower(domain; power = 0.1),
+                     velocity_forcing = domain -> ConstantPower(domain; target = 0.1),
                      scalar = true, ntracers = 50, rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
@@ -109,13 +109,13 @@ using Test
   end
 
   @testset "domain-free forcing spec" begin
-    for spec in (ConstantPower(power = 0.1), Linear(rate = 0.5),
-                 BandRescaling(kinetic_energy = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
+    for spec in (ConstantPower(target = 0.1), Linear(rate = 0.5),
+                 BandRescaling(target = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(power = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(20))
     run!(sim; steps = 5)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
@@ -150,7 +150,7 @@ using Test
 
   @testset "warmup! detects stationarity" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(power = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(21))
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
@@ -164,7 +164,7 @@ using Test
   @testset "warmup! gates on the scalar" begin
     D = GBGIsotropicTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                        velocity_forcing = ConstantPower(power = 0.1),
+                        velocity_forcing = ConstantPower(target = 0.1),
                         scalar_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3),
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
@@ -186,7 +186,7 @@ using Test
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     φ̂ = scalar_spectral(domain)
-    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; power = 0.15))
+    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15))
     for _ in 1:80
       velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
       vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
@@ -198,7 +198,7 @@ using Test
 
   @testset "warmup! skewness gate runs" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(power = 0.15), scalar = false,
+                     velocity_forcing = ConstantPower(target = 0.15), scalar = false,
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
@@ -206,21 +206,21 @@ using Test
     @test current_step(sim) > 0
   end
 
-  @testset "BandRescaling target = :total pins total energy" begin
+  @testset "BandRescaling over = :total pins total energy" begin
     # :total rescales the band to make the whole-field energy equal the target each step
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                     velocity_forcing = BandRescaling(kinetic_energy = 0.8, target = :total),
+                     velocity_forcing = BandRescaling(target = 0.8, over = :total),
                      scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(sim; dt = 0.01)
     @test kinetic_energy(sim) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
     simb = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                      velocity_forcing = BandRescaling(kinetic_energy = 0.3, target = :band),
+                      velocity_forcing = BandRescaling(target = 0.3, over = :band),
                       scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb)) && kinetic_energy(simb) > 0
     # the target symbol is validated at construction
     domain = FixedDomain(16, 2π; scalar_type = Float64)
-    @test_throws ArgumentError BandRescaling(domain; kinetic_energy = 0.5, target = :bogus)
+    @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)
   end
 end

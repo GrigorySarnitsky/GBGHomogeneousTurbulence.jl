@@ -133,7 +133,7 @@ _resolve_forcing(f, domain::FixedDomain) = f(domain)
 function Simulation(domain::FixedDomain;
                     kinetic_energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = BandRescaling(domain; kinetic_energy, target = :total),
+                    velocity_forcing = BandRescaling(domain; target = kinetic_energy, over = :total),
                     scalar_forcing = NoForcing(),
                     integrator::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(integrator, domain),

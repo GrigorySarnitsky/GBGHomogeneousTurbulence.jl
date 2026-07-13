@@ -8,12 +8,15 @@
 """
     SimulationDomain
 
-The discretised periodic box a run lives on — the reusable, read-only frame. Provides [`FixedDomain`](@ref)
-(the fixed, unsheared cubic box: grid, transform plans, spectral multipliers, squared-wavenumber field, and
-the de-alias kernel built by a [`DealiasingStrategy`](@ref) — [`TwoThirds`](@ref) or [`HouLi`](@ref)); the
-field-sized allocators ([`spectral_vector`](@ref), [`scalar_spectral`](@ref), …); [`max_wavenumber`](@ref);
-and [`dealias!`](@ref), which applies the de-alias kernel to a spectral field in place. Precision and
-backend enter here and flow everywhere from here.
+The discretised periodic box a run lives on — the reusable, read-only frame:
+- [`FixedDomain`](@ref) — the fixed, unsheared cubic box (grid, transform plans, spectral multipliers,
+  squared-wavenumber field, de-alias kernel).
+- [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref) or [`HouLi`](@ref),
+  and the cutoff it sets, [`max_wavenumber`](@ref).
+- [`spectral_vector`](@ref), [`scalar_spectral`](@ref), … — the field-sized scratch allocators.
+- [`dealias!`](@ref) — apply the de-alias kernel to a field in spectral representation, in place.
+
+Precision and backend enter here and flow everywhere from here.
 """
 module SimulationDomain
 
@@ -55,16 +58,16 @@ struct TwoThirds <: DealiasingStrategy end
 
 The smooth Hou–Li spectral filter, transfer function
 ``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
-with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. `order`
-sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); `strength` sets the
+with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
+sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
 damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
 (`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
 epsilon — ``\\approx 36`` for `Float64`, ``\\approx 16`` for `Float32` — so the Nyquist mode always damps
 to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilisation,
-hence an opt-in, not the default. Applied isotropically in ``\\kappa`` (the filter TurTLE uses, there
-per-axis). Because it retains energy out to the Nyquist wavenumber it takes a proportionally smaller
-CFL step than the ``2/3`` rule — handled automatically by `recommended_cfl`.
+hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
+the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
+automatically by `recommended_cfl`.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
@@ -86,17 +89,6 @@ The discretised periodic box a run lives on — the reusable, read-only frame: a
 `side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
 pseudospectral method needs on that box.
 
-Its fields:
-- `grid`, `layout` — the `Grid3D` and its real–Fourier memory layout.
-- `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex transform plans, one per field
-  rank: the velocity (a vector field), the scalar ``\\varphi``, and the rank-2 strain tensor the
-  derivative-skewness diagnostic needs.
-- `multipliers` — the `FieldSpectralMultipliers`, the spectral first-derivative operators.
-- `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
-  spectral space ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as a
-  scalar-field kernel for weighted spectral reductions.
-- `dealias`, `dealiasing` — the de-alias kernel and the [`DealiasingStrategy`](@ref) that built it.
-
 # Arguments
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length = 2π` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
@@ -106,6 +98,17 @@ Its fields:
   advective-CFL ceiling through `recommended_cfl`.
 - `scalar_type = Float64` — the real element type (`Float32` is GPU-friendly).
 - `array_type = Array` — the storage backend: `Array` (CPU) or `CuArray` / `ROCArray` (GPU).
+
+# Fields
+- `grid`, `layout` — the `Grid3D` and its real–Fourier memory layout.
+- `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex transform plans, one per field
+  rank: the velocity (a vector field), the scalar (a scalar field), and the rank-2 strain tensor the
+  derivative-skewness diagnostic needs.
+- `multipliers` — the `FieldSpectralMultipliers`, the spectral first-derivative operators.
+- `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
+  spectral representation ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as
+  a scalar-field kernel for weighted spectral reductions.
+- `dealias`, `dealiasing` — the de-alias kernel and the [`DealiasingStrategy`](@ref) that built it.
 """
 struct FixedDomain{G, L, VP, SP, TP, M, K, SK, D, DS}
   grid::G
@@ -198,8 +201,7 @@ end
 """
     spectral_vector(domain)
 
-Allocate a single zeroed vector field in spectral representation on `domain`'s backend and element type
-(a scratch buffer for the time loop).
+Allocate a single zeroed vector field in spectral representation on `domain`'s backend and element type.
 """
 spectral_vector(domain::FixedDomain) =
   VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid)
@@ -217,8 +219,7 @@ physical_vector(domain::FixedDomain) =
 """
     scalar_spectral(domain)
 
-Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type
-(used for the scalar ``\\varphi``, the integrating factor, and kernel scratch).
+Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type.
 """
 scalar_spectral(domain::FixedDomain) =
   ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid)
@@ -227,8 +228,7 @@ scalar_spectral(domain::FixedDomain) =
 """
     scalar_physical(domain)
 
-Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type
-(used for the scalar ``\\varphi`` in physical space).
+Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type.
 """
 scalar_physical(domain::FixedDomain) =
   ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid)
@@ -237,8 +237,7 @@ scalar_physical(domain::FixedDomain) =
 """
     tensor_spectral(domain)
 
-Allocate a single zeroed second-order tensor field in spectral representation (scratch for the
-strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbol{u}``).
+Allocate a single zeroed second-order tensor field in spectral representation on `domain`'s backend and element type.
 """
 tensor_spectral(domain::FixedDomain) =
   TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid)
@@ -247,7 +246,7 @@ tensor_spectral(domain::FixedDomain) =
 """
     tensor_physical(domain)
 
-Allocate a single zeroed second-order tensor field in physical representation.
+Allocate a single zeroed second-order tensor field in physical representation on `domain`'s backend and element type.
 """
 tensor_physical(domain::FixedDomain) =
   TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid)

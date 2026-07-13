@@ -6,12 +6,13 @@
 """
     State
 
-The DNS realisation of the Mori–Zwanzig State role — the field the dynamics acts on and how it is
-seeded: [`ResolvedFields`](@ref), the inert record of the evolving spectral velocity and scalar (the
-single source of truth — the physical fields are derived, never stored), and the random initial
-conditions [`random_solenoidal_velocity!`](@ref) (the divergence-free velocity) and
-[`random_scalar!`](@ref) (the mean-zero scalar) that seed it. All sized to a
-[`FixedDomain`](@ref).
+The evolving state a run advances, and how it is seeded:
+- [`ResolvedFields`](@ref) — the inert record of the evolving velocity and scalar in spectral
+  representation (the single source of truth; the physical fields are derived, never stored).
+- [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
+  (a divergence-free velocity, a mean-zero scalar) that seed it.
+
+All sized to a [`FixedDomain`](@ref).
 """
 module State
 
@@ -26,12 +27,15 @@ export ResolvedFields, random_solenoidal_velocity!, random_scalar!
 """
     ResolvedFields(domain; scalar = false)
 
-The inert record of the evolving spectral fields a run advances — the Mori–Zwanzig state, and the single
-source of truth: the spectral velocity ``\\hat{\\boldsymbol u}`` (`velocity`) and, when the run carries a
-passive scalar, the spectral scalar ``\\hat\\varphi`` (`scalar`; `nothing` otherwise). The physical
-velocity, vorticity, and scalar are *derived* from these on demand, never stored here — so the state
-cannot go stale. No operation hangs on this record: the generator advances it and the observables read it
-as external functions of ``(\\hat{\\boldsymbol u}, \\hat\\varphi)``. Allocated on a [`FixedDomain`](@ref).
+The inert record of the evolving fields a run advances, in spectral representation — the single source
+of truth, from which the velocity, vorticity, and scalar in physical representation are derived on demand
+and never stored, so the state cannot go stale. Build it on a [`FixedDomain`](@ref); pass `scalar = true`
+to carry a passive scalar.
+
+# Fields
+- `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol u}``.
+- `scalar` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the run carries
+  no passive scalar.
 """
 struct ResolvedFields{UH, PH}
   velocity::UH                   # û (spectral) — the resolved velocity, the single source of truth
@@ -59,8 +63,8 @@ spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``
 shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or
 Pope form from the `Phenomenology` submodule's model spectra, which the run layer can wire in for you.
 
-`domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
-(defaults to `Random.default_rng()`).
+The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
+stream (defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
                                      kinetic_energy::Real = 0.5, peak_wavenumber::Real = 2.0,
@@ -108,8 +112,8 @@ scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `scalar_variance` rescaling —
 e.g. an Obukhov–Corrsin form from `Phenomenology`.
 
-`domain` is the [`FixedDomain`](@ref) the field is generated on; `rng` is the random stream
-(defaults to `Random.default_rng()`).
+The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
+stream (defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, domain::FixedDomain;
                         scalar_variance::Real = 1.0, peak_wavenumber::Real = 2.0,

@@ -58,8 +58,8 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; power)`, and
-`BandRescaling(; kinetic_energy)` — return a `DeferredForcing`
+A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; target)`, and
+`BandRescaling(; target)` — return a `DeferredForcing`
 capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
 `FixedDomain` exist (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
@@ -120,6 +120,12 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
 end
 
 
+# The observable a forcing `target` agrees with: kinetic energy ½⟨|u|²⟩ for the velocity (a vector
+# field, tensor order 1), scalar variance ⟨φ²⟩ for the scalar (order 0) — the ½ convention only for the
+# vector, matching `Observables.kinetic_energy` / `Observables.scalar_variance`.
+_target_factor(field) = field_tensor_order(field) == 0 ? 1.0 : 0.5
+
+
 """
     NoForcing()
 
@@ -129,42 +135,52 @@ struct NoForcing <: AbstractForcing end
 
 
 """
-    BandRescaling(domain; kinetic_energy, target = :band, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(domain; target, over = :band, lowest_shell = 1, highest_shell = 2)
 
-Deterministic constant-energy forcing (post-step). Each step the in-band Fourier modes (integer
-shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
-``2\\pi/L``) are rescaled by a single factor; `target` selects what is held fixed:
+Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed. Each step the in-band
+Fourier modes (integer shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of
+``2\\pi/L``) are rescaled by a single factor to hold the `target`.
 
-  * `:band` (default) — the band's own energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}} = \\texttt{energy}`` (band kinetic energy for the velocity, half the band scalar variance ``\\tfrac12\\langle\\varphi^{2}\\rangle_{\\mathrm{band}}`` for the scalar ``\\varphi``); the *total* energy then floats, oscillating slowly about its mean as the band feeds the cascade.
-  * `:total` — the band is rescaled to absorb the whole-field deficit so the *total* energy ``\\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle = \\texttt{kinetic\\_energy}``, which directly pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``. If the out-of-band energy alone exceeds `kinetic_energy`, the band is zeroed (the closest reachable state).
+`target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
+energy** ``\\tfrac12\\langle\\lvert\\boldsymbol u\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
+the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` (`scalar_variance`) for the scalar — the field's
+L² observable, carrying the ½ only for the vector.
+
+`over` selects where the target applies:
+  * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
+    about its mean as the band feeds the cascade.
+  * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
+    `target` (for the velocity this pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``).
+    If the out-of-band value alone exceeds `target`, the band is zeroed (the closest reachable state).
 
 Rescaling preserves the divergence-free constraint either way.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
-  target_energy::T     # the energy ½⟨|·|²⟩ to hold (in the band, or the total)
-  target::Symbol       # :band (hold the band energy) or :total (hold the total energy)
+  target::T            # the observable to hold: kinetic_energy (velocity) or scalar_variance (scalar)
+  over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
 end
 
-function BandRescaling(domain::FixedDomain; kinetic_energy::Real, target::Symbol = :band,
+function BandRescaling(domain::FixedDomain; target::Real, over::Symbol = :band,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
-  target in (:band, :total) ||
-    throw(ArgumentError("BandRescaling `target` must be :band or :total; got :$target"))
-  return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(kinetic_energy), target)
+  over in (:band, :total) ||
+    throw(ArgumentError("BandRescaling `over` must be :band or :total; got :$over"))
+  return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over)
 end
 
 
 function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain, scratch)
-  band_energy = 0.5 * weighted_inner(field, forcing.band)  # ½⟨|·|²⟩ in the band (fused; no band-pass copy)
-  band_energy < 1e-12 && return field                  # nothing in the band yet (guard)
-  # aim the band at: the target itself (:band), or what makes the *total* hit the target (:total)
-  target_band = if forcing.target === :total
-    total_energy = 0.5 * inner(field, field)           # ½⟨|·|²⟩ over the whole field
-    max(zero(band_energy), forcing.target_energy - total_energy + band_energy)
+  factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
+  band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
+  band_value < 1e-12 && return field                   # nothing in the band yet (guard)
+  # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
+  target_band = if forcing.over === :total
+    total_value = factor * inner(field, field)         # the observable over the whole field
+    max(zero(band_value), forcing.target - total_value + band_value)
   else
-    forcing.target_energy
+    forcing.target
   end
-  scale = sqrt(target_band / band_energy)
+  scale = sqrt(target_band / band_value)
   convolve!(field, field, forcing.band, scale - 1, 1)  # rescale in-band modes (α/β accumulate)
   return field
 end
@@ -173,11 +189,12 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\boldsymbol{u}`` in a low-wavenumber band (Lundgren 2003),
+Linear (negative-damping) forcing ``f = A\\,\\text{field}`` in a low-wavenumber band (Lundgren 2003),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
-rate ``A - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``. A positive `rate` injects energy.
+rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity). A positive `rate`
+amplifies the field.
 """
 struct Linear{M, T} <: AbstractForcing
   mask::M              # real array: the band indicator (1 in band, 0 outside)
@@ -197,33 +214,32 @@ end
 
 
 """
-    ConstantPower(domain; power, lowest_shell = 1, highest_shell = 2)
+    ConstantPower(domain; target, lowest_shell = 1, highest_shell = 2)
 
-Constant-power forcing: a banded linear forcing ``f = A\\,\\boldsymbol{u}`` on integer shells
+Constant-injection-rate forcing: a banded linear forcing ``f = A\\,\\text{field}`` on integer shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of ``2\\pi/L`` (default 1–2),
-whose rate is set each step so the energy-injection rate
-``\\langle\\boldsymbol{u}\\cdot f\\rangle = A\\,(2E_{\\mathrm{band}})`` equals
-the target ``\\varepsilon = \\texttt{power}`` — i.e. ``A = \\varepsilon / (2E_{\\mathrm{band}})`` with
-``E_{\\mathrm{band}} = \\tfrac12\\langle\\lvert\\cdot\\rvert^{2}\\rangle_{\\mathrm{band}}`` of the
-start-of-step field. The rate is folded into the integrating factor; like `Linear`, it preserves a
-solenoidal velocity.
+whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
+injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
+diagnostics: `dissipation` ``\\varepsilon`` for the velocity, `scalar_dissipation`
+``\\varepsilon_\\varphi`` for the scalar. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
+velocity.
 """
 struct ConstantPower{K, M, T} <: AbstractForcing
-  band::K              # band-pass kernel (for the band energy)
+  band::K              # band-pass kernel (for the band observable)
   mask::M              # real array band indicator
-  target_power::T      # the target injection rate ε
+  target::T            # the dissipation rate to hold: dissipation (velocity) or scalar_dissipation (scalar)
 end
 
-function ConstantPower(domain::FixedDomain; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
+function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
   band = _shell_band(domain, lowest_shell, highest_shell)
   mask = real.(field_data(band))
-  return ConstantPower(band, mask, float(power))
+  return ConstantPower(band, mask, float(target))
 end
 
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain, buffers)
   T = eltype(rate)
-  band_energy = 0.5 * weighted_inner(field, forcing.band)       # E_band (fused; no band-pass copy)
-  amplitude = band_energy > 1e-12 ? forcing.target_power / (2 * band_energy) : 0.0
+  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
+  amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
   rate .= T(amplitude) .* forcing.mask
   return true
 end
@@ -304,15 +320,15 @@ add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain, buffers) =
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
 # domain exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
-# `ConstantPower(power = 0.1)` — with `Simulation` supplying the domain.
+# `ConstantPower(target = 0.1)` — with `Simulation` supplying the domain.
 Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> Linear(domain; rate, lowest_shell, highest_shell))
 
-ConstantPower(; power::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  DeferredForcing(domain -> ConstantPower(domain; power, lowest_shell, highest_shell))
+ConstantPower(; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> ConstantPower(domain; target, lowest_shell, highest_shell))
 
-BandRescaling(; kinetic_energy::Real, target::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  DeferredForcing(domain -> BandRescaling(domain; kinetic_energy, target, lowest_shell, highest_shell))
+BandRescaling(; target::Real, over::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> BandRescaling(domain; target, over, lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =

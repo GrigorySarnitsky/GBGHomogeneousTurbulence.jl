@@ -68,22 +68,24 @@ end
 The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
 memory. Build it per scheme with [`allocate_buffers`](@ref), which dispatches on the concrete `integrator`.
 
-Its fields — the shared right-hand-side scratch every scheme needs:
-- `velocity_copy`, `vorticity_spectral` — spectral working space the physical velocity/vorticity
-  recovery consumes.
-- `product_physical`, `product_spectral` — the physical and spectral quadratic products (the Lamb
-  vector, and the scalar flux ``\\boldsymbol{u}\\varphi``).
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the buffers are sized (`similar`) to.
+- `scalar = false` — whether to allocate the nested `ScalarBuffers` for a passive scalar.
+
+# Fields
+The shared right-hand-side scratch every scheme needs:
+- `velocity_copy`, `vorticity_spectral` — working space in spectral representation that the
+  velocity/vorticity recovery consumes.
+- `product_physical`, `product_spectral` — the quadratic products in physical and spectral representation
+  (the Lamb vector, and the scalar flux ``\\boldsymbol{u}\\varphi``).
 - `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star`,
-  `velocity_star_spectral` — the start-of-step and substage physical velocity/vorticity registers.
+  `velocity_star_spectral` — the start-of-step and substage velocity/vorticity registers in physical
+  representation.
 - `nonlinear`, `integrating_factor`, `velocity_rate` — the assembled nonlinear term, the shared viscous
   integrating factor, and the velocity's per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
 - `stage1`, `stage2` — the Runge–Kutta stage registers.
 - `scalar` — a nested `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else
   `nothing`; when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
-
-# Arguments
-- `domain` — the [`FixedDomain`](@ref) the buffers are sized (`similar`) to.
-- `scalar = false` — whether to allocate the nested `ScalarBuffers` for a passive scalar.
 """
 struct IntegratorBuffers{VS, SS, VP, RK, SB}
   vorticity_spectral::VS

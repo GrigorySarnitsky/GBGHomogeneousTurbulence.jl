@@ -4,7 +4,7 @@ using GBGIsotropicTurbulence.Phenomenology
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 
 # one short forced run, shared across the validation checks
-const SIM = Simulation(grid_points_per_axis = 32, viscosity = 0.02, velocity_forcing = ConstantPower(power = 0.1))
+const SIM = Simulation(grid_points_per_axis = 32, viscosity = 0.02, velocity_forcing = ConstantPower(target = 0.1))
 for _ in 1:20
   advance!(SIM)
 end

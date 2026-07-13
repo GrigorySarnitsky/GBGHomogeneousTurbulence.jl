@@ -81,7 +81,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     mean_before = field_data(φ̂0)[1, 1, 1]
 
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; kinetic_energy = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
     _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end

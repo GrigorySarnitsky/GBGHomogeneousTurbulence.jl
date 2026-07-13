@@ -49,7 +49,7 @@ using Test
 
   @testset "ConstantPower sets injection rate = power" begin
     power = 0.3
-    forcing = ConstantPower(domain; power = power, lowest_shell = 1, highest_shell = 2)
+    forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
     set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
     A = maximum(buffers.velocity_rate)
@@ -67,7 +67,7 @@ using Test
 
   @testset "ConstantPower bounded and solenoidal" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = ConstantPower(domain; power = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = ConstantPower(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
     û = run_velocity(conditions, 100)
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)

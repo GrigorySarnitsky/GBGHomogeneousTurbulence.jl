@@ -105,11 +105,12 @@ comments stay Unicode (they are not rendered).
 
 The organizing spec for every user-facing docstring and API page; the rendered glossary at
 `docs/src/notation.md` is the reader's copy of the notation. Two audiences, one rule each: a **module
-docstring is a map**; a **function docstring is a home**.
+docstring is a map**; a **function or type docstring is a home**.
 
 **Two-tier structure.**
-- **Module docstring = map.** What the module is, its scope and place in the architecture (its MZ
-  role), its invariants — then a **linked one-liner per operation, and no formulas.** Every formula
+- **Module docstring = map.** What the module is, its scope, its invariants — then a **linked one-liner per
+  operation, and no formulas** (no Mori–Zwanzig framing or architecture rationale — those live in
+  `ARCHITECTURE.md`). Every formula
   lives in the operation's own docstring.
 - **Function docstring = home**, in this order: (1) a one-sentence identity in the user's terms; (2)
   when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
@@ -118,6 +119,11 @@ docstring is a map**; a **function docstring is a home**.
   **named / published** method (verbatim-consistent with `ARCHITECTURE.md` §References), none for a
   classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
   (→ `ARCHITECTURE.md`).
+- **Type docstring = home, constructor-first**, in this order: (1) a one-sentence identity in the
+  user's terms; (2) the constructor and its arguments — how the user builds and uses the type (the
+  primary read); (3) an example where the construction is non-obvious; (4) a demoted `# Fields` section —
+  the plain positional constructor and the field explanations. The struct's fields are reference detail,
+  not the opening; lead with the constructor the user calls.
 
 **Physical meaning first — even for spectral-representation operations.** A field is a real physical
 object; spectral is only a *representation*. A docstring for an operation *computed* in spectral

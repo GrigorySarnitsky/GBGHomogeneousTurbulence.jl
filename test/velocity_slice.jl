@@ -18,7 +18,7 @@ using Test
   domain = FixedDomain(N, L; scalar_type = T)
   buffers = IntegratorBuffers(domain; scalar = true)
   conditions = FlowConditions(viscosity = ν,
-                    velocity_forcing = BandRescaling(domain; kinetic_energy = 0.6, lowest_shell = 1, highest_shell = 2))
+                    velocity_forcing = BandRescaling(domain; target = 0.6, lowest_shell = 1, highest_shell = 2))
   integrator = IFRK2()
 
   û = spectral_vector(domain)

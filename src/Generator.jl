@@ -13,21 +13,22 @@
 
 The flow's equations of motion — the incompressible Navier–Stokes right-hand side in rotational form
 (the de-aliased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
-integrating factor. In the Mori–Zwanzig reading (design doc §8) this is the *generator of the full
-dynamics* — it advances the flow state; `Observables` are the functions of that state, and
-`Propagator` the numerical propagator.
+integrating factor.
 
-Its six operations (each formula lives in the operation's own docstring):
+Its contents (each formula lives in the operation's own docstring):
+- [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
+  the Schmidt number, the forcings).
 - [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
-  recover the physical velocity, vorticity, and scalar from their spectral representations.
+  recover the velocity, vorticity, and scalar in physical representation from their spectral
+  representation.
 - [`velocity_nonlinear!`](@ref), [`scalar_nonlinear!`](@ref) — assemble the de-aliased, Leray-projected
-  momentum and scalar nonlinear terms (the reversible advection).
-- [`integrating_factor!`](@ref) — build the exact viscous/diffusive spectral multiplier for the linear
-  diffusion term.
+  momentum and scalar nonlinear terms.
+- [`integrating_factor!`](@ref) — build the exact viscous/diffusive multiplier for the linear diffusion
+  term.
 
 Each field-transforming or nonlinear-assembly operation takes the `domain` (a [`FixedDomain`](@ref)) and
-the individual preallocated scratch field(s) it writes into as its final argument(s), so the module names
-no buffer bundle; [`integrating_factor!`](@ref) takes `domain` alone.
+the individual preallocated scratch field(s) it writes into as its final argument(s);
+[`integrating_factor!`](@ref) takes `domain` alone.
 """
 module Generator
 
@@ -62,9 +63,8 @@ FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scala
 """
     velocity_to_physical!(u, û, domain, velocity_copy)
 
-Compute the physical velocity ``\\boldsymbol{u}`` from the velocity field `û` (given in spectral
-representation ``\\hat{\\boldsymbol{u}}``) into `u`, leaving `û` unchanged. The scratch `velocity_copy` (a
-spectral vector field) is the working space.
+Recover the velocity in physical representation into `u`, from the spectral `û` (left unchanged). The
+scratch `velocity_copy` (a vector field in spectral representation) is the working space.
 """
 function velocity_to_physical!(u, û, domain::FixedDomain, velocity_copy)
   copyto!(field_data(velocity_copy), field_data(û))  # copy û first — the in-place inverse transform consumes its spectral source
@@ -76,10 +76,10 @@ end
 """
     vorticity_to_physical!(ω, û, domain, vorticity_spectral)
 
-Compute the physical vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` from the
-velocity field `û` (given in spectral representation ``\\hat{\\boldsymbol{u}}``) into `ω`: the spectral
-vorticity ``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in the scratch
-`vorticity_spectral` (a spectral vector field) and transformed, leaving `û` untouched.
+Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
+into `ω`, from the velocity `û` in spectral representation, leaving `û` untouched. The spectral vorticity
+``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in the scratch
+`vorticity_spectral` (a vector field in spectral representation) and transformed.
 """
 function vorticity_to_physical!(ω, û, domain::FixedDomain, vorticity_spectral)
   curl!(vorticity_spectral, û, domain.multipliers)
@@ -92,7 +92,7 @@ end
     velocity_nonlinear!(nonlinear, u, ω, domain, product_physical, product_spectral)
 
 Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
-from the physical velocity `u` ``\\boldsymbol{u}`` and vorticity `ω` ``\\boldsymbol{\\omega}``.
+from the velocity `u` and vorticity `ω` in physical representation.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -110,9 +110,9 @@ becomes
 
 The term computed here is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
 with the de-alias kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of
-the quadratic product. The Lamb vector is held in the scratch `product_physical` (a physical vector
-field) and its transform in `product_spectral` (a spectral vector field), so the operation allocates
-nothing.
+the quadratic product. The Lamb vector is held in the scratch `product_physical` (a vector field in physical
+representation) and its transform in `product_spectral` (a vector field in spectral representation), so
+the operation allocates nothing.
 """
 function velocity_nonlinear!(nonlinear, u, ω, domain::FixedDomain, product_physical, product_spectral)
   cross!(product_physical, u, ω)
@@ -126,7 +126,7 @@ end
 """
     integrating_factor!(factor, domain, diffusivity, dt, rate = nothing)
 
-Write the exact diffusive integrating factor into the scalar spectral buffer `factor`. Over a step
+Write the exact diffusive integrating factor into `factor` (a scalar field in spectral representation). Over a step
 ``\\Delta t`` (`dt`) the diffusion equation ``\\partial_t f = D\\nabla^{2} f`` is solved exactly in spectral
 representation by the per-mode multiplier
 
@@ -138,7 +138,7 @@ so multiplying a field by `factor` advances its viscous/diffusive part exactly (
 restriction). The `domain` (a `FixedDomain`) supplies the squared-wavenumber
 field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (`domain.squared_wavenumber`); in spectral
 representation ``-\\nabla^{2}`` acts as multiplication by it. The diffusivity ``D`` (`diffusivity`) is the kinematic viscosity ``\\nu`` for the
-velocity and ``\\nu/\\mathrm{Sc}`` for the scalar ``\\varphi`` (``\\mathrm{Sc}`` the Schmidt number).
+velocity and ``\\nu/\\mathrm{Sc}`` for the scalar (``\\mathrm{Sc}`` the Schmidt number).
 
 When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
 `set_forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
@@ -159,9 +159,8 @@ end
 """
     scalar_to_physical!(φ, φ̂, domain, scalar_copy)
 
-Compute the physical scalar `φ` ``\\varphi`` from `φ̂` (the scalar in spectral representation
-``\\hat{\\varphi}``) into `φ`, leaving `φ̂` unchanged. The scratch `scalar_copy` (a spectral scalar
-field) is the working space.
+Recover the scalar in physical representation into `φ`, from the spectral `φ̂` (left unchanged). The
+scratch `scalar_copy` (a scalar field in spectral representation) is the working space.
 """
 function scalar_to_physical!(φ, φ̂, domain::FixedDomain, scalar_copy)
   copyto!(field_data(scalar_copy), field_data(φ̂))  # copy φ̂ first — the in-place inverse transform consumes its spectral source
@@ -174,7 +173,7 @@ end
     scalar_nonlinear!(nonlinear, u, φ, domain, product_physical, product_spectral)
 
 Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the
-physical `u` ``\\boldsymbol{u}`` and physical `φ` ``\\varphi``.
+velocity `u` and scalar `φ` in physical representation.
 
 In conservative form the advection is
 ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
@@ -183,8 +182,8 @@ exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` compo
 kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode untouched. It is computed
 pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
 the kernel controlling the aliasing of the quadratic product.
-The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the momentum scratch `product_physical` (physical) and
-`product_spectral` (spectral).
+The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the momentum scratch — `product_physical` in physical
+representation, `product_spectral` in spectral.
 """
 function scalar_nonlinear!(nonlinear, u, φ, domain::FixedDomain, product_physical, product_spectral)
   φ_data = field_data(φ)
