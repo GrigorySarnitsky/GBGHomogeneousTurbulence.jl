@@ -114,6 +114,7 @@ grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.veloci
 awk '/^"""/{d=!d;s=d;next} s&&/^[^ ]/{s=0} s&&/^    [A-Za-z_].*\(/&&length>88{print FILENAME":"FNR}' src/*.jl  # wide docstring signatures — FNR (per-file)
 grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring: a §-number / design-doc path (drop #-comment hits) — must be empty
 grep -rnzE 'References?:[^"]*;' src/*.jl                                # crammed citation block (two citations joined by `;`) → one per bullet line
+grep -rnoE '\. `[a-z][a-z_]+`' src/*.jl docs/src docs/*.md              # prose sentence opens with a lowercase code identifier → capitalize the lead word or reword (triage: bullets / args / signatures exempt)
 ```
 
 - Triage (drop false positives — universally standard math; the real Julia operators `×` / `⋅` / `≈`;

@@ -50,7 +50,7 @@ using GBGIsotropicTurbulence
 # Assemble a forced case. Everything the run needs — the domain, buffers, physics,
 # integrator, state, and initial condition — is built with defaults from a few numbers.
 sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
-                 velocity_forcing = ConstantPower(power = 0.1),
+                 velocity_forcing = ConstantPower(target = 0.1),
                  scalar = true, schmidt = 1.0)
 
 # Spin past the transient: advance until the running dissipation ε(t) stops drifting
@@ -77,7 +77,7 @@ interleave a bespoke measurement drops straight to §4. The run layer is a conve
 never a wall in front of it.
 
 > **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example
-> above runs as written — a forcing can be named operator-free (`ConstantPower(power = 0.1)`, a
+> above runs as written — a forcing can be named operator-free (`ConstantPower(target = 0.1)`, a
 > `DeferredForcing`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
 > the package's primary quality target, but it is no longer a sketch.
 
@@ -290,7 +290,7 @@ Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
 alone. Each forcing has an operator-taking constructor and an operator-free keyword form
-(`ConstantPower(power = 0.1)`, a `DeferredForcing`) materialised when `Simulation` builds the frame, so a case
+(`ConstantPower(target = 0.1)`, a `DeferredForcing`) materialised when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
 ### 4.5 `Propagator` — the map that advances the state in time

@@ -65,7 +65,8 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
    omission; "for symmetry", "for completeness", or "it's convenient" is never a valid justification (a
    missing capability encodes a decision — the PF / SS discipline).
 4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free over the
-   preallocated `FieldBuffers`; storage is generic `AbstractArray` (no scalar indexing of device arrays).
+   preallocated buffers (the state and the integrator's `IntegratorBuffers`); storage is generic
+   `AbstractArray` (no scalar indexing of device arrays).
    **Minimal memory footprint trumps compute cost** — prefer low-storage integrators, and per-call
    allocation of an *occasional* diagnostic over resident scratch. Precision (`Float32` / `Float64`)
    and footprint are **studied fitness axes**, not afterthoughts.
@@ -82,8 +83,8 @@ inverse. Operators and extended Base functions are imported before being extende
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
-`buffers.velocity`, `buffers.vorticity_start`, `sim.velocity`, `Tracers.velocity1` — as do function names
-(`velocity_vorticity!`), `Physics.velocity_forcing`, and prose. The rule: **symbols for math
+`buffers.velocity_physical`, `buffers.vorticity_start`, `state.velocity`, `Tracers.velocity1` — as do
+function names (`velocity_to_physical!`, `velocity_nonlinear!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
 
@@ -216,7 +217,10 @@ density** ``E(\kappa)`` with an **energy**; and a dimensionally-incomplete refer
 expand it — the physics mirror of the sibling backends' type-error guard.
 
 **Prose is grammatical.** Every sentence has a subject and a verb; no verbless fragments, noun-stacks,
-`label:`-colon tags, or comma splices. Concise means few words, not missing verbs.
+`label:`-colon tags, or comma splices. Concise means few words, not missing verbs. A prose sentence
+never opens with a lowercase code identifier — a bare `dissipation` at the start reads as a typo against
+the capitalization, so lead with a capitalized word ("The `dissipation` reduction…") or reword (bulleted
+`` `arg` `` entries and signatures are exempt).
 
 **Neutral reference register.** A tunable is an *option* / *setting* / *axis* / post-hoc *choice*,
 never a "knob"; keep a neutral tone across every authored surface — docstrings, `ARCHITECTURE.md`, the
