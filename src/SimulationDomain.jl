@@ -62,7 +62,8 @@ with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist 
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
 damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
 (`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
-epsilon — ``\\approx 36`` for `Float64`, ``\\approx 16`` for `Float32` — so the Nyquist mode always damps
+epsilon — ``\\approx 36`` for [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
+[`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps
 to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilisation,
 hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
@@ -96,15 +97,19 @@ pseudospectral method needs on that box.
   the default) or [`HouLi`](@ref) (the smooth Hou–Li filter), applied by [`dealias!`](@ref) as a
   coefficientwise multiply to control the aliasing of the quadratic nonlinearity; it also sets the
   advective-CFL ceiling through `recommended_cfl`.
-- `scalar_type = Float64` — the real element type (`Float32` is GPU-friendly).
-- `array_type = Array` — the storage backend: `Array` (CPU) or `CuArray` / `ROCArray` (GPU).
+- `scalar_type = Float64` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
+- `array_type = Array` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
+  [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
 
 # Fields
-- `grid`, `layout` — the `Grid3D` and its real–Fourier memory layout.
+- `grid`, `layout` — the [`Grid3D`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.Grid3D) and its
+  real–Fourier memory layout.
 - `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex transform plans, one per field
   rank: the velocity (a vector field), the scalar (a scalar field), and the rank-2 strain tensor the
   derivative-skewness diagnostic needs.
-- `multipliers` — the `FieldSpectralMultipliers`, the spectral first-derivative operators.
+- `multipliers` — the
+  [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers),
+  the spectral first-derivative operators.
 - `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
   spectral representation ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as
   a scalar-field kernel for weighted spectral reductions.

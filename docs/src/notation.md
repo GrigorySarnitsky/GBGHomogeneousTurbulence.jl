@@ -46,14 +46,14 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | `FieldSpectralMultipliers` |
+| ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers) |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
 | ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^2`` acts as multiplication by it | `domain.squared_wavenumber` |
-| ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, `to_physical` |
-| ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | `curl`, `divergence` |
-| ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | `helmholtz_projection` |
+| ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral), [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
+| ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
+| ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
 | ``\mathcal E(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\big((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\Delta t\big)`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | `integrating_factor!` |
-| ``\star`` | periodic convolution (the dealias/band/envelope kernels) | `convolve` |
+| ``\star`` | periodic convolution (the dealias/band/envelope kernels) | [`convolve`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.convolve) |
 
 ## Diagnostics
 
@@ -61,7 +61,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
-| ``E(\kappa)`` | energy spectrum (energy per unit wavenumber) | `radial_spectrum` (from `GBGPeriodicFields`) |
+| ``E(\kappa)`` | energy spectrum (energy per unit wavenumber) | [`radial_spectrum`](@extref GBGPeriodicFields GBGPeriodicFields.Reductions.radial_spectrum) (from `GBGPeriodicFields`) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
 
@@ -75,7 +75,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
-| ``T`` | the real element type (`Float32` / `Float64`) | `scalar_type` |
+| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `scalar_type` |
 
 ## Forcing
 

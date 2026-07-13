@@ -102,7 +102,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
   scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
   initial condition.
-- `initial_spectrum = nothing` — a `Phenomenology` `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
+- `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
+  `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
   run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `kinetic_energy`.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
@@ -218,7 +219,8 @@ integral_scale(sim::Simulation) = integral_scale(sim.state.velocity, sim.domain)
     flow_parameters(sim)
 
 The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
-`Phenomenology` reference law be evaluated at the run's measured state. The viscosity ``\\nu`` and the
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) reference law be evaluated at the run's
+measured state. The viscosity ``\\nu`` and the
 Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the integral scale ``L`` are measured from the
 current velocity field.
@@ -234,7 +236,8 @@ end
 """
     validate_spectrum(sim, model)
 
-Compare the measured energy spectrum of `sim` against a `Phenomenology` model spectrum `model` (an
+Compare the measured energy spectrum of `sim` against a
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum `model` (an
 `EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). Returns a named
 tuple `(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the
 measured and predicted ``E(\\kappa)``, and the relative L² discrepancy over the resolved (non-empty)

@@ -115,7 +115,9 @@ end
     sample!(out, field, tracers) -> out
 
 Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
-`VectorPointValues` for the velocity, a `ScalarPointValues` for the scalar ``\\varphi``), using the
+[`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
+velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
+for the scalar ``\\varphi``), using the
 tracers' interpolation scheme. Used to gather a field along the trajectories for the Lagrangian
 statistics.
 """
@@ -153,7 +155,8 @@ ntracers(tracers::Tracers) = size(tracers.positions, 1)
 """
     velocity_buffer(tracers)
 
-Allocate a `VectorPointValues` of shape `(M, 3)` matching the tracers, for use as the `out` of
+Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) of
+shape `(M, 3)` matching the tracers, for use as the `out` of
 [`sample!`](@ref) when sampling the velocity along the trajectories.
 """
 velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
@@ -161,7 +164,8 @@ velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions)
 """
     scalar_buffer(tracers)
 
-Allocate a `ScalarPointValues` of length `M` matching the tracers, for use as the `out` of
+Allocate a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues) of
+length `M` matching the tracers, for use as the `out` of
 [`sample!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
 """
 scalar_buffer(tracers::Tracers) =

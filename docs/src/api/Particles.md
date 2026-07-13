@@ -34,8 +34,10 @@ sample!
 
 ## Sample buffers
 
-Allocate the point-value `out` for `sample!` — a `VectorPointValues` for the velocity, a
-`ScalarPointValues` for the scalar.
+Allocate the point-value `out` for `sample!` — a
+[`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
+velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
+for the scalar.
 
 ```@docs
 velocity_buffer

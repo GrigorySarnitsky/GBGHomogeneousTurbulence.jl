@@ -61,7 +61,8 @@ Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radi
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
 shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or
-Pope form from the `Phenomenology` submodule's model spectra, which the run layer can wire in for you.
+Pope form from the [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model
+spectra, which the run layer can wire in for you.
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
@@ -110,7 +111,7 @@ Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a ta
 scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 ``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed
 spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `scalar_variance` rescaling —
-e.g. an Obukhov–Corrsin form from `Phenomenology`.
+e.g. an Obukhov–Corrsin form from [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology).
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).

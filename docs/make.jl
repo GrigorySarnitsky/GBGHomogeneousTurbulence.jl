@@ -84,6 +84,7 @@ lint_notation_variants()
 
 
 using Documenter
+using DocumenterInterLinks
 using GBGIsotropicTurbulence
 # Phenomenology is deliberately not re-exported by the umbrella (ARCHITECTURE §4.7); bring its
 # submodule names into scope here so the docs pages can reference them by bare name, as the DNS API is.
@@ -95,6 +96,18 @@ using GBGIsotropicTurbulence.Phenomenology.Scalings
 # Make `using GBGIsotropicTurbulence` available to any `jldoctest` examples (recursive covers the
 # submodules). Doctests are off for now (no runnable examples yet); flip `doctest = true` once added.
 DocMeta.setdocmeta!(GBGIsotropicTurbulence, :DocTestSetup, :(using GBGIsotropicTurbulence); recursive = true)
+
+
+# Cross-package clickable references (DocumenterInterLinks): a backticked external object is linked to
+# its own documentation through the published Sphinx-style inventory (`objects.inv`) of each package.
+# `@extref` links (in the docstrings and pages) resolve against these. GBGPeriodicFields deploys only
+# `dev` docs so far (no tagged release), hence the `dev` inventory. Fetched at build time — CI has network.
+links = InterLinks(
+  "Julia"             => "https://docs.julialang.org/en/v1/objects.inv",
+  "CUDA"              => "https://cuda.juliagpu.org/stable/objects.inv",
+  "AMDGPU"            => "https://amdgpu.juliagpu.org/stable/objects.inv",
+  "GBGPeriodicFields" => "https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/dev/objects.inv",
+)
 
 
 makedocs(
@@ -120,6 +133,7 @@ makedocs(
   ),
   checkdocs = :exports,
   doctest   = false,
+  plugins   = [links],
   pages = [
     "Home"     => "index.md",
     "Notation" => "notation.md",
