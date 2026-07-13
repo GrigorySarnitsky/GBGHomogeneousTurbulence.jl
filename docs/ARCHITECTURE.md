@@ -519,16 +519,15 @@ generalisation is built for them until a second concrete case forces the abstrac
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark).
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
   Lagrangian trajectory samples in, streamed summaries out).
-- **Alternative dealiasing and nonlinear forms.** `DealiasingStrategy` today supplies a *kernel* applied
-  coefficient-wise *after* the nonlinear term is assembled — which carries the sharp ``2/3`` rule and the
-  smooth Hou–Li filter, but not ``3/2`` zero-padding or phase-shifting (which restructure how the
-  nonlinear product is *computed*, not merely filter its output), nor the **skew-symmetric** momentum form
-  (which reorganises how the quadratic product is assembled, to conserve energy in the discrete equations).
-  Their common generalisation is a single strategy that *owns the de-aliased nonlinear assembly* —
-  ``\hat{\boldsymbol u}`` and ``\hat\varphi`` in, the de-aliased product out — with the present
-  kernel-multiply one realisation and padding, phase-shift, and skew-symmetric its siblings. It touches
-  only the `Generator`'s nonlinear assembly and its scratch, never the State (§4.1); deferred, with the
-  rotational form + spherical ``2/3`` the recorded lean default.
+- **Alternative dealiasing and nonlinear forms (partly built).** `DealiasingStrategy` now *owns the
+  de-aliased nonlinear assembly* — ``\hat{\boldsymbol u}`` (and ``\hat\varphi``) in, the de-aliased term
+  out — so a strategy may restructure *how* the product is computed, not merely filter its output. The
+  sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realisation; **`PhaseShift`**
+  (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
+  ``\tfrac{\sqrt2}{3}N``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
+  ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganises the quadratic product
+  to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
+  scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
 - **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
   stability-calibrated, conservative ceiling with a manual `cfl` override — and nothing adapts it to a
   target *temporal* accuracy. An embedded-error or PI step controller, distinct in purpose from the
@@ -882,6 +881,21 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     its eventual siblings in the product. A six-lens naming panel with an adversarial pass fixed the slate
     (`IntegratorBuffers`, and the scratch-field names `product_physical`/`product_spectral` over the
     velocity-only `lamb`).
+27. **(2026-07) Phase-shift de-aliasing, on `GBGPeriodicFields`' `translation_kernel`.** Adds
+    [`PhaseShift`](@ref) as an opt-in `DealiasingStrategy` (the default stays the rotational form +
+    spherical ``2/3``). Each quadratic nonlinear term is assembled twice — on the grid and on a grid
+    displaced half a cell — and averaged, cancelling the aliasing images that wrap in an *odd* number of
+    axes; a spherical truncation at
+    ``\kappa_{\max} = \tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L} \approx 0.94\,\kappa_{\mathrm{Ny}}`` removes the
+    surviving *two-axis* images (a single half-cell shift is exact only in 1-D; Patterson & Orszag 1971,
+    Rogallo 1981). It keeps a ``\sqrt2`` wider band than the ``2/3`` rule (``\approx 2.8\times`` the modes
+    in the retained sphere) at ``2\times`` the nonlinear-term transforms and a displaced-evaluation scratch
+    field. This realises the deferred D6 assembly generalisation (§7) for this sibling: `DealiasingStrategy`
+    now dispatches the whole ``\hat{\boldsymbol u}\to`` de-aliased-term computation, not only a post-multiply
+    kernel. The displacement is built once as two `translation_kernel`s (the shift theorem's phase, PF
+    decision 28, whose Nyquist even/odd split makes the kernel a real field); because the cutoff is
+    sub-Nyquist the Nyquist-attenuation caveat never bites. Verified against a zero-padded oracle — exact to
+    machine precision across the retained band on a field whose raw product is 44 % aliased.
 
 ---
 

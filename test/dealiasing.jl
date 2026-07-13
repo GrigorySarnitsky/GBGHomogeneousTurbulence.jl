@@ -1,5 +1,6 @@
-# De-aliasing-strategy tests: the sharp `TwoThirds` (default) vs the smooth `HouLi` kernels, and the
-# CFL ceiling auto-scaling to the active strategy (a strategy that keeps more modes takes a smaller step).
+# De-aliasing-strategy tests: the sharp `TwoThirds` (default), the smooth `HouLi`, and the exact
+# `PhaseShift` (checked against a zero-padded oracle) kernels, and the CFL ceiling auto-scaling to the
+# active strategy (a strategy that keeps more modes takes a smaller step).
 
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data
@@ -51,5 +52,66 @@ using Test
     sim2 = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = HouLi(), scalar = false,
                       rng = MersenneTwister(8))
     @test sim2.domain.dealiasing isa HouLi
+  end
+
+  @testset "PhaseShift spherical cutoff and CFL" begin
+    domain = FixedDomain(N, L; dealiasing = PhaseShift())
+    @test domain.dealiasing isa PhaseShift
+    mask = real.(field_data(domain.dealias))
+    @test all(m -> m == 0 || m == 1, mask)                          # a sharp spherical truncation
+    @test max_wavenumber(domain) ≈ (2 * sqrt(2) / 3) * (N / 2) * (2π / L)   # κ_max = √2·N/3·(2π/L)
+    @test count(==(1), mask) > count(==(1), real.(field_data(FixedDomain(N, L).dealias)))  # keeps more than 2/3
+    rk3 = IFLowStorageRK3()
+    @test recommended_cfl(rk3, domain) ≈ recommended_cfl(rk3) / sqrt(2)     # tighter step for the wider band
+  end
+
+  @testset "PhaseShift de-aliases exactly (vs a zero-padded oracle)" begin
+    # A field band-limited to the PhaseShift band |k| ≤ √2·N/3 has a quadratic product that aliases INTO
+    # that retained band. Phase-shift must reproduce the exact term a 2N zero-padded grid gives (no
+    # aliasing there), across the whole band; the raw N-grid product must not.
+    Np = 12
+    dps = FixedDomain(Np, L; dealiasing = PhaseShift())
+    d2  = FixedDomain(2Np, L)                                        # 2N oracle grid (raw product, no dealias)
+    SD  = GBGIsotropicTurbulence.SimulationDomain
+    GEN = GBGIsotropicTurbulence.Generator
+    û = SD.spectral_vector(dps)
+    random_solenoidal_velocity!(û, dps; peak_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
+    half = Np ÷ 2
+    mapidx(i) = i ≤ half + 1 ? i : i + Np                           # fft-freq index map, N → 2N
+    embed(A) = (B = zeros(eltype(A), Np + 1, 2Np, 2Np, 3);          # zero-pad ×(2N/N)³ = 8
+                for c in 1:3, i3 in 1:Np, i2 in 1:Np, i1 in 1:half+1
+                  B[i1, mapidx(i2), mapidx(i3), c] = 8 * A[i1, i2, i3, c]
+                end; B)
+    restrict(B) = [B[i1, mapidx(i2), mapidx(i3), c] / 8
+                   for i1 in 1:half+1, i2 in 1:Np, i3 in 1:Np, c in 1:3]
+    function nlt(domain, ûf, phaseshift::Bool)
+      b = allocate_buffers(IFRK2(), domain; scalar = false)
+      u = SD.physical_vector(domain); ω = SD.physical_vector(domain)
+      GEN.velocity_to_physical!(u, ûf, domain, b.velocity_copy)
+      GEN.vorticity_to_physical!(ω, ûf, domain, b.vorticity_spectral)
+      out = SD.spectral_vector(domain)
+      phaseshift ? velocity_nonlinear!(out, ûf, u, ω, domain, b.product_physical, b.product_spectral, b.phase_shift) :
+                   GEN._velocity_lamb!(out, u, ω, domain, b.product_physical, b.product_spectral)
+      field_data(out)
+    end
+    Nps, Nraw = nlt(dps, û, true), nlt(dps, û, false)
+    û2 = SD.spectral_vector(d2); field_data(û2) .= embed(field_data(û))
+    oracle = restrict(nlt(d2, û2, false))
+    mask = sqrt.(dps.squared_wavenumber) .≤ (2 * sqrt(2) / 3) * (Np / 2)
+    bmax(a, b) = maximum(maximum(abs.(view(a, :, :, :, c) .- view(b, :, :, :, c)) .* mask) for c in 1:3)
+    ref = maximum(abs.(oracle) .* reshape(mask, size(mask)..., 1))
+    @test bmax(Nps, oracle) / ref < 1e-10          # phase-shift reproduces the exact de-aliased term
+    @test bmax(Nraw, oracle) / ref > 1e-2          # raw is genuinely aliased (the test is non-trivial)
+  end
+
+  @testset "a PhaseShift simulation runs and stays finite" begin
+    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = PhaseShift(), scalar = true,
+                     velocity_forcing = ConstantPower(target = 0.1), rng = MersenneTwister(9))
+    @test sim.domain.dealiasing isa PhaseShift
+    @test sim.buffers.phase_shift !== nothing                        # the displaced-evaluation scratch was built
+    @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3()) / sqrt(2)
+    run!(sim; steps = 8)
+    @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
+    @test isfinite(scalar_variance(sim)) && scalar_variance(sim) > 0
   end
 end

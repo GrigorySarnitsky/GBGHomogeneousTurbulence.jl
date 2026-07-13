@@ -34,7 +34,7 @@ the step `dt`, and an optional forcing `rate`.
 module Generator
 
 using GBGPeriodicFields
-using ..SimulationDomain: FixedDomain
+using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift
 using ..Forcing: AbstractForcing, NoForcing
 
 export velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
@@ -92,10 +92,10 @@ end
 
 
 """
-    velocity_nonlinear!(nonlinear, u, ω, domain, product_physical, product_spectral)
+    velocity_nonlinear!(nonlinear, û, u, ω, domain, product_physical, product_spectral, phase_shift)
 
-Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`,
-from the velocity `u` and vorticity `ω` in physical representation.
+Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`, from
+the velocity `û` in spectral representation and its physical velocity `u` and vorticity `ω`.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -111,18 +111,51 @@ becomes
 \\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
 ```
 
-The term computed here is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
-with the de-alias kernel `domain.dealias` (the sharp ``2/3`` rule by default) controlling the aliasing of
-the quadratic product. The Lamb vector is held in the scratch `product_physical` (a vector field in physical
-representation) and its transform in `product_spectral` (a vector field in spectral representation), so
+The term computed is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
+de-aliased by the domain's [`DealiasingStrategy`](@ref). A **mask** strategy ([`TwoThirds`](@ref),
+[`HouLi`](@ref)) forms it once from `u`, `ω` and multiplies by the low-pass `domain.dealias` (`û` and
+`phase_shift` are unused). [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
+recovered on a grid displaced by half a cell (using `û` and the `phase_shift` translation kernels and
+scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
+
+The Lamb vector is held in `product_physical` (a vector field in physical representation) and its
+transform in `product_spectral`; the displaced evaluation reuses these and the `phase_shift` buffers, so
 the operation allocates nothing.
 """
-function velocity_nonlinear!(nonlinear, u, ω, domain::FixedDomain, product_physical, product_spectral)
-  cross!(product_physical, u, ω)
-  to_spectral!(product_spectral, product_physical, domain.velocity_plans)
-  helmholtz_projection!(nonlinear, product_spectral, domain.multipliers)
+velocity_nonlinear!(nonlinear, û, u, ω, domain::FixedDomain, product_physical, product_spectral, phase_shift) =
+  _velocity_nonlinear!(domain.dealiasing, nonlinear, û, u, ω, domain, product_physical, product_spectral, phase_shift)
+
+# Mask strategies (TwoThirds / HouLi): one evaluation, post-multiplied by the low-pass kernel.
+function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, û, u, ω, domain::FixedDomain,
+                              product_physical, product_spectral, phase_shift)
+  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral)
   convolve!(nonlinear, nonlinear, domain.dealias)
   return nonlinear
+end
+
+# Phase-shift: average the primary and the half-cell-displaced evaluation (cancels the odd-parity
+# aliases), then the spherical `domain.dealias` truncation removes the surviving two-axis aliases.
+function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedDomain,
+                              product_physical, product_spectral, phase_shift)
+  T = real(eltype(field_data(nonlinear)))
+  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral)                        # primary
+  convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
+  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_physical, product_spectral)
+  convolve!(phase_shift.velocity_shifted, phase_shift.velocity_shifted, phase_shift.back)              # displaced term, shifted back
+  combine!(nonlinear, T(1 // 2), nonlinear, T(1 // 2), phase_shift.velocity_shifted)                   # average the two grids
+  convolve!(nonlinear, nonlinear, domain.dealias)                                                      # spherical truncation
+  return nonlinear
+end
+
+# The raw pseudospectral ℙ(u×ω) in spectral representation, with no de-aliasing — the piece both
+# dealiasing strategies build.
+function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_physical, product_spectral)
+  cross!(product_physical, u, ω)
+  to_spectral!(product_spectral, product_physical, domain.velocity_plans)
+  helmholtz_projection!(out, product_spectral, domain.multipliers)
+  return out
 end
 
 
@@ -174,10 +207,10 @@ end
 
 
 """
-    scalar_nonlinear!(nonlinear, u, φ, domain, product_physical, product_spectral)
+    scalar_nonlinear!(nonlinear, û, φ̂, u, φ, domain, product_physical, product_spectral, phase_shift)
 
-Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the
-velocity `u` and scalar `φ` in physical representation.
+Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the velocity
+`û` and scalar `φ̂` in spectral representation and their physical `u`, `φ`.
 
 In conservative form the advection is
 ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
@@ -185,17 +218,55 @@ In conservative form the advection is
 exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component, and the de-alias
 kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode untouched. It is computed
 pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
-the kernel controlling the aliasing of the quadratic product.
+the kernel controlling the aliasing of the quadratic product — a **mask** strategy ([`TwoThirds`](@ref),
+[`HouLi`](@ref)) forms the flux once from `u`, `φ` (`û`, `φ̂`, `phase_shift` unused), while
+[`PhaseShift`](@ref) averages it with the flux recovered on a grid displaced half a cell (using `û`, `φ̂`,
+and the `phase_shift` scratch) before the spherical truncation.
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the momentum scratch — `product_physical` in physical
 representation, `product_spectral` in spectral.
 """
-function scalar_nonlinear!(nonlinear, u, φ, domain::FixedDomain, product_physical, product_spectral)
-  φ_data = field_data(φ)
-  field_data(product_physical) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)  # flux uφ
-  to_spectral!(product_spectral, product_physical, domain.velocity_plans)        # (uφ)^
-  divergence!(nonlinear, product_spectral, domain.multipliers)          # i𝛋·(uφ)^ = ∇·(uφ)
-  convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)          # N_φ = -dealias(∇·(uφ))
+scalar_nonlinear!(nonlinear, û, φ̂, u, φ, domain::FixedDomain, product_physical, product_spectral, phase_shift) =
+  _scalar_nonlinear!(domain.dealiasing, nonlinear, û, φ̂, u, φ, domain, product_physical, product_spectral, phase_shift)
+
+# Mask strategies: one flux evaluation, divergence, low-pass — the −1 folds in the −∇· sign.
+function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
+                            product_physical, product_spectral, phase_shift)
+  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral)
+  convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)
   return nonlinear
+end
+
+# Phase-shift: average the primary and half-cell-displaced flux divergences (cancels the odd-parity
+# aliases), then the spherical truncation (folding in the −∇· sign) removes the two-axis aliases.
+function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
+                            product_physical, product_spectral, phase_shift)
+  T = real(eltype(field_data(nonlinear)))
+  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral)                 # primary ∇·(uφ)
+  convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                     # û on the displaced grid
+  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
+  scalar_to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain, phase_shift.scalar_copy)
+  _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain, product_physical)   # (u_s φ_s)^
+  convolve!(product_spectral, product_spectral, phase_shift.back)                                        # displaced flux, shifted back
+  divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·
+  combine!(nonlinear, T(1 // 2), nonlinear, T(1 // 2), phase_shift.scalar_shifted)                       # average the two grids
+  convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)                                                 # spherical truncation, ×−1
+  return nonlinear
+end
+
+# Raw ∇·(uφ) in spectral representation, no de-aliasing.
+function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_physical, product_spectral)
+  _scalar_flux!(product_spectral, u, φ, domain, product_physical)
+  divergence!(out, product_spectral, domain.multipliers)
+  return out
+end
+
+# The flux uφ (a vector), transformed to spectral, into `flux_spectral`; `flux_physical` holds uφ.
+function _scalar_flux!(flux_spectral, u, φ, domain::FixedDomain, flux_physical)
+  φ_data = field_data(φ)
+  field_data(flux_physical) .= field_data(u) .* reshape(φ_data, size(φ_data)..., 1)
+  to_spectral!(flux_spectral, flux_physical, domain.velocity_plans)
+  return flux_spectral
 end
 
 

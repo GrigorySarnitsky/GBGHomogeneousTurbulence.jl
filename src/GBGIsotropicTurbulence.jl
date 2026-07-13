@@ -67,6 +67,7 @@ using .SimulationDomain:
   DealiasingStrategy,
   TwoThirds,
   HouLi,
+  PhaseShift,
   max_wavenumber
 
 using .State:
@@ -149,6 +150,7 @@ export FixedDomain,
        DealiasingStrategy,
        TwoThirds,
        HouLi,
+       PhaseShift,
        max_wavenumber,
        velocity_to_physical!,
        vorticity_to_physical!,

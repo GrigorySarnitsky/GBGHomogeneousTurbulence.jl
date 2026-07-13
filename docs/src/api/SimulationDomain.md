@@ -23,6 +23,7 @@ and the smooth Hou–Li filter.
 DealiasingStrategy
 TwoThirds
 HouLi
+PhaseShift
 ```
 
 The de-aliasing cutoff it sets — the highest wavenumber the domain evolves, and the resolution

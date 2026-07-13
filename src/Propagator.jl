@@ -29,7 +29,7 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
 module Propagator
 
 using GBGPeriodicFields
-using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
+using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction, PhaseShift,
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
                   scalar_to_physical!, scalar_nonlinear!, FlowConditions
@@ -63,6 +63,21 @@ struct ScalarBuffers{SS, SP, RK}
 end
 
 
+# Phase-shift de-aliasing scratch + the two translation kernels (present only when `dealiasing isa
+# PhaseShift`). The kernels are built once from the half-cell displacement; the scalar fields are
+# `nothing` for a velocity-only run.
+struct PhaseShiftBuffers{K, VS, VP, SS, SP}
+  to_shifted::K                   # translation kernel: recover a field on the grid displaced by +½ cell
+  back::K                         # translation kernel: shift a displaced term back to the grid
+  velocity_shifted::VS            # û on the displaced grid, then the displaced nonlinear term
+  u_shifted::VP                   # velocity recovered on the displaced grid
+  omega_shifted::VP               # vorticity recovered on the displaced grid
+  scalar_shifted::SS              # φ̂ on the displaced grid, then the displaced flux divergence (or nothing)
+  scalar_copy::SS                 # recovery scratch for the displaced scalar (or nothing)
+  phi_shifted::SP                 # scalar recovered on the displaced grid (or nothing)
+end
+
+
 """
     IntegratorBuffers(domain; scalar = false)
 
@@ -88,8 +103,10 @@ The shared right-hand-side scratch every scheme needs:
 - `stage1`, `stage2` — the Runge–Kutta stage registers.
 - `scalar` — a nested `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else
   `nothing`; when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
+- `phase_shift` — a nested `PhaseShiftBuffers` (the two translation kernels and the displaced-evaluation
+  scratch) when the domain's `dealiasing` is [`PhaseShift`](@ref), else `nothing`.
 """
-struct IntegratorBuffers{VS, SS, VP, RK, SB}
+struct IntegratorBuffers{VS, SS, VP, RK, SB, PB}
   vorticity_spectral::VS
   stage1::VS
   stage2::VS
@@ -105,6 +122,7 @@ struct IntegratorBuffers{VS, SS, VP, RK, SB}
   product_physical::VP
   velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
   scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
+  phase_shift::PB                # PhaseShiftBuffers, or nothing unless dealiasing isa PhaseShift
 end
 
 
@@ -118,6 +136,22 @@ ScalarBuffers(domain::FixedDomain) = ScalarBuffers(
   _forcing_rate(domain),
 )
 
+# Build the two translation kernels once (offset = half a cell) and the displaced-evaluation scratch; the
+# scalar fields only when a scalar is evolved. A scalar kernel translates a vector or scalar field alike.
+function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
+  δ = 0.5 .* domain.grid.grid_spacing
+  reference = scalar_spectral(domain)
+  return PhaseShiftBuffers(
+    translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
+    translation_kernel(reference, domain.multipliers,   δ),   # shift a displaced term back to the grid
+    spectral_vector(domain),
+    physical_vector(domain), physical_vector(domain),
+    scalar ? scalar_spectral(domain) : nothing,
+    scalar ? scalar_spectral(domain) : nothing,
+    scalar ? scalar_physical(domain) : nothing,
+  )
+end
+
 function IntegratorBuffers(domain::FixedDomain; scalar::Bool = false)
   return IntegratorBuffers(
     spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
@@ -127,6 +161,7 @@ function IntegratorBuffers(domain::FixedDomain; scalar::Bool = false)
     physical_vector(domain), physical_vector(domain),
     _forcing_rate(domain),
     scalar ? ScalarBuffers(domain) : nothing,
+    domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
   )
 end
 
@@ -215,7 +250,7 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::Integr
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
-    velocity_nonlinear!(buffers.nonlinear, u, ω, domain, buffers.product_physical, buffers.product_spectral)          # N̂_u
+    velocity_nonlinear!(buffers.nonlinear, û, u, ω, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)          # N̂_u
     add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain, buffers)         # + additive forcing (OU)
     if i == 1
       multiply!(hu, dt_T, buffers.nonlinear)                                      # A₁ = 0
@@ -232,7 +267,7 @@ function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::Integr
     if has_scalar
       hφ = sb.stage1                                                              # scalar accumulator
       scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
-      scalar_nonlinear!(sb.nonlinear, u, sb.field, domain, buffers.product_physical, buffers.product_spectral)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral)
+      scalar_nonlinear!(sb.nonlinear, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral)
       add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain, buffers)
       if i == 1
         multiply!(hφ, dt_T, sb.nonlinear)
@@ -304,11 +339,11 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffer
   end
 
   # stage 1 — nonlinear terms at the start-of-step state
-  velocity_nonlinear!(buffers.stage1, buffers.velocity_physical, buffers.vorticity_start, domain, buffers.product_physical, buffers.product_spectral)              # N̂_u,1
+  velocity_nonlinear!(buffers.stage1, û, buffers.velocity_physical, buffers.vorticity_start, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)              # N̂_u,1
   add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain, buffers)
   if has_scalar
     scalar_to_physical!(sb.field, φ̂, domain, sb.copy)
-    scalar_nonlinear!(sb.stage1, buffers.velocity_physical, sb.field, domain, buffers.product_physical, buffers.product_spectral)            # N̂_φ,1
+    scalar_nonlinear!(sb.stage1, û, φ̂, buffers.velocity_physical, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)            # N̂_φ,1
     add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain, buffers)
   end
 
@@ -325,11 +360,11 @@ function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffer
   # stage 2 — nonlinear terms at the predictor state
   velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, buffers.velocity_copy)
   vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers.vorticity_spectral)
-  velocity_nonlinear!(buffers.stage2, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral)      # N̂_u,2
+  velocity_nonlinear!(buffers.stage2, buffers.velocity_star_spectral, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)      # N̂_u,2
   add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain, buffers)
   if has_scalar
     scalar_to_physical!(sb.field, sb.star_spectral, domain, sb.copy)
-    scalar_nonlinear!(sb.stage2, buffers.velocity_star, sb.field, domain, buffers.product_physical, buffers.product_spectral)       # N̂_φ,2
+    scalar_nonlinear!(sb.stage2, buffers.velocity_star_spectral, sb.star_spectral, buffers.velocity_star, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)       # N̂_φ,2
     add_forcing_source!(conditions.scalar_forcing, sb.stage2, domain, buffers)
   end
 
