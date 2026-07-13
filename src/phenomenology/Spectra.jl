@@ -255,7 +255,7 @@ Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2) =
   ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β), _POPE2000)
 
 
-const _VONKARMAN2000 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530"; valid_Reλ = (0.0, Inf))
+const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530"; valid_Reλ = (0.0, Inf))
 
 """
     VonKarman1948(; C_K = 1.5, c_L = 1.0)
@@ -273,7 +273,7 @@ inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when th
 is the Kolmogorov constant; `c_L` fixes the peak scale.
 """
 VonKarman1948(; C_K = 1.5, c_L = 1.0) =
-  ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN2000)
+  ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN1948)
 
 
 const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063"; valid_Reλ = (0.0, Inf))

@@ -72,6 +72,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |---|---|---|
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | `flow_parameters` |
+| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm d\kappa / \int_0^\infty E\,\mathrm d\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | `integral_scale` |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
 | ``\lambda`` | Taylor microscale, ``\sqrt{15\,\nu\,u'^2/\varepsilon}`` | `taylor_microscale` |
@@ -81,7 +82,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |---|---|---|
 | ``N`` | grid points per side | `grid_points_per_axis` |
-| ``L`` | box side (``\Omega = [0,L)^3``); **also** the integral length scale in turbulence diagnostics (`integral_scale`, the model-spectrum roll-off ``f_L(\kappa L)``), which the box side only approximates | `side_length` |
+| ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (set by the `dealiasing` strategy) | `DealiasingStrategy` |

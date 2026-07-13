@@ -226,7 +226,7 @@ The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the brid
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) reference law be evaluated at the run's
 measured state. The viscosity ``\\nu`` and the
 Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
-``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the integral scale ``L`` are measured from the
+``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the longitudinal integral scale ``L_{11}`` are measured from the
 current velocity field.
 """
 function flow_parameters(sim::Simulation)

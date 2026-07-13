@@ -75,7 +75,7 @@ Fields (all keyword; a homogeneous-isotropic state fixes the rest):
   * `dissipation` — the mean dissipation rate ``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol\\omega\\rvert^2\\rangle``.
   * `rms_velocity` — the single-component r.m.s. velocity ``u'`` (so the turbulent kinetic energy is
     ``k = \\tfrac32 u'^2``).
-  * `integral_scale` — the integral length ``L`` (a large-scale quantity, independent of ``\\nu`` and
+  * `integral_scale` — the longitudinal integral length ``L_{11}`` (a large-scale quantity, independent of ``\\nu`` and
     ``\\varepsilon``; it fixes the energy-containing range).
   * `schmidt` — the Schmidt number ``\\mathrm{Sc}`` (the scalar diffusivity is
     ``\\varkappa = \\nu/\\mathrm{Sc}``); default `1.0`.

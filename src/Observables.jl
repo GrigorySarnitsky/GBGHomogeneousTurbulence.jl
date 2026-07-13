@@ -166,10 +166,10 @@ The longitudinal integral length scale of the velocity field `û`, measured from
 [`energy_spectrum`](@ref) ``E(\\kappa)``,
 
 ```math
-L = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
+L_{11} = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
 ```
 
-`L` is the large-eddy scale — the one flow parameter a
+``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
 small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 """

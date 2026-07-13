@@ -406,7 +406,7 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
 
 Three exist now — enough for the validation checklist — and the count caps near six: `PDFs`, `Decay` (``k \sim t^{-n}``),
 and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries the
-quantities a law reads (``\varepsilon``, ``\nu``, ``L``, ``u'``, ``\mathrm{Sc}``, ``\varepsilon_\varphi``),
+quantities a law reads (``\varepsilon``, ``\nu``, ``L_{11}``, ``u'``, ``\mathrm{Sc}``, ``\varepsilon_\varphi``),
 with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
 helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
@@ -888,7 +888,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 ## References
 
 Cited author–year above; full entries here. DOIs to be confirmed against the user's copies before the
-docs are published (they are not yet filled in, per the no-guessed-citation rule).
+docs are published (they are not yet filled in, per the no-guessed-citation rule). The extraction-bound
+`Phenomenology` leaf (§4.8) is exempt: each reference law carries its own self-contained citation in a
+`Reference` value, so this list need not duplicate the ~two dozen it cites.
 
 - Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
   large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
