@@ -928,6 +928,8 @@ docs are published (they are not yet filled in, per the no-guessed-citation rule
 - Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(The
   sheared-frame scheme, §7; the spherical-truncation dealiasing of the `PhaseShift` strategy,
   decision 27.)*
+- Hou, T. Y. & Li, R. (2007). Computing nearly singular solutions using pseudo-spectral methods.
+  *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.

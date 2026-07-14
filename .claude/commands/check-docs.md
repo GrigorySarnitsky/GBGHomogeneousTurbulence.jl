@@ -72,8 +72,12 @@ read-through, so passive reading is not a check.
    forcing families; a capability list missing a builder). Check each module / operation / summary still
    names everything added since it was written, against the current `export`s / method set.
 6. **Cited** — context-standard author–year; ≤ 3 authors named, `First et al.` for 4+; inline references
-   verbatim-consistent with the `ARCHITECTURE.md` §References entry; **never cite an inaccessible source**
-   (the private notes under `inspiration/` are working material, not citable).
+   verbatim-consistent with the `ARCHITECTURE.md` §References entry. **Bidirectional:** every inline
+   author–year cite in a `src/*.jl` docstring has a matching `§References` entry — a cite with no entry is
+   a defect; an entry citing no docstring is stale. The extraction-bound `Phenomenology` leaf is
+   **exempt**: each reference law carries its own self-contained `Reference` value, so its cites are *not*
+   duplicated in `§References`. **Never cite an inaccessible source** (the private notes under
+   `inspiration/` are working material, not citable).
 7. **Consistent across variant pairs** (the `src/` docstrings — *relational*, not per-surface) — group
    each operation's generics (allocating `f` / in-place `f!`, physical / spectral, getter / `set_…!`) and
    confirm the defining math (formula, spectral kernel) lives in **one home**, every other variant a thin
@@ -114,6 +118,7 @@ grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.veloci
 awk '/^"""/{d=!d;s=d;next} s&&/^[^ ]/{s=0} s&&/^    [A-Za-z_].*\(/&&length>88{print FILENAME":"FNR}' src/*.jl  # wide docstring signatures — FNR (per-file)
 grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring: a §-number / design-doc path (drop #-comment hits) — must be empty
 grep -rnzE 'References?:[^"]*;' src/*.jl                                # crammed citation block (two citations joined by `;`) → one per bullet line
+comm -23 <(grep -rhoE '\((19|20)[0-9]{2}' src/SimulationDomain.jl src/Propagator.jl src/Generator.jl src/Observables.jl src/Forcing.jl src/State.jl | grep -oE '(19|20)[0-9]{2}' | sort -u) <(sed -n '/^## References/,$p' docs/ARCHITECTURE.md | grep -oE '\((19|20)[0-9]{2}' | grep -oE '(19|20)[0-9]{2}' | sort -u)  # §4: a dynamics-side cite year with no §References entry (Phenomenology leaf exempt) — triage each
 grep -rnE '\. `[a-z][a-z_]+!?`' src/*.jl docs/src docs/*.md | grep -vE ':[0-9]+:[[:space:]]*#'  # prose sentence opens with a lowercase code identifier (incl. an `f!` form) → capitalize the lead word or reword (triage: bullets / args / signatures exempt)
 ```
 

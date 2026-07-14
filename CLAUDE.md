@@ -121,8 +121,9 @@ docstring is a map**; a **function or type docstring is a home**.
   when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
   (4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
   load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
-  **named / published** method (verbatim-consistent with `ARCHITECTURE.md` §References), none for a
-  classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
+  **named / published** method (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
+  has a §References entry and every entry a citing docstring; the extraction-bound `Phenomenology` leaf is
+  exempt, carrying its own self-contained `Reference` values), none for a classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
   (→ `ARCHITECTURE.md`).
 - **Type docstring = home, constructor-first**, in this order: (1) a one-sentence identity in the
   user's terms; (2) the constructor and its arguments — how the user builds and uses the type (the
