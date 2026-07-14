@@ -11,7 +11,7 @@ The measured functions of the flow state:
 - [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
   variance.
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
-- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the K41 marker of developed
+- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the K41 (Kolmogorov 1941) marker of developed
   turbulence.
 - [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step.
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral

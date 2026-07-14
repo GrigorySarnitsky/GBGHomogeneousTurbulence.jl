@@ -26,7 +26,7 @@ a direct dependency.
 | ``\boldsymbol u`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol u = 0`` | the velocity state |
 | ``\boldsymbol\omega`` | the vorticity ``\nabla\times\boldsymbol u`` | `vorticity_to_physical!` |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
-| ``p`` | the pressure (absorbed by the Leray projection, never stored) | — |
+| ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol f`` | a body forcing on the momentum equation | `AbstractForcing` |
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
 | ``\boldsymbol x``, ``t`` | position in the box ``\Omega``; time | — |

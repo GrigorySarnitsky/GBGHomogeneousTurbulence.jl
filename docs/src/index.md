@@ -8,10 +8,8 @@ tracking and field sampling.
 
 It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
 supplies every field operation — transforms, spectral differential operators, convolution,
-interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
-package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
-and the statistics. The GPU is the primary target, so each time step is in-place and allocation-free
-over preallocated buffers (occasional diagnostics allocate per call).
+interpolation, and reductions. The GPU is the primary target, so each time step is in-place and
+allocation-free over preallocated buffers (occasional diagnostics allocate per call).
 
 ## Installation
 

@@ -218,16 +218,20 @@ end
 Assemble the dealiased advection term of the passive-scalar equation into `nonlinear`, from the velocity
 `û` and scalar `φ̂` in spectral representation and their physical `u`, `φ`.
 
-In conservative form the advection is
-``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
-``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form is used because it conserves the scalar mean
-exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component, and the dealias
-kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode untouched. It is computed
-pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
-the kernel controlling the aliasing of the quadratic product — a **mask** strategy ([`TwoThirds`](@ref),
-[`HouLi`](@ref)) forms the flux once from `u`, `φ` (`û`, `φ̂`, `phase_shift` unused), while
-[`PhaseShift`](@ref) averages it with the flux recovered on a grid displaced half a cell (using `û`, `φ̂`,
-and the `phase_shift` scratch) before the spherical truncation.
+In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
+``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form
+conserves the scalar mean exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0``
+component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode
+untouched.
+
+It is computed pseudospectrally as
+``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
+The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
+([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û`, `φ̂`, and
+`phase_shift` unused — pass `nothing` for `phase_shift` there. [`PhaseShift`](@ref) instead averages it
+with the flux recovered on a grid displaced half a cell — using `û`, `φ̂`, and the `phase_shift` scratch
+(the run's `buffers.phase_shift`, built only for a `PhaseShift` domain) — before the spherical truncation.
+
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the momentum scratch — `product_physical` in physical
 representation, `product_spectral` in spectral.
 """

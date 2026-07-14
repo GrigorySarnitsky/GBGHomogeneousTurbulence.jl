@@ -1,6 +1,6 @@
 # Architecture
 
-This is the design document for `GBGIsotropicTurbulence` — what the package is, how it is organised,
+This is the design document for `GBGIsotropicTurbulence` — what the package is, how it is organized,
 and *why* it is shaped the way it is. It is the spec: read it before any structural change, and do not
 re-litigate a recorded decision (§11) without the user. `CLAUDE.md` is the terse working copy and defers
 here; the rendered symbol glossary is [`docs/src/notation.md`](notation.md).
@@ -83,10 +83,10 @@ never a wall in front of it.
 
 ---
 
-## 3. The organising frame
+## 3. The organizing frame
 
 A run is fixed by two independent things: **what** continuous problem you pose, and **how** you realize it
-numerically. Beneath both lies a single organising idea.
+numerically. Beneath both lies a single organizing idea.
 
 ### The foundation — one dynamics under a ladder of projections
 
@@ -202,7 +202,7 @@ inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} 
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
 **metriplectic seam** — a reversible part that conserves energy and an irreversible part that dissipates
-it (§8) — and the numerical split is built to honour it. The incompressible momentum equation is
+it (§8) — and the numerical split is built to honor it. The incompressible momentum equation is
 advanced in **rotational (Lamb-vector) form**: writing the convective term through the identity
 ``(\boldsymbol u\cdot\nabla)\boldsymbol u = \nabla(\tfrac12\lvert\boldsymbol u\rvert^2) - \boldsymbol u\times\boldsymbol\omega``
 (with vorticity ``\boldsymbol\omega = \nabla\times\boldsymbol u``) and letting the Leray–Helmholtz
@@ -455,7 +455,7 @@ is deferred (§7).
 dividing line is **domain-neutrality**, not "thinness":
 
 - **To `GBGPeriodicFields`** — every field operation: the transforms, `curl!` / `cross!` / `divergence!`,
-  the Leray projection `helmholtz_projection!` (``\mathbb P``), `convolve!` and the dealias/band kernels,
+  the Leray–Helmholtz projection `helmholtz_projection!` (``\mathbb P``), `convolve!` and the dealias/band kernels,
   the reductions (`inner`, the radial spectrum and correlation), and grid↔point interpolation. The rule
   *everything diagonal in Fourier is a `GBGPeriodicFields` operator* is followed in the code.
 - **To `GBGStreamingStatistics`** — every estimator: histograms, densities, conditional means and
@@ -530,7 +530,7 @@ generalization is built for them until a second concrete case forces the abstrac
   sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; **`PhaseShift`**
   (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
   ``\tfrac{\sqrt2}{3}N``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
-  ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganises the quadratic product
+  ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganizes the quadratic product
   to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
   scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
 - **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
@@ -547,7 +547,7 @@ generalization is built for them until a second concrete case forces the abstrac
 The package makes real theory legible. One framework — **Mori–Zwanzig — is its foundation** (§3); the rest
 are lenses read through it. Nothing in the *numerics* is load-bearing on the subordinate lenses — the
 arithmetic would be identical had they never been named — but the *architecture* is founded on the
-Mori–Zwanzig decomposition, which is exact and so can carry that weight. The lenses organise
+Mori–Zwanzig decomposition, which is exact and so can carry that weight. The lenses organize
 *understanding* and set what the tool is built to *investigate*, not assume.
 
 - **Mori–Zwanzig — the foundation, elaborated.** §3 states the decomposition; here is its machinery. A
@@ -700,7 +700,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
    onto the two kinds of variation (§3). *(Revised from an earlier "System × Model × Method" framing
    after an adversarial review.)*
 8. **(2026-07) Mori–Zwanzig is the central lens, not a foundation.** The code does not depend on it;
-   it organises understanding and is demonstrated, not assumed. The other lenses (GENERIC, the
+   it organizes understanding and is demonstrated, not assumed. The other lenses (GENERIC, the
    commuting square, RG) are read through it, and RG/universality is a hypothesis to test (§8).
 9. **(2026-07) Precision and footprint are studied axes.** Both precisions supported equally, the
    working point chosen by fitness test; the sufficiency frontier is a deliverable (§6).
