@@ -11,7 +11,8 @@ using Test
 
 
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
-function integrate_fixed(integrator, domain, buffers, û0, conditions, dt, nsteps)
+function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
+  buffers = allocate_buffers(integrator, domain; scalar = true)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
   φ̂ = scalar_spectral(domain)
@@ -32,7 +33,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
-  buffers = IntegratorBuffers(domain; scalar = true)
+  buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
@@ -44,15 +45,15 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "temporal convergence order" begin
     unforced = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
     rk3 = IFLowStorageRK3()
-    u1 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / n, n)
-    u2 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / (2n), 2n)
-    u4 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / (4n), 4n)
+    u1 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / n, n)
+    u2 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / (2n), 2n)
+    u4 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / (4n), 4n)
     rk3_ratio = diffnorm(u1, u2) / diffnorm(u2, u4)
 
     rk2 = IFRK2()
-    v1 = integrate_fixed(rk2, domain, buffers, û0, unforced, Tfinal / n, n)
-    v2 = integrate_fixed(rk2, domain, buffers, û0, unforced, Tfinal / (2n), 2n)
-    v4 = integrate_fixed(rk2, domain, buffers, û0, unforced, Tfinal / (4n), 4n)
+    v1 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / n, n)
+    v2 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (2n), 2n)
+    v4 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (4n), 4n)
     rk2_ratio = diffnorm(v1, v2) / diffnorm(v2, v4)
 
     @test 5.0 < rk3_ratio < 12.0      # third order ⇒ ≈ 8

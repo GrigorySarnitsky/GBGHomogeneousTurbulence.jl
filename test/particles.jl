@@ -91,7 +91,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   end
 
   @testset "advect in a real HIT velocity field" begin
-    buffers = IntegratorBuffers(domain; scalar = true)
+    buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = spectral_vector(domain)

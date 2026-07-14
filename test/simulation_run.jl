@@ -177,7 +177,7 @@ using Test
 
   @testset "derivative skewness" begin
     domain = FixedDomain(24, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
-    buffers = IntegratorBuffers(domain; scalar = true)
+    buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)

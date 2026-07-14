@@ -16,7 +16,7 @@ using Test
   ν = 5.0e-2
 
   domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
-  buffers = IntegratorBuffers(domain; scalar = true)
+  buffers = allocate_buffers(IFRK2(), domain; scalar = true)
   conditions = FlowConditions(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; target = 0.6, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
   integrator = IFRK2()

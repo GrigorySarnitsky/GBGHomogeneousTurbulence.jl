@@ -17,7 +17,7 @@ using Test
   L = 2π
   ν = 0.05
   domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
-  buffers = IntegratorBuffers(domain; scalar = true)
+  buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = spectral_vector(domain)
   random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))

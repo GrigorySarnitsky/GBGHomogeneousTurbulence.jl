@@ -34,7 +34,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   L = 2π
   ν = 0.1
   domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
-  buffers = IntegratorBuffers(domain; scalar = true)
+  buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7

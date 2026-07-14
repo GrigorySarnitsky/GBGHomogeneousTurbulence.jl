@@ -54,11 +54,11 @@ abstract type AbstractIntegrator end
 
 # The passive-scalar step buffers — held by `IntegratorBuffers` only when a scalar is evolved,
 # `nothing` otherwise (so a velocity-only run allocates none of them).
-struct ScalarBuffers{SS, SP, RK}
+struct ScalarBuffers{SS, ST2, SST, NL, SP, RK}
   stage1::SS
-  stage2::SS
-  star_spectral::SS
-  nonlinear::SS
+  stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
+  star_spectral::SST             # IFRK2 only
+  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   copy::SS
   field::SP
   rate::RK                       # per-mode linear forcing rate for φ, folded into E_κ
@@ -81,41 +81,45 @@ end
 
 
 """
-    IntegratorBuffers(domain; scalar = false)
+    IntegratorBuffers
 
 The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
-memory. Build it per scheme with [`allocate_buffers`](@ref), which dispatches on the concrete `integrator`.
-
-# Arguments
-- `domain` — the [`FixedDomain`](@ref) the buffers are sized (`similar`) to.
-- `scalar = false` — whether to allocate the nested `ScalarBuffers` for a passive scalar.
+memory. Built per scheme by [`allocate_buffers`](@ref)`(integrator, domain; scalar)`, which allocates
+**exactly** that scheme's working set: a register another scheme would use is left `nothing`, never
+allocated.
 
 # Fields
-The shared right-hand-side scratch every scheme needs:
+Shared — every scheme allocates these:
 - `velocity_copy`, `vorticity_spectral` — working space in spectral representation that the
   velocity/vorticity recovery consumes.
 - `product_physical`, `product_spectral` — the quadratic products in physical and spectral representation
   (the Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, and the scalar flux ``\\boldsymbol{u}\\varphi``).
 - `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star` — the start-of-step and
   substage velocity/vorticity registers in physical representation.
-- `velocity_star_spectral` — the substage velocity predictor ``\\hat{\\boldsymbol{u}}^{*}`` in spectral
-  representation (the `IFRK2` update writes it before the inverse transform).
-- `nonlinear`, `integrating_factor`, `velocity_rate` — the assembled nonlinear term, the shared viscous
-  integrating factor, and the velocity's per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
-- `stage1`, `stage2` — the Runge–Kutta stage registers.
-- `scalar` — a nested `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else
-  `nothing`; when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
-- `phase_shift` — a nested `PhaseShiftBuffers` (the two translation kernels and the displaced-evaluation
-  scratch) when the domain's `dealiasing` is [`PhaseShift`](@ref), else `nothing`.
+- `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
+  first stage for [`IFRK2`](@ref)).
+- `integrating_factor`, `velocity_rate` — the shared viscous integrating factor and the velocity's
+  per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
+
+Scheme-specific — allocated only for the scheme that uses it, else `nothing`:
+- `nonlinear` — the assembled nonlinear term ([`IFLowStorageRK3`](@ref) only).
+- `stage2`, `velocity_star_spectral` — the second stage register and the substage velocity predictor
+  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation ([`IFRK2`](@ref) only).
+
+Nested:
+- `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
+  when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
+- `phase_shift` — a `PhaseShiftBuffers` (the two translation kernels and the displaced-evaluation scratch)
+  when the domain's `dealiasing` is [`PhaseShift`](@ref), else `nothing`.
 """
-struct IntegratorBuffers{VS, SS, VP, RK, SB, PB}
+struct IntegratorBuffers{VS, ST2, VSS, NL, SS, VP, RK, SB, PB}
   vorticity_spectral::VS
   stage1::VS
-  stage2::VS
-  velocity_star_spectral::VS
+  stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
+  velocity_star_spectral::VSS    # IFRK2 only
   velocity_copy::VS
   product_spectral::VS
-  nonlinear::VS
+  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   integrating_factor::SS
   velocity_physical::VP
   vorticity_start::VP
@@ -130,13 +134,6 @@ end
 
 _forcing_rate(domain::FixedDomain) =
   fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
-
-ScalarBuffers(domain::FixedDomain) = ScalarBuffers(
-  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain),
-  scalar_spectral(domain), scalar_spectral(domain),
-  scalar_physical(domain),
-  _forcing_rate(domain),
-)
 
 # Build the two translation kernels once (offset = half a cell) and the displaced-evaluation scratch; the
 # scalar fields only when a scalar is evolved. A scalar kernel translates a vector or scalar field alike.
@@ -154,31 +151,17 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
   )
 end
 
-function IntegratorBuffers(domain::FixedDomain; scalar::Bool = false)
-  return IntegratorBuffers(
-    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
-    spectral_vector(domain), spectral_vector(domain), spectral_vector(domain), spectral_vector(domain),
-    scalar_spectral(domain),
-    physical_vector(domain), physical_vector(domain), physical_vector(domain),
-    physical_vector(domain), physical_vector(domain),
-    _forcing_rate(domain),
-    scalar ? ScalarBuffers(domain) : nothing,
-    domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
-  )
-end
-
-
 """
     allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
 
-Allocate the [`IntegratorBuffers`](@ref) a step needs, dispatching on the concrete `integrator` so a
-scheme may size its own scratch. Currently every scheme shares one working set, sized for all of them —
-an `IFLowStorageRK3` run still carries the spectral predictor register only `IFRK2` writes. The run layer
-calls this when assembling a `Simulation`; to build buffers directly, use the
-`IntegratorBuffers(domain; scalar)` constructor.
+Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, dispatching on the concrete scheme so it
+allocates **exactly** its working set — never a register another scheme would use.
+[`IFLowStorageRK3`](@ref) allocates `stage1` + `nonlinear`; [`IFRK2`](@ref) allocates `stage1` + `stage2`
++ `velocity_star_spectral`. `scalar = true` adds the nested `ScalarBuffers`, likewise sized to the scheme.
+A scheme with no method here is a hard error — there is no over-allocating fallback. The run layer calls
+this when assembling a `Simulation`.
 """
-allocate_buffers(::AbstractIntegrator, domain::FixedDomain; scalar::Bool = false) =
-  IntegratorBuffers(domain; scalar)
+function allocate_buffers end
 
 
 """
@@ -394,6 +377,52 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)
   return û, φ̂
 end
+
+
+# Per-scheme scratch — each scheme allocates exactly its working set; there is no `::AbstractIntegrator`
+# fallback, so a scheme with no method here is a hard error (never a silent over-allocation).
+# IFLowStorageRK3 uses stage1 + nonlinear; IFRK2 uses stage1 + stage2 + velocity_star_spectral; each
+# leaves the other scheme's registers `nothing`.
+ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
+  scalar_spectral(domain), nothing, nothing, scalar_spectral(domain),           # stage1, stage2, star_spectral, nonlinear
+  scalar_spectral(domain), scalar_physical(domain), _forcing_rate(domain),       # copy, field, rate
+)
+ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
+  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain), nothing,   # stage1, stage2, star_spectral, nonlinear
+  scalar_spectral(domain), scalar_physical(domain), _forcing_rate(domain),       # copy, field, rate
+)
+
+allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
+  spectral_vector(domain),                                # vorticity_spectral
+  spectral_vector(domain),                                # stage1
+  nothing,                                                # stage2 (IFRK2 only)
+  nothing,                                                # velocity_star_spectral (IFRK2 only)
+  spectral_vector(domain),                                # velocity_copy
+  spectral_vector(domain),                                # product_spectral
+  spectral_vector(domain),                                # nonlinear
+  scalar_spectral(domain),                                # integrating_factor
+  physical_vector(domain), physical_vector(domain), physical_vector(domain),   # velocity_physical, vorticity_start, vorticity_physical
+  physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
+  _forcing_rate(domain),                                  # velocity_rate
+  scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
+  domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
+)
+
+allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
+  spectral_vector(domain),                                # vorticity_spectral
+  spectral_vector(domain),                                # stage1
+  spectral_vector(domain),                                # stage2
+  spectral_vector(domain),                                # velocity_star_spectral
+  spectral_vector(domain),                                # velocity_copy
+  spectral_vector(domain),                                # product_spectral
+  nothing,                                                # nonlinear (IFLowStorageRK3 only)
+  scalar_spectral(domain),                                # integrating_factor
+  physical_vector(domain), physical_vector(domain), physical_vector(domain),   # velocity_physical, vorticity_start, vorticity_physical
+  physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
+  _forcing_rate(domain),                                  # velocity_rate
+  scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
+  domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
+)
 
 
 """
