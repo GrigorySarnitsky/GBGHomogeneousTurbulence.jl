@@ -32,7 +32,7 @@ scalar field), through tensor-order-generic field operators. The velocity and sc
 scalar decays freely, force both, or leave either unforced.
 
 An operator-free keyword constructor (`BandRescaling(; …)`, `Linear(; …)`, `ConstantPower(; …)`) returns
-a [`DeferredForcing`](@ref) that a `Simulation` materialises once the domain exists.
+a [`DeferredForcing`](@ref) that a `Simulation` materializes once the domain exists.
 """
 module Forcing
 
@@ -60,7 +60,7 @@ abstract type AbstractForcing end
 
 A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; target)`, and
 `BandRescaling(; target)` — return a `DeferredForcing`
-capturing the parameters; it is materialised into the concrete `AbstractForcing` once the
+capturing the parameters; it is materialized into the concrete `AbstractForcing` once the
 `FixedDomain` exists (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
 """
@@ -109,7 +109,7 @@ prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, buffers, dt::Rea
 """
     add_forcing_source!(forcing, nonlinear, domain, buffers) -> nonlinear
 
-Add an additive forcing source to the de-aliased nonlinear-term buffer `nonlinear` at each Runge–Kutta
+Add an additive forcing source to the dealiased nonlinear-term buffer `nonlinear` at each Runge–Kutta
 stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
 [`FixedDomain`](@ref) `domain` with the shared per-step scratch `buffers`. The default does nothing.
 """

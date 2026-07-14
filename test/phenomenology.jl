@@ -139,7 +139,7 @@ end
   fpφ = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
                        integral_scale = 1.0, scalar_dissipation = 0.05)
   r = 0.05
-  @test structure_function(Yaglom1949(), r, fpφ; order = 3) ≈ -(4 / 3) * 0.05 * r   # exact 4/3 law
+  @test structure_function(Yaglom1949(), r, fpφ; order = 3) ≈ -(2 / 3) * 0.05 * r   # -(2/3)ε_φ r (full-variance ε_φ; the classical 4/3 pairs with the half-variance rate)
   @test_throws ArgumentError structure_function(Yaglom1949(), r, FP; order = 3)     # no scalar dissipation
   @test_throws ArgumentError structure_function(Yaglom1949(), r, fpφ; order = 2)
   # Lundgren's finite-Re 4/5 law, reduced from the exact -4/5 εr at finite Re_λ

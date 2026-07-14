@@ -69,17 +69,19 @@ with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
-By default the run is **forced and stationary** — a `BandRescaling` holds the total energy at `kinetic_energy` —
-and the viscosity is chosen from the grid rather than supplied:
+By default the run is **forced and stationary** — a `BandRescaling` holds the total (whole-field) energy
+at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from the grid rather than supplied:
 
-  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number the grid resolves.
+  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with the
+    chosen resolution criterion `k_max_η`.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
     ``k``, `side_length` the side ``L``, and ``G`` the box-normalization group constant (``\\approx 0.9``),
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
-    resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the de-aliasing cutoff,
+    resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
-    retained-Nyquist fraction, `k_max_η = 2` means ``\\Delta x \\approx \\eta``. The `kinetic_energy` and `side_length` fix
+    retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
+    (``f = 2/3``); a wider-band strategy resolves a finer ``\\Delta x`` at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
@@ -91,18 +93,21 @@ The keywords marked *(front door only)* configure the `FixedDomain` and are cons
 the rest are forwarded to the `Simulation(domain; …)` form.
 
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
-- `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
-  ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
+- `domain` — a pre-built [`FixedDomain`](@ref), the positional argument of the second form (the front
+  door builds one from `grid_points_per_axis`, `side_length`, `dealiasing`, `scalar_type`, `array_type`).
+- `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
+  keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
 - `scalar_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
-- `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, or `HouLi` smooth); it
-  sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
+- `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
+  `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `DeferredForcing` from an
-  operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total energy
-  at `kinetic_energy`, `scalar_forcing` to `NoForcing()`. The velocity and scalar are forced independently.
+  operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
+  (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
+  velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
   scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
   initial condition.
@@ -155,7 +160,7 @@ function Simulation(domain::FixedDomain;
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     ntracers::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
-  # The stationary dissipation the box sustains (`Li2008`) — a modelled estimate, not a measurement.
+  # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
   side_length = domain.grid.domain_size[1]
   ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
@@ -242,10 +247,13 @@ end
 
 Compare the measured energy spectrum of `sim` against a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum `model` (an
-`EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). Returns a named
-tuple `(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the
-measured and predicted ``E(\\kappa)``, and the relative L² discrepancy over the resolved (non-empty)
-shells.
+`EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). The measured
+[`energy_spectrum`](@ref) is a per-shell energy (``k = \\sum_\\kappa E(\\kappa)``) while the model is a
+spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa``), so the density is multiplied by the
+shell width ``\\Delta\\kappa = 2\\pi/L`` before comparison — making the two agree at any box side ``L`` (not
+only the default ``L = 2\\pi``, where ``\\Delta\\kappa = 1``). Returns a named tuple
+`(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the measured and
+predicted per-shell ``E(\\kappa)``, and the relative L² discrepancy over the resolved (non-empty) shells.
 
 !!! note
     A developed, well-resolved run agrees with a good model across the inertial range; at low Reynolds
@@ -255,11 +263,14 @@ shells.
 function validate_spectrum(sim::Simulation, model::EnergySpectrum)
   fp = flow_parameters(sim)
   κ, measured = energy_spectrum(sim)
+  # Measured is a per-shell energy (k = Σ E); the model is a density (k = ∫ E dκ). Bring the density to a
+  # per-shell energy by the shell width Δκ = 2π/L so the comparison is correct at any box side L.
+  Δκ = 2π / sim.domain.grid.domain_size[1]
   predicted = similar(measured)
   num = zero(eltype(measured))
   den = zero(eltype(measured))
   for i in eachindex(κ, measured)
-    predicted[i] = κ[i] > 0 ? spectrum(model, κ[i], fp) : zero(eltype(measured))
+    predicted[i] = κ[i] > 0 ? spectrum(model, κ[i], fp) * Δκ : zero(eltype(measured))
     if measured[i] > 0
       num += (measured[i] - predicted[i])^2
       den += measured[i]^2

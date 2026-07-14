@@ -64,7 +64,7 @@ end
 ```
 
 The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each step from
-the advective CFL condition (§4.5), refreshes the cached start-of-step fields the propagator needs, and
+the advective-CFL condition (§4.5), refreshes the cached start-of-step fields the propagator needs, and
 treats **warm-up as a first-class verb**. By default `warmup!` advances until the flow is statistically
 stationary, watching the running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness
 ``S(t)`` — the small-scale signals that settle last — rather than the kinetic energy a constant-energy
@@ -85,7 +85,7 @@ never a wall in front of it.
 
 ## 3. The organising frame
 
-A run is fixed by two independent things: **what** continuous problem you pose, and **how** you realise it
+A run is fixed by two independent things: **what** continuous problem you pose, and **how** you realize it
 numerically. Beneath both lies a single organising idea.
 
 ### The foundation — one dynamics under a ladder of projections
@@ -106,7 +106,7 @@ differing only in *which* state each holds and *how much* memory its generator m
 - the **Generator** — the right-hand side that evolves it, itself split into a reversible and an
   irreversible part (§4.2);
 - the **Observables** — the measured functions of the state (§4.3);
-- the **Propagator** — the map that advances the state through time, realised by a choice of
+- the **Propagator** — the map that advances the state through time, realized by a choice of
   integrating-factor scheme (§4.5).
 
 Today only the finest rung, DNS, is built. The roles are named and carved so the coarser rungs slot in
@@ -142,7 +142,7 @@ Method is fibered over the Model, not independent of it.
 Two research disciplines live on these two kinds of variation:
 
 - **Method-independence.** Vary the realization, hold the specification fixed, and the answer must not
-  change beyond discretisation error. Two schemes, two precisions, or two grid sizes for the *same* DNS
+  change beyond discretization error. Two schemes, two precisions, or two grid sizes for the *same* DNS
   must agree; agreement is the correctness signal, and the cheapest realization that still agrees is a
   finding, not merely a default.
 - **Statistical commutation.** Descend the Model ladder, hold the System fixed, and the coarse Model must
@@ -160,7 +160,7 @@ pointed at different axes. Those functionals are exactly the Observables of §4.
 
 Each concern is its own module, included in dependency order by the umbrella
 `src/GBGIsotropicTurbulence.jl`. The four Mori–Zwanzig roles carry their role names — `State`, `Generator`,
-`Observables`, `Propagator`; the System's forcing, the discretised frame, the Lagrangian instruments, the
+`Observables`, `Propagator`; the System's forcing, the discretized frame, the Lagrangian instruments, the
 run layer, and the reference laws are named by their job. The rule is that **a role recurring at every
 rung of the ladder wears its role name, while a concrete mechanism wears its job** — so the load-bearing
 structure is legible at a glance, and no piece of plain machinery is dressed in theory it does not carry.
@@ -169,8 +169,8 @@ structure is legible at a glance, and no piece of plain machinery is dressed in 
 
 Two modules separate *what evolves* from the *frame it evolves on*.
 
-- **`SimulationDomain`** provides the discretised periodic box the run lives on — the reusable,
-  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube, realised by
+- **`SimulationDomain`** provides the discretized periodic box the run lives on — the reusable,
+  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube, realized by
   the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
   velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
   spectral multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (in spectral
@@ -180,7 +180,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   from here**: `scalar_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
-- **`State`** owns the DNS realisation of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
+- **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
   record of the evolving spectral fields — the velocity ``\hat{\boldsymbol u}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
   scalar are derived from it on demand and never stored, so the state cannot go stale. No operation hangs
@@ -196,7 +196,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
-`Generator` realises the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
+`Generator` realizes the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
 inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} = 1/\nu``), the Schmidt number
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
@@ -253,16 +253,16 @@ puts on any closure: net dissipation lives in the diffusion term alone, so a sub
 
 ### 4.3 `Observables` — the measured functions of the state
 
-`Observables` realises the Mori–Zwanzig observables: the functions of the state that are measured. Each
+`Observables` realizes the Mori–Zwanzig observables: the functions of the state that are measured. Each
 states the physical quantity first, then the reduction that computes it:
 
 - `kinetic_energy` ``k = \tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` and `dissipation`
   ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``;
 - `scalar_variance` ``\langle\varphi^2\rangle`` and `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
-- `max_speed`, which sets the advective CFL;
+- `max_speed`, which sets the advective-CFL;
 - `derivative_skewness`, the K41 marker ``S \approx -0.5`` of developed turbulence, computed
-  coordinate-free as the normalised third invariant of the strain rate ``\boldsymbol S``,
+  coordinate-free as the normalized third invariant of the strain rate ``\boldsymbol S``,
   ``3C\langle\det\boldsymbol S\rangle/\langle\boldsymbol S:\boldsymbol S\rangle^{3/2}`` with the exact
   isotropy constant ``C = \tfrac47\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
@@ -285,18 +285,19 @@ step through a small interface whose four methods each default to doing nothing:
 - `prepare_forcing!` — advance internal state once per step (a stochastic process);
 - `apply_forcing!` — apply a post-step projection or rescale.
 
-`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), and `Linear` and
-`ConstantPower` (negative-damping, Lundgren 2003, folded into ``\mathcal E``) are provided; a stochastic Eswaran–Pope
+`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), `Linear`
+(fixed-rate negative damping, Lundgren 2003), and `ConstantPower` (its rate reset each step to hold the
+injection rate) — the two linear forcings folded into ``\mathcal E`` — are provided; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
 alone. Each forcing has an operator-taking constructor and an operator-free keyword form
-(`ConstantPower(target = 0.1)`, a `DeferredForcing`) materialised when `Simulation` builds the frame, so a case
+(`ConstantPower(target = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
 ### 4.5 `Propagator` — the map that advances the state in time
 
-`Propagator` realises the Mori–Zwanzig propagator: the map that carries the state forward in time, built
+`Propagator` realizes the Mori–Zwanzig propagator: the map that carries the state forward in time, built
 on the generator's reversible/irreversible seam. Its numerical schemes are the Model-fibered part of the
 Method (§3).
 
@@ -345,8 +346,9 @@ for the Heun push, and a clock. Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
   builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
-  scheme. The viscosity is set from the grid by default — the highest Reynolds number the grid
-  resolves (decision 20) — with an explicit `viscosity` the opt-in override. Setup is a few numbers.
+  scheme. The viscosity is set from the grid by default — the highest Reynolds number consistent with the
+  chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
+  Setup is a few numbers.
 - **`advance!(sim; dt)`** and **`run!(sim; ...)`** own the time loop: choose ``\Delta t`` from the
   scheme's CFL and the current `max_speed`, refresh the cached start-of-step velocity and vorticity,
   `step!`, advect tracers, and fire a user callback on a fixed time interval.
@@ -398,11 +400,14 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
   **composed**: an inertial core ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
   factor ``f_L(\kappa L)`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named type fixing a
   published triple.
-- **`StructureFunctions`** — functions of ``r`` (the ``S_p(r)`` laws and the two-point correlations,
+- **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and the two-point correlations,
   which share the representation).
-- **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends (``C_K``, the
-  dissipation constant ``C_\varepsilon``, the derivative skewness ``S``, the flatness, the
-  Obukhov–Corrsin constant, the Lagrangian ``C_0``, the mechanical-to-scalar timescale ratio).
+- **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends: the Kolmogorov
+  constant ``C_K`` (`Sreenivasan1995`), the normalized dissipation constant ``C_\varepsilon``
+  (`Sreenivasan1998`), and the box-normalized dissipation group ``k/(L\varepsilon)^{2/3}`` (`Li2008`,
+  which the run layer inverts to set the viscosity). The derivative skewness, the flatness, the
+  Lagrangian ``C_0``, and the mechanical-to-scalar timescale ratio are forward-looking additions to the
+  family, not yet built.
 
 Three exist now — enough for the validation checklist — and the count caps near six: `PDFs`, `Decay` (``k \sim t^{-n}``),
 and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries the
@@ -498,7 +503,7 @@ working point on a studied axis, not a universal law.
 ## 7. Deliberately deferred
 
 These are **named so they are not precluded, and deliberately left un-abstracted**: no extension point or
-generalisation is built for them until a second concrete case forces the abstraction. None is a gap.
+generalization is built for them until a second concrete case forces the abstraction. None is a gap.
 
 - **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
   added to the RHS. *Built and validated, then archived* from the public surface (un-exported,
@@ -520,9 +525,9 @@ generalisation is built for them until a second concrete case forces the abstrac
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
   Lagrangian trajectory samples in, streamed summaries out).
 - **Alternative dealiasing and nonlinear forms (partly built).** `DealiasingStrategy` now *owns the
-  de-aliased nonlinear assembly* — ``\hat{\boldsymbol u}`` (and ``\hat\varphi``) in, the de-aliased term
+  dealiased nonlinear assembly* — ``\hat{\boldsymbol u}`` (and ``\hat\varphi``) in, the dealiased term
   out — so a strategy may restructure *how* the product is computed, not merely filter its output. The
-  sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realisation; **`PhaseShift`**
+  sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; **`PhaseShift`**
   (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
   ``\tfrac{\sqrt2}{3}N``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
   ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganises the quadratic product
@@ -547,22 +552,22 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
 
 - **Mori–Zwanzig — the foundation, elaborated.** §3 states the decomposition; here is its machinery. A
   projection ``\mathcal P`` splits the full state into a resolved part and the rest, and applying it to the
-  exact dynamics gives the resolved variables a **generalised Langevin equation**: a streaming term (the
+  exact dynamics gives the resolved variables a **generalized Langevin equation**: a streaming term (the
   projected drift), a **memory integral** over a kernel ``K(t-s)`` carrying the history the projection
-  discarded, and a **coloured-noise** term living in the unresolved subspace. A Model is a choice of
+  discarded, and a **colored-noise** term living in the unresolved subspace. A Model is a choice of
   ``\mathcal P`` and a closure that approximates that kernel and that noise; DNS is the identity
   projection, for which both vanish, so it needs no closure. The memory kernel ``K`` is the precise content
-  of the tendency a coarse state cannot supply on its own (§3), and modelling it is the closure problem the
+  of the tendency a coarse state cannot supply on its own (§3), and modeling it is the closure problem the
   tool exists to test.
 - **Open systems / non-equilibrium — a reading of the projection.** The Mori–Zwanzig cut *is* the
   open-system system/environment split: the **resolved** variables are the system, the projected-out
   variables the environment, which survives only as the memory + noise above. A driven-dissipative flow is
   an open system in a non-equilibrium steady state — energy injected by the forcing (an energy *reservoir*,
-  the source of §4.2), dissipated to the unmodelled viscous *bath* (the sink), balanced at stationarity. The
+  the source of §4.2), dissipated to the unmodeled viscous *bath* (the sink), balanced at stationarity. The
   lens carries its own caveat: whatever a model *retains* of the environment — a stochastic forcing's
   internal state, a closure's subgrid degrees of freedom — is not the environment but the finite
-  **Markovian surrogate** kept on the system's own side, a *modelled* degree of freedom; so it homes, when
-  built, as a modelled slot on the one `State`, never a separate "environment state".
+  **Markovian surrogate** kept on the system's own side, a *modeled* degree of freedom; so it homes, when
+  built, as a modeled slot on the one `State`, never a separate "environment state".
 - **The commuting square — the modeling ideal.** With ``\Pi`` a coarse-graining and ``S`` a flow map, one
   would like ``\Pi\circ S_{\text{fine}} = S_{\text{coarse}}\circ\Pi``. It cannot hold pathwise: the coarse
   state does not determine its own tendency (that is the memory and noise made concrete), and turbulence is
@@ -575,9 +580,9 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   Hamiltonian (symplectic) bracket generating the reversible part, a dissipative (metric) bracket the
   irreversible — the lens says *why* the split is structure-preserving and constrains every closure to be
   net-dissipative. Here it is a lens rather than a literal thermodynamics: isothermal incompressible flow
-  has no genuine entropy (§4.2). The term is Morrison's (metric + symplectic); GENERIC (Grmela–Öttinger)
+  has no genuine entropy (§4.2). The term is Morrison's (metric + symplectic); Öttinger's GENERIC
   is the same structure.
-- **Renormalisation / scale invariance — a hypothesis, never a foundation.** Small-scale universality is
+- **Renormalization / scale invariance — a hypothesis, never a foundation.** Small-scale universality is
   what would make closure constants transferable, but it is approximate (intermittency), it fails for
   scalar small scales (persistent gradient anisotropy), and the unclosed terms are *conditional* quantities
   that re-import the large scales. So the tool is built to *test* how universal a closure is, per regime,
@@ -599,7 +604,7 @@ one usually encodes a decision.
    and CPU/GPU are first-class (§6).
 4. **Allocation-free stepping over a compile-time state.** A time step allocates no field-sized memory over
    the preallocated `IntegratorBuffers` — load-bearing for GPU hot loops. The evolving state is a **compile-time
-   product of concretely-typed buffers** (a parametrised record the compiler specialises), never a
+   product of concretely-typed buffers** (a parametrized record the compiler specializes), never a
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
    that lets the state grow (a scalar today, a coarser Model's extra fields tomorrow) to more slots at no
    runtime cost.
@@ -607,7 +612,7 @@ one usually encodes a decision.
    (inherited from `GBGPeriodicFields`).
 6. **No baked-in physical model, closure, or universality assumption.** The tool investigates these; it
    does not assume them (§8). The Mori–Zwanzig foundation is exempt because it is *exact*, not a model — a
-   projection is an identity, and what remains modelled is the closure the tool is built to test (§3).
+   projection is an identity, and what remains modeled is the closure the tool is built to test (§3).
 7. **A library, not a framework.** The run layer is a convenience over exposed pieces (§2, §4.7), never a
    mandatory shell.
 8. **The scalar is denoted ``\varphi``**, never ``\theta`` — in code, mathematics, and prose.
@@ -618,14 +623,14 @@ one usually encodes a decision.
 ## 10. Conventions
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
-  exact/ideal form, *then* the discrete realisation — as `integrating_factor!` leads with
+  exact/ideal form, *then* the discrete realization — as `integrating_factor!` leads with
   ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_nonlinear!` with
   the Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
 - **Coordinate-free where a coordinate-free form exists.** Homogeneous isotropic turbulence is
   statistically isotropic — no preferred direction — so a diagnostic or computation that picks a coordinate
   axis imports a spurious direction-dependence; state the **rotation-invariant** form, not an axis
-  projection. The reference is `derivative_skewness`: the normalised third invariant of the strain rate
+  projection. The reference is `derivative_skewness`: the normalized third invariant of the strain rate
   ``\boldsymbol S``, not the axis-picking longitudinal velocity-derivative skewness (decision 17).
 - **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
   rationale and the decision log. Mathematics is rendered LaTeX in the glossary's notation
@@ -681,7 +686,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
    advection; the reversible generator of the geometric lens.
 3. **(2026-06) `IFLowStorageRK3` (Williamson 2N / RKW3) is the default; per-scheme CFL.** Third-order,
-   imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscously-stabilised
+   imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscously-stabilized
    option.
 4. **(2026-06) One passive scalar ``\varphi``, coupled in-stage.** Velocity and scalar advance through
    the same RK stages to keep the passive coupling time-accurate.
@@ -713,13 +718,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the strict
     "real turbulence yet" gate (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
     forced, ``\langle\varphi^2\rangle`` must flatten too — the scalar reaches stationarity after the
-    velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the DNS warm-up
-    research review.)*
+    velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the warm-up
+    literature.)*
 14. **(2026-07) Operator-free forcing construction via `ForcingSpec`.** `ConstantPower(power = 0.1)`
-    (and the other banded forcings) return a `ForcingSpec` capturing the parameters, materialised into
+    (and the other banded forcings; keyword since renamed `power` → `target`) return a `ForcingSpec`
+    capturing the parameters, materialized into
     the concrete `AbstractForcing` once `Simulation` builds the domain — so a case names its forcing
     before the grid exists. The operator-taking constructor is unchanged.
-15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`target = :band | :total`).**
+15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
     `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
     to pin the whole-field energy — hence the r.m.s. velocity ``u'`` and ``\mathrm{Re}_\lambda`` — the
     constant-total-energy forcing convention. A modeling choice with two defensible answers, so it is a selectable
@@ -757,7 +763,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 19. **(2026-07) The measured-vs-predicted validation harness — the first `Phenomenology` consumer.** The
     velocity energy spectrum is measured from a run (`energy_spectrum`, the halved `GBGPeriodicFields`
     radial spectrum) and the integral scale `integral_scale` from it; `flow_parameters` bridges a
-    `Simulation` to a `Phenomenology` `FlowParameters` (``\nu``, ``\varepsilon``, ``u'``, ``L`` from the
+    `Simulation` to a `Phenomenology` `FlowParameters` (``\nu``, ``\varepsilon``, ``u'``, ``L_{11}`` from the
     measured state), and `validate_spectrum(sim, model)` compares the measured spectrum against a model
     spectrum evaluated at that state, returning the relative L² discrepancy. This realizes the
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
@@ -768,9 +774,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
     (``k/(L\varepsilon)^{2/3} \approx 0.9``, the dissipation anomaly in box variables, calibrated to
     JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
-    option (default `2`) — the highest Reynolds number the grid resolves. This is the **construction**
-    half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to validate them.
-    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at `energy`,
+    option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
+    **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
+    validate them.
+    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at `kinetic_energy`,
     default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. It does **not**
     breach the extraction boundary — `Li2008` stays a pure scalar law with no `GBGPeriodicFields` /
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
@@ -794,7 +801,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     exercise confirmed the carving is internally consistent and surfaced two things now recorded: the four
     MZ roles are level-agnostic — abstractions the coarser Model rungs will populate, *ready but not
     populated* while DNS is the only built rung (not a speculative extension point, invariant 9) — and the
-    state-realisation discipline now folded into invariant 4.
+    state-realization discipline now folded into invariant 4.
 22. **(2026-07) Mori–Zwanzig raised to foundation; the physics-first renames; this document rewritten.**
     Following the structural verification (decision 21), Mori–Zwanzig is made the **foundation** of the
     architecture, not merely the central lens — *reversing decision 8*. The reversal is safe because the
@@ -814,7 +821,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     forcing-protocol renames, and an open-systems sub-lens.** A close read of the rewrite settled three
     changes. (a) The parameter bundle `Physics` — the viscosity, the Schmidt number, and the two forcings,
     the physical *conditions* that tune the generator, misfiled under the `Propagator` stepper — is renamed
-    **`FlowConditions`** and folded into **`Generator`**, the right-hand side it parametrises; this adds the
+    **`FlowConditions`** and folded into **`Generator`**, the right-hand side it parametrizes; this adds the
     honest `Generator → Forcing` dependency (the RHS includes the forcing source). A six-perspective naming
     panel chose `FlowConditions` over `System` (the bundle is a proper *subset* of the §3 System axis — it
     lacks the initial condition and the domain — so a type named for the axis while holding less is ambiguous
@@ -823,8 +830,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     verb-first: `set_forcing_rate!`, `add_forcing_source!`, `prepare_forcing!`, `apply_forcing!`. (c) The
     open-systems / non-equilibrium reading is recorded as a **sub-lens under Mori–Zwanzig** (§8), not new
     state types: a six-tradition panel (unanimous) confirmed the system/environment split *is* the
-    Mori–Zwanzig resolved/modelled cut, but that whatever a model retains of the environment is a finite
-    **Markovian surrogate on the system's own side** — a `modelled` slot on the one `State`, never a separate
+    Mori–Zwanzig resolved/modeled cut, but that whatever a model retains of the environment is a finite
+    **Markovian surrogate on the system's own side** — a `modeled` slot on the one `State`, never a separate
     'environment state' — so a stateful forcing's internal state homes there when `StochasticOU` is
     de-archived, and no type is minted now (invariant 9).
 24. **(2026-07) The domain module is `SimulationDomain`, its concrete type `FixedDomain`.** Decision 22
@@ -832,7 +839,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     Julia will not let a module cleanly re-export a type of its *own* name — `using ..SimulationDomain:
     SimulationDomain` binds the module and shadows the type, so a bare `SimulationDomain(...)` constructor
     call stops resolving (verified empirically). The module keeps the user-facing concern name
-    `SimulationDomain` (the discretised box a run lives on); its type takes a name for *what it is among the
+    `SimulationDomain` (the discretized box a run lives on); its type takes a name for *what it is among the
     alternatives*. Weighed against `SimpleDomain` (relational and vague — simple next to what?) and
     `PeriodicCube` (a property the deferred sheared frame *also* has), the choice is **`FixedDomain`**: the
     fixed, unsheared, orthogonal cube with time-independent, separable wavenumbers. It names the very axis
@@ -847,7 +854,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     compute or memory penalty and reads as one convention with `scalar_to_physical!` (`X_to_physical!`
     produces the physical `X`, its source shown in the signature). (b) **`ForcingSpec` is renamed
     `DeferredForcing`**, naming the object by its meaning — a forcing specified before the domain exists
-    and materialised once it does — rather than the `spec` abbreviation (superseding the name minted in
+    and materialized once it does — rather than the `spec` abbreviation (superseding the name minted in
     decision 14). (c) **`random_scalar!` gains a `spectrum` keyword** mirroring
     `random_solenoidal_velocity!`, seeding the scalar from a target radial scalar-variance spectrum (an
     Obukhov–Corrsin form from `Phenomenology`) for spectrum-matched initial conditions and faster
@@ -881,7 +888,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     its eventual siblings in the product. A six-lens naming panel with an adversarial pass fixed the slate
     (`IntegratorBuffers`, and the scratch-field names `product_physical`/`product_spectral` over the
     velocity-only `lamb`).
-27. **(2026-07) Phase-shift de-aliasing, on `GBGPeriodicFields`' `translation_kernel`.** Adds
+27. **(2026-07) Phase-shift dealiasing, on `GBGPeriodicFields`' `translation_kernel`.** Adds
     [`PhaseShift`](@ref) as an opt-in `DealiasingStrategy` (the default stays the rotational form +
     spherical ``2/3``). Each quadratic nonlinear term is assembled twice — on the grid and on a grid
     displaced half a cell — and averaged, cancelling the aliasing images that wrap in an *odd* number of
@@ -890,10 +897,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     surviving *two-axis* images (a single half-cell shift is exact only in 1-D; Patterson & Orszag 1971,
     Rogallo 1981). It keeps a ``\sqrt2`` wider band than the ``2/3`` rule (``\approx 2.8\times`` the modes
     in the retained sphere) at ``2\times`` the nonlinear-term transforms and a displaced-evaluation scratch
-    field. This realises the deferred D6 assembly generalisation (§7) for this sibling: `DealiasingStrategy`
-    now dispatches the whole ``\hat{\boldsymbol u}\to`` de-aliased-term computation, not only a post-multiply
-    kernel. The displacement is built once as two `translation_kernel`s (the shift theorem's phase, PF
-    decision 28, whose Nyquist even/odd split makes the kernel a real field); because the cutoff is
+    field. This realizes the deferred D6 assembly generalization (§7) for this sibling: `DealiasingStrategy`
+    now dispatches the whole ``\hat{\boldsymbol u}\to`` dealiased-term computation, not only a post-multiply
+    kernel. The displacement is built once as two `translation_kernel`s (the shift theorem's phase, a
+    `GBGPeriodicFields` translation primitive whose Nyquist even/odd split makes the kernel a real
+    field); because the cutoff is
     sub-Nyquist the Nyquist-attenuation caveat never bites. Verified against a zero-padded oracle — exact to
     machine precision across the retained band on a field whose raw product is 44 % aliased.
 
@@ -910,11 +918,16 @@ docs are published (they are not yet filled in, per the no-guessed-citation rule
   large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
 - Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
   *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy relations behind the strain-skewness constant, §4.3.)*
+- Patterson, G. S. & Orszag, S. A. (1971). Spectral calculations of isotropic turbulence: efficient
+  removal of aliasing interactions. *Phys. Fluids* **14**, 2538–2541. *(Phase-shift dealiasing; the
+  `PhaseShift` strategy, §7, decision 27.)*
+- Orszag, S. A. (1971). On the elimination of aliasing in finite-difference schemes by filtering
+  high-wavenumber components. *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
 - Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
-  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(Pseudospectral method; the ``2/3``
-  dealiasing rule, Orszag 1971.)*
+  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
 - Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(The
-  sheared-frame scheme, §7.)*
+  sheared-frame scheme, §7; the spherical-truncation dealiasing of the `PhaseShift` strategy,
+  decision 27.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.

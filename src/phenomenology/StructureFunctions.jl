@@ -2,7 +2,8 @@
     Phenomenology.StructureFunctions
 
 Inertial-range structure-function laws — parametrizations of the longitudinal velocity structure
-function ``D_{L\\dots}(r)``, evaluated by [`structure_function`](@ref).
+function ``D_{L\\dots}(r)`` and the mixed velocity–scalar structure function
+``\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle`` (Yaglom), evaluated by [`structure_function`](@ref).
 
 - [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
   self-similar exponents (via [`scaling_exponent`](@ref)).
@@ -23,9 +24,11 @@ export StructureFunction, Kolmogorov1941, Kolmogorov1962, SheLeveque1994, Yaglom
 """
     StructureFunction <: TurbulenceLaw
 
-Supertype of the velocity structure-function laws — parametrizations of
-``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the ``p``-th moment of the longitudinal velocity
-increment across a separation ``r``), evaluated by [`structure_function`](@ref).
+Supertype of the inertial-range structure-function laws — parametrizations of the longitudinal velocity
+moments ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the ``p``-th moment of the longitudinal
+velocity increment across a separation ``r``) and the mixed velocity–scalar moment
+``\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle`` ([`Yaglom1949`](@ref)), evaluated by
+[`structure_function`](@ref).
 """
 abstract type StructureFunction <: TurbulenceLaw end
 
@@ -45,8 +48,9 @@ The Kolmogorov (1941) inertial-range structure-function laws for the longitudina
     free constant.
 
 Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`FlowParameters`](@ref))
-supplies the dissipation rate ``\\varepsilon``. Any other `order` throws — K41 fixes only these two longitudinal
-moments universally.
+supplies the dissipation rate ``\\varepsilon``; any other `order` throws (K41 fixes only these two
+longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law, order)` gives the self-similar
+K41 exponent ``\\zeta_p = p/3``.
 """
 struct Kolmogorov1941 <: StructureFunction
   C₂::Float64
@@ -73,7 +77,7 @@ const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**
     SheLeveque1994()
 
 The She–Lévêque (1994) intermittency model for the inertial-range scaling exponents. Its
-[`scaling_exponent`](@ref)`(law, p)` gives the anomalous exponent
+[`scaling_exponent`](@ref)`(law, order)` gives the anomalous exponent
 
 ```math
 \\zeta_p = \\frac{p}{9} + 2\\left[1 - \\left(\\tfrac{2}{3}\\right)^{p/3}\\right]
@@ -97,7 +101,7 @@ const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82"; valid_R
     Kolmogorov1962(; μ = 0.25)
 
 The Kolmogorov (1962) log-normal (refined-similarity) intermittency model. Its
-[`scaling_exponent`](@ref)`(law, p)` gives
+[`scaling_exponent`](@ref)`(law, order)` gives
 
 ```math
 \\zeta_p = \\frac{p}{3} - \\frac{\\mu}{18}\\,p\\,(p - 3),
@@ -123,17 +127,21 @@ const _YAGLOM = Reference("Yaglom (1949), *Dokl. Akad. Nauk SSSR* **69**, 743"; 
 """
     Yaglom1949()
 
-The Yaglom (1949) 4/3 law — the exact inertial-range scaling of the mixed third-order velocity–scalar
-structure function,
+The Yaglom (1949) "4/3 law" — the exact inertial-range scaling of the mixed third-order velocity–scalar
+structure function, the passive-scalar analogue of the 4/5 law (a consequence of the Yaglom relation);
+it carries no free constant. Its classical ``-\\tfrac{4}{3}`` coefficient is stated for the dissipation
+rate of the *half*-variance ``\\tfrac12\\langle\\varphi^2\\rangle``, namely
+``\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle`` — just as the 4/5 law pairs with
+``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol\\omega\\rvert^2\\rangle``, the dissipation of the
+half-energy ``k``. This package's ``\\varepsilon_\\varphi = 2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``
+(`scalar_dissipation`) is the *full*-variance rate, twice that, so in these variables the law is
 
 ```math
-\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle(r) = -\\tfrac{4}{3}\\,\\varepsilon_\\varphi\\,r,
+\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle(r) = -\\tfrac{2}{3}\\,\\varepsilon_\\varphi\\,r.
 ```
 
-the passive-scalar analogue of the 4/5 law (a consequence of the Yaglom relation); it carries no free
-constant. [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar
-dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order`
-throws.
+[`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar dissipation
+``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order` throws.
 """
 struct Yaglom1949 <: StructureFunction end
 
@@ -141,7 +149,7 @@ function structure_function(::Yaglom1949, r, fp::FlowParameters; order::Integer 
   order == 3 || throw(ArgumentError("Yaglom1949 gives only the 3rd-order (4/3) mixed law; got order=$order"))
   isnan(fp.scalar_dissipation) && throw(ArgumentError(
     "Yaglom1949 needs the scalar dissipation rate — set `scalar_dissipation` in FlowParameters"))
-  return -(4//3) * fp.scalar_dissipation * r
+  return -(2//3) * fp.scalar_dissipation * r
 end
 
 provenance(::Yaglom1949) = _YAGLOM

@@ -1,4 +1,4 @@
-# State — the DNS realisation of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
+# State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
 # velocity and scalar — the single source of truth; the physical fields are derived, never stored) and
 # the random initial conditions that seed a run. The per-step scratch lives with the integrator
 # (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
@@ -51,12 +51,17 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
-``\\boldsymbol{u}`` of a chosen energy spectrum, de-aliased and rescaled so the kinetic energy
+``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
-projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
+projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``. This low-level default
+(`kinetic_energy = 0.5`) is not the run default: the `Simulation` front door supplies `1.5`
+(``u' = 1``) instead, so the two layers' defaults differ by design.
 
-By default (`spectrum = nothing`) the velocity is concentrated at large scales by the Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` (``\\kappa_p`` is `peak_wavenumber`).
+By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
+characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
+amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
+peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
@@ -101,12 +106,15 @@ end
                    spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
-chosen spectrum, de-aliased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
+chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
 `scalar_variance`. The noise is made mean-zero in physical space before the transform, so the
 ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
 
-By default (`spectrum = nothing`) the scalar is concentrated at large scales by the Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` (``\\kappa_p`` is `peak_wavenumber`).
+By default (`spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
+characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
+amplitudes, the shell-summed scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
+peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
 scalar-variance spectrum, to seed that shape instead: each mode is scaled by
 ``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed

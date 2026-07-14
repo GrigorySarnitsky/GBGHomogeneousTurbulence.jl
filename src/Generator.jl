@@ -12,7 +12,7 @@
     Generator
 
 The flow's equations of motion — the incompressible Navier–Stokes right-hand side in rotational form
-(the de-aliased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
+(the dealiased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
 integrating factor.
 
 Its contents (each formula lives in the operation's own docstring):
@@ -21,7 +21,7 @@ Its contents (each formula lives in the operation's own docstring):
 - [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
   recover the velocity, vorticity, and scalar in physical representation from their spectral
   representation.
-- [`velocity_nonlinear!`](@ref), [`scalar_nonlinear!`](@ref) — assemble the de-aliased, Leray-projected
+- [`velocity_nonlinear!`](@ref), [`scalar_nonlinear!`](@ref) — assemble the dealiased, Leray-projected
   momentum and scalar nonlinear terms.
 - [`integrating_factor!`](@ref) — build the exact viscous/diffusive multiplier for the linear diffusion
   term.
@@ -94,7 +94,7 @@ end
 """
     velocity_nonlinear!(nonlinear, û, u, ω, domain, product_physical, product_spectral, phase_shift)
 
-Assemble the de-aliased, Leray-projected nonlinear term of the momentum equation into `nonlinear`, from
+Assemble the dealiased, Leray-projected nonlinear term of the momentum equation into `nonlinear`, from
 the velocity `û` in spectral representation and its physical velocity `u` and vorticity `ω`.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
@@ -112,7 +112,7 @@ becomes
 ```
 
 The term computed is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
-de-aliased by the domain's [`DealiasingStrategy`](@ref). A **mask** strategy ([`TwoThirds`](@ref),
+dealiased by the domain's [`DealiasingStrategy`](@ref). A **mask** strategy ([`TwoThirds`](@ref),
 [`HouLi`](@ref)) forms it once from `u`, `ω` and multiplies by the low-pass `domain.dealias` (`û` and
 `phase_shift` are unused). [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
 recovered on a grid displaced by half a cell (using `û` and the `phase_shift` translation kernels and
@@ -149,7 +149,7 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedD
   return nonlinear
 end
 
-# The raw pseudospectral ℙ(u×ω) in spectral representation, with no de-aliasing — the piece both
+# The raw pseudospectral ℙ(u×ω) in spectral representation, with no dealiasing — the piece both
 # dealiasing strategies build.
 function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_physical, product_spectral)
   cross!(product_physical, u, ω)
@@ -209,13 +209,13 @@ end
 """
     scalar_nonlinear!(nonlinear, û, φ̂, u, φ, domain, product_physical, product_spectral, phase_shift)
 
-Assemble the de-aliased advection term of the passive-scalar equation into `nonlinear`, from the velocity
+Assemble the dealiased advection term of the passive-scalar equation into `nonlinear`, from the velocity
 `û` and scalar `φ̂` in spectral representation and their physical `u`, `φ`.
 
 In conservative form the advection is
 ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since
 ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form is used because it conserves the scalar mean
-exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component, and the de-alias
+exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0`` component, and the dealias
 kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode untouched. It is computed
 pseudospectrally as ``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
 the kernel controlling the aliasing of the quadratic product — a **mask** strategy ([`TwoThirds`](@ref),
@@ -254,7 +254,7 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::Fi
   return nonlinear
 end
 
-# Raw ∇·(uφ) in spectral representation, no de-aliasing.
+# Raw ∇·(uφ) in spectral representation, no dealiasing.
 function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_physical, product_spectral)
   _scalar_flux!(product_spectral, u, φ, domain, product_physical)
   divergence!(out, product_spectral, domain.multipliers)

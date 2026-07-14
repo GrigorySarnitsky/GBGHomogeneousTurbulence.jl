@@ -34,8 +34,9 @@ end
   v = validate_spectrum(SIM, Pope2000())
   @test length(v.wavenumbers) == length(v.measured) == length(v.predicted)
   @test isfinite(v.relative_error) && v.relative_error ≥ 0
-  # the prediction is the model evaluated at the run's own flow parameters
+  # the prediction is the model density × the shell width Δκ = 2π/L (a per-shell energy, matching `measured`)
   fp = flow_parameters(SIM)
+  Δκ = 2π / SIM.domain.grid.domain_size[1]
   i = findfirst(>(0), v.wavenumbers)
-  @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp)
+  @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp) * Δκ
 end

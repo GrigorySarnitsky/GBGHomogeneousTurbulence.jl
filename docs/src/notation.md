@@ -5,7 +5,7 @@ denotes. All mathematics is rendered LaTeX; a code identifier always appears in 
 inside a math span. This page is the single reference — a docstring introduces a symbol on first use
 and need not repeat the convention.
 
-The physical conventions are standard turbulence usage — see Pope, *Turbulent Flows*; the field and
+The physical conventions are standard turbulence usage — see Pope (2000), *Turbulent Flows*; the field and
 spectral conventions follow [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl),
 a direct dependency.
 
@@ -28,6 +28,7 @@ a direct dependency.
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray projection, never stored) | — |
 | ``\boldsymbol f`` | a body forcing on the momentum equation | `AbstractForcing` |
+| ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
 | ``\boldsymbol x``, ``t`` | position in the box ``\Omega``; time | — |
 
 ## Parameters
@@ -51,7 +52,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^2`` acts as multiplication by it | `domain.squared_wavenumber` |
 | ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral), [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
-| ``\mathbb P`` | the Helmholtz (Leray) projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
+| ``\mathbb P`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
 | ``\mathcal E(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\big((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\Delta t\big)`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | `integrating_factor!` |
 | ``\star`` | periodic convolution (the dealias/band/envelope kernels) | [`convolve`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.convolve) |
 
@@ -61,7 +62,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
-| ``E(\kappa)`` | energy spectrum (energy per unit wavenumber), ``k = \sum_\kappa E(\kappa)`` | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
+| ``E(\kappa)`` | energy in each wavenumber-magnitude shell, ``k = \sum_\kappa E(\kappa)`` | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
 

@@ -4,14 +4,14 @@
 package for homogeneous isotropic turbulence on a three-dimensional periodic domain: an incompressible
 velocity field ``\boldsymbol{u}`` together with a single passive scalar ``\varphi``, each optionally
 forced, advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle
-tracking and Eulerian + Lagrangian statistics.
+tracking and field sampling.
 
 It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
 supplies every field operation — transforms, spectral differential operators, convolution,
 interpolation, and reductions. `GBGPeriodicFields` is deliberately time- and particle-free; this
 package is the consumer that owns time integration, forcing, the scalar transport, particle tracking,
-and the statistics. The GPU is the primary target, so the time loop is in-place and allocation-free
-over preallocated buffers.
+and the statistics. The GPU is the primary target, so each time step is in-place and allocation-free
+over preallocated buffers (occasional diagnostics allocate per call).
 
 ## Installation
 
@@ -49,7 +49,7 @@ and the passive scalar ``\varphi`` by the advection–diffusion equation
 with ``\mathrm{Sc}`` the Schmidt number and ``f_\varphi`` a forcing on the scalar. In both
 equations the diffusive (stiff) term is integrated exactly through an integrating factor, the
 nonlinear term explicitly by a Runge–Kutta stage combination, and the quadratic product is
-de-aliased by the default ``2/3`` rule (other strategies are available).
+dealiased by the default ``2/3`` rule (other strategies are available).
 
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
@@ -57,11 +57,12 @@ de-aliased by the default ``2/3`` rule (other strategies are available).
     [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `BandRescaling`, `Linear`, and
     `ConstantPower`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
-    are scaffolded; the Eulerian and Lagrangian statistics are being added.
+    provide usable model spectra, structure-function laws, and scaling constants; the Eulerian and
+    Lagrangian statistics are being added.
 
 ## Components
 
-- [`SimulationDomain`](api/SimulationDomain.md): the discretised periodic box a run lives on — the
+- [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.

@@ -18,8 +18,8 @@ The measured functions of the flow state:
   length scale derived from it.
 
 Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
-distribution over wavenumber); none de-aliases first — a reduction is Parseval-exact and the run keeps
-the field de-aliased, so a reduction in physical representation is exact too.
+distribution over wavenumber); none dealiases first — a reduction is Parseval-exact and the run keeps
+the field dealiased, so a reduction in physical representation is exact too.
 """
 module Observables
 
@@ -57,9 +57,9 @@ dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
 """
     max_speed(u)
 
-The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert`` — an allocation-free
-reduction used to set the advective CFL timestep. It differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``
-by at most ``\\sqrt{3}``, well inside the CFL margin.
+The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
+in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
+differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert`` by at most ``\\sqrt{3}``, well inside the CFL margin.
 """
 max_speed(u) = maximum(abs, field_data(u))
 
@@ -75,11 +75,11 @@ scalar_variance(φ) = inner(φ, φ)
 
 
 """
-    scalar_dissipation(φ, domain, diffusivity)
+    scalar_dissipation(φ̂, domain, diffusivity)
 
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-`φ` ``\\varphi`` (in spectral representation), the [`FixedDomain`](@ref) bundle `domain`, and the
+in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
@@ -87,8 +87,8 @@ against the squared-wavenumber multiplier `domain.squared_wavenumber_kernel` —
 coefficients, with no physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's
 cached ``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
 """
-scalar_dissipation(φ, domain::FixedDomain, diffusivity::Real) =
-  2 * diffusivity * weighted_inner(φ, domain.squared_wavenumber_kernel)
+scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
+  2 * diffusivity * weighted_inner(φ̂, domain.squared_wavenumber_kernel)
 
 
 # The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal

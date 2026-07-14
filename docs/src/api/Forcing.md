@@ -21,7 +21,7 @@ ConstantPower
 
 ## Deferred forcing
 
-The operator-free deferred form a strategy's constructor returns, materialised into a concrete forcing
+The operator-free deferred form a strategy's constructor returns, materialized into a concrete forcing
 once the domain exists.
 
 ```@docs

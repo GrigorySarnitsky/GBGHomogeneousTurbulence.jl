@@ -10,7 +10,7 @@
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
-# only marginally stable for advection (see its docstring). Each `step!` assumes the caller has
+# imaginary-axis unstable for advection (see its docstring). Each `step!` assumes the caller has
 # filled `buffers.velocity_physical` / `buffers.vorticity_start` with the start-of-step physical velocity and vorticity.
 
 """
@@ -63,7 +63,7 @@ struct ScalarBuffers{SS, SP, RK}
 end
 
 
-# Phase-shift de-aliasing scratch + the two translation kernels (present only when `dealiasing isa
+# Phase-shift dealiasing scratch + the two translation kernels (present only when `dealiasing isa
 # PhaseShift`). The kernels are built once from the half-cell displacement; the scalar fields are
 # `nothing` for a velocity-only run.
 struct PhaseShiftBuffers{K, VS, VP, SS, SP}
@@ -169,10 +169,11 @@ end
 """
     allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
 
-Allocate the [`IntegratorBuffers`](@ref) a step needs, dispatching on the concrete `integrator` so each
-scheme allocates exactly its working set (currently the same for every scheme). The run layer calls this
-when assembling a `Simulation`; to build buffers directly, use the `IntegratorBuffers(domain; scalar)`
-constructor.
+Allocate the [`IntegratorBuffers`](@ref) a step needs, dispatching on the concrete `integrator` so a
+scheme may size its own scratch. Currently every scheme shares one working set, sized for all of them —
+an `IFLowStorageRK3` run still carries the spectral predictor register only `IFRK2` writes. The run layer
+calls this when assembling a `Simulation`; to build buffers directly, use the
+`IntegratorBuffers(domain; scalar)` constructor.
 """
 allocate_buffers(::AbstractIntegrator, domain::FixedDomain; scalar::Bool = false) =
   IntegratorBuffers(domain; scalar)
@@ -197,7 +198,7 @@ function step! end
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` built by [`integrating_factor!`](@ref) over a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar)
-and ``\\widehat{\\boldsymbol{N}}`` the de-aliased nonlinearity of each field, the step carries a state
+and ``\\widehat{\\boldsymbol{N}}`` the dealiased nonlinearity of each field, the step carries a state
 ``\\hat q`` and a single accumulator
 ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
@@ -293,7 +294,7 @@ end
 Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
 factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the diffusive kernel of
 [`integrating_factor!`](@ref) at ``D = \\nu`` and ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
-``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's de-aliased nonlinearity, one step of a
+``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's dealiased nonlinearity, one step of a
 field ``\\hat q`` with
 integrating factor ``\\mathcal{E}`` is
 
@@ -397,7 +398,7 @@ end
 A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 ``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
 
-The advective eigenvalues of the de-aliased system are imaginary, of magnitude up to
+The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\max\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
 scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The one-argument form returns the value
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
@@ -405,7 +406,7 @@ calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2
 conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), so a small ``0.25``.
 
-The two-argument form scales that ceiling by the domain's de-aliasing: a strategy that keeps modes
+The two-argument form scales that ceiling by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
 proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses.
 Override either for a specific run.
@@ -414,7 +415,7 @@ recommended_cfl(::AbstractIntegrator) = 0.3
 recommended_cfl(::IFRK2) = 0.25
 recommended_cfl(::IFLowStorageRK3) = 0.5
 
-# Scale the base (2/3-calibrated) ceiling by the active de-aliasing: factor = (2/3)/f, f the retained
+# Scale the base (2/3-calibrated) ceiling by the active dealiasing: factor = (2/3)/f, f the retained
 # Nyquist fraction (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
 recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
   recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)

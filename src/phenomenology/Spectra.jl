@@ -18,6 +18,11 @@ dissipation-range roll-off, each swappable.
   [`ModelSpectrum`](@ref).
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
+
+The velocity-spectrum presets `Pope2000` / `VonKarman1948` / `Pao1965` are factory *functions* that
+assemble and return a composed `ModelSpectrum`, whereas the scalar preset `ObukhovCorrsin1949` — like the
+structure-function and scaling laws — is a concrete *type* with a keyword constructor; both are invoked
+identically as `Name(; …)`.
 """
 module Spectra
 
@@ -205,15 +210,15 @@ dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 The composed model energy spectrum
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L)\\,f_\\eta(\\kappa\\eta),
+E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L_{11})\\,f_\\eta(\\kappa\\eta),
 ```
 
 an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-off `large_scale` (a
 [`LargeScaleFactor`](@ref), giving ``f_L``) and a dissipation-range roll-off `dissipation` (a
 [`DissipationFactor`](@ref), giving ``f_\\eta``); `ref` is its [`Reference`](@ref). Build one directly to
 mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
-[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and ``L`` from `fp` and forms
-``\\eta`` with [`kolmogorov_length`](@ref).
+[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the integral scale ``L_{11}`` from
+`fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).
 
 This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000; Meyers &
 Meneveau 2008); the large-scale roll-off sets the low-wavenumber slope
@@ -244,7 +249,7 @@ The Pope (2000) model spectrum — a preset [`ModelSpectrum`](@ref) with [`PopeL
 [`PopeDissipation`](@ref) roll-offs:
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L)\\,f_\\eta(\\kappa\\eta).
+E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L_{11})\\,f_\\eta(\\kappa\\eta).
 ```
 
 `C_K` is the Kolmogorov constant; the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number
@@ -265,7 +270,7 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 
 ```math
 E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}
-             \\left(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6},
+             \\left(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\right)^{17/6},
 ```
 
 the classic interpolation between the ``\\kappa^4`` energy-containing range and the ``\\kappa^{-5/3}``
@@ -320,8 +325,9 @@ E_\\varphi(\\kappa) = C_{OC}\\,\\varepsilon_\\varphi\\,\\varepsilon^{-1/3}\\,\\k
 
 the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
 inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
-constant (``\\approx 0.67`` for the three-dimensional spectrum). [`spectrum`](@ref) reads the scalar
-dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
+constant (``\\approx 0.67`` for the three-dimensional spectrum). The name is a dual eponym — Obukhov
+(1949) and Corrsin (independently, 1951); the `1949` handle is Obukhov's year. [`spectrum`](@ref) reads
+the scalar dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
 kinetic-energy dissipation ``\\varepsilon`` from `fp`.
 """
 struct ObukhovCorrsin1949 <: ScalarSpectrum

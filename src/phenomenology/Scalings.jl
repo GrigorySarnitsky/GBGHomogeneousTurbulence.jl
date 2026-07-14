@@ -106,21 +106,22 @@ const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB);
 The box-normalized dissipation group
 
 ```math
-\\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
+G = \\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
 ```
 
 relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the dissipation
-rate ``\\varepsilon`` — nearly Reynolds-number-independent across the JHTDB isotropic datasets
-(``\\mathrm{Re}_\\lambda \\approx 400\\text{–}2500``) and comparable box DNS. It is the dissipation
-anomaly / normalized-dissipation law ``C_\\varepsilon = \\varepsilon L/u'^3`` (Taylor 1935; Sreenivasan
-1998; Kaneda et al. 2003 for the periodic box) written with the **box side** in place of the integral
-scale, which folds the setup-dependent integral-scale-to-box ratio into the constant (``\\approx 0.5``
-becomes ``\\approx 0.9``).
+rate ``\\varepsilon`` — nearly Reynolds-number-independent from the JHTDB forced-isotropic dataset
+(``\\mathrm{Re}_\\lambda \\approx 433``) up to comparable higher-Reynolds-number periodic-box DNS
+(Kaneda et al., ``\\mathrm{Re}_\\lambda`` to ``\\approx 2300``). It is a distinct group from the classical
+dissipation anomaly ``C_\\varepsilon = \\varepsilon L/u'^3`` (Taylor 1935; Sreenivasan 1998; Kaneda et al.
+2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is measured
+on the integral scale; at a common length the two are exactly related by
+``G = \\tfrac{3}{2}\\,C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``).
 
 The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
-inverted, [`stationary_dissipation`](@ref)`(law, k, L)` predicts the dissipation a stationary run of
-energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the run layer uses to
-set the viscosity from the grid and target energy.
+inverted, [`stationary_dissipation`](@ref)`(law, energy, side_length)` predicts the dissipation a
+stationary run of energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the
+run layer uses to set the viscosity from the grid and target energy.
 """
 struct Li2008 <: ScalingLaw
   constant::Float64

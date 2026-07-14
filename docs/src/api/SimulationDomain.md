@@ -5,7 +5,7 @@ Modules = [GBGIsotropicTurbulence.SimulationDomain]
 Order   = [:module]
 ```
 
-## The discretised box
+## The discretized box
 
 The reusable, read-only frame every buffer is allocated from — the `FixedDomain`, a fixed, unsheared
 periodic cube (a sheared frame is deferred).
@@ -14,10 +14,10 @@ periodic cube (a sheared frame is deferred).
 FixedDomain
 ```
 
-## De-aliasing strategies
+## Dealiasing strategies
 
-The aliasing-control strategy passed to `FixedDomain` — the supertype, then the sharp 2/3-rule default
-and the smooth Hou–Li filter.
+The aliasing-control strategy passed to `FixedDomain` — the supertype, then the sharp ``2/3``-rule
+default, the smooth Hou–Li filter, and `PhaseShift`.
 
 ```@docs
 DealiasingStrategy
@@ -26,7 +26,7 @@ HouLi
 PhaseShift
 ```
 
-The de-aliasing cutoff it sets — the highest wavenumber the domain evolves, and the resolution
+The dealiasing cutoff it sets — the highest wavenumber the domain evolves, and the resolution
 criterion ``\kappa_{\max}\eta`` a run is built to meet.
 
 ```@docs
@@ -47,9 +47,9 @@ tensor_spectral
 tensor_physical
 ```
 
-## De-alias filtering
+## Dealias filtering
 
-Apply the domain's de-alias low-pass kernel to a spectral field in place.
+Apply the domain's dealias low-pass kernel to a spectral field in place.
 
 ```@docs
 dealias!

@@ -27,7 +27,7 @@ scalar_to_physical!
 
 ## Nonlinear-term assembly
 
-The de-aliased, Leray-projected rotational-form momentum term, and the conservative scalar-advection
+The dealiased, Leray-projected rotational-form momentum term, and the conservative scalar-advection
 term.
 
 ```@docs

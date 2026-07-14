@@ -35,10 +35,15 @@ export Tracers, advect!, sample!,
 
 A set of Lagrangian tracers. The first form seeds `count` tracers uniformly at random in the periodic
 box of `domain` (on the domain's backend and element type); the second wraps a given `(M, 3)` position
-array. The `scheme` is the `GBGPeriodicFields` interpolation scheme used to evaluate the velocity (and
-any sampled field) at the tracer positions — `CatmullRom` (the default), `LalescuSpline(n, m)`, or
-`LagrangeSpline(n)`. The `rng` (first form only) is the random stream seeding the uniformly-random
-tracer positions; it defaults to `Random.default_rng()`.
+array. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to evaluate the velocity
+(and any sampled field) at the tracer positions.
+[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` default;
+[`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
+[`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
+smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
+acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and smoothness parameters.
+The `rng` (first form only) is the random stream seeding the uniformly-random tracer positions; it
+defaults to `Random.default_rng()`.
 
 Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
 [`ntracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
@@ -93,7 +98,7 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `domain` (a
 [`FixedDomain`](@ref)). This is second-order accurate in time. The start-of-step
 velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
-the Lagrangian statistics.
+the forthcoming Lagrangian statistics.
 """
 function advect!(tracers::Tracers, velocity_start, velocity_end, domain::FixedDomain, dt::Real)
   L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
@@ -118,7 +123,7 @@ Sample the physical `field` at the current tracer positions into the point-value
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
 for the scalar ``\\varphi``), using the
-tracers' interpolation scheme. Used to gather a field along the trajectories for the Lagrangian
+tracers' interpolation scheme. Used to gather a field along the trajectories for the forthcoming Lagrangian
 statistics.
 """
 function sample!(out, field, tracers::Tracers)

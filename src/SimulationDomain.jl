@@ -1,5 +1,5 @@
-# SimulationDomain — the discretised, periodic, cubic box a run lives on: the grid, the real–Fourier
-# layout, the transform plans, the spectral multipliers, the |k|² field, and the de-alias kernel.
+# SimulationDomain — the discretized, periodic, cubic box a run lives on: the grid, the real–Fourier
+# layout, the transform plans, the spectral multipliers, the |k|² field, and the dealias kernel.
 # Reusable and read-only; precision and backend enter here (scalar_type / array_type) and flow
 # everywhere from here. The concrete frame is `FixedDomain` (fixed, orthogonal, unsheared); a sheared
 # (Rogallo) frame is deferred (ARCHITECTURE §7). Field-sized allocators (spectral_vector, …) build
@@ -8,13 +8,13 @@
 """
     SimulationDomain
 
-The discretised periodic box a run lives on — the reusable, read-only frame:
+The discretized periodic box a run lives on — the reusable, read-only frame:
 - [`FixedDomain`](@ref) — the fixed, unsheared cubic box (grid, transform plans, spectral multipliers,
-  squared-wavenumber field, de-alias kernel).
+  squared-wavenumber field, dealias kernel).
 - [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref), [`HouLi`](@ref), or
   [`PhaseShift`](@ref), and the cutoff it sets, [`max_wavenumber`](@ref).
 - [`spectral_vector`](@ref), [`scalar_spectral`](@ref), … — the field-sized scratch allocators.
-- [`dealias!`](@ref) — apply the de-alias kernel to a field in spectral representation, in place.
+- [`dealias!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
 
 Precision and backend enter here and flow everywhere from here.
 """
@@ -27,7 +27,7 @@ export FixedDomain,
        tensor_spectral, tensor_physical,
        dealias!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift, max_wavenumber
 
-# ── De-aliasing strategies ────────────────────────────────────────────────────────────────────────
+# ── Dealiasing strategies ────────────────────────────────────────────────────────────────────────
 # How the aliasing of the quadratic nonlinearity is controlled. Each strategy builds the `domain.dealias`
 # kernel (applied by `dealias!`/`convolve!`) and declares the Nyquist fraction it keeps energetic,
 # which sets the advective-CFL ceiling (see `recommended_cfl`).
@@ -37,8 +37,9 @@ export FixedDomain,
 
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through `recommended_cfl`, the advective-CFL
-ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default) and
-[`HouLi`](@ref) (the smooth Hou–Li filter).
+ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default),
+[`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average with
+spherical ``2\\sqrt2/3`` truncation).
 """
 abstract type DealiasingStrategy end
 
@@ -48,7 +49,7 @@ abstract type DealiasingStrategy end
 The sharp isotropic ``2/3``-rule truncation: keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac23\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
-``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact de-aliasing
+``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
 of the quadratic nonlinearity, and the lean, GPU-friendly default.
 """
 struct TwoThirds <: DealiasingStrategy end
@@ -65,7 +66,7 @@ damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{str
 epsilon — ``\\approx 36`` for [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
 [`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps
 to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
-than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilisation,
+than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization,
 hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
 automatically by `recommended_cfl`.
@@ -80,12 +81,12 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift de-aliasing: assemble each quadratic nonlinear term on the grid **and** on a grid displaced
+Phase-shift dealiasing: assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt2}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
 average cancels the aliasing images that wrap in an odd number of axes; the spherical cutoff removes the
-surviving two-axis images. It de-aliases the quadratic **exactly** while keeping the resolved band out to
+surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
 ``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94\\,\\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt2``
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac23\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
 modes in the retained sphere).
@@ -102,12 +103,12 @@ term). Opt-in, not the default. Because it retains energy out to
     cutoff at ``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
 
-Phase-shift de-aliasing follows Patterson & Orszag (1971); the combination with spherical truncation is
+Phase-shift dealiasing follows Patterson & Orszag (1971); the combination with spherical truncation is
 Rogallo (1981).
 """
 struct PhaseShift <: DealiasingStrategy end
 
-# The fraction of the Nyquist wavenumber a strategy keeps energetic — sets κ_max for the advective CFL.
+# The fraction of the Nyquist wavenumber a strategy keeps energetic — sets κ_max for the advective-CFL.
 _retained_nyquist_fraction(::TwoThirds) = 2 // 3
 _retained_nyquist_fraction(::HouLi) = 1 // 1
 # Phase-shift keeps the spherical band to κ_max = √2·N/3·(2π/L) = (2√2/3)·κ_Ny (Rogallo).
@@ -118,14 +119,14 @@ _retained_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
     FixedDomain(grid_points_per_axis, side_length = 2π; dealiasing = TwoThirds(),
                       scalar_type = Float64, array_type = Array)
 
-The discretised periodic box a run lives on — the reusable, read-only frame: a cube of side length
+The discretized periodic box a run lives on — the reusable, read-only frame: a cube of side length
 `side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
 pseudospectral method needs on that box.
 
 # Arguments
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length = 2π` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
-- `dealiasing = TwoThirds()` — the de-aliasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule,
+- `dealiasing = TwoThirds()` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule,
   the default) and [`HouLi`](@ref) (the smooth Hou–Li filter) apply [`dealias!`](@ref) as a coefficientwise
   multiply, while [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller
   band at ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
@@ -146,7 +147,7 @@ pseudospectral method needs on that box.
 - `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
   spectral representation ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as
   a scalar-field kernel for weighted spectral reductions.
-- `dealias`, `dealiasing` — the de-alias kernel and the [`DealiasingStrategy`](@ref) that built it.
+- `dealias`, `dealiasing` — the dealias kernel and the [`DealiasingStrategy`](@ref) that built it.
 """
 struct FixedDomain{G, L, VP, SP, TP, M, K, SK, D, DS}
   grid::G
@@ -210,7 +211,7 @@ function _build_dealias(strategy::HouLi, reference, multipliers, squared_wavenum
 end
 
 
-# Internal: the array type and element types are read off the de-alias kernel's storage, so every
+# Internal: the array type and element types are read off the dealias kernel's storage, so every
 # scratch buffer lands on the same backend (CPU/GPU) — the GBGPeriodicFields `similar(field_data(ref), …)`
 # allocation discipline (its invariant 6).
 _reference(domain::FixedDomain) = field_data(domain.dealias)
@@ -222,7 +223,7 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 """
     max_wavenumber(domain)
 
-The highest wavenumber magnitude that `domain` actually evolves — the de-aliasing cutoff
+The highest wavenumber magnitude that `domain` actually evolves — the dealiasing cutoff
 
 ```math
 \\kappa_{\\max} = f\\,\\frac N2\\,\\frac{2\\pi}{L},
@@ -231,7 +232,7 @@ The highest wavenumber magnitude that `domain` actually evolves — the de-alias
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt2/3`` for `PhaseShift`).
 It is the cutoff the
-de-aliasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` itself; the modes above it are
+dealiasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` itself; the modes above it are
 zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
 ``\\kappa_{\\max}\\eta`` that a run is set up to meet.
 """
@@ -298,10 +299,11 @@ tensor_physical(domain::FixedDomain) =
 """
     dealias!(field, domain)
 
-Apply the run's de-alias low-pass `domain.dealias` to `field` in place — a coefficientwise multiply that
+Apply the run's dealias low-pass `domain.dealias` to `field` in place — a coefficientwise multiply that
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
-[`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact de-aliasing)
-or the smooth [`HouLi`](@ref) filter (which only damps the aliasing). The `field` may be a vector or
+[`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
+the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
+``2\\sqrt2/3\\,\\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation.
 """
 dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
