@@ -325,7 +325,7 @@ function advance!(sim::Simulation; dt = nothing)
   buffers = sim.buffers
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  step!(sim.integrator, sim.state.velocity, sim.state.scalar, sim.domain, buffers, sim.conditions, Δt)
+  step!(sim.integrator, sim.state, sim.domain, buffers, sim.conditions, Δt)
 
   # u(tₙ) is still cached (step! only reads it); save it, refresh to u(tₙ₊₁), then Heun-advect.
   sim.tracers === nothing || copyto!(field_data(sim.tracer_velocity), field_data(buffers.velocity_physical))

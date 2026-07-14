@@ -190,7 +190,7 @@ using Test
     for _ in 1:80
       velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
       vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, 0.012)
+      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, 0.012)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05

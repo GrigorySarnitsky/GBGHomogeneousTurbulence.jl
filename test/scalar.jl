@@ -20,7 +20,7 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   for _ in 1:nsteps
     velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
     vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
+    step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
   end
   return û, φ̂
 end

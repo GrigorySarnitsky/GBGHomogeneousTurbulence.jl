@@ -34,6 +34,7 @@ using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction, PhaseShift,
 using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
                   scalar_to_physical!, scalar_nonlinear!, FlowConditions
 using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
+using ..State: ResolvedFields
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
        recommended_cfl
@@ -43,8 +44,9 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, û, φ̂, domain, buffers, conditions, dt)`, advancing the velocity `û` and the
-scalar `φ̂` (both in spectral representation) by one timestep in place, and may specialize
+[`step!`](@ref)`(integrator, state, domain, buffers, conditions, dt)`, advancing the `state`'s velocity
+``\\hat{\\boldsymbol u}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one timestep in
+place, and may specialize
 [`recommended_cfl`](@ref).
 """
 abstract type AbstractIntegrator end
@@ -180,12 +182,13 @@ allocate_buffers(::AbstractIntegrator, domain::FixedDomain; scalar::Bool = false
 
 
 """
-    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
+    step!(integrator, state, domain, buffers, conditions, dt)
 
-Advance the velocity `û` and passive scalar `φ̂` (in spectral representation) by one timestep `dt` in
-place, using the `integrator`, `domain`, `buffers`, and the problem `conditions` (a
-[`FlowConditions`](@ref)). Dispatches on the concrete `integrator` type (see `IFRK2`,
-`IFLowStorageRK3`). The caller must have filled `buffers.velocity_physical` and `buffers.vorticity_start`
+Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
+``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`,
+`domain`, `buffers`, and the problem `conditions` (a [`FlowConditions`](@ref)). Dispatches on the concrete
+`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled
+`buffers.velocity_physical` and `buffers.vorticity_start`
 with the start-of-step velocity and vorticity in physical representation (via
 [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)).
 """
@@ -220,8 +223,9 @@ third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFR
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
-function step!(::IFLowStorageRK3, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffers,
+function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
                conditions::FlowConditions, dt::Real)
+  û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   a = (zero(T), T(-5 // 9), T(-153 // 128))
@@ -320,8 +324,9 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
 struct IFRK2 <: AbstractIntegrator end
 
 
-function step!(::IFRK2, û, φ̂, domain::FixedDomain, buffers::IntegratorBuffers,
+function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
                conditions::FlowConditions, dt::Real)
+  û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   half = dt_T / 2

@@ -107,7 +107,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
       dt = 0.4 * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
       copyto!(field_data(u_start), field_data(buffers.velocity_physical))           # u(tₙ)
-      step!(IFLowStorageRK3(), û, φ̂, domain, buffers, conditions, dt)
+      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
       u_end = to_physical(û, domain.velocity_plans)                     # u(tₙ₊₁)
       advect!(tracers, u_start, u_end, domain, dt)
     end

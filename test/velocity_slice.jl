@@ -35,7 +35,7 @@ using Test
     vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
     dt = cfl * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
     push!(energies, kinetic_energy(buffers.velocity_physical))
-    step!(integrator, û, φ̂, domain, buffers, conditions, dt)
+    step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
   end
 
   @test all(isfinite, energies)
@@ -54,8 +54,8 @@ using Test
   velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
   vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
   dt = cfl * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
-  step!(integrator, û, φ̂, domain, buffers, conditions, dt)                            # warm up
-  step_bytes = @allocated step!(integrator, û, φ̂, domain, buffers, conditions, dt)
+  step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)                            # warm up
+  step_bytes = @allocated step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes < field_bytes
 end
