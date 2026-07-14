@@ -69,7 +69,7 @@ to that precision's machine epsilon; pass an explicit `strength` to override. It
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization,
 hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
-automatically by `recommended_cfl`.
+automatically by `recommended_cfl`. The smooth spectral filter is due to Hou & Li (2007).
 """
 struct HouLi <: DealiasingStrategy
   order::Int

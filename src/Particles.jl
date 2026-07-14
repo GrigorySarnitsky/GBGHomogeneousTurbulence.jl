@@ -50,6 +50,14 @@ defaults to `Random.default_rng()`.
 Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
 [`ntracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
 [`advect!`](@ref) allocates no per-step memory.
+
+# Fields
+- `positions` — the `(M, 3)` tracer positions (read with [`tracer_positions`](@ref)).
+- `predictor` — `(M, 3)` scratch for the Heun predictor.
+- `position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation.
+- `velocity1`, `velocity2` — the interpolated velocities at the start-of-step and predictor positions;
+  `velocity1` is the retained trajectory velocity (read with [`tracer_velocities`](@ref)).
+- `scheme` — the velocity-interpolation scheme.
 """
 struct Tracers{P, PSX, PSP, VV, S}
   positions::P              # (M, 3)

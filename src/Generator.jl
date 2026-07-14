@@ -51,6 +51,10 @@ scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and 
 
 Every argument is explicit — `FlowConditions` carries no defaults; the `Simulation` front door supplies
 the run-layer values (`schmidt = 1.0`, both forcings `NoForcing()`).
+
+# Fields
+- `viscosity`, `schmidt` — the kinematic viscosity ``\\nu`` and the Schmidt number ``\\mathrm{Sc}`` (both `Float64`).
+- `velocity_forcing`, `scalar_forcing` — the velocity and scalar forcing strategies, each an `AbstractForcing`.
 """
 struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   viscosity::Float64
