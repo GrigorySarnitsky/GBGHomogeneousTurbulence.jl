@@ -85,9 +85,9 @@ end
   @test isapprox(dissipation_factor(PaoDissipation(1.5), 1e-6), 1.0; atol = 1e-3)
   @test large_scale_factor(UnitLargeScale(), 3.0) == 1.0
   # closure-predicted exponential cutoff: f_η → 1 in the inertial range, decays with κη
-  @test isapprox(dissipation_factor(ExponentialDissipation(0.6), 1e-8), 1.0; atol = 1e-6)
-  @test dissipation_factor(ExponentialDissipation(0.6), 5.0) <
-        dissipation_factor(ExponentialDissipation(0.6), 1.0)
+  @test isapprox(dissipation_factor(ExponentialDissipation(6.7), 1e-8), 1.0; atol = 1e-6)
+  @test dissipation_factor(ExponentialDissipation(6.7), 5.0) <
+        dissipation_factor(ExponentialDissipation(6.7), 1.0)
   @test isapprox(dissipation_factor(SaffmanDissipation(), 1e-6), 1.0; atol = 1e-6)   # Gaussian cutoff → 1
   @test dissipation_factor(SaffmanDissipation(), 2.0) < dissipation_factor(SaffmanDissipation(), 1.0)
 end
@@ -113,7 +113,7 @@ end
   # every roll-off factor tends to 1 in the inertial range
   @test large_scale_factor(PopeLargeScale(6.78, 2.0), 1e8) ≈ 1.0 atol = 1e-4
   @test large_scale_factor(VonKarmanLarge(1.0), 1e8) ≈ 1.0 atol = 1e-4
-  for d in (PopeDissipation(0.4, 5.2), PaoDissipation(1.5), ExponentialDissipation(0.6), SaffmanDissipation())
+  for d in (PopeDissipation(0.4, 5.2), PaoDissipation(1.5), ExponentialDissipation(6.7), SaffmanDissipation())
     @test dissipation_factor(d, 1e-8) ≈ 1.0 atol = 1e-6
   end
 

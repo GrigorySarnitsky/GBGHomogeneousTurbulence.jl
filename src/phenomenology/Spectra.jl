@@ -182,9 +182,12 @@ dissipation_factor(f::PaoDissipation, κη) = exp(-1.5 * f.α * κη^(4//3))
 
 The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta\\,\\kappa\\eta)``
 — the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
-spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). `β` is
-fit-dependent — of order `0.6` in high-Reynolds-number DNS (Ishihara et al. 2005) — and the factor
-tends to `1` in the inertial range (``\\kappa\\eta \\to 0``).
+spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). It is the
+*far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
+``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018; consistent with Chen et al. 1993,
+``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``). The
+near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara et al.
+2005), a different form this factor does not model.
 """
 struct ExponentialDissipation <: DissipationFactor
   β::Float64
@@ -196,8 +199,10 @@ dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
 """
     SaffmanDissipation()
 
-Saffman's Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)``
-(Saffman 1963) — a simple, parameter-free cutoff that tends to `1` in the inertial range.
+A Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)`` — a simple,
+parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman (1963,
+appendix; about half the earlier Townsend 1951a spectrum), whose coefficient is skewness-dependent
+(about 2.6 to 3.3) and is rounded here to `2` for a parameter-free factor.
 """
 struct SaffmanDissipation <: DissipationFactor end
 
