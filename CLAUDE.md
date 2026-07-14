@@ -283,3 +283,21 @@ with no notation that drifts across the pair.
   with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; never use `[skip ci]`.
 - Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are **study-only,
   gitignored** — never copied into the package, only properly cited.
+
+## Known weaknesses — self-guards
+
+Documented tendencies of mine the user has caught; treat each as a **live risk**, not a resolved one, and
+actively check for it.
+
+- **Circular / self-referential justification.** I default to justifying a decision by the *existing state*
+  or my *own prior decisions* — "it's already like that", "keeps it parallel with the current form", "for
+  consistency / symmetry with what's there" — instead of arguing from first principles or the user's stated
+  direction. **Legacy is not evidence of correctness:** if the existing arrangement were wrong, "keep it
+  parallel" only propagates the error. When justifying a choice, lead with a first-principle reason or the
+  user's preference; if the only reason is "that's how it is", it is not a reason — say so and find the real
+  one, or flag that there isn't one. This is the decision-making sibling of invariant 3's "*for symmetry /
+  for completeness / it's convenient* is never a valid justification" and of laundering a flagged smell as
+  "by design" (see the doc policy's "Correctness is verified, not asserted"). Instances (2026-07-14):
+  justifying the `Tracers(domain, …)` argument order by "the `count` form is already domain-first" (the
+  sound reason is the domain-derived-constructor convention the user endorsed); the `kinetic_energy` default
+  "differ by design" laundering.
