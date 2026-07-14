@@ -140,9 +140,10 @@ the run-layer defaults (`side_length = 2π`, `dealiasing = TwoThirds()`, `elemen
 
 # Fields
 - `grid`, `layout` — the [`Grid3D`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.Grid3D) and its
-  real–Fourier memory layout.
-- `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex transform plans, one per field
-  rank: the velocity (a vector field), the scalar (a scalar field), and the rank-2 strain tensor the
+  [`RealFourierLayout`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.RealFourierLayout) memory layout.
+- `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex
+  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans), one per
+  field rank: the velocity (a vector field), the scalar (a scalar field), and the rank-2 strain tensor the
   derivative-skewness diagnostic needs.
 - `multipliers` — the
   [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers),

@@ -119,10 +119,11 @@ becomes
 
 The term computed is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref). A **mask** strategy ([`TwoThirds`](@ref),
-[`HouLi`](@ref)) forms it once from `u`, `ω` and multiplies by the low-pass `domain.dealias` (`û` and
-`phase_shift` are unused). [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
-recovered on a grid displaced by half a cell (using `û` and the `phase_shift` translation kernels and
-scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
+[`HouLi`](@ref)) forms it once from `u`, `ω` and multiplies by the low-pass `domain.dealias`, leaving `û`
+and `phase_shift` unused — pass `nothing` for `phase_shift` there. [`PhaseShift`](@ref) forms it **twice** —
+from `u`, `ω`, and from the fields recovered on a grid displaced by half a cell (using `û` and the
+`phase_shift` scratch, the run's `buffers.phase_shift`, built only for a `PhaseShift` domain) — averages
+the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
 
 The Lamb vector is held in `product_physical` (a vector field in physical representation) and its
 transform in `product_spectral`; the displaced evaluation reuses these and the `phase_shift` buffers, so

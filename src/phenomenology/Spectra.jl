@@ -227,8 +227,9 @@ mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
 
 This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000; Meyers &
 Meneveau 2008); the large-scale roll-off sets the low-wavenumber slope
-``E(\\kappa\\to 0)\\propto\\kappa^\\sigma`` — ``\\sigma = 2`` (Saffman-type, the [`PopeLargeScale`](@ref)
-default) or ``\\sigma = 4`` (Batchelor-type, [`VonKarmanLarge`](@ref)).
+``E(\\kappa\\to 0)\\propto\\kappa^\\sigma`` — ``\\sigma = 2`` (the Saffman-type ``\\kappa^{2}`` low-wavenumber
+spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelor-type ``\\kappa^{4}``,
+[`VonKarmanLarge`](@ref)).
 """
 struct ModelSpectrum{L<:LargeScaleFactor, D<:DissipationFactor} <: EnergySpectrum
   C_K::Float64

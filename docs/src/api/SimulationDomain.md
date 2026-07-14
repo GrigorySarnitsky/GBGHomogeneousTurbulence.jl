@@ -17,7 +17,7 @@ FixedDomain
 ## Dealiasing strategies
 
 The aliasing-control strategy passed to `FixedDomain` — the supertype, then the sharp ``2/3``-rule
-default, the smooth Hou–Li filter, and `PhaseShift`.
+default, the smooth Hou–Li filter, and the exact half-cell phase-shift with spherical truncation.
 
 ```@docs
 DealiasingStrategy

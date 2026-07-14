@@ -18,8 +18,12 @@ The measured functions of the flow state:
   length scale derived from it.
 
 Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
-distribution over wavenumber); none dealiases first — a reduction is Parseval-exact and the run keeps
-the field dealiased, so a reduction in physical representation is exact too.
+distribution over wavenumber); none dealiases first. The **quadratic** reductions (`kinetic_energy`,
+`dissipation`, `scalar_variance`, `scalar_dissipation`) are Parseval-exact — a quadratic of a
+``2/3``-truncated field stays below the aliasing threshold, so the reduction is exact in either
+representation. The **cubic** `derivative_skewness` is not: its grid mean folds a small residual from the
+truncation edge back into the mean, so it carries a slight aliasing on a ``2/3`` field (negligible when
+well-resolved; exact cubic dealiasing would need the ``1/2`` rule).
 """
 module Observables
 
@@ -124,9 +128,12 @@ From the velocity field `û` in spectral representation, the strain is formed di
 (skipping the full nine-component velocity gradient), carried to physical space by its rank-2 tensor
 transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
 ``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`); `domain` also sizes the per-call tensor and scalar scratch.
+Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
+residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
+quadratic reductions, not exactly alias-free.
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
-(all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (Kolmogorov)
-— the enstrophy-production / vortex-stretching signature. Its plateau is the strict "real turbulence yet"
+(all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an
+empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the strict "real turbulence yet"
 gate of the warm-up detector.
 """
 function derivative_skewness(û, domain::FixedDomain)
@@ -173,6 +180,17 @@ L_{11} = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
 small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+
+For reference, two related scales follow from the same spectrum. The **transverse** integral scale is
+``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full trace**
+velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\hat{\\boldsymbol{e}})\\rangle`` — with no directional projection — is
+
+```math
+L_E = \\frac{\\pi}{2}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}
+    = \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}\\big(L_{11} + 2L_{22}\\big),
+```
+
+the isotropic average of the one longitudinal and two transverse contributions.
 """
 function integral_scale(û, domain::FixedDomain)
   κ, E = energy_spectrum(û, domain)
