@@ -42,13 +42,15 @@ export velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integ
 
 
 """
-    FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(),
-                   scalar_forcing = NoForcing())
+    FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
 
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
 the Reynolds number is ``\\mathrm{Re} = 1/\\nu``), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both `AbstractForcing`). Consumed by the time step (`step!`).
+
+Every argument is explicit — `FlowConditions` carries no defaults; the `Simulation` front door supplies
+the run-layer values (`schmidt = 1.0`, both forcings `NoForcing()`).
 """
 struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   viscosity::Float64
@@ -57,7 +59,7 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   scalar_forcing::SF
 end
 
-FlowConditions(; viscosity, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing()) =
+FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
   FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
 

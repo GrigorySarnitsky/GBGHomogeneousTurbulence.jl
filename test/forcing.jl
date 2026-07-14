@@ -16,7 +16,7 @@ using Test
   N = 24
   L = 2π
   ν = 0.05
-  domain = FixedDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
   buffers = IntegratorBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
@@ -57,9 +57,9 @@ using Test
   end
 
   @testset "Linear injects energy, stays solenoidal" begin
-    unforced = run_velocity(FlowConditions(viscosity = ν), 60)
+    unforced = run_velocity(FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing()), 60)
     forced = run_velocity(FlowConditions(viscosity = ν,
-                                  velocity_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2)), 60)
+                                  velocity_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing()), 60)
     @test kinetic_energy(forced) > kinetic_energy(unforced)
     rel_div = l2norm(divergence(forced, domain.multipliers)) / (l2norm(forced) + 1e-30)
     @test rel_div < 1e-8
@@ -67,7 +67,7 @@ using Test
 
   @testset "ConstantPower bounded and solenoidal" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = ConstantPower(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = ConstantPower(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = run_velocity(conditions, 100)
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
@@ -79,7 +79,7 @@ using Test
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
     conditions = FlowConditions(viscosity = ν,
-                      scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2))
+                      scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, velocity_forcing = NoForcing())
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     for _ in 1:40
       velocity_to_physical!(buffers.velocity_physical, û_zero, domain, buffers.velocity_copy)
@@ -117,7 +117,7 @@ using Test
 
   @testset "StochasticOU sustains velocity energy" begin
     ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
-    conditions = FlowConditions(viscosity = ν, velocity_forcing = ou)
+    conditions = FlowConditions(viscosity = ν, velocity_forcing = ou, schmidt = 1.0, scalar_forcing = NoForcing())
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     dealias!(û, domain)

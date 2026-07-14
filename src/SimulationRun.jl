@@ -52,7 +52,7 @@ end
 
 """
     Simulation(; grid_points_per_axis, k_max_η = 2, kinetic_energy = 1.5,
-                 side_length = 2π, scalar_type = Float64, array_type = Array,
+                 side_length = 2π, element_type = Float64, array_type = Array,
                  dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
@@ -94,13 +94,13 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
 - `domain` — a pre-built [`FixedDomain`](@ref), the positional argument of the second form (the front
-  door builds one from `grid_points_per_axis`, `side_length`, `dealiasing`, `scalar_type`, `array_type`).
+  door builds one from `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
   keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
-- `scalar_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
+- `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
@@ -198,9 +198,9 @@ function Simulation(domain::FixedDomain;
 end
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
-                    scalar_type::Type = Float64, array_type = Array,
+                    element_type::Type = Float64, array_type = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
-  return Simulation(FixedDomain(grid_points_per_axis, side_length; dealiasing, scalar_type, array_type); kwargs...)
+  return Simulation(FixedDomain(grid_points_per_axis, side_length; dealiasing, element_type, array_type); kwargs...)
 end
 
 

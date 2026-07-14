@@ -17,12 +17,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   T = Float64
   N = 16
   L = 2π
-  domain = FixedDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
   uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "uniform field advects exactly" begin
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0; 2.0 3.0 4.0]
-    tracers = Tracers(copy(X0); scheme = CatmullRom)
+    tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
     c = 0.5
     set_uniform_x!(uniform, c)
     nsteps, dt = 20, 0.005
@@ -42,7 +42,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     exact_x = X0[1, 1] + sin(ω * Tfinal) / ω                  # ∫₀ᵀ cos(ωt) dt
 
     final_x(nsteps) = begin
-      tracers = Tracers(copy(X0); scheme = CatmullRom)
+      tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
       u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       dt = Tfinal / nsteps
@@ -61,7 +61,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "positions wrap into [0, L)" begin
     X0 = T[6.2 6.2 6.2]                                        # near the upper boundary (L = 2π ≈ 6.283)
-    tracers = Tracers(copy(X0); scheme = CatmullRom)
+    tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
       advect!(tracers, uniform, uniform, domain, 0.02)
@@ -93,7 +93,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "advect in a real HIT velocity field" begin
     buffers = IntegratorBuffers(domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.05,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)

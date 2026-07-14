@@ -30,14 +30,16 @@ export Tracers, advect!, sample!,
 
 
 """
-    Tracers(domain, count; scheme = CatmullRom, rng = default_rng())
-    Tracers(positions; scheme = CatmullRom)
+    Tracers(domain, count; scheme, rng = default_rng())
+    Tracers(domain, positions; scheme)
 
-A set of Lagrangian tracers. The first form seeds `count` tracers uniformly at random in the periodic
-box of `domain` (on the domain's backend and element type); the second wraps a given `(M, 3)` position
-array. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to evaluate the velocity
-(and any sampled field) at the tracer positions.
-[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` default;
+A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `count`
+tracers uniformly at random in the periodic box of `domain`; the second wraps a given `(M, 3)` array of
+`M` tracer positions (the three columns are the ``x, y, z`` components), converting it to `domain`'s
+backend and element type. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
+evaluate the velocity (and any sampled field) at the tracer positions.
+[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
+(the `Simulation` front door's default `tracer_scheme`);
 [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
 [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
 smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
@@ -60,21 +62,24 @@ struct Tracers{P, PSX, PSP, VV, S}
 end
 
 
-function Tracers(positions::AbstractMatrix; scheme = CatmullRom)
+function Tracers(domain::FixedDomain, positions::AbstractMatrix; scheme)
   size(positions, 2) == 3 || throw(DimensionMismatch("tracer positions must have shape (M, 3); got $(size(positions))"))
-  predictor = similar(positions)
-  return Tracers(positions, predictor,
-                 PointSet(positions), PointSet(predictor),
-                 VectorPointValues(similar(positions)), VectorPointValues(similar(positions)),
+  T = real(eltype(field_data(domain.dealias)))
+  pos = similar(domain.squared_wavenumber, T, size(positions))     # the domain's backend + element type
+  copyto!(pos, positions)
+  predictor = similar(pos)
+  return Tracers(pos, predictor,
+                 PointSet(pos), PointSet(predictor),
+                 VectorPointValues(similar(pos)), VectorPointValues(similar(pos)),
                  scheme)
 end
 
-function Tracers(domain::FixedDomain, count::Integer; scheme = CatmullRom, rng = Random.default_rng())
+function Tracers(domain::FixedDomain, count::Integer; scheme, rng = Random.default_rng())
   T = real(eltype(field_data(domain.dealias)))
   L = T(domain.grid.domain_size[1])
   positions = similar(domain.squared_wavenumber, T, (Int(count), 3))
   copyto!(positions, L .* rand(rng, T, Int(count), 3))
-  return Tracers(positions; scheme)
+  return Tracers(domain, positions; scheme)
 end
 
 

@@ -1,6 +1,6 @@
 # SimulationDomain — the discretized, periodic, cubic box a run lives on: the grid, the real–Fourier
 # layout, the transform plans, the spectral multipliers, the |k|² field, and the dealias kernel.
-# Reusable and read-only; precision and backend enter here (scalar_type / array_type) and flow
+# Reusable and read-only; precision and backend enter here (element_type / array_type) and flow
 # everywhere from here. The concrete frame is `FixedDomain` (fixed, orthogonal, unsheared); a sheared
 # (Rogallo) frame is deferred (ARCHITECTURE §7). Field-sized allocators (spectral_vector, …) build
 # scratch fields sized to the domain.
@@ -116,23 +116,26 @@ _retained_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
 
 
 """
-    FixedDomain(grid_points_per_axis, side_length = 2π; dealiasing = TwoThirds(),
-                      scalar_type = Float64, array_type = Array)
+    FixedDomain(grid_points_per_axis, side_length;
+                dealiasing, element_type, array_type)
 
 The discretized periodic box a run lives on — the reusable, read-only frame: a cube of side length
 `side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
 pseudospectral method needs on that box.
 
 # Arguments
+`FixedDomain` carries **no defaults** — every argument is explicit; the `Simulation` front door supplies
+the run-layer defaults (`side_length = 2π`, `dealiasing = TwoThirds()`, `element_type = Float64`,
+`array_type = Array`).
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
-- `side_length = 2π` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
-- `dealiasing = TwoThirds()` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule,
-  the default) and [`HouLi`](@ref) (the smooth Hou–Li filter) apply [`dealias!`](@ref) as a coefficientwise
-  multiply, while [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller
-  band at ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
+- `side_length` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
+- `dealiasing` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule) and [`HouLi`](@ref)
+  (the smooth Hou–Li filter) apply [`dealias!`](@ref) as a coefficientwise multiply, while
+  [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller band at
+  ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
   advective-CFL ceiling through `recommended_cfl`.
-- `scalar_type = Float64` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
-- `array_type = Array` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
+- `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
+- `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
 
 # Fields
@@ -166,10 +169,10 @@ end
 _zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef, dims...), zero(S))
 
 
-function FixedDomain(grid_points_per_axis::Integer, side_length::Real = 2π;
-                           dealiasing::DealiasingStrategy = TwoThirds(),
-                           scalar_type::Type{T} = Float64,
-                           array_type = Array) where {T<:AbstractFloat}
+function FixedDomain(grid_points_per_axis::Integer, side_length::Real;
+                           dealiasing::DealiasingStrategy,
+                           element_type::Type{T},
+                           array_type) where {T<:AbstractFloat}
   N = Int(grid_points_per_axis)
   L = T(side_length)
   grid = Grid3D((N, N, N), (L, L, L))

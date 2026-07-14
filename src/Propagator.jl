@@ -392,7 +392,6 @@ end
 
 
 """
-    recommended_cfl(integrator)
     recommended_cfl(integrator, domain)
 
 A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
@@ -400,25 +399,27 @@ A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\max\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
-scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The one-argument form returns the value
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The base ceiling is
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
 conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), so a small ``0.25``.
 
-The two-argument form scales that ceiling by the domain's dealiasing: a strategy that keeps modes
+It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
-proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses.
-Override either for a specific run.
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
+override `cfl` for a specific run.
 """
-recommended_cfl(::AbstractIntegrator) = 0.3
-recommended_cfl(::IFRK2) = 0.25
-recommended_cfl(::IFLowStorageRK3) = 0.5
+# The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
+# corrects it for the domain's dealiasing band.
+_base_cfl(::AbstractIntegrator) = 0.3
+_base_cfl(::IFRK2) = 0.25
+_base_cfl(::IFLowStorageRK3) = 0.5
 
-# Scale the base (2/3-calibrated) ceiling by the active dealiasing: factor = (2/3)/f, f the retained
-# Nyquist fraction (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
+# Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
+# (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
 recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
-  recommended_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
+  _base_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
 
 
 end # module Propagator

@@ -33,7 +33,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = FixedDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
   buffers = IntegratorBuffers(domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
@@ -42,7 +42,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     û0 = spectral_vector(domain)                                   # zero velocity
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
-    conditions = FlowConditions(viscosity = ν, schmidt = Sc)               # unforced
+    conditions = FlowConditions(viscosity = ν, schmidt = Sc, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())               # unforced
     dt = 0.02
     nsteps = 25
     total_time = dt * nsteps
@@ -59,7 +59,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     dealias!(û0, domain)
     φ̂0 = scalar_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
-    conditions = FlowConditions(viscosity = ν)                             # Sc = 1, unforced
+    conditions = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())                             # Sc = 1, unforced
 
     rk3 = IFLowStorageRK3()
     Tfinal = 0.4
@@ -81,7 +81,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     mean_before = field_data(φ̂0)[1, 1, 1]
 
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, 0.02, 30)
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end

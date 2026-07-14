@@ -88,7 +88,7 @@ using Test
   end
 
   @testset "bring-your-own domain + fixed dt" begin
-    domain = FixedDomain(16, L; scalar_type = Float64)
+    domain = FixedDomain(16, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     sim = Simulation(domain; viscosity = 0.02, rng = MersenneTwister(3))
     advance!(sim; dt = 0.001)
     @test current_step(sim) == 1
@@ -96,7 +96,7 @@ using Test
   end
 
   @testset "Float32 case runs" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar_type = Float32,
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; element_type = Float32,
                      scalar = false, rng = MersenneTwister(4))
     run!(sim; steps = 10)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
@@ -176,7 +176,7 @@ using Test
   end
 
   @testset "derivative skewness" begin
-    domain = FixedDomain(24, 2π; scalar_type = Float64)
+    domain = FixedDomain(24, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     buffers = IntegratorBuffers(domain; scalar = true)
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
@@ -186,7 +186,7 @@ using Test
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     φ̂ = scalar_spectral(domain)
-    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15))
+    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     for _ in 1:80
       velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
       vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
@@ -220,7 +220,7 @@ using Test
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb)) && kinetic_energy(simb) > 0
     # the target symbol is validated at construction
-    domain = FixedDomain(16, 2π; scalar_type = Float64)
+    domain = FixedDomain(16, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)
   end
 end

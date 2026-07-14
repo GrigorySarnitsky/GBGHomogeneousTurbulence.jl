@@ -31,7 +31,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = FixedDomain(N, L; scalar_type = T)
+  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
   buffers = IntegratorBuffers(domain; scalar = true)
 
   û0 = spectral_vector(domain)
@@ -42,7 +42,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   n = 8
 
   @testset "temporal convergence order" begin
-    unforced = FlowConditions(viscosity = ν)
+    unforced = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
     rk3 = IFLowStorageRK3()
     u1 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / n, n)
     u2 = integrate_fixed(rk3, domain, buffers, û0, unforced, Tfinal / (2n), 2n)
@@ -62,13 +62,13 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2))
+                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     integrator = IFLowStorageRK3()
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))
     φ̂ = scalar_spectral(domain)
     Δx = L / N
-    cfl = recommended_cfl(integrator)
+    cfl = recommended_cfl(integrator, domain)
     energies = T[]
     for _ in 1:200
       velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
@@ -92,8 +92,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   end
 
   @testset "recommended_cfl" begin
-    @test recommended_cfl(IFLowStorageRK3()) > recommended_cfl(IFRK2())
-    @test 0 < recommended_cfl(IFRK2()) < 1
-    @test 0 < recommended_cfl(IFLowStorageRK3()) < 1
+    @test recommended_cfl(IFLowStorageRK3(), domain) > recommended_cfl(IFRK2(), domain)
+    @test 0 < recommended_cfl(IFRK2(), domain) < 1
+    @test 0 < recommended_cfl(IFLowStorageRK3(), domain) < 1
   end
 end

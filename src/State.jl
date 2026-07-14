@@ -47,15 +47,13 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 
 """
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0,
+    random_solenoidal_velocity!(û, domain; kinetic_energy, peak_wavenumber,
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
 ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
-projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``. This low-level default
-(`kinetic_energy = 0.5`) is not the run default: the `Simulation` front door supplies `1.5`
-(``u' = 1``) instead, so the two layers' defaults differ by design.
+projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
@@ -73,7 +71,7 @@ The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `r
 stream (defaults to `Random.default_rng()`).
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
-                                     kinetic_energy::Real = 0.5, peak_wavenumber::Real = 2.0,
+                                     kinetic_energy::Real, peak_wavenumber::Real,
                                      spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = physical_vector(domain)
@@ -102,7 +100,7 @@ end
 
 
 """
-    random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0,
+    random_scalar!(φ̂, domain; scalar_variance, peak_wavenumber,
                    spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
@@ -125,7 +123,7 @@ The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `r
 stream (defaults to `Random.default_rng()`).
 """
 function random_scalar!(φ̂, domain::FixedDomain;
-                        scalar_variance::Real = 1.0, peak_wavenumber::Real = 2.0,
+                        scalar_variance::Real, peak_wavenumber::Real,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = scalar_physical(domain)

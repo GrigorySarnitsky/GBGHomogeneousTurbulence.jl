@@ -177,7 +177,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   space, ``-\nabla^2`` acts as multiplication by ``\lvert\boldsymbol{\kappa}\rvert^2``), and the dealias
   kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default). The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
-  from here**: `scalar_type` fixes the real element type (`Float32` or `Float64`)
+  from here**: `element_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert

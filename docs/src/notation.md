@@ -88,7 +88,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
-| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `scalar_type` |
+| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
 
 ## Forcing
 

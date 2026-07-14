@@ -12,7 +12,7 @@ using Test
   N = 16
 
   @testset "TwoThirds sharp kernel is the default" begin
-    domain = FixedDomain(N, L; scalar_type = Float64)
+    domain = FixedDomain(N, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test domain.dealiasing isa TwoThirds
     mask = real.(field_data(domain.dealias))
     @test all(m -> m == 0 || m == 1, mask)             # sharp 0/1 truncation
@@ -20,32 +20,32 @@ using Test
   end
 
   @testset "HouLi smooth filter" begin
-    domain = FixedDomain(N, L; dealiasing = HouLi(), scalar_type = Float64)
+    domain = FixedDomain(N, L; dealiasing = HouLi(), element_type = Float64, array_type = Array)
     @test domain.dealiasing isa HouLi
     g = real.(field_data(domain.dealias))
     @test all(x -> -1e-12 ≤ x ≤ 1 + 1e-12, g)          # a transfer function in [0,1]
     @test maximum(g) ≈ 1 rtol = 1e-6                    # ≈ 1 at the mean (k = 0)
     @test any(x -> 0.01 < x < 0.99, g)                 # genuinely smooth intermediate values, not 0/1
     zeros_houli = count(==(0), g)
-    zeros_23 = count(==(0), real.(field_data(FixedDomain(N, L).dealias)))
+    zeros_23 = count(==(0), real.(field_data(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias)))
     @test zeros_houli < zeros_23                        # keeps more modes than the 2/3 rule
   end
 
   @testset "auto-CFL scales with the dealiasing" begin
-    ops23 = FixedDomain(N, L)
-    opsHL = FixedDomain(N, L; dealiasing = HouLi())
+    ops23 = FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    opsHL = FixedDomain(N, L; dealiasing = HouLi(), element_type = Float64, array_type = Array)
     rk3 = IFLowStorageRK3()
-    @test recommended_cfl(rk3, ops23) ≈ recommended_cfl(rk3)          # 2/3 ⇒ base value unchanged
-    @test recommended_cfl(rk3, opsHL) ≈ recommended_cfl(rk3) * 2 / 3  # HouLi keeps to Nyquist ⇒ ×2/3
-    @test recommended_cfl(rk3, opsHL) < recommended_cfl(rk3, ops23)   # a tighter step
+    base = recommended_cfl(rk3, ops23)                               # the 2/3 rule sets the base ceiling
+    @test recommended_cfl(rk3, opsHL) ≈ base * 2 / 3                 # HouLi keeps to Nyquist ⇒ ×2/3
+    @test recommended_cfl(rk3, opsHL) < base                         # a tighter step
   end
 
   @testset "a HouLi simulation runs and stays finite" begin
-    domain = FixedDomain(N, L; dealiasing = HouLi())
+    domain = FixedDomain(N, L; dealiasing = HouLi(), element_type = Float64, array_type = Array)
     sim = Simulation(domain; viscosity = 0.03,
                      velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(7))
-    @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3()) * 2 / 3        # the domain-aware CFL flowed in
+    @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)    # the domain-aware CFL flowed in
     run!(sim; steps = 10)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
     # the resolution front door threads `dealiasing` through to the domain
@@ -55,14 +55,15 @@ using Test
   end
 
   @testset "PhaseShift spherical cutoff and CFL" begin
-    domain = FixedDomain(N, L; dealiasing = PhaseShift())
+    domain = FixedDomain(N, L; dealiasing = PhaseShift(), element_type = Float64, array_type = Array)
     @test domain.dealiasing isa PhaseShift
     mask = real.(field_data(domain.dealias))
     @test all(m -> m == 0 || m == 1, mask)                          # a sharp spherical truncation
     @test max_wavenumber(domain) ≈ (2 * sqrt(2) / 3) * (N / 2) * (2π / L)   # κ_max = √2·N/3·(2π/L)
-    @test count(==(1), mask) > count(==(1), real.(field_data(FixedDomain(N, L).dealias)))  # keeps more than 2/3
+    @test count(==(1), mask) > count(==(1), real.(field_data(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias)))  # keeps more than 2/3
     rk3 = IFLowStorageRK3()
-    @test recommended_cfl(rk3, domain) ≈ recommended_cfl(rk3) / sqrt(2)     # tighter step for the wider band
+    base = recommended_cfl(rk3, FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array))
+    @test recommended_cfl(rk3, domain) ≈ base / sqrt(2)                     # tighter step for the wider band
   end
 
   @testset "PhaseShift de-aliases exactly (vs a zero-padded oracle)" begin
@@ -70,12 +71,12 @@ using Test
     # that retained band. Phase-shift must reproduce the exact term a 2N zero-padded grid gives (no
     # aliasing there), across the whole band; the raw N-grid product must not.
     Np = 12
-    dps = FixedDomain(Np, L; dealiasing = PhaseShift())
-    d2  = FixedDomain(2Np, L)                                        # 2N oracle grid (raw product, no dealias)
+    dps = FixedDomain(Np, L; dealiasing = PhaseShift(), element_type = Float64, array_type = Array)
+    d2  = FixedDomain(2Np, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)                                        # 2N oracle grid (raw product, no dealias)
     SD  = GBGIsotropicTurbulence.SimulationDomain
     GEN = GBGIsotropicTurbulence.Generator
     û = SD.spectral_vector(dps)
-    random_solenoidal_velocity!(û, dps; peak_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
+    random_solenoidal_velocity!(û, dps; kinetic_energy = 0.5, peak_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
     half = Np ÷ 2
     mapidx(i) = i ≤ half + 1 ? i : i + Np                           # fft-freq index map, N → 2N
     embed(A) = (B = zeros(eltype(A), Np + 1, 2Np, 2Np, 3);          # zero-pad ×(2N/N)³ = 8
@@ -109,7 +110,7 @@ using Test
                      velocity_forcing = ConstantPower(target = 0.1), rng = MersenneTwister(9))
     @test sim.domain.dealiasing isa PhaseShift
     @test sim.buffers.phase_shift !== nothing                        # the displaced-evaluation scratch was built
-    @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3()) / sqrt(2)
+    @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)
     run!(sim; steps = 8)
     @test isfinite(kinetic_energy(sim)) && kinetic_energy(sim) > 0
     @test isfinite(scalar_variance(sim)) && scalar_variance(sim) > 0
