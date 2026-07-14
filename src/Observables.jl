@@ -82,10 +82,11 @@ The mean scalar-variance dissipation rate
 in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
-``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``, formed by a fused `weighted_inner`
-against the squared-wavenumber multiplier `domain.squared_wavenumber_kernel` — straight from the spectral
-coefficients, with no physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's
-cached ``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
+``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle`` — a
+``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral inner product against the
+`domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
+physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's cached
+``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
   2 * diffusivity * weighted_inner(φ̂, domain.squared_wavenumber_kernel)

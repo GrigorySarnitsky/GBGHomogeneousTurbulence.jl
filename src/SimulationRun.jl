@@ -17,8 +17,9 @@ The run layer: [`Simulation`](@ref) (the assembled state of a case) and the func
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
 per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
 [`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count, and the
-observables (`kinetic_energy`, `dissipation`, `scalar_variance`, `energy_spectrum`, `integral_scale`)
-accept a `Simulation` directly. [`flow_parameters`](@ref) reports the run's dimensionless flow state (a
+observables (`kinetic_energy`, `dissipation`, `derivative_skewness`, `scalar_variance`,
+`scalar_dissipation`, `energy_spectrum`, `integral_scale`, `max_speed`) accept a `Simulation` directly,
+each returning the same value as its field-argument form. [`flow_parameters`](@ref) reports the run's dimensionless flow state (a
 `Phenomenology` `FlowParameters`), and [`validate_spectrum`](@ref) compares its measured energy spectrum
 against a `Phenomenology` model.
 """
@@ -30,8 +31,8 @@ using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physica
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
 using ..Generator: velocity_to_physical!, vorticity_to_physical!
-using ..Observables: max_speed, derivative_skewness
-import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale
+import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale,
+                      derivative_skewness, scalar_dissipation, max_speed
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -211,10 +212,14 @@ _refresh_cached_fields!(sim::Simulation) =
    vorticity_to_physical!(sim.buffers.vorticity_start, sim.state.velocity, sim.domain, sim.buffers.vorticity_spectral); sim)
 
 
-# Observables on a `Simulation` — thin wrappers extending the `Observables` generics by reading the
-# spectral state `sim.state` directly: `kinetic_energy`/`scalar_variance`/`energy_spectrum`/`integral_scale`
-# are Parseval reductions of û/φ̂; `dissipation` curls û into the spectral-vorticity scratch (used as a
-# workspace) and reduces it. None reads the physical scratch as state.
+# Observables on a `Simulation` — thin wrappers extending the `Observables` generics so every diagnostic
+# accepts a `Simulation` directly and returns the same scalar (or, for `energy_spectrum`, the same (κ, E)
+# tuple) as its field-argument form. Each reads the current state: `kinetic_energy` / `scalar_variance` /
+# `energy_spectrum` / `integral_scale` are Parseval reductions of the spectral state `sim.state`;
+# `dissipation` and `derivative_skewness` reduce the velocity `sim.state.velocity` (`dissipation` curls it
+# into the spectral-vorticity scratch as workspace); `scalar_dissipation` reduces `sim.state.scalar` at the
+# diffusivity ϰ = ν/Sc (`NaN` when no scalar is evolved, as does `scalar_variance`); `max_speed` reads the
+# cached physical velocity `sim.buffers.velocity_physical` — the only wrapper that reads the physical scratch.
 kinetic_energy(sim::Simulation) = kinetic_energy(sim.state.velocity)
 dissipation(sim::Simulation) =
   (curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers);
@@ -222,6 +227,11 @@ dissipation(sim::Simulation) =
 scalar_variance(sim::Simulation) = sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)
 energy_spectrum(sim::Simulation) = energy_spectrum(sim.state.velocity, sim.domain)
 integral_scale(sim::Simulation) = integral_scale(sim.state.velocity, sim.domain)
+derivative_skewness(sim::Simulation) = derivative_skewness(sim.state.velocity, sim.domain)
+scalar_dissipation(sim::Simulation) =
+  sim.state.scalar === nothing ? NaN :
+  scalar_dissipation(sim.state.scalar, sim.domain, sim.conditions.viscosity / sim.conditions.schmidt)
+max_speed(sim::Simulation) = max_speed(sim.buffers.velocity_physical)
 
 
 """
@@ -232,7 +242,9 @@ The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the brid
 measured state. The viscosity ``\\nu`` and the
 Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the longitudinal integral scale ``L_{11}`` are measured from the
-current velocity field.
+current velocity field. The scalar dissipation is **not** populated — it is left `NaN`; the scalar
+reference laws (`Yaglom1949`, `ObukhovCorrsin1949`) that read it take a `FlowParameters` with
+`scalar_dissipation` supplied explicitly.
 """
 function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim)

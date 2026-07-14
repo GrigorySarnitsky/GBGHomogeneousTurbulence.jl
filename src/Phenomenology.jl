@@ -197,10 +197,12 @@ function scaling_exponent end
 """
     structure_function(law, r, fp; order) -> Float64
 
-The reference velocity structure function ``D_{L\\dots}(r) = \\langle(\\delta u)^{\\texttt{order}}\\rangle``
-predicted by a `law` (a [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction))
-at separation `r` for the state `fp` (a [`FlowParameters`](@ref)) — the moment of the longitudinal
-velocity increment ``\\delta u`` across a distance `r`. Its home is
+The reference structure function of the given `order` predicted by a `law` (a
+[`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)) at
+separation `r` for the state `fp` (a [`FlowParameters`](@ref)). Most laws give the longitudinal
+**velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^{\\texttt{order}}\\rangle`` of the velocity
+increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives
+``\\langle\\delta u_L\\,(\\delta\\varphi)^{2}\\rangle``, the transport of scalar variance. Its home is
 [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """
 function structure_function end
