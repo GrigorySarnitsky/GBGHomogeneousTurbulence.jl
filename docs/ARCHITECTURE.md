@@ -398,7 +398,7 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
   **composed**: an inertial core ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
-  factor ``f_L(\kappa L)`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named type fixing a
+  factor ``f_L(\kappa L_{11})`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named type fixing a
   published triple.
 - **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and the two-point correlations,
   which share the representation).
@@ -533,6 +533,14 @@ generalization is built for them until a second concrete case forces the abstrac
   ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganizes the quadratic product
   to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
   scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
+- **A reified `Generator` operator.** Today the evolution is functions (`velocity_nonlinear!`,
+  `scalar_nonlinear!`, `integrating_factor!`) the `Propagator` calls with a `FlowConditions` and the
+  scratch — `step!` takes the `State` and the `FlowConditions`, not a first-class RHS object. A `Generator`
+  **type**, bundling the conditions with the dealiased-nonlinear and integrating-factor assembly into one
+  operator the `Propagator` steps (`step!(integrator, state, generator, …)`), is deferred until it reifies
+  what the functions do not: a hollow wrapper earns nothing. The pressure toward it is real, though —
+  stripping the run-layer defaults to the `Simulation` front door (decision 28) leaves `FlowConditions` a
+  bare explicit argument, exactly the friction such an operator would absorb (§4.2).
 - **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
   stability-calibrated, conservative ceiling with a manual `cfl` override — and nothing adapts it to a
   target *temporal* accuracy. An embedded-error or PI step controller, distinct in purpose from the
@@ -607,7 +615,10 @@ one usually encodes a decision.
    product of concretely-typed buffers** (a parametrized record the compiler specializes), never a
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
    that lets the state grow (a scalar today, a coarser Model's extra fields tomorrow) to more slots at no
-   runtime cost.
+   runtime cost. **Each scheme allocates exactly its working set:** `allocate_buffers` dispatches on the
+   concrete integrator and builds only the registers that scheme writes — there is no over-allocating
+   `::AbstractIntegrator` fallback, so a scheme with no method is a hard error, never a silent superset
+   (an `IFLowStorageRK3` run does not carry `IFRK2`'s two predictor registers).
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU scope
    (inherited from `GBGPeriodicFields`).
 6. **No baked-in physical model, closure, or universality assumption.** The tool investigates these; it
@@ -720,11 +731,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     forced, ``\langle\varphi^2\rangle`` must flatten too — the scalar reaches stationarity after the
     velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the warm-up
     literature.)*
-14. **(2026-07) Operator-free forcing construction via `ForcingSpec`.** `ConstantPower(power = 0.1)`
-    (and the other banded forcings; keyword since renamed `power` → `target`) return a `ForcingSpec`
-    capturing the parameters, materialized into
-    the concrete `AbstractForcing` once `Simulation` builds the domain — so a case names its forcing
-    before the grid exists. The operator-taking constructor is unchanged.
+14. **(2026-07) Operator-free forcing construction.** `ConstantPower(target = 0.1)` (and the other banded
+    forcings) return a `DeferredForcing` capturing the parameters, materialized into the concrete
+    `AbstractForcing` once `Simulation` builds the domain — so a case names its forcing before the grid
+    exists. The operator-taking constructor is unchanged. *(Originally the keyword was `power` and the
+    return type `ForcingSpec`; both since renamed — `power` → `target`, `ForcingSpec` → `DeferredForcing`
+    — decision 25.)*
 15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
     `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
     to pin the whole-field energy — hence the r.m.s. velocity ``u'`` and ``\mathrm{Re}_\lambda`` — the
@@ -772,7 +784,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 20. **(2026-07) Resolution-based `viscosity` — the run layer *consumes* a `Phenomenology` law to build a
     run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
-    (``k/(L\varepsilon)^{2/3} \approx 0.9``, the dissipation anomaly in box variables, calibrated to
+    (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L/u'^3``, related by ``G = \tfrac{3}{2}\,C_\varepsilon^{-2/3}`` — calibrated to
     JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
@@ -904,6 +916,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     field); because the cutoff is
     sub-Nyquist the Nyquist-attenuation caveat never bites. Verified against a zero-padded oracle — exact to
     machine precision across the retained band on a field whose raw product is 44 % aliased.
+28. **(2026-07) Defaults live only at the `Simulation` front door; observables read the state; buffers are
+    per-scheme.** A round of API tightening after a fresh docs read.
+    - **Defaults only in `SimulationRun`.** The low-level types carry no convenience defaults —
+      `FixedDomain`, `FlowConditions`, the initial-condition seeders, and `Tracers` require their
+      arguments; the `Simulation` front door supplies the run-layer values. Model/preset types
+      (`Pope2000`, `HouLi`, …) keep their canonical parameters; `rng` may default anywhere. (This removed a
+      laundered smell — an IC seeder that defaulted `kinetic_energy = 0.5` while the front door supplied
+      `1.5`, once documented "by design" rather than fixed.)
+    - **`scalar_type` → `element_type`** (the keyword names the array element type, not the passive
+      scalar's type); **`Tracers(domain, positions)`**, so backend and precision flow from the domain.
+    - **`step!` advances the `State`** (`ResolvedFields`), not loose ``\hat{\boldsymbol u}`` / ``\hat\varphi``.
+    - **Observables are functions of the state, not the `Simulation`.** No `f(sim)` form: an observable
+      taking a `Simulation` reached across `state` / `buffers` / `conditions`, smearing the single source of
+      truth (decision 26); the run layer supplies the explicit state variables.
+    - **`allocate_buffers` is per-scheme and exact** (invariant 4): each integrator allocates only the
+      registers it uses; over-allocation is a hard error. The friction of the now-explicit `FlowConditions`
+      is the standing argument for a reified `Generator` operator (§7).
 
 ---
 
