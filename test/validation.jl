@@ -1,5 +1,6 @@
 using Test
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: curl!
 using GBGIsotropicTurbulence.Phenomenology
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 
@@ -11,11 +12,11 @@ end
 
 
 @testset "energy_spectrum — Parseval consistency" begin
-  κ, E = energy_spectrum(SIM)
+  κ, E = energy_spectrum(SIM.state.velocity, SIM.domain)
   @test length(κ) == length(E)
   @test all(≥(0), E)                                          # a power spectrum is non-negative
-  @test isapprox(sum(E), kinetic_energy(SIM); rtol = 1e-5)    # Σ E(κ) = k
-  @test integral_scale(SIM) > 0
+  @test isapprox(sum(E), kinetic_energy(SIM.state.velocity); rtol = 1e-5)    # Σ E(κ) = k
+  @test integral_scale(SIM.state.velocity, SIM.domain) > 0
 end
 
 
@@ -23,9 +24,10 @@ end
   fp = flow_parameters(SIM)
   @test fp isa FlowParameters
   @test fp.viscosity == 0.02
-  @test fp.dissipation ≈ dissipation(SIM)
-  @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM) / 3)
-  @test fp.integral_scale ≈ integral_scale(SIM)
+  curl!(SIM.buffers.vorticity_spectral, SIM.state.velocity, SIM.domain.multipliers)
+  @test fp.dissipation ≈ dissipation(SIM.buffers.vorticity_spectral, SIM.conditions.viscosity)
+  @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity) / 3)
+  @test fp.integral_scale ≈ integral_scale(SIM.state.velocity, SIM.domain)
   @test taylor_reynolds(fp) > 0
 end
 

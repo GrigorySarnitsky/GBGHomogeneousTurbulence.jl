@@ -16,10 +16,8 @@
 The run layer: [`Simulation`](@ref) (the assembled state of a case) and the functions that advance it —
 [`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
 per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
-[`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count, and the
-observables (`kinetic_energy`, `dissipation`, `derivative_skewness`, `scalar_variance`,
-`scalar_dissipation`, `energy_spectrum`, `integral_scale`, `max_speed`) accept a `Simulation` directly,
-each returning the same value as its field-argument form. [`flow_parameters`](@ref) reports the run's dimensionless flow state (a
+[`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count.
+[`flow_parameters`](@ref) reports the run's dimensionless flow state (a
 `Phenomenology` `FlowParameters`), and [`validate_spectrum`](@ref) compares its measured energy spectrum
 against a `Phenomenology` model.
 """
@@ -31,8 +29,8 @@ using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physica
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
 using ..Generator: velocity_to_physical!, vorticity_to_physical!
-import ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale,
-                      derivative_skewness, scalar_dissipation, max_speed
+using ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale,
+                     derivative_skewness, max_speed
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -212,26 +210,10 @@ _refresh_cached_fields!(sim::Simulation) =
    vorticity_to_physical!(sim.buffers.vorticity_start, sim.state.velocity, sim.domain, sim.buffers.vorticity_spectral); sim)
 
 
-# Observables on a `Simulation` — thin wrappers extending the `Observables` generics so every diagnostic
-# accepts a `Simulation` directly and returns the same scalar (or, for `energy_spectrum`, the same (κ, E)
-# tuple) as its field-argument form. Each reads the current state: `kinetic_energy` / `scalar_variance` /
-# `energy_spectrum` / `integral_scale` are Parseval reductions of the spectral state `sim.state`;
-# `dissipation` and `derivative_skewness` reduce the velocity `sim.state.velocity` (`dissipation` curls it
-# into the spectral-vorticity scratch as workspace); `scalar_dissipation` reduces `sim.state.scalar` at the
-# diffusivity ϰ = ν/Sc (`NaN` when no scalar is evolved, as does `scalar_variance`); `max_speed` reads the
-# cached physical velocity `sim.buffers.velocity_physical` — the only wrapper that reads the physical scratch.
-kinetic_energy(sim::Simulation) = kinetic_energy(sim.state.velocity)
-dissipation(sim::Simulation) =
-  (curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers);
-   dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity))
-scalar_variance(sim::Simulation) = sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)
-energy_spectrum(sim::Simulation) = energy_spectrum(sim.state.velocity, sim.domain)
-integral_scale(sim::Simulation) = integral_scale(sim.state.velocity, sim.domain)
-derivative_skewness(sim::Simulation) = derivative_skewness(sim.state.velocity, sim.domain)
-scalar_dissipation(sim::Simulation) =
-  sim.state.scalar === nothing ? NaN :
-  scalar_dissipation(sim.state.scalar, sim.domain, sim.conditions.viscosity / sim.conditions.schmidt)
-max_speed(sim::Simulation) = max_speed(sim.buffers.velocity_physical)
+# Observables are functions of the state, not the `Simulation`: to diagnose a run, the caller supplies the
+# state fields and parameters explicitly — `kinetic_energy(sim.state.velocity)`, or `dissipation(ω, ν)`
+# after curling `sim.state.velocity` into the spectral-vorticity scratch. The run-layer functions below do
+# exactly that; the observable generics themselves never take a `Simulation`.
 
 
 """
@@ -247,9 +229,12 @@ reference laws (`Yaglom1949`, `ObukhovCorrsin1949`) that read it take a `FlowPar
 `scalar_dissipation` supplied explicitly.
 """
 function flow_parameters(sim::Simulation)
-  k = kinetic_energy(sim)
-  FlowParameters(; viscosity = sim.conditions.viscosity, dissipation = dissipation(sim),
-                 rms_velocity = sqrt(2k / 3), integral_scale = integral_scale(sim),
+  k = kinetic_energy(sim.state.velocity)
+  curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers)
+  ε = dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity)
+  FlowParameters(; viscosity = sim.conditions.viscosity, dissipation = ε,
+                 rms_velocity = sqrt(2k / 3),
+                 integral_scale = integral_scale(sim.state.velocity, sim.domain),
                  schmidt = sim.conditions.schmidt)
 end
 
@@ -274,7 +259,7 @@ predicted per-shell ``E(\\kappa)``, and the relative L² discrepancy over the re
 """
 function validate_spectrum(sim::Simulation, model::EnergySpectrum)
   fp = flow_parameters(sim)
-  κ, measured = energy_spectrum(sim)
+  κ, measured = energy_spectrum(sim.state.velocity, sim.domain)
   # Measured is a per-shell energy (k = Σ E); the model is a density (k = ∫ E dκ). Bring the density to a
   # per-shell energy by the shell width Δκ = 2π/L so the comparison is correct at any box side L.
   Δκ = 2π / sim.domain.grid.domain_size[1]
@@ -310,8 +295,9 @@ current_step(sim::Simulation) = sim.clock.step
 # The eddy-turnover time τ = k/ε from the current diagnostics — the clock warm-up and run budgets
 # count in units of it.
 function _turnover_time(sim::Simulation)
-  ε = dissipation(sim)
-  return ε > 0 ? Float64(kinetic_energy(sim) / ε) : 1.0
+  curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers)
+  ε = dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity)
+  return ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
 end
 
 
@@ -406,7 +392,7 @@ run!(sim; turnovers = 10)                        # advance ten eddy-turnover tim
 
 history = Float64[]                              # sample the kinetic energy every 0.1 time units
 run!(sim; time = 5.0, every = 0.1) do s
-    push!(history, kinetic_energy(s))
+    push!(history, kinetic_energy(s.state.velocity))
 end
 ```
 """
@@ -495,8 +481,9 @@ end
 # transforms) and test.
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
-  ε = dissipation(sim)
-  φ2 = m.gate_scalar ? scalar_variance(sim) : 0.0
+  curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers)
+  ε = dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity)
+  φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
   S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
