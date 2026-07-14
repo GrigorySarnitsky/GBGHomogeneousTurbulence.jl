@@ -444,6 +444,8 @@ to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) ta
 proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
 override `cfl` for a specific run.
 """
+function recommended_cfl end
+
 # The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
 # corrects it for the domain's dealiasing band.
 _base_cfl(::AbstractIntegrator) = 0.3
