@@ -117,7 +117,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
-  interpolation scheme.
+  interpolation scheme; forwarded to the `Tracers` constructor as its `count` and `scheme`.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 
 # Fields
