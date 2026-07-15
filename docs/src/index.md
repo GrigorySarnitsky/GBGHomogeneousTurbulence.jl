@@ -27,11 +27,28 @@ Then:
 using GBGIsotropicTurbulence
 ```
 
+## Quick start
+
+Build a case at the front door, spin it up to stationarity, and advance it:
+
+```julia
+using GBGIsotropicTurbulence
+
+sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
+                                              # ν is chosen from the resolution criterion
+warmup!(sim)                                  # spin up to statistical stationarity
+run!(sim; turnovers = 5)                      # advance five eddy-turnover times
+
+kinetic_energy(sim.state.velocity)            # read a measured observable off the state
+flow_parameters(sim)                          # the run's measured flow state
+```
+
 ## What it solves
 
 With ``\boldsymbol{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` the vorticity,
 ``\nu`` the kinematic viscosity, ``\mathbb{P}`` the Leray–Helmholtz projection onto divergence-free
-fields, and ``\boldsymbol{f}`` a forcing, the momentum equation is advanced in rotational form,
+fields, and ``\boldsymbol{f}`` a forcing, the momentum equation is advanced in rotational form (its
+advective term carried by the Lamb vector ``\boldsymbol{u}\times\boldsymbol{\omega}``),
 
 ```math
 \partial_t \boldsymbol{u} = \mathbb{P}\,(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
@@ -64,20 +81,20 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
+- [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
+  chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
-  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the CFL helper
-  `max_speed`, and the `energy_spectrum` / `integral_scale`).
-- [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
-  chosen independently for the velocity and the scalar.
+  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the
+  Courant–Friedrichs–Lewy (CFL) helper `max_speed`, and the `energy_spectrum` / `integral_scale`).
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a selectable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
   runs it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
-  stationarity); it reports the dimensionless flow state (`flow_parameters`) and compares the measured
+  stationarity); it reports the measured flow state (`flow_parameters`) and compares the measured
   energy spectrum to a `Phenomenology` model (`validate_spectrum`).
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by

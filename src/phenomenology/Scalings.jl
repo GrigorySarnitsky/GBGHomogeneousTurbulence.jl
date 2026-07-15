@@ -110,13 +110,15 @@ G = \\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
 ```
 
 relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the dissipation
-rate ``\\varepsilon`` — nearly Reynolds-number-independent from the JHTDB forced-isotropic dataset
-(``\\mathrm{Re}_\\lambda \\approx 433``) up to comparable higher-Reynolds-number periodic-box DNS
-(Kaneda et al., ``\\mathrm{Re}_\\lambda`` to ``\\approx 2300``). It is a distinct group from the classical
-dissipation anomaly ``C_\\varepsilon = \\varepsilon L/u'^3`` (Taylor 1935; Sreenivasan 1998; Kaneda et al.
-2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is measured
-on the integral scale; at a common length the two are exactly related by
-``G = \\tfrac{3}{2}\\,C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``).
+rate ``\\varepsilon`` — nearly Reynolds-number-independent from the Johns Hopkins Turbulence Database
+(JHTDB) forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``) and consistent with
+higher-Reynolds-number periodic-box DNS. It is a distinct group from the classical
+dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` (Taylor 1935; Sreenivasan 1998; Kaneda
+et al. 2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is
+normalized on the **integral** scale ``L_{11}``, not the box side ``L``. Formed on a common length the two
+are exactly related by ``G = \\tfrac{3}{2}\\,C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
+``G \\approx 0.9`` (box side) and ``C_\\varepsilon \\approx 0.5`` (integral scale) sit at *different*
+lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly.
 
 The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
 inverted, [`stationary_dissipation`](@ref)`(law, energy, side_length)` predicts the dissipation a

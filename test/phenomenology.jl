@@ -119,19 +119,19 @@ end
 
   # every intermittency model is exact at ζ_3 = 1 and bends below the self-similar p/3 for p > 3
   for m in (Kolmogorov1941(), Kolmogorov1962(), SheLeveque1994())
-    @test scaling_exponent(m, 3) ≈ 1.0
-    @test scaling_exponent(m, 6) ≤ 2.0 + 1e-9
-    @test scaling_exponent(m, 2) ≥ 2 / 3 - 1e-9
+    @test scaling_exponent(m; order=3) ≈ 1.0
+    @test scaling_exponent(m; order=6) ≤ 2.0 + 1e-9
+    @test scaling_exponent(m; order=2) ≥ 2 / 3 - 1e-9
   end
 end
 
 
 @testset "StructureFunctions — K62 log-normal exponents" begin
   k62 = Kolmogorov1962()
-  @test scaling_exponent(k62, 3) ≈ 1.0                                    # exact at p = 3
-  @test scaling_exponent(k62, 6) ≈ 2 - 0.25                               # ζ_6 = 2 − μ
-  @test scaling_exponent(k62, 2) ≈ 2 / 3 - (0.25 / 18) * 2 * (2 - 3)
-  @test scaling_exponent(k62, 6) < scaling_exponent(Kolmogorov1941(), 6)  # bends below p/3
+  @test scaling_exponent(k62; order=3) ≈ 1.0                                    # exact at p = 3
+  @test scaling_exponent(k62; order=6) ≈ 2 - 0.25                               # ζ_6 = 2 − μ
+  @test scaling_exponent(k62; order=2) ≈ 2 / 3 - (0.25 / 18) * 2 * (2 - 3)
+  @test scaling_exponent(k62; order=6) < scaling_exponent(Kolmogorov1941(); order=6)  # bends below p/3
 end
 
 
@@ -170,11 +170,11 @@ end
 @testset "StructureFunctions — She–Lévêque intermittency exponents" begin
   sl, k41 = SheLeveque1994(), Kolmogorov1941()
   @test sl isa StructureFunction
-  @test scaling_exponent(sl, 3) ≈ 1.0                           # exact at p = 3 (the 4/5 law)
-  @test scaling_exponent(k41, 3) ≈ 1.0
-  @test scaling_exponent(k41, 2) ≈ 2 / 3                        # K41 self-similar ζ_p = p/3
-  @test scaling_exponent(sl, 2) ≈ 2 / 9 + 2 * (1 - (2 / 3)^(2 / 3))
-  @test scaling_exponent(sl, 6) < scaling_exponent(k41, 6)      # intermittency bends p > 3 down
+  @test scaling_exponent(sl; order=3) ≈ 1.0                           # exact at p = 3 (the 4/5 law)
+  @test scaling_exponent(k41; order=3) ≈ 1.0
+  @test scaling_exponent(k41; order=2) ≈ 2 / 3                        # K41 self-similar ζ_p = p/3
+  @test scaling_exponent(sl; order=2) ≈ 2 / 9 + 2 * (1 - (2 / 3)^(2 / 3))
+  @test scaling_exponent(sl; order=6) < scaling_exponent(k41; order=6)      # intermittency bends p > 3 down
   @test provenance(sl).valid_Reλ == (200.0, Inf)
 end
 

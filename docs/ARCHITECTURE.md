@@ -54,7 +54,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  scalar = true, schmidt = 1.0)
 
 # Spin past the transient: advance until the running dissipation ε(t) stops drifting
-# (k(t) is deliberately not used — a constant-energy forcing would clamp it flat).
+# (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).
 warmup!(sim)
 
 # Advance and measure. The callback fires on a fixed interval with the current state.
@@ -356,9 +356,9 @@ for the Heun push, and a clock. Over it:
   ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a trailing-window
   flatness test), reading ``\varepsilon`` rather than the clampable ``k(t)``, and, when the scalar is
   forced, until ``\langle\varphi^2\rangle`` settles too; or a fixed turnover, time, or step budget.
-- **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables
-  (`kinetic_energy(sim)`, `dissipation(sim)`, `scalar_variance(sim)`, `energy_spectrum(sim)`,
-  `integral_scale(sim)`) the current-state diagnostics, for a callback to read.
+- **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
+  `sim.state` (e.g. `kinetic_energy(sim.state.velocity)`, `dissipation` on the recovered vorticity) the
+  current-state diagnostics, for a callback to read.
 
 The layer wires §4.1–§4.6 together and holds no physics or numerics of its own.
 
@@ -377,17 +377,18 @@ comparison machine of §3 sets them side by side. Two properties follow, both in
   subtypes of one law family, discovered and validated alike, never baked in as truth.
 
 **The abstraction is the strategy pattern** already used for `AbstractForcing` / `AbstractIntegrator` /
-`DealiasingStrategy`: **a law family is an abstract type, each parametrization a concrete subtype**
-carrying its fitted coefficients and provenance, implementing one small interface — evaluate the law at its
+`DealiasingStrategy`: **a law family is an abstract type, each parametrization a named preset** — usually a
+concrete subtype carrying its fitted coefficients and provenance, or (for the composed velocity spectra) a
+factory function that assembles a `ModelSpectrum` — implementing one small interface: evaluate the law at its
 argument (``\kappa``, ``r``, ``\mathrm{Re}_\lambda``) given a `FlowParameters` bundle; report its
 `provenance` (the citation and validity range); and eventually `fit` itself to data. Choosing a law is
-choosing the subtype (`Pope2000` versus `VonKarman1948`) and optionally overriding its coefficients
+choosing the preset (`Pope2000` versus `VonKarman1948`) and optionally overriding its coefficients
 (`Pope2000(; C_K = 1.6)`, the published fit being the default). Provenance is first-class — the comparison
 needs a law's validity range to be fair, and it is the single source of the citation.
 
 **Naming is a three-level handle**, because one author publishes many models across years and quantities:
 the **quantity is the submodule** (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the **paper is the
-author-year type** (`Pope2000`, first author's surname, the full list in `provenance`), and a **same
+author-year handle** (`Pope2000`, first author's surname, the full list in `provenance`), and a **same
 author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The validating case
 would be Kolmogorov 1941 across two submodules — `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5
 laws) and a spectrum counterpart `Spectra.Kolmogorov1941`, were one added — separated by the submodule
@@ -398,10 +399,10 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
   **composed**: an inertial core ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
-  factor ``f_L(\kappa L_{11})`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named type fixing a
+  factor ``f_L(\kappa L_{11})`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
   published triple.
-- **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and the two-point correlations,
-  which share the representation).
+- **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
+  representation, any two-point correlation law when one is added).
 - **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends: the Kolmogorov
   constant ``C_K`` (`Sreenivasan1995`), the normalized dissipation constant ``C_\varepsilon``
   (`Sreenivasan1998`), and the box-normalized dissipation group ``k/(L\varepsilon)^{2/3}`` (`Li2008`,
@@ -513,7 +514,7 @@ generalization is built for them until a second concrete case forces the abstrac
   ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.6, §8).
 - **The sheared frame (Rogallo), a `ShearedDomain`.** A uniform mean velocity gradient makes the
-  wavenumbers time-dependent (``d\boldsymbol{\kappa}/dt = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)
+  wavenumbers time-dependent (``\mathrm{d}\boldsymbol{\kappa}/\mathrm{d}t = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)
   and non-separable — the `SimulationDomain` counterpart to `FixedDomain` (§4.1). This is
   the one future with a concrete `GBGPeriodicFields` dependency: its separable per-axis multipliers cannot
   hold a sheared lattice, so it is a bounded extension *there* (rule 1 of §5), not a job here.
@@ -716,9 +717,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 9. **(2026-07) Precision and footprint are studied axes.** Both precisions supported equally, the
    working point chosen by fitness test; the sufficiency frontier is a deliverable (§6).
 10. **(2026-07) Particles are instruments with first-class numerics.** The role is a probe; the
-    trajectory integrator and sampling-consistency are fitness-tested Method work (§4.5).
+    trajectory integrator and sampling-consistency are fitness-tested Method work (§4.6).
 11. **(2026-07) The run + warm-up layer is a first-class, present concern.** Ease of setup and running
-    is the primary quality metric, so the ergonomic front door is built now, not deferred (§2, §4.6).
+    is the primary quality metric, so the ergonomic front door is built now, not deferred (§2, §4.7).
 12. **(2026-07) Single `ARCHITECTURE.md` (consumer archetype) + `docs/src/notation.md`; no
     `FORMALIZATION.md`.** IT is an operator consumer; its claims are dynamical and pinned by tests
     (§10).
@@ -762,9 +763,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     The physical strain tensor is unavoidable (cubic ⇒ non-Parseval), so this diagnostic allocates its
     rank-2 buffers per call (sampling cadence) rather than keeping them resident — footprint over compute.
 18. **(2026-07) `Phenomenology` — a reference-law library, author-year naming, extraction-bound.** A new
-    submodule (§4.7) collecting the established turbulence phenomenology — model spectra, structure-function
+    submodule (§4.8) collecting the established turbulence phenomenology — model spectra, structure-function
     laws, dimensionless-constant fits — as one strategy family per quantity: each law family an abstract
-    type, each parametrization an author-year subtype (`Spectra.Pope2000`), disambiguated on three axes
+    type, each parametrization an author-year preset (`Spectra.Pope2000`), disambiguated on three axes
     (quantity → submodule, paper → author-year, same-year collision → a trailing letter). It is the
     predicted counterpart to `Observables` — a provider the validation layer reads, not a comparer — and
     holds our own fits beside the literature on equal footing. **Built inside this package but designed to
@@ -777,14 +778,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     radial spectrum) and the integral scale `integral_scale` from it; `flow_parameters` bridges a
     `Simulation` to a `Phenomenology` `FlowParameters` (``\nu``, ``\varepsilon``, ``u'``, ``L_{11}`` from the
     measured state), and `validate_spectrum(sim, model)` compares the measured spectrum against a model
-    spectrum evaluated at that state, returning the relative L² discrepancy. This realizes the
+    spectrum evaluated at that state, returning a named tuple of the measured and predicted spectra and
+    their relative ``L^2`` discrepancy. This realizes the
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
     no `GBGStreamingStatistics` bridge is needed for it. The structure-function and scaling-constant
     paths (via `radial_correlation` and the scalar diagnostics) share the shape and are deferred.
 20. **(2026-07) Resolution-based `viscosity` — the run layer *consumes* a `Phenomenology` law to build a
     run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
-    (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L/u'^3``, related by ``G = \tfrac{3}{2}\,C_\varepsilon^{-2/3}`` — calibrated to
+    (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2}\,C_\varepsilon^{-2/3}`` — calibrated to
     JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
@@ -938,8 +940,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 ## References
 
-Cited author–year above; full entries here. DOIs to be confirmed against the user's copies before the
-docs are published (they are not yet filled in, per the no-guessed-citation rule). The extraction-bound
+Cited author–year above; full entries here (DOIs are omitted rather than filled from memory, per the
+no-guessed-citation rule). The extraction-bound
 `Phenomenology` leaf (§4.8) is exempt: each reference law carries its own self-contained citation in a
 `Reference` value, so this list need not duplicate the ~two dozen it cites.
 

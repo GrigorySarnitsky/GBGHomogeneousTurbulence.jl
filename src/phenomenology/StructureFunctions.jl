@@ -42,14 +42,14 @@ The Kolmogorov (1941) inertial-range structure-function laws for the longitudina
 ``\\delta u_L``. [`structure_function`](@ref)`(law, r, fp; order)` returns:
 
   * `order = 2` — the **2/3 law** ``D_{LL}(r) = C_2\\,(\\varepsilon r)^{2/3}``, the second-order
-    increment; the constant `C₂ ≈ 2.0` is empirical (default `2.0`).
+    increment; the constant ``C_2 \\approx 2.0`` is empirical (default `2.0`).
   * `order = 3` — the **4/5 law** ``D_{LLL}(r) = -\\tfrac{4}{5}\\,\\varepsilon r``, the third-order
     increment; this one is *exact* (a consequence of the Kármán–Howarth–Monin relation), carrying no
     free constant.
 
 Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`FlowParameters`](@ref))
 supplies the dissipation rate ``\\varepsilon``; any other `order` throws (K41 fixes only these two
-longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law, order)` gives the self-similar
+longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law; order)` gives the self-similar
 K41 exponent ``\\zeta_p = p/3``.
 """
 struct Kolmogorov1941 <: StructureFunction
@@ -68,7 +68,7 @@ end
 
 provenance(::Kolmogorov1941) = _K41
 
-scaling_exponent(::Kolmogorov1941, order::Real) = order / 3    # self-similar K41 exponent ζ_p = p/3
+scaling_exponent(::Kolmogorov1941; order::Real) = order / 3    # self-similar K41 exponent ζ_p = p/3
 
 
 const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**, 336"; valid_Reλ = (200.0, Inf))
@@ -77,7 +77,7 @@ const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**
     SheLeveque1994()
 
 The She–Lévêque (1994) intermittency model for the inertial-range scaling exponents. Its
-[`scaling_exponent`](@ref)`(law, order)` gives the anomalous exponent
+[`scaling_exponent`](@ref)`(law; order)` gives the anomalous exponent
 
 ```math
 \\zeta_p = \\frac{p}{9} + 2\\left[1 - \\left(\\tfrac{2}{3}\\right)^{p/3}\\right]
@@ -90,7 +90,7 @@ implements [`scaling_exponent`](@ref) but not [`structure_function`](@ref).
 """
 struct SheLeveque1994 <: StructureFunction end
 
-scaling_exponent(::SheLeveque1994, order::Real) = order / 9 + 2 * (1 - (2 / 3)^(order / 3))
+scaling_exponent(::SheLeveque1994; order::Real) = order / 9 + 2 * (1 - (2 / 3)^(order / 3))
 
 provenance(::SheLeveque1994) = _SHELEVEQUE
 
@@ -101,7 +101,7 @@ const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82"; valid_R
     Kolmogorov1962(; μ = 0.25)
 
 The Kolmogorov (1962) log-normal (refined-similarity) intermittency model. Its
-[`scaling_exponent`](@ref)`(law, order)` gives
+[`scaling_exponent`](@ref)`(law; order)` gives
 
 ```math
 \\zeta_p = \\frac{p}{3} - \\frac{\\mu}{18}\\,p\\,(p - 3),
@@ -117,7 +117,7 @@ end
 
 Kolmogorov1962(; μ = 0.25) = Kolmogorov1962(μ)
 
-scaling_exponent(m::Kolmogorov1962, order::Real) = order / 3 - (m.μ / 18) * order * (order - 3)
+scaling_exponent(m::Kolmogorov1962; order::Real) = order / 3 - (m.μ / 18) * order * (order - 3)
 
 provenance(::Kolmogorov1962) = _K62
 

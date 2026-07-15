@@ -11,13 +11,12 @@
 """
     Particles
 
-Lagrangian tracer tracking: `Tracers` (positions + a selectable interpolation `scheme`), the
-second-order [`advect!`](@ref) (Heun-in-time on the start- and end-of-step velocity), and
-[`sample!`](@ref) for reading a field along the trajectories.
-
-Trajectory readouts are [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
-[`ntracers`](@ref); [`velocity_buffer`](@ref) / [`scalar_buffer`](@ref) allocate the
-`out` buffers for [`sample!`](@ref).
+Lagrangian tracer tracking:
+- [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
+- [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the start- and end-of-step velocity).
+- [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
+  [`scalar_buffer`](@ref) allocate its `out` buffers.
+- [`tracer_positions`](@ref), [`tracer_velocities`](@ref), [`ntracers`](@ref) — the trajectory readouts.
 """
 module Particles
 
@@ -99,13 +98,12 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 (`velocity_end` ``= \\boldsymbol{u}(t_{n+1})``) of the step:
 
 ```math
-\\boldsymbol{v}_1 = \\boldsymbol{u}(t_n, \\boldsymbol{X}),
-\\quad
-\\boldsymbol{X}^{*} = \\boldsymbol{X} + \\Delta t\\,\\boldsymbol{v}_1,
-\\quad
-\\boldsymbol{v}_2 = \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}),
-\\quad
-\\boldsymbol{X} \\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
+\\begin{aligned}
+\\boldsymbol{v}_1 &= \\boldsymbol{u}(t_n, \\boldsymbol{X}), &
+\\boldsymbol{X}^{*} &= \\boldsymbol{X} + \\Delta t\\,\\boldsymbol{v}_1, \\\\
+\\boldsymbol{v}_2 &= \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}), &
+\\boldsymbol{X} &\\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
+\\end{aligned}
 ```
 
 with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `domain` (a

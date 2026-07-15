@@ -2,7 +2,7 @@
 # constants), each an author-year parametrization of an abstract law family per quantity. The
 # *predicted* counterpart to `Observables`: a provider the validation layer reads, never a comparer.
 #
-# Extraction-bound (docs/ARCHITECTURE.md §4.7, decision 18): this module depends on no field or
+# Extraction-bound (docs/ARCHITECTURE.md §4.8, decision 18): this module depends on no field or
 # statistics backend and no dynamics — a law is a scalar function — and the umbrella does NOT
 # re-export it, so it can be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite.
 
@@ -15,13 +15,14 @@ that theory and experiment have established, each an author-year parametrization
 family. This is the *predicted* counterpart to the measured `Observables`: a provider the validation
 layer reads to compare a run against, never a comparer itself and never assumed by the dynamics.
 
-A law family is an abstract type; each parametrization is a concrete subtype carrying its fitted
-coefficients and its provenance. Choosing a law is choosing the subtype (the published fit is the
-default); a name is disambiguated by its **submodule** (the quantity), its **author-year** (the paper),
-and a trailing letter (a same-year collision).
+A law family is an abstract type; each parametrization is a named preset — usually a concrete subtype
+carrying its fitted coefficients and its provenance, or (for the composed velocity spectra like
+`Spectra.Pope2000`) a factory function that assembles one. Choosing a law is choosing the preset (the
+published fit is the default); a name is disambiguated by its **submodule** (the quantity), its
+**author-year** (the paper), and a trailing letter (a same-year collision).
 
 **The flow state a law reads:**
-- [`FlowParameters`](@ref) — the dimensionless flow-state bundle a law evaluates against, with the
+- [`FlowParameters`](@ref) — the flow-state bundle a law evaluates against, with the
   derived scales [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
   [`taylor_reynolds`](@ref), and [`scalar_diffusivity`](@ref) as helpers.
 - [`provenance`](@ref) — a law's citation and validity range (a [`Reference`](@ref)); [`fit`](@ref)
@@ -64,10 +65,10 @@ abstract type TurbulenceLaw end
     FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale,
                      schmidt = 1.0, scalar_dissipation = NaN)
 
-The dimensionless flow-state bundle a law is evaluated against — the analogue of `FlowConditions` and
-`FixedDomain` on the phenomenology side. It carries the independent groups of a homogeneous
-isotropic state; the small scales and the Taylor-scale Reynolds number are [derived](@ref
-taylor_reynolds) from them, not stored.
+The flow-state bundle a law is evaluated against — the analogue of `FlowConditions` and
+`FixedDomain` on the phenomenology side. It carries the independent dimensional quantities of a homogeneous
+isotropic state (``\\nu``, ``\\varepsilon``, ``u'``, ``L_{11}``); the small scales and the dimensionless
+Taylor-scale Reynolds number are [derived](@ref taylor_reynolds) from them, not stored.
 
 Fields (all keyword; a homogeneous-isotropic state fixes the rest):
 
@@ -176,7 +177,7 @@ function provenance end
 
 The reference spectrum predicted by a model `law` at wavenumber `κ` for the state `fp` (a
 [`FlowParameters`](@ref)) — the velocity energy spectrum ``E(\\kappa)`` for an `EnergySpectrum` (the
-density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,d\\kappa``), or the scalar
+density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa``), or the scalar
 spectrum ``E_\\varphi(\\kappa)`` for a `ScalarSpectrum`. Its home and the composed form are in
 [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
 """
@@ -184,7 +185,7 @@ function spectrum end
 
 
 """
-    scaling_exponent(law, order) -> Float64
+    scaling_exponent(law; order) -> Float64
 
 The inertial-range scaling exponent ``\\zeta_p`` of the order-``p`` longitudinal velocity structure
 function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, predicted by a `law` (a `StructureFunction`) — the
@@ -200,8 +201,8 @@ function scaling_exponent end
 The reference structure function of the given `order` predicted by a `law` (a
 [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)) at
 separation `r` for the state `fp` (a [`FlowParameters`](@ref)). Most laws give the longitudinal
-**velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^{\\texttt{order}}\\rangle`` of the velocity
-increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives
+**velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the `order`-th moment ``p``) of the
+velocity increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives
 ``\\langle\\delta u_L\\,(\\delta\\varphi)^{2}\\rangle``, the transport of scalar variance. Its home is
 [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """

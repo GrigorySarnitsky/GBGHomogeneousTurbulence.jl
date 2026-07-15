@@ -8,8 +8,9 @@ Order   = [:module]
 ## The simulation
 
 The assembled, ready-to-run case — the front-door `Simulation(; grid_points_per_axis, viscosity, …)` and the
-domain-taking `Simulation(domain; …)` constructors. The observables `kinetic_energy`, `dissipation`,
-`scalar_variance`, `energy_spectrum`, and `integral_scale` also accept a `Simulation` directly.
+domain-taking `Simulation(domain; …)` constructors. Read its measured state by applying the
+[`Observables`](Observables.md) to `sim.state` — for example `kinetic_energy(sim.state.velocity)` in a
+`run!` callback.
 
 ```@docs
 Simulation

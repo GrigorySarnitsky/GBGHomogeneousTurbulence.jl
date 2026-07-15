@@ -50,7 +50,8 @@ scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and 
 (`velocity_forcing`, `scalar_forcing`, both `AbstractForcing`). Consumed by the time step (`step!`).
 
 Every argument is explicit — `FlowConditions` carries no defaults; the `Simulation` front door supplies
-the run-layer values (`schmidt = 1.0`, both forcings `NoForcing()`).
+the run-layer values (`schmidt = 1.0`, a stationary `BandRescaling` velocity forcing, and `NoForcing()`
+for the scalar).
 
 # Fields
 - `viscosity`, `schmidt` — the kinematic viscosity ``\\nu`` and the Schmidt number ``\\mathrm{Sc}`` (both `Float64`).

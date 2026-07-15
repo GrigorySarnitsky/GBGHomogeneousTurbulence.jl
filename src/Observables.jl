@@ -19,11 +19,12 @@ The measured functions of the flow state:
 
 Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
 distribution over wavenumber); none dealiases first. The **quadratic** reductions (`kinetic_energy`,
-`dissipation`, `scalar_variance`, `scalar_dissipation`) are Parseval-exact — a quadratic of a
-``2/3``-truncated field stays below the aliasing threshold, so the reduction is exact in either
-representation. The **cubic** `derivative_skewness` is not: its grid mean folds a small residual from the
-truncation edge back into the mean, so it carries a slight aliasing on a ``2/3`` field (negligible when
-well-resolved; exact cubic dealiasing would need the ``1/2`` rule).
+`dissipation`, `scalar_variance`, `scalar_dissipation`) are Parseval-exact: each is a normalized inner
+product, summed exactly from the spectral coefficients regardless of representation; the equivalent
+physical-space mean picks up no aliasing either, because the quadratic's zero mode folds in nothing when
+``2\\kappa_{\\max} < N`` (the ``2/3`` rule). The **cubic** `derivative_skewness` is not: its grid mean
+folds a small residual from the truncation edge back into the mean, so it carries a slight aliasing on a
+``2/3`` field (negligible when well-resolved; exact cubic dealiasing would need the ``1/2`` rule).
 """
 module Observables
 
@@ -63,7 +64,9 @@ dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
 in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
-differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert`` by at most ``\\sqrt{3}``, well inside the CFL margin.
+differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert`` by at most ``\\sqrt{3}``, a gap absorbed by the
+conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling (whose
+eigenvalue bound over-estimates the true spectral radius).
 """
 max_speed(u) = maximum(abs, field_data(u))
 
@@ -110,16 +113,18 @@ the strain-rate tensor ``\\boldsymbol{S} = \\operatorname{sym}\\nabla\\boldsymbo
 is the scalar skewness, the bold ``\\boldsymbol{S}`` the strain-rate tensor):
 
 ```math
-S = C\\,\\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
-  = 3C\\,\\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}},
-\\qquad C = \\tfrac{4}{7}\\sqrt{\\tfrac{15}{2}} \\approx 1.5649.
+\\begin{aligned}
+S &= C\\,\\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
+   = 3C\\,\\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}, \\\\
+C &= \\tfrac{4}{7}\\sqrt{15/2} \\approx 1.5649.
+\\end{aligned}
 ```
 
 Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, traceless,
 ``\\operatorname{tr}\\boldsymbol{S}^{3} = 3\\det\\boldsymbol{S}``. By isotropy this equals the classical
-longitudinal skewness ``\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle / \\langle(\\partial u_1/\\partial x_1)^{2}\\rangle^{3/2}``;
-the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial u_1/\\partial x_1)^{3}\\rangle``
-and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial u_1/\\partial x_1)^{2}\\rangle`` (Betchov 1956). So the
+longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
+the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
+and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle`` (Betchov 1956). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 
@@ -179,15 +184,19 @@ L_{11} = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
-small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+small scales do not fix. The integrals above are the idealized continuous definition; they are evaluated
+as sums over the measured [`energy_spectrum`](@ref) shells (whose per-shell energy makes the shell width
+cancel in the ratio). The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 For reference, two related scales follow from the same spectrum. The **transverse** integral scale is
 ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full trace**
-velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\hat{\\boldsymbol{e}})\\rangle`` — with no directional projection — is
+velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\boldsymbol{e})\\rangle`` (``\\boldsymbol{e}`` a unit vector) — with no directional projection — is
 
 ```math
-L_E = \\frac{\\pi}{2}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}
-    = \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}\\big(L_{11} + 2L_{22}\\big),
+\\begin{aligned}
+L_E &= \\frac{\\pi}{2}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa} \\\\
+    &= \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}(L_{11} + 2L_{22}),
+\\end{aligned}
 ```
 
 the isotropic average of the one longitudinal and two transverse contributions.

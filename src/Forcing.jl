@@ -28,8 +28,8 @@ The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref
 [`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
 scalar field), through tensor-order-generic field operators. The velocity and scalar are forced
 **independently**: [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate `velocity_forcing` and `scalar_forcing`
-(each an `AbstractForcing`, each defaulting to `NoForcing()`), so a run can force the velocity while the
-scalar decays freely, force both, or leave either unforced.
+(each an `AbstractForcing`), so a run can force the velocity while the scalar decays freely, force both, or
+leave either unforced.
 
 An operator-free keyword constructor (`BandRescaling(; …)`, `Linear(; …)`, `ConstantPower(; …)`) returns
 a [`DeferredForcing`](@ref) that a `Simulation` materializes once the domain exists.
@@ -58,9 +58,10 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A deferred forcing. The operator-free keyword constructors — `Linear(; rate)`, `ConstantPower(; target)`, and
-`BandRescaling(; target)` — return a `DeferredForcing`
-capturing the parameters; it is materialized into the concrete `AbstractForcing` once the
+A deferred forcing. The operator-free keyword constructors — `Linear(; rate, …)`,
+`ConstantPower(; target, …)`, and `BandRescaling(; target, over, …)` — return a `DeferredForcing`
+capturing the same keywords as their `domain`-taking forms (the band `lowest_shell` / `highest_shell`, and
+`BandRescaling`'s `over`); it is materialized into the concrete `AbstractForcing` once the
 `FixedDomain` exists (done for you by `Simulation`). A forcing argument therefore accepts either a
 ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
 """
@@ -147,7 +148,7 @@ Fourier modes (integer shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\tex
 The `target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
 energy** ``\\tfrac12\\langle\\lvert\\boldsymbol u\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
 the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` (`scalar_variance`) for the scalar — the field's
-L² observable, carrying the ½ only for the vector.
+``L^{2}`` observable, carrying the ``\\tfrac12`` only for the vector.
 
 The `over` keyword selects where the target applies:
   * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
@@ -192,7 +193,8 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\texttt{field}`` in a low-wavenumber band (Lundgren 2003),
+Linear (negative-damping) forcing ``f = A\\,\\texttt{field}`` in a low-wavenumber band (a band-limited
+variant of Lundgren 2003, whose linear forcing acts at every wavenumber),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net

@@ -1,4 +1,4 @@
-# Structure functions
+# StructureFunctions
 
 ```@autodocs
 Modules = [GBGIsotropicTurbulence.Phenomenology.StructureFunctions]

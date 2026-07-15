@@ -95,7 +95,7 @@ function dissipation_factor end
 """
     PopeLargeScale(c_L, p₀)
 
-Pope's large-scale roll-off ``f_L(\\kappa L) = \\left(\\dfrac{\\kappa L}{\\sqrt{(\\kappa L)^2 + c_L}}\\right)^{5/3 + p_0}``,
+Pope's large-scale roll-off ``f_L(\\kappa L) = \\left(\\frac{\\kappa L}{\\sqrt{(\\kappa L)^2 + c_L}}\\right)^{5/3 + p_0}``,
 which tends to `1` in the inertial range and rolls the spectrum off below the integral scale. `c_L` is
 set by the requirement that the spectrum integrate to the kinetic energy; `p₀` fixes the low-wavenumber
 slope (Pope 2000).
@@ -129,7 +129,7 @@ dissipation_factor(f::PopeDissipation, κη) = exp(-f.β * ((κη^4 + f.c_η^4)^
     VonKarmanLarge(c_L)
 
 The von Kármán large-scale roll-off
-``f_L(\\kappa L) = \\left(\\dfrac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6}``, which tends to `1`
+``f_L(\\kappa L) = \\left(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6}``, which tends to `1`
 in the inertial range and produces the classic ``\\kappa^4`` energy-containing range at low wavenumber
 (``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^4``); `c_L` fixes the peak scale (von Kármán 1948).
 """
@@ -201,8 +201,9 @@ dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
 
 A Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)`` — a simple,
 parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman (1963,
-appendix; about half the earlier Townsend 1951a spectrum), whose coefficient is skewness-dependent
-(about 2.6 to 3.3) and is rounded here to `2` for a parameter-free factor.
+appendix; about half the earlier Townsend 1951 spectrum), whose coefficient is skewness-dependent
+(about 2.6 to 3.3) and is simplified downward to `2` here for a parameter-free, deliberately soft cutoff
+(retaining a little more near-cutoff energy than the physical range would).
 """
 struct SaffmanDissipation <: DissipationFactor end
 
@@ -331,7 +332,10 @@ E_\\varphi(\\kappa) = C_{OC}\\,\\varepsilon_\\varphi\\,\\varepsilon^{-1/3}\\,\\k
 
 the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
 inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
-constant (``\\approx 0.67`` for the three-dimensional spectrum). The name is a dual eponym — Obukhov
+constant (``\\approx 0.67`` for the three-dimensional spectrum), quoted — unlike Yaglom's classical
+``4/3`` — for the *full*-variance scalar dissipation ``2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``,
+so it pairs directly with this package's full-variance ``\\varepsilon_\\varphi`` (`scalar_dissipation`)
+with no factor-of-two conversion. The name is a dual eponym — Obukhov
 (1949) and Corrsin (independently, 1951); the `1949` handle is Obukhov's year. [`spectrum`](@ref) reads
 the scalar dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
 kinetic-energy dissipation ``\\varepsilon`` from `fp`.

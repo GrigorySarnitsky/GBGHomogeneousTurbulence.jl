@@ -13,7 +13,7 @@ a direct dependency.
 
 | Concept | Symbol | Convention |
 |---|---|---|
-| Imaginary unit | ``\mathrm i`` | Upright, always — never bare italic `i`, never `\imath`. Writing it upright frees `i` for use as an index. |
+| Imaginary unit | ``\mathrm i`` | Upright, always — never bare italic ``i``, never ``\imath``. Writing it upright frees ``i`` for use as an index. |
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
 | Spatial average | ``\langle\,\cdot\,\rangle`` | The box average ``\frac1{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\boldsymbol x`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, `to_spectral(f)`. A field is one physical object; physical and spectral are two representations of it. |
@@ -62,7 +62,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |---|---|---|
 | ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
-| ``E(\kappa)`` | energy in each wavenumber-magnitude shell, ``k = \sum_\kappa E(\kappa)`` | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
+| ``E(\kappa)`` | the energy spectrum, in two readings related by the shell width ``\Delta\kappa = 2\pi/L``: as *measured*, the energy in each wavenumber-magnitude shell (``k = \sum_\kappa E(\kappa)``); as a `Phenomenology` *model*, the spectral density per unit wavenumber (``k = \int_0^\infty E(\kappa)\,\mathrm d\kappa``) | `energy_spectrum` (measured; the `GBGPeriodicFields` radial spectrum, halved) / `spectrum` (model density) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
 

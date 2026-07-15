@@ -27,8 +27,8 @@
 
 Tools for simulating and analyzing homogeneous isotropic turbulence on three-dimensional periodic
 domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
-of integrating-factor time-stepping scheme, with Lagrangian particle tracking and Eulerian +
-Lagrangian statistics.
+of integrating-factor time-stepping scheme, with Lagrangian particle tracking and field sampling for
+the forthcoming Eulerian + Lagrangian statistics.
 
 Built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl).
 
@@ -40,7 +40,7 @@ module GBGIsotropicTurbulence
 using GBGPeriodicFields
 
 
-# Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.7): it is
+# Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.8): it is
 # deliberately NOT re-exported below — reach the reference laws opt-in through the submodule namespace,
 # e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra`.
 include("Phenomenology.jl")

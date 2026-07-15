@@ -13,13 +13,13 @@
 """
     SimulationRun
 
-The run layer: [`Simulation`](@ref) (the assembled state of a case) and the functions that advance it —
-[`advance!`](@ref) (one step), [`run!`](@ref) (advance to a stopping condition, with an optional
-per-interval callback), and [`warmup!`](@ref) (spin up to statistical stationarity).
-[`current_time`](@ref) and [`current_step`](@ref) report the elapsed time and step count.
-[`flow_parameters`](@ref) reports the run's dimensionless flow state (a
-`Phenomenology` `FlowParameters`), and [`validate_spectrum`](@ref) compares its measured energy spectrum
-against a `Phenomenology` model.
+The run layer:
+- [`Simulation`](@ref) — the assembled state of a case.
+- [`advance!`](@ref), [`run!`](@ref), [`warmup!`](@ref) — advance one step, advance to a stopping
+  condition (with an optional per-interval callback), and spin up to statistical stationarity.
+- [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
+- [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
+- [`validate_spectrum`](@ref) — compare the run's measured energy spectrum against a `Phenomenology` model.
 """
 module SimulationRun
 
@@ -29,8 +29,8 @@ using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physica
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
 using ..Generator: velocity_to_physical!, vorticity_to_physical!
-using ..Observables: kinetic_energy, dissipation, scalar_variance, energy_spectrum, integral_scale,
-                     derivative_skewness, max_speed
+using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
+                     integral_scale, derivative_skewness, max_speed
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -62,9 +62,9 @@ A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@re
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
-[`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state with the observables
-([`kinetic_energy`](@ref), [`dissipation`](@ref), …) and [`flow_parameters`](@ref), and its progress
-with [`current_time`](@ref) / [`current_step`](@ref).
+[`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
+observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`), summarize it with
+[`flow_parameters`](@ref), and track its progress with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
@@ -80,7 +80,8 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
     **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
-    (``f = 2/3``); a wider-band strategy resolves a finer ``\\Delta x`` at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
+    (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
+    same grid at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
@@ -108,8 +109,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
-  scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale spectral peak of the
-  initial condition.
+  scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale envelope wavenumber
+  ``\\kappa_p`` of the initial condition (the shell-summed spectrum peaks at ``\\kappa_p/\\sqrt2``).
 - `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
   `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
@@ -219,23 +220,25 @@ _refresh_cached_fields!(sim::Simulation) =
 """
     flow_parameters(sim)
 
-The dimensionless flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
+The measured flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) reference law be evaluated at the run's
 measured state. The viscosity ``\\nu`` and the
 Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
-``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), and the longitudinal integral scale ``L_{11}`` are measured from the
-current velocity field. The scalar dissipation is **not** populated — it is left `NaN`; the scalar
-reference laws (`Yaglom1949`, `ObukhovCorrsin1949`) that read it take a `FlowParameters` with
-`scalar_dissipation` supplied explicitly.
+``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), the longitudinal integral scale ``L_{11}``, and —
+when the run carries a scalar — the scalar dissipation ``\\varepsilon_\\varphi`` are measured from the
+current state (the scalar dissipation is left `NaN` only for a scalar-free run, where the scalar reference
+laws do not apply).
 """
 function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim.state.velocity)
   curl!(sim.buffers.vorticity_spectral, sim.state.velocity, sim.domain.multipliers)
   ε = dissipation(sim.buffers.vorticity_spectral, sim.conditions.viscosity)
+  εφ = sim.state.scalar === nothing ? NaN :
+    scalar_dissipation(sim.state.scalar, sim.domain, sim.conditions.viscosity / sim.conditions.schmidt)
   FlowParameters(; viscosity = sim.conditions.viscosity, dissipation = ε,
                  rms_velocity = sqrt(2k / 3),
                  integral_scale = integral_scale(sim.state.velocity, sim.domain),
-                 schmidt = sim.conditions.schmidt)
+                 schmidt = sim.conditions.schmidt, scalar_dissipation = εφ)
 end
 
 
@@ -250,7 +253,7 @@ spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa``), so th
 shell width ``\\Delta\\kappa = 2\\pi/L`` before comparison — making the two agree at any box side ``L`` (not
 only the default ``L = 2\\pi``, where ``\\Delta\\kappa = 1``). Returns a named tuple
 `(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the measured and
-predicted per-shell ``E(\\kappa)``, and the relative L² discrepancy over the resolved (non-empty) shells.
+predicted per-shell ``E(\\kappa)``, and the relative ``L^{2}`` discrepancy over the resolved (non-empty) shells.
 
 !!! note
     A developed, well-resolved run agrees with a good model across the inertial range; at low Reynolds

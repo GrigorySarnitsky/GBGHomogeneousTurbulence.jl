@@ -156,8 +156,9 @@ end
 
 Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, dispatching on the concrete scheme so it
 allocates **exactly** its working set — never a register another scheme would use.
-[`IFLowStorageRK3`](@ref) allocates `stage1` + `nonlinear`; [`IFRK2`](@ref) allocates `stage1` + `stage2`
-+ `velocity_star_spectral`. `scalar = true` adds the nested `ScalarBuffers`, likewise sized to the scheme.
+[`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`; [`IFRK2`](@ref) allocates `stage1`,
+`stage2`, and `velocity_star_spectral`. `scalar = true` adds the nested `ScalarBuffers`, likewise sized to
+the scheme.
 A scheme with no method here is a hard error — there is no over-allocating fallback. The run layer calls
 this when assembling a `Simulation`.
 """
@@ -170,10 +171,14 @@ function allocate_buffers end
 Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`,
 `domain`, `buffers`, and the problem `conditions` (a [`FlowConditions`](@ref)). Dispatches on the concrete
-`integrator` type (see `IFRK2`, `IFLowStorageRK3`). The caller must have filled
-`buffers.velocity_physical` and `buffers.vorticity_start`
-with the start-of-step velocity and vorticity in physical representation (via
-[`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)).
+`integrator` type (see `IFRK2`, `IFLowStorageRK3`).
+
+!!! warning "Start-of-step caches must be filled by the caller"
+    `step!` reads — but does not fill — `buffers.velocity_physical` and `buffers.vorticity_start`, which
+    must already hold the start-of-step velocity and vorticity in physical representation (via
+    [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)). The run layer's
+    [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does this for you; calling `step!`
+    directly on unfilled caches silently produces a wrong step.
 """
 function step! end
 
@@ -288,7 +293,7 @@ integrating factor ``\\mathcal{E}`` is
 ```math
 \\begin{aligned}
 \\hat q^{*} &= \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\boldsymbol{N}}_1), \\\\
-\\hat q_{n+1} &= \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}\\big(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2\\big),
+\\hat q_{n+1} &= \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2),
 \\end{aligned}
 ```
 
@@ -432,8 +437,11 @@ A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
 ``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\max\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
-scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The base ceiling is
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt3`` of ``\\sup\\lvert\\boldsymbol
+u\\rvert``); that gap is absorbed by the conservative factor below, since the eigenvalue bound itself
+over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
 conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,

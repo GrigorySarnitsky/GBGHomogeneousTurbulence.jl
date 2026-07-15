@@ -97,10 +97,10 @@ term). Opt-in, not the default. Because it retains energy out to
 ``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
 ``2/3`` rule — handled automatically by `recommended_cfl`.
 
-!!! note "The Nyquist mode is untouched"
+!!! note "The Nyquist mistranslation does not bite"
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
-    cutoff at ``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
+    cutoff at ``2\\sqrt2/3\\,\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
 
 Phase-shift dealiasing follows Patterson & Orszag (1971); the combination with spherical truncation is
