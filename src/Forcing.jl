@@ -76,7 +76,7 @@ end
     set_forcing_rate!(forcing, rate, field, domain, buffers) -> Bool
 
 For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
-(the forcing ``f = A\\,\\texttt{field}``) and return `true`; the integrator folds it into the diffusive
+(the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
 integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_factor!`](@ref GBGIsotropicTurbulence.Generator.integrating_factor!)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
@@ -146,9 +146,9 @@ Fourier modes (integer shells ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\tex
 ``2\\pi/L``) are rescaled by a single factor to hold the `target`.
 
 The `target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
-energy** ``\\tfrac12\\langle\\lvert\\boldsymbol u\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
+energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
 the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` (`scalar_variance`) for the scalar — the field's
-``L^{2}`` observable, carrying the ``\\tfrac12`` only for the vector.
+``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
 
 The `over` keyword selects where the target applies:
   * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
@@ -193,7 +193,7 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A\\,\\texttt{field}`` in a low-wavenumber band (a band-limited
+Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
 variant of Lundgren 2003, whose linear forcing acts at every wavenumber),
 with the fixed rate ``A = \\texttt{rate}`` on shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``. The rate is
@@ -221,7 +221,7 @@ end
 """
     ConstantPower(domain; target, lowest_shell = 1, highest_shell = 2)
 
-Constant-injection-rate forcing: a banded linear forcing ``f = A\\,\\texttt{field}`` on integer shells
+Constant-injection-rate forcing: a banded linear forcing ``f = A \\texttt{field}`` on integer shells
 ``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}`` of ``2\\pi/L`` (default 1–2),
 whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
 injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
@@ -259,7 +259,7 @@ Stochastic (Eswaran–Pope) forcing: each forced Fourier mode in the band
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
 
 ```math
-\\hat f \\leftarrow \\theta\\,\\hat f + \\sqrt{\\sigma^{2}(1-\\theta^{2})}\\;\\xi,
+\\hat f \\leftarrow \\theta \\hat f + \\sqrt{\\sigma^{2}(1-\\theta^{2})}\\;\\xi,
 \\qquad \\theta = \\exp(-\\Delta t / T_L),
 ```
 

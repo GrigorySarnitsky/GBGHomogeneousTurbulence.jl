@@ -81,7 +81,7 @@ const _SREENIVASAN1995 = Reference("Sreenivasan (1995), *Phys. Fluids* **7**, 27
     Sreenivasan1995(; C_K = 1.5)
 
 The three-dimensional Kolmogorov constant ``C_K`` of the inertial-range energy spectrum
-``E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\kappa^{-5/3}`` — the amplitude a `Spectra` model uses. Reviewing
+``E(\\kappa) = C_K \\varepsilon^{2/3}\\kappa^{-5/3}`` — the amplitude a `Spectra` model uses. Reviewing
 the experimental and numerical record, Sreenivasan (1995) found it close to universal, a reliable
 estimate being ``C_K = 1.5 \\pm 0.1`` (the default; Sagaut & Cambon 2018), with no significant
 Reynolds-number trend; [`scaling`](@ref)`(law, fp)` returns it, independent of `fp`.
@@ -116,7 +116,7 @@ higher-Reynolds-number periodic-box DNS. It is a distinct group from the classic
 dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` (Taylor 1935; Sreenivasan 1998; Kaneda
 et al. 2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is
 normalized on the **integral** scale ``L_{11}``, not the box side ``L``. Formed on a common length the two
-are exactly related by ``G = \\tfrac{3}{2}\\,C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
+are exactly related by ``G = \\tfrac{3}{2} C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
 ``G \\approx 0.9`` (box side) and ``C_\\varepsilon \\approx 0.5`` (integral scale) sit at *different*
 lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly.
 

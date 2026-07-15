@@ -3,7 +3,7 @@
 
 Inertial-range structure-function laws — parametrizations of the longitudinal velocity structure
 function ``D_{L\\dots}(r)`` and the mixed velocity–scalar structure function
-``\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle`` (Yaglom), evaluated by [`structure_function`](@ref).
+``\\langle\\delta u_L (\\delta\\varphi)^2\\rangle`` (Yaglom), evaluated by [`structure_function`](@ref).
 
 - [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
   self-similar exponents (via [`scaling_exponent`](@ref)).
@@ -27,7 +27,7 @@ export StructureFunction, Kolmogorov1941, Kolmogorov1962, SheLeveque1994, Yaglom
 Supertype of the inertial-range structure-function laws — parametrizations of the longitudinal velocity
 moments ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the ``p``-th moment of the longitudinal
 velocity increment across a separation ``r``) and the mixed velocity–scalar moment
-``\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle`` ([`Yaglom1949`](@ref)), evaluated by
+``\\langle\\delta u_L (\\delta\\varphi)^2\\rangle`` ([`Yaglom1949`](@ref)), evaluated by
 [`structure_function`](@ref).
 """
 abstract type StructureFunction <: TurbulenceLaw end
@@ -41,9 +41,9 @@ const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301";
 The Kolmogorov (1941) inertial-range structure-function laws for the longitudinal velocity increment
 ``\\delta u_L``. [`structure_function`](@ref)`(law, r, fp; order)` returns:
 
-  * `order = 2` — the **2/3 law** ``D_{LL}(r) = C_2\\,(\\varepsilon r)^{2/3}``, the second-order
+  * `order = 2` — the **2/3 law** ``D_{LL}(r) = C_2 (\\varepsilon r)^{2/3}``, the second-order
     increment; the constant ``C_2 \\approx 2.0`` is empirical (default `2.0`).
-  * `order = 3` — the **4/5 law** ``D_{LLL}(r) = -\\tfrac{4}{5}\\,\\varepsilon r``, the third-order
+  * `order = 3` — the **4/5 law** ``D_{LLL}(r) = -\\tfrac{4}{5} \\varepsilon r``, the third-order
     increment; this one is *exact* (a consequence of the Kármán–Howarth–Monin relation), carrying no
     free constant.
 
@@ -104,7 +104,7 @@ The Kolmogorov (1962) log-normal (refined-similarity) intermittency model. Its
 [`scaling_exponent`](@ref)`(law; order)` gives
 
 ```math
-\\zeta_p = \\frac{p}{3} - \\frac{\\mu}{18}\\,p\\,(p - 3),
+\\zeta_p = \\frac{p}{3} - \\frac{\\mu}{18} p (p - 3),
 ```
 
 with `μ` the intermittency exponent (``\\approx 0.25``). Like [`SheLeveque1994`](@ref) it is exact at
@@ -130,14 +130,14 @@ const _YAGLOM = Reference("Yaglom (1949), *Dokl. Akad. Nauk SSSR* **69**, 743"; 
 The Yaglom (1949) "4/3 law" — the exact inertial-range scaling of the mixed third-order velocity–scalar
 structure function, the passive-scalar analogue of the 4/5 law (a consequence of the Yaglom relation);
 it carries no free constant. Its classical ``-\\tfrac{4}{3}`` coefficient is stated for the dissipation
-rate of the *half*-variance ``\\tfrac12\\langle\\varphi^2\\rangle``, namely
+rate of the *half*-variance ``\\tfrac{1}{2}\\langle\\varphi^2\\rangle``, namely
 ``\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle`` — just as the 4/5 law pairs with
-``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol\\omega\\rvert^2\\rangle``, the dissipation of the
+``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^2\\rangle``, the dissipation of the
 half-energy ``k``. This package's ``\\varepsilon_\\varphi = 2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``
 (`scalar_dissipation`) is the *full*-variance rate, twice that, so in these variables the law is
 
 ```math
-\\langle\\delta u_L\\,(\\delta\\varphi)^2\\rangle(r) = -\\tfrac{2}{3}\\,\\varepsilon_\\varphi\\,r.
+\\langle\\delta u_L (\\delta\\varphi)^2\\rangle(r) = -\\tfrac{2}{3} \\varepsilon_\\varphi r.
 ```
 
 [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar dissipation
@@ -164,10 +164,10 @@ The finite-Reynolds-number correction to the 4/5 law for the third-order longitu
 structure function,
 
 ```math
-D_{LLL}(r) = -\\left(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\right)\\varepsilon\\,r,
+D_{LLL}(r) = -\\left(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\right)\\varepsilon r,
 ```
 
-which relaxes to the exact ``-\\tfrac45\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
+which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
 ``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
 asymptotic 4/5 slope (Lundgren 2002; Sagaut & Cambon 2018, Table 4.5).
 [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading ``\\mathrm{Re}_\\lambda`` from

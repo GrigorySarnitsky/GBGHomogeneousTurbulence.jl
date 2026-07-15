@@ -73,9 +73,9 @@ Taylor-scale Reynolds number are [derived](@ref taylor_reynolds) from them, not 
 Fields (all keyword; a homogeneous-isotropic state fixes the rest):
 
   * `viscosity` — the kinematic viscosity ``\\nu``.
-  * `dissipation` — the mean dissipation rate ``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol\\omega\\rvert^2\\rangle``.
+  * `dissipation` — the mean dissipation rate ``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^2\\rangle``.
   * `rms_velocity` — the single-component r.m.s. velocity ``u'`` (so the turbulent kinetic energy is
-    ``k = \\tfrac32 u'^2``).
+    ``k = \\tfrac{3}{2} u'^2``).
   * `integral_scale` — the longitudinal integral length ``L_{11}`` (a large-scale quantity, independent of ``\\nu`` and
     ``\\varepsilon``; it fixes the energy-containing range).
   * `schmidt` — the Schmidt number ``\\mathrm{Sc}`` (the scalar diffusivity is
@@ -118,9 +118,9 @@ kolmogorov_time(fp::FlowParameters) = sqrt(fp.viscosity / fp.dissipation)
 """
     taylor_microscale(fp) -> Float64
 
-The Taylor microscale ``\\lambda = \\sqrt{15\\,\\nu\\,u'^2/\\varepsilon}`` of the state `fp` (a
+The Taylor microscale ``\\lambda = \\sqrt{15 \\nu u'^2/\\varepsilon}`` of the state `fp` (a
 [`FlowParameters`](@ref)) — the intermediate scale set by the isotropic relation
-``\\varepsilon = 15\\,\\nu\\,u'^2/\\lambda^2``.
+``\\varepsilon = 15 \\nu u'^2/\\lambda^2``.
 """
 taylor_microscale(fp::FlowParameters) =
   sqrt(15 * fp.viscosity * fp.rms_velocity^2 / fp.dissipation)
@@ -203,7 +203,7 @@ The reference structure function of the given `order` predicted by a `law` (a
 separation `r` for the state `fp` (a [`FlowParameters`](@ref)). Most laws give the longitudinal
 **velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the `order`-th moment ``p``) of the
 velocity increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives
-``\\langle\\delta u_L\\,(\\delta\\varphi)^{2}\\rangle``, the transport of scalar variance. Its home is
+``\\langle\\delta u_L (\\delta\\varphi)^{2}\\rangle``, the transport of scalar variance. Its home is
 [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """
 function structure_function end

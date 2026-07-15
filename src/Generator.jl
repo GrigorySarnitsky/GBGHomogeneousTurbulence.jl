@@ -107,18 +107,18 @@ the velocity `û` in spectral representation and its physical velocity `u` and v
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
 ```math
-(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
+(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
 ```
 
 so that, with the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbing the
-pressure and the ``\\nabla(\\tfrac12\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient, the momentum equation
+pressure and the ``\\nabla(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient, the momentum equation
 becomes
 
 ```math
-\\partial_t\\boldsymbol{u} = \\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
+\\partial_t\\boldsymbol{u} = \\mathbb{P} (\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
 ```
 
-The term computed is the spectral image of ``\\mathbb{P}\\,(\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
+The term computed is the spectral image of ``\\mathbb{P} (\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref). A **mask** strategy ([`TwoThirds`](@ref),
 [`HouLi`](@ref)) forms it once from `u`, `ω` and multiplies by the low-pass `domain.dealias`, leaving `û`
 and `phase_shift` unused — pass `nothing` for `phase_shift` there. [`PhaseShift`](@ref) forms it **twice** —
@@ -175,7 +175,7 @@ Write the exact diffusive integrating factor into `factor` (a scalar field in sp
 representation by the per-mode multiplier
 
 ```math
-\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big(-D\\,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\,\\Delta t\\big),
+\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big(-D \\lvert\\boldsymbol{\\kappa}\\rvert^{2} \\Delta t\\big),
 ```
 
 so multiplying a field by `factor` advances its viscous/diffusive part exactly (no stability
@@ -186,7 +186,7 @@ velocity and ``\\nu/\\mathrm{Sc}`` for the scalar (``\\mathrm{Sc}`` the Schmidt 
 
 When a linear forcing rate ``A(\\boldsymbol{\\kappa})`` is supplied (`rate`, a real array; from the
 `set_forcing_rate!` of a `Linear`/`ConstantPower` forcing), it is folded into the linear operator,
-``\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2})\\,\\Delta t\\big)``
+``\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\Delta t\\big)``
 — exact for the linear forcing, so the integrator keeps its order.
 """
 function integrating_factor!(factor, domain::FixedDomain, diffusivity::Real, dt::Real, rate = nothing)
@@ -227,7 +227,7 @@ component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by de
 untouched.
 
 It is computed pseudospectrally as
-``-\\,\\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
+``- \\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``.
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û`, `φ̂`, and
 `phase_shift` unused — pass `nothing` for `phase_shift` there. [`PhaseShift`](@ref) instead averages it

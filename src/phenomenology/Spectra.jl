@@ -166,7 +166,7 @@ large_scale_factor(::UnitLargeScale, κL) = one(κL)
     PaoDissipation(α)
 
 Pao's dissipation-range roll-off
-``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\tfrac32\\,\\alpha\\,(\\kappa\\eta)^{4/3}\\big)``, from the
+``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\tfrac{3}{2} \\alpha (\\kappa\\eta)^{4/3}\\big)``, from the
 hypothesis that the spectral energy flux stays constant through the dissipation range; `α` is the
 Kolmogorov constant ``C_K`` (Pao 1965).
 """
@@ -180,7 +180,7 @@ dissipation_factor(f::PaoDissipation, κη) = exp(-1.5 * f.α * κη^(4//3))
 """
     ExponentialDissipation(β)
 
-The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta\\,\\kappa\\eta)``
+The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta \\kappa\\eta)``
 — the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
 spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). It is the
 *far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
@@ -216,7 +216,7 @@ dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 The composed model energy spectrum
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L_{11})\\,f_\\eta(\\kappa\\eta),
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\\kappa\\eta),
 ```
 
 an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-off `large_scale` (a
@@ -256,7 +256,7 @@ The Pope (2000) model spectrum — a preset [`ModelSpectrum`](@ref) with [`PopeL
 [`PopeDissipation`](@ref) roll-offs:
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,f_L(\\kappa L_{11})\\,f_\\eta(\\kappa\\eta).
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\\kappa\\eta).
 ```
 
 `C_K` is the Kolmogorov constant; the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number
@@ -276,7 +276,7 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 [`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
              \\left(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\right)^{17/6},
 ```
 
@@ -297,8 +297,8 @@ The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no ener
 ([`UnitLargeScale`](@ref)) and the [`PaoDissipation`](@ref) cutoff:
 
 ```math
-E(\\kappa) = C_K\\,\\varepsilon^{2/3}\\,\\kappa^{-5/3}\\,
-             \\exp\\!\\big(-\\tfrac32\\,C_K\\,(\\kappa\\eta)^{4/3}\\big),
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} 
+             \\exp\\!\\big(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\big),
 ```
 
 covering the inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
@@ -327,7 +327,7 @@ const _OBUKHOVCORRSIN = Reference("Obukhov (1949) / Corrsin (1951)"; valid_Reλ 
 The Obukhov–Corrsin inertial-convective scalar spectrum
 
 ```math
-E_\\varphi(\\kappa) = C_{OC}\\,\\varepsilon_\\varphi\\,\\varepsilon^{-1/3}\\,\\kappa^{-5/3},
+E_\\varphi(\\kappa) = C_{OC} \\varepsilon_\\varphi \\varepsilon^{-1/3} \\kappa^{-5/3},
 ```
 
 the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's

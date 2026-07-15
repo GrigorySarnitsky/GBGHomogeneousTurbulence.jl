@@ -16,7 +16,7 @@ reference for turbulence notation (§References).
 ## 1. Identity
 
 > `GBGIsotropicTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS) of
-> homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol u`` and one passive
+> homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol{u}`` and one passive
 > scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable integrating-factor
 > time-stepping, with Lagrangian particle probes and Eulerian + Lagrangian statistics. It is a **library
 > of composable pieces with a thin ergonomic run layer on top**, built as a *consumer* of
@@ -181,11 +181,11 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
-  record of the evolving spectral fields — the velocity ``\hat{\boldsymbol u}`` and, when the run carries
+  record of the evolving spectral fields — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
   scalar are derived from it on demand and never stored, so the state cannot go stale. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
-  ``(\hat{\boldsymbol u}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
+  ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
   carrier so the arrows stay primary (§11 decision 26). Its initial conditions seed it:
   `random_solenoidal_velocity!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar!` fills a mean-zero scalar to a target variance. The
@@ -204,35 +204,35 @@ adds the `Generator → Forcing` dependency. It carries a
 **metriplectic seam** — a reversible part that conserves energy and an irreversible part that dissipates
 it (§8) — and the numerical split is built to honor it. The incompressible momentum equation is
 advanced in **rotational (Lamb-vector) form**: writing the convective term through the identity
-``(\boldsymbol u\cdot\nabla)\boldsymbol u = \nabla(\tfrac12\lvert\boldsymbol u\rvert^2) - \boldsymbol u\times\boldsymbol\omega``
-(with vorticity ``\boldsymbol\omega = \nabla\times\boldsymbol u``) and letting the Leray–Helmholtz
+``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) - \boldsymbol{u}\times\boldsymbol{\omega}``
+(with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}``) and letting the Leray–Helmholtz
 projection ``\mathbb P`` onto divergence-free fields absorb the pressure and the kinetic-energy gradient,
 the equation becomes
 
 ```math
-\partial_t\boldsymbol u = \mathbb P\,(\boldsymbol u\times\boldsymbol\omega) + \nu\nabla^2\boldsymbol u + \boldsymbol f .
+\partial_t\boldsymbol{u} = \mathbb P (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^2\boldsymbol{u} + \boldsymbol{f} .
 ```
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
 
 - **The reversible term.** `velocity_to_physical!` and `vorticity_to_physical!` recover the physical velocity and vorticity from
-  ``\hat{\boldsymbol u}``; `velocity_nonlinear!` then assembles
-  ``\mathbb P\,(\boldsymbol u\times\boldsymbol\omega)``, dealiased by the ``2/3`` rule to remove the
+  ``\hat{\boldsymbol{u}}``; `velocity_nonlinear!` then assembles
+  ``\mathbb P (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
   Orszag 1971). Rotational form is the cheap, energy-conserving way to compute the advection spectrally,
   and incompressible Euler is genuinely Hamiltonian — so this term is the flow's *reversible*,
   energy-conserving generator, stepped explicitly.
-- **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol u`` is the flow's *irreversible*,
+- **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly*: `integrating_factor!`
   builds the flow map
-  ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2)\,\Delta t\big)``
+  ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
   — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below) — and multiplying a field by ``\mathcal E`` advances its diffusion with
   no stability restriction. ``\mathcal E`` is a *propagator*, a flow map over a step, not a generator;
   keeping the two apart is exactly the Generator/Propagator distinction of §4.5.
-- **The source.** ``\boldsymbol f`` is the forcing, an external drive that is neither seam half (§4.4).
-  When a forcing is *linear* in the field (``\boldsymbol f = A\,\boldsymbol u``), its rate
+- **The source.** ``\boldsymbol{f}`` is the forcing, an external drive that is neither seam half (§4.4).
+  When a forcing is *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``), its rate
   ``A(\boldsymbol{\kappa})`` is diagonal and linear like the diffusion, so it folds into the same
   exponential ``\mathcal E`` for exactness — and there it *injects* energy, ``\mathcal E > 1`` wherever
   ``A > D\lvert\boldsymbol{\kappa}\rvert^2``. So ``\mathcal E`` cross-cuts the seam: it carries the
@@ -241,8 +241,8 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
 
 The passive scalar rides the same generator: `scalar_to_physical!` transforms ``\hat\varphi`` to the
 physical ``\varphi`` at each stage, and `scalar_nonlinear!` assembles the advection in conservative form
-``-\nabla\cdot(\boldsymbol u\varphi)`` (equal to ``-\boldsymbol u\cdot\nabla\varphi`` since
-``\nabla\cdot\boldsymbol u = 0``); the conservative form conserves the scalar mean exactly under the
+``-\nabla\cdot(\boldsymbol{u}\varphi)`` (equal to ``-\boldsymbol{u}\cdot\nabla\varphi`` since
+``\nabla\cdot\boldsymbol{u} = 0``); the conservative form conserves the scalar mean exactly under the
 ``2/3`` rule.
 
 The metriplectic reading is a **lens, not a literal thermodynamics**: incompressible isothermal flow
@@ -256,15 +256,15 @@ puts on any closure: net dissipation lives in the diffusion term alone, so a sub
 `Observables` realizes the Mori–Zwanzig observables: the functions of the state that are measured. Each
 states the physical quantity first, then the reduction that computes it:
 
-- `kinetic_energy` ``k = \tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` and `dissipation`
-  ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``;
+- `kinetic_energy` ``k = \tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` and `dissipation`
+  ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle``;
 - `scalar_variance` ``\langle\varphi^2\rangle`` and `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
 - `max_speed`, which sets the advective-CFL;
 - `derivative_skewness`, the K41 marker ``S \approx -0.5`` of developed turbulence, computed
-  coordinate-free as the normalized third invariant of the strain rate ``\boldsymbol S``,
-  ``3C\langle\det\boldsymbol S\rangle/\langle\boldsymbol S:\boldsymbol S\rangle^{3/2}`` with the exact
-  isotropy constant ``C = \tfrac47\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
+  coordinate-free as the normalized third invariant of the strain rate ``\boldsymbol{S}``,
+  ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
+  isotropy constant ``C = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
 - `energy_spectrum` ``E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
   derived from it.
@@ -275,11 +275,11 @@ harness whose *predicted* half is `Phenomenology` (§4.8).
 
 ### 4.4 `Forcing` — the source
 
-Forcing is the System's energy-injection strategy — the source term ``\boldsymbol f`` of §4.2, and the one
+Forcing is the System's energy-injection strategy — the source term ``\boldsymbol{f}`` of §4.2, and the one
 deliberately designed-in extension point. `AbstractForcing` is the supertype; a forcing enters the
 step through a small interface whose four methods each default to doing nothing:
 
-- `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol f = A\,\boldsymbol u``): fill the
+- `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
 - `prepare_forcing!` — advance internal state once per step (a stochastic process);
@@ -302,14 +302,14 @@ on the generator's reversible/irreversible seam. Its numerical schemes are the M
 Method (§3).
 
 - **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
-  advances the spectral velocity ``\hat{\boldsymbol u}`` and scalar ``\hat\varphi`` **together** through
+  advances the spectral velocity ``\hat{\boldsymbol{u}}`` and scalar ``\hat\varphi`` **together** through
   the same Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
-  ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
+  ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **`IntegratorBuffers`** is the per-step scratch the propagator owns and writes into — the shared
   right-hand-side working fields (the physical-recovery copies, the `product_physical`/`product_spectral`
@@ -322,8 +322,8 @@ Method (§3).
 ### 4.6 `Particles` — Lagrangian instruments
 
 Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
-state-carrying trajectory object: today a tracer (position ``\boldsymbol x``); the deferred ladder is
-inertial (``\boldsymbol x, \boldsymbol v``) and oriented (``\boldsymbol x, \boldsymbol v, \boldsymbol L``)
+state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
+inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme; `advect!` pushes them
 Heun-in-time on the velocity at the start and end of the step (the fields the solver already produces);
 `sample!` reads any field along the trajectories for Lagrangian statistics.
@@ -340,7 +340,7 @@ integrator** — the reversible generator of §8 again — so the split does not
 ### 4.7 `SimulationRun` — the front door
 
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
-spectral fields ``\hat{\boldsymbol u}`` and ``\hat\varphi`` the generator acts on), the `IntegratorBuffers`
+spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `IntegratorBuffers`
 scratch, the `FlowConditions`, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
 for the Heun push, and a clock. Over it:
 
@@ -398,7 +398,7 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
-  **composed**: an inertial core ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
+  **composed**: an inertial core ``C_K \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
   factor ``f_L(\kappa L_{11})`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
   published triple.
 - **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
@@ -510,8 +510,8 @@ generalization is built for them until a second concrete case forces the abstrac
   added to the RHS. *Built and validated, then archived* from the public surface (un-exported,
   undocumented) to be re-added; its host-side random increment is the one allocation-free exception
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
-- **Inertial and oriented particles** — ``(\boldsymbol x,\boldsymbol v)`` with matrix drag, then
-  ``(\boldsymbol x,\boldsymbol v,\boldsymbol L)`` with torque. The translational drag reuses the
+- **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
+  ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric integrator (§4.6, §8).
 - **The sheared frame (Rogallo), a `ShearedDomain`.** A uniform mean velocity gradient makes the
   wavenumbers time-dependent (``\mathrm{d}\boldsymbol{\kappa}/\mathrm{d}t = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)
@@ -526,7 +526,7 @@ generalization is built for them until a second concrete case forces the abstrac
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
   Lagrangian trajectory samples in, streamed summaries out).
 - **Alternative dealiasing and nonlinear forms (partly built).** `DealiasingStrategy` now *owns the
-  dealiased nonlinear assembly* — ``\hat{\boldsymbol u}`` (and ``\hat\varphi``) in, the dealiased term
+  dealiased nonlinear assembly* — ``\hat{\boldsymbol{u}}`` (and ``\hat\varphi``) in, the dealiased term
   out — so a strategy may restructure *how* the product is computed, not merely filter its output. The
   sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; **`PhaseShift`**
   (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
@@ -643,7 +643,7 @@ one usually encodes a decision.
   statistically isotropic — no preferred direction — so a diagnostic or computation that picks a coordinate
   axis imports a spurious direction-dependence; state the **rotation-invariant** form, not an axis
   projection. The reference is `derivative_skewness`: the normalized third invariant of the strain rate
-  ``\boldsymbol S``, not the axis-picking longitudinal velocity-derivative skewness (decision 17).
+  ``\boldsymbol{S}``, not the axis-picking longitudinal velocity-derivative skewness (decision 17).
 - **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
   rationale and the decision log. Mathematics is rendered LaTeX in the glossary's notation
   ([`docs/src/notation.md`](notation.md)); a code identifier is always in `backticks` and never inside a
@@ -679,7 +679,7 @@ one usually encodes a decision.
   Self-contained / Notation / Formatted / Current / Cited / variant-pairs) × (every surface:
   `ARCHITECTURE.md`, every `src/*.jl` docstring, every `docs/src` page) — run to completion in one pass
   (`.claude/commands/check-docs.md`). *Correct* extends to physical-formula and normalization checking
-  (the ``1/N``, the ``2\varkappa``, the ``\tfrac12`` in the energy, Parseval factors) and to the
+  (the ``1/N``, the ``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval factors) and to the
   category/type-error class above. Two build lints (`lint_inline_math`, `lint_notation_variants`) and
   `checkdocs = :exports` are the mechanical backstop.
 - **Citations** follow author–year; the full references are §References. Never cite an inaccessible source;
@@ -786,7 +786,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 20. **(2026-07) Resolution-based `viscosity` — the run layer *consumes* a `Phenomenology` law to build a
     run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
-    (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2}\,C_\varepsilon^{-2/3}`` — calibrated to
+    (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2} C_\varepsilon^{-2/3}`` — calibrated to
     JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
@@ -797,7 +797,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
     sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
     wavenumber), not ``\eta/\Delta x`` (geometric): the former is dealiasing-aware through
-    ``\kappa_{\max} = f\,\tfrac N2\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
+    ``\kappa_{\max} = f \tfrac N2\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
     accuracy itself depends on the dealiasing.
 21. **(2026-07) The physics-first carving is checked against a formal structural model
     (`docs/architecture.als`).** The module carving and the Mori–Zwanzig role wiring were re-examined
@@ -877,20 +877,20 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\approx 16`` for `Float32`), so the Nyquist mode always damps to that precision's epsilon —
     precision as a studied axis (invariant 4); an explicit `strength` overrides.
 26. **(2026-07) The state reified as `ResolvedFields`; the per-step scratch relocated to `Propagator`.**
-    The DNS state — the evolving spectral velocity ``\hat{\boldsymbol u}`` and optional scalar
+    The DNS state — the evolving spectral velocity ``\hat{\boldsymbol{u}}`` and optional scalar
     ``\hat\varphi`` — is made first-class as **`ResolvedFields`** (module `State`), completing the
     Mori–Zwanzig triad whose State leg had been missing: the fields were scattered across the `Simulation`
     value while the diagnostics read the physical *scratch* as if it were state (`kinetic_energy(sim)` read
     `buffers.velocity`). It is a **bare, inert record with every operation external** — the panel's ruling,
     which adopts the category lens's guardrail (arrows primary, no methods on the carrier) and rejects its
-    dissolution. **`ResolvedFields` holds only the spectral truth** (``\hat{\boldsymbol u}``,
+    dissolution. **`ResolvedFields` holds only the spectral truth** (``\hat{\boldsymbol{u}}``,
     ``\hat\varphi``); the physical velocity, vorticity, and scalar are a Method-side derived view, never
     stored, so the state cannot go stale — and because the physical chart is rung-specific (EDQNM has no
     phases to invert), keeping it out of the state keeps the record fit to lift, unchanged, to one slot of
     the future product-of-slots `State` (§7, abstraction-ready, not built). The observables become **thin
     functions of the natural representation** with no `State` dependency:
     `kinetic_energy`/`scalar_variance`/`derivative_skewness`/`energy_spectrum` are Parseval reductions of
-    ``\hat{\boldsymbol u}``/``\hat\varphi``, `dissipation` curls into scratch and reduces, and the run layer
+    ``\hat{\boldsymbol{u}}``/``\hat\varphi``, `dissipation` curls into scratch and reduces, and the run layer
     prepares what each needs — the mirror of the generator, both now thin externals over bare fields.
     Consequently the monolithic `FieldBuffers` is dissolved: the generator's operators take their
     **individual scratch fields** (naming no bundle), so the scratch is free to live with the integrator
@@ -907,12 +907,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     spherical ``2/3``). Each quadratic nonlinear term is assembled twice — on the grid and on a grid
     displaced half a cell — and averaged, cancelling the aliasing images that wrap in an *odd* number of
     axes; a spherical truncation at
-    ``\kappa_{\max} = \tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L} \approx 0.94\,\kappa_{\mathrm{Ny}}`` removes the
+    ``\kappa_{\max} = \tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L} \approx 0.94 \kappa_{\mathrm{Ny}}`` removes the
     surviving *two-axis* images (a single half-cell shift is exact only in 1-D; Patterson & Orszag 1971,
     Rogallo 1981). It keeps a ``\sqrt2`` wider band than the ``2/3`` rule (``\approx 2.8\times`` the modes
     in the retained sphere) at ``2\times`` the nonlinear-term transforms and a displaced-evaluation scratch
     field. This realizes the deferred D6 assembly generalization (§7) for this sibling: `DealiasingStrategy`
-    now dispatches the whole ``\hat{\boldsymbol u}\to`` dealiased-term computation, not only a post-multiply
+    now dispatches the whole ``\hat{\boldsymbol{u}}\to`` dealiased-term computation, not only a post-multiply
     kernel. The displacement is built once as two `translation_kernel`s (the shift theorem's phase, a
     `GBGPeriodicFields` translation primitive whose Nyquist even/odd split makes the kernel a real
     field); because the cutoff is
@@ -928,7 +928,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       `1.5`, once documented "by design" rather than fixed.)
     - **`scalar_type` → `element_type`** (the keyword names the array element type, not the passive
       scalar's type); **`Tracers(domain, positions)`**, so backend and precision flow from the domain.
-    - **`step!` advances the `State`** (`ResolvedFields`), not loose ``\hat{\boldsymbol u}`` / ``\hat\varphi``.
+    - **`step!` advances the `State`** (`ResolvedFields`), not loose ``\hat{\boldsymbol{u}}`` / ``\hat\varphi``.
     - **Observables are functions of the state, not the `Simulation`.** No `f(sim)` form: an observable
       taking a `Simulation` reached across `state` / `buffers` / `conditions`, smearing the single source of
       truth (decision 26); the run layer supplies the explicit state variables.

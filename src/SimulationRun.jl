@@ -57,7 +57,7 @@ end
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the velocity
-``\\hat{\\boldsymbol u}`` and passive scalar ``\\hat\\varphi`` in spectral representation), any
+``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), any
 [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
@@ -78,7 +78,7 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     ``k``, `side_length` the side ``L``, and ``G`` the box-normalization group constant (``\\approx 0.9``),
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
-    **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi\\,\\eta/\\Delta x`` with ``f`` the
+    **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
     same grid at the same `k_max_η`. The `kinetic_energy` and `side_length` fix

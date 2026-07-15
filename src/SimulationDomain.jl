@@ -47,7 +47,7 @@ abstract type DealiasingStrategy end
     TwoThirds()
 
 The sharp isotropic ``2/3``-rule truncation: keep the modes
-``\\kappa \\le \\kappa_{\\max} = \\tfrac23\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
+``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
 of the quadratic nonlinearity, and the lean, GPU-friendly default.
@@ -58,7 +58,7 @@ struct TwoThirds <: DealiasingStrategy end
     HouLi(; order = 36, strength = nothing)
 
 The smooth Hou–Li spectral filter, transfer function
-``\\exp\\!\\big(-\\,\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
+``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
 damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
@@ -87,8 +87,8 @@ by half a cell, average the two, and truncate spherically at
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
 average cancels the aliasing images that wrap in an odd number of axes; the spherical cutoff removes the
 surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
-``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94\\,\\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt2``
-further than the [`TwoThirds`](@ref) rule's ``\\tfrac23\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
+``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt2``
+further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
 modes in the retained sphere).
 
 Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform per
@@ -100,7 +100,7 @@ term). Opt-in, not the default. Because it retains energy out to
 !!! note "The Nyquist mistranslation does not bite"
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
-    cutoff at ``2\\sqrt2/3\\,\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
+    cutoff at ``2\\sqrt2/3 \\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
 
 Phase-shift dealiasing follows Patterson & Orszag (1971); the combination with spherical truncation is
@@ -230,7 +230,7 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 The highest wavenumber magnitude that `domain` actually evolves — the dealiasing cutoff
 
 ```math
-\\kappa_{\\max} = f\\,\\frac N2\\,\\frac{2\\pi}{L},
+\\kappa_{\\max} = f \\frac N2 \\frac{2\\pi}{L},
 ```
 
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
@@ -307,7 +307,7 @@ Apply the run's dealias low-pass `domain.dealias` to `field` in place — a coef
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
-``2\\sqrt2/3\\,\\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
+``2\\sqrt2/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation.
 """
 dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)

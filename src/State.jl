@@ -33,7 +33,7 @@ and never stored, so the state cannot go stale. Build it on a [`FixedDomain`](@r
 to carry a passive scalar.
 
 # Fields
-- `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol u}``.
+- `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
 - `scalar` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the run carries
   no passive scalar.
 """
@@ -52,7 +52,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
-``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope

@@ -45,7 +45,7 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
 
 Supertype of the time-marching schemes. A scheme implements
 [`step!`](@ref)`(integrator, state, domain, buffers, conditions, dt)`, advancing the `state`'s velocity
-``\\hat{\\boldsymbol u}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one timestep in
+``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one timestep in
 place, and may specialize
 [`recommended_cfl`](@ref).
 """
@@ -168,7 +168,7 @@ function allocate_buffers end
 """
     step!(integrator, state, domain, buffers, conditions, dt)
 
-Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol u}`` and passive scalar
+Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`,
 `domain`, `buffers`, and the problem `conditions` (a [`FlowConditions`](@ref)). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`).
@@ -195,10 +195,10 @@ and ``\\widehat{\\boldsymbol{N}}`` the dealiased nonlinearity of each field, the
 
 ```math
 \\begin{aligned}
-\\boldsymbol{h} &\\leftarrow A_i\\,\\boldsymbol{h} + \\Delta t\\,\\widehat{\\boldsymbol{N}}(\\hat q), \\\\
-\\hat q &\\leftarrow \\hat q + B_i\\,\\boldsymbol{h}, \\\\
-\\hat q &\\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\hat q, \\\\
-\\boldsymbol{h} &\\leftarrow \\mathcal{E}_D(d_i\\Delta t)\\,\\boldsymbol{h},
+\\boldsymbol{h} &\\leftarrow A_i \\boldsymbol{h} + \\Delta t \\widehat{\\boldsymbol{N}}(\\hat q), \\\\
+\\hat q &\\leftarrow \\hat q + B_i \\boldsymbol{h}, \\\\
+\\hat q &\\leftarrow \\mathcal{E}_D(d_i\\Delta t) \\hat q, \\\\
+\\boldsymbol{h} &\\leftarrow \\mathcal{E}_D(d_i\\Delta t) \\boldsymbol{h},
 \\end{aligned}
 ```
 
@@ -293,8 +293,8 @@ integrating factor ``\\mathcal{E}`` is
 
 ```math
 \\begin{aligned}
-\\hat q^{*} &= \\mathcal{E}\\,(\\hat q_n + \\Delta t\\,\\widehat{\\boldsymbol{N}}_1), \\\\
-\\hat q_{n+1} &= \\mathcal{E}\\,\\hat q_n + \\tfrac{\\Delta t}{2}(\\mathcal{E}\\,\\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2),
+\\hat q^{*} &= \\mathcal{E} (\\hat q_n + \\Delta t \\widehat{\\boldsymbol{N}}_1), \\\\
+\\hat q_{n+1} &= \\mathcal{E} \\hat q_n + \\tfrac{\\Delta t}{2}(\\mathcal{E} \\widehat{\\boldsymbol{N}}_1 + \\widehat{\\boldsymbol{N}}_2),
 \\end{aligned}
 ```
 
@@ -435,13 +435,12 @@ allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = Integrato
     recommended_cfl(integrator, domain)
 
 A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
-``\\Delta t = C\\,\\Delta x / \\max_i\\lvert u_i\\rvert``.
+``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
 scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
-maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt3`` of ``\\sup\\lvert\\boldsymbol
-u\\rvert``); that gap is absorbed by the conservative factor below, since the eigenvalue bound itself
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt3`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap is absorbed by the conservative factor below, since the eigenvalue bound itself
 over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken

@@ -114,6 +114,8 @@ grep -rnE '\$[^$]*[\\_^{}][^$]*\$' docs                                # stray T
 grep -rniE '\bknobs?\b' docs src                                       # neutral register — must be empty
 grep -rnE '\\partial_[ijk]' src/*.jl docs/*.md docs/src                # bare-index ∂ → \partial_{x_i}; build-enforced, must be empty
 grep -rnE '\\mathbf' src/*.jl docs/*.md docs/src                       # upright bold → \boldsymbol; build-enforced, must be empty
+grep -rnP '\\\\,(?!\\\\mathrm d)' src/*.jl; grep -rnP '\\,(?!\\mathrm d)' docs/src docs/*.md  # gratuitous thin space → keep only the differential \,\mathrm d, else use a plain space; must be empty
+grep -rnP '\\\\([dt]?frac[0-9]|boldsymbol\s*[A-Za-z\\])' src/*.jl; grep -rnP '\\([dt]?frac[0-9]|boldsymbol\s*[A-Za-z\\])' docs/src docs/*.md  # unbraced group arg → brace it (\tfrac45→\tfrac{4}{5}, \boldsymbol u→\boldsymbol{u}); must be empty
 grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.velocity|_forcing|_spectral|_physical|_field|_copy|_star|_start|_rate|_nonlinear|_plans|velocity_|vorticity_|`|the |physical |a velocity'  # stale math-variable names (triage: keep struct fields / function names / prose)
 awk '/^"""/{d=!d;s=d;next} s&&/^[^ ]/{s=0} s&&/^    [A-Za-z_].*\(/&&length>88{print FILENAME":"FNR}' src/*.jl  # wide docstring signatures — FNR (per-file)
 grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring: a §-number / design-doc path (drop #-comment hits) — must be empty

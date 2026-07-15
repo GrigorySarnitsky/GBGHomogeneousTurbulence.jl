@@ -15,7 +15,7 @@ a direct dependency.
 |---|---|---|
 | Imaginary unit | ``\mathrm i`` | Upright, always — never bare italic ``i``, never ``\imath``. Writing it upright frees ``i`` for use as an index. |
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
-| Spatial average | ``\langle\,\cdot\,\rangle`` | The box average ``\frac1{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\boldsymbol x`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
+| Spatial average | ``\langle \cdot \rangle`` | The box average ``\frac{1}{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm d\boldsymbol{x}`` over the periodic domain ``\Omega`` — the homogeneous ensemble average. |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, `to_spectral(f)`. A field is one physical object; physical and spectral are two representations of it. |
 | Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*. The scalar diffusivity ``\varkappa`` (Parameters) is a fourth, deliberately distinct glyph. |
 
@@ -23,13 +23,13 @@ a direct dependency.
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``\boldsymbol u`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol u = 0`` | the velocity state |
-| ``\boldsymbol\omega`` | the vorticity ``\nabla\times\boldsymbol u`` | `vorticity_to_physical!` |
+| ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | `vorticity_to_physical!` |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
-| ``\boldsymbol f`` | a body forcing on the momentum equation | `AbstractForcing` |
+| ``\boldsymbol{f}`` | a body forcing on the momentum equation | `AbstractForcing` |
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
-| ``\boldsymbol x``, ``t`` | position in the box ``\Omega``; time | — |
+| ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 
 ## Parameters
 
@@ -60,8 +60,8 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 | Symbol | Meaning | Code |
 |---|---|---|
-| ``k`` | turbulent kinetic energy ``\tfrac12\langle\lvert\boldsymbol u\rvert^2\rangle`` | `kinetic_energy` |
-| ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` | `dissipation` |
+| ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | `kinetic_energy` |
+| ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | `dissipation` |
 | ``E(\kappa)`` | the energy spectrum, in two readings related by the shell width ``\Delta\kappa = 2\pi/L``: as *measured*, the energy in each wavenumber-magnitude shell (``k = \sum_\kappa E(\kappa)``); as a `Phenomenology` *model*, the spectral density per unit wavenumber (``k = \int_0^\infty E(\kappa)\,\mathrm d\kappa``) | `energy_spectrum` (measured; the `GBGPeriodicFields` radial spectrum, halved) / `spectrum` (model density) |
 | ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
@@ -76,7 +76,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm d\kappa / \int_0^\infty E\,\mathrm d\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | `integral_scale` |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15\,\nu\,u'^2/\varepsilon}`` | `taylor_microscale` |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | `taylor_microscale` |
 
 ## Numerics
 
@@ -85,8 +85,8 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``N`` | grid points per side | `grid_points_per_axis` |
 | ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
-| ``C`` | advective-CFL ceiling, ``\Delta t = C\,\Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
-| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac23\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
+| ``C`` | advective-CFL ceiling, ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
+| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
 | ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
 

@@ -39,8 +39,8 @@ export kinetic_energy, dissipation, max_speed,
 """
     kinetic_energy(u)
 
-The turbulent kinetic energy ``\\tfrac12\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
-velocity field `u`. Computed as ``\\tfrac12\\,\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
+The turbulent kinetic energy ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
+velocity field `u`. Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
 the normalized inner product, so by Parseval's theorem it accepts `u` in either
 representation.
 """
@@ -51,10 +51,10 @@ kinetic_energy(u) = 0.5 * inner(u, u)
     dissipation(ω, viscosity)
 
 The mean kinetic-energy dissipation rate of a homogeneous flow,
-``\\varepsilon = \\nu\\,\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, from the physical
+``\\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, from the physical
 `ω` ``\\boldsymbol{\\omega}`` and the kinematic `viscosity` ``\\nu`` (the homogeneous
 identity ``\\varepsilon = 2\\nu\\langle S_{ij}S_{ij}\\rangle = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``,
-with the strain-rate tensor ``S_{ij} = \\tfrac12(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``).
+with the strain-rate tensor ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``).
 """
 dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
 
@@ -85,7 +85,7 @@ scalar_variance(φ) = inner(φ, φ)
     scalar_dissipation(φ̂, domain, diffusivity)
 
 The mean scalar-variance dissipation rate
-``\\varepsilon_\\varphi = 2\\varkappa\\,\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
+``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
 in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
@@ -114,8 +114,8 @@ is the scalar skewness, the bold ``\\boldsymbol{S}`` the strain-rate tensor):
 
 ```math
 \\begin{aligned}
-S &= C\\,\\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
-   = 3C\\,\\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}, \\\\
+S &= C \\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
+   = 3C \\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}, \\\\
 C &= \\tfrac{4}{7}\\sqrt{15/2} \\approx 1.5649.
 \\end{aligned}
 ```
@@ -161,8 +161,8 @@ The measured kinetic-energy spectrum ``E(\\kappa)`` of the velocity field `û` (
 representation) — the turbulent kinetic energy resolved over wavenumber-magnitude shells,
 ``k = \\sum_\\kappa E(\\kappa)``. Returns `(κ, E)`: the shell-center wavenumber magnitudes and the energy
 in each shell (brought to the host, an occasional diagnostic). It is the `GBGPeriodicFields` radial
-spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol u}\\rvert^2`` while the
-kinetic energy carries the ``\\tfrac12``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
+spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
+kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
 spectrum, for validation.
 """
@@ -179,7 +179,7 @@ The longitudinal integral length scale of the velocity field `û`, measured from
 [`energy_spectrum`](@ref) ``E(\\kappa)``,
 
 ```math
-L_{11} = \\frac{3\\pi}{4}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
+L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
 ```
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
@@ -194,7 +194,7 @@ velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdo
 
 ```math
 \\begin{aligned}
-L_E &= \\frac{\\pi}{2}\\,\\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa} \\\\
+L_E &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa} \\\\
     &= \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}(L_{11} + 2L_{22}),
 \\end{aligned}
 ```
