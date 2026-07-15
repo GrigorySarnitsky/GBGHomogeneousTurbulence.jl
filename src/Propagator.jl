@@ -204,7 +204,8 @@ and ``\\widehat{\\boldsymbol{N}}`` the dealiased nonlinearity of each field, the
 
 with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
 ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
-lockstep (the same ``A,B,d``), each with its own diffusivity.
+lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing is applied after
+the third stage.
 Three nonlinear evaluations per step, two field registers per field — the default workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """

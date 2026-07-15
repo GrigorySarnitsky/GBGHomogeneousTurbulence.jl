@@ -121,6 +121,20 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   their interpolation scheme, forwarded to the `Tracers` constructor.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 
+# Examples
+```julia
+# Grid mode — a 128³ forced-stationary run, ν set from the resolution criterion:
+sim = Simulation(grid_points_per_axis = 128)
+
+# Explicit mode — set ν directly, carry a passive scalar, force at constant power:
+sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
+                 scalar = true, velocity_forcing = ConstantPower(target = 0.1))
+
+# Domain-first — build the frame yourself, then hand it to the second form:
+domain = FixedDomain(128, 2π; dealiasing = HouLi(), element_type = Float64, array_type = Array)
+sim = Simulation(domain; viscosity = 5e-3)
+```
+
 # Fields
 - `domain`, `buffers`, `conditions`, `integrator` — the [`FixedDomain`](@ref), [`IntegratorBuffers`](@ref),
   [`FlowConditions`](@ref), and the chosen scheme.
@@ -517,6 +531,13 @@ reaches stationarity after the velocity); an unforced scalar has no stationary s
 
 Passing an explicit `turnovers`, `time`, or `steps` instead runs a **fixed budget** (no detection) —
 the simple spin-up when the transient length is known.
+
+# Examples
+```julia
+warmup!(sim)                          # detect stationarity (ε- and skewness-plateau gates)
+warmup!(sim; gate_skewness = false)   # relax the skewness gate (a shorter, looser spin-up)
+warmup!(sim; turnovers = 20)          # or a fixed eddy-turnover budget, no detection
+```
 """
 function warmup!(sim::Simulation; turnovers = nothing, time = nothing, steps = nothing,
                  gate_scalar::Bool = true, gate_skewness::Bool = true, min_turnovers::Real = 5,

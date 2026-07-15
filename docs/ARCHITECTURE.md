@@ -966,7 +966,8 @@ no-guessed-citation rule). The extraction-bound
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.
   *(The linear negative-damping forcing.)*
 - Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. *(The
-  2N low-storage family; the third-order RKW3 coefficients.)*
+  2N low-storage family; the package's third-order coefficients are Williamson's Eq. (11), his recommended
+  case 7 — the set later adopted for spectral DNS and popularly named "RKW3".)*
 - Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
 - Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,
