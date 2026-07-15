@@ -121,7 +121,7 @@ using .Particles:
   sample!,
   tracer_positions,
   tracer_velocities,
-  ntracers,
+  number_of_tracers,
   velocity_buffer,
   scalar_buffer
 
@@ -189,7 +189,7 @@ export FixedDomain,
        sample!,
        tracer_positions,
        tracer_velocities,
-       ntracers,
+       number_of_tracers,
        velocity_buffer,
        scalar_buffer,
        Simulation,

@@ -117,8 +117,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `kinetic_energy`.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
-- `ntracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and their
-  interpolation scheme; forwarded to the `Tracers` constructor as its `count` and `scheme`.
+- `number_of_tracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
+  their interpolation scheme, forwarded to the `Tracers` constructor.
 - `rng` — the random stream for the initial condition and the tracer seeding.
 
 # Fields
@@ -158,7 +158,7 @@ function Simulation(domain::FixedDomain;
                     cfl::Real = recommended_cfl(integrator, domain),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
-                    ntracers::Integer = 0, tracer_scheme = CatmullRom,
+                    number_of_tracers::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
@@ -189,8 +189,8 @@ function Simulation(domain::FixedDomain;
   random_solenoidal_velocity!(state.velocity, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
   scalar && random_scalar!(state.scalar, domain; scalar_variance, peak_wavenumber, rng)
 
-  tracers = ntracers > 0 ? Tracers(domain, ntracers; scheme = tracer_scheme, rng) : nothing
-  tracer_velocity = ntracers > 0 ? physical_vector(domain) : nothing
+  tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
+  tracer_velocity = number_of_tracers > 0 ? physical_vector(domain) : nothing
 
   sim = Simulation(domain, buffers, conditions, integrator, state, tracers, tracer_velocity,
                    Float64(cfl), Clock(0.0, 0))

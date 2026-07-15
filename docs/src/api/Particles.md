@@ -18,7 +18,7 @@ Tracers
 ```@docs
 tracer_positions
 tracer_velocities
-ntracers
+number_of_tracers
 ```
 
 ## The tracking loop

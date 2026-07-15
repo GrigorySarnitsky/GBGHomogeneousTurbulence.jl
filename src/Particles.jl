@@ -16,7 +16,7 @@ Lagrangian tracer tracking:
 - [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the start- and end-of-step velocity).
 - [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
   [`scalar_buffer`](@ref) allocate its `out` buffers.
-- [`tracer_positions`](@ref), [`tracer_velocities`](@ref), [`ntracers`](@ref) — the trajectory readouts.
+- [`tracer_positions`](@ref), [`tracer_velocities`](@ref), [`number_of_tracers`](@ref) — the trajectory readouts.
 """
 module Particles
 
@@ -25,14 +25,14 @@ using Random
 using ..SimulationDomain: FixedDomain
 
 export Tracers, advect!, sample!,
-       tracer_positions, tracer_velocities, ntracers, velocity_buffer, scalar_buffer
+       tracer_positions, tracer_velocities, number_of_tracers, velocity_buffer, scalar_buffer
 
 
 """
-    Tracers(domain, count; scheme, rng = default_rng())
+    Tracers(domain, number_of_tracers; scheme, rng = default_rng())
     Tracers(domain, positions; scheme)
 
-A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `count`
+A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `number_of_tracers`
 tracers uniformly at random in the periodic box of `domain`; the second wraps a given `(M, 3)` array of
 `M` tracer positions (the three columns are the ``x, y, z`` components), converting it to `domain`'s
 backend and element type. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
@@ -47,7 +47,7 @@ The `rng` (first form only) is the random stream seeding the uniformly-random tr
 defaults to `Random.default_rng()`.
 
 Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
-[`ntracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
+[`number_of_tracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
 [`advect!`](@ref) allocates no per-step memory.
 
 # Fields
@@ -81,11 +81,11 @@ function Tracers(domain::FixedDomain, positions::AbstractMatrix; scheme)
                  scheme)
 end
 
-function Tracers(domain::FixedDomain, count::Integer; scheme, rng = Random.default_rng())
+function Tracers(domain::FixedDomain, number_of_tracers::Integer; scheme, rng = Random.default_rng())
   T = real(eltype(field_data(domain.dealias)))
   L = T(domain.grid.domain_size[1])
-  positions = similar(domain.squared_wavenumber, T, (Int(count), 3))
-  copyto!(positions, L .* rand(rng, T, Int(count), 3))
+  positions = similar(domain.squared_wavenumber, T, (Int(number_of_tracers), 3))
+  copyto!(positions, L .* rand(rng, T, Int(number_of_tracers), 3))
   return Tracers(domain, positions; scheme)
 end
 
@@ -161,11 +161,11 @@ tracer_velocities(tracers::Tracers) = point_values(tracers.velocity1)
 
 
 """
-    ntracers(tracers)
+    number_of_tracers(tracers)
 
 The number of tracers `M`.
 """
-ntracers(tracers::Tracers) = size(tracers.positions, 1)
+number_of_tracers(tracers::Tracers) = size(tracers.positions, 1)
 
 
 """
@@ -185,7 +185,7 @@ length `M` matching the tracers, for use as the `out` of
 [`sample!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
 """
 scalar_buffer(tracers::Tracers) =
-  ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), ntracers(tracers)))
+  ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), number_of_tracers(tracers)))
 
 
 end # module Particles

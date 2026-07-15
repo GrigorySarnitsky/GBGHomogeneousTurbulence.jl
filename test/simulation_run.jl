@@ -18,7 +18,7 @@ using Test
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
                      velocity_forcing = domain -> ConstantPower(domain; target = 0.1),
-                     scalar = true, ntracers = 50, rng = MersenneTwister(1))
+                     scalar = true, number_of_tracers = 50, rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
