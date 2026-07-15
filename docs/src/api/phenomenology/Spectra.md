@@ -56,3 +56,18 @@ The passive-scalar spectrum models.
 ScalarSpectrum
 ObukhovCorrsin1949
 ```
+
+## References
+
+The published provenance of each preset on this page, read from its
+[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)` — the extraction-bound leaf
+carries its own citations, so these are not duplicated in the `ARCHITECTURE.md` reference list.
+
+```@eval
+import GBGIsotropicTurbulence.Phenomenology as Phen
+import GBGIsotropicTurbulence.Phenomenology.Spectra as Spec
+import Markdown
+laws = [Spec.Pope2000(), Spec.VonKarman1948(), Spec.Pao1965(), Spec.ObukhovCorrsin1949()]
+cites = unique([Phen.provenance(l).citation for l in laws])
+Markdown.parse(join(["- " * c for c in cites], "\n"))
+```

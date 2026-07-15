@@ -18,3 +18,18 @@ SheLeveque1994
 Yaglom1949
 Lundgren2002
 ```
+
+## References
+
+The published provenance of each law on this page, read from its
+[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)` — the extraction-bound leaf
+carries its own citations, so these are not duplicated in the `ARCHITECTURE.md` reference list.
+
+```@eval
+import GBGIsotropicTurbulence.Phenomenology as Phen
+import GBGIsotropicTurbulence.Phenomenology.StructureFunctions as SF
+import Markdown
+laws = [SF.Kolmogorov1941(), SF.Kolmogorov1962(), SF.SheLeveque1994(), SF.Yaglom1949(), SF.Lundgren2002()]
+cites = unique([Phen.provenance(l).citation for l in laws])
+Markdown.parse(join(["- " * c for c in cites], "\n"))
+```
