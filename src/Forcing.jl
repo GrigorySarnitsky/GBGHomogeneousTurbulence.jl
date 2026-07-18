@@ -85,7 +85,7 @@ end
 
 For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
-integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_factor!`](@ref GBGIsotropicTurbulence.Generator.integrating_factor!)), so the
+integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
 rate. The `field` is the start-of-step field in spectral representation; `domain` is the

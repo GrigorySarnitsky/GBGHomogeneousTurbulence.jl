@@ -14,8 +14,9 @@
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
 #   State            — the spectral state + its physical recoveries + the DerivedFields observation
 #                      cache + initial conditions (the MZ State role)
-#   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor;
-#                      holds FlowConditions (ν, Sc, the forcings) — the physical conditions it is built from
+#   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
+#                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
+#                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor!/scalar_factor!/finalize!)
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
@@ -85,10 +86,14 @@ using .State:
   random_scalar!
 
 using .Generator:
-  velocity_nonlinear!,
-  integrating_factor!,
-  scalar_nonlinear!,
-  FlowConditions
+  FlowConditions,
+  ResolvedGenerator,
+  prepare!,
+  velocity_rhs!,
+  scalar_rhs!,
+  velocity_factor!,
+  scalar_factor!,
+  finalize!
 
 using .Observables:
   kinetic_energy,
@@ -165,10 +170,14 @@ export FixedDomain,
        max_wavenumber,
        velocity_to_physical!,
        vorticity_to_physical!,
-       velocity_nonlinear!,
-       integrating_factor!,
        scalar_to_physical!,
-       scalar_nonlinear!,
+       ResolvedGenerator,
+       prepare!,
+       velocity_rhs!,
+       scalar_rhs!,
+       velocity_factor!,
+       scalar_factor!,
+       finalize!,
        kinetic_energy,
        dissipation,
        max_speed,

@@ -98,6 +98,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)
     state = ResolvedFields(û, scalar_spectral(domain))
+    generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = DerivedFields(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
     u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
@@ -107,7 +108,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       u = physical_velocity(derived, state, domain)
       dt = 0.4 * Δx / max(max_speed(u), 1e-6)
       copyto!(field_data(u_start), field_data(u))                       # u(tₙ)
-      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, dt)
+      step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
       advect!(tracers, u_start, physical_velocity(derived, state, domain), domain, dt)   # u(tₙ₊₁)
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)

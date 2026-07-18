@@ -8,27 +8,31 @@ Order   = [:module]
 ## Flow conditions
 
 The physical conditions the generator is built from — viscosity, Schmidt number, and the velocity and
-scalar forcings — that `step!` consumes.
+scalar forcings.
 
 ```@docs
 FlowConditions
 ```
 
-## Nonlinear-term assembly
+## The reified generator
 
-The dealiased, Leray-projected rotational-form momentum term, and the conservative scalar-advection
-term.
+The right-hand side as one object — the conditions bundled with the assembly scratch its evaluations
+write through. A time-marching scheme consumes it only through the protocol below.
 
 ```@docs
-velocity_nonlinear!
-scalar_nonlinear!
+ResolvedGenerator
 ```
 
-## Integrating factor
+## The generator protocol
 
-The exact per-mode diffusive propagator — ν for the velocity, ν/Sc for the scalar — optionally folding
-in a linear forcing rate.
+One step of the dynamics, as the scheme sees it: open with `prepare!`, evaluate the right-hand sides
+and the exact linear factors at each stage, close with `finalize!`.
 
 ```@docs
-integrating_factor!
+prepare!
+velocity_rhs!
+scalar_rhs!
+velocity_factor!
+scalar_factor!
+finalize!
 ```

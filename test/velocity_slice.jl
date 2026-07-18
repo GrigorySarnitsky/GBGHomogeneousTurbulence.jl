@@ -20,6 +20,7 @@ using Test
   conditions = FlowConditions(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; target = 0.6, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
   integrator = IFRK2()
+  generator = ResolvedGenerator(domain, conditions; scalar = true)
 
   û = spectral_vector(domain)
   random_solenoidal_velocity!(û, domain; kinetic_energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
@@ -36,7 +37,7 @@ using Test
     u = physical_velocity(derived, state, domain)
     dt = cfl * Δx / max(max_speed(u), 1e-6)
     push!(energies, kinetic_energy(u))
-    step!(integrator, state, domain, buffers, derived, conditions, dt)
+    step!(integrator, state, generator, domain, buffers, derived, dt)
   end
 
   @test all(isfinite, energies)
@@ -53,8 +54,8 @@ using Test
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
   dt = cfl * Δx / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
-  step!(integrator, state, domain, buffers, derived, conditions, dt)                            # warm up
-  step_bytes = @allocated step!(integrator, state, domain, buffers, derived, conditions, dt)
+  step!(integrator, state, generator, domain, buffers, derived, dt)                            # warm up
+  step_bytes = @allocated step!(integrator, state, generator, domain, buffers, derived, dt)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes < field_bytes
 end

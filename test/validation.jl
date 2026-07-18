@@ -26,7 +26,7 @@ end
   @test fp.viscosity == 0.02
   ω̂ = spectral_vector(SIM.domain)
   curl!(ω̂, SIM.state.velocity, SIM.domain.multipliers)
-  @test fp.dissipation ≈ dissipation(ω̂, SIM.conditions.viscosity)
+  @test fp.dissipation ≈ dissipation(ω̂, SIM.generator.conditions.viscosity)
   @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity) / 3)
   @test fp.integral_scale ≈ integral_scale(SIM.state.velocity, SIM.domain)
   @test taylor_reynolds(fp) > 0

@@ -52,15 +52,15 @@ using Test
   @testset "grid-resolved viscosity (grid mode)" begin
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = k_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
-    ν = sim.conditions.viscosity
+    ν = sim.generator.conditions.viscosity
     ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
-    @test sim.conditions.velocity_forcing isa BandRescaling        # forced by default
+    @test sim.generator.conditions.velocity_forcing isa BandRescaling        # forced by default
     @test ν > 0
 
-    @test Simulation(grid_points_per_axis = 32, k_max_η = 3; rng = MersenneTwister(3)).conditions.viscosity > ν
-    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, k_max_η = 5).conditions.viscosity == 0.01
+    @test Simulation(grid_points_per_axis = 32, k_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
+    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, k_max_η = 5).generator.conditions.viscosity == 0.01
   end
 
   @testset "initial condition from a spectrum" begin
@@ -188,8 +188,9 @@ using Test
     state = ResolvedFields(û, scalar_spectral(domain))
     derived = DerivedFields(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
+    generator = ResolvedGenerator(domain, conditions; scalar = true)
     for _ in 1:80
-      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, 0.012)
+      step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.012)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05

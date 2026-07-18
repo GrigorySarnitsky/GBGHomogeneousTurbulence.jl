@@ -55,9 +55,10 @@ using Test
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+    generator = ResolvedGenerator(domain, conditions)
     epoch0 = derived.fields_epoch
     u_before = copy(field_data(physical_velocity(derived, state, domain)))
-    step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, 0.01)
+    step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.01)
     @test derived.fields_epoch == epoch0 + 1
     @test field_data(physical_velocity(derived, state, domain)) != u_before   # recomputed post-step
   end

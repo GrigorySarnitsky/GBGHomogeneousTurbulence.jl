@@ -86,14 +86,18 @@ using Test
     restrict(B) = [B[i1, mapidx(i2), mapidx(i3), c] / 8
                    for i1 in 1:half+1, i2 in 1:Np, i3 in 1:Np, c in 1:3]
     function nlt(domain, ûf, phaseshift::Bool)
-      b = allocate_buffers(IFRK2(), domain; scalar = false)
       u = SD.physical_vector(domain); ω = SD.physical_vector(domain)
       tmp = SD.spectral_vector(domain)
       velocity_to_physical!(u, ûf, domain, tmp)
       vorticity_to_physical!(ω, ûf, domain, tmp)
       out = SD.spectral_vector(domain)
-      phaseshift ? velocity_nonlinear!(out, ûf, u, ω, domain, b.product_physical, b.product_spectral, b.phase_shift) :
-                   GEN._velocity_lamb!(out, u, ω, domain, b.product_physical, b.product_spectral)
+      if phaseshift
+        unforced = FlowConditions(viscosity = 1.0, schmidt = 1.0,
+                                  velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+        velocity_rhs!(out, ResolvedGenerator(domain, unforced), ûf, u, ω, domain)
+      else
+        GEN._velocity_lamb!(out, u, ω, domain, SD.physical_vector(domain), SD.spectral_vector(domain))
+      end
       field_data(out)
     end
     Nps, Nraw = nlt(dps, û, true), nlt(dps, û, false)
@@ -122,6 +126,7 @@ using Test
 
     function integrate(integrator, dt, nsteps)
       b = allocate_buffers(integrator, domain; scalar = true)
+      generator = ResolvedGenerator(domain, conditions; scalar = true)
       derived = DerivedFields(domain)
       û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
       φ̂ = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
@@ -129,7 +134,7 @@ using Test
       copyto!(field_data(φ̂), field_data(φ̂0))
       state = ResolvedFields(û, φ̂)
       for _ in 1:nsteps
-        step!(integrator, state, domain, b, derived, conditions, dt)
+        step!(integrator, state, generator, domain, b, derived, dt)
       end
       return û, φ̂
     end
@@ -154,7 +159,7 @@ using Test
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = PhaseShift(), scalar = true,
                      velocity_forcing = ConstantPower(target = 0.1), rng = MersenneTwister(9))
     @test sim.domain.dealiasing isa PhaseShift
-    @test sim.buffers.phase_shift !== nothing                        # the displaced-evaluation scratch was built
+    @test sim.generator.phase_shift !== nothing                      # the displaced-evaluation scratch was built
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)
     run!(sim; steps = 8)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0

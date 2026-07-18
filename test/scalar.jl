@@ -13,6 +13,7 @@ using Test
 
 
 function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
+  generator = ResolvedGenerator(domain, conditions; scalar = true)
   derived = DerivedFields(domain)
   û = spectral_vector(domain)
   φ̂ = scalar_spectral(domain)
@@ -20,7 +21,7 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   copyto!(field_data(φ̂), field_data(φ̂0))
   state = ResolvedFields(û, φ̂)
   for _ in 1:nsteps
-    step!(integrator, state, domain, buffers, derived, conditions, dt)
+    step!(integrator, state, generator, domain, buffers, derived, dt)
   end
   return û, φ̂
 end

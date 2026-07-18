@@ -13,12 +13,13 @@ using Test
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
 function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   buffers = allocate_buffers(integrator, domain; scalar = true)
+  generator = ResolvedGenerator(domain, conditions; scalar = true)
   derived = DerivedFields(domain)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
   state = ResolvedFields(û, scalar_spectral(domain))
   for _ in 1:nsteps
-    step!(integrator, state, domain, buffers, derived, conditions, dt)
+    step!(integrator, state, generator, domain, buffers, derived, dt)
   end
   return û
 end
@@ -64,6 +65,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     integrator = IFLowStorageRK3()
+    generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = DerivedFields(domain)
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))
@@ -75,7 +77,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
       u = physical_velocity(derived, state, domain)
       dt = cfl * Δx / max(max_speed(u), 1e-6)
       push!(energies, kinetic_energy(u))
-      step!(integrator, state, domain, buffers, derived, conditions, dt)
+      step!(integrator, state, generator, domain, buffers, derived, dt)
     end
     @test all(isfinite, energies)
     @test 0.05 < energies[end] < 10.0
@@ -83,8 +85,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     @test rel_div < 1e-8
 
     dt = cfl * Δx / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
-    step!(integrator, state, domain, buffers, derived, conditions, dt)                       # warm up
-    bytes = @allocated step!(integrator, state, domain, buffers, derived, conditions, dt)
+    step!(integrator, state, generator, domain, buffers, derived, dt)                       # warm up
+    bytes = @allocated step!(integrator, state, generator, domain, buffers, derived, dt)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
     @test bytes < field_bytes
   end

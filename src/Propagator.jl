@@ -1,7 +1,9 @@
 # Propagator — the interchangeable time-marching schemes, as concrete `AbstractIntegrator` subtypes
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
-# is advanced exactly through exp(-diffusivity·|k|²Δt) (built in Generator), and the nonlinear term is
-# advanced explicitly by a Runge–Kutta stage combination.
+# is advanced exactly through exp(-diffusivity·|k|²Δt), and the nonlinear term is advanced explicitly
+# by a Runge–Kutta stage combination. A scheme consumes the physics only through the ResolvedGenerator
+# protocol (prepare!/velocity_rhs!/scalar_rhs!/velocity_factor!/scalar_factor!/finalize!) — it does
+# stage arithmetic and stage-state recoveries, never assembling the right-hand side itself.
 #
 # `step!` advances the velocity û and the passive scalar φ̂ *together* through the same RK stages: the
 # scalar is passive, so the only time-accurate coupling is to evaluate both nonlinear terms at each
@@ -30,10 +32,10 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
 module Propagator
 
 using GBGPeriodicFields
-using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction, PhaseShift,
+using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
-using ..Generator: velocity_nonlinear!, integrating_factor!, scalar_nonlinear!, FlowConditions
-using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
+using ..Generator: ResolvedGenerator, prepare!, finalize!,
+                   velocity_rhs!, scalar_rhs!, velocity_factor!, scalar_factor!
 using ..State: ResolvedFields, DerivedFields, physical_velocity, physical_vorticity,
                resolved_fields_modified!, spectral_scratch,
                velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
@@ -46,7 +48,7 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, state, domain, buffers, derived, conditions, dt)`, advancing the `state`'s
+[`step!`](@ref)`(integrator, state, generator, domain, buffers, derived, dt)`, advancing the `state`'s
 velocity ``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one
 timestep in place, and may specialize
 [`recommended_cfl`](@ref).
@@ -56,29 +58,13 @@ abstract type AbstractIntegrator end
 
 # The passive-scalar step buffers — held by `IntegratorBuffers` only when a scalar is evolved,
 # `nothing` otherwise (so a velocity-only run allocates none of them).
-struct ScalarBuffers{SS, ST2, SST, NL, SP, RK}
+struct ScalarBuffers{SS, ST2, SST, NL, SP}
   stage1::SS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
   star_spectral::SST             # IFRK2 only
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   copy::SS
   field::SP
-  rate::RK                       # per-mode linear forcing rate for φ, folded into E_κ
-end
-
-
-# Phase-shift dealiasing scratch + the two translation kernels (present only when `dealiasing isa
-# PhaseShift`). The kernels are built once from the half-cell displacement; the scalar fields are
-# `nothing` for a velocity-only run.
-struct PhaseShiftBuffers{K, VS, VP, SS, SP}
-  to_shifted::K                   # translation kernel: recover a field on the grid displaced by +½ cell
-  back::K                         # translation kernel: shift a displaced term back to the grid
-  velocity_shifted::VS            # û on the displaced grid, then the displaced nonlinear term
-  u_shifted::VP                   # velocity recovered on the displaced grid
-  omega_shifted::VP               # vorticity recovered on the displaced grid
-  scalar_shifted::SS              # φ̂ on the displaced grid, then the displaced flux divergence (or nothing)
-  scalar_copy::SS                 # recovery scratch for the displaced scalar (or nothing)
-  phi_shifted::SP                 # scalar recovered on the displaced grid (or nothing)
 end
 
 
@@ -92,59 +78,35 @@ allocated.
 
 # Fields
 Shared — every scheme allocates these:
-- `product_physical`, `product_spectral` — the quadratic products in physical and spectral representation
-  (the Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, and the scalar flux ``\\boldsymbol{u}\\varphi``).
 - `vorticity_physical`, `velocity_star` — the substage velocity/vorticity registers in physical
   representation (the start-of-step fields come from the run's `DerivedFields` charts).
 - `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
   first stage for [`IFRK2`](@ref)).
-- `integrating_factor`, `velocity_rate` — the shared viscous integrating factor and the velocity's
-  per-mode linear-forcing-rate array ``A(\\boldsymbol{\\kappa})``.
+- `integrating_factor` — the register the exact linear subflow is written into each substep.
 
 Scheme-specific — allocated only for the scheme that uses it, else `nothing`:
-- `nonlinear` — the assembled nonlinear term ([`IFLowStorageRK3`](@ref) only).
+- `nonlinear` — the assembled right-hand side ([`IFLowStorageRK3`](@ref) only).
 - `stage2`, `velocity_star_spectral` — the second stage register and the substage velocity predictor
   ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation ([`IFRK2`](@ref) only).
 
 Nested:
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
-- `phase_shift` — a `PhaseShiftBuffers` (the two translation kernels and the displaced-evaluation scratch)
-  when the domain's `dealiasing` is [`PhaseShift`](@ref), else `nothing`.
+
+The right-hand-side **assembly** scratch (the quadratic products, the phase-shift buffers, the
+forcing-rate arrays) lives with the generator, on the
+[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here are
+only the scheme's own stage registers.
 """
-struct IntegratorBuffers{VS, ST2, VSS, NL, SS, VP, RK, SB, PB}
+struct IntegratorBuffers{VS, ST2, VSS, NL, SS, VP, SB}
   stage1::VS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
   velocity_star_spectral::VSS    # IFRK2 only
-  product_spectral::VS
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   integrating_factor::SS
   vorticity_physical::VP
   velocity_star::VP
-  product_physical::VP
-  velocity_rate::RK              # per-mode linear forcing rate A(k) (real), folded into E_ν
   scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
-  phase_shift::PB                # PhaseShiftBuffers, or nothing unless dealiasing isa PhaseShift
-end
-
-
-_forcing_rate(domain::FixedDomain) =
-  fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
-
-# Build the two translation kernels once (offset = half a cell) and the displaced-evaluation scratch; the
-# scalar fields only when a scalar is evolved. A scalar kernel translates a vector or scalar field alike.
-function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
-  δ = 0.5 .* domain.grid.grid_spacing
-  reference = scalar_spectral(domain)
-  return PhaseShiftBuffers(
-    translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
-    translation_kernel(reference, domain.multipliers,   δ),   # shift a displaced term back to the grid
-    spectral_vector(domain),
-    physical_vector(domain), physical_vector(domain),
-    scalar ? scalar_spectral(domain) : nothing,
-    scalar ? scalar_spectral(domain) : nothing,
-    scalar ? scalar_physical(domain) : nothing,
-  )
 end
 
 """
@@ -162,19 +124,22 @@ function allocate_buffers end
 
 
 """
-    step!(integrator, state, domain, buffers, derived, conditions, dt)
+    step!(integrator, state, generator, domain, buffers, derived, dt)
 
 Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
-``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`,
-`domain`, `buffers`, the run's observation cache `derived` (a
-[`DerivedFields`](@ref GBGIsotropicTurbulence.State.DerivedFields)), and the problem `conditions` (a
-[`FlowConditions`](@ref)). Dispatches on the concrete `integrator` type (see `IFRK2`,
-`IFLowStorageRK3`).
+``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
+reified `generator` (a [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
+the equations of motion, their conditions, and their assembly scratch), the `domain`, the scheme's
+`buffers`, and the run's observation cache `derived` (a
+[`DerivedFields`](@ref GBGIsotropicTurbulence.State.DerivedFields)). Dispatches on the concrete
+`integrator` type (see `IFRK2`, `IFLowStorageRK3`).
 
-The start-of-step velocity and vorticity in physical representation are read through `derived`'s
-accessors — recomputed automatically when stale, so a hand-run loop needs no manual refill — and the
-cache's fields epoch is advanced when the step completes, marking every derived chart for recomputation
-on its next read.
+A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
+right-hand sides and exact linear factors through the generator protocol at each stage, and closes
+with the generator's `finalize!` — it never assembles the physics itself. The start-of-step velocity
+and vorticity in physical representation are read through `derived`'s accessors — recomputed
+automatically when stale, so a hand-run loop needs no manual refill — and the cache's fields epoch is
+advanced when the step completes, marking every derived chart for recomputation on its next read.
 """
 function step! end
 
@@ -183,9 +148,11 @@ function step! end
     IFLowStorageRK3()
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
-integrating factor ``\\mathcal{E}_D(\\tau)`` built by [`integrating_factor!`](@ref) over a substep
+integrating factor ``\\mathcal{E}_D(\\tau)`` built by the generator's
+[`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!) /
+[`scalar_factor!`](@ref GBGIsotropicTurbulence.Generator.scalar_factor!) over a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar)
-and ``\\widehat{\\boldsymbol{N}}`` the dealiased nonlinearity of each field, the step carries a state
+and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
 ``\\hat q`` and a single accumulator
 ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
@@ -208,28 +175,19 @@ third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFR
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
-function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
-               derived::DerivedFields, conditions::FlowConditions, dt::Real)
+function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
+               domain::FixedDomain, buffers::IntegratorBuffers, derived::DerivedFields, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   a = (zero(T), T(-5 // 9), T(-153 // 128))
   b = (T(1 // 3), T(15 // 16), T(8 // 15))
   d = (T(1 // 3), T(5 // 12), T(1 // 4))
-  ν = conditions.viscosity
-  κ = conditions.viscosity / conditions.schmidt
   hu = buffers.stage1                                                             # velocity accumulator
   sb = buffers.scalar                                                             # ScalarBuffers, or nothing
   has_scalar = φ̂ !== nothing
 
-  # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(conditions.velocity_forcing, û, domain, dt)
-  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain) ? buffers.velocity_rate : nothing
-  scalar_rate = nothing
-  if has_scalar
-    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, dt)
-    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain) ? sb.rate : nothing
-  end
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
   for i in 1:3
     if i == 1
@@ -241,16 +199,14 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
-    # BOTH nonlinear terms are assembled at the stage state before either field is updated: the
+    # BOTH right-hand sides are evaluated at the stage state before either field is updated: the
     # PhaseShift displaced evaluations read û (and φ̂), so an assembly after the velocity update
     # would pair u at the next stage with φ at this one — breaking the alias cancellation and
     # degrading the scalar's coupling to first order (caught by the convergence-matrix test).
-    velocity_nonlinear!(buffers.nonlinear, û, u, ω, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)          # N̂_u
-    add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain)         # + additive forcing (OU)
+    velocity_rhs!(buffers.nonlinear, generator, û, u, ω, domain)                  # N̂_u
     if has_scalar
       scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
-      scalar_nonlinear!(sb.nonlinear, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral; N̂_u is already banked in buffers.nonlinear)
-      add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain)
+      scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, sb.field, domain)            # N̂_φ (N̂_u already banked)
     end
 
     if i == 1
@@ -259,7 +215,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
       combine!(hu, a[i], hu, dt_T, buffers.nonlinear)                             # hu ← Aᵢ hu + Δt N̂_u
     end
     combine!(û, one(T), û, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
-    integrating_factor!(buffers.integrating_factor, domain, ν, d[i] * dt, velocity_rate)   # E_ν(dᵢΔt)
+    velocity_factor!(buffers.integrating_factor, generator, domain, d[i] * dt)    # E_ν(dᵢΔt)
     convolve!(û, û, buffers.integrating_factor)
     i < 3 && convolve!(hu, hu, buffers.integrating_factor)
 
@@ -272,14 +228,13 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
         combine!(hφ, a[i], hφ, dt_T, sb.nonlinear)
       end
       combine!(φ̂, one(T), φ̂, b[i], hφ)
-      integrating_factor!(buffers.integrating_factor, domain, κ, d[i] * dt, scalar_rate)     # E_κ(dᵢΔt)
+      scalar_factor!(buffers.integrating_factor, generator, domain, d[i] * dt)    # E_κ(dᵢΔt)
       convolve!(φ̂, φ̂, buffers.integrating_factor)
       i < 3 && convolve!(hφ, hφ, buffers.integrating_factor)
     end
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain)
-  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain)
+  finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
   resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end
@@ -289,9 +244,11 @@ end
     IFRK2()
 
 Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
-factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the diffusive kernel of
-[`integrating_factor!`](@ref) at ``D = \\nu`` and ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
-``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's dealiased nonlinearity, one step of a
+factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the generator's
+[`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!) /
+[`scalar_factor!`](@ref GBGIsotropicTurbulence.Generator.scalar_factor!) at ``D = \\nu`` and
+``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
+``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a
 field ``\\hat q`` with
 integrating factor ``\\mathcal{E}`` is
 
@@ -317,59 +274,46 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
 struct IFRK2 <: AbstractIntegrator end
 
 
-function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
-               derived::DerivedFields, conditions::FlowConditions, dt::Real)
+function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
+               domain::FixedDomain, buffers::IntegratorBuffers, derived::DerivedFields, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   half = dt_T / 2
-  ν = conditions.viscosity
-  κ = conditions.viscosity / conditions.schmidt
   sb = buffers.scalar                                                            # ScalarBuffers, or nothing
   has_scalar = φ̂ !== nothing
 
-  # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(conditions.velocity_forcing, û, domain, dt)
-  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain) ? buffers.velocity_rate : nothing
-  scalar_rate = nothing
-  if has_scalar
-    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, dt)
-    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain) ? sb.rate : nothing
-  end
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
-  # stage 1 — nonlinear terms at the start-of-step state (read through the derived-field charts)
+  # stage 1 — right-hand sides at the start-of-step state (read through the derived-field charts)
   u = physical_velocity(derived, state, domain)
-  velocity_nonlinear!(buffers.stage1, û, u, physical_vorticity(derived, state, domain), domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)              # N̂_u,1
-  add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain)
+  velocity_rhs!(buffers.stage1, generator, û, u, physical_vorticity(derived, state, domain), domain)  # N̂_u,1
   if has_scalar
     scalar_to_physical!(sb.field, φ̂, domain, sb.copy)
-    scalar_nonlinear!(sb.stage1, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)            # N̂_φ,1
-    add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain)
+    scalar_rhs!(sb.stage1, generator, û, φ̂, u, sb.field, domain)                 # N̂_φ,1
   end
 
   # predictors û*, φ̂*
-  integrating_factor!(buffers.integrating_factor, domain, ν, dt, velocity_rate)                 # E_ν
+  velocity_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_ν
   combine!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1)                      # û* ← ûₙ + Δt N̂_u,1
   convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, buffers.integrating_factor)
   if has_scalar
-    integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)                 # E_κ
+    scalar_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_κ
     combine!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1)                                       # φ̂* ← φ̂ₙ + Δt N̂_φ,1
     convolve!(sb.star_spectral, sb.star_spectral, buffers.integrating_factor)
   end
 
-  # stage 2 — nonlinear terms at the predictor state
+  # stage 2 — right-hand sides at the predictor state
   velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
   vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
-  velocity_nonlinear!(buffers.stage2, buffers.velocity_star_spectral, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)      # N̂_u,2
-  add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain)
+  velocity_rhs!(buffers.stage2, generator, buffers.velocity_star_spectral, buffers.velocity_star, buffers.vorticity_physical, domain)  # N̂_u,2
   if has_scalar
     scalar_to_physical!(sb.field, sb.star_spectral, domain, sb.copy)
-    scalar_nonlinear!(sb.stage2, buffers.velocity_star_spectral, sb.star_spectral, buffers.velocity_star, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)       # N̂_φ,2
-    add_forcing_source!(conditions.scalar_forcing, sb.stage2, domain)
+    scalar_rhs!(sb.stage2, generator, buffers.velocity_star_spectral, sb.star_spectral, buffers.velocity_star, sb.field, domain)       # N̂_φ,2
   end
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
-  integrating_factor!(buffers.integrating_factor, domain, ν, dt, velocity_rate)
+  velocity_factor!(buffers.integrating_factor, generator, domain, dt)
   convolve!(buffers.stage1, buffers.stage1, buffers.integrating_factor)
   convolve!(û, û, buffers.integrating_factor)
   combine!(û, one(T), û, half, buffers.stage1)                                             # ûₙ₊₁ += (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
@@ -377,15 +321,14 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
   if has_scalar
-    integrating_factor!(buffers.integrating_factor, domain, κ, dt, scalar_rate)
+    scalar_factor!(buffers.integrating_factor, generator, domain, dt)
     convolve!(sb.stage1, sb.stage1, buffers.integrating_factor)
     convolve!(φ̂, φ̂, buffers.integrating_factor)
     combine!(φ̂, one(T), φ̂, half, sb.stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
     combine!(φ̂, one(T), φ̂, half, sb.stage2)
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain)
-  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain)
+  finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
   resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end
@@ -397,39 +340,31 @@ end
 # leaves the other scheme's registers `nothing`.
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
   scalar_spectral(domain), nothing, nothing, scalar_spectral(domain),           # stage1, stage2, star_spectral, nonlinear
-  scalar_spectral(domain), scalar_physical(domain), _forcing_rate(domain),       # copy, field, rate
+  scalar_spectral(domain), scalar_physical(domain),                             # copy, field
 )
 ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
   scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain), nothing,   # stage1, stage2, star_spectral, nonlinear
-  scalar_spectral(domain), scalar_physical(domain), _forcing_rate(domain),       # copy, field, rate
+  scalar_spectral(domain), scalar_physical(domain),                             # copy, field
 )
 
 allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   spectral_vector(domain),                                # stage1
   nothing,                                                # stage2 (IFRK2 only)
   nothing,                                                # velocity_star_spectral (IFRK2 only)
-  spectral_vector(domain),                                # product_spectral
   spectral_vector(domain),                                # nonlinear
   scalar_spectral(domain),                                # integrating_factor
-  physical_vector(domain),                                # vorticity_physical
-  physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
-  _forcing_rate(domain),                                  # velocity_rate
+  physical_vector(domain), physical_vector(domain),       # vorticity_physical, velocity_star
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
-  domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
 )
 
 allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   spectral_vector(domain),                                # stage1
   spectral_vector(domain),                                # stage2
   spectral_vector(domain),                                # velocity_star_spectral
-  spectral_vector(domain),                                # product_spectral
   nothing,                                                # nonlinear (IFLowStorageRK3 only)
   scalar_spectral(domain),                                # integrating_factor
-  physical_vector(domain),                                # vorticity_physical
-  physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
-  _forcing_rate(domain),                                  # velocity_rate
+  physical_vector(domain), physical_vector(domain),       # vorticity_physical, velocity_star
   scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
-  domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
 )
 
 

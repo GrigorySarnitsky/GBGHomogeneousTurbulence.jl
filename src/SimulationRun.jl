@@ -1,5 +1,6 @@
-# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, conditions,
-# integrator, spectral state (û, φ̂), the derived-field observation cache, and any tracers;
+# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, the reified
+# generator (the equations of motion with their conditions and assembly scratch), the integrator, the
+# spectral state (û, φ̂), the derived-field observation cache, and any tracers;
 # `advance!`/`run!`/`warmup!` own the CFL-adaptive time loop. It holds no physics or numerics of its
 # own — it wires the pieces of SimulationDomain/State/Generator/Observables/Forcing/Propagator/Particles
 # so a case is a few lines to set up and run, warm-up included, while every piece stays reachable for a
@@ -32,7 +33,8 @@ import ..State: physical_velocity, physical_vorticity, resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness, max_speed
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
-using ..Propagator: AbstractIntegrator, FlowConditions, IntegratorBuffers, allocate_buffers, step!,
+using ..Generator: FlowConditions, ResolvedGenerator
+using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 using ..Particles: Tracers, advect!
 using ..Phenomenology: FlowParameters
@@ -56,7 +58,8 @@ end
     Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
-[`FlowConditions`](@ref), the chosen integrator, the [`ResolvedFields`](@ref) state (the velocity
+[`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and
+the assembly scratch), the chosen integrator, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the
 [`DerivedFields`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
@@ -137,18 +140,19 @@ sim = Simulation(domain; viscosity = 5e-3)
 ```
 
 # Fields
-- `domain`, `buffers`, `conditions`, `integrator` — the [`FixedDomain`](@ref), [`IntegratorBuffers`](@ref),
-  [`FlowConditions`](@ref), and the chosen scheme.
+- `domain`, `buffers`, `generator`, `integrator` — the [`FixedDomain`](@ref), [`IntegratorBuffers`](@ref),
+  the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
+  the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
 - `derived` — the [`DerivedFields`](@ref) observation cache (the stamped physical velocity/vorticity charts).
 - `tracers`, `tracer_velocity` — the [`Tracers`](@ref) (or `nothing`), and the buffer holding the velocity
   in physical representation for the Heun tracer push.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
-struct Simulation{DOM, FB, IG, VF<:AbstractForcing, SF<:AbstractForcing, RF, DF, TR, TV}
+struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, TV}
   domain::DOM
   buffers::FB
-  conditions::FlowConditions{VF, SF}
+  generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   integrator::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   derived::DF              # DerivedFields: the stamped observation cache over the state
@@ -162,8 +166,8 @@ end
 # A forcing may be given ready-built (an `AbstractForcing`) or as a factory `domain -> AbstractForcing`
 # — the latter lets a banded forcing be named before the domain exists (`domain -> ConstantPower(domain;
 # target)`), since a forcing precomputes its band from `domain`.
-_resolve_forcing(f::AbstractForcing, ::FixedDomain) = f
-_resolve_forcing(f, domain::FixedDomain) = f(domain)
+_materialize_forcing(f::AbstractForcing, ::FixedDomain) = f
+_materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
 function Simulation(domain::FixedDomain;
@@ -191,8 +195,8 @@ function Simulation(domain::FixedDomain;
 
   buffers = allocate_buffers(integrator, domain; scalar)
   conditions = FlowConditions(; viscosity = ν, schmidt,
-                    velocity_forcing = _resolve_forcing(velocity_forcing, domain),
-                    scalar_forcing = _resolve_forcing(scalar_forcing, domain))
+                    velocity_forcing = _materialize_forcing(velocity_forcing, domain),
+                    scalar_forcing = _materialize_forcing(scalar_forcing, domain))
 
   state = ResolvedFields(domain; scalar)
   ic_spectrum = nothing
@@ -209,7 +213,7 @@ function Simulation(domain::FixedDomain;
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
   tracer_velocity = number_of_tracers > 0 ? physical_vector(domain) : nothing
 
-  return Simulation(domain, buffers, conditions, integrator, state, DerivedFields(domain),
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, DerivedFields(domain),
                     tracers, tracer_velocity, Float64(cfl), Clock(0.0, 0))
 end
 
@@ -239,7 +243,7 @@ resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.deri
 The measured flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) reference law be evaluated at the run's
 measured state. The viscosity ``\\nu`` and the
-Schmidt number are read from `sim.conditions`; the dissipation ``\\varepsilon``, the r.m.s. velocity
+Schmidt number are read from the generator's conditions; the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), the longitudinal integral scale ``L_{11}``, and —
 when the run carries a scalar — the scalar dissipation ``\\varepsilon_\\varphi`` are measured from the
 current state (the scalar dissipation is left `NaN` only for a scalar-free run, where the scalar reference
@@ -249,13 +253,13 @@ function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim.state.velocity)
   ω̂ = spectral_scratch(sim.derived)
   curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.conditions.viscosity)
+  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
   εφ = sim.state.scalar === nothing ? NaN :
-    scalar_dissipation(sim.state.scalar, sim.domain, sim.conditions.viscosity / sim.conditions.schmidt)
-  FlowParameters(; viscosity = sim.conditions.viscosity, dissipation = ε,
+    scalar_dissipation(sim.state.scalar, sim.domain, sim.generator.conditions.viscosity / sim.generator.conditions.schmidt)
+  FlowParameters(; viscosity = sim.generator.conditions.viscosity, dissipation = ε,
                  rms_velocity = sqrt(2k / 3),
                  integral_scale = integral_scale(sim.state.velocity, sim.domain),
-                 schmidt = sim.conditions.schmidt, scalar_dissipation = εφ)
+                 schmidt = sim.generator.conditions.schmidt, scalar_dissipation = εφ)
 end
 
 
@@ -317,7 +321,7 @@ current_step(sim::Simulation) = sim.clock.step
 function _turnover_time(sim::Simulation)
   ω̂ = spectral_scratch(sim.derived)
   curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.conditions.viscosity)
+  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
   return ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
 end
 
@@ -348,7 +352,7 @@ function advance!(sim::Simulation; dt = nothing)
   sim.tracers === nothing ||
     copyto!(field_data(sim.tracer_velocity), field_data(physical_velocity(sim)))
 
-  step!(sim.integrator, sim.state, sim.domain, sim.buffers, sim.derived, sim.conditions, Δt)
+  step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.derived, Δt)
 
   # The accessor recomputes u(tₙ₊₁) from the advanced û — the end-of-step field of the Heun pair.
   sim.tracers === nothing ||
@@ -506,13 +510,13 @@ function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   ω̂ = spectral_scratch(sim.derived)
   curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.conditions.viscosity)
+  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
   φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
   S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
-_scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.conditions.scalar_forcing isa NoForcing)
+_scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.generator.conditions.scalar_forcing isa NoForcing)
 
 
 """
