@@ -350,6 +350,40 @@ const GAP_HOLDERS = Dict(
 )
 
 
+
+# ---------------------------------------------------------------- the episode ledger
+#
+# Peak memory = resident + the transients of whatever episode is running. The hot loop is
+# allocation-free (the step!/advance! guards), so during production stepping peak equals the resident
+# ledger above. Outside it, the transient episodes are few, sequential (single-threaded — episodes
+# never overlap, so the run-phase peak is resident + the LARGEST episode), and frozen here in units
+# of N³ reals, measured mechanically via @allocated (warmed calls; generous bands for library drift).
+# Attribution (measured op by op, 2026-07-18):
+#   seeding (velocity)    ≈ 10.3 — noise vector 3.0 + host randn staging 3.1 + envelope 1.06 +
+#                                  an ALIASED helmholtz_projection!(û, û, …) transient 3.2 (the
+#                                  aliased path allocates; the hot loop's non-aliased calls do not —
+#                                  raised to GBGPeriodicFields). Construction-time only.
+#   seeding (scalar)      ≈ 3.1  — noise scalar 1.0 + host randn staging 1.0 + envelope 1.06.
+#   derivative_skewness   ≈ 19.6 — spectral tensor 9 × 1.06 + physical tensor 9 + det field 1: the
+#                                  DOMINANT episode (~ +55 % over the default resident set), and ON
+#                                  BY DEFAULT during warmup!'s skewness gate — the binding device
+#                                  peak of a default warm-up at the largest N that fits. Invariant
+#                                  4's per-call-diagnostic trade, priced. (PF stores full 9-component
+#                                  tensors; symmetric 6-component storage is the recorded reduction.)
+#   energy_spectrum       ≈ 1.6  — GBGPeriodicFields radial_spectrum internal staging (not the O(N)
+#                                  shell vectors); integral_scale and flow_parameters inherit it.
+# The archived StochasticOU's prepare! also projects its noise ALIASED — an OU-forced step is NOT
+# allocation-free today (~3 units/step); recorded on the de-archival gate.
+const EPISODE_UNITS = [
+  ("seed velocity",      10.3, 1.0),
+  ("seed scalar",         3.1, 0.5),
+  ("derivative_skewness", 19.6, 1.0),
+  ("energy_spectrum",     1.6, 0.5),
+  ("integral_scale",      1.6, 0.5),
+  ("flow_parameters",     1.6, 0.5),
+]
+
+
 @testset "memory audit" begin
   domains = Dict(tag => FixedDomain(N_AUDIT, 2π; element_type = Float64,
                                     dealiasing = tag === :TwoThirds ? TwoThirds() :
@@ -442,5 +476,39 @@ const GAP_HOLDERS = Dict(
       @test peak_liveness(ops_of(scalar)).physical_vector ==
             BASE[(scheme, :TwoThirds, scalar)].physical_vector
     end
+  end
+
+  @testset "episode ledger — transient peaks, frozen and attributed" begin
+    N = 32
+    domain = FixedDomain(N, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    unit = 8 * N^3
+    û = spectral_vector(domain)
+    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    φ̂ = scalar_spectral(domain)
+    random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
+    episodes = Dict(
+      "seed velocity" => () -> random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5,
+                                                           peak_wavenumber = 2.0, rng = MersenneTwister(1)),
+      "seed scalar" => () -> random_scalar!(φ̂, domain; scalar_variance = 1.0,
+                                            peak_wavenumber = 2.0, rng = MersenneTwister(2)),
+      "derivative_skewness" => () -> derivative_skewness(û, domain),
+      "energy_spectrum" => () -> energy_spectrum(û, domain),
+      "integral_scale" => () -> integral_scale(û, domain),
+      "flow_parameters" => () -> flow_parameters(sim),
+    )
+    measured = Dict{String, Float64}()
+    for (name, expected, tolerance) in EPISODE_UNITS
+      f = episodes[name]
+      f(); f()                                          # warm (compile) before measuring
+      measured[name] = (@allocated f()) / unit
+      @test abs(measured[name] - expected) <= tolerance
+    end
+    # The skewness is the dominant episode — the run-phase peak driver a default warm-up pays.
+    @test measured["derivative_skewness"] == maximum(values(measured))
+
+    # The hot loop stays allocation-free at the run layer too, so stepping-phase peak = resident.
+    advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)
+    @test (@allocated advance!(sim; dt = 1e-3)) < 0.2 * unit
   end
 end

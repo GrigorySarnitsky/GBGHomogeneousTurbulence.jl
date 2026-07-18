@@ -1089,7 +1089,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     seeding transients and the recorded per-call diagnostic allocations (invariant 4's exception,
     e.g. the derivative-skewness tensors) are *peak*-memory events a separate instrument would
     cover — and the **frame** (the domain's plans, multipliers, kernels) is excluded as shared,
-    combination-independent infrastructure, a constant offset rather than an axis. (b) **The
+    combination-independent infrastructure, a constant offset rather than an axis. (c) **The episode
+    ledger** closes the resident-vs-peak gap: the hot loop is allocation-free (the step guards), so
+    the stepping-phase peak *is* the resident ledger; outside it the transient episodes are few,
+    sequential, and frozen in units of ``N^3`` reals with mechanical `@allocated` drift guards —
+    seeding ``\approx 10.3`` (construction only; includes a ``3.2``-unit transient from the *aliased*
+    Leray projection, raised to `GBGPeriodicFields`), the energy spectrum ``\approx 1.6`` (the
+    backend's radial-spectrum staging), and the **velocity-derivative skewness ``\approx 19.6`` — the
+    dominant episode, about half again the default resident set, and on by default in `warmup!`'s
+    skewness gate**: the binding device peak of a default warm-up at the largest fitting ``N``.
+    This prices invariant 4's per-call-diagnostic trade (resident traded into episodic peak) and
+    names its reduction paths: symmetric six-component tensor storage at the backend (the tensors are
+    stored with all nine components today), or gating the skewness off when memory binds. The
+    archived `StochasticOU`'s prepare phase also projects its noise aliased — an OU-forced step is
+    not allocation-free today (``\approx 3`` units per step), recorded on its de-archival gate. The
+    allocator-level high-water mark (GC and pool timing) remains an empirical measurement on the
+    benchmark hosts, a fitness number rather than a test invariant. (b) **The
     liveness audit**: each `step!` body is a straight-line program, so its op list (reads and writes
     per primitive field operation) gives every value a live range, and the peak number of
     simultaneously live values per shape class is the *lower bound* on the buffers the implemented
