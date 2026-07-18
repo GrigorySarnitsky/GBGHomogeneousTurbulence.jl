@@ -648,7 +648,7 @@ one usually encodes a decision.
    estimators from `GBGStreamingStatistics` (§5).
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
    and CPU/GPU are first-class (§6).
-4. **Allocation-free stepping over a compile-time state.** A time step allocates no field-sized memory over
+4. **Allocation-free stepping over a compile-time state — with an audited footprint.** A time step allocates no field-sized memory over
    the preallocated `IntegratorBuffers` — load-bearing for GPU hot loops. The evolving state is a **compile-time
    product of concretely-typed buffers** (a parametrized record the compiler specializes), never a
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
@@ -1067,6 +1067,32 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     deterministic clamp has no conserved quantity and no well-defined ensemble except in limiting
     cases (Bussi, Donadio & Parrinello 2007) — a spin-up and amplitude-holding tool, with stochastic
     rescaling the recorded upgrade path when faithful fluctuations of the held quantity matter.
+33. **(2026-07) The memory audit: a frozen buffer ledger and a liveness lower bound, in the standard
+    suite.** "Minimal footprint" becomes a checked property instead of an aspiration
+    (`test/memory_audit.jl`, run by `Pkg.test()`). Two instruments. (a) **The ledger**: a reflective
+    walk over every resident field-sized buffer a run owns (state, observation cache, generator,
+    integrator registers, forcing-owned kernels), counted per shape class and asserted against a
+    frozen table for every scheme × dealiasing × scalar combination — adding or removing a buffer
+    anywhere fails the suite, so a footprint change must be a conscious, recorded decision. (b) **The
+    liveness audit**: each `step!` body is a straight-line program, so its op list (reads and writes
+    per primitive field operation) gives every value a live range, and the peak number of
+    simultaneously live values per shape class is the *lower bound* on the buffers the implemented
+    operation order needs — the classical register-allocation argument. The audit asserts achieved ≥
+    bound and that **every nonzero gap carries a named holder**; an unclaimed gap fails the test.
+    Current verdicts: the physical-vector count sits *exactly at its bound* under the chart contract
+    (the charts are contract-live across the step; the epoch-at-start chart-reuse that would release
+    two registers during the stages is the recorded candidate); one spectral-vector gap is held by
+    the State/Generator **ownership boundary** (the cache's recovery scratch and the generator's
+    product registers could alias in the implemented schedule but live on opposite sides of a
+    deliberately kept seam); the spectral-scalar gaps are held by the **shared factor register**
+    (deletable by a fused exponential-multiply convolution — raised to `GBGPeriodicFields` as a
+    request, with an in-place transform mode for disposable sources as the second request, which
+    would halve the archived `StochasticOU`'s noise scratch on de-archival) and by the scalar's
+    transient registers (`copy`/`nonlinear`/factor could share one slot). Bounds are relative to the
+    typed-field reuse model; the byte-level refinement (a spectral and a physical field have equal
+    byte size under the rfft padding) is recorded as a `GBGPeriodicFields`-level question, not chased
+    here. The op lists are re-derived whenever a `step!` body or the generator protocol changes — the
+    ledger failing is the reminder.
 
 ---
 

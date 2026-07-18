@@ -273,7 +273,9 @@ with no notation that drifts across the pair.
 ## Verification workflow
 
 - Load: `julia --project -e 'using GBGIsotropicTurbulence'`.
-- Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green.
+- Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green. The suite includes the memory
+  audit (`test/memory_audit.jl`): a deliberate footprint change updates its frozen ledger (and, on a
+  structural `step!`/protocol change, its op lists) in the same commit, citing the decision.
 - Docs build: `julia --project=docs docs/make.jl` — `checkdocs = :exports` plus the two build lints
   (`lint_inline_math`, `lint_notation_variants`) must be clean. After a build, revert the transient
   dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list `docs/Manifest.toml`,
