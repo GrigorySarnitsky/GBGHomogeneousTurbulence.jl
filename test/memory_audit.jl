@@ -82,12 +82,13 @@ end
 
 # Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
 # one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
-function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
+function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool;
+                charts = (:velocity, :vorticity))
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
   state = ResolvedFields(domain; scalar)
   velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity, domain, 0.01)
   scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar, domain, 0.01)
-  owners = Any[state, DerivedFields(domain), ResolvedGenerator(domain, conditions; scalar),
+  owners = Any[state, DerivedFields(domain; charts), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
     push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
@@ -126,6 +127,14 @@ _forcing_delta(tag, slot) =
 # (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
 
 const TRACER_DELTA = (spectral_vector = 0, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, rate = 0)
+
+# The charts axis of the observation layer: each declared chart is one resident physical vector; the
+# spectral scratch is unconditional. The base table pins the default (both charts) — the rotational
+# generator's declared working set requires both to step, so for a stepping run the axis is pinned by
+# the physics; it is live at the API level (observation-only uses) and becomes a run axis when
+# per-component chart declarations or further charts land.
+_chart_delta(charts) = (spectral_vector = 0, physical_vector = length(charts) - 2,
+                        spectral_scalar = 0, physical_scalar = 0, rate = 0)
 
 _build_forcing(tag, domain) =
   tag === :none  ? NoForcing() :
@@ -369,6 +378,14 @@ const GAP_HOLDERS = Dict(
                            _forcing_delta(stag, :scalar)),
                       tracers ? TRACER_DELTA : ZERO)
       @test counts == expected
+    end
+  end
+
+  @testset "ledger — the charts axis (API-level; pinned to both charts for a stepping run)" begin
+    for scheme in (:RK3, :RK2), scalar in (false, true),
+        charts in ((), (:velocity,), (:velocity, :vorticity))
+      counts = ledger(domains[:TwoThirds], _scheme(scheme), scalar, NoForcing(), NoForcing(), false; charts)
+      @test counts == _add(BASE[(scheme, :TwoThirds, scalar)], _chart_delta(charts))
     end
   end
 

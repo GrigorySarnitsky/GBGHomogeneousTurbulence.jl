@@ -1077,11 +1077,19 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     unforced, tracer-free base cells plus a per-forcing delta table and a tracer delta, and an
     exhaustive sweep over the whole product (~360 combinations) asserts measured = base + deltas,
     cell by cell — a cross-term (a buffer whose existence depends on two axes at once) fails the
-    sweep and must be recorded. Adding or removing a buffer
-    anywhere fails the suite, so a footprint change must be a conscious, recorded decision. The
-    particle-integrator axis has one point today (the Heun pusher), entering as on/off with the
+    sweep and must be recorded. The observation cache's **charts axis** (resident charts are
+    opt-in) is audited at the API level with its own delta; for any *stepping* run it is pinned by
+    the physics — the rotational generator's declared working set requires both charts — and becomes
+    a live run axis when per-component chart declarations or further charts land. Adding or removing
+    a buffer anywhere fails the suite, so a footprint change must be a conscious, recorded decision.
+    The particle-integrator axis has one point today (the Heun pusher), entering as on/off with the
     per-tracer ``(M, 3)`` arrays audited in their own units; precision, backend, and the
-    interpolation scheme change bytes, never counts, so they are outside a count ledger. (b) **The
+    interpolation scheme change bytes, never counts, so they are outside a count ledger. Two scope
+    boundaries are deliberate: the ledger audits the **resident** working set — construction-time
+    seeding transients and the recorded per-call diagnostic allocations (invariant 4's exception,
+    e.g. the derivative-skewness tensors) are *peak*-memory events a separate instrument would
+    cover — and the **frame** (the domain's plans, multipliers, kernels) is excluded as shared,
+    combination-independent infrastructure, a constant offset rather than an axis. (b) **The
     liveness audit**: each `step!` body is a straight-line program, so its op list (reads and writes
     per primitive field operation) gives every value a live range, and the peak number of
     simultaneously live values per shape class is the *lower bound* on the buffers the implemented
