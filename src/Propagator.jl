@@ -244,8 +244,18 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
+    # BOTH nonlinear terms are assembled at the stage state before either field is updated: the
+    # PhaseShift displaced evaluations read û (and φ̂), so an assembly after the velocity update
+    # would pair u at the next stage with φ at this one — breaking the alias cancellation and
+    # degrading the scalar's coupling to first order (caught by the convergence-matrix test).
     velocity_nonlinear!(buffers.nonlinear, û, u, ω, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)          # N̂_u
     add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain, buffers)         # + additive forcing (OU)
+    if has_scalar
+      scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
+      scalar_nonlinear!(sb.nonlinear, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral; N̂_u is already banked in buffers.nonlinear)
+      add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain, buffers)
+    end
+
     if i == 1
       multiply!(hu, dt_T, buffers.nonlinear)                                      # A₁ = 0
     else
@@ -257,12 +267,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
     i < 3 && convolve!(hu, hu, buffers.integrating_factor)
 
     # The passive scalar rides the same stages (skipped, with its buffers unallocated, when absent).
-    # `u` and `φ̂` are untouched above, so this is bit-identical to advancing them together.
     if has_scalar
       hφ = sb.stage1                                                              # scalar accumulator
-      scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
-      scalar_nonlinear!(sb.nonlinear, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral)
-      add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain, buffers)
       if i == 1
         multiply!(hφ, dt_T, sb.nonlinear)
       else

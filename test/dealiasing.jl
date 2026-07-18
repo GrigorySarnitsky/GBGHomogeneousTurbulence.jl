@@ -105,6 +105,50 @@ using Test
     @test bmax(Nraw, oracle) / ref > 1e-2          # raw is genuinely aliased (the test is non-trivial)
   end
 
+  @testset "temporal convergence is scheme-order under PhaseShift (coupled scalar)" begin
+    # Self-convergence (Cauchy) ratios ‖q(Δt)−q(Δt/2)‖/‖q(Δt/2)−q(Δt/4)‖ ≈ 2^p on BOTH fields.
+    # Guards the stage-ordering contract: both nonlinear terms must be assembled at the stage state
+    # before either field is updated — the PhaseShift displaced evaluations read û (and φ̂), so an
+    # assembly after the velocity update degrades the scalar to first order (ratio ≈ 2, not ≈ 8).
+    Nc = 16
+    domain = FixedDomain(Nc, L; element_type = Float64, dealiasing = PhaseShift(), array_type = Array)
+    û0 = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
+    random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
+    random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
+                                velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+
+    function integrate(integrator, dt, nsteps)
+      b = allocate_buffers(integrator, domain; scalar = true)
+      û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
+      φ̂ = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
+      copyto!(field_data(û), field_data(û0))
+      copyto!(field_data(φ̂), field_data(φ̂0))
+      for _ in 1:nsteps
+        velocity_to_physical!(b.velocity_physical, û, domain, b.velocity_copy)
+        vorticity_to_physical!(b.vorticity_start, û, domain, b.vorticity_spectral)
+        step!(integrator, ResolvedFields(û, φ̂), domain, b, conditions, dt)
+      end
+      return û, φ̂
+    end
+    diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
+    function ratios(integrator)
+      Tfinal = 0.4; n = 8
+      u1, p1 = integrate(integrator, Tfinal / n, n)
+      u2, p2 = integrate(integrator, Tfinal / 2n, 2n)
+      u4, p4 = integrate(integrator, Tfinal / 4n, 4n)
+      return diffnorm(u1, u2) / diffnorm(u2, u4), diffnorm(p1, p2) / diffnorm(p2, p4)
+    end
+
+    rk3_velocity, rk3_scalar = ratios(IFLowStorageRK3())
+    @test 5.0 < rk3_velocity < 12.0        # third order ⇒ ≈ 8
+    @test 5.0 < rk3_scalar < 12.0          # the scalar must match — the stage-ordering guard
+    rk2_velocity, rk2_scalar = ratios(IFRK2())
+    @test 3.0 < rk2_velocity < 6.0         # second order ⇒ ≈ 4
+    @test 3.0 < rk2_scalar < 6.0
+  end
+
   @testset "a PhaseShift simulation runs and stays finite" begin
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = PhaseShift(), scalar = true,
                      velocity_forcing = ConstantPower(target = 0.1), rng = MersenneTwister(9))
