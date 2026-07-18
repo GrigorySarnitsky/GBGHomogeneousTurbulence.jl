@@ -97,19 +97,18 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)
-    φ̂ = scalar_spectral(domain)
+    state = ResolvedFields(û, scalar_spectral(domain))
+    derived = DerivedFields(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
     u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
     Δx = L / N
     for _ in 1:50
-      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      dt = 0.4 * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
-      copyto!(field_data(u_start), field_data(buffers.velocity_physical))           # u(tₙ)
-      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
-      u_end = to_physical(û, domain.velocity_plans)                     # u(tₙ₊₁)
-      advect!(tracers, u_start, u_end, domain, dt)
+      u = physical_velocity(derived, state, domain)
+      dt = 0.4 * Δx / max(max_speed(u), 1e-6)
+      copyto!(field_data(u_start), field_data(u))                       # u(tₙ)
+      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, dt)
+      advect!(tracers, u_start, physical_velocity(derived, state, domain), domain, dt)   # u(tₙ₊₁)
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)
     @test all(isfinite, tracer_velocities(tracers))

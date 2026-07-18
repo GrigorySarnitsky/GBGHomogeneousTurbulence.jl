@@ -18,27 +18,26 @@ integrating factor.
 Its contents (each formula lives in the operation's own docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
-- [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
-  recover the velocity, vorticity, and scalar in physical representation from their spectral
-  representation.
 - [`velocity_nonlinear!`](@ref), [`scalar_nonlinear!`](@ref) — assemble the dealiased, Leray-projected
   momentum and scalar nonlinear terms.
 - [`integrating_factor!`](@ref) — build the exact viscous/diffusive multiplier for the linear diffusion
   term.
 
-Each field-transforming or nonlinear-assembly operation takes the `domain` (a [`FixedDomain`](@ref)) and
-the individual preallocated scratch field(s) it writes into as its final argument(s);
-[`integrating_factor!`](@ref) needs no scratch field — it takes `domain` with the scalar `diffusivity`,
-the step `dt`, and an optional forcing `rate`.
+The physical-representation recoveries the assemblies consume
+([`velocity_to_physical!`](@ref) and its siblings) live with the state, in
+[`State`](@ref GBGIsotropicTurbulence.State). Each nonlinear-assembly operation takes the `domain`
+(a [`FixedDomain`](@ref)) and the individual preallocated scratch field(s) it writes into as its final
+argument(s); [`integrating_factor!`](@ref) needs no scratch field — it takes `domain` with the scalar
+`diffusivity`, the step `dt`, and an optional forcing `rate`.
 """
 module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift
+using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing
 
-export velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
-       scalar_to_physical!, scalar_nonlinear!, FlowConditions
+export velocity_nonlinear!, integrating_factor!, scalar_nonlinear!, FlowConditions
 
 
 """
@@ -66,36 +65,6 @@ end
 
 FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
   FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
-
-
-"""
-    velocity_to_physical!(u, û, domain, velocity_copy)
-
-Recover the velocity in physical representation into `u`, from the spectral `û` (left unchanged), on the
-[`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `velocity_copy` (a vector
-field in spectral representation) is the working space.
-"""
-function velocity_to_physical!(u, û, domain::FixedDomain, velocity_copy)
-  copyto!(field_data(velocity_copy), field_data(û))  # copy û first — the in-place inverse transform consumes its spectral source
-  to_physical!(u, velocity_copy, domain.velocity_plans)
-  return u
-end
-
-
-"""
-    vorticity_to_physical!(ω, û, domain, vorticity_spectral)
-
-Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
-into `ω`, from the velocity `û` in spectral representation, leaving `û` untouched. The spectral vorticity
-``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in the scratch
-`vorticity_spectral` (a vector field in spectral representation) and transformed to physical
-representation by the [`FixedDomain`](@ref) `domain`'s plans.
-"""
-function vorticity_to_physical!(ω, û, domain::FixedDomain, vorticity_spectral)
-  curl!(vorticity_spectral, û, domain.multipliers)
-  to_physical!(ω, vorticity_spectral, domain.velocity_plans)
-  return ω
-end
 
 
 """
@@ -197,20 +166,6 @@ function integrating_factor!(factor, domain::FixedDomain, diffusivity::Real, dt:
     field_data(factor) .= complex.(exp.(T(dt) .* (rate .- T(diffusivity) .* domain.squared_wavenumber)))
   end
   return factor
-end
-
-
-"""
-    scalar_to_physical!(φ, φ̂, domain, scalar_copy)
-
-Recover the scalar in physical representation into `φ`, from the spectral `φ̂` (left unchanged), on the
-[`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `scalar_copy` (a scalar
-field in spectral representation) is the working space.
-"""
-function scalar_to_physical!(φ, φ̂, domain::FixedDomain, scalar_copy)
-  copyto!(field_data(scalar_copy), field_data(φ̂))  # copy φ̂ first — the in-place inverse transform consumes its spectral source
-  to_physical!(φ, scalar_copy, domain.scalar_plans)
-  return φ
 end
 
 

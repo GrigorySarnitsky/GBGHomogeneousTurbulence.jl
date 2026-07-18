@@ -13,14 +13,14 @@ using Test
 
 
 function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
+  derived = DerivedFields(domain)
   û = spectral_vector(domain)
   φ̂ = scalar_spectral(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
+  state = ResolvedFields(û, φ̂)
   for _ in 1:nsteps
-    velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-    step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+    step!(integrator, state, domain, buffers, derived, conditions, dt)
   end
   return û, φ̂
 end

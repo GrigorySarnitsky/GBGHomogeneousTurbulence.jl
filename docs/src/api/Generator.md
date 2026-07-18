@@ -14,17 +14,6 @@ scalar forcings — that `step!` consumes.
 FlowConditions
 ```
 
-## Physical-field evaluation
-
-Recover the velocity, vorticity, and scalar in physical representation that the nonlinear terms consume,
-from the state in spectral representation (the sources are preserved).
-
-```@docs
-velocity_to_physical!
-vorticity_to_physical!
-scalar_to_physical!
-```
-
 ## Nonlinear-term assembly
 
 The dealiased, Leray-projected rotational-form momentum term, and the conservative scalar-advection

@@ -24,8 +24,9 @@ end
   fp = flow_parameters(SIM)
   @test fp isa FlowParameters
   @test fp.viscosity == 0.02
-  curl!(SIM.buffers.vorticity_spectral, SIM.state.velocity, SIM.domain.multipliers)
-  @test fp.dissipation ≈ dissipation(SIM.buffers.vorticity_spectral, SIM.conditions.viscosity)
+  ω̂ = spectral_vector(SIM.domain)
+  curl!(ω̂, SIM.state.velocity, SIM.domain.multipliers)
+  @test fp.dissipation ≈ dissipation(ω̂, SIM.conditions.viscosity)
   @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity) / 3)
   @test fp.integral_scale ≈ integral_scale(SIM.state.velocity, SIM.domain)
   @test taylor_reynolds(fp) > 0

@@ -185,12 +185,11 @@ using Test
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
-    φ̂ = scalar_spectral(domain)
+    state = ResolvedFields(û, scalar_spectral(domain))
+    derived = DerivedFields(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     for _ in 1:80
-      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, 0.012)
+      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, 0.012)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05

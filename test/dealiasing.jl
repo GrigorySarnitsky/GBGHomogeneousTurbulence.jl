@@ -88,8 +88,9 @@ using Test
     function nlt(domain, ûf, phaseshift::Bool)
       b = allocate_buffers(IFRK2(), domain; scalar = false)
       u = SD.physical_vector(domain); ω = SD.physical_vector(domain)
-      GEN.velocity_to_physical!(u, ûf, domain, b.velocity_copy)
-      GEN.vorticity_to_physical!(ω, ûf, domain, b.vorticity_spectral)
+      tmp = SD.spectral_vector(domain)
+      velocity_to_physical!(u, ûf, domain, tmp)
+      vorticity_to_physical!(ω, ûf, domain, tmp)
       out = SD.spectral_vector(domain)
       phaseshift ? velocity_nonlinear!(out, ûf, u, ω, domain, b.product_physical, b.product_spectral, b.phase_shift) :
                    GEN._velocity_lamb!(out, u, ω, domain, b.product_physical, b.product_spectral)
@@ -121,14 +122,14 @@ using Test
 
     function integrate(integrator, dt, nsteps)
       b = allocate_buffers(integrator, domain; scalar = true)
+      derived = DerivedFields(domain)
       û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
       φ̂ = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
       copyto!(field_data(û), field_data(û0))
       copyto!(field_data(φ̂), field_data(φ̂0))
+      state = ResolvedFields(û, φ̂)
       for _ in 1:nsteps
-        velocity_to_physical!(b.velocity_physical, û, domain, b.velocity_copy)
-        vorticity_to_physical!(b.vorticity_start, û, domain, b.vorticity_spectral)
-        step!(integrator, ResolvedFields(û, φ̂), domain, b, conditions, dt)
+        step!(integrator, state, domain, b, derived, conditions, dt)
       end
       return û, φ̂
     end

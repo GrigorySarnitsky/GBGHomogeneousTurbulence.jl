@@ -1,14 +1,24 @@
 # State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
-# velocity and scalar — the single source of truth; the physical fields are derived, never stored) and
-# the random initial conditions that seed a run. The per-step scratch lives with the integrator
-# (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
+# velocity and scalar — the single source of truth; the physical fields are derived, never stored),
+# the chart map that recovers the physical representations, `DerivedFields` (the stamped, memoized
+# observation cache those recoveries fill), and the random initial conditions that seed a run. The
+# per-step scratch lives with the integrator (`IntegratorBuffers` in `Propagator`). Everything is
+# sized to a `FixedDomain` from `SimulationDomain`.
 
 """
     State
 
-The evolving state a run advances, and how it is seeded:
+The evolving state a run advances, its derived views, and how it is seeded:
 - [`ResolvedFields`](@ref) — the inert record of the evolving velocity and scalar in spectral
   representation (the single source of truth; the physical fields are derived, never stored).
+- [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
+  recover the velocity, vorticity, and scalar in physical representation from the spectral state.
+- [`DerivedFields`](@ref) — the observation cache: stamped, memoized derived fields with
+  recompute-on-staleness accessors.
+- [`physical_velocity`](@ref), [`physical_vorticity`](@ref) — the sanctioned reads of the cached
+  velocity and vorticity in physical representation.
+- [`resolved_fields_modified!`](@ref) — declare an out-of-band state mutation so every cached chart
+  is recomputed on its next read; [`spectral_scratch`](@ref) — the cache's spectral working space.
 - [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
   (a divergence-free velocity, a mean-zero scalar) that seed it.
 
@@ -21,7 +31,10 @@ using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, physical_vector,
                           scalar_spectral, scalar_physical, _real_type
 
-export ResolvedFields, random_solenoidal_velocity!, random_scalar!
+export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
+       velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!,
+       DerivedFields, physical_velocity, physical_vorticity, resolved_fields_modified!,
+       spectral_scratch
 
 
 """
@@ -47,6 +60,183 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 
 """
+    velocity_to_physical!(u, û, domain, spectral_scratch)
+
+Recover the velocity in physical representation into `u`, from the spectral `û` (left unchanged), on
+the [`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `spectral_scratch` (a
+vector field in spectral representation) is the working space.
+"""
+function velocity_to_physical!(u, û, domain::FixedDomain, spectral_scratch)
+  copyto!(field_data(spectral_scratch), field_data(û))  # copy û first — the in-place inverse transform consumes its spectral source
+  to_physical!(u, spectral_scratch, domain.velocity_plans)
+  return u
+end
+
+
+"""
+    vorticity_to_physical!(ω, û, domain, spectral_scratch)
+
+Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
+into `ω`, from the velocity `û` in spectral representation, leaving `û` untouched. The spectral vorticity
+``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in the scratch
+`spectral_scratch` (a vector field in spectral representation) and transformed to physical
+representation by the [`FixedDomain`](@ref) `domain`'s plans.
+"""
+function vorticity_to_physical!(ω, û, domain::FixedDomain, spectral_scratch)
+  curl!(spectral_scratch, û, domain.multipliers)
+  to_physical!(ω, spectral_scratch, domain.velocity_plans)
+  return ω
+end
+
+
+"""
+    scalar_to_physical!(φ, φ̂, domain, scalar_scratch)
+
+Recover the scalar in physical representation into `φ`, from the spectral `φ̂` (left unchanged), on the
+[`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `scalar_scratch` (a scalar
+field in spectral representation) is the working space.
+"""
+function scalar_to_physical!(φ, φ̂, domain::FixedDomain, scalar_scratch)
+  copyto!(field_data(scalar_scratch), field_data(φ̂))  # copy φ̂ first — the in-place inverse transform consumes its spectral source
+  to_physical!(φ, scalar_scratch, domain.scalar_plans)
+  return φ
+end
+
+
+# One observation-cache slot: the derived field's preallocated storage plus the fields epoch it was
+# last computed at (0 = never). Mutable so an accessor can restamp in place.
+mutable struct Stamped{F}
+  value::F
+  stamp::Int
+end
+
+
+"""
+    DerivedFields(domain; charts = (:velocity, :vorticity))
+
+The observation cache of a run — preallocated, stamped, memoized derived fields, giving every reader
+(a diagnostic, a particle push, a statistics callback) a sanctioned way to the physical representations
+the time loop would otherwise compute and discard. Each chart slot holds a derived field's values —
+on the grid lattice, or (for future trajectory-bound charts) at the tracer positions; particle content
+never enters. An accessor ([`physical_velocity`](@ref), [`physical_vorticity`](@ref)) returns the
+stored field when it is current for the present state and recomputes it first otherwise, so a stale
+read is impossible.
+
+Build the cache on a [`FixedDomain`](@ref); `charts` names the slots to allocate — resident memory is
+opt-in, and reading a chart that was not declared is an error. The available charts are `:velocity`
+(the velocity ``\\boldsymbol{u}`` in physical representation) and `:vorticity` (the vorticity
+``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation).
+
+# Freshness
+The cache carries one epoch counter per dynamical factor of the run — `fields_epoch` for the resolved
+fields (advanced by every completed `step!`, and by [`resolved_fields_modified!`](@ref) after an
+out-of-band mutation) and `particles_epoch` for the tracers (reserved for trajectory-bound charts).
+A slot's stamp records the epoch it was computed at; a stamp behind the epoch marks the slot stale,
+and the accessor recomputes and restamps it on the next read.
+
+# Fields
+- `charts` — a `NamedTuple` of the allocated slots; each slot holds the derived field's preallocated
+  storage and its stamp.
+- `spectral_scratch` — the cache's spectral working space (see [`spectral_scratch`](@ref)).
+- `fields_epoch`, `particles_epoch` — the per-factor epoch counters.
+"""
+mutable struct DerivedFields{NT, S}
+  charts::NT
+  spectral_scratch::S
+  fields_epoch::Int
+  particles_epoch::Int
+end
+
+
+function DerivedFields(domain::FixedDomain; charts = (:velocity, :vorticity))
+  known = (:velocity, :vorticity)
+  for chart in charts
+    chart in known ||
+      throw(ArgumentError("unknown derived-field chart :$chart; the available charts are $known"))
+  end
+  slots = NamedTuple{Tuple(charts)}(Tuple(Stamped(physical_vector(domain), 0) for _ in charts))
+  return DerivedFields(slots, spectral_vector(domain), 1, 1)
+end
+
+
+# Fetch a chart slot, with a complete-at-the-REPL error when the chart was not declared.
+function _chart(derived::DerivedFields, key::Symbol)
+  hasproperty(derived.charts, key) ||
+    throw(ArgumentError("the derived-field chart :$key was not allocated for this run; declare it in " *
+                        "the `charts` of `DerivedFields` (resident chart memory is opt-in)"))
+  return getproperty(derived.charts, key)
+end
+
+
+"""
+    physical_velocity(derived, state, domain)
+    physical_velocity(sim)
+
+The velocity ``\\boldsymbol{u}`` in physical representation, current for the `state` — the sanctioned
+read of the derived velocity field. When the [`DerivedFields`](@ref) `derived`'s `:velocity` chart is
+already current (its stamp matches the fields epoch) the stored field is returned as is; otherwise it
+is first recomputed from the spectral ``\\hat{\\boldsymbol{u}}`` of `state` (a [`ResolvedFields`](@ref))
+by [`velocity_to_physical!`](@ref) on the [`FixedDomain`](@ref) `domain`, and restamped. Treat the
+returned field as read-only: it is the cache's storage, shared by every reader until the fields next
+advance. The second form reads a `Simulation`'s cache, state, and domain.
+"""
+function physical_velocity(derived::DerivedFields, state::ResolvedFields, domain::FixedDomain)
+  slot = _chart(derived, :velocity)
+  if slot.stamp != derived.fields_epoch
+    velocity_to_physical!(slot.value, state.velocity, domain, derived.spectral_scratch)
+    slot.stamp = derived.fields_epoch
+  end
+  return slot.value
+end
+
+
+"""
+    physical_vorticity(derived, state, domain)
+    physical_vorticity(sim)
+
+The vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation,
+current for the `state` — the sanctioned read of the derived vorticity field, memoized exactly as
+[`physical_velocity`](@ref) (recomputed by [`vorticity_to_physical!`](@ref) when stale, returned as is
+when current; treat as read-only). The second form reads a `Simulation`'s cache, state, and domain.
+"""
+function physical_vorticity(derived::DerivedFields, state::ResolvedFields, domain::FixedDomain)
+  slot = _chart(derived, :vorticity)
+  if slot.stamp != derived.fields_epoch
+    vorticity_to_physical!(slot.value, state.velocity, domain, derived.spectral_scratch)
+    slot.stamp = derived.fields_epoch
+  end
+  return slot.value
+end
+
+
+"""
+    resolved_fields_modified!(derived)
+    resolved_fields_modified!(sim)
+
+Declare that the resolved fields — the spectral ``\\hat{\\boldsymbol{u}}``, ``\\hat\\varphi`` — were
+changed outside the sanctioned propagators (a re-seeded velocity, any direct write to the state's
+storage), so every derived chart is stale and will be recomputed on its next read. Advances the
+cache's fields epoch and returns `derived`.
+
+The sanctioned mutators call this for you: `step!` advances the epoch itself when it completes. A
+hand-run loop that mutates the spectral state directly **must** call it — a forgotten call leaves the
+charts serving the previous fields, the one staleness the cache cannot detect on its own.
+"""
+resolved_fields_modified!(derived::DerivedFields) = (derived.fields_epoch += 1; derived)
+
+
+"""
+    spectral_scratch(derived)
+
+The observation cache's working space in spectral representation (a vector field) — the scratch the
+chart recomputations, and the run layer's spectral reductions, write through. Its contents are
+undefined between operations: any single operation may use it freely; nothing may store into it
+across operations.
+"""
+spectral_scratch(derived::DerivedFields) = derived.spectral_scratch
+
+
+"""
     random_solenoidal_velocity!(û, domain; kinetic_energy, peak_wavenumber,
                                 spectrum = nothing, rng = default_rng())
 
@@ -69,6 +259,10 @@ spectra, which the run layer can wire in for you.
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
+
+!!! note
+    Seeding into a running case mutates the resolved fields out of band — follow it with
+    [`resolved_fields_modified!`](@ref) so the derived charts are recomputed on their next read.
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
@@ -121,6 +315,10 @@ e.g. an Obukhov–Corrsin form from [`Phenomenology`](@ref GBGIsotropicTurbulenc
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
+
+!!! note
+    Seeding into a running case mutates the resolved fields out of band — follow it with
+    [`resolved_fields_modified!`](@ref) so the derived charts are recomputed on their next read.
 """
 function random_scalar!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,

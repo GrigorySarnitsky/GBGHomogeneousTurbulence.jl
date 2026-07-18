@@ -13,13 +13,12 @@ using Test
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
 function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   buffers = allocate_buffers(integrator, domain; scalar = true)
+  derived = DerivedFields(domain)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
-  φ̂ = scalar_spectral(domain)
+  state = ResolvedFields(û, scalar_spectral(domain))
   for _ in 1:nsteps
-    velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-    step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+    step!(integrator, state, domain, buffers, derived, conditions, dt)
   end
   return û
 end
@@ -65,29 +64,27 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     integrator = IFLowStorageRK3()
+    derived = DerivedFields(domain)
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))
-    φ̂ = scalar_spectral(domain)
+    state = ResolvedFields(û, scalar_spectral(domain))
     Δx = L / N
     cfl = recommended_cfl(integrator, domain)
     energies = T[]
     for _ in 1:200
-      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      dt = cfl * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
-      push!(energies, kinetic_energy(buffers.velocity_physical))
-      step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+      u = physical_velocity(derived, state, domain)
+      dt = cfl * Δx / max(max_speed(u), 1e-6)
+      push!(energies, kinetic_energy(u))
+      step!(integrator, state, domain, buffers, derived, conditions, dt)
     end
     @test all(isfinite, energies)
     @test 0.05 < energies[end] < 10.0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
 
-    velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-    vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-    dt = cfl * Δx / max(max_speed(buffers.velocity_physical), 1e-6)
-    step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)                       # warm up
-    bytes = @allocated step!(integrator, ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+    dt = cfl * Δx / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
+    step!(integrator, state, domain, buffers, derived, conditions, dt)                       # warm up
+    bytes = @allocated step!(integrator, state, domain, buffers, derived, conditions, dt)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
     @test bytes < field_bytes
   end

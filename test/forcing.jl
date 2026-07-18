@@ -25,11 +25,10 @@ using Test
 
   run_velocity(conditions, nsteps; dt = 0.01) = begin
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
-    φ̂ = scalar_spectral(domain)
+    state = ResolvedFields(û, scalar_spectral(domain))
+    derived = DerivedFields(domain)
     for _ in 1:nsteps
-      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, dt)
     end
     û
   end
@@ -81,10 +80,10 @@ using Test
     conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, velocity_forcing = NoForcing())
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
+    state = ResolvedFields(û_zero, φ̂)
+    derived = DerivedFields(domain)
     for _ in 1:40
-      velocity_to_physical!(buffers.velocity_physical, û_zero, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û_zero, domain, buffers.vorticity_spectral)
-      step!(IFLowStorageRK3(), ResolvedFields(û_zero, φ̂), domain, buffers, conditions, 0.01)
+      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, 0.01)
     end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
   end
@@ -121,12 +120,11 @@ using Test
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     dealias!(û, domain)
-    φ̂ = scalar_spectral(domain)
+    state = ResolvedFields(û, scalar_spectral(domain))
+    derived = DerivedFields(domain)
     for n in 1:200
-      velocity_to_physical!(buffers.velocity_physical, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_start, û, domain, buffers.vorticity_spectral)
-      dt = 0.4 * (L / N) / max(max_speed(buffers.velocity_physical), 1e-6)
-      step!(IFLowStorageRK3(), ResolvedFields(û, φ̂), domain, buffers, conditions, dt)
+      dt = 0.4 * (L / N) / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
+      step!(IFLowStorageRK3(), state, domain, buffers, derived, conditions, dt)
     end
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)

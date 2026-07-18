@@ -10,8 +10,9 @@
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
-# imaginary-axis unstable for advection (see its docstring). Each `step!` assumes the caller has
-# filled `buffers.velocity_physical` / `buffers.vorticity_start` with the start-of-step physical velocity and vorticity.
+# imaginary-axis unstable for advection (see its docstring). Each `step!` reads the start-of-step
+# physical velocity and vorticity through the `DerivedFields` accessors — recomputed automatically when
+# stale, so no caller prefill exists to forget — and advances the cache's fields epoch on completion.
 
 """
     Propagator
@@ -31,10 +32,11 @@ module Propagator
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction, PhaseShift,
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
-using ..Generator: velocity_to_physical!, vorticity_to_physical!, velocity_nonlinear!, integrating_factor!,
-                  scalar_to_physical!, scalar_nonlinear!, FlowConditions
+using ..Generator: velocity_nonlinear!, integrating_factor!, scalar_nonlinear!, FlowConditions
 using ..Forcing: set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
-using ..State: ResolvedFields
+using ..State: ResolvedFields, DerivedFields, physical_velocity, physical_vorticity,
+               resolved_fields_modified!, spectral_scratch,
+               velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
        recommended_cfl
@@ -44,9 +46,9 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, state, domain, buffers, conditions, dt)`, advancing the `state`'s velocity
-``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one timestep in
-place, and may specialize
+[`step!`](@ref)`(integrator, state, domain, buffers, derived, conditions, dt)`, advancing the `state`'s
+velocity ``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one
+timestep in place, and may specialize
 [`recommended_cfl`](@ref).
 """
 abstract type AbstractIntegrator end
@@ -90,12 +92,10 @@ allocated.
 
 # Fields
 Shared — every scheme allocates these:
-- `velocity_copy`, `vorticity_spectral` — working space in spectral representation that the
-  velocity/vorticity recovery consumes.
 - `product_physical`, `product_spectral` — the quadratic products in physical and spectral representation
   (the Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, and the scalar flux ``\\boldsymbol{u}\\varphi``).
-- `velocity_physical`, `vorticity_start`, `vorticity_physical`, `velocity_star` — the start-of-step and
-  substage velocity/vorticity registers in physical representation.
+- `vorticity_physical`, `velocity_star` — the substage velocity/vorticity registers in physical
+  representation (the start-of-step fields come from the run's `DerivedFields` charts).
 - `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
   first stage for [`IFRK2`](@ref)).
 - `integrating_factor`, `velocity_rate` — the shared viscous integrating factor and the velocity's
@@ -113,16 +113,12 @@ Nested:
   when the domain's `dealiasing` is [`PhaseShift`](@ref), else `nothing`.
 """
 struct IntegratorBuffers{VS, ST2, VSS, NL, SS, VP, RK, SB, PB}
-  vorticity_spectral::VS
   stage1::VS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
   velocity_star_spectral::VSS    # IFRK2 only
-  velocity_copy::VS
   product_spectral::VS
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   integrating_factor::SS
-  velocity_physical::VP
-  vorticity_start::VP
   vorticity_physical::VP
   velocity_star::VP
   product_physical::VP
@@ -166,19 +162,19 @@ function allocate_buffers end
 
 
 """
-    step!(integrator, state, domain, buffers, conditions, dt)
+    step!(integrator, state, domain, buffers, derived, conditions, dt)
 
 Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`,
-`domain`, `buffers`, and the problem `conditions` (a [`FlowConditions`](@ref)). Dispatches on the concrete
-`integrator` type (see `IFRK2`, `IFLowStorageRK3`).
+`domain`, `buffers`, the run's observation cache `derived` (a
+[`DerivedFields`](@ref GBGIsotropicTurbulence.State.DerivedFields)), and the problem `conditions` (a
+[`FlowConditions`](@ref)). Dispatches on the concrete `integrator` type (see `IFRK2`,
+`IFLowStorageRK3`).
 
-!!! warning "Start-of-step caches must be filled by the caller"
-    `step!` reads — but does not fill — `buffers.velocity_physical` and `buffers.vorticity_start`, which
-    must already hold the start-of-step velocity and vorticity in physical representation (via
-    [`velocity_to_physical!`](@ref) and [`vorticity_to_physical!`](@ref)). The run layer's
-    [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does this for you; calling `step!`
-    directly on unfilled caches silently produces a wrong step.
+The start-of-step velocity and vorticity in physical representation are read through `derived`'s
+accessors — recomputed automatically when stale, so a hand-run loop needs no manual refill — and the
+cache's fields epoch is advanced when the step completes, marking every derived chart for recomputation
+on its next read.
 """
 function step! end
 
@@ -213,7 +209,7 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
-               conditions::FlowConditions, dt::Real)
+               derived::DerivedFields, conditions::FlowConditions, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -237,10 +233,11 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
 
   for i in 1:3
     if i == 1
-      u, ω = buffers.velocity_physical, buffers.vorticity_start                  # cached start-of-step
+      u = physical_velocity(derived, state, domain)                              # start-of-step charts
+      ω = physical_vorticity(derived, state, domain)                             # (fresh or recomputed)
     else
-      velocity_to_physical!(buffers.velocity_star, û, domain, buffers.velocity_copy)
-      vorticity_to_physical!(buffers.vorticity_physical, û, domain, buffers.vorticity_spectral)
+      velocity_to_physical!(buffers.velocity_star, û, domain, spectral_scratch(derived))
+      vorticity_to_physical!(buffers.vorticity_physical, û, domain, spectral_scratch(derived))
       u, ω = buffers.velocity_star, buffers.vorticity_physical
     end
 
@@ -283,6 +280,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
 
   apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)   # scalar-spectral scratch (free here)
+  resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end
 
@@ -320,7 +318,7 @@ struct IFRK2 <: AbstractIntegrator end
 
 
 function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::IntegratorBuffers,
-               conditions::FlowConditions, dt::Real)
+               derived::DerivedFields, conditions::FlowConditions, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -339,12 +337,13 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
     scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain, buffers) ? sb.rate : nothing
   end
 
-  # stage 1 — nonlinear terms at the start-of-step state
-  velocity_nonlinear!(buffers.stage1, û, buffers.velocity_physical, buffers.vorticity_start, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)              # N̂_u,1
+  # stage 1 — nonlinear terms at the start-of-step state (read through the derived-field charts)
+  u = physical_velocity(derived, state, domain)
+  velocity_nonlinear!(buffers.stage1, û, u, physical_vorticity(derived, state, domain), domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)              # N̂_u,1
   add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain, buffers)
   if has_scalar
     scalar_to_physical!(sb.field, φ̂, domain, sb.copy)
-    scalar_nonlinear!(sb.stage1, û, φ̂, buffers.velocity_physical, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)            # N̂_φ,1
+    scalar_nonlinear!(sb.stage1, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)            # N̂_φ,1
     add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain, buffers)
   end
 
@@ -359,8 +358,8 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
   end
 
   # stage 2 — nonlinear terms at the predictor state
-  velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, buffers.velocity_copy)
-  vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, buffers.vorticity_spectral)
+  velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
+  vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
   velocity_nonlinear!(buffers.stage2, buffers.velocity_star_spectral, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)      # N̂_u,2
   add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain, buffers)
   if has_scalar
@@ -387,6 +386,7 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
 
   apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
   has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)
+  resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end
 
@@ -405,15 +405,13 @@ ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
 )
 
 allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
-  spectral_vector(domain),                                # vorticity_spectral
   spectral_vector(domain),                                # stage1
   nothing,                                                # stage2 (IFRK2 only)
   nothing,                                                # velocity_star_spectral (IFRK2 only)
-  spectral_vector(domain),                                # velocity_copy
   spectral_vector(domain),                                # product_spectral
   spectral_vector(domain),                                # nonlinear
   scalar_spectral(domain),                                # integrating_factor
-  physical_vector(domain), physical_vector(domain), physical_vector(domain),   # velocity_physical, vorticity_start, vorticity_physical
+  physical_vector(domain),                                # vorticity_physical
   physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
   _forcing_rate(domain),                                  # velocity_rate
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
@@ -421,15 +419,13 @@ allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) =
 )
 
 allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
-  spectral_vector(domain),                                # vorticity_spectral
   spectral_vector(domain),                                # stage1
   spectral_vector(domain),                                # stage2
   spectral_vector(domain),                                # velocity_star_spectral
-  spectral_vector(domain),                                # velocity_copy
   spectral_vector(domain),                                # product_spectral
   nothing,                                                # nonlinear (IFLowStorageRK3 only)
   scalar_spectral(domain),                                # integrating_factor
-  physical_vector(domain), physical_vector(domain), physical_vector(domain),   # velocity_physical, vorticity_start, vorticity_physical
+  physical_vector(domain),                                # vorticity_physical
   physical_vector(domain), physical_vector(domain),       # velocity_star, product_physical
   _forcing_rate(domain),                                  # velocity_rate
   scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
