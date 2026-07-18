@@ -223,12 +223,12 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
   has_scalar = φ̂ !== nothing
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(conditions.velocity_forcing, û, domain, buffers, dt)
-  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain, buffers) ? buffers.velocity_rate : nothing
+  prepare_forcing!(conditions.velocity_forcing, û, domain, dt)
+  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain) ? buffers.velocity_rate : nothing
   scalar_rate = nothing
   if has_scalar
-    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, buffers, dt)
-    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain, buffers) ? sb.rate : nothing
+    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, dt)
+    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain) ? sb.rate : nothing
   end
 
   for i in 1:3
@@ -246,11 +246,11 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
     # would pair u at the next stage with φ at this one — breaking the alias cancellation and
     # degrading the scalar's coupling to first order (caught by the convergence-matrix test).
     velocity_nonlinear!(buffers.nonlinear, û, u, ω, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)          # N̂_u
-    add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain, buffers)         # + additive forcing (OU)
+    add_forcing_source!(conditions.velocity_forcing, buffers.nonlinear, domain)         # + additive forcing (OU)
     if has_scalar
       scalar_to_physical!(sb.field, φ̂, domain, sb.copy)                          # φ at the stage state
       scalar_nonlinear!(sb.nonlinear, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)               # N̂_φ (reuses buffers.product_physical/buffers.product_spectral; N̂_u is already banked in buffers.nonlinear)
-      add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain, buffers)
+      add_forcing_source!(conditions.scalar_forcing, sb.nonlinear, domain)
     end
 
     if i == 1
@@ -278,8 +278,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, domain::FixedDomain, bu
     end
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
-  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)   # scalar-spectral scratch (free here)
+  apply_forcing!(conditions.velocity_forcing, û, domain)
+  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain)
   resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end
@@ -329,22 +329,22 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
   has_scalar = φ̂ !== nothing
 
   # per-step forcing state (OU advance) and linear rates, from the start-of-step state
-  prepare_forcing!(conditions.velocity_forcing, û, domain, buffers, dt)
-  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain, buffers) ? buffers.velocity_rate : nothing
+  prepare_forcing!(conditions.velocity_forcing, û, domain, dt)
+  velocity_rate = set_forcing_rate!(conditions.velocity_forcing, buffers.velocity_rate, û, domain) ? buffers.velocity_rate : nothing
   scalar_rate = nothing
   if has_scalar
-    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, buffers, dt)
-    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain, buffers) ? sb.rate : nothing
+    prepare_forcing!(conditions.scalar_forcing, φ̂, domain, dt)
+    scalar_rate = set_forcing_rate!(conditions.scalar_forcing, sb.rate, φ̂, domain) ? sb.rate : nothing
   end
 
   # stage 1 — nonlinear terms at the start-of-step state (read through the derived-field charts)
   u = physical_velocity(derived, state, domain)
   velocity_nonlinear!(buffers.stage1, û, u, physical_vorticity(derived, state, domain), domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)              # N̂_u,1
-  add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain, buffers)
+  add_forcing_source!(conditions.velocity_forcing, buffers.stage1, domain)
   if has_scalar
     scalar_to_physical!(sb.field, φ̂, domain, sb.copy)
     scalar_nonlinear!(sb.stage1, û, φ̂, u, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)            # N̂_φ,1
-    add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain, buffers)
+    add_forcing_source!(conditions.scalar_forcing, sb.stage1, domain)
   end
 
   # predictors û*, φ̂*
@@ -361,11 +361,11 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
   velocity_to_physical!(buffers.velocity_star, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
   vorticity_to_physical!(buffers.vorticity_physical, buffers.velocity_star_spectral, domain, spectral_scratch(derived))
   velocity_nonlinear!(buffers.stage2, buffers.velocity_star_spectral, buffers.velocity_star, buffers.vorticity_physical, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)      # N̂_u,2
-  add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain, buffers)
+  add_forcing_source!(conditions.velocity_forcing, buffers.stage2, domain)
   if has_scalar
     scalar_to_physical!(sb.field, sb.star_spectral, domain, sb.copy)
     scalar_nonlinear!(sb.stage2, buffers.velocity_star_spectral, sb.star_spectral, buffers.velocity_star, sb.field, domain, buffers.product_physical, buffers.product_spectral, buffers.phase_shift)       # N̂_φ,2
-    add_forcing_source!(conditions.scalar_forcing, sb.stage2, domain, buffers)
+    add_forcing_source!(conditions.scalar_forcing, sb.stage2, domain)
   end
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
@@ -384,8 +384,8 @@ function step!(::IFRK2, state::ResolvedFields, domain::FixedDomain, buffers::Int
     combine!(φ̂, one(T), φ̂, half, sb.stage2)
   end
 
-  apply_forcing!(conditions.velocity_forcing, û, domain, buffers.product_spectral)
-  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain, sb.nonlinear)
+  apply_forcing!(conditions.velocity_forcing, û, domain)
+  has_scalar && apply_forcing!(conditions.scalar_forcing, φ̂, domain)
   resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
   return û, φ̂
 end

@@ -41,7 +41,7 @@ using Test
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
     fill!(buffers.velocity_rate, 0.0)
-    @test set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
+    @test set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain)
     @test maximum(buffers.velocity_rate) ≈ A        # A on the band
     @test minimum(buffers.velocity_rate) == 0       # zero outside the band
   end
@@ -50,7 +50,7 @@ using Test
     power = 0.3
     forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain, buffers)
+    set_forcing_rate!(forcing, buffers.velocity_rate, û0, domain)
     A = maximum(buffers.velocity_rate)
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
   end
@@ -95,7 +95,7 @@ using Test
     û = spectral_vector(domain)                              # velocity reference ⇒ solenoidal forcing
     samples = T[]
     for n in 1:1000
-      prepare_forcing!(ou, û, domain, buffers, 0.01)
+      prepare_forcing!(ou, û, domain, 0.01)
       n > 500 && push!(samples, inner(ou.state, ou.state))
     end
     @test 0.6 * target_variance < sum(samples) / length(samples) < 1.6 * target_variance
@@ -108,8 +108,8 @@ using Test
     b = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 7)
     û = spectral_vector(domain)
     for n in 1:20
-      prepare_forcing!(a, û, domain, buffers, 0.01)
-      prepare_forcing!(b, û, domain, buffers, 0.01)
+      prepare_forcing!(a, û, domain, 0.01)
+      prepare_forcing!(b, û, domain, 0.01)
     end
     @test field_data(a.state) == field_data(b.state)
   end

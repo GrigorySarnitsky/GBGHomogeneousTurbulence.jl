@@ -38,7 +38,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, scalar_spectral, spectral_vector
+using ..SimulationDomain: FixedDomain, scalar_spectral, spectral_vector, scalar_physical, physical_vector
 
 export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,
        set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
@@ -50,7 +50,15 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
 Supertype of the energy-injection strategies. A strategy may implement any of [`set_forcing_rate!`](@ref)
 (a linear forcing rate folded into the integrating factor), [`apply_forcing!`](@ref) (a post-step
 projection), [`prepare_forcing!`](@ref) (a per-step state advance), and [`add_forcing_source!`](@ref) (an
-additive per-stage source); all default to doing nothing.
+additive per-stage source); all default to doing nothing, and a strategy owns whatever scratch its hooks
+need.
+
+The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
+`set_forcing_rate!` run once before the Runge–Kutta stages (the state a later hook consumes must be
+prepared here), `add_forcing_source!` runs at every stage, and `apply_forcing!` runs after the completed
+step. The linear rate and the additive source are two channels of **one** forcing term — the part linear
+in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
+single strategy may legitimately use both.
 """
 abstract type AbstractForcing end
 
@@ -73,7 +81,7 @@ end
 
 
 """
-    set_forcing_rate!(forcing, rate, field, domain, buffers) -> Bool
+    set_forcing_rate!(forcing, rate, field, domain) -> Bool
 
 For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
@@ -81,40 +89,39 @@ integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`integrating_fac
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
 rate. The `field` is the start-of-step field in spectral representation; `domain` is the
-[`FixedDomain`](@ref), and `buffers` the shared per-step scratch (unused by the linear forcings, present
-for interface uniformity).
+[`FixedDomain`](@ref).
 """
-set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain, buffers) = false
+set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = false
 
 
 """
-    apply_forcing!(forcing, field, domain, scratch) -> field
+    apply_forcing!(forcing, field, domain) -> field
 
 Apply a post-step forcing to `field` (a velocity or scalar ``\\varphi`` field in spectral
-representation) in place, on the [`FixedDomain`](@ref) `domain`, using the spectral `scratch` buffer. The
-default does nothing; see `BandRescaling`.
+representation) in place, on the [`FixedDomain`](@ref) `domain`. The default does nothing; see
+`BandRescaling`.
 """
-apply_forcing!(::AbstractForcing, field, domain::FixedDomain, scratch) = field
+apply_forcing!(::AbstractForcing, field, domain::FixedDomain) = field
 
 
 """
-    prepare_forcing!(forcing, field, domain, buffers, dt) -> nothing
+    prepare_forcing!(forcing, field, domain, dt) -> nothing
 
 Update a forcing's internal state once per step, before the Runge–Kutta stages, from the
 start-of-step `field` (in spectral representation) and the timestep `dt`, on the [`FixedDomain`](@ref)
-`domain` with the shared per-step scratch `buffers`. The default does nothing.
+`domain`. A stateful forcing owns whatever scratch this needs. The default does nothing.
 """
-prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, buffers, dt::Real) = nothing
+prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, dt::Real) = nothing
 
 
 """
-    add_forcing_source!(forcing, nonlinear, domain, buffers) -> nonlinear
+    add_forcing_source!(forcing, nonlinear, domain) -> nonlinear
 
 Add an additive forcing source to the dealiased nonlinear-term buffer `nonlinear` at each Runge–Kutta
 stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
-[`FixedDomain`](@ref) `domain` with the shared per-step scratch `buffers`. The default does nothing.
+[`FixedDomain`](@ref) `domain`. The default does nothing.
 """
-add_forcing_source!(::AbstractForcing, nonlinear, domain::FixedDomain, buffers) = nonlinear
+add_forcing_source!(::AbstractForcing, nonlinear, domain::FixedDomain) = nonlinear
 
 
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
@@ -173,7 +180,7 @@ function BandRescaling(domain::FixedDomain; target::Real, over::Symbol = :band,
 end
 
 
-function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain, scratch)
+function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
   band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
   band_value < 1e-12 && return field                   # nothing in the band yet (guard)
@@ -211,7 +218,7 @@ function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, high
   return Linear(mask, float(rate))
 end
 
-function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain, buffers)
+function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
   T = eltype(rate)
   rate .= T(forcing.rate) .* forcing.mask
   return true
@@ -241,7 +248,7 @@ function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer 
   return ConstantPower(band, mask, float(target))
 end
 
-function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain, buffers)
+function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = eltype(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
   amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
@@ -273,7 +280,9 @@ the forcing is divergence-free. The frozen ``\\hat f`` is added to the right-han
 the random stream, so a forced run is reproducible.
 
 The same type forces either the velocity or the scalar ``\\varphi``: it adapts to the field it is
-given (a vector or scalar state, projected only for the velocity), allocated on first use.
+given (a vector or scalar state, projected only for the velocity). The forcing owns its state and its
+noise scratch — one field in physical and one in spectral representation, allocated on first use, so a
+velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
 
 !!! note
     The random increment is generated host-side each step; on the GPU this is a portability-first
@@ -285,24 +294,30 @@ mutable struct StochasticOU{B, R, T} <: AbstractForcing
   variance::T                                # σ²: stationary forcing variance ⟨|f|²⟩
   rng::R                                     # random stream (persists across steps)
   state::Union{Nothing, AbstractFieldSpectral}   # the OU forcing f̂ (allocated on first use)
+  noise_physical::Union{Nothing, AbstractFieldPhysical}  # own noise scratch (allocated on first use)
+  noise_spectral::Union{Nothing, AbstractFieldSpectral}
 end
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
                       lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0)
   band = _shell_band(domain, lowest_shell, highest_shell)
-  return StochasticOU(band, float(correlation_time), float(variance), MersenneTwister(seed), nothing)
+  return StochasticOU(band, float(correlation_time), float(variance), MersenneTwister(seed),
+                      nothing, nothing, nothing)
 end
 
 _ou_state(::VectorFieldSpectral, domain) = spectral_vector(domain)
 _ou_state(::ScalarFieldSpectral, domain) = scalar_spectral(domain)
-_ou_buffers(::VectorFieldSpectral, buffers, domain) = (buffers.product_physical, buffers.product_spectral, domain.velocity_plans)
-_ou_buffers(::ScalarFieldSpectral, buffers, domain) = (buffers.scalar.field, buffers.scalar.copy, domain.scalar_plans)
+_ou_noise(::VectorFieldSpectral, domain) = (physical_vector(domain), spectral_vector(domain))
+_ou_noise(::ScalarFieldSpectral, domain) = (scalar_physical(domain), scalar_spectral(domain))
+_ou_plans(::VectorFieldSpectral, domain) = domain.velocity_plans
+_ou_plans(::ScalarFieldSpectral, domain) = domain.scalar_plans
 
 
-function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, buffers, dt::Real)
+function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real)
   T = real(eltype(field_data(field)))
   ou.state === nothing && (ou.state = _ou_state(field, domain))
-  noise_physical, noise_spectral, plans = _ou_buffers(field, buffers, domain)
+  ou.noise_physical === nothing && ((ou.noise_physical, ou.noise_spectral) = _ou_noise(field, domain))
+  noise_physical, noise_spectral, plans = ou.noise_physical, ou.noise_spectral, _ou_plans(field, domain)
 
   # unit-variance band-limited (and, for the velocity, solenoidal) random increment ξ
   copyto!(field_data(noise_physical), randn(ou.rng, T, size(field_data(noise_physical))...))
@@ -319,7 +334,7 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, buffers,
   return nothing
 end
 
-add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain, buffers) =
+add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain) =
   add!(nonlinear, nonlinear, ou.state)
 
 
