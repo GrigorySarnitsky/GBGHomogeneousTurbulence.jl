@@ -80,11 +80,14 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
-  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
+  advances, its physical recoveries, the `DerivedFields` observation cache (stamped charts of the
+  physical velocity and vorticity, recomputed exactly when stale), and the random initial conditions —
+  a divergence-free velocity and a mean-zero scalar.
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
-  right-hand side, the passive-scalar advection, and the exact viscous integrating factor.
+  right-hand side, the passive-scalar advection, and the exact viscous integrating factor — reified as
+  the `ResolvedGenerator` a scheme consumes through the generator protocol.
 - [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
   `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the
   Courant–Friedrichs–Lewy (CFL) helper `max_speed`, and the `energy_spectrum` / `integral_scale`).

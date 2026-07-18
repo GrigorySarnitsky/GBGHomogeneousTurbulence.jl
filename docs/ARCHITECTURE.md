@@ -64,7 +64,8 @@ end
 ```
 
 The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each step from
-the advective-CFL condition (§4.5), refreshes the cached start-of-step fields the propagator needs, and
+the advective-CFL condition (§4.5), reads the physical fields through the `DerivedFields` observation
+cache (§4.1 — recomputed exactly when stale, so nothing must be manually refreshed), and
 treats **warm-up as a first-class verb**. By default `warmup!` advances until the flow is statistically
 stationary, watching the running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness
 ``S(t)`` — the small-scale signals that settle last — rather than the kinetic energy a constant-energy
@@ -183,16 +184,25 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
   record of the evolving spectral fields — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
-  scalar are derived from it on demand and never stored, so the state cannot go stale. No operation hangs
+  scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
-  carrier so the arrows stay primary (§11 decision 26). Its initial conditions seed it:
+  carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recoveries
+  `velocity_to_physical!`, `vorticity_to_physical!`, `scalar_to_physical!` that evaluate those functions —
+  is homed here with the state it reads, and **`DerivedFields`** memoizes its values: an observation cache
+  of stamped chart slots (opt-in, an undeclared chart is an error) with one epoch counter per dynamical
+  factor of the run (fields, particles). An accessor (`physical_velocity`, `physical_vorticity`) returns
+  the stored field when its stamp matches the fields epoch and recomputes it first otherwise, so a stale
+  read is impossible; `step!` advances the epoch as it completes, and an out-of-band mutation of the
+  spectral state is declared through `resolved_fields_modified!` — the one freshness event the cache
+  cannot detect itself (§11 decision 30). Its initial conditions seed the state:
   `random_solenoidal_velocity!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar!` fills a mean-zero scalar to a target variance. The
-  per-step scratch is **not** state: it lives with the integrator that owns it (`IntegratorBuffers` in
-  `Propagator`, §4.5), preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
+  per-step scratch is **not** state: the scheme's registers live with the integrator (`IntegratorBuffers`
+  in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
+  preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
   to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
-  composes the `ResolvedFields`, and the time loop advances it in place.
+  composes the `ResolvedFields` and its `DerivedFields`, and the time loop advances the state in place.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -215,16 +225,17 @@ the equation becomes
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
 
-- **The reversible term.** `velocity_to_physical!` and `vorticity_to_physical!` recover the physical velocity and vorticity from
-  ``\hat{\boldsymbol{u}}``; `velocity_nonlinear!` then assembles
+- **The reversible term.** The recoveries (`velocity_to_physical!`, `vorticity_to_physical!`, homed with
+  the state, §4.1) produce the physical velocity and vorticity from
+  ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
   ``\mathbb P (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
   Orszag 1971). Rotational form is the cheap, energy-conserving way to compute the advection spectrally,
   and incompressible Euler is genuinely Hamiltonian — so this term is the flow's *reversible*,
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol{u}`` is the flow's *irreversible*,
-  net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly*: `integrating_factor!`
-  builds the flow map
+  net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly*: the factor pair
+  `velocity_factor!` / `scalar_factor!` builds the flow map
   ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
   — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
@@ -240,7 +251,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   right-hand side, not of ``\mathcal E``.
 
 The passive scalar rides the same generator: `scalar_to_physical!` transforms ``\hat\varphi`` to the
-physical ``\varphi`` at each stage, and `scalar_nonlinear!` assembles the advection in conservative form
+physical ``\varphi`` at each stage, and `scalar_rhs!` assembles the advection in conservative form
 ``-\nabla\cdot(\boldsymbol{u}\varphi)`` (equal to ``-\boldsymbol{u}\cdot\nabla\varphi`` since
 ``\nabla\cdot\boldsymbol{u} = 0``); the conservative form conserves the scalar mean exactly under the
 ``2/3`` rule.
@@ -250,6 +261,18 @@ carries no genuine entropy — the dissipated kinetic energy simply leaves the m
 the load-bearing content is the reversible/irreversible split of the right-hand side and the constraint it
 puts on any closure: net dissipation lives in the diffusion term alone, so a subgrid model may only
 *remove* energy through that half (§8).
+
+The generator is **reified**: **`ResolvedGenerator`** bundles the `FlowConditions` with the assembly
+scratch its evaluations write through (the quadratic-product fields, the `PhaseShift`
+displaced-evaluation buffers, the per-mode forcing-rate arrays), behind a six-verb protocol —
+`prepare!` opens the step (advances each forcing's internal state, arms the linear rates),
+`velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
+(dealiased nonlinear term plus additive forcing source), `velocity_factor!` / `scalar_factor!` build
+each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
+`velocity_rhs!` and `velocity_factor!` are the required core; `prepare!` and `finalize!` default to
+no-ops. A scheme consumes the physics only through this protocol, so it can never assemble the
+right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
+reification (§11 decisions 29, 31).
 
 ### 4.3 `Observables` — the measured functions of the state
 
@@ -285,7 +308,15 @@ step through a small interface whose four methods each default to doing nothing:
 - `prepare_forcing!` — advance internal state once per step (a stochastic process);
 - `apply_forcing!` — apply a post-step projection or rescale.
 
-`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed), `Linear`
+The four hooks form one per-step lifecycle with a fixed order — `prepare_forcing!` and
+`set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `apply_forcing!` after the
+completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
+part folded into ``\mathcal E``, the remainder added at stages). A strategy owns whatever scratch its
+hooks need; none receives the integrator's buffers (§11 decision 32).
+
+`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed — a deterministic
+clamp, fit for spin-up and amplitude-holding but not a faithful stationary sampler; its docstring
+carries the Berendsen-class caveat, Bussi, Donadio & Parrinello 2007), `Linear`
 (fixed-rate negative damping, Lundgren 2003), and `ConstantPower` (its rate reset each step to hold the
 injection rate) — the two linear forcings folded into ``\mathcal E`` — are provided; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
@@ -311,13 +342,12 @@ Method (§3).
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
-- **`IntegratorBuffers`** is the per-step scratch the propagator owns and writes into — the shared
-  right-hand-side working fields (the physical-recovery copies, the `product_physical`/`product_spectral`
-  that carry the quadratic products, the physical registers, the integrating factor, the linear forcing
-  rates) plus the scheme's Runge–Kutta stage registers — built by `allocate_buffers` dispatching on the
-  concrete scheme, so each allocates exactly its working set. Because the generator's operators take their
-  scratch fields individually (naming no bundle), this scratch belongs to the propagator's realization,
-  not upstream with the state; it is decidedly *not* the state (§11 decision 26).
+- **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers, the
+  factor register, and the substage recovery pair — built by `allocate_buffers` dispatching on the
+  concrete scheme, so each allocates exactly its working set. The right-hand-side *assembly* scratch
+  lives with the generator on the `ResolvedGenerator` (§4.2), and the start-of-step physical fields are
+  the observation cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
+  the scheme's registers, nothing more. None of this scratch is state (§11 decisions 26, 30, 31).
 
 ### 4.6 `Particles` — Lagrangian instruments
 
@@ -340,8 +370,9 @@ integrator** — the reversible generator of §8 again — so the split does not
 ### 4.7 `SimulationRun` — the front door
 
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
-spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `IntegratorBuffers`
-scratch, the `FlowConditions`, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
+spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `DerivedFields`
+observation cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
+scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
 for the Heun push, and a clock. Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
@@ -350,8 +381,8 @@ for the Heun push, and a clock. Over it:
   chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim; dt)`** and **`run!(sim; ...)`** own the time loop: choose ``\Delta t`` from the
-  scheme's CFL and the current `max_speed`, refresh the cached start-of-step velocity and vorticity,
-  `step!`, advect tracers, and fire a user callback on a fixed time interval.
+  scheme's CFL and the current `max_speed` (read through the velocity chart), `step!`, advect tracers on
+  the two endpoint velocities the accessors serve, and fire a user callback on a fixed time interval.
 - **`warmup!(sim; ...)`** advances to statistical stationarity — by default until the running dissipation
   ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a trailing-window
   flatness test), reading ``\varepsilon`` rather than the clampable ``k(t)``, and, when the scalar is
@@ -508,7 +539,8 @@ generalization is built for them until a second concrete case forces the abstrac
 
 - **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
   added to the RHS. *Built and validated, then archived* from the public surface (un-exported,
-  undocumented) to be re-added; its host-side random increment is the one allocation-free exception
+  undocumented) to be re-added; it owns its noise scratch (decision 32), and its host-side random
+  increment is the one allocation-free exception
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
@@ -534,14 +566,6 @@ generalization is built for them until a second concrete case forces the abstrac
   ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganizes the quadratic product
   to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
   scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
-- **A reified `Generator` operator.** Today the evolution is functions (`velocity_nonlinear!`,
-  `scalar_nonlinear!`, `integrating_factor!`) the `Propagator` calls with a `FlowConditions` and the
-  scratch — `step!` takes the `State` and the `FlowConditions`, not a first-class RHS object. A `Generator`
-  **type**, bundling the conditions with the dealiased-nonlinear and integrating-factor assembly into one
-  operator the `Propagator` steps (`step!(integrator, state, generator, …)`), is deferred until it reifies
-  what the functions do not: a hollow wrapper earns nothing. The pressure toward it is real, though —
-  stripping the run-layer defaults to the `Simulation` front door (decision 28) leaves `FlowConditions` a
-  bare explicit argument, exactly the friction such an operator would absorb (§4.2).
 - **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
   stability-calibrated, conservative ceiling with a manual `cfl` override — and nothing adapts it to a
   target *temporal* accuracy. An embedded-error or PI step controller, distinct in purpose from the
@@ -597,6 +621,19 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   that re-import the large scales. So the tool is built to *test* how universal a closure is, per regime,
   not to assume it. This is the general charter: **the architecture investigates the physics; it must not
   assume it** — the same discipline as the model-free statistics it consumes.
+- **The skew-product tower — what a `Simulation` is.** The composite system factors as a tower
+  ``t \to`` forcing noise ``\to`` fields ``\to`` particles: the generator is block lower-triangular
+  (each row reads only itself and the rows above — the fields never read the tracer positions, the
+  clock reads nothing), so the flow is a skew product and `advance!` is its Gauss–Seidel sweep in
+  topological order (step the fields, refresh the observation, push the tracers, tick the clock).
+  Triangularity is what licenses the composed propagator — splitting error cannot propagate *up* the
+  triangle — and it gives every state slot a litmus: **the restart record holds exactly what the flow
+  map needs** (``\hat{\boldsymbol{u}}``, ``\hat\varphi``; the tracer positions; a stochastic
+  forcing's internal state — the extended-phase-space discipline of molecular dynamics' thermostats);
+  the observation cache holds spent compute, reconstructable from the record (delete it and the
+  trajectory is unchanged); and the clock and output cursors are the experimenter's logbook. The
+  `DerivedFields` charts are the tower's *algebraic* variables — solved, never integrated — and their
+  per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
 
 ---
 
@@ -635,8 +672,8 @@ one usually encodes a decision.
 ## 10. Conventions
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
-  exact/ideal form, *then* the discrete realization — as `integrating_factor!` leads with
-  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_nonlinear!` with
+  exact/ideal form, *then* the discrete realization — as `velocity_factor!` leads with
+  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_rhs!` with
   the Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
 - **Coordinate-free where a coordinate-free form exists.** Homogeneous isotropic turbulence is
@@ -901,7 +938,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     representation — the *resolved fields* — with `FilteredFields` (LES/FDF) and a spectrum record (EDQNM)
     its eventual siblings in the product. A six-lens naming panel with an adversarial pass fixed the slate
     (`IntegratorBuffers`, and the scratch-field names `product_physical`/`product_spectral` over the
-    velocity-only `lamb`).
+    velocity-only `lamb`). *(Amended by decisions 30–31: the physical chart the diagnostics read is now
+    typed — the `DerivedFields` cache in `State` — the recoveries live with the state, the assembly
+    scratch on the `ResolvedGenerator`, and `IntegratorBuffers` holds only the scheme's registers; the
+    individual-scratch-arguments discipline this entry set applies unchanged to the internals.)*
 27. **(2026-07) Phase-shift dealiasing, on `GBGPeriodicFields`' `translation_kernel`.** Adds
     [`PhaseShift`](@ref) as an opt-in `DealiasingStrategy` (the default stays the rotational form +
     spherical ``2/3``). Each quadratic nonlinear term is assembled twice — on the grid and on a grid
@@ -934,7 +974,99 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       truth (decision 26); the run layer supplies the explicit state variables.
     - **`allocate_buffers` is per-scheme and exact** (invariant 4): each integrator allocates only the
       registers it uses; over-allocation is a hard error. The friction of the now-explicit `FlowConditions`
-      is the standing argument for a reified `Generator` operator (§7).
+      is the standing argument for a reified `Generator` operator (§7). *(Realized: decision 31.)*
+29. **(2026-07) The RK3 stage ordering: both right-hand sides before either update; the
+    dealiasing × scheme convergence matrix.** The `IFLowStorageRK3` stage loop updated and rotated
+    ``\hat{\boldsymbol{u}}`` *before* assembling the scalar's advection. A mask strategy never reads
+    ``\hat{\boldsymbol{u}}`` there, but `PhaseShift`'s displaced evaluation does (decision 27) — so the
+    displaced flux paired the *next* stage's velocity with *this* stage's scalar, breaking the odd-axis
+    alias cancellation at ``O(\Delta t)`` and degrading the scalar from third to **first** order
+    (measured self-convergence ratios 2.02 against 7.97 for the velocity; `IFRK2`'s call sites were
+    consistent, and the term-level padding oracle cannot see a call-site mismatch — it checks the
+    assembly with matched inputs). The comment that had licensed the old order ("`u` and `φ̂` are
+    untouched above") was written before `PhaseShift` made the assembly read ``\hat{\boldsymbol{u}}``
+    — an invalidated premise, not a wrong derivation. Both right-hand sides are now evaluated at the
+    stage state before either field is updated (bit-identical for the mask strategies), and the suite
+    carries the **dealiasing × scheme convergence matrix**: both fields must converge at scheme order
+    under every strategy. The bug is the motivating instance for decision 31's seam — a stage that
+    reads a mid-update intermediate is a malformed factorization, which a reified right-hand side makes
+    unrepresentable.
+30. **(2026-07) The observation layer: `DerivedFields` — stamped, memoized charts over the state; the
+    recoveries move to `State`.** The physical recoveries are the **chart map** of the state — they
+    read only ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and the frame — so they home in `State`
+    (`Generator` imports them for its displaced evaluations; the new `Generator → State` edge respects
+    the include order). `DerivedFields` memoizes their values: preallocated slots (`:velocity`,
+    `:vorticity`), each stamped with the **fields epoch** it was computed at; an accessor
+    (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
+    first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
+    completes. An out-of-band mutation is declared through **`resolved_fields_modified!`**, named for
+    the event that breaks the chart–state invariant (the naming lesson of SciML's `u_modified!` →
+    `derivative_discontinuity!` rename: name the verb for the violated invariant, not the mutated
+    slot); the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
+    loops to it. This kills the `step!` silent-precondition footgun — there is no caller prefill left
+    to forget. **Epoch granularity is deliberately coarse**: one counter per dynamical factor of the
+    tower (fields, particles), no finer — every production memoization precedent surveyed (LAMMPS
+    computes' timestep stamps, OpenFOAM's registry event numbers, Fluidsim's iteration stamps) uses a
+    single counter, within-step consistency is the seam's job (decision 31), and an over-fine epoch
+    system is itself a silent-staleness surface. Charts are **opt-in** (an undeclared chart errors —
+    resident GPU memory is a choice), and the cache's shared spectral scratch replaces two
+    `IntegratorBuffers` slots — net one resident spectral vector *fewer* than before the layer.
+    Naming: **`DerivedFields`** was fixed by a six-lens panel (5–1 over `DerivedQuantities`, upheld by
+    an adversarial pass) with a license clause the docstring carries — each slot holds *a derived
+    field's values*, on the grid lattice or at the tracer positions; particle content never enters —
+    a recorded rename trigger (the first particle-*sourced* slot, e.g. a number density, reopens the
+    name), and a recorded guard: ``\varepsilon``, ``k``, ``E(\kappa)`` never become resident slots
+    (statistics belong to `GBGStreamingStatistics`; occasional diagnostics allocate per call). Kills,
+    not to be re-proposed: `Observations` (collides with `Observables`), `DerivedViews`/`StateViews`
+    (a Julia view cannot be stale), `Charts` (these are non-invertible functionals, not manifold
+    charts), `Diagnostics` (the community word for scalar time series), `Snapshot` (asserts
+    restart-copy structure), `DerivedQuantities` (indiscriminate extension).
+31. **(2026-07) The generator reified: `ResolvedGenerator` and the six-verb protocol; schemes shrink
+    to stage arithmetic.** Closes §7's deferred item on its own terms — the reification now carries
+    what the loose functions could not: the assembly scratch (the quadratic products, the `PhaseShift`
+    buffers, the forcing-rate arrays), the conditions, and the step lifecycle. The protocol:
+    `prepare!` (open the step — advance forcing state, arm linear rates), `velocity_rhs!` /
+    `scalar_rhs!` (each field's explicit right-hand side at a stage state: the dealiased nonlinear
+    term plus the additive forcing source), `velocity_factor!` / `scalar_factor!` (each field's exact
+    linear subflow — the generator is the semilinear split ``\partial_t \hat q = A\hat q + N(\hat q)``
+    with a *diagonal, exact* linear operator, the exponential-integrator family's special case), and
+    `finalize!` (close the step — the post-step forcing projections). The rhs/factor pairs are the
+    required core; `prepare!`/`finalize!` default to no-ops (a two-tier required/optional protocol).
+    **`finalize!` on the generator is a recorded deviation** from the solver-library precedent (the
+    SciML/PETSc/SUNDIALS right-hand-side objects are pure evaluators, with post-step action in
+    callback layers), adopted because the projection is part of the *step's* contract, not of
+    observation: the charts, the diagnostics, and the tracer push must see the forced end-of-step
+    state, and molecular-dynamics practice places exactly this operation inside the step (a
+    constraint's velocity-projection stage, a thermostat's end-of-step rescale, the trailing factor of
+    a symmetric splitting). The signature becomes `step!(integrator, state, generator, domain,
+    buffers, derived, dt)`: both schemes now contain no physics — no viscosity, no forcing calls, no
+    conditions — and `Propagator` drops its `Forcing` dependency. The old public assembly trio
+    (`velocity_nonlinear!`, `scalar_nonlinear!`, `integrating_factor!`) demotes to internals behind
+    the protocol, retiring the eight-argument assembly signatures. The name extends the axis
+    convention — `ResolvedFields` ↔ `ResolvedGenerator`, resolved against filtered, with
+    `FilteredGenerator` (carrying its closure) the eventual LES sibling — and the run layer's
+    `_resolve_forcing` was renamed `_materialize_forcing`, reserving *resolved* for that axis against
+    `DeferredForcing`'s materialization vocabulary. Every migration stage was verified
+    **bit-identical** on fixed-seed trajectories (all three dealiasing strategies and the
+    `StochasticOU`-forced case) against the pre-migration code.
+32. **(2026-07) Forcing hooks own their scratch; the lifecycle order is contract.** The four-hook
+    interface no longer receives the integrator's buffer bundle ("for interface uniformity" — the
+    smell decision 26's discipline predicted): `set_forcing_rate!`, `apply_forcing!`,
+    `prepare_forcing!`, and `add_forcing_source!` take only what they act on, and `StochasticOU` owns
+    its noise scratch (one field in physical and one in spectral representation, allocated on first
+    use like its ``\hat{\boldsymbol{f}}`` state) instead of reaching into `buffers.product_*` by
+    field name — at the recorded price of two resident fields for a velocity-forcing instance,
+    accepted to sever the one cross-component reach-in (the extended-system discipline: a thermostat
+    never touches the integrator's registers; the OU re-add stays gated on a GPU-tuned generator
+    either way). The hook lifecycle — prepare and rate before the stages, source at every stage,
+    projection after the completed step — is documented as part of the `AbstractForcing` contract,
+    with the rate and the source recorded as two channels of *one* forcing term (the exactly linear
+    part in the factor, the remainder at stages). This stage deliberately ran *before* the generator
+    reification, against the migration plan's original order: the borrow had to be severed before the
+    borrowed scratch could move homes. `BandRescaling` carries the Berendsen-class caveat — a
+    deterministic clamp has no conserved quantity and no well-defined ensemble except in limiting
+    cases (Bussi, Donadio & Parrinello 2007) — a spin-up and amplitude-holding tool, with stochastic
+    rescaling the recorded upgrade path when faithful fluctuations of the held quantity matter.
 
 ---
 
@@ -965,6 +1097,10 @@ no-guessed-citation rule). The extraction-bound
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.
   *(The linear negative-damping forcing.)*
+- Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.
+  *J. Chem. Phys.* **126**, 014101. *(Stochastic velocity rescaling; its deterministic limit is the
+  Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
+  the caveat `BandRescaling` carries.)*
 - Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. *(The
   2N low-storage family; the package's third-order coefficients are Williamson's Eq. (11), his recommended
   case 7 — the set later adopted for spectral DNS and popularly named "RKW3".)*

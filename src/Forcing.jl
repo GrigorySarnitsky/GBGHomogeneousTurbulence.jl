@@ -165,6 +165,14 @@ The `over` keyword selects where the target applies:
     If the out-of-band value alone exceeds `target`, the band is zeroed (the closest reachable state).
 
 Rescaling preserves the divergence-free constraint either way.
+
+!!! note "A deterministic clamp, not a faithful stationary sampler"
+    Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of
+    stochastic velocity rescaling: it has no conserved quantity, is not associated with a well-defined
+    ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
+    holds (Bussi, Donadio & Parrinello 2007). Use it to spin up or to pin an amplitude; when the held
+    quantity is itself measured, prefer a fixed-injection forcing (`ConstantPower`), which leaves the
+    energy free to fluctuate.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)

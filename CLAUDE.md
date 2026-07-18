@@ -30,9 +30,13 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
 - `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
-  spectral representation, the single source of truth) and the random initial conditions.
+  spectral representation, the single source of truth), the physical recoveries (the chart map), the
+  `DerivedFields` observation cache (stamped charts, epoch freshness, `resolved_fields_modified!`),
+  and the random initial conditions.
 - `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
-  factor. The MZ *generator*.
+  factor, reified as `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
+  `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_factor!` / `scalar_factor!` / `finalize!`.
+  The MZ *generator*.
 - `Observables` — the measured functions of state (kinetic energy, dissipation, derivative skewness,
   scalar variance and dissipation, max speed, energy spectrum, integral scale). The MZ *observables*.
 - `Forcing` — pluggable energy-injection strategies (`AbstractForcing`).
@@ -65,7 +69,8 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
    omission; "for symmetry", "for completeness", or "it's convenient" is never a valid justification (a
    missing capability encodes a decision — the PF / SS discipline).
 4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free over the
-   preallocated buffers (the state and the integrator's `IntegratorBuffers`); storage is generic
+   preallocated buffers (the state, the integrator's `IntegratorBuffers`, the generator's assembly
+   scratch, and the observation cache's charts); storage is generic
    `AbstractArray` (no scalar indexing of device arrays).
    **Minimal memory footprint trumps compute cost** — prefer low-storage integrators, and per-call
    allocation of an *occasional* diagnostic over resident scratch. Precision (`Float32` / `Float64`)
@@ -83,8 +88,8 @@ inverse. Operators and extended Base functions are imported before being extende
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
-`buffers.velocity_physical`, `buffers.vorticity_start`, `state.velocity`, `Tracers.velocity1` — as do
-function names (`velocity_to_physical!`, `velocity_nonlinear!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
+`buffers.velocity_star`, `generator.product_physical`, `state.velocity`, `Tracers.velocity1` — as do
+function names (`velocity_to_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
 
