@@ -2,32 +2,40 @@
 #
 # Two instruments, both run in the standard suite:
 #
-#  1. THE LEDGER — a reflective walk over every resident field-sized buffer a run owns (state, the
-#     observation cache, the generator, the integrator buffers, forcing-owned kernels), counted per
-#     shape class and asserted against a frozen table for every (scheme × dealiasing × scalar)
-#     combination. Adding or removing a buffer anywhere fails this test: a footprint change must be a
-#     conscious, recorded decision, never a drive-by.
+#  1. THE LEDGER — a reflective walk over every resident field-sized buffer a run owns, counted per
+#     shape class. The full combination space is a product of five axes — scheme × dealiasing ×
+#     scalar × (velocity forcing × scalar forcing) × tracers — and the footprint is COMPOSITIONAL:
+#     the frozen spec is the unforced, tracer-free BASE table (12 cells) plus a per-forcing DELTA
+#     table and a tracer DELTA, and an exhaustive sweep over the whole product (~360 combinations)
+#     asserts measured = base + deltas, cell by cell. Adding or removing a buffer anywhere fails the
+#     suite: a footprint change must be a conscious, recorded decision, never a drive-by. (The
+#     particle-integrator axis has one point today — the Heun pusher — so it enters as on/off;
+#     precision, backend, and the interpolation scheme change bytes, never counts.)
 #
 #  2. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
-#     from the step! bodies, give every value a live range; the peak number of simultaneously live
-#     values per shape class is the LOWER BOUND on the buffers the implemented operation order needs.
-#     The frozen gap register records achieved − bound per class with a NAMED HOLDER for every
-#     nonzero gap (an ownership boundary, a survive-the-step contract, a PF-kernel granularity).
-#     A gap without a holder is an optimization left on the table; a bound crossing achieved is a
-#     bookkeeping error. Re-derive the op lists whenever a step! body or the generator protocol
-#     changes — the ledger failing is the reminder.
+#     from the step! bodies and the generator protocol, give every value a live range; the peak
+#     number of simultaneously live values per shape class is the LOWER BOUND on the buffers the
+#     implemented operation order needs. The gap register records achieved − bound per class with a
+#     NAMED HOLDER for every nonzero gap (an ownership boundary, a survive-the-step contract, a
+#     PF-kernel granularity). A gap without a holder is an optimization left on the table, and the
+#     test fails; a bound crossing achieved is a bookkeeping error. Re-derive the op lists whenever
+#     a step! body or the generator protocol changes — the ledger failing is the reminder.
 #
 # Shape classes (Float64 sizes per unit, in units of N³ reals): spectral_vector ≈ 3·(1+1/N),
 # physical_vector = 3, spectral_scalar ≈ 1+1/N, physical_scalar = 1, rate ≈ ½·(1+1/N).
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data
+using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); audited for the re-add
+using GBGPeriodicFields: field_data, CatmullRom
 using Random
 using Test
 
 
 const N_AUDIT = 8
 const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :rate)
+
+const ZERO = NamedTuple{CLASSES}((0, 0, 0, 0, 0))
+_add(a, b) = NamedTuple{CLASSES}(Tuple(getproperty(a, c) + getproperty(b, c) for c in CLASSES))
 
 
 # ---------------------------------------------------------------- the reflective ledger
@@ -38,9 +46,12 @@ shape_class(a::AbstractArray, N) =
                           (size(a, 1) == N ? :physical_scalar : :rate))
 
 # Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
-# aliased buffer is counted once — aliasing IS a legitimate footprint optimization).
+# aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
+# stream's internal state is O(1) constant memory, not field-scale working memory — skipped, so the
+# audit's tiny N does not misread it as a buffer.
 function collect_field_arrays!(acc, x, seen, N)
   x === nothing && return acc
+  x isa Random.AbstractRNG && return acc
   if x isa AbstractArray
     if length(x) >= N^3 ÷ 2 && !(objectid(x) in seen)
       push!(seen, objectid(x))
@@ -56,56 +67,84 @@ function collect_field_arrays!(acc, x, seen, N)
   return acc
 end
 
-function ledger(scheme, dealiasing, scalar::Bool)
-  domain = FixedDomain(N_AUDIT, 2π; element_type = Float64, dealiasing, array_type = Array)
-  conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
-                              velocity_forcing = BandRescaling(domain; target = 0.5),
-                              scalar_forcing = NoForcing())
-  state = ResolvedFields(domain; scalar)
-  derived = DerivedFields(domain)
-  generator = ResolvedGenerator(domain, conditions; scalar)
-  buffers = allocate_buffers(scheme, domain; scalar)
-
+_counts(owners, N) = begin
   acc = AbstractArray[]
   seen = Set{UInt}()
-  for owner in (state, derived, generator, buffers)
-    collect_field_arrays!(acc, owner, seen, N_AUDIT)
+  for owner in owners
+    collect_field_arrays!(acc, owner, seen, N)
   end
   counts = Dict(class => 0 for class in CLASSES)
   for a in acc
-    counts[shape_class(a, N_AUDIT)] += 1
+    counts[shape_class(a, N)] += 1
   end
-  return NamedTuple{CLASSES}(Tuple(counts[class] for class in CLASSES))
+  NamedTuple{CLASSES}(Tuple(counts[class] for class in CLASSES))
 end
 
-# The frozen table — the standard-procedure guard. A deliberate footprint change updates this table
-# (and, for a structural change, the op lists below) in the same commit, citing the decision.
-# Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar, rate.
-const LEDGER_EXPECTED = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 2, physical_scalar = 0, rate = 1),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
-  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 2, physical_scalar = 0, rate = 1),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 4, physical_scalar = 0, rate = 1),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, rate = 2),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 2, physical_scalar = 0, rate = 1),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 7, physical_scalar = 1, rate = 2),
-  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 2, physical_scalar = 0, rate = 1),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 7, physical_scalar = 1, rate = 2),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 4, physical_scalar = 0, rate = 1),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 11, physical_scalar = 2, rate = 2),
+# Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
+# one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
+function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
+  conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
+  state = ResolvedFields(domain; scalar)
+  velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity, domain, 0.01)
+  scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar, domain, 0.01)
+  owners = Any[state, DerivedFields(domain), ResolvedGenerator(domain, conditions; scalar),
+               allocate_buffers(scheme, domain; scalar)]
+  if tracers
+    push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
+    push!(owners, physical_vector(domain))            # the run layer's Heun endpoint buffer u(tₙ)
+  end
+  return _counts(owners, N_AUDIT)
+end
+
+# The frozen BASE table — unforced (NoForcing/NoForcing), tracer-free. A deliberate footprint change
+# updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
+# decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar, rate.
+const BASE = Dict(
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 2),
+  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 2),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 1),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, rate = 2),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
+  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 1),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, rate = 2),
 )
 
+# The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)
+# kernels and masks for either slot; the OU's state and noise scratch take the forced field's shape.
+_forcing_delta(tag, slot) =
+  tag === :none  ? ZERO :
+  tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
+  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, rate = 1) :
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 1) :
+  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
+                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, rate = 0)
+# (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
+
+const TRACER_DELTA = (spectral_vector = 0, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, rate = 0)
+
+_build_forcing(tag, domain) =
+  tag === :none  ? NoForcing() :
+  tag === :band  ? BandRescaling(domain; target = 0.5) :
+  tag === :linear ? Linear(domain; rate = 0.1) :
+  tag === :power ? ConstantPower(domain; target = 0.1) :
+  StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
+
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFRK2()
-_dealiasing(tag) = tag === :TwoThirds ? TwoThirds() : (tag === :HouLi ? HouLi() : PhaseShift())
+const FORCING_TAGS = (:none, :band, :linear, :power, :ou)
 
 
 # ---------------------------------------------------------------- the liveness audit
 
 # One primitive field operation of a step: what it reads, what it writes. Transcribed from the
-# step! bodies and the generator protocol (src/Propagator.jl, src/Generator.jl) — re-derive on any
-# change there. Values are symbolic; VALUE_CLASS types them; CONTRACT_LIVE marks the values that
-# must survive the whole step (the state record; the charts under the current epoch-at-end design).
+# step! bodies and the generator protocol (src/Propagator.jl, src/Generator.jl, src/Forcing.jl) —
+# re-derive on any change there. Values are symbolic; VALUE_CLASS types them; CONTRACT_LIVE marks
+# the values that must survive the whole step (the state record, the OU forcing state, and the
+# charts under the current epoch-at-end design).
 struct Op
   name::String
   reads::Vector{Symbol}
@@ -115,23 +154,28 @@ end
 const VALUE_CLASS = Dict(
   :û => :spectral_vector, :scratch => :spectral_vector, :ps => :spectral_vector,
   :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
-  :ustar_spec => :spectral_vector,
+  :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
   :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
-  :ustar => :physical_vector, :ωstar => :physical_vector,
+  :ustar => :physical_vector, :ωstar => :physical_vector, :noise_p => :physical_vector,
   :φ̂ => :spectral_scalar, :fac => :spectral_scalar, :sb_copy => :spectral_scalar,
   :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
   :φstar_spec => :spectral_scalar,
   :sb_field => :physical_scalar,
 )
-const CONTRACT_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω])
+const CONTRACT_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω, :ou_state])
 
-# The velocity assembly at a stage (mask strategies), reading physical (u, ω) named by the caller.
-_assembly(u, ω) = [
-  Op("cross u×ω",        [u, ω],        [:pp]),
-  Op("flux→spectral",    [:pp],         [:ps]),
-  Op("Leray projection", [:ps],         [:nl]),
-  Op("dealias",          [:nl],         [:nl]),
-]
+# The velocity assembly at a stage (mask strategies), reading physical (u, ω) named by the caller;
+# `source` appends the additive-forcing source read (the OU) when present.
+_assembly(u, ω; source = false) = begin
+  ops = [
+    Op("cross u×ω",        [u, ω],        [:pp]),
+    Op("flux→spectral",    [:pp],         [:ps]),
+    Op("Leray projection", [:ps],         [:nl]),
+    Op("dealias",          [:nl],         [:nl]),
+  ]
+  source && push!(ops, Op("add OU source", [:nl, :ou_state], [:nl]))
+  ops
+end
 _scalar_assembly(u) = [
   Op("copy φ̂",          [:φ̂],          [:sb_copy]),
   Op("φ recovery",       [:sb_copy],    [:sb_field]),
@@ -160,18 +204,29 @@ _scalar_update() = [
   Op("rotate φ̂",        [:φ̂, :fac],   [:φ̂]),
   Op("rotate hφ",        [:sb_h, :fac], [:sb_h]),
 ]
+# The OU forcing's prepare! phase (velocity slot): generate, transform, band-limit, project,
+# normalize, and fold the increment into the contract-live forcing state f̂.
+_ou_prepare() = [
+  Op("draw noise",       Symbol[],           [:noise_p]),
+  Op("noise→spectral",   [:noise_p],         [:noise_s]),
+  Op("band-limit",       [:noise_s],         [:noise_s]),
+  Op("project noise",    [:noise_s],         [:noise_s]),
+  Op("normalize",        [:noise_s],         Symbol[]),
+  Op("f̂ ← θf̂ + sξ",    [:ou_state, :noise_s], [:ou_state]),
+]
 
 # IFLowStorageRK3, mask dealiasing: stage 1 reads the charts; stages 2–3 recover into the substage
 # registers. (hu is seeded at stage 1 by `multiply` — modeled as accumulate with hu initially dead.)
-function rk3_ops(scalar::Bool)
+function rk3_ops(scalar::Bool; ou::Bool = false)
   ops = Op[]
-  append!(ops, _assembly(:chart_u, :chart_ω))
+  ou && append!(ops, _ou_prepare())
+  append!(ops, _assembly(:chart_u, :chart_ω; source = ou))
   scalar && append!(ops, _scalar_assembly(:chart_u))
   append!(ops, _velocity_update(:nl))
   scalar && append!(ops, _scalar_update())
   for _ in 2:3
     append!(ops, _recoveries())
-    append!(ops, _assembly(:ustar, :ωstar))
+    append!(ops, _assembly(:ustar, :ωstar; source = ou))
     scalar && append!(ops, _scalar_assembly(:ustar))
     append!(ops, _velocity_update(:nl))
     scalar && append!(ops, _scalar_update())
@@ -261,15 +316,16 @@ function peak_liveness(ops)
   return NamedTuple{CLASSES}(Tuple(peaks[class] for class in CLASSES))
 end
 
-# The gap register: achieved (working buffers the op list can touch — kernels and rate arrays,
-# constant configuration rather than working values, are excluded) minus the liveness bound, with a
-# named holder for every nonzero gap. Empty holder = unclaimed gap = a finding, and the test fails.
-# Recorded holders (decision 33): OWNERSHIP — the recovery scratch (State/DerivedFields) and the
-# generator's product/assembly registers could alias in this schedule, but live across an ownership
-# boundary kept deliberately; CHART CONTRACT — the charts must survive the step under the
-# epoch-at-end design (the epoch-at-start reuse is the recorded candidate); SHARED FACTOR — the
-# factor register could be deleted by a fused exponential-convolve (raised to GBGPeriodicFields);
-# SCALAR REGISTERS — the scalar's copy/nonlinear/factor registers could share one transient slot.
+# The gap register: achieved working buffers (kernels, masks, and rate arrays are configuration, not
+# working values, and are excluded on both sides) minus the liveness bound, with a named holder for
+# every nonzero gap. An unclaimed gap is a finding, and the test fails. Recorded holders
+# (decision 33): OWNERSHIP — buffers that could alias in this schedule but live across a
+# deliberately kept boundary (the cache's recovery scratch vs the generator's product/nonlinear
+# registers; the OU's noise buffers vs the generator's products); CHART CONTRACT — the charts must
+# survive the step under the epoch-at-end design (the epoch-at-start reuse is the recorded
+# candidate); SHARED FACTOR — the factor register could be deleted by a fused exponential-convolve
+# (raised to GBGPeriodicFields); SCALAR REGISTERS — the scalar's copy/nonlinear/factor registers
+# could share one transient slot.
 const GAP_HOLDERS = Dict(
   (:RK3, false) => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
@@ -279,20 +335,57 @@ const GAP_HOLDERS = Dict(
                         :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
   (:RK2, true)  => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR + SCALAR REGISTERS"),
+  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (scratch, OU noise ↔ product/nonlinear)",
+                           :physical_vector => "OWNERSHIP (OU noise ↔ product)",
+                           :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
 )
 
 
 @testset "memory audit" begin
-  @testset "ledger — every resident buffer, frozen per combination" begin
-    for ((scheme, dealiasing, scalar), expected) in LEDGER_EXPECTED
-      counts = ledger(_scheme(scheme), _dealiasing(dealiasing), scalar)
+  domains = Dict(tag => FixedDomain(N_AUDIT, 2π; element_type = Float64,
+                                    dealiasing = tag === :TwoThirds ? TwoThirds() :
+                                                 tag === :HouLi ? HouLi() : PhaseShift(),
+                                    array_type = Array)
+                 for tag in (:TwoThirds, :HouLi, :PhaseShift))
+
+  @testset "ledger — the frozen base (unforced, tracer-free)" begin
+    for ((scheme, dealiasing, scalar), expected) in BASE
+      counts = ledger(domains[dealiasing], _scheme(scheme), scalar, NoForcing(), NoForcing(), false)
       @test counts == expected
     end
   end
 
+  @testset "ledger — the full five-axis product is compositional" begin
+    # scheme × dealiasing × scalar × velocity forcing × scalar forcing × tracers: every combination
+    # must equal base + velocity-forcing delta + scalar-forcing delta + tracer delta. A cross-term
+    # (a buffer whose existence depends on two axes at once) fails here and must be recorded.
+    for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift), scalar in (false, true),
+        vtag in FORCING_TAGS, stag in (scalar ? FORCING_TAGS : (:none,)), tracers in (false, true)
+      domain = domains[dealiasing]
+      counts = ledger(domain, _scheme(scheme), scalar,
+                      _build_forcing(vtag, domain), _build_forcing(stag, domain), tracers)
+      expected = _add(_add(_add(BASE[(scheme, dealiasing, scalar)],
+                                _forcing_delta(vtag, :velocity)),
+                           _forcing_delta(stag, :scalar)),
+                      tracers ? TRACER_DELTA : ZERO)
+      @test counts == expected
+    end
+  end
+
+  @testset "tracer storage scales with M, not N" begin
+    # The Tracers value carries exactly four (M, 3) arrays (positions, predictor, and the two
+    # point-value registers) — per-tracer memory, audited in its own units.
+    tracers = Tracers(domains[:TwoThirds], 4; scheme = CatmullRom, rng = MersenneTwister(1))
+    acc = AbstractArray[]
+    collect_field_arrays!(acc, tracers, Set{UInt}(), 2)   # threshold 4 elements: catch the M-arrays
+    m_arrays = [a for a in acc if size(a) == (4, 3)]
+    @test length(m_arrays) == 4
+  end
+
   @testset "op lists name real registers" begin
     # The symbolic values must correspond to actual storage: charts + scratch on DerivedFields,
-    # products on ResolvedGenerator, registers on IntegratorBuffers/ScalarBuffers.
+    # products on ResolvedGenerator, registers on IntegratorBuffers/ScalarBuffers, the OU's state
+    # and noise on the forcing.
     @test :spectral_scratch in fieldnames(DerivedFields)
     @test all(f -> f in fieldnames(ResolvedGenerator), (:product_physical, :product_spectral))
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
@@ -301,28 +394,36 @@ const GAP_HOLDERS = Dict(
               (:stage1, :stage2, :velocity_star_spectral, :nonlinear, :integrating_factor,
                :vorticity_physical, :velocity_star))
     @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :star_spectral, :nonlinear, :copy, :field))
+    @test all(f -> f in fieldnames(StochasticOU), (:state, :noise_physical, :noise_spectral))
   end
 
   @testset "liveness bounds and the gap register" begin
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      bound = peak_liveness(ops_of(scalar))
-      achieved = LEDGER_EXPECTED[(scheme, :TwoThirds, scalar)]
-      holders = GAP_HOLDERS[(scheme, scalar)]
+    cases = [(:RK3, rk3_ops(false), BASE[(:RK3, :TwoThirds, false)], (:RK3, false)),
+             (:RK3, rk3_ops(true),  BASE[(:RK3, :TwoThirds, true)],  (:RK3, true)),
+             (:RK2, rk2_ops(false), BASE[(:RK2, :TwoThirds, false)], (:RK2, false)),
+             (:RK2, rk2_ops(true),  BASE[(:RK2, :TwoThirds, true)],  (:RK2, true)),
+             (:RK3, rk3_ops(false; ou = true),
+              _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:ou, :velocity)), (:RK3_OU, false))]
+    for (scheme, ops, achieved, holder_key) in cases
+      bound = peak_liveness(ops)
+      holders = GAP_HOLDERS[holder_key]
       for class in (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar)
-        # kernels/rates are configuration, not working values: subtract the band kernel from the
-        # spectral-scalar ledger before comparing against the working-value bound.
-        working = getproperty(achieved, class) - (class === :spectral_scalar ? 1 : 0)
+        # Kernels/masks/rates are configuration, not working values: the OU delta's band kernel is
+        # the one configuration entry inside a forcing delta — subtract it for the OU case.
+        working = getproperty(achieved, class) -
+                  (holder_key === (:RK3_OU, false) && class === :spectral_scalar ? 1 : 0)
         b = getproperty(bound, class)
         @test b <= working                        # a bound above the ledger is a bookkeeping error
-        gap = working - b
-        if gap > 0
+        if working - b > 0
           @test haskey(holders, class)            # every gap carries a named holder (decision 33)
         end
       end
-      # The physical-vector count is exactly at its bound under the chart contract: the charts are
-      # contract-live, and the substage registers + product peak alongside them.
+    end
+    # The physical-vector count sits exactly at its bound under the chart contract for the unforced
+    # cases: the charts are contract-live, and the substage registers + product peak alongside them.
+    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
       @test peak_liveness(ops_of(scalar)).physical_vector ==
-            LEDGER_EXPECTED[(scheme, :TwoThirds, scalar)].physical_vector
+            BASE[(scheme, :TwoThirds, scalar)].physical_vector
     end
   end
 end
