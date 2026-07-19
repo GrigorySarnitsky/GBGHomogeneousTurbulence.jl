@@ -311,3 +311,15 @@ actively check for it.
   justifying the `Tracers(domain, …)` argument order by "the `count` form is already domain-first" (the
   sound reason is the domain-derived-constructor convention the user endorsed); the `kinetic_energy` default
   "differ by design" laundering.
+- **Asserting a shape instead of expanding it.** When mapping work onto a backend — a PF / SS request, a
+  gap-register holder, a "this chain needs a new op" claim — I pattern-match over operation *names* and
+  assert the algebraic shape, instead of writing the expression out and unifying it against the backend's
+  **current** method set. Both failure directions are live: requesting an operation whose composition is
+  already expressible (the 2026-07-19 shift-back∘average — expressible all along as the five-argument
+  `convolve!` α/β form, verified in the clone and in use on a neighboring line), and proposing a consumer
+  that is not an instance of the requested op (the phase-shift chain claimed for the two-operand combine —
+  a kernel on *one* operand is not `ĝ⊙(α·a + β·b)`). The rule: **before raising a request or naming a gap
+  holder, expand each candidate chain algebraically and check it against the existing exports** — the doc
+  policy's "a plausible 'X is just Y' is false until the expansion matches", applied to code shapes and
+  backend surfaces, not only docstrings. Instances (2026-07-19, both caught by PF's triage): the missed
+  free win at `Generator.jl` 253–254; the item-7 phase-shift consumer misclaim.
