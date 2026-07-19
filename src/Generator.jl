@@ -250,8 +250,8 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedD
   velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_physical, product_spectral)
-  convolve!(phase_shift.velocity_shifted, phase_shift.velocity_shifted, phase_shift.back)              # displaced term, shifted back
-  combine!(nonlinear, T(1 // 2), nonlinear, T(1 // 2), phase_shift.velocity_shifted)                   # average the two grids
+  # The shift-back and the two-grid average are one α/β convolve — ½·back ⊙ (displaced) + ½·(primary).
+  convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back, T(1 // 2), T(1 // 2))
   convolve!(nonlinear, nonlinear, domain.dealias)                                                      # spherical truncation
   return nonlinear
 end
@@ -367,9 +367,10 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::Fi
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
   scalar_to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain, phase_shift.scalar_copy)
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain, product_physical)   # (u_s φ_s)^
-  convolve!(product_spectral, product_spectral, phase_shift.back)                                        # displaced flux, shifted back
-  divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·
-  combine!(nonlinear, T(1 // 2), nonlinear, T(1 // 2), phase_shift.scalar_shifted)                       # average the two grids
+  divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·, still on the displaced grid
+  # The shift-back symbol commutes through the iκ· contraction (iκ·(ĝ v̂) = ĝ (iκ·v̂)), so it rides
+  # the averaging convolve — ½·back ⊙ (displaced ∇·) + ½·(primary ∇·) — one pass, not shift + combine.
+  convolve!(nonlinear, phase_shift.scalar_shifted, phase_shift.back, T(1 // 2), T(1 // 2))
   convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)                                                 # spherical truncation, ×−1
   return nonlinear
 end

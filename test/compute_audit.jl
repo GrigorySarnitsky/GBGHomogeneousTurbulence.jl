@@ -71,7 +71,7 @@ const OP_COST = Dict(
   "dealias"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "shift û"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "shift φ̂"           => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "shift back"         => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "shift-back average" => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "band-limit"         => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "build E_ν"          => _cost(:pointwise; extra = _ex(rate = 1)),
   "build E_κ"          => _cost(:pointwise; extra = _ex(rate = 1)),
@@ -82,7 +82,7 @@ const OP_COST = Dict(
 # the aliased-projection CONTRACT; that the aliased path allocates today is the episode ledger's
 # recorded defect, raised to GBGPeriodicFields.)
 for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl û", "shifted curl",
-             "cross u×ω", "Leray projection", "divergence", "flux uφ", "average grids",
+             "cross u×ω", "Leray projection", "divergence", "flux uφ",
              "seed hu", "seed hφ", "accumulate hu", "accumulate hφ", "û += B·hu", "φ̂ += B·hφ",
              "rotate û", "rotate hu", "rotate φ̂", "rotate hφ", "rotate û*", "rotate φ̂*",
              "rotate N̂_u,1", "rotate N̂_φ,1", "û* predictor", "φ̂* predictor",
@@ -244,19 +244,22 @@ const TRANSFORM_GAP_HOLDERS = Dict(
 
 # Full-field passes per shape class and step (reads + writes + configuration reads), transforms
 # excluded. Traffic in N³-real units ≈ 3·(SV + PV) + 1·(SS + PS) + ½·R at leading order in 1/N.
+# PhaseShift cells re-frozen 2026-07-19: the shift-back now rides the averaging convolve as one
+# α/β pass in both displaced chains (the PF-triage free win; for the scalar the shift-back symbol
+# commutes through the divergence contraction) — 2 spectral-vector passes fewer per evaluation.
 const PASSES_BASE = Dict(
   (:RK3, :TwoThirds,  false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, rate = 3),
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
   (:RK3, :HouLi,      false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, rate = 3),
   (:RK3, :HouLi,      true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 90, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, rate = 3),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 114, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, rate = 6),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 84, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, rate = 3),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 102, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, rate = 6),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 7, physical_scalar = 0, rate = 2),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 39, physical_scalar = 2, rate = 4),
   (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 7, physical_scalar = 0, rate = 2),
   (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 39, physical_scalar = 2, rate = 4),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 57, physical_vector = 12, spectral_scalar = 11, physical_scalar = 0, rate = 2),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 73, physical_vector = 20, spectral_scalar = 65, physical_scalar = 4, rate = 4),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 11, physical_scalar = 0, rate = 2),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 65, physical_scalar = 4, rate = 4),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).

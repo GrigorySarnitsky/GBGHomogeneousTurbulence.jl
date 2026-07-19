@@ -61,8 +61,9 @@ _chart_recomputes() = [
 # (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. A mask
 # strategy (TwoThirds / HouLi) evaluates once and low-passes; PhaseShift also reads the stage's
 # SPECTRAL velocity `uspec` for the half-cell-displaced evaluation through the generator's
-# PhaseShiftBuffers registers, averages the two grids, and truncates spherically. `source` appends
-# the additive-forcing read (the OU's per-stage add_forcing_source!).
+# PhaseShiftBuffers registers, averages the two grids (the shift-back riding the averaging convolve
+# as one fused α/β pass — the PF-triage free win, 2026-07-19), and truncates spherically. `source`
+# appends the additive-forcing read (the OU's per-stage add_forcing_source!).
 function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = false)
   ops = [
     Op("cross u×ω",        [u, ω],        [:pp]),
@@ -79,8 +80,7 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
       Op("cross u×ω",          [:ushift, :ωshift], [:pp]),
       Op("flux→spectral",      [:pp],              [:ps]),
       Op("Leray projection",   [:ps],              [:vshift]),
-      Op("shift back",         [:vshift],          [:vshift]),
-      Op("average grids",      [out, :vshift],     [out]),
+      Op("shift-back average", [out, :vshift],     [out]),
     ])
   end
   push!(ops, Op("dealias", [out], [out]))
@@ -112,9 +112,8 @@ function _scalar_assembly(uspec, φspec, u, out; phase_shift = false)
       Op("shifted φ recovery", [:scopy],         [:pshift]),
       Op("flux uφ",            [:ushift, :pshift], [:pp]),
       Op("flux→spectral",      [:pp],            [:ps]),
-      Op("shift back",         [:ps],            [:ps]),
       Op("divergence",         [:ps],            [:sshift]),
-      Op("average grids",      [out, :sshift],   [out]),
+      Op("shift-back average", [out, :sshift],   [out]),
     ])
   end
   push!(ops, Op("dealias", [out], [out]))
