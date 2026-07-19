@@ -554,7 +554,13 @@ generalization is built for them until a second concrete case forces the abstrac
   filtered-density-function or moment Model (§8). Each is a coarser projection on the ladder of §3, and the
   four roles are already carved to receive it — but, per invariant 9, no generality is built until a second
   rung forces it. Each is discriminated from DNS by statistical commutation; the canonical acceptance test
-  is the relaxation of a two-mode scalar distribution (a micromixing benchmark).
+  is the relaxation of a two-mode scalar distribution (a micromixing benchmark). The natural first
+  *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \,|\, \kappa_c)`` at the truncation
+  wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a **per-mode linear rate**, a
+  negative linear-forcing citizen folded into the integrating factor exactly as the armed forcing rate
+  is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_c)/\kappa_c}`` scale updated
+  per step from one shell reduction. The Hou–Li filter at ``\nu = 0`` is its crude implicit sibling
+  (numerical-dissipation LES), with the known cutoff-bottleneck caveat.
 - **The statistics bridge** — the sampling-to-`GBGStreamingStatistics` path (Eulerian field samples and
   Lagrangian trajectory samples in, streamed summaries out).
 - **Alternative dealiasing and nonlinear forms (partly built).** `DealiasingStrategy` now *owns the
@@ -572,6 +578,19 @@ generalization is built for them until a second concrete case forces the abstrac
   stability CFL, would make temporal accuracy a studied fitness axis beside precision and footprint (§5).
   Deferred: HIT runs are typically stability-limited near the CFL ceiling, so a fixed step at the CFL is
   rarely the accuracy bottleneck.
+- **The ``\nu = 0`` truncated-Euler experiment — an integrator and dealiasing oracle.** At zero
+  viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
+  assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
+  continuous time — so measured energy drift isolates the time integrator alone: a per-scheme
+  conservation and order-of-accuracy test (the drift must scale with the scheme's order), a second
+  witness that the sharp strategies are exactly Galerkin (an alias residue breaks the detailed
+  conservation of the retained triads), and a direct measurement of the Hou–Li filter's effective
+  dissipation (the one deliberately non-conservative strategy). The long run is a validation target of
+  its own: the truncated system thermalizes toward absolute equilibrium — an equipartition
+  ``E(\kappa) \propto \kappa^{2}`` tail growing from the cutoff, the thermalized tail acting on the
+  large scales like an eddy viscosity while it grows (Cichowlas et al. 2005). It is not a turbulence
+  run — the dissipation-based diagnostics degenerate (``\varepsilon \to 0``, ``\mathrm{Re}_\lambda``
+  undefined) — and it is deferred as a *test*, not a capability.
 
 ---
 
@@ -1186,6 +1205,12 @@ no-guessed-citation rule). The extraction-bound
   decision 27.)*
 - Hou, T. Y. & Li, R. (2007). Computing nearly singular solutions using pseudo-spectral methods.
   *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
+- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). Effective dissipation and turbulence
+  in spectrally truncated Euler flows. *Phys. Rev. Lett.* **95**, 264502. *(Thermalization of the
+  Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
+- Chollet, J.-P. & Lesieur, M. (1981). Parameterization of small scales of three-dimensional isotropic
+  turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
+  viscosity ``\nu_e(\kappa\,|\,\kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.
