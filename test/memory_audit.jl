@@ -31,11 +31,11 @@ using Random
 using Test
 
 
-const N_AUDIT = 8
-const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :rate)
+# The shared op model (CLASSES, Op, the step op lists, peak_liveness) — one source of truth for this
+# audit's liveness projection and test/compute_audit.jl's cost projection.
+include("audit_ops.jl")
 
-const ZERO = NamedTuple{CLASSES}((0, 0, 0, 0, 0))
-_add(a, b) = NamedTuple{CLASSES}(Tuple(getproperty(a, c) + getproperty(b, c) for c in CLASSES))
+const N_AUDIT = 8
 
 
 # ---------------------------------------------------------------- the reflective ledger
@@ -149,181 +149,9 @@ const FORCING_TAGS = (:none, :band, :linear, :power, :ou)
 
 # ---------------------------------------------------------------- the liveness audit
 
-# One primitive field operation of a step: what it reads, what it writes. Transcribed from the
-# step! bodies and the generator protocol (src/Propagator.jl, src/Generator.jl, src/Forcing.jl) —
-# re-derive on any change there. Values are symbolic; VALUE_CLASS types them; CONTRACT_LIVE marks
-# the values that must survive the whole step (the state record, the OU forcing state, and the
-# charts under the current epoch-at-end design).
-struct Op
-  name::String
-  reads::Vector{Symbol}
-  writes::Vector{Symbol}
-end
-
-const VALUE_CLASS = Dict(
-  :û => :spectral_vector, :scratch => :spectral_vector, :ps => :spectral_vector,
-  :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
-  :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
-  :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
-  :ustar => :physical_vector, :ωstar => :physical_vector, :noise_p => :physical_vector,
-  :φ̂ => :spectral_scalar, :fac => :spectral_scalar, :sb_copy => :spectral_scalar,
-  :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
-  :φstar_spec => :spectral_scalar,
-  :sb_field => :physical_scalar,
-)
-const CONTRACT_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω, :ou_state])
-
-# The velocity assembly at a stage (mask strategies), reading physical (u, ω) named by the caller;
-# `source` appends the additive-forcing source read (the OU) when present.
-_assembly(u, ω; source = false) = begin
-  ops = [
-    Op("cross u×ω",        [u, ω],        [:pp]),
-    Op("flux→spectral",    [:pp],         [:ps]),
-    Op("Leray projection", [:ps],         [:nl]),
-    Op("dealias",          [:nl],         [:nl]),
-  ]
-  source && push!(ops, Op("add OU source", [:nl, :ou_state], [:nl]))
-  ops
-end
-_scalar_assembly(u) = [
-  Op("copy φ̂",          [:φ̂],          [:sb_copy]),
-  Op("φ recovery",       [:sb_copy],    [:sb_field]),
-  Op("flux uφ",          [u, :sb_field],[:pp]),
-  Op("flux→spectral",    [:pp],         [:ps]),
-  Op("divergence",       [:ps],         [:sb_nl]),
-  Op("dealias",          [:sb_nl],      [:sb_nl]),
-]
-_recoveries() = [
-  Op("copy û",           [:û],          [:scratch]),
-  Op("u recovery",       [:scratch],    [:ustar]),
-  Op("curl û",           [:û],          [:scratch]),
-  Op("ω recovery",       [:scratch],    [:ωstar]),
-]
-_velocity_update(rhs) = [
-  Op("accumulate hu",    [rhs, :hu],    [:hu]),
-  Op("û += B·hu",        [:û, :hu],     [:û]),
-  Op("build E_ν",        Symbol[],      [:fac]),
-  Op("rotate û",         [:û, :fac],    [:û]),
-  Op("rotate hu",        [:hu, :fac],   [:hu]),
-]
-_scalar_update() = [
-  Op("accumulate hφ",    [:sb_nl, :sb_h], [:sb_h]),
-  Op("φ̂ += B·hφ",       [:φ̂, :sb_h],  [:φ̂]),
-  Op("build E_κ",        Symbol[],      [:fac]),
-  Op("rotate φ̂",        [:φ̂, :fac],   [:φ̂]),
-  Op("rotate hφ",        [:sb_h, :fac], [:sb_h]),
-]
-# The OU forcing's prepare! phase (velocity slot): generate, transform, band-limit, project,
-# normalize, and fold the increment into the contract-live forcing state f̂.
-_ou_prepare() = [
-  Op("draw noise",       Symbol[],           [:noise_p]),
-  Op("noise→spectral",   [:noise_p],         [:noise_s]),
-  Op("band-limit",       [:noise_s],         [:noise_s]),
-  Op("project noise",    [:noise_s],         [:noise_s]),
-  Op("normalize",        [:noise_s],         Symbol[]),
-  Op("f̂ ← θf̂ + sξ",    [:ou_state, :noise_s], [:ou_state]),
-]
-
-# IFLowStorageRK3, mask dealiasing: stage 1 reads the charts; stages 2–3 recover into the substage
-# registers. (hu is seeded at stage 1 by `multiply` — modeled as accumulate with hu initially dead.)
-function rk3_ops(scalar::Bool; ou::Bool = false)
-  ops = Op[]
-  ou && append!(ops, _ou_prepare())
-  append!(ops, _assembly(:chart_u, :chart_ω; source = ou))
-  scalar && append!(ops, _scalar_assembly(:chart_u))
-  append!(ops, _velocity_update(:nl))
-  scalar && append!(ops, _scalar_update())
-  for _ in 2:3
-    append!(ops, _recoveries())
-    append!(ops, _assembly(:ustar, :ωstar; source = ou))
-    scalar && append!(ops, _scalar_assembly(:ustar))
-    append!(ops, _velocity_update(:nl))
-    scalar && append!(ops, _scalar_update())
-  end
-  push!(ops, Op("finalize (band rescale)", [:û], [:û]))
-  return ops
-end
-
-# IFRK2 (Heun), mask dealiasing.
-function rk2_ops(scalar::Bool)
-  ops = Op[]
-  append!(ops, _assembly(:chart_u, :chart_ω))                      # N̂_u,1 → nl plays stage1's role
-  scalar && append!(ops, _scalar_assembly(:chart_u))
-  append!(ops, [
-    Op("build E_ν",       Symbol[],           [:fac]),
-    Op("û* predictor",    [:û, :nl],          [:ustar_spec]),
-    Op("rotate û*",       [:ustar_spec, :fac],[:ustar_spec]),
-  ])
-  scalar && append!(ops, [
-    Op("build E_κ",       Symbol[],           [:fac]),
-    Op("φ̂* predictor",   [:φ̂, :sb_nl],      [:φstar_spec]),
-    Op("rotate φ̂*",      [:φstar_spec, :fac],[:φstar_spec]),
-  ])
-  append!(ops, [
-    Op("copy û*",         [:ustar_spec],      [:scratch]),
-    Op("u* recovery",     [:scratch],         [:ustar]),
-    Op("curl û*",         [:ustar_spec],      [:scratch]),
-    Op("ω* recovery",     [:scratch],         [:ωstar]),
-  ])
-  append!(ops, [
-    Op("cross u*×ω*",     [:ustar, :ωstar],   [:pp]),
-    Op("flux→spectral",   [:pp],              [:ps]),
-    Op("Leray projection",[:ps],              [:stage2]),
-    Op("dealias",         [:stage2],          [:stage2]),
-  ])
-  scalar && append!(ops, [
-    Op("copy φ̂*",        [:φstar_spec],      [:sb_copy]),
-    Op("φ* recovery",     [:sb_copy],         [:sb_field]),
-    Op("flux u*φ*",       [:ustar, :sb_field],[:pp]),
-    Op("flux→spectral",   [:pp],              [:ps]),
-    Op("divergence",      [:ps],              [:sb_stage2]),
-    Op("dealias",         [:sb_stage2],       [:sb_stage2]),
-  ])
-  append!(ops, [
-    Op("build E_ν",       Symbol[],           [:fac]),
-    Op("rotate N̂_u,1",   [:nl, :fac],        [:nl]),
-    Op("rotate û",        [:û, :fac],         [:û]),
-    Op("û corrector 1",   [:û, :nl],          [:û]),
-    Op("û corrector 2",   [:û, :stage2],      [:û]),
-  ])
-  scalar && append!(ops, [
-    Op("build E_κ",       Symbol[],           [:fac]),
-    Op("rotate N̂_φ,1",   [:sb_nl, :fac],     [:sb_nl]),
-    Op("rotate φ̂",       [:φ̂, :fac],        [:φ̂]),
-    Op("φ̂ corrector 1",  [:φ̂, :sb_nl],      [:φ̂]),
-    Op("φ̂ corrector 2",  [:φ̂, :sb_stage2],  [:φ̂]),
-  ])
-  push!(ops, Op("finalize (band rescale)", [:û], [:û]))
-  return ops
-end
-
-# Peak simultaneous liveness per shape class: a value is live from its first write (or from the
-# start, if contract-live or read before written) to its last read (or the end, if contract-live).
-function peak_liveness(ops)
-  first_use = Dict{Symbol, Int}()
-  last_use = Dict{Symbol, Int}()
-  for (i, op) in enumerate(ops), v in Iterators.flatten((op.reads, op.writes))
-    haskey(first_use, v) || (first_use[v] = i)
-    last_use[v] = i
-  end
-  for v in keys(first_use)
-    if v in CONTRACT_LIVE
-      first_use[v] = 0
-      last_use[v] = length(ops) + 1
-    end
-  end
-  peaks = Dict(class => 0 for class in CLASSES)
-  for i in 1:length(ops)
-    live = Dict(class => 0 for class in CLASSES)
-    for v in keys(first_use)
-      first_use[v] <= i <= last_use[v] && (live[VALUE_CLASS[v]] += 1)
-    end
-    for class in CLASSES
-      peaks[class] = max(peaks[class], live[class])
-    end
-  end
-  return NamedTuple{CLASSES}(Tuple(peaks[class] for class in CLASSES))
-end
+# The op lists (rk3_ops / rk2_ops and their builders) and peak_liveness live in audit_ops.jl —
+# shared with the compute audit; re-derive them there whenever a step! body or the generator
+# protocol changes.
 
 # The gap register: achieved working buffers (kernels, masks, and rate arrays are configuration, not
 # working values, and are excluded on both sides) minus the liveness bound, with a named holder for

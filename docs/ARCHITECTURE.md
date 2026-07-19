@@ -1125,6 +1125,42 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     here. The op lists are re-derived whenever a `step!` body or the generator protocol changes — the
     ledger failing is the reminder.
 
+34. **(2026-07) The compute audit: frozen transform and pass ledgers with fusion bounds, in the
+    standard suite.** The compute twin of decision 33 (`test/compute_audit.jl`): the same
+    straight-line op lists — extracted to `test/audit_ops.jl` as the single source of truth both
+    audits project, and upgraded to pass-exact fidelity to `step!` (stage 1 *seeds* the low-storage
+    accumulator, the last stage skips its rotation) — priced in the two compute currencies of a
+    pseudospectral step on a GPU. (a) **The transform ledger**: scalar-equivalent FFT counts (c2r,
+    r2c) per step, frozen per scheme × dealiasing × scalar cell with the chart recomputes amortized
+    in (each chart is recovered once per fields epoch, wherever first read — which is also why the
+    **tracer transform delta is zero**: the Heun endpoints ride the epoch cache, the observation
+    layer's compute dividend). Transforms carry the flops — ``\tfrac52 N^3\log_2 N^3`` per scalar
+    transform against O(1–20) flops per point for every pointwise kernel, far under the roofline
+    machine balance — so **flops are derived from the count, never an independent frozen axis**.
+    The counts are per-evaluation × evaluations (asserted structurally), the mask evaluation is
+    ``(6, 3)`` for the velocity and ``(1, 3)`` for the scalar, and `PhaseShift` doubles the velocity
+    transforms exactly — the dealiasing axis's memory↔compute trade now priced on both sides.
+    Verdicts: every cell sits **at its lower bound** (each physical component field consumed costs
+    one c2r, each spectral product component one r2c, for the algorithms as chosen) except
+    `PhaseShift` × scalar, where `scalar_rhs!` re-shifts and re-recovers the displaced velocity that
+    `velocity_rhs!` left fresh at the same stage state — 3 c2r per evaluation, held by the named
+    **shifted-velocity reuse** gap (the fix is a same-stage freshness contract on the generator's
+    displaced scratch across two protocol verbs — a seam question, recorded, not chased). (b) **The
+    pass ledger**: full-field memory passes per shape class for everything between transforms —
+    pointwise kernels are bandwidth-bound, so what fusion buys is passes, and the **fusion bound**
+    is the liveness argument transplanted to traffic: per between-barriers segment, a perfectly
+    fused kernel reads each live-in once, writes each live-out once, reads each field-scale
+    configuration array once, and a pure intermediate costs nothing. Verdicts: the physical-side
+    and configuration classes sit *at* the fused ideal in every cell; every gap lives in the two
+    spectral classes and is held by **PF kernel granularity** (the numpy model's op-per-kernel
+    boundaries) plus the **factor materialization** the open `GBGPeriodicFields`
+    fused-exponential request would delete. Forcing enters as frozen per-hook deltas (only the
+    stochastic forcing transforms — its noise pipeline; the OU-velocity column is cross-checked
+    against its op list). Both ledgers are static projections; their currency is anchored by the
+    shared op lists (decision 33's re-derive obligation) and regenerated for review by the
+    `AUDIT_PRINT` aid. Kernel-launch counts and achieved bandwidth on the GPU hosts remain
+    benchmark-side empirics, outside the suite.
+
 ---
 
 ## References
