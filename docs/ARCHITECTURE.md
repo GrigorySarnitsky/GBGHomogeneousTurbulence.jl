@@ -578,6 +578,17 @@ generalization is built for them until a second concrete case forces the abstrac
   stability CFL, would make temporal accuracy a studied fitness axis beside precision and footprint (§5).
   Deferred: HIT runs are typically stability-limited near the CFL ceiling, so a fixed step at the CFL is
   rarely the accuracy bottleneck.
+- **User-selectable FFT planner effort.** `GBGPeriodicFields` lets each transform plan carry a backend
+  planner flag and time limit — the `fft_flags` and `fft_timelimit` keywords of `FieldTransformPlans` —
+  yet `FixedDomain` (§4.1) builds its velocity, scalar, and tensor plans without them, so every run takes
+  the planner default (`FFTW.ESTIMATE` on the CPU path) and neither the domain nor the `Simulation` front
+  door exposes an override. Closing it is a two-keyword passthrough, deferred on cost/benefit: the
+  transform is the dominant per-step cost, so a one-time `FFTW.MEASURE` / `FFTW.PATIENT` planning search
+  is a genuine performance lever beside the precision and footprint axes (§5) — but that search is an
+  FFTW planning concept that pays off on the **CPU** path, IT's development-and-small-run platform, not
+  the GPU-primary production target (invariant 4), where the plan is effectively fixed. It is wired when a
+  long CPU campaign makes the search worth the added front-door surface — named for the planning-effort
+  choice a user makes, not the raw backend flag.
 - **The ``\nu = 0`` truncated-Euler experiment — an integrator and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
