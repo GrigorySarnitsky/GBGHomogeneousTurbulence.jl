@@ -354,9 +354,18 @@ Method (§3).
 Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
-probes (§7). `Tracers` holds positions and a chosen interpolation scheme; `advect!` pushes them
-Heun-in-time on the velocity at the start and end of the step (the fields the solver already produces);
-`sample!` reads any field along the trajectories for Lagrangian statistics.
+probes (§7). `Tracers` holds positions and a chosen interpolation scheme; the push is Heun-in-time on
+the velocity at the start and end of the step (the fields the solver already produces), split across
+`record_trajectory_velocity!` (before the step) and `advect!` (after it); `sample!` reads any field
+along the trajectories for Lagrangian statistics.
+
+The split is what keeps an ``M``-point instrument at ``M``-point cost. A run holds one physical
+velocity field — the observation cache's chart, recomputed in place once the state advances — so a
+single-call push would need the start-of-step field retained, an ``N^{3}\times3`` resident buffer and
+an ``N^{3}\times3`` copy per step to serve an ``M\times3`` interpolation. Interpolating onto the
+tracers *before* the step instead records the same information in the ``M\times3`` buffer the tracer
+set already owns. Tracked and untracked runs therefore have identical field-scale residency and
+per-step traffic — the zero both audits now assert.
 
 Their **numerics are first-class**, on the same footing as the field schemes. Two axes matter: the
 trajectory integrator — today a single second-order Heun push, with higher-order pushers the studied
@@ -372,8 +381,8 @@ integrator** — the reversible generator of §8 again — so the split does not
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
 spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `DerivedFields`
 observation cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
-scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling and the tracer-velocity buffer
-for the Heun push, and a clock. Over it:
+scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling, and a clock.
+Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
   builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
@@ -381,8 +390,9 @@ for the Heun push, and a clock. Over it:
   chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim; dt)`** and **`run!(sim; ...)`** own the time loop: choose ``\Delta t`` from the
-  scheme's CFL and the current `max_speed` (read through the velocity chart), `step!`, advect tracers on
-  the two endpoint velocities the accessors serve, and fire a user callback on a fixed time interval.
+  scheme's CFL and the current `max_speed` (read through the velocity chart), record the start-of-step
+  velocity along any trajectories, `step!`, push the tracers on the two endpoint velocities the
+  accessors serve, and fire a user callback on a fixed time interval.
 - **`warmup!(sim; ...)`** advances to statistical stationarity — by default until the running dissipation
   ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a trailing-window
   flatness test), reading ``\varepsilon`` rather than the clampable ``k(t)``, and, when the scalar is
@@ -1190,6 +1200,45 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     shared op lists (decision 33's re-derive obligation) and regenerated for review by the
     `AUDIT_PRINT` aid. Kernel-launch counts and achieved bandwidth on the GPU hosts remain
     benchmark-side empirics, outside the suite.
+
+35. **(2026-07) A recorded cost is not a minimal one: every audited cell is held against a physical
+    floor, and the residual distance must be claimed.** Decisions 33 and 34 built ledgers that
+    *record* what a run costs and fail when the number drifts. That certifies stability, not
+    minimality: a frozen cell measures what **is**, never what **should be**, and a cost with no
+    lower bound held against it is unexamined rather than optimal. The correction is to give every
+    cell a **floor** — the cost the quantity cannot go below on physical grounds — and to require
+    that `achieved − floor > 0` carry a **named holder**, split into `FIX`-then-retire (a local win,
+    removed when taken) and `PF-RAISE` (a recorded backend request). An unclaimed gap fails the
+    suite. This inverts enforcement from *did the number change* to *is there residual distance to
+    the floor, and is it accounted for*, and it subsumes a third axis the two ledgers could not see:
+    **form** — not how well a fixed expression is scheduled, but which of the mathematically
+    equivalent expressions is evaluated at all (Parseval for a quadratic reduction, the Dirichlet
+    form for a gradient energy, the solenoidal identity for enstrophy, a spectrum that already
+    integrates to the energy). Cubic and nonlinear invariants are floors, not gaps: the Lamb vector,
+    the scalar flux, and ``\det S`` have no quadratic shortcut.
+
+    Two structural consequences beyond the ledgers. The op model must extend **past `step!`** to
+    every surface a run touches — the initial-condition seeders, the observables, the run-loop
+    accounting, the tracer push, the forcing hooks — since a cost outside the stepped region is
+    invisible, not absent. And an **eighth axis** joins the seven: **host–device synchronization**.
+    On GPU-primary code every reduction that returns a Julia scalar is a blocking device-to-host
+    transfer that drains the pipeline, and no footprint or traffic count can see a barrier; the
+    floor is one such readback per step under an adaptive CFL (only the speed bound gates the next
+    launch) and none under a fixed step. Decision 34 had placed synchronization outside the suite as
+    a benchmark empiric — correct for *achieved* bandwidth, wrong for the *count*, which is a static
+    property of the schedule and belongs with the other ledgers.
+
+    First fruits, each verified and each retiring its holder rather than recording it: the tracer
+    push no longer retains a start-of-step velocity **field** (§4.6) — an ``N^{3}\times3`` resident
+    buffer and per-step copy serving an ``M\times3`` interpolation, which the ledgers had faithfully
+    recorded as a tracer delta and never challenged, in plain conflict with invariant 4's *footprint
+    over compute*; the run layer measures ``\varepsilon`` through the Dirichlet form rather than
+    building a vorticity to square away; and `IFRK2` builds each integrating factor once per step
+    instead of twice. Where a residual is deliberately **not** taken it is named and its premise
+    tested, not asserted — the coincident integrating factors at ``\mathrm{Sc} = 1`` are left
+    unexploited because the guard would make the hot loop's schedule depend on a runtime value, and
+    because the sound condition is *equal diffusivities and both linear rates unarmed*, never
+    ``\mathrm{Sc} = 1`` alone.
 
 ---
 

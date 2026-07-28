@@ -92,7 +92,6 @@ function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, 
                allocate_buffers(scheme, domain; scalar)]
   if tracers
     push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
-    push!(owners, physical_vector(domain))            # the run layer's Heun endpoint buffer u(tₙ)
   end
   return _counts(owners, N_AUDIT)
 end
@@ -126,7 +125,11 @@ _forcing_delta(tag, slot) =
                        (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, rate = 0)
 # (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
 
-const TRACER_DELTA = (spectral_vector = 0, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, rate = 0)
+# Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
+# and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the
+# tracers as M interpolated vectors rather than retained as a field, so a tracked run adds no resident
+# field to an untracked one. This zero is the assertion, not a placeholder.
+const TRACER_DELTA = ZERO
 
 # The charts axis of the observation layer: each declared chart is one resident physical vector; the
 # spectral scratch is unconditional. The base table pins the default (both charts) — the rotational

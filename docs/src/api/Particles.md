@@ -23,11 +23,14 @@ number_of_tracers
 
 ## The tracking loop
 
-The two steps of Lagrangian tracking: advance the tracers along the flow with second-order
-Heun-in-time advection, then read a physical field along their trajectories — both feeding the
-Lagrangian statistics.
+The steps of Lagrangian tracking: put the start-of-step velocity on record along the trajectories,
+advance the tracers with second-order Heun-in-time advection once the fields have moved, then read a
+physical field along their trajectories — all feeding the Lagrangian statistics. The push is two
+verbs because the run holds a single physical velocity field, so the start-of-step values are taken
+off it before the state advances.
 
 ```@docs
+record_trajectory_velocity!
 advect!
 sample!
 ```

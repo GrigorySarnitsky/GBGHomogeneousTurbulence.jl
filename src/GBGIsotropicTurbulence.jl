@@ -128,6 +128,7 @@ using .Propagator:
 
 using .Particles:
   Tracers,
+  record_trajectory_velocity!,
   advect!,
   sample!,
   tracer_positions,
@@ -205,6 +206,7 @@ export FixedDomain,
        recommended_cfl,
        FlowConditions,
        Tracers,
+       record_trajectory_velocity!,
        advect!,
        sample!,
        tracer_positions,

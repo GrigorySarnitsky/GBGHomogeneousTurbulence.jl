@@ -1,7 +1,7 @@
 # Lagrangian tracer tests. Key checks: a uniform velocity advects tracers exactly; the Heun-in-time
 # integration is second-order (a time-varying uniform field, so the only error is temporal);
 # positions wrap periodically; the interpolation scheme is pluggable; sampling reads a field along
-# the trajectories; and advect! allocates nothing per step.
+# the trajectories; and the two-verb push (record + advect) allocates nothing per step.
 
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, field_data, to_physical,
@@ -27,7 +27,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     set_uniform_x!(uniform, c)
     nsteps, dt = 20, 0.005
     for _ in 1:nsteps
-      advect!(tracers, uniform, uniform, domain, dt)
+      record_trajectory_velocity!(tracers, uniform)
+      advect!(tracers, uniform, domain, dt)
     end
     X = tracer_positions(tracers)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
@@ -49,7 +50,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       for n in 0:nsteps-1
         set_uniform_x!(u_start, cos(ω * n * dt))
         set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
-        advect!(tracers, u_start, u_end, domain, dt)
+        record_trajectory_velocity!(tracers, u_start)
+        advect!(tracers, u_end, domain, dt)
       end
       tracer_positions(tracers)[1, 1]
     end
@@ -64,7 +66,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
-      advect!(tracers, uniform, uniform, domain, 0.02)
+      record_trajectory_velocity!(tracers, uniform)
+      advect!(tracers, uniform, domain, 0.02)
     end
     X = tracer_positions(tracers)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
@@ -75,7 +78,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     for scheme in (CatmullRom, LagrangeSpline(2))
       tracers = Tracers(domain, 50; scheme = scheme, rng = MersenneTwister(1))
       for _ in 1:10
-        advect!(tracers, uniform, uniform, domain, 0.01)
+        record_trajectory_velocity!(tracers, uniform)
+        advect!(tracers, uniform, domain, 0.01)
       end
       X = tracer_positions(tracers)
       @test all(isfinite, X) && all(0 .<= X .< L)
@@ -101,21 +105,21 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = DerivedFields(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
-    u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
     Δx = L / N
     for _ in 1:50
       u = physical_velocity(derived, state, domain)
       dt = 0.4 * Δx / max(max_speed(u), 1e-6)
-      copyto!(field_data(u_start), field_data(u))                       # u(tₙ)
+      record_trajectory_velocity!(tracers, u)                           # u(tₙ), onto the tracers
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
-      advect!(tracers, u_start, physical_velocity(derived, state, domain), domain, dt)   # u(tₙ₊₁)
+      advect!(tracers, physical_velocity(derived, state, domain), domain, dt)   # u(tₙ₊₁)
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)
     @test all(isfinite, tracer_velocities(tracers))
 
-    # allocation-free advection step
-    bytes = @allocated advect!(tracers, u_start, u_start, domain, 0.001)
+    # allocation-free advection step — both verbs of the push
+    u = physical_velocity(derived, state, domain)
+    bytes = @allocated (record_trajectory_velocity!(tracers, u); advect!(tracers, u, domain, 0.001))
     @test bytes < 4096
   end
 end

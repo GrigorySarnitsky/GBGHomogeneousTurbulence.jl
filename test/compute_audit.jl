@@ -340,13 +340,15 @@ function _forcing_pass_delta(tag, slot, scheme)
     _ex(spectral_scalar = 10 + 3 * _evals(scheme), physical_scalar = 1, rate = 0)
 end
 
-# Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache
-# (src/SimulationRun.jl advance!: the pre-step read reuses the previous post-step recompute, and the
-# post-step recompute serves the next step's stage 1) — the epoch design's compute dividend. What
-# they do add per step is the endpoint copy (one physical-vector read + write) and O(M) interpolation
-# work, below field scale.
+# Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache (the pre-step read
+# reuses the previous post-step recompute, and the post-step recompute serves the next step's stage
+# 1) — the epoch design's compute dividend. Since 2026-07-28 they add no field-scale PASSES either:
+# the start-of-step velocity is interpolated onto the tracers before the step rather than copied out
+# of the chart, so all the tracer push touches is O(M) interpolation work, below field scale. Both
+# deltas are at the floor an M-point Lagrangian instrument can reach — it must read the velocity
+# somewhere, and it now reads only the M points it needs.
 const TRACER_TRANSFORM_DELTA = (c2r = 0, r2c = 0)
-const TRACER_PASS_DELTA = _ex(physical_vector = 2)
+const TRACER_PASS_DELTA = ZERO
 
 
 # ---------------------------------------------------------------- regeneration aid
@@ -449,9 +451,10 @@ end
 
   @testset "tracers ride the chart cache — zero transform delta" begin
     # Frozen intent: an advance! that bypassed the epoch cache for the Heun endpoints would have to
-    # flip this constant consciously (and pay 3 c2r per step).
+    # flip these constants consciously — 3 c2r per step for a re-recovered chart, 2 physical-vector
+    # passes for a retained endpoint field.
     @test TRACER_TRANSFORM_DELTA == (c2r = 0, r2c = 0)
-    @test TRACER_PASS_DELTA == _ex(physical_vector = 2)
+    @test TRACER_PASS_DELTA == ZERO
   end
 
   @testset "op lists name real displaced registers" begin

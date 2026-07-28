@@ -8,8 +8,9 @@
 #
 # Freshness is the observation cache's job, not a loop invariant: the physical u / ω are read through
 # the `DerivedFields` accessors, which recompute a chart exactly when its stamp is behind the fields
-# epoch that `step!` advances. The tracer push reads u(tₙ) before the step (saved to `tracer_velocity`)
-# and u(tₙ₊₁) after it — Heun on the two endpoint velocities, both through the accessors.
+# epoch that `step!` advances. The tracer push interpolates u(tₙ) onto the tracers before the step and
+# u(tₙ₊₁) after it — Heun on the two endpoint velocities, both read through the accessors. Only the M
+# interpolated vectors are held across the step, never a second copy of the field.
 
 """
     SimulationRun
@@ -36,7 +37,7 @@ using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
-using ..Particles: Tracers, advect!
+using ..Particles: Tracers, record_trajectory_velocity!, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
@@ -145,11 +146,10 @@ sim = Simulation(domain; viscosity = 5e-3)
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
 - `derived` — the [`DerivedFields`](@ref) observation cache (the stamped physical velocity/vorticity charts).
-- `tracers`, `tracer_velocity` — the [`Tracers`](@ref) (or `nothing`), and the buffer holding the velocity
-  in physical representation for the Heun tracer push.
+- `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
-struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, TV}
+struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
@@ -157,7 +157,6 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, TV}
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   derived::DF              # DerivedFields: the stamped observation cache over the state
   tracers::TR              # Tracers, or nothing
-  tracer_velocity::TV      # physical buffer holding u(tₙ) for the Heun advect, or nothing
   cfl::Float64
   clock::Clock
 end
@@ -211,10 +210,9 @@ function Simulation(domain::FixedDomain;
   scalar && random_scalar!(state.scalar, domain; scalar_variance, peak_wavenumber, rng)
 
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
-  tracer_velocity = number_of_tracers > 0 ? physical_vector(domain) : nothing
 
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, DerivedFields(domain),
-                    tracers, tracer_velocity, Float64(cfl), Clock(0.0, 0))
+                    tracers, Float64(cfl), Clock(0.0, 0))
 end
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
@@ -344,15 +342,16 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # Save u(tₙ) for the Heun tracer push before the step advances the fields epoch.
+  # Put u(tₙ) on record along the trajectories before the step advances the fields epoch — M
+  # interpolated vectors, so the endpoint velocity never costs a second copy of the field.
   sim.tracers === nothing ||
-    copyto!(field_data(sim.tracer_velocity), field_data(physical_velocity(sim)))
+    record_trajectory_velocity!(sim.tracers, physical_velocity(sim))
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.derived, Δt)
 
   # The accessor recomputes u(tₙ₊₁) from the advanced û — the end-of-step field of the Heun pair.
   sim.tracers === nothing ||
-    advect!(sim.tracers, sim.tracer_velocity, physical_velocity(sim), sim.domain, Δt)
+    advect!(sim.tracers, physical_velocity(sim), sim.domain, Δt)
 
   sim.clock.time += Δt
   sim.clock.step += 1

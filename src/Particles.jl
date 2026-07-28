@@ -13,6 +13,7 @@
 
 Lagrangian tracer tracking:
 - [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
+- [`record_trajectory_velocity!`](@ref) — put the start-of-step Lagrangian velocity on record.
 - [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the start- and end-of-step velocity).
 - [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
   [`scalar_buffer`](@ref) allocate its `out` buffers.
@@ -24,7 +25,7 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain
 
-export Tracers, advect!, sample!,
+export Tracers, record_trajectory_velocity!, advect!, sample!,
        tracer_positions, tracer_velocities, number_of_tracers, velocity_buffer, scalar_buffer
 
 
@@ -48,7 +49,7 @@ defaults to `Random.default_rng()`.
 
 Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
 [`number_of_tracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
-[`advect!`](@ref) allocates no per-step memory.
+the tracer push allocates no per-step memory.
 
 # Fields
 - `positions` — the `(M, 3)` tracer positions (read with [`tracer_positions`](@ref)).
@@ -91,11 +92,35 @@ end
 
 
 """
-    advect!(tracers, velocity_start, velocity_end, domain, dt) -> tracers
+    record_trajectory_velocity!(tracers, u) -> tracers
 
-Advance the tracer positions by one step of size `dt`, in place, by Heun-in-time on the physical
-velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and end
-(`velocity_end` ``= \\boldsymbol{u}(t_{n+1})``) of the step:
+Record the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the flow velocity seen by
+each tracer where it currently sits — by interpolating the physical velocity field `u`
+``\\boldsymbol{u}`` onto the tracer positions with the set's interpolation scheme.
+
+Call it on the start-of-step velocity, before the field solver advances the state; [`advect!`](@ref)
+then completes the push from the recorded values and the end-of-step field. The push is split across
+these two verbs because a run holds only one physical velocity field: the observation cache
+recomputes that chart in place once the state has advanced, so the start-of-step values must be taken
+off it while it still holds ``\\boldsymbol{u}(t_n)``. Recording them costs ``M \\times 3`` values for
+``M`` tracers, where keeping the field itself would cost ``N^{3} \\times 3``.
+
+What is recorded is also the trajectory velocity read back by [`tracer_velocities`](@ref), and the
+quantity the Lagrangian statistics accumulate.
+"""
+function record_trajectory_velocity!(tracers::Tracers, u)
+  interpolate!(tracers.velocity1, u, tracers.position_points, tracers.scheme)
+  return tracers
+end
+
+
+"""
+    advect!(tracers, velocity_end, domain, dt) -> tracers
+
+Advance the tracer positions by one step of size `dt`, in place, by Heun-in-time on the velocity at
+the two ends of the step — the start-of-step values that
+[`record_trajectory_velocity!`](@ref) put on record, and the end-of-step physical velocity field
+`velocity_end` ``= \\boldsymbol{u}(t_{n+1})``:
 
 ```math
 \\begin{aligned}
@@ -107,17 +132,21 @@ velocity fields at the start (`velocity_start` ``= \\boldsymbol{u}(t_n)``) and e
 ```
 
 with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `domain` (a
-[`FixedDomain`](@ref)). This is second-order accurate in time. The start-of-step
-velocity ``\\boldsymbol{v}_1`` is retained ([`tracer_velocities`](@ref)) as the trajectory velocity for
-the forthcoming Lagrangian statistics.
+[`FixedDomain`](@ref)). This is second-order accurate in time — advecting on the frozen start-of-step
+velocity alone would be first order.
+
+!!! note
+    ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here, so
+    `record_trajectory_velocity!` must already have run against ``\\boldsymbol{u}(t_n)`` for this
+    step. Calling `advect!` twice without re-recording pushes the second step off a stale
+    ``\\boldsymbol{v}_1``.
 """
-function advect!(tracers::Tracers, velocity_start, velocity_end, domain::FixedDomain, dt::Real)
+function advect!(tracers::Tracers, velocity_end, domain::FixedDomain, dt::Real)
   L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
   Δt = real(eltype(tracers.positions))(dt)
   X = tracers.positions
   Xstar = tracers.predictor
 
-  interpolate!(tracers.velocity1, velocity_start, tracers.position_points, tracers.scheme)
   v1 = point_values(tracers.velocity1)
   Xstar .= mod.(X .+ Δt .* v1, L)
   interpolate!(tracers.velocity2, velocity_end, tracers.predictor_points, tracers.scheme)
