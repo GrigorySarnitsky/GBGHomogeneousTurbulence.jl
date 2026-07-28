@@ -74,13 +74,16 @@ const HOST_SIDE_FORCING_SCALARS = Holder(
   "needed to leave the device. Closing it needs a reduction into a device-resident scalar and " *
   "kernels that accept one as a coefficient; the guard branch folds into the same kernel.")
 
-const UNFUSED_BUDGET_REDUCTION = Holder(
-  "UNFUSED (k, ε) REDUCTION", :PF_RAISE,
-  "A turnover-budgeted loop needs τ = k/ε on the host, and k and ε are two independent reductions " *
-  "over the same field — two barriers where one two-output reduction would cost one.")
+const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
+  "UNFUSED QUADRATIC REDUCTIONS", :PF_RAISE,
+  "The quadratic diagnostics a budgeted or warming run needs on the host — k and ε for the turnover " *
+  "clock, the scalar variance for the stationarity detector — are independent sweeps of the same " *
+  "state, one barrier each, where a single multi-output reduction would cost one barrier for all of " *
+  "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
+  "operand and needs its own pass.")
 
 const ALL_HOLDERS = (UNUSED_FUSION, MATERIALIZED_SYMBOLS,
-                     HOST_SIDE_FORCING_SCALARS, UNFUSED_BUDGET_REDUCTION)
+                     HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS)
 
 
 # ---------------------------------------------------------------- the synchronization ledger
@@ -99,18 +102,31 @@ end
 #                                                    observable as well when `over = :total`
 #   set_forcing_rate!       (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
 #   prepare_forcing!        (src/Forcing.jl)       — the stochastic forcing's noise variance → the rescale
+#   _observe_and_test!      (src/SimulationRun.jl) — the stationarity detector's sampled signals: the
+#                                                    derivative skewness, and the scalar variance when
+#                                                    the scalar gate is on. ε is NOT counted twice
+#                                                    here: the loop measures it once and hands it to
+#                                                    both the detector and the turnover clock.
 #
 # The adaptive timestep is the one crossing with a nonzero floor: Δt is chosen on the host and
 # parameterizes every kernel of the step it opens, so the reduction that sets it must land before
 # anything launches. A fixed timestep needs none. Every other scalar here is consumed by a following
 # device kernel and only visits the host because it is written as a Julia number.
 function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,
-                  turnover_budget::Bool = false)
+                  turnover_budget::Bool = false, monitor::Symbol = :none)
   syncs = Sync[]
   adaptive_dt && push!(syncs, Sync("cfl max_speed", 1, nothing))
-  if turnover_budget
-    push!(syncs, Sync("turnover ε", 1, nothing))              # one of the pair is irreducible…
-    push!(syncs, Sync("turnover k", 0, UNFUSED_BUDGET_REDUCTION))   # …the second is the unfused half
+  if turnover_budget || monitor !== :none
+    # One barrier serves the whole quadratic family if the reduction is fused; the first carries the
+    # floor, the rest are the unfused remainder.
+    push!(syncs, Sync("turnover ε", 1, nothing))
+    push!(syncs, Sync("turnover k", 0, UNFUSED_QUADRATIC_REDUCTIONS))
+  end
+  if monitor !== :none
+    # The skewness is a cubic reduction over the strain tensor — its own operand, its own barrier.
+    push!(syncs, Sync("derivative skewness", 1, nothing))
+    monitor === :skew_scalar &&
+      push!(syncs, Sync("scalar variance", 0, UNFUSED_QUADRATIC_REDUCTIONS))
   end
   for (tag, slot) in ((velocity_forcing, :velocity), (scalar_forcing, :scalar))
     if tag === :band
@@ -151,6 +167,14 @@ const SYNC_LEDGER = (
             turnover_budget = true),                                             achieved = 5, floor = 2),
   (name = "turnover-budgeted, fixed dt, unforced",
    cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 2, floor = 1),
+  # The warm-up surface — past step!, where the stationarity detector samples. ε is measured once
+  # per iteration and shared with the turnover clock, so it appears here once, not twice.
+  (name = "warm-up sample, BandRescaling :total",
+   cfg = (; adaptive_dt = true, velocity_forcing = :band_total, monitor = :skew),
+   achieved = 6, floor = 3),
+  (name = "warm-up sample, scalar gate, unforced",
+   cfg = (; adaptive_dt = true, velocity_forcing = :none, monitor = :skew_scalar),
+   achieved = 5, floor = 3),
 )
 
 
@@ -217,7 +241,7 @@ const SYNC_LEDGER = (
       s.holder === nothing || push!(sync_holders, s.holder.name)
     end
     @test HOST_SIDE_FORCING_SCALARS.name in sync_holders
-    @test UNFUSED_BUDGET_REDUCTION.name in sync_holders
+    @test UNFUSED_QUADRATIC_REDUCTIONS.name in sync_holders
   end
 
   @testset "retired holders stay retired" begin

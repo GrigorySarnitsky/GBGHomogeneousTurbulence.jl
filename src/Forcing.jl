@@ -263,16 +263,13 @@ diagnostics: `dissipation` ``\\varepsilon`` for the velocity, `scalar_dissipatio
 ``\\varepsilon_\\varphi`` for the scalar. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
-struct ConstantPower{K, M, T} <: AbstractForcing
-  band::K              # band-pass kernel (for the band observable)
-  mask::M              # real array band indicator
+struct ConstantPower{K, T} <: AbstractForcing
+  band::K              # band-pass kernel — serves both the band observable and the rate's indicator
   target::T            # the dissipation rate to hold: dissipation (velocity) or scalar_dissipation (scalar)
 end
 
 function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
-  band = _shell_band(domain, lowest_shell, highest_shell)
-  mask = real.(field_data(band))
-  return ConstantPower(band, mask, float(target))
+  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(target))
 end
 
 uses_linear_rate(::ConstantPower) = true
@@ -281,7 +278,9 @@ function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDom
   T = eltype(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
   amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
-  rate .= T(amplitude) .* forcing.mask
+  # The band indicator is the real part of the kernel already held for the observable — taken
+  # lazily in the fill rather than stored a second time.
+  rate .= T(amplitude) .* real.(field_data(forcing.band))
   return true
 end
 
@@ -354,12 +353,13 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real
   convolve!(noise_spectral, noise_spectral, ou.band)
   field isa VectorFieldSpectral && helmholtz_projection!(noise_spectral, noise_spectral, domain.multipliers)
   noise_variance = inner(noise_spectral, noise_spectral)
-  noise_variance > 0 && multiply!(noise_spectral, one(T) / sqrt(T(noise_variance)), noise_spectral)
 
-  # exact Ornstein–Uhlenbeck update
+  # exact Ornstein–Uhlenbeck update. The unit-variance rescale of ξ is not a pass of its own: the
+  # only consumer of ξ is the combination below, so 1/√⟨ξ,ξ⟩ rides in as part of its coefficient.
   θ = exp(-T(dt) / T(ou.correlation_time))
   s = sqrt(T(ou.variance) * (one(T) - θ^2))
-  combine!(ou.state, θ, ou.state, s, noise_spectral)                        # f̂ ← θ f̂ + √(σ²(1-θ²)) ξ
+  β = noise_variance > 0 ? s / sqrt(T(noise_variance)) : zero(T)
+  combine!(ou.state, θ, ou.state, β, noise_spectral)                        # f̂ ← θ f̂ + √(σ²(1-θ²)) ξ̂
   return nothing
 end
 

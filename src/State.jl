@@ -282,10 +282,12 @@ function random_solenoidal_velocity!(û, domain::FixedDomain;
     shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
     field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
   end
+  # The truncation rides in the envelope rather than as a second sweep of the field: both are
+  # per-mode scalar multipliers, and a scalar commutes through the (per-mode) Leray projection, so
+  # folding them costs one scalar-field pass instead of a whole vector field's.
+  convolve!(envelope, envelope, domain.dealias)
   convolve!(û, û, envelope)
-
   helmholtz_projection!(û, û, domain.multipliers)
-  convolve!(û, û, domain.dealias)
 
   current_energy = 0.5 * inner(û, û)
   current_energy > 0 && (field_data(û) .*= sqrt(T(kinetic_energy) / current_energy))
@@ -299,8 +301,9 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-`scalar_variance`. The noise is made mean-zero in physical space before the transform, so the
-``\\boldsymbol{\\kappa}=\\boldsymbol 0`` (mean) mode vanishes.
+`scalar_variance`. The mean vanishes by construction: the envelope is zero at
+``\\boldsymbol{\\kappa}=\\boldsymbol 0``, and that mode's coefficient *is* the spatial mean
+``\\langle\\varphi\\rangle``.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
@@ -325,22 +328,25 @@ function random_scalar!(φ̂, domain::FixedDomain;
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = scalar_physical(domain)
-  data = randn(rng, T, physical_field_shape(domain.grid, Val(0))...)
-  data .-= sum(data) / length(data)                            # zero the spatial mean
-  copyto!(field_data(noise), data)
+  copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(0))...))
   to_spectral!(φ̂, noise, domain.scalar_plans)
 
   envelope = scalar_spectral(domain)
   if isnothing(spectrum)
+    # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
+    # its spatial mean, so killing that mode leaves ⟨φ⟩ = 0 without a physical-space pass or the
+    # reduction one would need to measure the mean. The `spectrum` branch below vanishes there too.
     inverse_peak_squared = one(T) / T(peak_wavenumber)^2
-    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
+    field_data(envelope) .= complex.(ifelse.(domain.squared_wavenumber .> 0,
+                                             exp.((-inverse_peak_squared) .* domain.squared_wavenumber),
+                                             zero(T)))
   else
     # Match a target radial scalar spectrum E_φ(κ): amplitude √(E_φ(κ))/κ ⇒ shell sum ∝ E_φ(κ).
     shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
     field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
   end
+  convolve!(envelope, envelope, domain.dealias)      # truncation folded in, as for the velocity
   convolve!(φ̂, φ̂, envelope)
-  convolve!(φ̂, φ̂, domain.dealias)
 
   current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
   current_variance > 0 && (field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance))

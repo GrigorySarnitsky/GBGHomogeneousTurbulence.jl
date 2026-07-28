@@ -175,9 +175,10 @@ _forcing_transform_delta(tag, slot) =
 #   linear — set_forcing_rate!: rate .= A·mask [mask + rate], then the armed factor build reads the
 #           rate once per build.
 #   power — set_forcing_rate!: weighted_inner(field, band) + rate .= a·mask + per-build rate reads.
-#   ou    — prepare_forcing!: draw + band-limit + project + normalize + rescale + state fold
-#           (10 slot-shaped passes + 1 kernel read + the physical noise write), then the per-stage
-#           additive source read/accumulate (3 passes × evaluations).
+#   ou    — prepare_forcing!: draw + band-limit + project + normalize + state fold (8 slot-shaped
+#           passes + 1 kernel read + the physical noise write; the unit-variance rescale folds into
+#           the state combination's coefficient), then the per-stage additive source read/accumulate
+#           (3 passes × evaluations).
 function _forcing_pass_delta(tag, slot, scheme)
   tag === :none && return ZERO
   if tag === :band
@@ -190,8 +191,8 @@ function _forcing_pass_delta(tag, slot, scheme)
                                 _ex(spectral_scalar = 2, rate = 2 + _builds(scheme))
   end
   return slot === :velocity ?
-    _ex(spectral_vector = 10 + 3 * _evals(scheme), physical_vector = 1, spectral_scalar = 1) :
-    _ex(spectral_scalar = 10 + 3 * _evals(scheme), physical_scalar = 1, rate = 0)
+    _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1, spectral_scalar = 1) :
+    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1, rate = 0)
 end
 
 # Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache (the pre-step read

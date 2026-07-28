@@ -124,13 +124,15 @@ _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
   tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
   tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, rate = 2) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 2) :
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 1) :
   slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
                        (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, rate = 0)
 # (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
-# The two rate-driven forcings carry TWO rate-shaped arrays each: their own band mask, and the
-# generator's rate array — which now exists precisely because such a forcing is present, so the
-# storage appears on the axis that causes it instead of unconditionally in the base.
+# Each rate-driven forcing carries the generator's rate array — which now exists precisely because
+# such a forcing is present, so the storage appears on the axis that causes it instead of
+# unconditionally in the base. `Linear` adds its own real band indicator on top; `ConstantPower`
+# does not, since the indicator is the real part of the kernel it already holds for the band
+# observable, taken lazily in the rate fill rather than stored twice (2026-07-28, decision 35).
 
 # Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
 # and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the

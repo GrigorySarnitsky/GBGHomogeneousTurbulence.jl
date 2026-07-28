@@ -163,15 +163,15 @@ function _scalar_update(; first = false, last = false)
 end
 
 # The OU forcing's prepare! phase (velocity slot, src/Forcing.jl): generate, transform, band-limit,
-# project, normalize (the variance reduction, then the rescale it feeds), and fold the increment into
-# the contract-live forcing state f̂.
+# project, normalize, and fold the increment into the contract-live forcing state f̂. The
+# unit-variance rescale of ξ is NOT a pass: its only consumer is the fold, so 1/√⟨ξ,ξ⟩ rides in as
+# part of that combination's coefficient (2026-07-28, decision 35).
 _ou_prepare() = [
   Op("draw noise",       Symbol[],           [:noise_p]),
   Op("noise→spectral",   [:noise_p],         [:noise_s]),
   Op("band-limit",       [:noise_s],         [:noise_s]),
   Op("project noise",    [:noise_s],         [:noise_s]),
   Op("normalize",        [:noise_s],         Symbol[]),
-  Op("rescale ξ",        [:noise_s],         [:noise_s]),
   Op("f̂ ← θf̂ + sξ",    [:ou_state, :noise_s], [:ou_state]),
 ]
 
@@ -315,7 +315,7 @@ for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl 
              "rotate û", "rotate hu", "rotate φ̂", "rotate hφ", "rotate û*", "rotate φ̂*",
              "rotate N̂_u,1", "rotate N̂_φ,1", "û* predictor", "φ̂* predictor",
              "û corrector 1", "û corrector 2", "φ̂ corrector 1", "φ̂ corrector 2",
-             "draw noise", "project noise", "rescale ξ", "f̂ ← θf̂ + sξ", "add OU source")
+             "draw noise", "project noise", "f̂ ← θf̂ + sξ", "add OU source")
   OP_COST[name] = _cost(:pointwise)
 end
 

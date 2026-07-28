@@ -312,12 +312,12 @@ The number of steps `sim` has taken.
 current_step(sim::Simulation) = sim.clock.step
 
 
-# The eddy-turnover time τ = k/ε from the current diagnostics — the clock warm-up and run budgets
-# count in units of it.
-function _turnover_time(sim::Simulation)
-  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
-  return ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
-end
+# The eddy-turnover time τ = k/ε — the unit the warm-up and run budgets count in. ε is passed in
+# rather than measured here: the caller needs it for the stationarity detector as well, and both
+# read the same state, so measuring it once keeps one reduction (and, on a device, one blocking
+# readback) out of every iteration of a budgeted loop.
+_turnover_time(sim::Simulation, ε::Real) =
+  ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
 
 
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
@@ -378,9 +378,12 @@ function _run_loop!(sim::Simulation, callback; turnovers = nothing, time = nothi
     target_time !== nothing && sim.clock.time ≥ target_time && break
     target_step !== nothing && sim.clock.step ≥ target_step && break
     target_turn !== nothing && elapsed_turn ≥ target_turn && break
-    stop !== nothing && stop(sim, elapsed_turn) && break
-
-    τ = (target_turn === nothing && stop === nothing) ? nothing : _turnover_time(sim)
+    # One ε per iteration, shared by the two consumers below: nothing between them advances the
+    # state, so a second measurement would return the same number at the price of another reduction.
+    ε = (target_turn === nothing && stop === nothing) ? nothing :
+        dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
+    stop !== nothing && stop(sim, elapsed_turn, ε) && break
+    τ = ε === nothing ? nothing : _turnover_time(sim, ε)
     Δt = cfl_timestep(sim)
     advance!(sim; dt = Δt)
     τ === nothing || (elapsed_turn += Δt / τ)
@@ -501,9 +504,8 @@ end
 
 # Compute the signals from `sim` (only when a sample is due — the skewness costs three inverse
 # transforms) and test.
-function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
+function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
-  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
   φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
   S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
@@ -554,7 +556,7 @@ function warmup!(sim::Simulation; turnovers = nothing, time = nothing, steps = n
                                 gate_scalar = gate_scalar && _scalar_forced(sim),
                                 gate_skew = gate_skewness, skew_floor)
   _run_loop!(sim, nothing; turnovers = Float64(max_turnovers),
-          stop = (s, et) -> _observe_and_test!(monitor, s, et))
+          stop = (s, et, ε) -> _observe_and_test!(monitor, s, et, ε))
   monitor.converged ||
     @warn "warmup!: hit the max_turnovers = $(max_turnovers) cap without detecting stationarity"
   return sim
