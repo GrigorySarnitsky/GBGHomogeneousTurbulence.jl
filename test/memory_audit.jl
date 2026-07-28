@@ -99,6 +99,10 @@ end
 # The frozen BASE table — unforced (NoForcing/NoForcing), tracer-free. A deliberate footprint change
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar, rate.
+# The PhaseShift cells lost a physical vector on 2026-07-28 (decision 35): the displaced velocity is
+# recovered onto the generator's physical product scratch, which the primary evaluation has already
+# spent, instead of into a register of its own — legal because the cross-product and flux kernels read
+# each element's whole fiber before writing it. Verified against the padding oracle, unchanged.
 # The rate column is ZERO throughout, and the zero is the point (2026-07-28, decision 35): a rate
 # array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
 # default configuration, whose BandRescaling is a post-step projection — carries none. It used to
@@ -108,14 +112,14 @@ const BASE = Dict(
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
   (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
   (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, rate = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, rate = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 9, physical_scalar = 2, rate = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
   (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, rate = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, rate = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 10, physical_scalar = 2, rate = 0),
 )
 
 # The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)

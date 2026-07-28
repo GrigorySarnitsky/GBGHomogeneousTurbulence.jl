@@ -315,8 +315,11 @@ end
   @testset "op lists name real displaced registers" begin
     PB = GBGIsotropicTurbulence.Generator.PhaseShiftBuffers
     @test all(f -> f in fieldnames(PB),
-              (:to_shifted, :back, :velocity_shifted, :u_shifted, :omega_shifted,
+              (:to_shifted, :back, :velocity_shifted, :omega_shifted,
                :scalar_shifted, :scalar_copy, :phi_shifted))
+    # The displaced velocity has no register of its own — it rides the generator's physical product
+    # scratch. A reinstated field here would be the op model going stale in the other direction.
+    @test !(:u_shifted in fieldnames(PB))
   end
 
   @testset "the coincident-factor holder names the exact condition" begin
