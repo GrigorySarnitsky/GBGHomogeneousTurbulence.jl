@@ -35,6 +35,7 @@
 # tables, then freeze the new values in the same commit, citing the decision.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: field_data
 using Test
 
 include("audit_ops.jl")
@@ -247,6 +248,11 @@ const TRANSFORM_GAP_HOLDERS = Dict(
 # PhaseShift cells re-frozen 2026-07-19: the shift-back now rides the averaging convolve as one
 # α/β pass in both displaced chains (the PF-triage free win; for the scalar the shift-back symbol
 # commutes through the divergence contraction) — 2 spectral-vector passes fewer per evaluation.
+# RK2 cells re-frozen 2026-07-28 (decision 35): every use of a field's integrating factor over an
+# IFRK2 step is at the one substep Δt, so each factor is now built once and all of its consumers run
+# in that visit — 1 spectral-scalar write and 1 rate read fewer per field per step (verified
+# bit-identical). This is the schedule-level half of the redundancy; the value-level half (at
+# Sc = 1 with both rates unarmed the two factors are the same field) stays a named floor holder.
 const PASSES_BASE = Dict(
   (:RK3, :TwoThirds,  false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, rate = 3),
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
@@ -254,12 +260,12 @@ const PASSES_BASE = Dict(
   (:RK3, :HouLi,      true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
   (:RK3, :PhaseShift, false) => (spectral_vector = 84, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, rate = 3),
   (:RK3, :PhaseShift, true)  => (spectral_vector = 102, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, rate = 6),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 7, physical_scalar = 0, rate = 2),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 39, physical_scalar = 2, rate = 4),
-  (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 7, physical_scalar = 0, rate = 2),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 39, physical_scalar = 2, rate = 4),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 11, physical_scalar = 0, rate = 2),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 65, physical_scalar = 4, rate = 4),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, rate = 1),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, rate = 2),
+  (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, rate = 1),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, rate = 2),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 10, physical_scalar = 0, rate = 1),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 63, physical_scalar = 4, rate = 2),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).
@@ -278,6 +284,25 @@ const FUSION_GAP_HOLDERS = Dict(
   :spectral_vector => "UNFUSED STAGE PIPELINE + FACTOR MATERIALIZATION (PF kernel granularity)",
   :spectral_scalar => "UNFUSED STAGE PIPELINE + FACTOR MATERIALIZATION (PF kernel granularity)",
 )
+
+# A VALUE-level residual the schedule model above cannot see, recorded rather than exploited. The
+# two integrating factors coincide as fields, ℰ_ν(τ) ≡ ℰ_κ(τ), exactly when the diffusivities agree
+# AND both linear forcing rates are unarmed — that is, Sc = 1 with no rate-armed forcing on either
+# field, since an armed rate A(κ) enters the exponent and the velocity's and scalar's differ in
+# general. So the second build per stage is redundant only on that configuration, and the sound
+# O(1) guard is the conjunction, never `Sc == 1` alone: a bare Schmidt test would silently hand the
+# scalar the velocity's forcing rate — a physics error no Sc = 1 unforced test could catch.
+#
+# It is left unexploited by choice. Non-unit Sc is a fully supported configuration, not a fallback,
+# and the guard would make the hot loop's schedule depend on a runtime value — one code path fast,
+# the other not, and the op model above forced to fork. The saving is one pointwise exponential
+# kernel per field per stage, no transform. The general form of the fix (a stamped factor register:
+# rebuild only when the full argument tuple (D, τ, rate epoch, armed) changes, the DerivedFields
+# epoch pattern) subsumes this case safely and is the route to take if the residual is ever paid
+# for; a Schmidt special case is not.
+const FACTOR_VALUE_HOLDER =
+  "COINCIDENT INTEGRATING FACTORS at Sc = 1 with both rates unarmed — one pointwise exponential per " *
+  "field per stage; unexploited (a value-dependent hot-loop branch; see the stamped-register route)"
 
 
 # ---------------------------------------------------------------- the frozen deltas
@@ -434,5 +459,33 @@ end
     @test all(f -> f in fieldnames(PB),
               (:to_shifted, :back, :velocity_shifted, :u_shifted, :omega_shifted,
                :scalar_shifted, :scalar_copy, :phi_shifted))
+  end
+
+  @testset "the coincident-factor holder names the exact condition" begin
+    # Pins FACTOR_VALUE_HOLDER's premise: the two integrating factors coincide as fields under
+    # Sc = 1 AND both rates unarmed, and NOT under either relaxation. The third case is the one
+    # that matters — it is why the unexploited residual may never be guarded on `Sc == 1` alone.
+    domain = FixedDomain(8, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    ℰ_u, ℰ_φ = scalar_spectral(domain), scalar_spectral(domain)
+    factors(sc, force) = begin
+      conditions = FlowConditions(; viscosity = 0.1, schmidt = sc, scalar_forcing = NoForcing(),
+                                  velocity_forcing = force)
+      generator = ResolvedGenerator(domain, conditions; scalar = true)
+      prepare!(generator, ResolvedFields(domain; scalar = true), domain, 0.01)
+      velocity_factor!(ℰ_u, generator, domain, 0.01)
+      scalar_factor!(ℰ_φ, generator, domain, 0.01)
+      (field_data(ℰ_u), field_data(ℰ_φ), generator)
+    end
+
+    a, b, gen = factors(1.0, NoForcing())                         # Sc = 1, no armed rate
+    @test !gen.velocity_rate_active && !gen.scalar_rate_active
+    @test a == b                                                  # coincide — the recorded residual
+
+    a, b, _ = factors(0.7, NoForcing())                           # Sc ≠ 1 — the supported case
+    @test a != b
+
+    a, b, gen = factors(1.0, Linear(domain; rate = 0.5))   # Sc = 1, velocity rate ARMED
+    @test gen.velocity_rate_active && !gen.scalar_rate_active
+    @test a != b            # a bare `Sc == 1` guard here would apply the velocity's rate to φ
   end
 end

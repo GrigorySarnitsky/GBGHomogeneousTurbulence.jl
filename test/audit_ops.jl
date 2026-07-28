@@ -202,30 +202,30 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
   charts && append!(ops, _chart_recomputes())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; phase_shift))     # N̂_u,1 → nl plays stage1's role
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
+  # Each field's ℰ is at the one substep Δt throughout the step, so it is built once and all four of
+  # its consumers (the predictor, N̂₁, the field itself) run in that one visit to the register.
   append!(ops, [
     Op("build E_ν",       Symbol[],           [:fac]),
     Op("û* predictor",    [:û, :nl],          [:ustar_spec]),
     Op("rotate û*",       [:ustar_spec, :fac],[:ustar_spec]),
+    Op("rotate N̂_u,1",   [:nl, :fac],        [:nl]),
+    Op("rotate û",        [:û, :fac],         [:û]),
   ])
   scalar && append!(ops, [
     Op("build E_κ",       Symbol[],           [:fac]),
     Op("φ̂* predictor",   [:φ̂, :sb_nl],      [:φstar_spec]),
     Op("rotate φ̂*",      [:φstar_spec, :fac],[:φstar_spec]),
+    Op("rotate N̂_φ,1",   [:sb_nl, :fac],     [:sb_nl]),
+    Op("rotate φ̂",       [:φ̂, :fac],        [:φ̂]),
   ])
   append!(ops, _recoveries(:ustar_spec))
   append!(ops, _velocity_assembly(:ustar_spec, :ustar, :ωstar, :stage2; phase_shift))
   scalar && append!(ops, _scalar_assembly(:ustar_spec, :φstar_spec, :ustar, :sb_stage2; phase_shift))
   append!(ops, [
-    Op("build E_ν",       Symbol[],           [:fac]),
-    Op("rotate N̂_u,1",   [:nl, :fac],        [:nl]),
-    Op("rotate û",        [:û, :fac],         [:û]),
     Op("û corrector 1",   [:û, :nl],          [:û]),
     Op("û corrector 2",   [:û, :stage2],      [:û]),
   ])
   scalar && append!(ops, [
-    Op("build E_κ",       Symbol[],           [:fac]),
-    Op("rotate N̂_φ,1",   [:sb_nl, :fac],     [:sb_nl]),
-    Op("rotate φ̂",       [:φ̂, :fac],        [:φ̂]),
     Op("φ̂ corrector 1",  [:φ̂, :sb_nl],      [:φ̂]),
     Op("φ̂ corrector 2",  [:φ̂, :sb_stage2],  [:φ̂]),
   ])

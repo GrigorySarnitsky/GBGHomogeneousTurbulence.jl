@@ -323,3 +323,19 @@ actively check for it.
   policy's "a plausible 'X is just Y' is false until the expansion matches", applied to code shapes and
   backend surfaces, not only docstrings. Instances (2026-07-19, both caught by PF's triage): the missed
   free win at `Generator.jl` 253–254; the item-7 phase-shift consumer misclaim.
+- **Treating what is *in place* as evidence it should be so — dismissing a flagged cost instead of
+  challenging it or asking.** When a finding surfaces a cost that is already *recorded* — a frozen audit
+  delta, a decision-logged tradeoff, an existing buffer — I default to closing it as "deliberate /
+  accepted / off-axis," treating the record as the justification. But **a frozen audit cell measures
+  what *is*, not what *should be*:** a recorded cost with no *lower bound* held against it is an
+  unexamined cost, not a minimal one. This is the audit-coverage sibling of the fusion-bound
+  complacency — "achieved = bound" certified nothing because the bound was not the physical floor — and
+  of invariant 3. The rule: **before dismissing a finding as acceptable, either produce the lower bound
+  that proves it minimal, or ask the user** — never close it by pointing at the existing arrangement,
+  and never let "it's already recorded / it was done to get things working" stand as a reason. Instance
+  (2026-07-25): dismissing the Lagrangian tracer's full-field ``\boldsymbol u(t_n)`` copy — an ``N^3``
+  resident buffer plus a per-step ``N^3`` copy serving an ``M\times3`` interpolation need — as "a
+  consciously-accepted tradeoff already frozen in both audits," when the freeze *records* the cost with
+  no bound challenging it and the ``N^3``-for-``M\times3`` spend violates the "minimal footprint trumps
+  compute" invariant. The user: "Stop taking what is in place as an indication that it should be like
+  that. Probably you should ask before you dismiss something."

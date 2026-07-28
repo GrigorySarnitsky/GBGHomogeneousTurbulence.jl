@@ -293,14 +293,23 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
     scalar_rhs!(sb.stage1, generator, û, φ̂, u, sb.field, domain)                 # N̂_φ,1
   end
 
-  # predictors û*, φ̂*
+  # Predictors û*, φ̂*, and the corrector's integrating-factor rotations banked in the same visit.
+  # Every use of a field's ℰ over the whole step is at the one substep Δt, so each factor is built
+  # ONCE and all four of its consumers run while it occupies the single register: ûₙ and N̂_u,1 are
+  # rotated here rather than after stage 2 (neither is read by the stage-2 assembly, which works off
+  # the predictor), which halves the factor builds without a second register. The rotations follow
+  # the predictor combination, which needs ûₙ and N̂_u,1 unrotated.
   velocity_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_ν
   combine!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1)                      # û* ← ûₙ + Δt N̂_u,1
   convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, buffers.integrating_factor)
+  convolve!(buffers.stage1, buffers.stage1, buffers.integrating_factor)                          # E_ν N̂_u,1
+  convolve!(û, û, buffers.integrating_factor)                                                    # E_ν ûₙ
   if has_scalar
     scalar_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_κ
     combine!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1)                                       # φ̂* ← φ̂ₙ + Δt N̂_φ,1
     convolve!(sb.star_spectral, sb.star_spectral, buffers.integrating_factor)
+    convolve!(sb.stage1, sb.stage1, buffers.integrating_factor)                                  # E_κ N̂_φ,1
+    convolve!(φ̂, φ̂, buffers.integrating_factor)                                                  # E_κ φ̂ₙ
   end
 
   # stage 2 — right-hand sides at the predictor state
@@ -312,18 +321,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
     scalar_rhs!(sb.stage2, generator, buffers.velocity_star_spectral, sb.star_spectral, buffers.velocity_star, sb.field, domain)       # N̂_φ,2
   end
 
-  # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
-  velocity_factor!(buffers.integrating_factor, generator, domain, dt)
-  convolve!(buffers.stage1, buffers.stage1, buffers.integrating_factor)
-  convolve!(û, û, buffers.integrating_factor)
+  # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2) — both rotated halves already banked
   combine!(û, one(T), û, half, buffers.stage1)                                             # ûₙ₊₁ += (Δt/2)(E_ν N̂_u,1 + N̂_u,2)
   combine!(û, one(T), û, half, buffers.stage2)
 
   # scalar update: φ̂ₙ₊₁ = E_κ φ̂ₙ + (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
   if has_scalar
-    scalar_factor!(buffers.integrating_factor, generator, domain, dt)
-    convolve!(sb.stage1, sb.stage1, buffers.integrating_factor)
-    convolve!(φ̂, φ̂, buffers.integrating_factor)
     combine!(φ̂, one(T), φ̂, half, sb.stage1)                                  # φ̂ₙ₊₁ += (Δt/2)(E_κ N̂_φ,1 + N̂_φ,2)
     combine!(φ̂, one(T), φ̂, half, sb.stage2)
   end
