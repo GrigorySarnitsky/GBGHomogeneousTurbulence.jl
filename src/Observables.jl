@@ -49,14 +49,55 @@ kinetic_energy(u) = 0.5 * inner(u, u)
 
 """
     dissipation(ω, viscosity)
+    dissipation(û, domain, viscosity)
 
-The mean kinetic-energy dissipation rate of a homogeneous flow,
-``\\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, from the physical
-`ω` ``\\boldsymbol{\\omega}`` and the kinematic `viscosity` ``\\nu`` (the homogeneous
-identity ``\\varepsilon = 2\\nu\\langle S_{ij}S_{ij}\\rangle = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``,
-with the strain-rate tensor ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``).
+The mean kinetic-energy dissipation rate of a homogeneous flow — a single number, not a field — at
+the kinematic `viscosity` ``\\nu``:
+
+```math
+\\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle
+            = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
+```
+
+the two forms equal for a homogeneous flow, with the strain-rate tensor
+``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
+
+Two routes to the same rate; take the one whose input is already in hand.
+
+  * `dissipation(ω, viscosity)` — from a vorticity field `ω` ``\\boldsymbol{\\omega}`` in either
+    representation, as the normalized inner product (Parseval). Use it when
+    ``\\boldsymbol{\\omega}`` exists for its own sake: the observation cache's chart, or a vorticity
+    the caller supplies.
+  * `dissipation(û, domain, viscosity)` — straight from the velocity in spectral representation `û`
+    ``\\hat{\\boldsymbol{u}}``, with the [`FixedDomain`](@ref) `domain` supplying the multiplier, and
+    no vorticity formed at all. Use it to measure off the state, where a
+    ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
+
+The second route trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral
+inner product against the `domain.squared_wavenumber_kernel` multiplier: from
+
+```math
+\\lvert\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}\\rvert^{2}
+  = \\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}
+  - \\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2},
+```
+
+the enstrophy of a divergence-free velocity is its Dirichlet (``H^{1}``) energy,
+``\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = \\langle\\hat{\\boldsymbol{u}},\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat{\\boldsymbol{u}}\\rangle``.
+
+!!! warning
+    The `û` route drops the ``\\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2}``
+    term, so it holds only for a divergence-free velocity — exact for a state advanced by the
+    Leray-projected dynamics, wrong for an arbitrary vector field. The vorticity route carries no
+    such condition. (The scalar twin, [`scalar_dissipation`](@ref), is unconditional: a scalar has
+    no solenoidal constraint to invoke.)
 """
+function dissipation end
+
 dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
+
+dissipation(û, domain::FixedDomain, viscosity::Real) =
+  viscosity * weighted_inner(û, domain.squared_wavenumber_kernel)
 
 
 """
@@ -92,8 +133,9 @@ The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle`` — a
 ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral inner product against the
 `domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
-physical gradient ``\\nabla\\varphi`` materialized (unlike the velocity dissipation's cached
-``\\boldsymbol{\\omega}``, ``\\nabla\\varphi`` is not otherwise formed by the scalar right-hand side).
+physical gradient ``\\nabla\\varphi`` materialized. It is the scalar twin of
+[`dissipation`](@ref)'s spectral route, and unconditional where that one needs a divergence-free
+velocity.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
   2 * diffusivity * weighted_inner(φ̂, domain.squared_wavenumber_kernel)

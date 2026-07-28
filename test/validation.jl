@@ -1,6 +1,6 @@
 using Test
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: curl!
+using GBGPeriodicFields: curl!, field_data
 using GBGIsotropicTurbulence.Phenomenology
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 
@@ -30,6 +30,26 @@ end
   @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity) / 3)
   @test fp.integral_scale ≈ integral_scale(SIM.state.velocity, SIM.domain)
   @test taylor_reynolds(fp) > 0
+end
+
+
+@testset "dissipation — the vorticity and Dirichlet routes, and the condition between them" begin
+  # ε = ν⟨|ω|²⟩ from a formed curl versus ν⟨û,|κ|²û⟩ straight from the velocity. The two agree
+  # because |κ×û|² = |κ|²|û|² − |κ·û|² and the projected dynamics keeps κ·û = 0 — so the second
+  # route is exact on any state the solver produces, and the run layer measures ε through it.
+  ν = SIM.generator.conditions.viscosity
+  ω̂ = spectral_vector(SIM.domain)
+  curl!(ω̂, SIM.state.velocity, SIM.domain.multipliers)
+  @test dissipation(SIM.state.velocity, SIM.domain, ν) ≈ dissipation(ω̂, ν) rtol = 1e-12
+
+  # The discarded term is not vacuous: break the solenoidal condition and the routes part company.
+  # This is the negative control behind the docstring's warning — the Dirichlet route is a claim
+  # about divergence-free fields, not an identity for an arbitrary vector field.
+  û = spectral_vector(SIM.domain)
+  copyto!(field_data(û), field_data(SIM.state.velocity))
+  @views field_data(û)[:, :, :, 1] .*= 2                     # no longer divergence-free
+  curl!(ω̂, û, SIM.domain.multipliers)
+  @test !isapprox(dissipation(û, SIM.domain, ν), dissipation(ω̂, ν); rtol = 1e-3)
 end
 
 

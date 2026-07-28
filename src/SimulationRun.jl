@@ -28,7 +28,7 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
-using ..State: ResolvedFields, DerivedFields, spectral_scratch, random_solenoidal_velocity!, random_scalar!
+using ..State: ResolvedFields, DerivedFields, random_solenoidal_velocity!, random_scalar!
 import ..State: physical_velocity, physical_vorticity, resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness, max_speed
@@ -251,9 +251,7 @@ laws do not apply).
 """
 function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim.state.velocity)
-  ω̂ = spectral_scratch(sim.derived)
-  curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
+  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
   εφ = sim.state.scalar === nothing ? NaN :
     scalar_dissipation(sim.state.scalar, sim.domain, sim.generator.conditions.viscosity / sim.generator.conditions.schmidt)
   FlowParameters(; viscosity = sim.generator.conditions.viscosity, dissipation = ε,
@@ -319,9 +317,7 @@ current_step(sim::Simulation) = sim.clock.step
 # The eddy-turnover time τ = k/ε from the current diagnostics — the clock warm-up and run budgets
 # count in units of it.
 function _turnover_time(sim::Simulation)
-  ω̂ = spectral_scratch(sim.derived)
-  curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
+  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
   return ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
 end
 
@@ -508,9 +504,7 @@ end
 # transforms) and test.
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
-  ω̂ = spectral_scratch(sim.derived)
-  curl!(ω̂, sim.state.velocity, sim.domain.multipliers)
-  ε = dissipation(ω̂, sim.generator.conditions.viscosity)
+  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
   φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
   S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
