@@ -11,6 +11,13 @@ using Random
 using Test
 
 
+# A forcing that implements the rate hook but forgets to declare it — the mistake the constructor
+# guard exists to catch (defined at top level: a struct cannot be declared inside a testset body).
+struct UndeclaredRateForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, field,
+                                                 domain::FixedDomain) = (rate .= 1; true)
+
+
 @testset "forcing" begin
   T = Float64
   N = 24
@@ -133,5 +140,29 @@ using Test
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
+  end
+
+  @testset "a rate array exists exactly where a forcing declares one" begin
+    # The storage tracks the physics: only a forcing that drives its field through a linear per-mode
+    # rate gets an A(κ) array. A post-step projection (BandRescaling — the run layer's default), a
+    # stochastic source, and no forcing at all carry none.
+    rate_driven = (Linear(domain; rate = 0.5), ConstantPower(domain; target = 0.1))
+    other = (NoForcing(), BandRescaling(domain; target = 0.5),
+             StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
+    generator(f) = ResolvedGenerator(domain, FlowConditions(; viscosity = ν, schmidt = 1.0,
+                     velocity_forcing = f, scalar_forcing = NoForcing()); scalar = false)
+
+    for f in rate_driven
+      @test uses_linear_rate(f)
+      @test generator(f).velocity_rate !== nothing
+    end
+    for f in other
+      @test !uses_linear_rate(f)
+      @test generator(f).velocity_rate === nothing
+    end
+
+    # The declaration is a contract, and breaking it is loud: a forcing that fills a rate without
+    # declaring one would be handed nothing and go silently unapplied, so construction rejects it.
+    @test_throws ArgumentError generator(UndeclaredRateForcing())
   end
 end

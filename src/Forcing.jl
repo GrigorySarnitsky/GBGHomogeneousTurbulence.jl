@@ -19,7 +19,8 @@
 
 The interchangeable energy-injection strategies, concrete `AbstractForcing` subtypes. A strategy acts on
 the step through up to four methods, each defaulting to doing nothing:
-- [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor.
+- [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor;
+  [`uses_linear_rate`](@ref) declares that a forcing supplies one.
 - [`apply_forcing!`](@ref) — a post-step projection or rescale.
 - [`prepare_forcing!`](@ref) — a per-step internal-state advance.
 - [`add_forcing_source!`](@ref) — an additive per-stage source.
@@ -41,7 +42,7 @@ using Random
 using ..SimulationDomain: FixedDomain, scalar_spectral, spectral_vector, scalar_physical, physical_vector
 
 export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,
-       set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
+       set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 
 """
@@ -92,6 +93,22 @@ rate. The `field` is the start-of-step field in spectral representation; `domain
 [`FixedDomain`](@ref).
 """
 set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = false
+
+
+"""
+    uses_linear_rate(forcing) -> Bool
+
+Whether `forcing` drives its field through a linear per-mode rate — that is, whether it implements
+[`set_forcing_rate!`](@ref). `false` by default; a forcing that does implement the hook **must**
+declare it `true`.
+
+The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only for a forcing that
+declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
+storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`, not an
+optimization: a forcing that fills a rate without declaring one is never given an array to fill, and
+the constructor rejects it rather than let the forcing go silently unapplied.
+"""
+uses_linear_rate(::AbstractForcing) = false
 
 
 """
@@ -226,6 +243,8 @@ function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, high
   return Linear(mask, float(rate))
 end
 
+uses_linear_rate(::Linear) = true
+
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
   T = eltype(rate)
   rate .= T(forcing.rate) .* forcing.mask
@@ -255,6 +274,8 @@ function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer 
   mask = real.(field_data(band))
   return ConstantPower(band, mask, float(target))
 end
+
+uses_linear_rate(::ConstantPower) = true
 
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = eltype(rate)

@@ -39,7 +39,8 @@ using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, Pha
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing,
-                 set_forcing_rate!, apply_forcing!, prepare_forcing!, add_forcing_source!
+                 set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
+                 add_forcing_source!
 
 export FlowConditions, ResolvedGenerator,
        prepare!, velocity_rhs!, scalar_rhs!, velocity_factor!, scalar_factor!, finalize!
@@ -103,8 +104,30 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
 end
 
 
-_forcing_rate(domain::FixedDomain) =
-  fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+# A rate array exists only for a forcing that declares one — the storage tracks the physics, not the
+# possibility of it. A forcing that fills a rate without declaring it would be handed `nothing` and go
+# silently unapplied, so that mismatch is a construction-time error rather than a wrong quiet run.
+function _forcing_rate(domain::FixedDomain, forcing)
+  if !uses_linear_rate(forcing)
+    _overrides_rate_hook(forcing) &&
+      throw(ArgumentError("$(nameof(typeof(forcing))) implements set_forcing_rate! but does not " *
+                          "declare uses_linear_rate(::$(nameof(typeof(forcing)))) = true, so it " *
+                          "would be given no rate array to fill and would never be applied"))
+    return nothing
+  end
+  return fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+end
+
+# Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
+# fallback? An unresolvable lookup (an ambiguity against the fallback) can only arise from a method
+# the forcing itself added, so it answers yes.
+_overrides_rate_hook(forcing) =
+  try
+    which(set_forcing_rate!, Tuple{typeof(forcing), Any, Any, FixedDomain}) !==
+      which(set_forcing_rate!, Tuple{AbstractForcing, Any, Any, FixedDomain})
+  catch
+    true
+  end
 
 
 """
@@ -131,7 +154,9 @@ run). The `Simulation` front door builds one for you.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``
-  ([`prepare!`](@ref) fills them; `scalar_rate` is `nothing` for a scalar-free generator).
+  ([`prepare!`](@ref) fills them). Each is `nothing` unless that field's forcing declares
+  `uses_linear_rate`, so a field driven by a post-step projection, a stochastic source, or nothing at
+  all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `velocity_rate_active`, `scalar_rate_active` — whether [`prepare!`](@ref) armed each rate this step.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PP, PS, PB, RK, SR}
@@ -149,7 +174,8 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
   ResolvedGenerator(conditions,
                     physical_vector(domain), spectral_vector(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
-                    _forcing_rate(domain), scalar ? _forcing_rate(domain) : nothing,
+                    _forcing_rate(domain, conditions.velocity_forcing),
+                    scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
                     false, false)
 
 
@@ -166,7 +192,7 @@ stages; the stage evaluations and the integrating factors then consume what it p
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
   conditions = generator.conditions
   prepare_forcing!(conditions.velocity_forcing, state.velocity, domain, dt)
-  generator.velocity_rate_active =
+  generator.velocity_rate_active = generator.velocity_rate === nothing ? false :
     set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity, domain)
   if state.scalar !== nothing
     prepare_forcing!(conditions.scalar_forcing, state.scalar, domain, dt)

@@ -31,11 +31,14 @@ DeferredForcing
 ## Forcing methods
 
 The four step methods a strategy may implement (each a no-op by default), listed in the order `step!`
-fires them.
+fires them, followed by the trait that declares a strategy supplies a linear rate — part of
+implementing `set_forcing_rate!`, since the generator allocates a rate array only where one is
+declared.
 
 ```@docs
 prepare_forcing!
 set_forcing_rate!
 add_forcing_source!
 apply_forcing!
+uses_linear_rate
 ```

@@ -99,19 +99,23 @@ end
 # The frozen BASE table — unforced (NoForcing/NoForcing), tracer-free. A deliberate footprint change
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar, rate.
+# The rate column is ZERO throughout, and the zero is the point (2026-07-28, decision 35): a rate
+# array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
+# default configuration, whose BandRescaling is a post-step projection — carries none. It used to
+# read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 2),
-  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 2),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 1),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, rate = 2),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
-  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 1),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 2),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 1),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, rate = 2),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, rate = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, rate = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, rate = 0),
 )
 
 # The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)
@@ -119,11 +123,14 @@ const BASE = Dict(
 _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
   tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
-  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, rate = 1) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 1) :
+  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, rate = 2) :
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 2) :
   slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
                        (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, rate = 0)
 # (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
+# The two rate-driven forcings carry TWO rate-shaped arrays each: their own band mask, and the
+# generator's rate array — which now exists precisely because such a forcing is present, so the
+# storage appears on the axis that causes it instead of unconditionally in the base.
 
 # Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
 # and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the
