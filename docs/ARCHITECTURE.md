@@ -1228,6 +1228,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     a benchmark empiric — correct for *achieved* bandwidth, wrong for the *count*, which is a static
     property of the schedule and belongs with the other ledgers.
 
+    The instrument is `test/optimality_audit.jl`, projecting the same op model the two ledgers do.
+    It carries the **holder register** — every named holder, its cause, and its disposition — and
+    enforces the discipline in both directions: an unclaimed gap fails, and so does a **stale
+    holder**, one whose gap has been closed everywhere, so retiring it is part of taking the win. It
+    also splits the pass gap into its two tiers, which have different owners: *achieved − bound* is
+    unused fusion (kernel granularity), while *bound − floor* is the traffic that exists only
+    because the per-mode symbols are materialized as ``N^{3}`` arrays. The split is diagnostic — the
+    spectral-vector class is entirely the first tier (its bound already sits at its floor), and the
+    rate class entirely the second (already perfectly fused, yet every unit of it is
+    ``\lvert\boldsymbol{\kappa}\rvert^{2}`` swept once per integrating-factor build), so a lazy
+    per-mode symbol apply would delete that class outright and do nothing for the other.
+
+    On the synchronization axis the default configuration issues **three** blocking readbacks per
+    step — the CFL speed bound, and `BandRescaling`'s band and whole-field observables — against a
+    floor of **one**. Only the timestep's is irreducible; a forcing's scalar is consumed by the very
+    next kernel and visits the host only because it is written as a Julia number.
+
     First fruits, each verified and each retiring its holder rather than recording it: the tracer
     push no longer retains a start-of-step velocity **field** (§4.6) — an ``N^{3}\times3`` resident
     buffer and per-step copy serving an ``M\times3`` interpolation, which the ledgers had faithfully

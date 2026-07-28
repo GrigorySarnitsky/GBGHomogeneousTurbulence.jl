@@ -5,6 +5,11 @@
 #     per shape class, the lower bound on the resident registers the operation order needs.
 #   * test/compute_audit.jl — the COST projection: the per-step transform counts and memory-pass
 #     counts (the frozen compute ledger, its minimality bounds, and the fusion gap register).
+#   * test/optimality_audit.jl — the FLOOR projection (decision 35): the synchronization ledger and
+#     the cross-axis holder register, which needs the same cost model the compute audit projects.
+#
+# The cost model at the foot of this file (OP_COST and the transform / pass / fusion-bound
+# projections) lives here rather than in one audit because two now share it.
 #
 # Every op is transcribed from the step! bodies and the generator protocol (src/Propagator.jl,
 # src/Generator.jl, the src/State.jl recoveries, the src/Forcing.jl hooks) — re-derive on any change
@@ -261,3 +266,156 @@ function peak_liveness(ops)
   end
   return NamedTuple{CLASSES}(Tuple(peaks[class] for class in CLASSES))
 end
+
+
+# ---------------------------------------------------------------- the op cost model
+
+# One cost entry per op NAME: its kind (:transform / :reduction / :pointwise / :noop), its
+# scalar-equivalent transform counts, and the field-scale configuration arrays it reads beyond its
+# symbolic operands (`extra`, by shape class): the dealias kernel and the translation kernels are
+# complex scalar-shaped fields (spectral_scalar), |κ|² and the forcing-rate arrays are real
+# spectral-shaped (rate). O(N) configuration (the axis multipliers, shell vectors) is ignored, as in
+# the memory ledger. A transform's own input/output traffic lives inside the transform count — the
+# FFT's internal passes are FFTW's, not this schedule's.
+_ex(; kw...) = merge(ZERO, NamedTuple(kw))
+_cost(kind; c2r = 0, r2c = 0, extra = ZERO) = (kind = kind, c2r = c2r, r2c = r2c, extra = extra)
+
+const OP_COST = Dict(
+  # transforms — the FFT currency
+  "flux→spectral"      => _cost(:transform; r2c = 3),
+  "noise→spectral"     => _cost(:transform; r2c = 3),
+  "u recovery"         => _cost(:transform; c2r = 3),
+  "ω recovery"         => _cost(:transform; c2r = 3),
+  "u chart recovery"   => _cost(:transform; c2r = 3),
+  "ω chart recovery"   => _cost(:transform; c2r = 3),
+  "shifted u recovery" => _cost(:transform; c2r = 3),
+  "shifted ω recovery" => _cost(:transform; c2r = 3),
+  "φ recovery"         => _cost(:transform; c2r = 1),
+  "shifted φ recovery" => _cost(:transform; c2r = 1),
+  # reductions — a fusion barrier like a transform (the scalar result gates the next kernel), but
+  # the read passes are real and irreducible
+  "normalize"          => _cost(:reduction),
+  # pointwise ops with a field-scale configuration read
+  "dealias"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "shift û"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "shift φ̂"           => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "shift-back average" => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "band-limit"         => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
+  "build E_ν"          => _cost(:pointwise; extra = _ex(rate = 1)),
+  "build E_κ"          => _cost(:pointwise; extra = _ex(rate = 1)),
+  # the unforced finalize is a no-op (the forcing deltas price the real hooks)
+  "finalize"           => _cost(:noop),
+)
+# Plain pointwise ops — passes are their symbolic reads and writes alone. ("project noise" prices
+# the aliased-projection CONTRACT; that the aliased path allocates today is the episode ledger's
+# recorded defect, raised to GBGPeriodicFields.)
+for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl û", "shifted curl",
+             "cross u×ω", "Leray projection", "divergence", "flux uφ",
+             "seed hu", "seed hφ", "accumulate hu", "accumulate hφ", "û += B·hu", "φ̂ += B·hφ",
+             "rotate û", "rotate hu", "rotate φ̂", "rotate hφ", "rotate û*", "rotate φ̂*",
+             "rotate N̂_u,1", "rotate N̂_φ,1", "û* predictor", "φ̂* predictor",
+             "û corrector 1", "û corrector 2", "φ̂ corrector 1", "φ̂ corrector 2",
+             "draw noise", "project noise", "rescale ξ", "f̂ ← θf̂ + sξ", "add OU source")
+  OP_COST[name] = _cost(:pointwise)
+end
+
+_op_cost(op) = get(OP_COST, op.name) do
+  error("unpriced op \"$(op.name)\" — a new or renamed op needs an OP_COST entry in the same commit")
+end
+
+
+function _transforms(ops)
+  c2r = 0
+  r2c = 0
+  for op in ops
+    cost = _op_cost(op)
+    c2r += cost.c2r
+    r2c += cost.r2c
+  end
+  return (c2r = c2r, r2c = r2c)
+end
+
+function _passes(ops)
+  acc = Dict(class => 0 for class in CLASSES)
+  for op in ops
+    cost = _op_cost(op)
+    (cost.kind === :transform || cost.kind === :noop) && continue
+    for v in Iterators.flatten((op.reads, op.writes))
+      acc[VALUE_CLASS[v]] += 1
+    end
+    for class in CLASSES
+      acc[class] += getproperty(cost.extra, class)
+    end
+  end
+  return NamedTuple{CLASSES}(Tuple(acc[class] for class in CLASSES))
+end
+
+# The fused ideal per between-barriers segment: live-in values read once, live-out values written
+# once, each distinct configuration array read once; pure intermediates cost nothing. A reduction
+# contributes its (irreducible) read passes and breaks the segment.
+# `materialize_symbols = false` gives the PHYSICAL FLOOR rather than the fused ideal: it drops the
+# field-scale configuration reads (the dealias mask, the translation kernels, the |κ|² the factor
+# build sweeps) on the grounds that a per-mode symbol evaluated IN REGISTER from the O(N) axis
+# multipliers moves no field-scale memory at all. The difference between the two is therefore
+# exactly the traffic that exists only because those symbols are materialized as N³ arrays.
+function _fusion_bound(ops; materialize_symbols::Bool = true)
+  barrier(op) = (kind = _op_cost(op).kind; kind === :transform || kind === :reduction)
+  acc = Dict(class => 0 for class in CLASSES)
+  n = length(ops)
+  i = 1
+  while i <= n
+    if barrier(ops[i])
+      if _op_cost(ops[i]).kind === :reduction
+        for v in ops[i].reads
+          acc[VALUE_CLASS[v]] += 1
+        end
+      end
+      i += 1
+      continue
+    end
+    j = i
+    while j < n && !barrier(ops[j + 1])
+      j += 1
+    end
+    live_in = Set{Symbol}()
+    written = Set{Symbol}()
+    extras = Dict{String, NamedTuple}()
+    for k in i:j
+      op = ops[k]
+      cost = _op_cost(op)
+      cost.kind === :noop && continue
+      for v in op.reads
+        v in written || push!(live_in, v)
+      end
+      for v in op.writes
+        push!(written, v)
+      end
+      materialize_symbols && cost.extra !== ZERO && (extras[op.name] = cost.extra)
+    end
+    for v in live_in
+      acc[VALUE_CLASS[v]] += 1
+    end
+    for v in written
+      if v in CONTRACT_LIVE || any(k -> v in ops[k].reads, (j + 1):n)
+        acc[VALUE_CLASS[v]] += 1
+      end
+    end
+    for extra in values(extras), class in CLASSES
+      acc[class] += getproperty(extra, class)
+    end
+    i = j + 1
+  end
+  return NamedTuple{CLASSES}(Tuple(acc[class] for class in CLASSES))
+end
+
+
+# The audited configuration space, and the op list each cell projects.
+const DEALIASINGS = (:TwoThirds, :HouLi, :PhaseShift)
+
+_ops(scheme, dealiasing, scalar; ou = false) =
+  scheme === :RK3 ?
+    rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift, charts = true) :
+    rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift, charts = true)
+
+_evals(scheme)  = scheme === :RK3 ? 3 : 2     # right-hand-side evaluations per step
+_builds(scheme) = scheme === :RK3 ? 3 : 2     # integrating-factor builds per field per step

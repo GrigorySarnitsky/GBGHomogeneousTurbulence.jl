@@ -8,6 +8,7 @@ module VelocitySliceTests; include("velocity_slice.jl"); end
 module DerivedFieldsTests; include("derived_fields.jl"); end
 module MemoryAuditTests;   include("memory_audit.jl");   end
 module ComputeAuditTests;  include("compute_audit.jl");  end
+module OptimalityAuditTests; include("optimality_audit.jl"); end
 module DealiasingTests;    include("dealiasing.jl");     end
 module IntegratorsTests;   include("integrators.jl");    end
 module ScalarTests;        include("scalar.jl");         end
