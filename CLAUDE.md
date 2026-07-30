@@ -274,14 +274,18 @@ with no notation that drifts across the pair.
 
 - Load: `julia --project -e 'using GBGIsotropicTurbulence'`.
 - Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green. The suite includes three
-  audits over the shared op model in `test/audit_ops.jl` (which owns both the op lists and the cost
-  model): `test/memory_audit.jl` and `test/compute_audit.jl` **measure** — a deliberate footprint or
+  audits over the shared op model in `test/audit_ops.jl` (which owns the op lists, the cost model,
+  and the shape-class decomposition with its reflective counter): `test/memory_audit.jl` and
+  `test/compute_audit.jl` **measure** — a deliberate footprint or
   step-schedule change updates the frozen ledgers (and, on a structural `step!`/protocol change, the
   op lists — `AUDIT_PRINT=1` regenerates the compute cells for review) in the same commit, citing the
   decision — while `test/optimality_audit.jl` **bounds**: every cell is held against a physical
   floor, and residual distance must carry a named holder. Its register works in both directions, so
   closing a gap means **retiring its holder in the same commit**; a holder left behind fails the
-  suite just as an unclaimed gap does.
+  suite just as an unclaimed gap does. The memory audit ledgers the working set and the read-only
+  frame (the `FixedDomain`) **separately**, joined by a completeness test requiring their sum to
+  account for every field-scale array a live `Simulation` reaches — so new residency cannot hide by
+  hanging off an unwalked owner (decision 36).
 - Docs build: `julia --project=docs docs/make.jl` — `checkdocs = :exports` plus the two build lints
   (`lint_inline_math`, `lint_notation_variants`) must be clean. After a build, revert the transient
   dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list `docs/Manifest.toml`,

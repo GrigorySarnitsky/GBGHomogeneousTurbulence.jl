@@ -1129,7 +1129,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     seeding transients and the recorded per-call diagnostic allocations (invariant 4's exception,
     e.g. the derivative-skewness tensors) are *peak*-memory events a separate instrument would
     cover — and the **frame** (the domain's plans, multipliers, kernels) is excluded as shared,
-    combination-independent infrastructure, a constant offset rather than an axis. (c) **The episode
+    combination-independent infrastructure, a constant offset rather than an axis. *(That second
+    boundary was withdrawn by decision 36: constant in the combination space is not the same as
+    small, and the frame now carries a ledger of its own.)* (c) **The episode
     ledger** closes the resident-vs-peak gap: the hot loop is allocation-free (the step guards), so
     the stepping-phase peak *is* the resident ledger; outside it the transient episodes are few,
     sequential, and frozen in units of ``N^3`` reals with mechanical `@allocated` drift guards —
@@ -1236,7 +1238,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     unused fusion (kernel granularity), while *bound − floor* is the traffic that exists only
     because the per-mode symbols are materialized as ``N^{3}`` arrays. The split is diagnostic — the
     spectral-vector class is entirely the first tier (its bound already sits at its floor), and the
-    rate class entirely the second (already perfectly fused, yet every unit of it is
+    real-spectral-scalar class entirely the second (already perfectly fused, yet every unit of it is
     ``\lvert\boldsymbol{\kappa}\rvert^{2}`` swept once per integrating-factor build), so a lazy
     per-mode symbol apply would delete that class outright and do nothing for the other.
 
@@ -1256,6 +1258,50 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     unexploited because the guard would make the hot loop's schedule depend on a runtime value, and
     because the sound condition is *equal diffusivities and both linear rates unarmed*, never
     ``\mathrm{Sc} = 1`` alone.
+
+36. **(2026-07) The frame is ledgered too, and the two ledgers must jointly account for every
+    field-scale array.** Decision 33's ledger walked what a run **evolves** — the state, the
+    observation cache, the generator's assembly scratch, the integrator registers, the tracers. It
+    never walked the `FixedDomain`, the read-only **frame** the run lives on, so that storage was
+    outside every instrument: the audit claimed to bound residency while measuring only part of it.
+    The frame is not small. It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}``
+    as a real array, the same ``\lvert\boldsymbol{\kappa}\rvert^{2}`` again as the `weighted_inner`
+    weight, and the dealiasing kernel — 322.5 MiB at ``256^{3}`` in double precision, some 8 % on top
+    of the default working set, and 2.51 GiB at ``512^{3}``.
+
+    What made the omission urgent rather than untidy is where the incoming lazy per-mode symbol work
+    lands. The phase-shift translation kernels hang off the generator and were therefore *inside* the
+    old ledger, while the dealias mask and both copies of ``\lvert\boldsymbol{\kappa}\rvert^{2}`` sit
+    in the frame and were outside it — so of the materialized symbols a ``256^{3}`` `PhaseShift` run
+    carries, the instrument could see 44 %. It would have confirmed the smaller half of the win and
+    been structurally blind to the larger.
+
+    The two ledgers are kept **apart** because they answer different questions — the working set is
+    what the schedule needs live, the frame is what the discretization costs to have precomputed —
+    and are joined by a **completeness invariant**: their sum must account for every field-scale
+    array reachable from a live `Simulation`, cell by cell. That invariant, not the frame table, is
+    what keeps the hole shut, since it fails on new residency wherever it hangs. One exclusion is
+    **named** rather than left absent: a backend FFT plan's work area is owned by the vendor library,
+    reachable from no Julia field, and observable only by a device query, so it stays a benchmark-side
+    empiric.
+
+    The frame's floor is **zero** field-scale arrays — every entry is a closed-form function of the
+    ``O(N)`` per-axis multipliers — and here the floor is *demonstrated* rather than argued: the
+    audit reconstructs ``\lvert\boldsymbol{\kappa}\rvert^{2}`` as the outer sum of three axis
+    vectors, checks the Dirichlet weight against it exactly, and checks that each strategy's kernel
+    is constant on the level sets of ``\lvert\boldsymbol{\kappa}\rvert^{2}`` — sharp, smooth, and
+    spherical alike. A future frame entry carrying genuine ``N^{3}`` information will fail those
+    reconstructions and move the floor.
+
+    Two findings the ledger surfaced the first time it ran, both claimed by the existing symbol
+    holder and retiring with it: ``\lvert\boldsymbol{\kappa}\rvert^{2}`` is resident **twice** in two
+    element types, because `weighted_inner` takes a spectral-scalar-typed weight while the envelope
+    and integrating-factor broadcasts want the real array; and both spectral-scalar frame entries are
+    real-valued symbols held in **complex** containers, at twice their information content. The audit
+    op model's fifth shape class was renamed in the same step — a class holding
+    ``\lvert\boldsymbol{\kappa}\rvert^{2}`` and the dealias mask cannot be called `rate` for one of
+    its occupants, and the frame table would have reported a nonzero rate cell for a domain that
+    carries no forcing at all.
 
 ---
 

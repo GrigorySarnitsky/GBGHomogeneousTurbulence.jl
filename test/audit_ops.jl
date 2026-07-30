@@ -8,8 +8,10 @@
 #   * test/optimality_audit.jl — the FLOOR projection (decision 35): the synchronization ledger and
 #     the cross-axis holder register, which needs the same cost model the compute audit projects.
 #
-# The cost model at the foot of this file (OP_COST and the transform / pass / fusion-bound
-# projections) lives here rather than in one audit because two now share it.
+# Two things beyond the op lists live here because more than one audit needs them: the class
+# decomposition with its reflective counter (immediately below — it is the operational definition of
+# CLASSES, and all three audits measure residency through it), and the cost model at the foot of the
+# file (OP_COST and the transform / pass / fusion-bound projections, shared by the latter two).
 #
 # Every op is transcribed from the step! bodies and the generator protocol (src/Propagator.jl,
 # src/Generator.jl, the src/State.jl recoveries, the src/Forcing.jl hooks) — re-derive on any change
@@ -17,13 +19,62 @@
 # an op's NAME keys its cost entry (compute_audit.jl's OP_COST), so a renamed or added op must get a
 # cost entry in the same commit.
 #
-# Both audits share the file by `include` into their own wrapper modules, so each stays runnable on
-# its own (`julia --project=. test/<audit>.jl`).
+# All three audits share the file by `include` into their own wrapper modules, so each stays
+# runnable on its own (`julia --project=. test/<audit>.jl`).
+
+using Random     # the reflective counter below skips a random stream's O(1) internal state
 
 const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :real_spectral_scalar)
 
 const ZERO = NamedTuple{CLASSES}((0, 0, 0, 0, 0))
 _add(a, b) = NamedTuple{CLASSES}(Tuple(getproperty(a, c) + getproperty(b, c) for c in CLASSES))
+
+
+# ---------------------------------------------------------------- the class decomposition, applied
+
+# Which class an array belongs to, and the reflective walk that counts a value's field-scale storage
+# by class. This is the operational definition of CLASSES above — the residency measurements of both
+# the working-set ledger and the frame ledger (memory_audit.jl) and the frame floor
+# (optimality_audit.jl) run through it — so it lives beside the class list rather than in one audit.
+shape_class(a::AbstractArray, N) =
+  eltype(a) <: Complex ? (ndims(a) == 4 ? :spectral_vector : :spectral_scalar) :
+                         (ndims(a) == 4 ? :physical_vector :
+                          (size(a, 1) == N ? :physical_scalar : :real_spectral_scalar))
+
+# Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
+# aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
+# stream's internal state is O(1) constant memory, not field-scale working memory — skipped, so the
+# audit's tiny N does not misread it as a buffer.
+function collect_field_arrays!(acc, x, seen, N)
+  x === nothing && return acc
+  x isa Random.AbstractRNG && return acc
+  if x isa AbstractArray
+    if length(x) >= N^3 ÷ 2 && !(objectid(x) in seen)
+      push!(seen, objectid(x))
+      push!(acc, x)
+    end
+  elseif isstructtype(typeof(x)) && !(x isa Function) && !(x isa Type)
+    objectid(x) in seen && return acc
+    push!(seen, objectid(x))
+    for name in fieldnames(typeof(x))
+      isdefined(x, name) && collect_field_arrays!(acc, getfield(x, name), seen, N)
+    end
+  end
+  return acc
+end
+
+_counts(owners, N) = begin
+  acc = AbstractArray[]
+  seen = Set{UInt}()
+  for owner in owners
+    collect_field_arrays!(acc, owner, seen, N)
+  end
+  counts = Dict(class => 0 for class in CLASSES)
+  for a in acc
+    counts[shape_class(a, N)] += 1
+  end
+  NamedTuple{CLASSES}(Tuple(counts[class] for class in CLASSES))
+end
 
 
 # One primitive field operation of a step: what it reads, what it writes.

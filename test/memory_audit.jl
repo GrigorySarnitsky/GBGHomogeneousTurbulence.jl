@@ -1,18 +1,27 @@
 # Memory audit — the enforcement of "minimal footprint" (ARCHITECTURE §9 invariant 4, decision 33).
 #
-# Two instruments, both run in the standard suite:
+# Three instruments, all run in the standard suite:
 #
-#  1. THE LEDGER — a reflective walk over every resident field-sized buffer a run owns, counted per
-#     shape class. The full combination space is a product of five axes — scheme × dealiasing ×
-#     scalar × (velocity forcing × scalar forcing) × tracers — and the footprint is COMPOSITIONAL:
-#     the frozen spec is the unforced, tracer-free BASE table (12 cells) plus a per-forcing DELTA
-#     table and a tracer DELTA, and an exhaustive sweep over the whole product (~360 combinations)
-#     asserts measured = base + deltas, cell by cell. Adding or removing a buffer anywhere fails the
-#     suite: a footprint change must be a conscious, recorded decision, never a drive-by. (The
-#     particle-integrator axis has one point today — the Heun pusher — so it enters as on/off;
-#     precision, backend, and the interpolation scheme change bytes, never counts.)
+#  1. THE WORKING-SET LEDGER — a reflective walk over every resident field-sized buffer a run
+#     EVOLVES, counted per shape class. The full combination space is a product of five axes —
+#     scheme × dealiasing × scalar × (velocity forcing × scalar forcing) × tracers — and the
+#     footprint is COMPOSITIONAL: the frozen spec is the unforced, tracer-free BASE table (12 cells)
+#     plus a per-forcing DELTA table and a tracer DELTA, and an exhaustive sweep over the whole
+#     product (~360 combinations) asserts measured = base + deltas, cell by cell. Adding or removing
+#     a buffer anywhere fails the suite: a footprint change must be a conscious, recorded decision,
+#     never a drive-by. (The particle-integrator axis has one point today — the Heun pusher — so it
+#     enters as on/off; precision, backend, and the interpolation scheme change bytes, never counts.)
 #
-#  2. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
+#  2. THE FRAME LEDGER — the same walk over what a run does NOT evolve: the read-only `FixedDomain`
+#     and its per-mode symbols. This storage sat outside every ledger until 2026-07-30 and is not
+#     small (322.5 MiB at 256³ / Float64, ~8 % on top of the default working set), so the audit
+#     claimed to bound residency while measuring only part of it. The two ledgers are kept apart
+#     because they answer different questions — the working set is what the schedule needs live, the
+#     frame is what the discretization costs to have precomputed — and a COMPLETENESS test then
+#     requires their sum to account for every field-scale array a live `Simulation` can reach, so
+#     nothing can fall between them again.
+#
+#  3. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
 #     from the step! bodies and the generator protocol, give every value a live range; the peak
 #     number of simultaneously live values per shape class is the LOWER BOUND on the buffers the
 #     implemented operation order needs. The gap register records achieved − bound per class with a
@@ -32,54 +41,15 @@ using Random
 using Test
 
 
-# The shared op model (CLASSES, Op, the step op lists, peak_liveness) — one source of truth for this
-# audit's liveness projection and test/compute_audit.jl's cost projection.
+# The shared op model (CLASSES, the class decomposition and its reflective counter, Op, the step op
+# lists, peak_liveness) — one source of truth for this audit's residency and liveness projections
+# and test/compute_audit.jl's cost projection.
 include("audit_ops.jl")
 
 const N_AUDIT = 8
 
 
-# ---------------------------------------------------------------- the reflective ledger
-
-shape_class(a::AbstractArray, N) =
-  eltype(a) <: Complex ? (ndims(a) == 4 ? :spectral_vector : :spectral_scalar) :
-                         (ndims(a) == 4 ? :physical_vector :
-                          (size(a, 1) == N ? :physical_scalar : :real_spectral_scalar))
-
-# Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
-# aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
-# stream's internal state is O(1) constant memory, not field-scale working memory — skipped, so the
-# audit's tiny N does not misread it as a buffer.
-function collect_field_arrays!(acc, x, seen, N)
-  x === nothing && return acc
-  x isa Random.AbstractRNG && return acc
-  if x isa AbstractArray
-    if length(x) >= N^3 ÷ 2 && !(objectid(x) in seen)
-      push!(seen, objectid(x))
-      push!(acc, x)
-    end
-  elseif isstructtype(typeof(x)) && !(x isa Function) && !(x isa Type)
-    objectid(x) in seen && return acc
-    push!(seen, objectid(x))
-    for name in fieldnames(typeof(x))
-      isdefined(x, name) && collect_field_arrays!(acc, getfield(x, name), seen, N)
-    end
-  end
-  return acc
-end
-
-_counts(owners, N) = begin
-  acc = AbstractArray[]
-  seen = Set{UInt}()
-  for owner in owners
-    collect_field_arrays!(acc, owner, seen, N)
-  end
-  counts = Dict(class => 0 for class in CLASSES)
-  for a in acc
-    counts[shape_class(a, N)] += 1
-  end
-  NamedTuple{CLASSES}(Tuple(counts[class] for class in CLASSES))
-end
+# ---------------------------------------------------------------- the working-set ledger
 
 # Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
 # one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
@@ -164,6 +134,39 @@ _build_forcing(tag, domain) =
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFRK2()
 const FORCING_TAGS = (:none, :band, :linear, :power, :ou)
+
+
+# ---------------------------------------------------------------- the frame ledger
+
+# The read-only frame the run lives on — the `FixedDomain` — measured with the same reflective walk.
+# It holds three field-scale arrays, and every one of them is a per-mode symbol: a closed-form
+# function of the O(N) per-axis multipliers, precomputed once and swept from memory thereafter.
+#
+#   |κ|² as a real array               → real_spectral_scalar   (the envelope, integrating-factor,
+#                                                                and HouLi-profile broadcasts, and
+#                                                                the `similar` storage template)
+#   |κ|² as a `weighted_inner` weight  → spectral_scalar        (the Dirichlet-energy route)
+#   the de-alias mask                  → spectral_scalar        (every strategy's kernel)
+#
+# Two things the cells make visible that no other surface stated. First, |κ|² is resident TWICE, in
+# two element types, because `weighted_inner` takes a spectral-scalar-typed weight while the
+# broadcasts want the real array — 193.5 MiB of one radial function at 256³ / Float64. Second, both
+# spectral-scalar entries are real-valued symbols in COMPLEX containers, so each costs 2× its
+# information content. Both are absorbed by a lazy per-mode symbol apply, which is why the frame's
+# floor (optimality_audit.jl) is zero field-scale arrays rather than three.
+#
+# The frame is invariant across the dealiasing strategy and the precision, and that invariance is
+# part of the assertion: every strategy's mask is one complex spectral scalar whatever its profile
+# (sharp, smooth, or spherical), and Float32 changes bytes, never counts.
+const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2,
+               physical_scalar = 0, real_spectral_scalar = 1)
+
+# Named exclusion, so it is recorded rather than merely absent: a backend FFT plan's work area is
+# owned by the vendor library (FFTW, rocFFT, cuFFT), reachable from no Julia field, and observable
+# only by a device query. Like the O(N) axis multipliers and shell vectors it is outside both
+# ledgers — but unlike them it is not small on GPU, so it belongs on the benchmark-side empirics
+# (decision 33's scope statement) rather than in this static projection.
+frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 
 # ---------------------------------------------------------------- the liveness audit
@@ -268,6 +271,47 @@ const EPISODE_UNITS = [
       counts = ledger(domains[:TwoThirds], _scheme(scheme), scalar, NoForcing(), NoForcing(), false; charts)
       @test counts == _add(BASE[(scheme, :TwoThirds, scalar)], _chart_delta(charts))
     end
+  end
+
+  @testset "frame ledger — the frozen per-mode symbols, invariant in strategy and precision" begin
+    for tag in (:TwoThirds, :HouLi, :PhaseShift), T in (Float64, Float32)
+      domain = FixedDomain(N_AUDIT, 2π; element_type = T, array_type = Array,
+                           dealiasing = tag === :TwoThirds ? TwoThirds() :
+                                        tag === :HouLi ? HouLi() : PhaseShift())
+      @test frame_ledger(domain) == FRAME
+    end
+    # The frame holds no field of the evolving classes: it is symbols, not state. Stating it
+    # separately keeps the three zeros above from reading as unfilled cells.
+    @test FRAME.spectral_vector == 0 && FRAME.physical_vector == 0 && FRAME.physical_scalar == 0
+
+    # The phase-shift translation kernels are frame-natured — built once from the grid spacing,
+    # never written again — but they hang off the generator's buffers, so the WORKING-SET ledger is
+    # where they appear (the +2 spectral scalars in every PhaseShift base cell). The split is by
+    # owner, not by nature, which is exactly why the completeness test below is the real closure.
+    @test BASE[(:RK3, :PhaseShift, false)].spectral_scalar -
+          BASE[(:RK3, :TwoThirds, false)].spectral_scalar == 2
+  end
+
+  @testset "no field-scale storage escapes both ledgers" begin
+    # The closure that keeps the frame hole shut. Walk a whole live `Simulation` — frame, state,
+    # observation cache, generator, integrator registers, tracers — and require the total to equal
+    # frame + working set, cell by cell. A future buffer that neither table names fails here
+    # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
+    for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
+        scalar in (false, true), tracers in (0, 4)
+      sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
+                       velocity_forcing = NoForcing(), integrator = _scheme(scheme),
+                       number_of_tracers = tracers, rng = MersenneTwister(1))
+      @test _counts((sim,), N_AUDIT) ==
+            _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
+                             tracers > 0 ? TRACER_DELTA : ZERO))
+    end
+
+    # And the configuration a user actually gets from the front door, forcing included: the default
+    # `Simulation` is RK3 × TwoThirds, velocity-only, band-rescaled over the total energy.
+    default = Simulation(domains[:TwoThirds]; viscosity = 0.1, rng = MersenneTwister(1))
+    @test _counts((default,), N_AUDIT) ==
+          _add(FRAME, _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:band, :velocity)))
   end
 
   @testset "tracer storage scales with M, not N" begin
