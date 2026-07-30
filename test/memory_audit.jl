@@ -22,7 +22,8 @@
 #     a step! body or the generator protocol changes — the ledger failing is the reminder.
 #
 # Shape classes (Float64 sizes per unit, in units of N³ reals): spectral_vector ≈ 3·(1+1/N),
-# physical_vector = 3, spectral_scalar ≈ 1+1/N, physical_scalar = 1, rate ≈ ½·(1+1/N).
+# physical_vector = 3, spectral_scalar ≈ 1+1/N, physical_scalar = 1,
+# real_spectral_scalar ≈ ½·(1+1/N) — the shape |κ|², the de-alias mask and a forcing rate all share.
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); audited for the re-add
@@ -43,7 +44,7 @@ const N_AUDIT = 8
 shape_class(a::AbstractArray, N) =
   eltype(a) <: Complex ? (ndims(a) == 4 ? :spectral_vector : :spectral_scalar) :
                          (ndims(a) == 4 ? :physical_vector :
-                          (size(a, 1) == N ? :physical_scalar : :rate))
+                          (size(a, 1) == N ? :physical_scalar : :real_spectral_scalar))
 
 # Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
 # aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
@@ -98,39 +99,41 @@ end
 
 # The frozen BASE table — unforced (NoForcing/NoForcing), tracer-free. A deliberate footprint change
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
-# decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar, rate.
+# decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar,
+# real_spectral_scalar.
 # The PhaseShift cells lost a physical vector on 2026-07-28 (decision 35): the displaced velocity is
 # recovered onto the generator's physical product scratch, which the primary evaluation has already
 # spent, instead of into a register of its own — legal because the cross-product and flux kernels read
 # each element's whole fiber before writing it. Verified against the padding oracle, unchanged.
-# The rate column is ZERO throughout, and the zero is the point (2026-07-28, decision 35): a rate
+# The real_spectral_scalar column is ZERO throughout, and the zero is the point (2026-07-28,
+# decision 35): a rate
 # array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
 # default configuration, whose BandRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, rate = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, rate = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 9, physical_scalar = 2, rate = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, rate = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, rate = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, rate = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 10, physical_scalar = 2, rate = 0),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 9, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 10, physical_scalar = 2, real_spectral_scalar = 0),
 )
 
 # The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)
 # kernels and masks for either slot; the OU's state and noise scratch take the forced field's shape.
 _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
-  tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
-  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, rate = 2) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, rate = 1) :
-  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, rate = 0) :
-                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, rate = 0)
+  tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0) :
+  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 2) :
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
+  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0) :
+                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0)
 # (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
 # Each rate-driven forcing carries the generator's rate array — which now exists precisely because
 # such a forcing is present, so the storage appears on the axis that causes it instead of
@@ -150,7 +153,7 @@ const TRACER_DELTA = ZERO
 # the physics; it is live at the API level (observation-only uses) and becomes a run axis when
 # per-component chart declarations or further charts land.
 _chart_delta(charts) = (spectral_vector = 0, physical_vector = length(charts) - 2,
-                        spectral_scalar = 0, physical_scalar = 0, rate = 0)
+                        spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0)
 
 _build_forcing(tag, domain) =
   tag === :none  ? NoForcing() :

@@ -203,7 +203,7 @@ const SYNC_LEDGER = (
   @testset "the two tiers have different owners" begin
     # The decomposition is informative, not decorative: it says WHICH change closes WHICH cost.
     # Spectral-vector traffic is entirely a fusion question — its bound already sits at its floor,
-    # so no lazy symbol would help it. The rate class is the mirror image: achieved sits exactly AT
+    # so no lazy symbol would help it. The real-spectral-scalar class is the mirror image: achieved sits AT
     # the fused bound (nothing to fuse) and the whole of it is |κ|² swept once per factor build, so
     # a lazy symbol deletes the class outright. Losing either property means the holders above have
     # stopped describing the code.
@@ -212,8 +212,8 @@ const SYNC_LEDGER = (
       bound = _fusion_bound(ops)
       floor = _fusion_bound(ops; materialize_symbols = false)
       @test bound.spectral_vector == floor.spectral_vector      # no materialized symbol in this class
-      @test floor.rate == 0                                     # …and this class is nothing else
-      @test _passes(ops).rate == bound.rate                     # already perfectly fused, still N³ traffic
+      @test floor.real_spectral_scalar == 0                                     # …and this class is nothing else
+      @test _passes(ops).real_spectral_scalar == bound.real_spectral_scalar                     # already perfectly fused, still N³ traffic
     end
   end
 

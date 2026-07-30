@@ -104,22 +104,22 @@ const TRANSFORM_GAP_HOLDERS = Dict(
 # commutes through the divergence contraction) — 2 spectral-vector passes fewer per evaluation.
 # RK2 cells re-frozen 2026-07-28 (decision 35): every use of a field's integrating factor over an
 # IFRK2 step is at the one substep Δt, so each factor is now built once and all of its consumers run
-# in that visit — 1 spectral-scalar write and 1 rate read fewer per field per step (verified
+# in that visit — 1 spectral-scalar write and 1 real-spectral-scalar read fewer per field per step (verified
 # bit-identical). This is the schedule-level half of the redundancy; the value-level half (at
 # Sc = 1 with both rates unarmed the two factors are the same field) stays a named floor holder.
 const PASSES_BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, rate = 3),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
-  (:RK3, :HouLi,      false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, rate = 3),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, rate = 6),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 84, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, rate = 3),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 102, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, rate = 6),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, rate = 1),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, rate = 2),
-  (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, rate = 1),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, rate = 2),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 10, physical_scalar = 0, rate = 1),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 63, physical_scalar = 4, rate = 2),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, real_spectral_scalar = 3),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, real_spectral_scalar = 6),
+  (:RK3, :HouLi,      false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, real_spectral_scalar = 3),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, real_spectral_scalar = 6),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 84, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, real_spectral_scalar = 3),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 102, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, real_spectral_scalar = 6),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, real_spectral_scalar = 1),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, real_spectral_scalar = 2),
+  (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, real_spectral_scalar = 1),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, real_spectral_scalar = 2),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 10, physical_scalar = 0, real_spectral_scalar = 1),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 63, physical_scalar = 4, real_spectral_scalar = 2),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).
@@ -185,14 +185,14 @@ function _forcing_pass_delta(tag, slot, scheme)
     return slot === :velocity ? _ex(spectral_vector = 3, spectral_scalar = 2) :
                                 _ex(spectral_scalar = 5)
   elseif tag === :linear
-    return _ex(rate = 2 + _builds(scheme))
+    return _ex(real_spectral_scalar = 2 + _builds(scheme))
   elseif tag === :power
-    return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1, rate = 2 + _builds(scheme)) :
-                                _ex(spectral_scalar = 2, rate = 2 + _builds(scheme))
+    return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1, real_spectral_scalar = 2 + _builds(scheme)) :
+                                _ex(spectral_scalar = 2, real_spectral_scalar = 2 + _builds(scheme))
   end
   return slot === :velocity ?
     _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1, spectral_scalar = 1) :
-    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1, rate = 0)
+    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1, real_spectral_scalar = 0)
 end
 
 # Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache (the pre-step read

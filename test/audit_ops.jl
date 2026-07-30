@@ -20,7 +20,7 @@
 # Both audits share the file by `include` into their own wrapper modules, so each stays runnable on
 # its own (`julia --project=. test/<audit>.jl`).
 
-const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :rate)
+const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :real_spectral_scalar)
 
 const ZERO = NamedTuple{CLASSES}((0, 0, 0, 0, 0))
 _add(a, b) = NamedTuple{CLASSES}(Tuple(getproperty(a, c) + getproperty(b, c) for c in CLASSES))
@@ -275,7 +275,8 @@ end
 # scalar-equivalent transform counts, and the field-scale configuration arrays it reads beyond its
 # symbolic operands (`extra`, by shape class): the dealias kernel and the translation kernels are
 # complex scalar-shaped fields (spectral_scalar), |κ|² and the forcing-rate arrays are real
-# spectral-shaped (rate). O(N) configuration (the axis multipliers, shell vectors) is ignored, as in
+# spectral-shaped (real_spectral_scalar). O(N) configuration (the axis multipliers, shell vectors)
+# is ignored, as in
 # the memory ledger. A transform's own input/output traffic lives inside the transform count — the
 # FFT's internal passes are FFTW's, not this schedule's.
 _ex(; kw...) = merge(ZERO, NamedTuple(kw))
@@ -302,8 +303,8 @@ const OP_COST = Dict(
   "shift φ̂"           => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "shift-back average" => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
   "band-limit"         => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "build E_ν"          => _cost(:pointwise; extra = _ex(rate = 1)),
-  "build E_κ"          => _cost(:pointwise; extra = _ex(rate = 1)),
+  "build E_ν"          => _cost(:pointwise; extra = _ex(real_spectral_scalar = 1)),
+  "build E_κ"          => _cost(:pointwise; extra = _ex(real_spectral_scalar = 1)),
   # the unforced finalize is a no-op (the forcing deltas price the real hooks)
   "finalize"           => _cost(:noop),
 )
