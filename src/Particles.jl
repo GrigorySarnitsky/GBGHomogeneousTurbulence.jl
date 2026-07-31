@@ -183,8 +183,15 @@ tracer_positions(tracers::Tracers) = tracers.positions
 """
     tracer_velocities(tracers)
 
-The `(M, 3)` array of the most recent trajectory velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` (set by
-[`advect!`](@ref)).
+The `(M, 3)` array of the most recent trajectory velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` —
+the velocity at the positions the tracers occupy, at the instant they occupy them, put on record by
+[`record_trajectory_velocity!`](@ref) before the step. This is the Lagrangian velocity the statistics
+accumulate.
+
+!!! note
+    Not the second velocity of the Heun pair. That one is evaluated at the *predicted* position, which
+    the tracer never reaches, so it is a stage value of the integration scheme rather than a sample of
+    the flow along the trajectory, and it is not read back.
 """
 tracer_velocities(tracers::Tracers) = point_values(tracers.velocity1)
 

@@ -30,6 +30,8 @@ a direct dependency.
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | `AbstractForcing` |
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
+| ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | [`tracer_positions`](@ref) |
+| ``M`` | the number of tracer particles | [`number_of_tracers`](@ref) |
 
 ## Parameters
 
