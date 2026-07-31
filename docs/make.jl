@@ -157,7 +157,8 @@ makedocs(
       "Scalings"           => "api/phenomenology/Scalings.md",
     ],
     "Design & Internals" => Any[
-      "Architecture" => "architecture.md",
+      "Architecture"   => "architecture.md",
+      "Derived fields" => "derived_fields.md",
     ],
   ],
 )
