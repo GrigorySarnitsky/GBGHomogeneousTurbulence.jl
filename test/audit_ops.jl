@@ -97,7 +97,23 @@ const VALUE_CLASS = Dict(
   :φstar_spec => :spectral_scalar, :sshift => :spectral_scalar, :scopy => :spectral_scalar,
   :sb_field => :physical_scalar, :pshift => :physical_scalar,
 )
-const CONTRACT_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω, :ou_state])
+# Values whose live range is extended past their last use in the op list. The split matters, and
+# conflating the two is how the physical-vector bound became a tautology (decision 37):
+#
+#   * DYNAMICS_LIVE — live because the DYNAMICS says so. The state is read and written by every
+#     stage and must persist between steps; there is no schedule in which it is not live. Extending
+#     it is a statement of fact, so it belongs in a lower bound.
+#   * CHART_CONTRACT_LIVE — live because a DESIGN CHOICE says so. The observation cache's charts are
+#     required to survive the step under the epoch-at-end design; a different design (refreshing the
+#     charts at the boundary and letting the substage registers reuse the slots) does not require it.
+#     Extending it is an assumption, so it belongs in a HOLDER, never in the bound it is measured
+#     against — the liveness projection therefore excludes it by default.
+const DYNAMICS_LIVE = Set([:û, :φ̂, :ou_state])
+const CHART_CONTRACT_LIVE = Set([:chart_u, :chart_ω])
+
+# The traffic model is a different question: a value written and still needed after a segment must
+# reach memory whatever the reason it survives, so the fusion bound uses the union.
+const CONTRACT_LIVE = union(DYNAMICS_LIVE, CHART_CONTRACT_LIVE)
 
 
 # The start-of-step chart recomputes (physical_velocity / physical_vorticity in src/State.jl): each
@@ -292,8 +308,16 @@ end
 
 
 # Peak simultaneous liveness per shape class: a value is live from its first write (or from the
-# start, if contract-live or read before written) to its last read (or the end, if contract-live).
-function peak_liveness(ops)
+# start, if extended or read before written) to its last read (or the end, if extended).
+#
+# `charts_live` selects WHICH values get their range extended, and the default is the point of
+# decision 37. With `false` (the bound) only DYNAMICS_LIVE is extended, so the result is a genuine
+# lower bound on the registers this operation order needs. With `true` the chart contract is added —
+# not a bound but a description of the present design, useful only for showing that the assumption
+# is load-bearing. Feeding the `true` value into a bound is how the physical-vector cell came to
+# report `achieved == bound` while the honest floor was two registers lower.
+function peak_liveness(ops; charts_live::Bool = false)
+  extended = charts_live ? CONTRACT_LIVE : DYNAMICS_LIVE
   first_use = Dict{Symbol, Int}()
   last_use = Dict{Symbol, Int}()
   for (i, op) in enumerate(ops), v in Iterators.flatten((op.reads, op.writes))
@@ -301,7 +325,7 @@ function peak_liveness(ops)
     last_use[v] = i
   end
   for v in keys(first_use)
-    if v in CONTRACT_LIVE
+    if v in extended
       first_use[v] = 0
       last_use[v] = length(ops) + 1
     end

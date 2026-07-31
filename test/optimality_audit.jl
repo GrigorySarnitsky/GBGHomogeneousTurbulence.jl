@@ -14,6 +14,13 @@
 #   * no stale holder   — a holder that no longer names a live gap ALSO fails, so a holder cannot
 #     outlive the problem it describes. Retiring it is part of taking the win.
 #
+# And the rule decision 37 added, which the two above cannot enforce on their own: AN ASSUMPTION MAY
+# NEVER BE AN INPUT TO THE BOUND IT IS MEASURED AGAINST. The liveness projection used to extend the
+# observation charts' live range across the whole step and then report the result as a lower bound;
+# since the ledger carries exactly those charts, `achieved == bound` was true by construction and the
+# suite asserted it, hiding two physical vectors. When a projection needs an assumption to reach the
+# achieved number, that assumption is a HOLDER, not a modelling input.
+#
 # A holder carries its disposition: `:FIX` (a local win, to be taken and the holder retired) or
 # `:PF_RAISE` (a recorded request against GBGPeriodicFields — the gap is not ours to close).
 #
@@ -95,8 +102,23 @@ const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
   "operand and needs its own pass.")
 
+const CHART_CONTRACT = Holder(
+  "CHART CONTRACT", :FIX,
+  "The observation cache's charts are required to stay live across the whole step, so the two " *
+  "substage recoveries cannot reuse their slots and the run carries two physical vectors above the " *
+  "liveness bound (768 MiB at 256³ / Float64). This is a design choice, not a constraint from the " *
+  "physics: the rotational form needs the VALUES of u and ω at the stage state, not stamped chart " *
+  "slots. Refreshing the charts at the step boundary — where the same recovery happens anyway, on " *
+  "the identical state — lets a chart and its substage register be one array, with the chart " *
+  "readable at every boundary and undefined inside a step.")
+
 const ALL_HOLDERS = (UNUSED_FUSION, MATERIALIZED_SYMBOLS,
-                     HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS)
+                     HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
+                     CHART_CONTRACT)
+
+# A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
+# cannot be added silently, and taking the win means deleting the entry in the same commit.
+const OPEN_LOCAL_WINS = ("CHART CONTRACT",)
 
 
 # ---------------------------------------------------------------- the synchronization ledger
@@ -296,6 +318,18 @@ const SYNC_LEDGER = (
     @test fusion_live                       # else retire UNUSED_FUSION
     @test symbols_live                      # else retire MATERIALIZED_SYMBOLS
 
+    # The chart contract's gap is live exactly while the assumption is load-bearing: extending the
+    # charts' live range across the step must still raise the physical-vector count. When the
+    # boundary refresh lands and a chart shares its substage register, these become equal and
+    # CHART_CONTRACT must be retired here in the same commit.
+    charts_live = any((:RK3, :RK2)) do scheme
+      any((false, true)) do scalar
+        ops = scheme === :RK3 ? rk3_ops(scalar) : rk2_ops(scalar)
+        peak_liveness(ops; charts_live = true).physical_vector > peak_liveness(ops).physical_vector
+      end
+    end
+    @test charts_live                       # else retire CHART_CONTRACT
+
     sync_holders = Set{String}()
     for row in SYNC_LEDGER, s in _syncs(; row.cfg...)
       s.holder === nothing || push!(sync_holders, s.holder.name)
@@ -367,8 +401,9 @@ const SYNC_LEDGER = (
       @test h.disposition in (:FIX, :PF_RAISE)
       @test !isempty(h.name) && length(h.what) > 40      # a holder names the cause, not just a label
     end
-    # Nothing in the register is a local win today: every live gap is a backend capability question.
-    # A :FIX holder appearing here is the signal to take it and retire it, not to freeze it.
-    @test all(h -> h.disposition === :PF_RAISE, ALL_HOLDERS)
+    # A `:FIX` holder is a local win left open, and the frozen list is what stops it becoming an
+    # accepted cost by default: adding one requires editing OPEN_LOCAL_WINS, and taking the win
+    # requires deleting the entry in the same commit.
+    @test Set(h.name for h in ALL_HOLDERS if h.disposition === :FIX) == Set(OPEN_LOCAL_WINS)
   end
 end

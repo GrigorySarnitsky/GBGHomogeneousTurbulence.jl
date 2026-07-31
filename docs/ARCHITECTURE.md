@@ -1303,6 +1303,41 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     its occupants, and the frame table would have reported a nonzero rate cell for a domain that
     carries no forcing at all.
 
+37. **(2026-07) An assumption may never be an input to the bound it is measured against.** The
+    liveness projection of decision 33 extends some values' live range across the whole step, and it
+    did so for two different reasons under one name. The evolving state
+    (``\hat{\boldsymbol{u}}``, ``\hat\varphi``, a stochastic forcing's internal state) is live because
+    the **dynamics** says so — every stage reads and writes it, and no schedule exists in which it is
+    not live — so extending it is a statement of fact and belongs in a lower bound. The observation
+    cache's charts are live because a **design choice** says so: the epoch-at-end contract requires
+    them to survive the step, and a different design does not. Extending *those* and then reporting
+    the result as the bound made the physical-vector cell a tautology — the ledger carries exactly
+    those charts, so `achieved == bound` held by construction, and the suite positively asserted the
+    equality.
+
+    Measured on the same operation lists: the honest liveness floor is **three** physical vectors —
+    the two substage recoveries plus the product register — against a ledger of **five**. The audit
+    reported a gap of zero where there are **two physical vectors, 768 MiB at ``256^{3}`` in double
+    precision**, the largest single residency item the optimality campaign has surfaced. The holder
+    that should have claimed it, `CHART CONTRACT`, had been *written down* in the register's own
+    comment from the start and never bound to a cell, because the assumption was consumed by the
+    bound instead.
+
+    This is decision 35's failure mode occurring inside the instrument decision 35 depends on.
+    Decision 35 corrected *a recorded cost is not a minimal one*; the residue it left is sharper — a
+    **bound built out of the very thing it should test** is worse than a loose bound, because a loose
+    bound at least fails honestly. The correction splits the set in two, admits only the dynamics half
+    to the projection, and makes the chart contract a holder with a `FIX` disposition, so the gap is
+    claimed and retires when the boundary-refresh design closes it.
+
+    Two details keep the fix honest. The traffic model of decision 34 keeps the **union**, because a
+    value that outlives a fusion segment must reach memory whatever the reason it survives — so the
+    compute ledger is untouched. And a guard test now asserts the assumption is **load-bearing**:
+    adding the chart extension back must raise the count, and raise it exactly onto the ledger, so
+    re-merging the two sets fails the suite rather than silently re-certifying the tautology. The
+    same test pins that the split is confined to its class — excluding the charts changes neither
+    spectral class, confirming the state's extension was never the defect.
+
 ---
 
 ## References

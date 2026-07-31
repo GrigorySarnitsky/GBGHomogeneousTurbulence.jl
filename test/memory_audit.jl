@@ -180,19 +180,29 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 # every nonzero gap. An unclaimed gap is a finding, and the test fails. Recorded holders
 # (decision 33): OWNERSHIP — buffers that could alias in this schedule but live across a
 # deliberately kept boundary (the cache's recovery scratch vs the generator's product/nonlinear
-# registers; the OU's noise buffers vs the generator's products); CHART CONTRACT — the charts must
-# survive the step under the epoch-at-end design (the epoch-at-start reuse is the recorded
-# candidate); SHARED FACTOR — the factor register could be deleted by a fused exponential-convolve
-# (raised to GBGPeriodicFields); SCALAR REGISTERS — the scalar's copy/nonlinear/factor registers
-# could share one transient slot.
+# registers; the OU's noise buffers vs the generator's products); CHART CONTRACT — the charts are
+# required to survive the whole step under the epoch-at-end design, which costs TWO physical vectors
+# against the bound (768 MiB at 256³ / Float64); SHARED FACTOR — the factor register could be deleted
+# by a fused exponential-convolve (raised to GBGPeriodicFields); SCALAR REGISTERS — the scalar's
+# copy/nonlinear/factor registers could share one transient slot.
+#
+# CHART CONTRACT was recorded in this comment from the start and never bound to a cell, because the
+# liveness projection extended the charts' live range across the step and then reported the result as
+# the bound (decision 37). That made `achieved == bound` a tautology in the physical-vector class and
+# the suite asserted it. The projection now extends only DYNAMICS_LIVE, so the assumption shows up
+# where it belongs — as a claimed gap.
 const GAP_HOLDERS = Dict(
-  (:RK3, false) => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
+  (:RK3, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
-  (:RK3, true)  => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
+  (:RK3, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR + SCALAR REGISTERS"),
-  (:RK2, false) => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
+  (:RK2, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
-  (:RK2, true)  => Dict(:spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
+  (:RK2, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
                         :spectral_scalar => "SHARED FACTOR + SCALAR REGISTERS"),
   (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (scratch, OU noise ↔ product/nonlinear)",
                            :physical_vector => "OWNERSHIP (OU noise ↔ product)",
@@ -361,12 +371,37 @@ const EPISODE_UNITS = [
         end
       end
     end
-    # The physical-vector count sits exactly at its bound under the chart contract for the unforced
-    # cases: the charts are contract-live, and the substage registers + product peak alongside them.
+    # The physical-vector class, stated as the numbers rather than as an equality that cannot fail.
+    # The bound is three — the two substage recoveries plus the product register — and the ledger
+    # carries five, because the charts are additionally required to survive the step. That difference
+    # is the CHART CONTRACT holder, and it is two physical vectors: 768 MiB at 256³ / Float64.
     for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      @test peak_liveness(ops_of(scalar)).physical_vector ==
-            BASE[(scheme, :TwoThirds, scalar)].physical_vector
+      ops = ops_of(scalar)
+      @test peak_liveness(ops).physical_vector == 3
+      @test BASE[(scheme, :TwoThirds, scalar)].physical_vector - peak_liveness(ops).physical_vector == 2
+      @test haskey(GAP_HOLDERS[(scheme, scalar)], :physical_vector)
     end
+  end
+
+  @testset "the liveness bound is not self-fulfilling" begin
+    # The guard decision 37 exists to install. Extending the charts' live range across the whole step
+    # and calling the result a bound made `achieved == bound` true by construction in this class —
+    # the assumption under test was an input to the test. Assert that the assumption is LOAD-BEARING
+    # (adding it back changes the number, and changes it exactly onto the ledger), so a future
+    # re-merge of the two sets fails here rather than silently re-certifying the tautology.
+    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
+      ops = ops_of(scalar)
+      bound    = peak_liveness(ops)                      # DYNAMICS_LIVE only — the honest floor
+      described = peak_liveness(ops; charts_live = true)  # + the chart contract — the present design
+      @test described.physical_vector > bound.physical_vector
+      @test described.physical_vector == BASE[(scheme, :TwoThirds, scalar)].physical_vector
+      # …and the split is confined to that class: the state's extension is a fact, not a choice, so
+      # it changes nothing when the charts are excluded.
+      @test bound.spectral_vector == described.spectral_vector
+      @test bound.spectral_scalar == described.spectral_scalar
+    end
+    @test isempty(intersect(DYNAMICS_LIVE, CHART_CONTRACT_LIVE))
+    @test CONTRACT_LIVE == union(DYNAMICS_LIVE, CHART_CONTRACT_LIVE)
   end
 
   @testset "episode ledger — transient peaks, frozen and attributed" begin

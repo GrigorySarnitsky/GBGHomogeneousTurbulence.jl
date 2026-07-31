@@ -341,6 +341,11 @@ actively check for it.
   of invariant 3. The rule: **before dismissing a finding as acceptable, either produce the lower bound
   that proves it minimal, or ask the user** — never close it by pointing at the existing arrangement,
   and never let "it's already recorded / it was done to get things working" stand as a reason. Instance
+  The sharpest form is **building the instrument out of the assumption it should test**: if a
+  projection needs an assumption to reach the achieved number, that assumption is a *holder*, not a
+  modelling input, and a bound that consumes it certifies nothing (decision 37 — the liveness
+  projection declared the observation charts live across the step, so `achieved == bound` held by
+  construction and hid two physical vectors). A bound that cannot fail is not a bound. Instances
   (2026-07-25): dismissing the Lagrangian tracer's full-field ``\boldsymbol u(t_n)`` copy — an ``N^3``
   resident buffer plus a per-step ``N^3`` copy serving an ``M\times3`` interpolation need — as "a
   consciously-accepted tradeoff already frozen in both audits," when the freeze *records* the cost with
