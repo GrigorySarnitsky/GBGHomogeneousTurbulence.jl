@@ -71,10 +71,12 @@ end
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar,
 # real_spectral_scalar.
-# The PhaseShift cells lost a physical vector on 2026-07-28 (decision 35): the displaced velocity is
-# recovered onto the generator's physical product scratch, which the primary evaluation has already
-# spent, instead of into a register of its own — legal because the cross-product and flux kernels read
-# each element's whole fiber before writing it. Verified against the padding oracle, unchanged.
+# The PhaseShift cells carry a register of their own for the displaced velocity. Landing it on the
+# generator's spent physical product scratch instead was tried and REVERTED (2026-07-31): the
+# backend's `cross!` guards destination/operand aliasing by allocating a temporary and copying back,
+# so the saved register cost a full physical vector of TRANSIENT allocation per stage and broke the
+# allocation-free hot loop. Retaking it needs an alias-safe kernel from the backend, not a rewiring
+# here — the allocation guard below is what now holds the claim.
 # The real_spectral_scalar column is ZERO throughout, and the zero is the point (2026-07-28,
 # decision 35): a rate
 # array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
@@ -85,14 +87,14 @@ const BASE = Dict(
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 6, spectral_scalar = 9, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 6, spectral_scalar = 10, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, real_spectral_scalar = 0),
 )
 
 # The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)
@@ -436,5 +438,27 @@ const EPISODE_UNITS = [
     # The hot loop stays allocation-free at the run layer too, so stepping-phase peak = resident.
     advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)
     @test (@allocated advance!(sim; dt = 1e-3)) < 0.2 * unit
+  end
+
+  @testset "the hot loop is allocation-free on EVERY dealiasing strategy" begin
+    # The coverage hole that let a regression ship (2026-07-31). The guard above runs one cell —
+    # RK3 × TwoThirds, velocity-only — so an allocation introduced on a strategy-specific code path
+    # was invisible to it. A `PhaseShift` run had been aliasing the destination of the displaced
+    # cross product onto one of its operands; the backend guards that case by allocating a temporary
+    # and copying back, at a full physical vector per stage, and nothing failed.
+    #
+    # The scope of this test is the point: the axes a step's code path actually branches on, not one
+    # representative configuration. A per-stage transient of one field-scale array reads as ≈ 3 units
+    # here, so the 0.5-unit ceiling separates "allocation-free" from "one field per stage" by a wide
+    # margin without being brittle about small run-layer bookkeeping.
+    N = 16
+    unit = 8 * N^3
+    for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFRK2()),
+        scalar in (false, true)
+      sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
+                       integrator = scheme, rng = MersenneTwister(1))
+      advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
+      @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * unit
+    end
   end
 end

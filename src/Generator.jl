@@ -80,6 +80,7 @@ struct PhaseShiftBuffers{K, VS, VP, SS, SP}
   to_shifted::K                   # translation kernel: recover a field on the grid displaced by +½ cell
   back::K                         # translation kernel: shift a displaced term back to the grid
   velocity_shifted::VS            # û on the displaced grid, then the displaced nonlinear term
+  u_shifted::VP                   # velocity recovered on the displaced grid
   omega_shifted::VP               # vorticity recovered on the displaced grid
   scalar_shifted::SS              # φ̂ on the displaced grid, then the displaced flux divergence (or nothing)
   scalar_copy::SS                 # recovery scratch for the displaced scalar (or nothing)
@@ -95,7 +96,7 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
     translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
     translation_kernel(reference, domain.multipliers,   δ),   # shift a displaced term back to the grid
     spectral_vector(domain),
-    physical_vector(domain),
+    physical_vector(domain), physical_vector(domain),
     scalar ? scalar_spectral(domain) : nothing,
     scalar ? scalar_spectral(domain) : nothing,
     scalar ? scalar_physical(domain) : nothing,
@@ -272,13 +273,9 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedD
   T = real(eltype(field_data(nonlinear)))
   _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral)                        # primary
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
-  # The displaced velocity is recovered ONTO the generator's physical product scratch, which the
-  # primary evaluation above has already consumed into `product_spectral`. It is then both the left
-  # operand and the destination of the displaced cross product — safe because the cross-product
-  # kernel reads each element's whole fiber into registers before writing any of it.
-  velocity_to_physical!(product_physical, phase_shift.velocity_shifted, domain, product_spectral)
+  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
-  _velocity_lamb!(phase_shift.velocity_shifted, product_physical, phase_shift.omega_shifted, domain, product_physical, product_spectral)
+  _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_physical, product_spectral)
   # The shift-back and the two-grid average are one α/β convolve — ½·back ⊙ (displaced) + ½·(primary).
   convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back, T(1 // 2), T(1 // 2))
   convolve!(nonlinear, nonlinear, domain.dealias)                                                      # spherical truncation
@@ -392,12 +389,10 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::Fi
   T = real(eltype(field_data(nonlinear)))
   _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral)                 # primary ∇·(uφ)
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                     # û on the displaced grid
-  # As in the velocity chain: the displaced velocity lands on the spent physical product scratch and
-  # is then multiplied in place by the displaced scalar, an elementwise broadcast.
-  velocity_to_physical!(product_physical, phase_shift.velocity_shifted, domain, product_spectral)
+  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
   scalar_to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain, phase_shift.scalar_copy)
-  _scalar_flux!(product_spectral, product_physical, phase_shift.phi_shifted, domain, product_physical)   # (u_s φ_s)^
+  _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain, product_physical)   # (u_s φ_s)^
   divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·, still on the displaced grid
   # The shift-back symbol commutes through the iκ· contraction (iκ·(ĝ v̂) = ĝ (iκ·v̂)), so it rides
   # the averaging convolve — ½·back ⊙ (displaced ∇·) + ½·(primary ∇·) — one pass, not shift + combine.

@@ -91,7 +91,7 @@ const VALUE_CLASS = Dict(
   :vshift => :spectral_vector,
   :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
   :ustar => :physical_vector, :ωstar => :physical_vector, :noise_p => :physical_vector,
-  :ωshift => :physical_vector,
+  :ushift => :physical_vector, :ωshift => :physical_vector,
   :φ̂ => :spectral_scalar, :fac => :spectral_scalar, :sb_copy => :spectral_scalar,
   :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
   :φstar_spec => :spectral_scalar, :sshift => :spectral_scalar, :scopy => :spectral_scalar,
@@ -133,8 +133,7 @@ _chart_recomputes() = [
 # (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. A mask
 # strategy (TwoThirds / HouLi) evaluates once and low-passes; PhaseShift also reads the stage's
 # SPECTRAL velocity `uspec` for the half-cell-displaced evaluation through the generator's
-# PhaseShiftBuffers registers — the displaced velocity landing on the generator's own physical
-# product scratch `pp`, spent by the primary evaluation (2026-07-28, decision 35) — averages the two grids (the shift-back riding the averaging convolve
+# PhaseShiftBuffers registers, averages the two grids (the shift-back riding the averaging convolve
 # as one fused α/β pass — the PF-triage free win, 2026-07-19), and truncates spherically. `source`
 # appends the additive-forcing read (the OU's per-stage add_forcing_source!).
 function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = false)
@@ -147,10 +146,10 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
     append!(ops, [
       Op("shift û",            [uspec],            [:vshift]),
       Op("shifted copy",       [:vshift],          [:ps]),
-      Op("shifted u recovery", [:ps],           [:pp]),
-      Op("shifted curl",       [:vshift],       [:ps]),
-      Op("shifted ω recovery", [:ps],           [:ωshift]),
-      Op("cross u×ω",          [:pp, :ωshift],  [:pp]),
+      Op("shifted u recovery", [:ps],              [:ushift]),
+      Op("shifted curl",       [:vshift],          [:ps]),
+      Op("shifted ω recovery", [:ps],              [:ωshift]),
+      Op("cross u×ω",          [:ushift, :ωshift], [:pp]),
       Op("flux→spectral",      [:pp],              [:ps]),
       Op("Leray projection",   [:ps],              [:vshift]),
       Op("shift-back average", [out, :vshift],     [out]),
@@ -179,11 +178,11 @@ function _scalar_assembly(uspec, φspec, u, out; phase_shift = false)
     append!(ops, [
       Op("shift û",            [uspec],          [:vshift]),
       Op("shifted copy",       [:vshift],        [:ps]),
-      Op("shifted u recovery", [:ps],            [:pp]),
+      Op("shifted u recovery", [:ps],            [:ushift]),
       Op("shift φ̂",           [φspec],          [:sshift]),
       Op("shifted copy φ̂",    [:sshift],        [:scopy]),
       Op("shifted φ recovery", [:scopy],         [:pshift]),
-      Op("flux uφ",            [:pp, :pshift],   [:pp]),
+      Op("flux uφ",            [:ushift, :pshift], [:pp]),
       Op("flux→spectral",      [:pp],            [:ps]),
       Op("divergence",         [:ps],            [:sshift]),
       Op("shift-back average", [out, :sshift],   [out]),
