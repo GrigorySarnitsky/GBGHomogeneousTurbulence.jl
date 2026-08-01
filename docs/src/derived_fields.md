@@ -19,15 +19,16 @@ a **request**.
 
 This package makes one choice about what a request may cost: **a request adds nothing to what a run's
 step cycle computes or moves.** The *cycle* is everything a run does to get from ``t_n`` to
-``t_{n+1}``. It measures the timestep, records the tracer velocities, takes the step, advects the
-particles, and measures whatever its stopping test needs. What it *moves* is counted in passes over
-the grid. The opposite choice is defensible: a run could do
-extra work in its cycle so that a request became free at the point of reading. This package does not, so
-how you configured the run and the stopping condition you gave it fix what a cycle costs — never what
-you later ask to see.
+``t_{n+1}``: it measures the timestep, records the tracer velocities, takes the step, advects the
+particles, and measures whatever its stopping test needs. Its unit of movement is one pass over the
+grid.
 
-Holding a quantity therefore gains you no information, so this page answers only what is left of the
-choice:
+The opposite choice is defensible — a run could do extra work in every cycle so that a request cost
+nothing when you read. This package chose otherwise. A cycle's cost therefore follows from how you
+configured the run and from the stopping condition you gave it, never from what you later ask to see.
+
+Because a run can rebuild any derived quantity, holding one gains you no information. This page
+answers what is left of the choice:
 
 1. **Which** derived quantities may a run hold? (§1)
 2. **What** guarantee does a held value carry? (§2)
@@ -36,27 +37,28 @@ choice:
    system; §5 applies §§1 and 3 to it)
 5. **How** do you read one, request one, and report a change you made? (§6)
 
-Sections 1–5 describe the design. Where the package does not yet meet a claim it is marked
+Sections 1–5 describe the design. Where the package does not yet meet a claim, it is marked
 `(not yet — §7)`, and §7 says why each gap stands.
 
 ---
 
 ## 1. Which quantities a run may hold
 
-Two questions decide it. The first asks whether a quantity is a derived quantity at all; the second
-asks whether a run may hold one that is.
+Two questions decide whether a run may hold a quantity. The first asks whether it is a derived
+quantity at all; the second asks whether a run may hold one that is.
 
 ### Is it a derived quantity at all?
 
-A derived quantity is fixed by the state at a single ``t_n``. Two ways to fall outside that:
+A derived quantity is fixed by the state at a single ``t_n``. A quantity can fall outside that in
+two ways:
 
 - **It depends on more than the state.** A quantity that also depends on the step size ``\Delta t``,
   on a forcing's internal variables, or on the coefficients of the time-stepping scheme is not
-  determined by the state, so no amount of state will rebuild it. A forcing's internal variables
+  determined by the state, so the state alone will not rebuild it. A forcing's internal variables
   include, for instance, the Ornstein–Uhlenbeck state of a stochastic source.
 - **It is fixed at some other instant.** A Runge–Kutta stage value is determined by the state *and*
   the discretization, so it is not the flow at any instant. A quantity carried along a trajectory
-  takes the probe's position as an argument too, so the same test binds it: the velocity at a
+  takes the probe's position as a second argument, and the test applies to that too: the velocity at a
   *predicted* position is a stage value of the probe's own integrator, at a position the probe never
   occupies.
 
@@ -70,16 +72,16 @@ in two different currencies.
 
 **In arithmetic: a run holds only what its cycle computes anyway.** A run rebuilds a held value from
 its cycle, not from your read `(not yet — §7)`. So a quantity that nothing in the cycle computes could
-be held only by making the cycle compute it — which is precisely the work a request may not add.
+be held only by making the cycle compute it — the work a request may not add.
 
-**In passes over the grid: a run holds only what its cycle already has whole.** This is the same
-choice in the second currency, and §3 states it.
+**In passes over the grid: a run holds only what its cycle already has whole.** The same choice,
+measured the second way; §3 states the rule it yields.
 
 ---
 
 ## 2. What a held value guarantees
 
-Section 1 shows that holding **gains** you nothing. This section is the other half: holding **loses**
+The opening showed that holding **gains** you nothing. This section is the other half: holding **loses**
 you nothing either, because a read never returns a value built from a superseded state.
 
 **The cycle rebuilds a held field at its end**, from the state it has just produced `(not yet — §7)`.
@@ -103,7 +105,7 @@ read for the same reason §1 bars them from being derived quantities at all.
 read. Under `run!` the loop measures the maximum speed at ``t_n``, before the step, because the
 timestep control needs it to choose ``\Delta t``. It measures ``\varepsilon`` and ``k`` there too when
 the run is budgeted in turnovers or stopped on a condition, and not otherwise. Their order within the
-iteration decides who reads them free: the stopping test runs after ``\varepsilon`` and before the
+iteration decides which reader gets them free: the stopping test runs after ``\varepsilon`` and before the
 other two, so it reads ``\varepsilon`` at no cost and would rebuild the rest. A callback fires once
 the step has completed, so it finds all three at a superseded state — a rebuild of one reduction
 each, and for the maximum speed a velocity recovery the next cycle would have performed anyway.
@@ -113,8 +115,8 @@ each, and for the maximum speed a velocity recovery the next cycle would have pe
 ## 3. What holding costs, and what you choose
 
 Holding never changes the number of Fourier transforms a cycle performs (§4.3 establishes this), so
-choosing to hold something is a memory decision and never a time decision. Memory is charged at one of
-three levels:
+choosing to hold something is a memory decision and never a time decision. Holding one costs memory
+at one of three levels:
 
 | what the cycle does with the value | what holding it costs you |
 |---|---|
@@ -127,27 +129,26 @@ in single. A velocity-only run under `TwoThirds` or `HouLi` already carries ten 
 five in each representation, so it holds about 3.8 GiB at that size before any scalar-shaped
 register.
 
-**A run accepts the first two levels and refuses the third**, following the choice of the opening in
-its second currency. A value the cycle forms only
-piecewise, inside a single traversal, would have to be written out for you, and that write is a pass
-the cycle does not already perform. Call a value **materialized** when the cycle has it whole
+**A run accepts the first two levels and refuses the third.** A value the cycle forms only piecewise,
+inside a single traversal, would have to be written out for you, and that write is a pass the cycle
+does not already perform — which is what the opening's choice forbids. Call a value **materialized** when the cycle has it whole
 somewhere; that is the second half of §1's rule — *a run holds only what its cycle already
 materializes.*
 
 The clearest instance is the integrand of a fused reduction. Computing ``k`` sums
 ``\lvert\hat{\boldsymbol{u}}(\boldsymbol{\kappa})\rvert^{2}`` over wavenumbers in one traversal,
-forming every value and keeping none. Written out, those values are twice the energy density mode by
-mode — a field in its own right, and one an anisotropy study wants. Materializing it costs one
+forming every value and keeping none. Written out, those values are twice the modal energy density —
+a field in its own right, and one an anisotropy study wants. Materializing it costs one
 grid-sized write and no new arithmetic. The integrand is not the energy spectrum: ``E(\kappa)`` is
 half its sum over each wavenumber shell, and computing ``E(\kappa)`` needs a further binning pass.
 
 ### What you choose
 
-**You request the fields and trajectory samples you want held when you configure the run.** A quantity
+**When you configure the run, you request the fields and trajectory samples you want held.** A quantity
 you do not request is not held; reading it is an error, not a quiet rebuild. So the memory a run
 occupies follows from the call that configured it, not from whichever diagnostic you happened to
-write. The cycle fixes which level a field sits at, and you cannot know it in advance; §5 gives it
-for the configuration §4 fixes.
+write. The cycle determines which level a field sits at, so you cannot know it in advance; §5 gives
+the levels for the configuration §4 sets.
 
 **A number the cycle already computes is held without asking**, and stored where it is computed
 rather than recomputed at the end. Keeping ``O(1)`` of storage is not worth a decision, so a run does
@@ -162,7 +163,8 @@ forced scalar. `(not yet — §7)`
 ## 4. The system this package solves, and what its cycle does
 
 The rules above turn on what a cycle computes, what it has whole, and what it costs. This section
-establishes those three for one system in one configuration: a mask dealiasing rule, a three-stage
+establishes those three for one system in one configuration: a mask dealiasing rule (`TwoThirds` or
+`HouLi`), a three-stage
 scheme, the default rescaling velocity forcing, and an adaptive timestep. Those are the axes that fix
 a cycle's work — together with the stopping condition, which decides which reductions the loop
 performs. A request is not among them.
@@ -195,9 +197,9 @@ reads
 with ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` the vorticity, ``\nu`` the kinematic
 viscosity, ``\varkappa = \nu/\mathrm{Sc}`` the scalar diffusivity, ``\boldsymbol{f}`` and ``f_\varphi``
 the forcings, and ``\boldsymbol{X}(t)`` a tracer position. No projection acts on ``\boldsymbol{f}``
-because every velocity forcing the package provides is already divergence-free. One proportional to
-the field scales a divergence-free field mode by mode, and a stochastic source is projected as it is
-drawn. The scalar advection is written in conservative form, which holds the
+because every velocity forcing the package provides is already divergence-free. A forcing
+proportional to the field scales a divergence-free field mode by mode, and a stochastic source is
+projected as it is drawn. The scalar advection is written in conservative form, which holds the
 ``\boldsymbol{\kappa} = 0`` tendency at exactly zero and fixes the split of transforms printed below.
 
 ### 4.2 How a step treats each term
@@ -210,19 +212,28 @@ drawn. The scalar advection is written in conservative form, which holds the
   ``\mathcal E(\boldsymbol{\kappa}) = \exp\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\big)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` the rate of a forcing
   proportional to the field, and ``\tau`` the sub-interval a stage advances.
-- **A forcing** arrives by one of three routes. One proportional to the field folds its rate
+- **A forcing** arrives by one of three routes. One proportional to the field folds its own rate
   ``A(\boldsymbol{\kappa})`` into that exponential — the rate array exists, the product
   ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` never does. An additive source enters the right-hand
   side at each stage. A rescaling applies to the completed step, as a map on the state rather than a
-  term in any equation. The default velocity forcing is one: it holds the
-  kinetic energy fixed by rescaling a band of modes.
+  term in any equation. The default velocity forcing is a rescaling: it holds the kinetic energy
+  fixed by rescaling a band of modes.
 
 ### 4.3 What a cycle costs in transforms
 
 The state lives in spectral representation, where derivatives are multiplications and the projection
-acts wavenumber by wavenumber. A product of two fields is a convolution there, so each quadratic term
-is evaluated the pseudospectral way. Under a mask rule, one **evaluation** of the velocity term takes
-five **operations**. The evaluation
+acts wavenumber by wavenumber. A product of two fields is a convolution there, so a cycle evaluates
+each quadratic term the pseudospectral way.
+
+A run removes the aliasing that pointwise product introduces according to its **dealiasing rule**, and
+the rule changes the count. [`TwoThirds`](@ref) and [`HouLi`](@ref) are **mask rules**: each discards
+or tapers the aliased wavenumbers in one per-wavenumber multiplication. [`PhaseShift`](@ref) instead
+evaluates the term a second time on a half-cell-displaced grid and averages the two, cancelling the
+aliases rather than filtering them, at twice the transforms. With the scalar it costs nine inverse
+transforms more than twice, because the scalar term re-recovers a displaced velocity the velocity
+term has already built.
+
+Under a mask rule, one **evaluation** of the velocity term takes five **operations**. The evaluation
 
 1. recovers ``\boldsymbol{u}`` in physical representation — **3 inverse transforms**;
 2. forms ``\hat{\boldsymbol{\omega}} = \mathrm i\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and
@@ -232,22 +243,14 @@ five **operations**. The evaluation
 4. transforms that array back — **3 forward transforms**;
 5. applies ``\mathbb P`` and the mask, both per-wavenumber multiplications.
 
-How a run removes the aliasing the pointwise product introduced is its **dealiasing rule**, and the
-rule changes the count. [`TwoThirds`](@ref) and [`HouLi`](@ref) are **mask rules**: each discards or
-tapers the aliased wavenumbers in one per-wavenumber multiplication. [`PhaseShift`](@ref) instead
-evaluates the term a second time on a half-cell-displaced grid and averages the two, cancelling the
-aliases rather than filtering them, at twice the transforms. With the scalar it costs nine inverse
-transforms more than twice, because the scalar term re-recovers a displaced velocity the velocity
-term has already built.
-
 | dealiasing rule | velocity only | with the scalar |
 |---|---|---|
 | `TwoThirds`, `HouLi` | 18 inverse, 9 forward | 21 inverse, 18 forward |
 | `PhaseShift` | 36 inverse, 18 forward | 51 inverse, 36 forward |
 
 **None of these counts depends on what a run holds.** The end-of-cycle rebuild of §2 replaces the next
-cycle's first-stage recovery rather than adding to it, so a field is recovered once per cycle
-whether or not you hold it. These transforms carry essentially all of the arithmetic — one scalar
+cycle's first-stage recovery rather than adding to it, so a cycle recovers a field once whether or
+not you hold it. These transforms carry essentially all of the arithmetic — one scalar
 transform costs of order ``10^{2}`` operations per grid point, while each pointwise operation above
 costs of order ten.
 
@@ -261,9 +264,9 @@ second cost level of §3, in the concrete. That saving is unavailable today: the
 product guards against writing into one of its own operands, allocating a temporary and copying back,
 which costs more than the array it would save.
 
-A cycle advances each tracer position with a two-stage scheme. The scheme samples the velocity at the start of
-the step, at the particle's position, and at the end of the step, at a **predicted position the
-particle never reaches**. Both samples are ``M\times3`` arrays for ``M`` particles, interpolated from
+A cycle advances each tracer position with a two-stage scheme. The scheme samples the velocity
+twice: at the start of the step, at the particle's own position; and at the end of the step, at a
+**predicted position the particle never reaches**. Both samples are ``M\times3`` arrays for ``M`` particles, interpolated from
 the physical velocity field with the tracer set's interpolation scheme — a Catmull–Rom spline by
 default, so the sampled velocity is continuously differentiable along a trajectory.
 
@@ -271,7 +274,7 @@ default, so the sampled velocity is continuously differentiable along a trajecto
 
 ## 5. What a run holds for this system
 
-Both states are always present, the fluid's and the probes'. Tracers consume a derived field and
+Both states are always present — the fluid's and the probes'. Tracers consume a derived field and
 produce values at points; they never hold a field. The table below covers what a cycle computes from the
 state.
 
