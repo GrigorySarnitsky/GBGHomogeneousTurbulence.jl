@@ -1,6 +1,6 @@
 # State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
 # velocity and scalar — the single source of truth; the physical fields are derived, never stored),
-# the chart map that recovers the physical representations, `DerivedFields` (the stamped, memoized
+# the recovery map that recovers the physical representations, `ObservablesCache` (the stamped, memoized
 # observation cache those recoveries fill), and the random initial conditions that seed a run. The
 # per-step scratch lives with the integrator (`IntegratorBuffers` in `Propagator`). Everything is
 # sized to a `FixedDomain` from `SimulationDomain`.
@@ -13,11 +13,11 @@ The evolving state a run advances, its derived views, and how it is seeded:
   representation (the single source of truth; the physical fields are derived, never stored).
 - [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
   recover the velocity, vorticity, and scalar in physical representation from the spectral state.
-- [`DerivedFields`](@ref) — the observation cache: stamped, memoized derived fields with
+- [`ObservablesCache`](@ref) — the observation cache: stamped, memoized derived fields with
   recompute-on-staleness accessors.
 - [`physical_velocity`](@ref), [`physical_vorticity`](@ref) — the sanctioned reads of the cached
   velocity and vorticity in physical representation.
-- [`resolved_fields_modified!`](@ref) — declare an out-of-band state mutation so every cached chart
+- [`resolved_fields_modified!`](@ref) — declare an out-of-band state mutation so every cached observable
   is recomputed on its next read; [`spectral_scratch`](@ref) — the cache's spectral working space.
 - [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
   (a divergence-free velocity, a mean-zero scalar) that seed it.
@@ -33,7 +33,7 @@ using ..SimulationDomain: FixedDomain, spectral_vector, physical_vector,
 
 export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
        velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!,
-       DerivedFields, physical_velocity, physical_vorticity, resolved_fields_modified!,
+       ObservablesCache, physical_velocity, physical_vorticity, resolved_fields_modified!,
        spectral_scratch
 
 
@@ -112,59 +112,59 @@ end
 
 
 """
-    DerivedFields(domain; charts = (:velocity, :vorticity))
+    ObservablesCache(domain; observables = (:velocity, :vorticity))
 
 The observation cache of a run — preallocated, stamped, memoized derived fields, giving every reader
 (a diagnostic, a particle push, a statistics callback) a sanctioned way to the physical representations
-the time loop would otherwise compute and discard. Each chart slot holds a derived field's values —
-on the grid lattice, or (for future trajectory-bound charts) at the tracer positions; particle content
+the time loop would otherwise compute and discard. Each slot holds a derived field's values —
+on the grid lattice, or (for future trajectory-bound observables) at the tracer positions; particle content
 never enters. An accessor ([`physical_velocity`](@ref), [`physical_vorticity`](@ref)) returns the
 stored field when it is current for the present state and recomputes it first otherwise, so a stale
 read is impossible.
 
-Build the cache on a [`FixedDomain`](@ref); `charts` names the slots to allocate — resident memory is
-opt-in, and reading a chart that was not declared is an error. The available charts are `:velocity`
+Build the cache on a [`FixedDomain`](@ref); `observables` names the slots to allocate — resident memory is
+opt-in, and reading one that was not declared is an error. The available observables are `:velocity`
 (the velocity ``\\boldsymbol{u}`` in physical representation) and `:vorticity` (the vorticity
 ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation).
 
 # Freshness
 The cache carries one epoch counter per dynamical factor of the run — `fields_epoch` for the resolved
 fields (advanced by every completed `step!`, and by [`resolved_fields_modified!`](@ref) after an
-out-of-band mutation) and `particles_epoch` for the tracers (reserved for trajectory-bound charts).
+out-of-band mutation) and `particles_epoch` for the tracers (reserved for trajectory-bound observables).
 A slot's stamp records the epoch it was computed at; a stamp behind the epoch marks the slot stale,
 and the accessor recomputes and restamps it on the next read.
 
 # Fields
-- `charts` — a `NamedTuple` of the allocated slots; each slot holds the derived field's preallocated
+- `observables` — a `NamedTuple` of the allocated slots; each slot holds the value's preallocated
   storage and its stamp.
 - `spectral_scratch` — the cache's spectral working space (see [`spectral_scratch`](@ref)).
 - `fields_epoch`, `particles_epoch` — the per-factor epoch counters.
 """
-mutable struct DerivedFields{NT, S}
-  charts::NT
+mutable struct ObservablesCache{NT, S}
+  observables::NT
   spectral_scratch::S
   fields_epoch::Int
   particles_epoch::Int
 end
 
 
-function DerivedFields(domain::FixedDomain; charts = (:velocity, :vorticity))
+function ObservablesCache(domain::FixedDomain; observables = (:velocity, :vorticity))
   known = (:velocity, :vorticity)
-  for chart in charts
-    chart in known ||
-      throw(ArgumentError("unknown derived-field chart :$chart; the available charts are $known"))
+  for name in observables
+    name in known ||
+      throw(ArgumentError("unknown observable :$name; this cache offers $known"))
   end
-  slots = NamedTuple{Tuple(charts)}(Tuple(Stamped(physical_vector(domain), 0) for _ in charts))
-  return DerivedFields(slots, spectral_vector(domain), 1, 1)
+  slots = NamedTuple{Tuple(observables)}(Tuple(Stamped(physical_vector(domain), 0) for _ in observables))
+  return ObservablesCache(slots, spectral_vector(domain), 1, 1)
 end
 
 
-# Fetch a chart slot, with a complete-at-the-REPL error when the chart was not declared.
-function _chart(derived::DerivedFields, key::Symbol)
-  hasproperty(derived.charts, key) ||
-    throw(ArgumentError("the derived-field chart :$key was not allocated for this run; declare it in " *
-                        "the `charts` of `DerivedFields` (resident chart memory is opt-in)"))
-  return getproperty(derived.charts, key)
+# Fetch a slot, with a complete-at-the-REPL error when the observable was not declared.
+function _slot(derived::ObservablesCache, key::Symbol)
+  hasproperty(derived.observables, key) ||
+    throw(ArgumentError("the observable :$key was not cached for this run; declare it in the " *
+                        "`observables` of `ObservablesCache` (resident memory is opt-in)"))
+  return getproperty(derived.observables, key)
 end
 
 
@@ -173,15 +173,15 @@ end
     physical_velocity(sim)
 
 The velocity ``\\boldsymbol{u}`` in physical representation, current for the `state` — the sanctioned
-read of the derived velocity field. When the [`DerivedFields`](@ref) `derived`'s `:velocity` chart is
+read of the derived velocity field. When the [`ObservablesCache`](@ref) `cache`'s `:velocity` slot is
 already current (its stamp matches the fields epoch) the stored field is returned as is; otherwise it
 is first recomputed from the spectral ``\\hat{\\boldsymbol{u}}`` of `state` (a [`ResolvedFields`](@ref))
 by [`velocity_to_physical!`](@ref) on the [`FixedDomain`](@ref) `domain`, and restamped. Treat the
 returned field as read-only: it is the cache's storage, shared by every reader until the fields next
 advance. The second form reads a `Simulation`'s cache, state, and domain.
 """
-function physical_velocity(derived::DerivedFields, state::ResolvedFields, domain::FixedDomain)
-  slot = _chart(derived, :velocity)
+function physical_velocity(derived::ObservablesCache, state::ResolvedFields, domain::FixedDomain)
+  slot = _slot(derived, :velocity)
   if slot.stamp != derived.fields_epoch
     velocity_to_physical!(slot.value, state.velocity, domain, derived.spectral_scratch)
     slot.stamp = derived.fields_epoch
@@ -199,8 +199,8 @@ current for the `state` — the sanctioned read of the derived vorticity field, 
 [`physical_velocity`](@ref) (recomputed by [`vorticity_to_physical!`](@ref) when stale, returned as is
 when current; treat as read-only). The second form reads a `Simulation`'s cache, state, and domain.
 """
-function physical_vorticity(derived::DerivedFields, state::ResolvedFields, domain::FixedDomain)
-  slot = _chart(derived, :vorticity)
+function physical_vorticity(derived::ObservablesCache, state::ResolvedFields, domain::FixedDomain)
+  slot = _slot(derived, :vorticity)
   if slot.stamp != derived.fields_epoch
     vorticity_to_physical!(slot.value, state.velocity, domain, derived.spectral_scratch)
     slot.stamp = derived.fields_epoch
@@ -215,25 +215,25 @@ end
 
 Declare that the resolved fields — the spectral ``\\hat{\\boldsymbol{u}}``, ``\\hat\\varphi`` — were
 changed outside the sanctioned propagators (a re-seeded velocity, any direct write to the state's
-storage), so every derived chart is stale and will be recomputed on its next read. Advances the
+storage), so every cached observable is stale and will be recomputed on its next read. Advances the
 cache's fields epoch and returns `derived`.
 
 The sanctioned mutators call this for you: `step!` advances the epoch itself when it completes. A
 hand-run loop that mutates the spectral state directly **must** call it — a forgotten call leaves the
-charts serving the previous fields, the one staleness the cache cannot detect on its own.
+cached values serving the previous fields, the one staleness the cache cannot detect on its own.
 """
-resolved_fields_modified!(derived::DerivedFields) = (derived.fields_epoch += 1; derived)
+resolved_fields_modified!(derived::ObservablesCache) = (derived.fields_epoch += 1; derived)
 
 
 """
     spectral_scratch(derived)
 
 The observation cache's working space in spectral representation (a vector field) — the scratch the
-chart recomputations, and the run layer's spectral reductions, write through. Its contents are
+recomputations, and the run layer's spectral reductions, write through. Its contents are
 undefined between operations: any single operation may use it freely; nothing may store into it
 across operations.
 """
-spectral_scratch(derived::DerivedFields) = derived.spectral_scratch
+spectral_scratch(derived::ObservablesCache) = derived.spectral_scratch
 
 
 """
@@ -262,7 +262,7 @@ stream (defaults to `Random.default_rng()`).
 
 !!! note
     Seeding into a running case mutates the resolved fields out of band — follow it with
-    [`resolved_fields_modified!`](@ref) so the derived charts are recomputed on their next read.
+    [`resolved_fields_modified!`](@ref) so the cached observables are recomputed on their next read.
 """
 function random_solenoidal_velocity!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
@@ -321,7 +321,7 @@ stream (defaults to `Random.default_rng()`).
 
 !!! note
     Seeding into a running case mutates the resolved fields out of band — follow it with
-    [`resolved_fields_modified!`](@ref) so the derived charts are recomputed on their next read.
+    [`resolved_fields_modified!`](@ref) so the cached observables are recomputed on their next read.
 """
 function random_scalar!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,

@@ -1,6 +1,6 @@
-# DerivedFields tests — the observation-cache contract: accessors recompute exactly when stale
+# ObservablesCache tests — the observation-cache contract: accessors recompute exactly when stale
 # (stamp behind the fields epoch), memoize otherwise; `resolved_fields_modified!` is the out-of-band
-# invalidation verb; an undeclared chart is an error; `step!` advances the epoch.
+# invalidation verb; an undeclared observable is an error; `step!` advances the epoch.
 
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data
@@ -17,7 +17,7 @@ using Test
   state = ResolvedFields(û, nothing)
 
   @testset "accessors recompute once and memoize" begin
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     u = physical_velocity(derived, state, domain)
     u_reference = physical_vector(domain)
     velocity_to_physical!(u_reference, û, domain, spectral_vector(domain))
@@ -30,7 +30,7 @@ using Test
   end
 
   @testset "out-of-band mutation needs the invalidation verb" begin
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     before = copy(field_data(physical_velocity(derived, state, domain)))
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.7, peak_wavenumber = 3.0, rng = MersenneTwister(2))
     # Without the verb the chart still serves the previous fields — the documented contract.
@@ -44,14 +44,14 @@ using Test
   end
 
   @testset "an undeclared chart is an error; charts are opt-in" begin
-    velocity_only = DerivedFields(domain; charts = (:velocity,))
+    velocity_only = ObservablesCache(domain; observables = (:velocity,))
     @test physical_velocity(velocity_only, state, domain) isa Any   # allocated chart reads fine
     @test_throws ArgumentError physical_vorticity(velocity_only, state, domain)
-    @test_throws ArgumentError DerivedFields(domain; charts = (:velocity, :enstrophy))
+    @test_throws ArgumentError ObservablesCache(domain; observables = (:velocity, :enstrophy))
   end
 
   @testset "step! advances the fields epoch" begin
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())

@@ -66,7 +66,7 @@ Two routes to the same rate; take the one whose input is already in hand.
 
   * `dissipation(ω, viscosity)` — from a vorticity field `ω` ``\\boldsymbol{\\omega}`` in either
     representation, as the normalized inner product (Parseval). Use it when
-    ``\\boldsymbol{\\omega}`` exists for its own sake: the observation cache's chart, or a vorticity
+    ``\\boldsymbol{\\omega}`` exists for its own sake: the cached velocity, or a vorticity
     the caller supplies.
   * `dissipation(û, domain, viscosity)` — straight from the velocity in spectral representation `û`
     ``\\hat{\\boldsymbol{u}}``, with the [`FixedDomain`](@ref) `domain` supplying the multiplier, and

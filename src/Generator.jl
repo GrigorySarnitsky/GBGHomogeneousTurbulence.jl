@@ -209,7 +209,7 @@ end
 Close a step of the generator: apply each forcing's post-step projection (its `apply_forcing!` hook —
 e.g. the energy rescale of a `BandRescaling`) to the advanced `state`, velocity first, then the scalar
 when the run carries one. A scheme calls this once after its final stage, so everything that follows
-the step — the diagnostics, the derived charts, the tracer push — sees the forced end-of-step fields.
+the step — the diagnostics, the derived observables, the tracer push — sees the forced end-of-step fields.
 Returns `state`.
 """
 function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)

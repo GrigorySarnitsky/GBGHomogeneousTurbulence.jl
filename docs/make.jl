@@ -158,7 +158,7 @@ makedocs(
     ],
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",
-      "Derived fields" => "derived_fields.md",
+      "Observables cache" => "observables_cache.md",
     ],
   ],
 )

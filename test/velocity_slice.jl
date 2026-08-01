@@ -27,7 +27,7 @@ using Test
   dealias!(û, domain)
   φ̂ = scalar_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
   state = ResolvedFields(û, φ̂)
-  derived = DerivedFields(domain)
+  derived = ObservablesCache(domain)
 
   Δx = L / N
   cfl = 0.5

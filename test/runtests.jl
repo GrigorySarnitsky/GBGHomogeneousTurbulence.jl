@@ -5,7 +5,7 @@
 # on its own:  julia --project=. test/<module>.jl
 
 module VelocitySliceTests; include("velocity_slice.jl"); end
-module DerivedFieldsTests; include("derived_fields.jl"); end
+module ObservablesCacheTests; include("observables_cache.jl"); end
 module MemoryAuditTests;   include("memory_audit.jl");   end
 module ComputeAuditTests;  include("compute_audit.jl");  end
 module OptimalityAuditTests; include("optimality_audit.jl"); end

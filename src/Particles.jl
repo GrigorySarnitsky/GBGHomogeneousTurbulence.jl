@@ -101,7 +101,7 @@ each tracer where it currently sits — by interpolating the physical velocity f
 Call it on the start-of-step velocity, before the field solver advances the state; [`advect!`](@ref)
 then completes the push from the recorded values and the end-of-step field. The push is split across
 these two verbs because a run holds only one physical velocity field: the observation cache
-recomputes that chart in place once the state has advanced, so the start-of-step values must be taken
+recomputes that field in place once the state has advanced, so the start-of-step values must be taken
 off it while it still holds ``\\boldsymbol{u}(t_n)``. Recording them costs ``M \\times 3`` values for
 ``M`` tracers, where keeping the field itself would cost ``N^{3} \\times 3``.
 

@@ -127,7 +127,7 @@ using Test
     function integrate(integrator, dt, nsteps)
       b = allocate_buffers(integrator, domain; scalar = true)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
-      derived = DerivedFields(domain)
+      derived = ObservablesCache(domain)
       û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
       φ̂ = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
       copyto!(field_data(û), field_data(û0))

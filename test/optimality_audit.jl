@@ -17,7 +17,7 @@
 # And the rule decision 37 added, which the two above cannot enforce on their own: AN ASSUMPTION MAY
 # NEVER BE AN INPUT TO THE BOUND IT IS MEASURED AGAINST. The liveness projection used to extend the
 # observation charts' live range across the whole step and then report the result as a lower bound;
-# since the ledger carries exactly those charts, `achieved == bound` was true by construction and the
+# since the ledger carries exactly those observables, `achieved == bound` was true by construction and the
 # suite asserted it, hiding two physical vectors. When a projection needs an assumption to reach the
 # achieved number, that assumption is a HOLDER, not a modelling input.
 #

@@ -151,7 +151,7 @@ const FUSION_GAP_HOLDERS = Dict(
 # and the guard would make the hot loop's schedule depend on a runtime value — one code path fast,
 # the other not, and the op model above forced to fork. The saving is one pointwise exponential
 # kernel per field per stage, no transform. The general form of the fix (a stamped factor register:
-# rebuild only when the full argument tuple (D, τ, rate epoch, armed) changes, the DerivedFields
+# rebuild only when the full argument tuple (D, τ, rate epoch, armed) changes, the ObservablesCache
 # epoch pattern) subsumes this case safely and is the route to take if the residual is ever paid
 # for; a Schmidt special case is not.
 const FACTOR_VALUE_HOLDER =

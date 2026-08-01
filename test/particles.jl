@@ -103,7 +103,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dealias!(û, domain)
     state = ResolvedFields(û, scalar_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
 
     Δx = L / N

@@ -186,7 +186,7 @@ using Test
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     state = ResolvedFields(û, scalar_spectral(domain))
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     for _ in 1:80

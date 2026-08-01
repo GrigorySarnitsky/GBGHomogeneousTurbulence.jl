@@ -64,7 +64,7 @@ end
 ```
 
 The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each step from
-the advective-CFL condition (§4.5), reads the physical fields through the `DerivedFields` observation
+the advective-CFL condition (§4.5), reads the physical fields through the `ObservablesCache` observation
 cache (§4.1 — recomputed exactly when stale, so nothing must be manually refreshed), and
 treats **warm-up as a first-class verb**. By default `warmup!` advances until the flow is statistically
 stationary, watching the running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness
@@ -189,8 +189,8 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
   carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recoveries
   `velocity_to_physical!`, `vorticity_to_physical!`, `scalar_to_physical!` that evaluate those functions —
-  is homed here with the state it reads, and **`DerivedFields`** memoizes its values: an observation cache
-  of stamped chart slots (opt-in, an undeclared chart is an error) with one epoch counter per dynamical
+  is homed here with the state it reads, and **`ObservablesCache`** memoizes its values: an observation cache
+  of stamped observable slots (opt-in, an undeclared observable is an error) with one epoch counter per dynamical
   factor of the run (fields, particles). An accessor (`physical_velocity`, `physical_vorticity`) returns
   the stored field when its stamp matches the fields epoch and recomputes it first otherwise, so a stale
   read is impossible; `step!` advances the epoch as it completes, and an out-of-band mutation of the
@@ -202,7 +202,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
   preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
   to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
-  composes the `ResolvedFields` and its `DerivedFields`, and the time loop advances the state in place.
+  composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in place.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -379,7 +379,7 @@ integrator** — the reversible generator of §8 again — so the split does not
 ### 4.7 `SimulationRun` — the front door
 
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
-spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `DerivedFields`
+spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `ObservablesCache`
 observation cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling, and a clock.
 Over it:
@@ -672,7 +672,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   forcing's internal state — the extended-phase-space discipline of molecular dynamics' thermostats);
   the observation cache holds spent compute, reconstructable from the record (delete it and the
   trajectory is unchanged); and the clock and output cursors are the experimenter's logbook. The
-  `DerivedFields` charts are the tower's *algebraic* variables — solved, never integrated — and their
+  `ObservablesCache` charts are the tower's *algebraic* variables — solved, never integrated — and their
   per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
 
 ---
@@ -979,7 +979,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     its eventual siblings in the product. A six-lens naming panel with an adversarial pass fixed the slate
     (`IntegratorBuffers`, and the scratch-field names `product_physical`/`product_spectral` over the
     velocity-only `lamb`). *(Amended by decisions 30–31: the physical chart the diagnostics read is now
-    typed — the `DerivedFields` cache in `State` — the recoveries live with the state, the assembly
+    typed — the `ObservablesCache` in `State` — the recoveries live with the state, the assembly
     scratch on the `ResolvedGenerator`, and `IntegratorBuffers` holds only the scheme's registers; the
     individual-scratch-arguments discipline this entry set applies unchanged to the internals.)*
 27. **(2026-07) Phase-shift dealiasing, on `GBGPeriodicFields`' `translation_kernel`.** Adds
@@ -1031,11 +1031,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     under every strategy. The bug is the motivating instance for decision 31's seam — a stage that
     reads a mid-update intermediate is a malformed factorization, which a reified right-hand side makes
     unrepresentable.
-30. **(2026-07) The observation layer: `DerivedFields` — stamped, memoized charts over the state; the
+30. **(2026-07) The observation layer: `ObservablesCache` — stamped, memoized charts over the state; the
     recoveries move to `State`.** The physical recoveries are the **chart map** of the state — they
     read only ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and the frame — so they home in `State`
     (`Generator` imports them for its displaced evaluations; the new `Generator → State` edge respects
-    the include order). `DerivedFields` memoizes their values: preallocated slots (`:velocity`,
+    the include order). `ObservablesCache` memoizes their values: preallocated slots (`:velocity`,
     `:vorticity`), each stamped with the **fields epoch** it was computed at; an accessor
     (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
@@ -1048,10 +1048,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     tower (fields, particles), no finer — every production memoization precedent surveyed (LAMMPS
     computes' timestep stamps, OpenFOAM's registry event numbers, Fluidsim's iteration stamps) uses a
     single counter, within-step consistency is the seam's job (decision 31), and an over-fine epoch
-    system is itself a silent-staleness surface. Charts are **opt-in** (an undeclared chart errors —
+    system is itself a silent-staleness surface. Observables are **opt-in** (an undeclared one errors —
     resident GPU memory is a choice), and the cache's shared spectral scratch replaces two
     `IntegratorBuffers` slots — net one resident spectral vector *fewer* than before the layer.
-    Naming: **`DerivedFields`** was fixed by a six-lens panel (5–1 over `DerivedQuantities`, upheld by
+    Naming: **`ObservablesCache`** was fixed by a six-lens panel (5–1 over `DerivedQuantities`, upheld by
     an adversarial pass) with a license clause the docstring carries — each slot holds *a derived
     field's values*, on the grid lattice or at the tracer positions; particle content never enters —
     a recorded rename trigger (the first particle-*sourced* slot, e.g. a number density, reopens the
@@ -1059,7 +1059,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (statistics belong to `GBGStreamingStatistics`; occasional diagnostics allocate per call). Kills,
     not to be re-proposed: `Observations` (collides with `Observables`), `DerivedViews`/`StateViews`
     (a Julia view cannot be stale), `Charts` (these are non-invertible functionals, not manifold
-    charts), `Diagnostics` (the community word for scalar time series), `Snapshot` (asserts
+    observables), `Diagnostics` (the community word for scalar time series), `Snapshot` (asserts
     restart-copy structure), `DerivedQuantities` (indiscriminate extension).
 31. **(2026-07) The generator reified: `ResolvedGenerator` and the six-verb protocol; schemes shrink
     to stage arithmetic.** Closes §7's deferred item on its own terms — the reification now carries
@@ -1075,7 +1075,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     **`finalize!` on the generator is a recorded deviation** from the solver-library precedent (the
     SciML/PETSc/SUNDIALS right-hand-side objects are pure evaluators, with post-step action in
     callback layers), adopted because the projection is part of the *step's* contract, not of
-    observation: the charts, the diagnostics, and the tracer push must see the forced end-of-step
+    observation: the observables, the diagnostics, and the tracer push must see the forced end-of-step
     state, and molecular-dynamics practice places exactly this operation inside the step (a
     constraint's velocity-projection stage, a thermostat's end-of-step rescale, the trailing factor of
     a symmetric splitting). The signature becomes `step!(integrator, state, generator, domain,
@@ -1312,7 +1312,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     cache's charts are live because a **design choice** says so: the epoch-at-end contract requires
     them to survive the step, and a different design does not. Extending *those* and then reporting
     the result as the bound made the physical-vector cell a tautology — the ledger carries exactly
-    those charts, so `achieved == bound` held by construction, and the suite positively asserted the
+    those observables, so `achieved == bound` held by construction, and the suite positively asserted the
     equality.
 
     Measured on the same operation lists: the honest liveness floor is **three** physical vectors —

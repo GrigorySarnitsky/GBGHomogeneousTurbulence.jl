@@ -243,7 +243,7 @@ _ou_prepare() = [
 ]
 
 
-# IFLowStorageRK3: stage 1 reads the charts; stages 2–3 recover into the substage registers.
+# IFLowStorageRK3: stage 1 reads the observables; stages 2–3 recover into the substage registers.
 # `charts` prepends the once-per-epoch chart recomputes (the cost projection); `phase_shift`
 # switches the assemblies to the displaced-evaluation form; `ou` adds the forcing's prepare phase
 # and per-stage source.
@@ -267,7 +267,7 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, char
 end
 
 
-# IFRK2 (Heun): stage 1 through the charts, the predictor pair, the stage-2 assembly at the
+# IFRK2 (Heun): stage 1 through the observables, the predictor pair, the stage-2 assembly at the
 # predictor state, then the corrector combinations.
 function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
   ops = Op[]

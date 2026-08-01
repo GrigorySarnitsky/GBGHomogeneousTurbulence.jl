@@ -12,7 +12,7 @@
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
 # the instruments, the run layer, and the reference laws are named by their job.
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
-#   State            — the spectral state + its physical recoveries + the DerivedFields observation
+#   State            — the spectral state + its physical recoveries + the ObservablesCache observation
 #                      cache + initial conditions (the MZ State role)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
@@ -77,7 +77,7 @@ using .State:
   velocity_to_physical!,
   vorticity_to_physical!,
   scalar_to_physical!,
-  DerivedFields,
+  ObservablesCache,
   physical_velocity,
   physical_vorticity,
   resolved_fields_modified!,
@@ -151,7 +151,7 @@ using .SimulationRun:
 
 export FixedDomain,
        ResolvedFields,
-       DerivedFields,
+       ObservablesCache,
        physical_velocity,
        physical_vorticity,
        resolved_fields_modified!,

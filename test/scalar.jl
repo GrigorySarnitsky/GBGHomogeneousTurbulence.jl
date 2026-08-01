@@ -14,7 +14,7 @@ using Test
 
 function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
-  derived = DerivedFields(domain)
+  derived = ObservablesCache(domain)
   û = spectral_vector(domain)
   φ̂ = scalar_spectral(domain)
   copyto!(field_data(û), field_data(û0))

@@ -32,7 +32,7 @@ reader (a diagnostic, a particle push, a statistics callback) to the physical re
 loop would otherwise compute and discard.
 
 ```@docs
-DerivedFields
+ObservablesCache
 physical_velocity
 physical_vorticity
 resolved_fields_modified!

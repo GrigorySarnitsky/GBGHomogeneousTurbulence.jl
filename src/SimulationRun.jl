@@ -7,7 +7,7 @@
 # hand-run loop.
 #
 # Freshness is the observation cache's job, not a loop invariant: the physical u / ω are read through
-# the `DerivedFields` accessors, which recompute a chart exactly when its stamp is behind the fields
+# the `ObservablesCache` accessors, which recompute an observable exactly when its stamp is behind the fields
 # epoch that `step!` advances. The tracer push interpolates u(tₙ) onto the tracers before the step and
 # u(tₙ₊₁) after it — Heun on the two endpoint velocities, both read through the accessors. Only the M
 # interpolated vectors are held across the step, never a second copy of the field.
@@ -29,7 +29,7 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
-using ..State: ResolvedFields, DerivedFields, random_solenoidal_velocity!, random_scalar!
+using ..State: ResolvedFields, ObservablesCache, random_solenoidal_velocity!, random_scalar!
 import ..State: physical_velocity, physical_vorticity, resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness, max_speed
@@ -62,7 +62,7 @@ A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@re
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and
 the assembly scratch), the chosen integrator, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the
-[`DerivedFields`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
+[`ObservablesCache`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
@@ -145,7 +145,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `derived` — the [`DerivedFields`](@ref) observation cache (the stamped physical velocity/vorticity charts).
+- `derived` — the [`ObservablesCache`](@ref) observation cache (the stamped physical velocity/vorticity observables).
 - `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
@@ -155,7 +155,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR}
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   integrator::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
-  derived::DF              # DerivedFields: the stamped observation cache over the state
+  derived::DF              # ObservablesCache: the stamped observation cache over the state
   tracers::TR              # Tracers, or nothing
   cfl::Float64
   clock::Clock
@@ -211,7 +211,7 @@ function Simulation(domain::FixedDomain;
 
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
 
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, DerivedFields(domain),
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, ObservablesCache(domain),
                     tracers, Float64(cfl), Clock(0.0, 0))
 end
 

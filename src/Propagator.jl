@@ -13,7 +13,7 @@
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
 # imaginary-axis unstable for advection (see its docstring). Each `step!` reads the start-of-step
-# physical velocity and vorticity through the `DerivedFields` accessors — recomputed automatically when
+# physical velocity and vorticity through the `ObservablesCache` accessors — recomputed automatically when
 # stale, so no caller prefill exists to forget — and advances the cache's fields epoch on completion.
 
 """
@@ -36,7 +36,7 @@ using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..Generator: ResolvedGenerator, prepare!, finalize!,
                    velocity_rhs!, scalar_rhs!, velocity_factor!, scalar_factor!
-using ..State: ResolvedFields, DerivedFields, physical_velocity, physical_vorticity,
+using ..State: ResolvedFields, ObservablesCache, physical_velocity, physical_vorticity,
                resolved_fields_modified!, spectral_scratch,
                velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 
@@ -79,7 +79,7 @@ allocated.
 # Fields
 Shared — every scheme allocates these:
 - `vorticity_physical`, `velocity_star` — the substage velocity/vorticity registers in physical
-  representation (the start-of-step fields come from the run's `DerivedFields` charts).
+  representation (the start-of-step fields come from the run's `ObservablesCache` observables).
 - `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
   first stage for [`IFRK2`](@ref)).
 - `integrating_factor` — the register the exact linear subflow is written into each substep.
@@ -131,7 +131,7 @@ Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbo
 reified `generator` (a [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
 the equations of motion, their conditions, and their assembly scratch), the `domain`, the scheme's
 `buffers`, and the run's observation cache `derived` (a
-[`DerivedFields`](@ref GBGIsotropicTurbulence.State.DerivedFields)). Dispatches on the concrete
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.State.ObservablesCache)). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`).
 
 A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
@@ -139,7 +139,7 @@ right-hand sides and exact linear factors through the generator protocol at each
 with the generator's `finalize!` — it never assembles the physics itself. The start-of-step velocity
 and vorticity in physical representation are read through `derived`'s accessors — recomputed
 automatically when stale, so a hand-run loop needs no manual refill — and the cache's fields epoch is
-advanced when the step completes, marking every derived chart for recomputation on its next read.
+advanced when the step completes, marking every cached observable for recomputation on its next read.
 """
 function step! end
 
@@ -176,7 +176,7 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
-               domain::FixedDomain, buffers::IntegratorBuffers, derived::DerivedFields, dt::Real)
+               domain::FixedDomain, buffers::IntegratorBuffers, derived::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -191,7 +191,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
 
   for i in 1:3
     if i == 1
-      u = physical_velocity(derived, state, domain)                              # start-of-step charts
+      u = physical_velocity(derived, state, domain)                              # start-of-step observables
       ω = physical_vorticity(derived, state, domain)                             # (fresh or recomputed)
     else
       velocity_to_physical!(buffers.velocity_star, û, domain, spectral_scratch(derived))
@@ -235,7 +235,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
+  resolved_fields_modified!(derived)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 
@@ -275,7 +275,7 @@ struct IFRK2 <: AbstractIntegrator end
 
 
 function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
-               domain::FixedDomain, buffers::IntegratorBuffers, derived::DerivedFields, dt::Real)
+               domain::FixedDomain, buffers::IntegratorBuffers, derived::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -285,7 +285,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
 
   prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
-  # stage 1 — right-hand sides at the start-of-step state (read through the derived-field charts)
+  # stage 1 — right-hand sides at the start-of-step state (read through the derived-field observables)
   u = physical_velocity(derived, state, domain)
   velocity_rhs!(buffers.stage1, generator, û, u, physical_vorticity(derived, state, domain), domain)  # N̂_u,1
   if has_scalar
@@ -332,7 +332,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(derived)                     # the step advanced the fields — charts go stale
+  resolved_fields_modified!(derived)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 

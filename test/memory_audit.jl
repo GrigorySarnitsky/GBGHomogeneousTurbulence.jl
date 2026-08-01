@@ -54,12 +54,12 @@ const N_AUDIT = 8
 # Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
 # one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
 function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool;
-                charts = (:velocity, :vorticity))
+                observables = (:velocity, :vorticity))
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
   state = ResolvedFields(domain; scalar)
   velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity, domain, 0.01)
   scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar, domain, 0.01)
-  owners = Any[state, DerivedFields(domain; charts), ResolvedGenerator(domain, conditions; scalar),
+  owners = Any[state, ObservablesCache(domain; observables), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
     push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
@@ -119,12 +119,12 @@ _forcing_delta(tag, slot) =
 # field to an untracked one. This zero is the assertion, not a placeholder.
 const TRACER_DELTA = ZERO
 
-# The charts axis of the observation layer: each declared chart is one resident physical vector; the
-# spectral scratch is unconditional. The base table pins the default (both charts) — the rotational
+# The observables axis of the cache: each declared observable is one resident physical vector; the
+# spectral scratch is unconditional. The base table pins the default (both observables) — the rotational
 # generator's declared working set requires both to step, so for a stepping run the axis is pinned by
 # the physics; it is live at the API level (observation-only uses) and becomes a run axis when
 # per-component chart declarations or further charts land.
-_chart_delta(charts) = (spectral_vector = 0, physical_vector = length(charts) - 2,
+_observable_delta(observables) = (spectral_vector = 0, physical_vector = length(observables) - 2,
                         spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0)
 
 _build_forcing(tag, domain) =
@@ -277,11 +277,11 @@ const EPISODE_UNITS = [
     end
   end
 
-  @testset "ledger — the charts axis (API-level; pinned to both charts for a stepping run)" begin
+  @testset "ledger — the observables axis (API-level; pinned to both for a stepping run)" begin
     for scheme in (:RK3, :RK2), scalar in (false, true),
-        charts in ((), (:velocity,), (:velocity, :vorticity))
-      counts = ledger(domains[:TwoThirds], _scheme(scheme), scalar, NoForcing(), NoForcing(), false; charts)
-      @test counts == _add(BASE[(scheme, :TwoThirds, scalar)], _chart_delta(charts))
+        observables in ((), (:velocity,), (:velocity, :vorticity))
+      counts = ledger(domains[:TwoThirds], _scheme(scheme), scalar, NoForcing(), NoForcing(), false; observables)
+      @test counts == _add(BASE[(scheme, :TwoThirds, scalar)], _observable_delta(observables))
     end
   end
 
@@ -337,10 +337,10 @@ const EPISODE_UNITS = [
   end
 
   @testset "op lists name real registers" begin
-    # The symbolic values must correspond to actual storage: charts + scratch on DerivedFields,
+    # The symbolic values must correspond to actual storage: charts + scratch on ObservablesCache,
     # products on ResolvedGenerator, registers on IntegratorBuffers/ScalarBuffers, the OU's state
     # and noise on the forcing.
-    @test :spectral_scratch in fieldnames(DerivedFields)
+    @test :spectral_scratch in fieldnames(ObservablesCache)
     @test all(f -> f in fieldnames(ResolvedGenerator), (:product_physical, :product_spectral))
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
     SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers

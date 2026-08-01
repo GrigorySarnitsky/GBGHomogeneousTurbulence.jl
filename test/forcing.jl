@@ -34,7 +34,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
     state = ResolvedFields(û, scalar_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     for _ in 1:nsteps
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
     end
@@ -91,7 +91,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     state = ResolvedFields(û_zero, φ̂)
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     for _ in 1:40
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.01)
     end
@@ -132,7 +132,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     dealias!(û, domain)
     state = ResolvedFields(û, scalar_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = DerivedFields(domain)
+    derived = ObservablesCache(domain)
     for n in 1:200
       dt = 0.4 * (L / N) / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
