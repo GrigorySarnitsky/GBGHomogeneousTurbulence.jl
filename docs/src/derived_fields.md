@@ -3,18 +3,21 @@
 A run integrates the velocity ``\boldsymbol{u}`` and the passive scalar ``\varphi``, and no other
 field. It holds them in spectral representation as ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, and it
 knows their values only at the discrete times ``t_0, t_1, t_2, \dots`` at which its steps begin and
-end. Together they are the **state**. Tracer positions are carried forward too, by their own equation,
-but they are not fields and not part of the state.
+end. Together they are the **state**. A run may also carry tracer particles, which are instruments
+rather than a second physics — probes of the flow, with a state of their own, their positions,
+advanced by their own equation. Where this page says *the state* it means the fluid's.
 
 Everything else a run computes is a **derived quantity**: something the state at one of those times
 determines completely. The velocity in physical representation is one. So are the vorticity, the
 advection terms, the velocity sampled along a particle trajectory, and the kinetic energy — a field in
 either representation, a set of values at particle positions, or a single number. Because the state
-determines them, a run can rebuild any of them exactly. To **hold** one is to retain it between steps
-for you to read, rather than rebuild it when you ask.
+determines them, a run can rebuild any of them exactly. Each has a value at each of those times, and
+to **hold** one is for a run to retain its value at ``t_n`` so that you can read it, instead of
+discarding it and rebuilding it when you ask. You say which quantities a run holds when you configure
+it, and that is a **request**.
 
-This package makes one choice about that, and states it here rather than deriving it: **requesting a
-quantity adds nothing to what a run's step cycle computes or moves.** The *cycle* is everything a run
+This package makes one choice about what a request may cost: **a request adds nothing to what a run's
+step cycle computes or moves.** The *cycle* is everything a run
 does to get from ``t_n`` to ``t_{n+1}`` — measuring the timestep, recording the tracer velocities,
 taking the step, advecting the particles, and whatever the loop measures for its own stopping test.
 What it *moves* is counted in passes over the grid. The opposite choice is defensible: a run could do
@@ -39,8 +42,8 @@ Sections 1–5 describe the design. Where the package does not yet meet a claim 
 
 ## 1. Which quantities a run may hold
 
-Two questions decide it, and they are different questions. The first asks whether a quantity is the
-kind of thing this page is about. The second asks whether a run may hold one that is.
+Two questions decide it. The first asks whether a quantity is the kind of thing this page is about;
+the second asks whether a run may hold one that is.
 
 ### Is it a derived quantity at all?
 
@@ -51,23 +54,24 @@ A derived quantity is fixed by the state at a single ``t_n``. Two ways to fall o
   the coefficients of the time-stepping scheme is not determined by the state, so no amount of state
   will rebuild it.
 - **It is fixed at some other instant.** A Runge–Kutta stage value is determined by the state *and*
-  the discretization, so it is not the flow at any instant. For a quantity carried along a
-  trajectory, the particle's position is one of its arguments: the velocity at a *predicted* position
-  is evaluated where no particle is.
+  the discretization, so it is not the flow at any instant. A quantity carried along a trajectory
+  takes the probe's position as an argument too, so the same test binds it: the velocity at a
+  *predicted* position is a stage value of the probe's own integrator, at a position the probe never
+  occupies.
 
 A quantity failing the second way fails the first as well — a stage value depends on ``\Delta t`` — so
 where both apply, the more specific reason is the one this page gives.
 
 ### May a run hold it?
 
-Here the choice stated above does the work, and it does so twice, in two different currencies.
+The choice above answers this, in two different currencies.
 
-**In arithmetic: a run holds only what its cycle computes anyway.** A run refreshes a held value from
+**In arithmetic: a run holds only what its cycle computes anyway.** A run rebuilds a held value from
 its cycle, not from your read `(not yet — §7)`. So a quantity that nothing in the cycle computes could
 be held only by making the cycle compute it — which is precisely the work a request may not add.
 
 **In passes over the grid: a run holds only what its cycle already has whole.** This is the same
-choice in the second currency, and §3 states it where the price makes it legible.
+choice in the second currency, and §3 states it.
 
 ---
 
@@ -76,22 +80,22 @@ choice in the second currency, and §3 states it where the price makes it legibl
 Rebuilding says holding **gains** you nothing. This section is the other half: holding **loses** you
 nothing either, because a read never returns a value built from a superseded state.
 
-**The cycle refreshes a held field at its end**, from the state it has just produced `(not yet — §7)`.
-That recovery is free, and conditionally so: it is the one the next cycle's first stage would have
-performed, moved earlier, which costs nothing provided another cycle follows and its first stage reads
-what is there. At the end of a run the last refresh has no successor to donate it to.
+**The cycle rebuilds a held field at its end**, from the state it has just produced `(not yet — §7)`.
+That recovery is the one the next cycle's first stage would have performed, moved earlier, so it
+costs nothing — provided another cycle follows and its first stage reads what is there. At the end of
+a run the last rebuild has no successor to donate it to.
 
 **Only you can supersede a held value afterwards**, by changing the state outside a cycle — reseeding
 an initial condition, applying a filter. You report that by calling
 [`resolved_fields_modified!`](@ref), which advances the run's counter; a read compares that counter
 against the stamp each held value carries and rebuilds when they differ. The routines that change the
-state as part of their normal work report it themselves. Given the refresh above, this path is
+state as part of their normal work report it themselves. Given the end-of-cycle rebuild above, this path is
 exercised only after a change of your own.
 
-**Nothing refreshes a held value in mid-cycle**, because in mid-cycle there is nothing to refresh: an
-array holding a quantity for you may be the array the cycle is working in (§3 prices this), and while
-a cycle runs it carries stage values. A run refuses such a read rather than answering it with one
-`(not yet — §7)`.
+**A read in mid-cycle is refused** `(not yet — §7)`, because it asks for a value at a time that is not
+one of the ``t_n``, and there is none. An array holding a quantity for you may be the array the cycle
+is working in (§3 prices this), and mid-cycle it carries stage values — barred from being read for the
+same reason §1 bars them from being derived quantities at all.
 
 **A held number is current at the instant its cycle measured it**, which is not always the instant you
 read. Under `run!` the loop measures the maximum speed at ``t_n``, before the step, because the
@@ -117,11 +121,11 @@ three levels:
 | never has it whole | one array, **and** a grid-sized write the cycle does not already perform |
 
 A vector field on the grid is ``3N^{3}`` reals — 384 MiB at ``N = 256`` in double precision, 192 MiB
-in single. A velocity-only run under a mask rule already carries ten vector-shaped fields, five in
-each representation, so about 3.8 GiB at that size before any scalar-shaped register.
+in single. A velocity-only run under `TwoThirds` or `HouLi` already carries ten vector-shaped fields,
+five in each representation, so about 3.8 GiB at that size before any scalar-shaped register.
 
-**A run accepts the first two levels and refuses the third.** The refusal is not a judgement about
-magnitude; it is the choice of the opening in its second currency. A value the cycle forms only
+**A run accepts the first two levels and refuses the third**, following the choice of the opening in
+its second currency. A value the cycle forms only
 piecewise, inside a single traversal, would have to be written out for you, and that write is a pass
 the cycle does not already perform. Calling a value **materialized** when the cycle has it whole
 somewhere, this is the second half of §1: *a run holds only what its cycle already materializes.*
@@ -236,7 +240,7 @@ term has already built.
 | `TwoThirds`, `HouLi` | 18 inverse, 9 forward | 21 inverse, 18 forward |
 | `PhaseShift` | 36 inverse, 18 forward | 51 inverse, 36 forward |
 
-**None of these counts depends on what a run holds.** The end-of-step refresh of §2 replaces the next
+**None of these counts depends on what a run holds.** The end-of-cycle rebuild of §2 replaces the next
 cycle's first-stage recovery rather than adding to it, so a held field is recovered once per cycle
 whether or not you hold it. These transforms carry essentially all of the arithmetic — one scalar
 transform costs of order ``10^{2}`` operations per grid point, while each pointwise operation above
@@ -262,8 +266,8 @@ default, so the sampled velocity is continuously differentiable along a trajecto
 
 ## 5. What a run holds for this system
 
-The state and the tracer positions are always present. Tracers consume a derived field and produce
-values at points; they never hold a field. The table below covers what a cycle computes from the
+Both states are always present, the fluid's and the probes'. Tracers consume a derived field and
+produce values at points; they never hold a field. The table below covers what a cycle computes from the
 state.
 
 **Held** takes the three values of §3: *on request*, *without asking*, *never*. Where a quantity is
@@ -287,7 +291,7 @@ quantity is never formed anywhere.
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}``; a rescaling forcing | — | never | not computed: a field-proportional forcing materializes its rate but never the product, and a rescaling has no rate at all |
 | an additive stochastic ``\boldsymbol{f}`` | spectral, grid | never | not a derived quantity: depends on the forcing's internal variables |
 | stage values of ``\boldsymbol{u}``, ``\boldsymbol{\omega}``, ``\varphi`` | physical, grid | never | not a derived quantity: fixed at a stage, not at a ``t_n`` |
-| velocity at the predicted particle position | ``M\times3`` at points | never | not a derived quantity: evaluated where no particle is |
+| velocity at the predicted particle position | ``M\times3`` at points | never | not a derived quantity: a stage value of the probe's integrator, at a position it never occupies |
 | ``E(\kappa)``, the integral scale | per shell | never | not computed: nothing in a cycle forms them |
 
 ### 5.1 The pressure is absent, *dissipation* names three objects, and only one tracer sample samples the flow
@@ -363,7 +367,7 @@ of §5 is design. The gaps, and why each stands:
 
 - **A run builds a held field when you first read it, not at the end of the preceding cycle.** The
   transform count is the same either way, since the next cycle's first stage consumes what a read
-  builds; what the eager refresh buys is a read between cycles that computes nothing, and the epoch
+  builds; what the eager rebuild buys is a read at ``t_n`` that computes nothing, and the epoch
   bookkeeping is written for invalidation rather than for deposit.
 - **A held field and the array a cycle works in are separate arrays**, so requesting a field costs a
   new allocation rather than a forgone overwrite. Sharing them requires the mid-cycle read to be refused, which is not yet implemented.
