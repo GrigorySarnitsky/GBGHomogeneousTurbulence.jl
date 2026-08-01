@@ -1,9 +1,10 @@
 # Derived quantities
 
-A run integrates the velocity ``\boldsymbol{u}`` and the passive scalar ``\varphi``, and no other
-field. It holds them in spectral representation as ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, and it
-knows their values only at the discrete times ``t_0, t_1, t_2, \dots`` at which its steps begin and
-end. Together they are the **state**. A run may also carry tracer particles. These are instruments
+A run integrates two fields and no others: the velocity ``\boldsymbol{u}`` and the passive scalar
+``\varphi``. The two of them at one instant make up the **state**, which a run holds in spectral
+representation as ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``. A run has the state at ``t_0``, then
+at ``t_1``, and so on through the discrete times where its steps begin and end; between those times it
+has no state at all. A run may also carry tracer particles. These are instruments
 rather than a second physics — probes of the flow, each with a state of its own, its position,
 advanced by its own equation. Where this page says *the state*, it means the fluid's.
 
@@ -21,7 +22,7 @@ step cycle computes or moves.** The *cycle* is everything a run does to get from
 ``t_{n+1}``. It measures the timestep, records the tracer velocities, takes the step, advects the
 particles, and measures whatever its stopping test needs. What it *moves* is counted in passes over
 the grid. The opposite choice is defensible: a run could do
-extra work in its cycle so that a request became free at the point of reading. This one does not, so
+extra work in its cycle so that a request became free at the point of reading. This package does not, so
 how you configured the run and the stopping condition you gave it fix what a cycle costs — never what
 you later ask to see.
 
@@ -260,7 +261,7 @@ second cost level of §3, in the concrete. That saving is unavailable today: the
 product guards against writing into one of its own operands, allocating a temporary and copying back,
 which costs more than the array it would save.
 
-A cycle advances each tracer position with a two-stage scheme. It samples the velocity at the start of
+A cycle advances each tracer position with a two-stage scheme. The scheme samples the velocity at the start of
 the step, at the particle's position, and at the end of the step, at a **predicted position the
 particle never reaches**. Both samples are ``M\times3`` arrays for ``M`` particles, interpolated from
 the physical velocity field with the tracer set's interpolation scheme — a Catmull–Rom spline by
@@ -326,7 +327,7 @@ velocity but is a stage value of the integrator, so a run does not expose it.
 
 !!! note "These calls are provisional"
     How you assemble and drive a run is not settled, so the calls below may change. The rules of
-    §§1–5 hold whatever they become.
+    §§1–5 hold whatever those calls become.
 
 You read the two held fields that exist today from a run:
 
