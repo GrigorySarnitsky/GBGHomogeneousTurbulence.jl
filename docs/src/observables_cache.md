@@ -8,15 +8,15 @@ representation as ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``. A run has the st
 ``t_0, t_1, t_2, \ldots, t_n, \ldots``, and between those times the run has no state.
 
 Everything else a run computes is an **observable** — a function of the state at one ``t_n``, and
-therefore rebuildable from the state exactly. Some are fields in either representation, some are
-values at particle positions, and some are single numbers.
+therefore rebuildable from the state exactly. Some observables are fields in either representation,
+some are values at particle positions, and some are single numbers.
 
 Components of a run need the same observable within one iteration. The velocity in physical
-representation is the clearest case: at ``t_n`` the timestep control reduces it for the advective CFL,
-the tracer set interpolates it onto the particles to start their push, and the generator's first stage
-assembles the Lamb vector from it. Left to themselves they would each recover it from
-``\hat{\boldsymbol{u}}`` and keep a copy — three recoveries and three resident fields where one of
-each suffices.
+representation is the clearest case: at ``t_n`` the timestep control needs its maximum for the
+advective CFL, the tracer set interpolates it onto the particles to start their push, and the
+generator's first stage assembles the Lamb vector from it. Left to themselves they would each recover
+it from ``\hat{\boldsymbol{u}}`` and keep a copy — three recoveries and three resident fields where
+one of each suffices.
 
 The **observables cache** is where a component puts a value another component will read, instead of
 holding it privately. To **cache** an observable is to keep its value at ``t_n`` there until something
@@ -24,37 +24,43 @@ reads it; the storage one cached observable occupies is its **slot**. An externa
 callback, a statistics accumulator — reads through the same door, but the cache exists for the run's
 own components, not for the consumer.
 
-An **iteration** is everything a run does between ``t_n`` and ``t_{n+1}``: it measures the timestep,
-records the tracer velocities, takes the step, advects the particles, and performs whatever reductions
-its stopping test needs. It strictly contains the **step**, which advances
-``(\hat{\boldsymbol{u}}, \hat\varphi)`` and is itself divided into the **stages** of the time scheme;
-the timestep measurement and the tracer record sit in the iteration but outside the step. Every rule
-below follows from one design choice, stated here rather than derived:
+An **iteration** is everything a run does to advance from ``t_n`` to ``t_{n+1}``: the timestep
+choice, the step, the particle push, and the deposits at its end. It strictly
+contains the **step**, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
+divided into the **stages** of the time scheme; the particle push and the deposits sit in the
+iteration but outside the step. At each boundary ``t_n``, before any iteration runs, sits the
+**observation**: the caller's callback reads the state and the cache, records what it wants, and
+decides whether the run continues `(not yet — §6)`. Every rule of the cache architecture below
+follows from one design choice, stated here rather than derived:
 
-> **Caching an observable adds nothing to what an iteration computes or moves.**
+> **Caching an observable adds nothing to what an iteration computes, moves, or stores.**
 
-To **compute** is to do arithmetic; to **move** is to carry bytes between memory and the processor.
-The two are separate costs, and on the GPU this package targets, the second usually dominates: a
-pointwise multiplication over a grid costs about ten arithmetic operations per point against
-twenty-four bytes moved. Traffic here comes in whole-array sweeps, so the unit of movement is one
-**pass** over the grid — a traversal touching every grid point once.
+To **compute** is to do arithmetic; to **move** is to carry bytes between memory and the processor;
+to **store** is to keep bytes resident. The first two are the halves of an iteration's cost in time,
+and on the GPU this package targets, the second usually dominates: a pointwise multiplication over a
+grid costs about ten arithmetic operations per point against twenty-four bytes moved. Traffic here
+comes in whole-array sweeps, so the unit of movement is one **pass** over the grid — a traversal
+touching every grid point once. Storing is the cost in memory, the axis this package minimizes
+first.
 
-The choice therefore bounds an iteration's cost **in time**, both halves of it. It deliberately does
-not bound cost in **memory**: a cached value occupies an array nothing else would need, and §3 is
-about exactly that price. The opposite choice is defensible — an iteration could do extra work so that
-a later read costs nothing — but this package caches only what some component computes anyway, so an
-iteration's cost follows from the configuration and the stopping condition, never from what is read
-afterwards.
+The choice therefore closes every cost axis at once: an iteration's arithmetic, traffic, and
+residency all follow from the configuration, never from what is read afterwards. The opposite choice
+is defensible — an iteration could do extra work, or keep extra arrays, so that a later read finds
+more — but this package caches only what the iteration produces anyway. What the choice gives up is
+control over the contents: since nothing may be added on any axis, what the cache holds is decided by
+the solver's own schedule, not by the reader — §1 derives the contents and §3 states that price.
 
 Tracer particles are instruments rather than a second physics: probes of the flow, each carrying a
-state of its own — its position — advanced by its own equation. Where this page says *the state*, it
+state of its own — its position — which its own equation advances. Where this page says *the state*, it
 means the fluid's.
 
 ---
 
-## 1. What the cache may hold
+## 1. What the cache holds
 
-Two questions settle the matter, in order.
+Nothing is cached by request, and there is no vocabulary to declare: the contents are derived from
+the configuration `(not yet — §6)`. An observable is cached exactly when it passes four tests — the
+first a matter of kind, the other three the design choice read along its three axes.
 
 **Is the quantity an observable?** It must be determined by the state at a single ``t_n`` — by the
 state alone, in every argument. A quantity carrying anything else fails: the step size ``\Delta t``, a
@@ -71,23 +77,26 @@ trajectory does not, so it is the flow at no time at all. The velocity a tracer 
 position is one the probe never occupies, so as a quantity along the trajectory it belongs to no
 ``t_n`` either.
 
-**May the cache hold it?** The design choice says caching adds nothing to what an iteration computes
-or moves, and that is two claims, one per half of the cost. Each becomes a test:
+**Computed — some component must produce it anyway.** This is the arithmetic axis: the iteration
+fills the cache as it produces the values `(not yet — §6)`, and an observable no component computes
+could enter only by making the iteration compute it, which the choice forbids. This test is where
+``\varepsilon`` and ``k`` fall out: each is one reduction away from the cached fields, but no
+component of the iteration performs that reduction, so the cache cannot hold them — whoever wants one
+computes it at an observation (§5).
 
-- **Arithmetic — some component must compute it anyway.** An iteration fills the cache as it produces
-  the values `(not yet — §6)`. An observable no component computes could enter the cache only by
-  making the iteration compute it, which the choice forbids.
-- **Traffic — some component must already hold it whole.** Writing out a value that exists only
-  piecewise inside one traversal costs a pass the iteration does not already perform. A value is
-  **materialized** when a component has it whole somewhere; the cache holds nothing that is not
-  materialized.
+**Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
+that exists only piecewise inside one traversal costs a pass the iteration does not already perform.
+The maximum-speed reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once, forming the
+speed at every grid point and keeping only the largest, so the *maximum* is materialized — one number
+— while the speed *field* is never whole anywhere and cannot be cached.
 
-The second test excludes the integrand of a fused reduction. To compute ``k``, an iteration sums
-``\lvert\hat{\boldsymbol{u}}(\boldsymbol{\kappa})\rvert^{2}`` over wavenumbers in one traversal,
-forming every value and keeping none. Those values are twice the modal energy density, a field an
-anisotropy study wants; writing it out would cost a grid-sized store, though no new arithmetic. It
-is not ``E(\kappa)``, which is half the sum of those values over each wavenumber shell and needs a
-binning pass.
+**Surviving — the schedule must leave it at the boundary, in a register the iteration already
+owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
+the register its producer computed it in `(not yet — §6)`. An observable is therefore cached exactly
+when the iteration's schedule still holds it whole when the boundary arrives, and register reuse is
+what removes one: a register overwritten before the boundary has nothing left to stamp. The contents
+are consequently a property of the solver's storage decisions, not a promise — §4.3's blocked reuse
+keeps the vorticity in the cache today, and landing that reuse will take it out (§3).
 
 ---
 
@@ -95,85 +104,103 @@ binning pass.
 
 **Nothing in the cache is ever recomputed.** The schedule is fixed when the cache is built and runs
 identically on every iteration: the same observables are deposited, at the same point, by the same
-components. A read either finds the value that the schedule left, or fails. There is no path —
+components. A read either finds the value that the schedule left, or throws. There is no path —
 internal or on request — by which reading causes a computation.
 
-That is what makes the rules below refusals rather than inconveniences. A cache that quietly rebuilt a
-stale value could never report a scheduling error; it would convert one into a doubled transform count
-that no ledger catches, since a ledger freezes the intended schedule. Because the schedule is fixed,
-an iteration's transform and traffic counts are exact constants of the configuration rather than
-averages over a run, and the frozen ledgers report the true cost.
+That is what makes the rules below refusals rather than inconveniences. A cache that quietly rebuilt
+a stale value could never report a scheduling error; it would convert one into a doubled transform
+count that no ledger catches, since a ledger freezes the intended schedule. Because the schedule is
+fixed, an iteration's transform and traffic counts are exact constants of the configuration rather
+than averages over a run, and the frozen ledgers report the true cost.
 
-**The iteration deposits at its end**, from the state it has just produced `(not yet — §6)`. That
-recovery — the inverse transform producing the field in physical representation — is the next
-iteration's first-stage recovery moved earlier, so it costs nothing: the next iteration reads instead
-of recovering. The deposit seeding the initial state is free on the same terms, since the first
-iteration reads it instead of recovering, but it must happen when the cache is built or the first read
-at ``t_0`` finds nothing. Only the last deposit of a run has no successor to fold into, so a run of
-``n`` iterations pays ``n+1`` recoveries where building on demand would pay ``n`` — one extra per run,
-not per iteration.
+**Everything is deposited at the tail of the iteration, from the state it has just produced**
+`(not yet — §6)`. For a field the deposit is the next iteration's first-stage recovery moved earlier,
+so it costs nothing: the next iteration reads instead of recovering. The move is more general than
+the recoveries. Everything in the next step's first stage that depends on the state alone — the
+recoveries, the quadratic products, their dealiasing and projection — can run at the tail,
+value-identical because nothing between the tail and the next first stage touches the state, and at
+an unchanged transform count; only the forcing's contribution stays behind, since it needs the step
+size the next iteration has not yet chosen. The numbers and the particle sample ride the same
+schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
+timestep choice, and the trajectory sample is interpolated from that velocity at each particle's new
+position for the next push's predictor.
 
-**A stamp says what a slot holds** `(not yet — §6)`, and takes three values: the observable at a named
-``t_n``, or the producer's scratch, or nothing yet deposited. A read is served only in the first case,
-and only when the named time is the current one; otherwise it raises. What a stale read reports is
-that the schedule is wrong — the caller asked at a moment the schedule does not fill — and the only
-repair is to fix the schedule.
+**The observation comes before the iteration** `(not yet — §6)`. At each boundary the callback reads
+what it wants and answers whether the run continues; only then does the next iteration run. Stopping
+is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
+instance, is a callback that accumulates ``\Delta t/\tau`` and says stop. Every boundary a run
+reaches is observed exactly once: the first because a deposit seeding the initial state is made when
+the cache is built `(not yet — §6)`, the last because the observation that stops the run has already
+read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
+tail has no following iteration to fold into — it serves the final observation instead — so, relative
+to a solver with no cache serving only its own dynamics, the run pays one extra tail: the state-only
+share of one first-stage evaluation, one reduction, and one interpolation, per run rather than per
+iteration.
 
-**A slot belongs to the component that produces it** `(not yet — §6)`, which owes a correct value and
-stamp at every boundary. Any component may take the array as scratch mid-iteration, and taking it
+**A stamp says what a slot holds** `(not yet — §6)`, and takes three values: the observable at a
+named ``t_n``, or the producer's scratch, or nothing yet deposited. A read is served only in the
+first case, and only when the named time is the current one; otherwise it throws. What a stale read
+reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
+the only repair is to fix the schedule.
+
+**A slot belongs to the component that produces it** `(not yet — §6)`; that component owes a correct
+value and stamp at every boundary. Any component may take the array as scratch mid-iteration, and taking it
 clears the stamp; this is what would let the Lamb vector be assembled into the vorticity's own slot
 rather than the third array §4.3 accounts for. While the slot holds the Lamb vector its stamp says
-*scratch*, so a read raises rather than returning a mislabelled field. Taking a slot costs no
-transform, since the owner deposits at the end of the iteration from the state it has just produced,
-which it would recover anyway. What it costs is reads: a slot taken before the last reader of that
-observable makes that read raise, so the schedule must order the two.
+*scratch*, so a read throws rather than returning a mislabelled field. Taking a slot costs no
+transform, since the owner deposits at the tail from the state it has just produced, which it would
+recover anyway. What it costs is reads: a slot taken before the last reader of that observable makes
+that read throw, so the schedule must order the two.
 
-**Every declared slot is deposited every iteration**, and a boundary reached with one still unstamped
-raises `(not yet — §6)`. A slot nobody fills would hold scratch for the rest of the run and raise on
-every later read; checking at the boundary names the fault where it happened.
+**Every slot is deposited on every iteration**, and the boundary check throws if a slot is still
+unstamped there `(not yet — §6)`. No caller can cause this — a slot exists only because the schedule fills it
+— so the check guards the solver against itself: a slot nobody refilled would hold scratch for the
+rest of the run and throw on every later read, and the boundary check names the fault where it
+happened.
 
-Code that writes the state outside an iteration — a reseed, a filter — must announce it by calling
-[`resolved_fields_modified!`](@ref), which clears every stamp `(not yet — §6)`, so that reads raise
-until the next deposit. That interval belongs to whoever made the change: the recoveries are exported,
-so a caller who mutates the state mid-run computes what they need themselves, in their own buffer.
+Code that writes the state outside an iteration — a reseed, a filter — must announce the change by
+calling [`resolved_fields_modified!`](@ref), which clears every stamp `(not yet — §6)`, so that reads
+throw
+until the next deposit. That interval belongs to whoever made the change: the recoveries are
+exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
+buffer.
 
-Numbers follow the same rule on a different schedule. Under `run!` the loop measures the maximum speed
-at ``t_n`` because the timestep control needs it to choose ``\Delta t``, and measures ``\varepsilon``
-and ``k`` there too when the run is budgeted in turnovers or stopped on a condition. They are stamped
-at ``t_n`` like every other observable `(not yet — §6)`, so a stopping test called before the step
-reads ``\varepsilon`` for free, and a read after the step raises rather than returning the previous
-boundary's value.
+**The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
+any other — deposited at the tail, stamped there, and read by the next iteration's timestep choice,
+which does scalar arithmetic on it and measures nothing `(not yet — §6)`. It is the only number the
+iteration produces, so it is the only number the cache holds; ``\varepsilon``, ``k``, or a variance
+is each one reduction away from the cached fields, performed by the observation that wants it (§5).
 
 ---
 
 ## 3. What caching costs
 
-Caching changes no transform an iteration performs (§4.3), so beyond the one extra recovery per run of
-§2 it is a memory decision and never a time decision. It costs at one of three levels:
+It costs nothing, on any of the three axes. That is bookkeeping, not a slogan: every slot is a
+register the iteration fills anyway (§1), every deposit is work the next first stage was about to do
+(§2), and no
+read computes. The cache is a naming-and-stamping layer over storage the run already owns: removing
+it would free no array, and the only work it adds is §2's final tail — the one tail whose deposits no
+iteration consumes, kept because it serves the final observation, and paid per run rather than per
+iteration.
 
-| what the producing component does with the value | cost of caching it |
-|---|---|
-| holds it whole and does not need that array again | nothing |
-| holds it whole but needs that array again | one array, for the component to write its next result elsewhere |
-| never holds it whole | one array **and** a grid-sized store — refused (§1) |
+What the design pays instead is control over the contents. Since nothing may be added, what the cache
+holds is decided by the solver's minimal-memory schedule, and it changes when the solver's storage
+decisions change: §4.3's blocked reuse keeps ``\boldsymbol{\omega}`` in the cache today, and the
+release that lands the reuse removes it. §5's table is therefore a consequence of the configuration
+and the package version, not an interface a reader chooses from.
 
-A vector field on the grid is ``3N^{3}`` reals: 384 MiB at ``N = 256`` in double precision, 192 MiB in
-single. A velocity-only run under `TwoThirds` or `HouLi` carries ten vector-shaped fields, five in each
-representation — about 3.8 GiB at that size, before the scalar-shaped registers.
+A reader who needs an absent observable computes it at an observation, from the state or the cached
+fields, with the exported recoveries and reductions — in storage they own. The sizes say when that is
+a real decision: a vector field on the grid is ``3N^{3}`` reals, 384 MiB at ``N = 256`` in double
+precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
+third of a gigabyte; a number costs nothing worth counting.
 
-Which observables a run caches is fixed when its [`ObservablesCache`](@ref) is constructed, and a run's
-footprint follows from that declaration. Declaring an observable no configured component produces is
-an error at construction rather than a failure at the first read `(not yet — §6)`, and one not
-declared at all is absent, so reading it raises. Which level a field sits at is a property of the
-configuration, so the cache can price a declaration when it is made and report what the declared set
-added `(not yet — §6)`; §5 states the cost wherever it is not the first level. Over-declaring stays a
-legitimate choice, paid knowingly.
-
-Numbers are cached without declaration `(not yet — §6)`, because ``O(1)`` of storage is not worth a
-decision. Which numbers an iteration computes depends on the run. A turnover-budgeted or
-condition-stopped `run!` measures ``\varepsilon`` and ``k`` each iteration, and an adaptive timestep
-measures the maximum speed; a `warmup!` watching for stationarity measures the derivative skewness at
-its sampling cadence, and the scalar variance too when the run carries a forced scalar.
+For scale: a velocity-only run under `TwoThirds` or `HouLi` today carries ten vector-shaped fields,
+five in each representation — about 3.8 GiB at ``256^{3}`` in double precision, before the
+scalar-shaped registers. Two of the ten exist only because a slot and its producer's register are
+separate arrays today; merging them as §1 describes removes both `(not yet — §6)`, and the same run
+carries eight. Landing §4.3's blocked reuse would remove a third array — and the vorticity's row of
+§5 with it.
 
 ---
 
@@ -181,8 +208,8 @@ its sampling cadence, and the scalar variance too when the run carries a forced 
 
 One configuration fixes the system: a mask dealiasing rule (`TwoThirds` or `HouLi`, each removing the
 aliased wavenumbers by a per-wavenumber multiplication), a three-stage scheme, the default rescaling
-velocity forcing, an adaptive timestep. Those axes and the stopping condition fix an iteration's work;
-a declaration does not.
+velocity forcing, an adaptive timestep. Those axes fix the whole of an iteration's work — stopping belongs
+to the observation (§2), and nothing a reader does changes what an iteration computes.
 
 ### 4.1 The equations
 
@@ -255,7 +282,7 @@ transform it back (3 forward); apply ``\mathbb P`` and the mask, both per-wavenu
 | `PhaseShift` | 36 inverse, 18 forward | 51 inverse, 36 forward |
 
 **No count depends on what the cache holds.** The deposit replaces the next iteration's first-stage
-recovery rather than adding to it, so an iteration recovers a field once whether or not it is cached.
+work rather than adding to it, so an iteration recovers a field once whether or not it is cached.
 These transforms carry essentially all of the arithmetic: a scalar transform costs of order ``10^{2}``
 floating-point operations per grid point, a pointwise multiplication of order ten.
 
@@ -265,42 +292,46 @@ array, as §2 describes, would need two. The backend's cross product blocks that
 against writing into one of its own operands by allocating a temporary and copying back, and the copy
 costs more than the one array the reuse would save. Taking the reuse therefore waits on a backend path
 that permits the in-place write, the kernel itself being safe — each output element reads only its own
-grid point.
+grid point. While the third array stands, the vorticity survives to the boundary and is cached;
+landing the reuse removes the array and, with it, the vorticity's row in §5.
 
-The tracer scheme samples the velocity twice. The first sample, the **trajectory sample**, is taken at
-``t_n`` at the particle's own position; the second at ``t_{n+1}``, at a predicted position the particle
-never reaches. Both are ``M\times3`` arrays, interpolated with the
-tracer set's scheme — a Catmull–Rom spline by default, so the sampled velocity is continuously
-differentiable along a trajectory.
+The tracer scheme consumes two velocity samples per push. The first, the **trajectory sample**
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the cache's deposit from the previous tail
+`(not yet — §6)`; the second is evaluated at ``t_{n+1}``, at a predicted position the particle never
+reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
+spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 ---
 
 ## 5. What this system caches
 
 Both states are always present — the fluid's and the probes'. Tracers consume a field and produce
-values at points; they hold no field. **Cached** takes three values: *declared*, named when the cache
-is constructed; *always*, cached without a declaration, as the numbers of §3 are; and *never*, refused
-by §1. **Built** says whether the package holds it today; it is `—` where *Cached* is *never*.
+values at points; they hold no field. **Cached** takes four values: *yes*, the schedule leaves the
+observable at the boundary; *depends*, the observable survives in some configurations and not in
+others; *no*, an observable the iteration does not surface, one act away at an observation; and
+*never*, failing §1's kind or materialization tests. **Built** says whether the package holds the
+observable today; the column reads `—` wherever *Cached* is not *yes*.
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
 |---|---|---|---|---|
-| ``\boldsymbol{u}`` | physical, grid | declared | yes | stage 1; read by the CFL, the tracers, the Lamb assembly |
-| ``\boldsymbol{\omega}`` | physical, grid | declared | yes | stage 1; read by the Lamb assembly. Costs one array while §4.3's reuse is blocked |
-| ``\varphi`` | physical, grid | declared | no | stage 1; read by the flux assembly |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | declared | yes | recorded before the step; read by `advect!` and by Lagrangian statistics |
-| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | declared | no | the generator; costs one array |
-| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | declared | no | the generator; costs one array |
-| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | declared | no | the generator; each later stage reuses the array, and a scalar reuses it for the flux |
-| ``\varepsilon``, ``k``, max speed, ``\langle\varphi^{2}\rangle``, skewness | one number | always | no | the loop, when the run's options measure them (§3) |
-| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | declared | no | the skewness gate of `warmup!` materializes and discards both; no `run!` iteration forms them |
-| ``\lvert\hat{\boldsymbol{u}}\rvert^{2}`` per mode | spectral, grid | never | — | not materialized: formed inside a fused reduction (§1) |
+| ``\boldsymbol{u}`` | physical, grid | yes | yes | the tail recovery; read by the timestep choice, the tracer push, the Lamb assembly, and observations |
+| ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the tail recovery; stays cached exactly while §4.3's reuse is blocked |
+| ``\varphi`` | physical, grid | yes | no | the tail recovery; read by the flux assembly |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
+| the maximum speed | one number | yes | no | the tail reduction over the cached velocity; read by the next timestep choice |
+| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | yes | no | the relocated first-stage evaluation (§2); read by the next step's first stage |
+| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | yes | no | the relocated first-stage evaluation (§2); read by the next step's first stage |
+| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | depends | — | survives the tail of a velocity-only run; with a scalar, the flux ``\boldsymbol{u}\varphi`` reuses its register and is the survivor instead |
+| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
+| ``E(\kappa)`` | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
+| the integral scale | one number | no | — | not computed: no iteration forms it |
+| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | never | — | not materialized: formed pointwise inside the maximum-speed reduction and kept nowhere (§1) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | never | — | not computed: applied as a multiplier (§4.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}``; a rescaling forcing | — | never | — | not computed: the rate exists, the product does not; a rescaling has no rate |
 | an additive stochastic ``\boldsymbol{f}`` | spectral, grid | never | — | not an observable: depends on the forcing's internal variables |
 | stage values of ``\boldsymbol{u}``, ``\boldsymbol{\omega}``, ``\varphi`` | physical, grid | never | — | not an observable: carries ``\Delta t`` and the scheme's coefficients |
 | velocity at the predicted particle position | ``M\times3`` at points | never | — | not an observable: the probe occupies no such position |
-| ``E(\kappa)`` | per shell | never | — | not computed: no iteration forms it |
-| the integral scale | one number | never | — | not computed: no iteration forms it |
 
 ### 5.1 Three points the table alone does not settle
 
@@ -312,12 +343,12 @@ combination, from which ``\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}`` must be s
 **Three objects are called dissipation.** The viscous term is the first, and §4.2 shows why no array
 holds it. A local dissipation field is the second, and it comes in two forms: the true one
 ``2\nu S_{ij}S_{ij}(\boldsymbol{x})``, and the vorticity-based
-``\nu\lvert\boldsymbol{\omega}\rvert^{2}(\boldsymbol{x})``, formable pointwise from a cached vorticity.
-The two differ by a divergence, so they agree only in the mean and are not interchangeable pointwise.
-The rate ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^{2}\rangle`` is the third — a
-number, obtained by summing over wavenumbers without building any field, and what
-[`dissipation`](@ref) returns. It may be written with either form precisely because they agree in the
-mean.
+``\nu\lvert\boldsymbol{\omega}\rvert^{2}(\boldsymbol{x})``, formable pointwise from the cached
+vorticity. The two differ by a divergence, so they agree only in the mean and are not interchangeable
+pointwise. The rate ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^{2}\rangle`` is the
+third — a number, obtained by summing over wavenumbers without building any field, and what
+[`dissipation`](@ref) returns when an observation applies it to the state. It may be written with
+either form precisely because they agree in the mean.
 
 **Only one tracer sample reflects the flow.** The trajectory sample
 ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` gives the velocity at the particle's own position and
@@ -344,30 +375,35 @@ domain = FixedDomain(64, 2π; dealiasing = TwoThirds(), element_type = Float64, 
 cache  = ObservablesCache(domain; observables = (:velocity, :vorticity))
 ```
 
-Today the cache holds only the velocity and the vorticity; the trajectory sample is held by the
-particle set. Every other row of §5 is design, and so is every claim §§1–3 mark `(not yet — §6)`.
-Seven gaps remain, each for a reason:
+Today the cache holds only the velocity and the vorticity, builds them on demand, and takes a
+declaration; the trajectory sample is held by the particle set. Every other row of §5 is design, and
+so is every claim §§1–4 mark `(not yet — §6)`. Eight gaps remain, each for a reason:
 
 - **A field is built when it is first read, and a stale read silently rebuilds it.** The transform
   count is the same either way, since the next iteration's first stage consumes what a read builds;
-  what the deposit buys is a read at ``t_n`` that computes nothing and a stale read that raises. The
+  what the tail deposit buys is an observation that computes nothing and a stale read that throws. The
   stamp bookkeeping is written to trigger a rebuild, not to refuse one — a single epoch counter that
   [`resolved_fields_modified!`](@ref) advances, rather than a stamp per slot that it clears.
 - **A slot and the array its producer works in are separate arrays.** There is no scratch reuse and so
-  no stamp-clearing, and a declaration costs a new allocation rather than a forgone overwrite. Sharing
-  them requires refusing the mid-iteration read, which follows from the schedule above and is not
+  no stamp-clearing, and each cached field costs an allocation rather than nothing. Merging them
+  requires refusing the mid-iteration read, which follows from the schedule above and is not
   implemented.
-- **Nothing checks that every declared slot was deposited**, and the initial state is not deposited at
-  all. Callbacks also fire only after the step, so there is no read point at ``t_0`` for a deposit to
-  serve: ``n`` iterations have ``n+1`` boundaries, and the loop offers ``n`` of them.
-- **A declaration is not validated against the configured components and its price is not reported.**
-  Declaring an observable nothing produces is accepted and fails later; the added residency is
-  computable at construction but not shown.
-- **No numbers are cached**, so the reductions a loop already performs are discarded and a later
-  consumer repeats them.
-- **`Simulation` passes no `observables` argument**, so a declaration is reachable only by assembling
-  a run's pieces directly. No narrower set is legal today: a step recovers both the velocity and the
-  vorticity at its first stage, whatever a declaration says.
+- **The contents are declared, not derived.** The constructor takes the set to cache as its
+  `observables` keyword, accepts a name nothing produces, and lets the mistake surface only at a later
+  read; under the automatic contents of §1 the keyword disappears. No narrower set is real today
+  anyway: a step recovers both the velocity and the vorticity at its first stage, whatever the
+  declaration says.
+- **Nothing is deposited at the tail, and nothing checks the boundary.** The initial state is not
+  deposited when the cache is built, and no check finds a slot left unstamped at a boundary.
+- **No number is cached.** The loop re-measures the maximum speed at the head of every iteration and
+  discards it — the reduction §2 deposits once at the tail.
+- **Stopping belongs to `run!`, not to the observation.** The loop takes its budget and stopping
+  condition as arguments (`turnovers`, `time`, `steps`, `stop`), measures ``\varepsilon`` and ``k``
+  itself when the budget or the stopping condition needs them, and ignores the callback's return
+  value, so a callback cannot stop the run.
+- **The callback fires only after the step.** A run of ``n`` iterations offers ``n`` observations of
+  its ``n+1`` boundaries; the initial state — the seeded spectrum a validation run most wants — is
+  never observed.
 - **The trajectory sample lives with the particle set**, and the sample's own documentation states
   whether it is current, rather than a stamp carrying that status.
 
