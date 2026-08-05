@@ -300,11 +300,12 @@ spline by default, so the sampled velocity is continuously differentiable along 
 ### 2.4 What it caches
 
 Both states are always present — the fluid's and the probes'. Tracers consume a field and produce
-values at points; they hold no field. **Cached** takes four values: *yes*, the schedule leaves the
-observable at the boundary; *depends*, the observable survives in some configurations and not in
-others; *no*, an observable the iteration does not surface, one act away at an observation; and
-*never*, failing §1.2's kind or materialization tests. **Built** says whether the package holds the
-observable today; the column reads `—` wherever *Cached* is not *yes*.
+values at points; they hold no field. The table below lists the observables of this system, one row
+each. Its **Cached** column takes four values: *yes*, the schedule leaves the observable at the
+boundary; *depends*, the observable survives in some configurations and not in others; *no*, an
+observable the iteration does not surface, one act away at an observation; and *never*, failing
+§1.2's kind or materialization tests. Its **Built** column says whether the package holds the
+observable today, and reads `—` wherever *Cached* is not *yes*.
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
 |---|---|---|---|---|
