@@ -3,7 +3,7 @@
 # active strategy (a strategy that keeps more modes takes a smaller step).
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data
+using GBGPeriodicFields: field_data, materialize_kernel
 using Random
 using Test
 
@@ -14,7 +14,7 @@ using Test
   @testset "TwoThirds sharp kernel is the default" begin
     domain = FixedDomain(N, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test domain.dealiasing isa TwoThirds
-    mask = real.(field_data(domain.dealias))
+    mask = real.(field_data(materialize_kernel(domain.dealias).field))
     @test all(m -> m == 0 || m == 1, mask)             # sharp 0/1 truncation
     @test any(==(1), mask) && any(==(0), mask)         # both kept and cut modes present
   end
@@ -22,12 +22,12 @@ using Test
   @testset "HouLi smooth filter" begin
     domain = FixedDomain(N, L; dealiasing = HouLi(), element_type = Float64, array_type = Array)
     @test domain.dealiasing isa HouLi
-    g = real.(field_data(domain.dealias))
+    g = real.(field_data(materialize_kernel(domain.dealias).field))
     @test all(x -> -1e-12 ≤ x ≤ 1 + 1e-12, g)          # a transfer function in [0,1]
     @test maximum(g) ≈ 1 rtol = 1e-6                    # ≈ 1 at the mean (k = 0)
     @test any(x -> 0.01 < x < 0.99, g)                 # genuinely smooth intermediate values, not 0/1
     zeros_houli = count(==(0), g)
-    zeros_23 = count(==(0), real.(field_data(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias)))
+    zeros_23 = count(==(0), real.(field_data(materialize_kernel(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias).field)))
     @test zeros_houli < zeros_23                        # keeps more modes than the 2/3 rule
   end
 
@@ -57,10 +57,10 @@ using Test
   @testset "PhaseShift spherical cutoff and CFL" begin
     domain = FixedDomain(N, L; dealiasing = PhaseShift(), element_type = Float64, array_type = Array)
     @test domain.dealiasing isa PhaseShift
-    mask = real.(field_data(domain.dealias))
+    mask = real.(field_data(materialize_kernel(domain.dealias).field))
     @test all(m -> m == 0 || m == 1, mask)                          # a sharp spherical truncation
     @test max_wavenumber(domain) ≈ (2 * sqrt(2) / 3) * (N / 2) * (2π / L)   # κ_max = √2·N/3·(2π/L)
-    @test count(==(1), mask) > count(==(1), real.(field_data(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias)))  # keeps more than 2/3
+    @test count(==(1), mask) > count(==(1), real.(field_data(materialize_kernel(FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias).field)))  # keeps more than 2/3
     rk3 = IFLowStorageRK3()
     base = recommended_cfl(rk3, FixedDomain(N, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array))
     @test recommended_cfl(rk3, domain) ≈ base / sqrt(2)                     # tighter step for the wider band
@@ -103,7 +103,10 @@ using Test
     Nps, Nraw = nlt(dps, û, true), nlt(dps, û, false)
     û2 = SD.spectral_vector(d2); field_data(û2) .= embed(field_data(û))
     oracle = restrict(nlt(d2, û2, false))
-    mask = sqrt.(dps.squared_wavenumber) .≤ (2 * sqrt(2) / 3) * (Np / 2)
+    m = dps.multipliers   # |κ|² from the axis vectors — the stored array is gone (decision 38)
+    κ² = reshape(m.squared_wavenumber_1, :, 1, 1) .+ reshape(m.squared_wavenumber_2, 1, :, 1) .+
+         reshape(m.squared_wavenumber_3, 1, 1, :)
+    mask = sqrt.(κ²) .≤ (2 * sqrt(2) / 3) * (Np / 2)
     bmax(a, b) = maximum(maximum(abs.(view(a, :, :, :, c) .- view(b, :, :, :, c)) .* mask) for c in 1:3)
     ref = maximum(abs.(oracle) .* reshape(mask, size(mask)..., 1))
     @test bmax(Nps, oracle) / ref < 1e-10          # phase-shift reproduces the exact de-aliased term

@@ -215,9 +215,12 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       combine!(hu, a[i], hu, dt_T, buffers.nonlinear)                             # hu ← Aᵢ hu + Δt N̂_u
     end
     combine!(û, one(T), û, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
-    velocity_factor!(buffers.integrating_factor, generator, domain, d[i] * dt)    # E_ν(dᵢΔt)
-    convolve!(û, û, buffers.integrating_factor)
-    i < 3 && convolve!(hu, hu, buffers.integrating_factor)
+    # The `StoredKernel` wrap puts the factor field in the kernel role (a bare field no longer
+    # dispatches as one); the wrap holds a reference and costs nothing per apply. Transitional —
+    # the stage-1b `exponential_convolve!` adoption removes the factor build and this wrap with it.
+    ℰ = StoredKernel(velocity_factor!(buffers.integrating_factor, generator, domain, d[i] * dt))
+    convolve!(û, û, ℰ)                                                            # E_ν(dᵢΔt)
+    i < 3 && convolve!(hu, hu, ℰ)
 
     # The passive scalar rides the same stages (skipped, with its buffers unallocated, when absent).
     if has_scalar
@@ -228,9 +231,9 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
         combine!(hφ, a[i], hφ, dt_T, sb.nonlinear)
       end
       combine!(φ̂, one(T), φ̂, b[i], hφ)
-      scalar_factor!(buffers.integrating_factor, generator, domain, d[i] * dt)    # E_κ(dᵢΔt)
-      convolve!(φ̂, φ̂, buffers.integrating_factor)
-      i < 3 && convolve!(hφ, hφ, buffers.integrating_factor)
+      ℰφ = StoredKernel(scalar_factor!(buffers.integrating_factor, generator, domain, d[i] * dt))
+      convolve!(φ̂, φ̂, ℰφ)                                                         # E_κ(dᵢΔt)
+      i < 3 && convolve!(hφ, hφ, ℰφ)
     end
   end
 
@@ -299,17 +302,18 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # rotated here rather than after stage 2 (neither is read by the stage-2 assembly, which works off
   # the predictor), which halves the factor builds without a second register. The rotations follow
   # the predictor combination, which needs ûₙ and N̂_u,1 unrotated.
-  velocity_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_ν
+  # The `StoredKernel` wrap puts the factor field in the kernel role (transitional; see the RK3 twin).
+  ℰ = StoredKernel(velocity_factor!(buffers.integrating_factor, generator, domain, dt))          # E_ν
   combine!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1)                      # û* ← ûₙ + Δt N̂_u,1
-  convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, buffers.integrating_factor)
-  convolve!(buffers.stage1, buffers.stage1, buffers.integrating_factor)                          # E_ν N̂_u,1
-  convolve!(û, û, buffers.integrating_factor)                                                    # E_ν ûₙ
+  convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, ℰ)
+  convolve!(buffers.stage1, buffers.stage1, ℰ)                                                   # E_ν N̂_u,1
+  convolve!(û, û, ℰ)                                                                             # E_ν ûₙ
   if has_scalar
-    scalar_factor!(buffers.integrating_factor, generator, domain, dt)                            # E_κ
+    ℰφ = StoredKernel(scalar_factor!(buffers.integrating_factor, generator, domain, dt))         # E_κ
     combine!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1)                                       # φ̂* ← φ̂ₙ + Δt N̂_φ,1
-    convolve!(sb.star_spectral, sb.star_spectral, buffers.integrating_factor)
-    convolve!(sb.stage1, sb.stage1, buffers.integrating_factor)                                  # E_κ N̂_φ,1
-    convolve!(φ̂, φ̂, buffers.integrating_factor)                                                  # E_κ φ̂ₙ
+    convolve!(sb.star_spectral, sb.star_spectral, ℰφ)
+    convolve!(sb.stage1, sb.stage1, ℰφ)                                                          # E_κ N̂_φ,1
+    convolve!(φ̂, φ̂, ℰφ)                                                                          # E_κ φ̂ₙ
   end
 
   # stage 2 — right-hand sides at the predictor state

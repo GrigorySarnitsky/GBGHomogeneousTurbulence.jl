@@ -87,31 +87,37 @@ const BASE = Dict(
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 9, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 7, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 3, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 10, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 8, physical_scalar = 2, real_spectral_scalar = 0),
 )
+# (PF adoption, 2026-08-05: the PhaseShift cells lost the two stored translation kernels — PF's
+# decision 50 returns them as per-axis `SeparableKernel`s, three O(N) factors each, below field
+# scale — so the PhaseShift spectral-scalar column now differs from a mask strategy's only by the
+# displaced-evaluation scratch.)
 
-# The frozen forcing DELTAS, per slot. Band/Linear/ConstantPower carry the same (scalar-shaped)
-# kernels and masks for either slot; the OU's state and noise scratch take the forced field's shape.
+# The frozen forcing DELTAS, per slot. Every band kernel is now a lazy radial symbol (PF adoption,
+# 2026-08-05 — PF decision 51), so a band-selecting forcing stores no field-scale kernel; the OU's
+# state and noise scratch take the forced field's shape.
 _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
-  tag === :band  ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0) :
+  tag === :band  ? ZERO :
   tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 2) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
-  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0) :
-                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0)
-# (:ou — the band kernel plus, in the forced field's shape, the OU state f̂ and the two noise buffers.)
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 2) :
+  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0) :
+                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2, physical_scalar = 1, real_spectral_scalar = 0)
+# (:ou — in the forced field's shape, the OU state f̂ and the two noise buffers; its band is lazy.)
 # Each rate-driven forcing carries the generator's rate array — which now exists precisely because
 # such a forcing is present, so the storage appears on the axis that causes it instead of
-# unconditionally in the base. `Linear` adds its own real band indicator on top; `ConstantPower`
-# does not, since the indicator is the real part of the kernel it already holds for the band
-# observable, taken lazily in the rate fill rather than stored twice (2026-07-28, decision 35).
+# unconditionally in the base. `Linear` and `ConstantPower` each add a materialized real band
+# indicator on top: with the band kernel lazy there are no stored coefficients for the rate fill to
+# read, so the indicator is built once at construction (half the complex field the stored band once
+# was; the pre-adoption ConstantPower read its indicator lazily from that stored kernel instead).
 
 # Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
 # and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the
@@ -141,27 +147,18 @@ const FORCING_TAGS = (:none, :band, :linear, :power, :ou)
 # ---------------------------------------------------------------- the frame ledger
 
 # The read-only frame the run lives on — the `FixedDomain` — measured with the same reflective walk.
-# It holds three field-scale arrays, and every one of them is a per-mode symbol: a closed-form
-# function of the O(N) per-axis multipliers, precomputed once and swept from memory thereafter.
-#
-#   |κ|² as a real array               → real_spectral_scalar   (the envelope, integrating-factor,
-#                                                                and HouLi-profile broadcasts, and
-#                                                                the `similar` storage template)
-#   |κ|² as a `weighted_inner` weight  → spectral_scalar        (the Dirichlet-energy route)
-#   the de-alias mask                  → spectral_scalar        (every strategy's kernel)
-#
-# Two things the cells make visible that no other surface stated. First, |κ|² is resident TWICE, in
-# two element types, because `weighted_inner` takes a spectral-scalar-typed weight while the
-# broadcasts want the real array — 193.5 MiB of one radial function at 256³ / Float64. Second, both
-# spectral-scalar entries are real-valued symbols in COMPLEX containers, so each costs 2× its
-# information content. Both are absorbed by a lazy per-mode symbol apply, which is why the frame's
-# floor (optimality_audit.jl) is zero field-scale arrays rather than three.
+# It holds NO field-scale array: every per-mode symbol it once stored — |κ|² as a real array, |κ|²
+# as the Dirichlet-energy weight, and the de-alias mask — is now a lazy kernel evaluated per mode
+# from the O(N) per-axis multipliers (PF adoption, 2026-08-05: `RadialKernel`, PF decisions 51/60).
+# The frame's zero floor, which optimality_audit.jl once held as a DEMONSTRATED reconstruction
+# against the resident arrays (decision 36), is thereby ACHIEVED: 322.5 MiB at 256³ / Float64
+# retired, |κ|² no longer resident twice in two element types.
 #
 # The frame is invariant across the dealiasing strategy and the precision, and that invariance is
-# part of the assertion: every strategy's mask is one complex spectral scalar whatever its profile
-# (sharp, smooth, or spherical), and Float32 changes bytes, never counts.
-const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2,
-               physical_scalar = 0, real_spectral_scalar = 1)
+# part of the assertion: every strategy's mask is a symbol whatever its profile (sharp, smooth, or
+# spherical), and no strategy stores one.
+const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
+               physical_scalar = 0, real_spectral_scalar = 0)
 
 # Named exclusion, so it is recorded rather than merely absent: a backend FFT plan's work area is
 # owned by the vendor library (FFTW, rocFFT, cuFFT), reachable from no Julia field, and observable
@@ -220,29 +217,31 @@ const GAP_HOLDERS = Dict(
 # ledger above. Outside it, the transient episodes are few, sequential (single-threaded — episodes
 # never overlap, so the run-phase peak is resident + the LARGEST episode), and frozen here in units
 # of N³ reals, measured mechanically via @allocated (warmed calls; generous bands for library drift).
-# Attribution (measured op by op, 2026-07-18):
-#   seeding (velocity)    ≈ 10.3 — noise vector 3.0 + host randn staging 3.1 + envelope 1.06 +
-#                                  an ALIASED helmholtz_projection!(û, û, …) transient 3.2 (the
-#                                  aliased path allocates; the hot loop's non-aliased calls do not —
-#                                  raised to GBGPeriodicFields). Construction-time only.
-#   seeding (scalar)      ≈ 3.1  — noise scalar 1.0 + host randn staging 1.0 + envelope 1.06.
+# Attribution (re-measured 2026-08-05 at the PF adoption; the 2026-07-18 numbers in parentheses):
+#   seeding (velocity)    ≈ 6.1 (10.3) — noise vector 3.0 + host randn staging 3.1. The envelope
+#                                  (was 1.06) is now a lazy radial kernel, and the ALIASED
+#                                  helmholtz_projection!(û, û, …) transient (was 3.2) is gone — the
+#                                  raise to GBGPeriodicFields landed as its guard-free one-pass
+#                                  projection. Construction-time only.
+#   seeding (scalar)      ≈ 2.1 (3.1) — noise scalar 1.0 + host randn staging 1.0; envelope lazy.
 #   derivative_skewness   ≈ 19.6 — spectral tensor 9 × 1.06 + physical tensor 9 + det field 1: the
 #                                  DOMINANT episode (~ +55 % over the default resident set), and ON
 #                                  BY DEFAULT during warmup!'s skewness gate — the binding device
 #                                  peak of a default warm-up at the largest N that fits. Invariant
 #                                  4's per-call-diagnostic trade, priced. (PF stores full 9-component
 #                                  tensors; symmetric 6-component storage is the recorded reduction.)
-#   energy_spectrum       ≈ 1.6  — GBGPeriodicFields radial_spectrum internal staging (not the O(N)
-#                                  shell vectors); integral_scale and flow_parameters inherit it.
-# The archived StochasticOU's prepare! also projects its noise ALIASED — an OU-forced step is NOT
-# allocation-free today (~3 units/step); recorded on the de-archival gate.
+#   energy_spectrum       ≈ 0.0 (1.6) — GBGPeriodicFields fused its radial_spectrum staging into the
+#                                  binning kernel (its decision 34); only the O(N) shell vectors
+#                                  remain. integral_scale and flow_parameters inherit the zero.
+# The archived StochasticOU's prepare! projects its noise ALIASED; with the projection now
+# guard-free that path should be allocation-free too — re-measure on the de-archival gate.
 const EPISODE_UNITS = [
-  ("seed velocity",      10.3, 1.0),
-  ("seed scalar",         3.1, 0.5),
+  ("seed velocity",       6.1, 1.0),
+  ("seed scalar",         2.1, 0.5),
   ("derivative_skewness", 19.6, 1.0),
-  ("energy_spectrum",     1.6, 0.5),
-  ("integral_scale",      1.6, 0.5),
-  ("flow_parameters",     1.6, 0.5),
+  ("energy_spectrum",     0.0, 0.2),
+  ("integral_scale",      0.0, 0.2),
+  ("flow_parameters",     0.0, 0.2),
 ]
 
 
@@ -292,16 +291,18 @@ const EPISODE_UNITS = [
                                         tag === :HouLi ? HouLi() : PhaseShift())
       @test frame_ledger(domain) == FRAME
     end
-    # The frame holds no field of the evolving classes: it is symbols, not state. Stating it
-    # separately keeps the three zeros above from reading as unfilled cells.
-    @test FRAME.spectral_vector == 0 && FRAME.physical_vector == 0 && FRAME.physical_scalar == 0
+    # The frame holds nothing at field scale in ANY class — the zero floor achieved, not merely
+    # demonstrated (see the FRAME comment above). Stated positively so the all-zero table cannot be
+    # read as unfilled cells.
+    @test all(class -> getproperty(FRAME, class) == 0, keys(FRAME))
 
     # The phase-shift translation kernels are frame-natured — built once from the grid spacing,
-    # never written again — but they hang off the generator's buffers, so the WORKING-SET ledger is
-    # where they appear (the +2 spectral scalars in every PhaseShift base cell). The split is by
-    # owner, not by nature, which is exactly why the completeness test below is the real closure.
-    @test BASE[(:RK3, :PhaseShift, false)].spectral_scalar -
-          BASE[(:RK3, :TwoThirds, false)].spectral_scalar == 2
+    # never written again — and are now per-axis `SeparableKernel`s (three O(N) factors each, PF
+    # decision 50), below field scale on either ledger: the PhaseShift base cells differ from a mask
+    # strategy's spectral scalars only by the displaced-evaluation scratch, which a velocity-only
+    # run does not carry.
+    @test BASE[(:RK3, :PhaseShift, false)].spectral_scalar ==
+          BASE[(:RK3, :TwoThirds, false)].spectral_scalar
   end
 
   @testset "no field-scale storage escapes both ledgers" begin
@@ -362,10 +363,10 @@ const EPISODE_UNITS = [
       bound = peak_liveness(ops)
       holders = GAP_HOLDERS[holder_key]
       for class in (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar)
-        # Kernels/masks/rates are configuration, not working values: the OU delta's band kernel is
-        # the one configuration entry inside a forcing delta — subtract it for the OU case.
-        working = getproperty(achieved, class) -
-                  (holder_key === (:RK3_OU, false) && class === :spectral_scalar ? 1 : 0)
+        # Kernels/masks/rates are configuration, not working values. Since the PF adoption every
+        # band kernel is lazy (no stored coefficients), so no forcing delta carries a configuration
+        # entry to subtract any more — the ledger rows ARE working values.
+        working = getproperty(achieved, class)
         b = getproperty(bound, class)
         @test b <= working                        # a bound above the ledger is a bookkeeping error
         if working - b > 0

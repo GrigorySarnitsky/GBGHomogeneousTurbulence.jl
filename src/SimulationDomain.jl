@@ -148,21 +148,23 @@ the run-layer defaults (`side_length = 2π`, `dealiasing = TwoThirds()`, `elemen
 - `multipliers` — the
   [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers),
   the spectral first-derivative operators.
-- `squared_wavenumber`, `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (in
-  spectral representation ``-\\nabla^{2}`` acts as multiplication by it), kept both as a real array and as
-  a scalar-field kernel for weighted spectral reductions.
-- `dealias`, `dealiasing` — the dealias kernel and the [`DealiasingStrategy`](@ref) that built it.
+- `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` as a lazy
+  [`RadialKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.RadialKernel) (in spectral
+  representation ``-\\nabla^{2}`` acts as multiplication by it) — the Dirichlet-energy weight the
+  weighted spectral reductions take; evaluated per mode from the multipliers, resident in no array.
+- `dealias`, `dealiasing` — the dealias kernel (a compressed
+  [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
+  mode) and the [`DealiasingStrategy`](@ref) that built it.
 """
-struct FixedDomain{G, L, VP, SP, TP, M, K, SK, D, DS}
+struct FixedDomain{G, L, VP, SP, TP, M, SK, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
   scalar_plans::SP
   tensor_plans::TP                 # rank-2 transform plans (the strain-tensor diagnostic)
   multipliers::M
-  squared_wavenumber::K            # |k|² as a real array
-  squared_wavenumber_kernel::SK    # |k|² as a ScalarFieldSpectral — the Dirichlet-energy weight for `weighted_inner`
-  dealias::D                       # isotropic low-pass kernel (ScalarFieldSpectral), built by `dealiasing`
+  squared_wavenumber_kernel::SK    # |k|² as a lazy RadialKernel — the Dirichlet-energy weight for `weighted_inner`
+  dealias::D                       # isotropic low-pass kernel (compressed, per-mode), built by `dealiasing`
   dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi / PhaseShift)
 end
 
@@ -190,38 +192,55 @@ function FixedDomain(grid_points_per_axis::Integer, side_length::Real;
   tensor_spectral_template = TensorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(2))), grid)
   tensor_plans = FieldTransformPlans(tensor_physical_template, tensor_spectral_template)
   multipliers = FieldSpectralMultipliers(velocity_spectral)
-  squared_wavenumber_kernel = squared_wavenumber_field(scalar_spectral_storage, multipliers)
-  squared_wavenumber = real.(field_data(squared_wavenumber_kernel))
-  dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, squared_wavenumber, N, L, T)
+  # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
+  # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
+  squared_wavenumber_kernel = radial_kernel(identity, scalar_spectral_storage, multipliers)
+  dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, N, L, T)
 
-  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber, squared_wavenumber_kernel, dealias, dealiasing)
+  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber_kernel, dealias, dealiasing)
 end
 
 
-# Build the `domain.dealias` kernel (a scalar low-pass in spectral representation) for a strategy.
-_build_dealias(::TwoThirds, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T} =
+# Build the `domain.dealias` kernel for a strategy — each a compressed radial kernel (a symbol of
+# |κ|², evaluated per mode), so no strategy stores a field of coefficients.
+_build_dealias(::TwoThirds, reference, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(reference, multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
 # Phase-shift: the spherical truncation that removes the two-axis aliases the half-cell average leaves.
-_build_dealias(::PhaseShift, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T} =
+_build_dealias(::PhaseShift, reference, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(reference, multipliers, T(2 * sqrt(2) / 3) * (N / 2) * (2π / L))
 
-function _build_dealias(strategy::HouLi, reference, multipliers, squared_wavenumber, N, L, ::Type{T}) where {T}
-  kernel = spectral_cutoff(reference, multipliers, T(2) * (N / 2) * (2π / L))    # all-pass ⇒ correct shape/backend
-  k_nyquist = T((N / 2) * (2π / L))
-  strength = isnothing(strategy.strength) ? -log(eps(T)) : strategy.strength
-  field_data(kernel) .= Complex{T}.(exp.(-T(strength) .* (sqrt.(squared_wavenumber) ./ k_nyquist) .^ strategy.order))
-  return kernel
+function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}) where {T}
+  # The smooth filter is a closed-form radial symbol; the closure captures VALUES only (a captured
+  # `Type` is not a bitstype and a GPU launch rejects it — PF's radial-kernel contract).
+  inverse_nyquist = one(T) / T((N / 2) * (2π / L))
+  strength = T(isnothing(strategy.strength) ? -log(eps(T)) : strategy.strength)
+  order = strategy.order
+  return radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order),
+                       reference, multipliers)
 end
 
 
-# Internal: the array type and element types are read off the dealias kernel's storage, so every
-# scratch buffer lands on the same backend (CPU/GPU) — the GBGPeriodicFields `similar(field_data(ref), …)`
-# allocation discipline (its invariant 6).
-_reference(domain::FixedDomain) = field_data(domain.dealias)
-_real_type(domain::FixedDomain) = real(eltype(_reference(domain)))
+# Internal: the array type and element type are read off the multipliers' axis arrays — O(N) vectors
+# that live on the domain's backend — so every scratch buffer lands on the same backend (CPU/GPU), the
+# GBGPeriodicFields `similar(reference, …)` allocation discipline (its invariant 6). The dealias
+# kernel no longer serves as the template: a compressed kernel stores no field-sized array.
+_reference(domain::FixedDomain) = domain.multipliers.squared_wavenumber_1
+_real_type(domain::FixedDomain) = eltype(_reference(domain))
 _complex_type(domain::FixedDomain) = complex(_real_type(domain))
 _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_reference(domain), S, dims), zero(S))
+
+
+# TRANSITIONAL — the integrating-factor builds are the one remaining consumer; the stage-1b adoption
+# of `exponential_convolve!` removes them and this helper with them. The lazy |κ|² broadcast over the
+# multipliers' three O(N) axis arrays, composable into a fused assignment (nothing field-sized built).
+function _squared_wavenumber_lazy(domain::FixedDomain)
+  m = domain.multipliers
+  return Base.broadcasted(+,
+    reshape(m.squared_wavenumber_1, :, 1, 1),
+    reshape(m.squared_wavenumber_2, 1, :, 1),
+    reshape(m.squared_wavenumber_3, 1, 1, :))
+end
 
 
 """

@@ -272,21 +272,25 @@ function random_solenoidal_velocity!(û, domain::FixedDomain;
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(1))...))
   to_spectral!(û, noise, domain.velocity_plans)
 
-  envelope = scalar_spectral(domain)
-  if isnothing(spectrum)
+  # The envelope is a radial symbol of |κ|², built as a lazy kernel (no field of coefficients); the
+  # closures capture converted VALUES only — a captured `Type` is not a bitstype and a GPU launch
+  # rejects it (PF's radial-kernel contract).
+  zero_value = zero(T)
+  envelope = if isnothing(spectrum)
     inverse_peak_squared = one(T) / T(peak_wavenumber)^2
-    field_data(envelope) .= complex.(exp.((-inverse_peak_squared) .* domain.squared_wavenumber))
+    radial_kernel(k2 -> exp(-inverse_peak_squared * k2), û, domain.multipliers)
   else
     # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
     # spectrum ∝ κ²·(√E/κ)² = E(κ) (the κ² is the shell's mode count); the DC mode stays at 0.
-    shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
-    field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
+    radial_kernel(k2 -> k2 > 0 ?
+                    oftype(zero_value, sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) :
+                    zero_value,
+                  û, domain.multipliers)
   end
   # The truncation rides in the envelope rather than as a second sweep of the field: both are
   # per-mode scalar multipliers, and a scalar commutes through the (per-mode) Leray projection, so
-  # folding them costs one scalar-field pass instead of a whole vector field's.
-  convolve!(envelope, envelope, domain.dealias)
-  convolve!(û, û, envelope)
+  # composing them (radial∘radial collapses to one symbol) costs one field pass in total.
+  convolve!(û, û, convolve(envelope, domain.dealias))
   helmholtz_projection!(û, û, domain.multipliers)
 
   current_energy = 0.5 * inner(û, û)
@@ -331,22 +335,23 @@ function random_scalar!(φ̂, domain::FixedDomain;
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(0))...))
   to_spectral!(φ̂, noise, domain.scalar_plans)
 
-  envelope = scalar_spectral(domain)
-  if isnothing(spectrum)
+  # Radial-symbol envelope, as for the velocity: lazy kernels, value-only captures.
+  zero_value = zero(T)
+  envelope = if isnothing(spectrum)
     # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
     # its spatial mean, so killing that mode leaves ⟨φ⟩ = 0 without a physical-space pass or the
     # reduction one would need to measure the mean. The `spectrum` branch below vanishes there too.
     inverse_peak_squared = one(T) / T(peak_wavenumber)^2
-    field_data(envelope) .= complex.(ifelse.(domain.squared_wavenumber .> 0,
-                                             exp.((-inverse_peak_squared) .* domain.squared_wavenumber),
-                                             zero(T)))
+    radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
+                  φ̂, domain.multipliers)
   else
     # Match a target radial scalar spectrum E_φ(κ): amplitude √(E_φ(κ))/κ ⇒ shell sum ∝ E_φ(κ).
-    shape = k2 -> k2 > 0 ? T(sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) : zero(T)
-    field_data(envelope) .= complex.(shape.(domain.squared_wavenumber))
+    radial_kernel(k2 -> k2 > 0 ?
+                    oftype(zero_value, sqrt(max(spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) :
+                    zero_value,
+                  φ̂, domain.multipliers)
   end
-  convolve!(envelope, envelope, domain.dealias)      # truncation folded in, as for the velocity
-  convolve!(φ̂, φ̂, envelope)
+  convolve!(φ̂, φ̂, convolve(envelope, domain.dealias))   # truncation folded in, as for the velocity
 
   current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
   current_variance > 0 && (field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance))

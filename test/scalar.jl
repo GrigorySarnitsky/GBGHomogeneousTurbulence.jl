@@ -49,7 +49,10 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     total_time = dt * nsteps
     _, φ̂ = integrate_coupled(IFLowStorageRK3(), domain, buffers, û0, φ̂0, conditions, dt, nsteps)
 
-    expected = field_data(φ̂0) .* complex.(exp.(-κ .* domain.squared_wavenumber .* total_time))
+    m = domain.multipliers   # |κ|² from the axis vectors — the stored array is gone (decision 38)
+    κ² = reshape(m.squared_wavenumber_1, :, 1, 1) .+ reshape(m.squared_wavenumber_2, 1, :, 1) .+
+         reshape(m.squared_wavenumber_3, 1, 1, :)
+    expected = field_data(φ̂0) .* complex.(exp.(-κ .* κ² .* total_time))
     relative_error = sqrt(sum(abs2, field_data(φ̂) .- expected)) / sqrt(sum(abs2, expected))
     @test relative_error < 1e-10
   end

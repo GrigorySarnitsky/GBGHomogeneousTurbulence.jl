@@ -23,7 +23,7 @@ module Particles
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain
+using ..SimulationDomain: FixedDomain, _reference, _real_type
 
 export Tracers, record_trajectory_velocity!, advect!, sample!,
        tracer_positions, tracer_velocities, number_of_tracers, velocity_buffer, scalar_buffer
@@ -72,8 +72,8 @@ end
 
 function Tracers(domain::FixedDomain, positions::AbstractMatrix; scheme)
   size(positions, 2) == 3 || throw(DimensionMismatch("tracer positions must have shape (M, 3); got $(size(positions))"))
-  T = real(eltype(field_data(domain.dealias)))
-  pos = similar(domain.squared_wavenumber, T, size(positions))     # the domain's backend + element type
+  T = _real_type(domain)
+  pos = similar(_reference(domain), T, size(positions))     # the domain's backend + element type
   copyto!(pos, positions)
   predictor = similar(pos)
   return Tracers(pos, predictor,
@@ -83,9 +83,9 @@ function Tracers(domain::FixedDomain, positions::AbstractMatrix; scheme)
 end
 
 function Tracers(domain::FixedDomain, number_of_tracers::Integer; scheme, rng = Random.default_rng())
-  T = real(eltype(field_data(domain.dealias)))
+  T = _real_type(domain)
   L = T(domain.grid.domain_size[1])
-  positions = similar(domain.squared_wavenumber, T, (Int(number_of_tracers), 3))
+  positions = similar(_reference(domain), T, (Int(number_of_tracers), 3))
   copyto!(positions, L .* rand(rng, T, Int(number_of_tracers), 3))
   return Tracers(domain, positions; scheme)
 end

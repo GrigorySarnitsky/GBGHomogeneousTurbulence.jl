@@ -56,7 +56,7 @@
 # decided.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data
+using GBGPeriodicFields: field_data, materialize_kernel
 using Test
 
 include("audit_ops.jl")
@@ -78,14 +78,13 @@ const UNUSED_FUSION = Holder(
 
 const MATERIALIZED_SYMBOLS = Holder(
   "MATERIALIZED PER-MODE SYMBOLS", :PF_RAISE,
-  "The de-alias mask, the phase-shift translation kernels, and |κ|² are stored as N³ arrays and " *
-  "swept once per use, though each is a closed-form function of the O(N) axis multipliers. A lazy " *
-  "per-mode symbol apply would evaluate them in register and move no field-scale memory. The " *
-  "holder covers both costs the materialization carries: the traffic (the pass floor's second " *
-  "tier) and the residency (the whole of the frame ledger — 322.5 MiB at 256³ / Float64, with " *
-  "|κ|² resident twice because `weighted_inner` takes a spectral-scalar-typed weight while the " *
-  "envelope and factor broadcasts want the real array, and with both spectral-scalar entries " *
-  "real-valued symbols held in complex containers at 2× their information content).")
+  "One per-mode symbol is still stored as an N³ array and swept per use: the integrating factor, " *
+  "built into its register each stage though it is a closed-form function of the O(N) axis " *
+  "multipliers (plus the armed rate). The holder now covers only that traffic — the pass floor's " *
+  "second tier — and retires with the fused-exponential (`exponential_convolve!`) adoption of the " *
+  "stage updates. Its former residency claim is CLOSED: the PF adoption (2026-08-05, PF decisions " *
+  "50/51/60) made the de-alias mask, the phase-shift translation kernels, and |κ|² lazy kernels, " *
+  "and the frame ledger is zero field-scale arrays — 322.5 MiB retired at 256³ / Float64.")
 
 const HOST_SIDE_FORCING_SCALARS = Holder(
   "HOST-SIDE FORCING SCALARS", :PF_RAISE,
@@ -252,51 +251,49 @@ const SYNC_LEDGER = (
     end
   end
 
-  @testset "the frame floor — resident symbols, demonstrated recoverable from O(N) axis data" begin
-    # The frame's floor is zero field-scale arrays, and the claim behind that floor — each resident
-    # symbol is a closed-form function of the O(N) per-axis multipliers, so the storage is
-    # materialization rather than information — is CHECKED here, not asserted. If a future symbol
-    # enters the frame that is genuinely N³ of information, it will fail these reconstructions and
-    # the floor will have to move.
+  @testset "the frame floor — zero field-scale arrays, ACHIEVED; the lazy symbols pinned" begin
+    # The frame's floor is zero field-scale arrays, and since the PF adoption (2026-08-05, PF
+    # decisions 50/51/60) it is ACHIEVED rather than demonstrated: |κ|², the Dirichlet weight, and
+    # every strategy's de-alias mask are lazy radial kernels evaluated per mode from the O(N) axis
+    # multipliers, and the PhaseShift translation kernels are per-axis factors. What this testset
+    # once verified by reconstructing the resident arrays it now verifies the other way round: the
+    # lazy symbols, materialized on demand, must equal the explicit reconstruction — the correctness
+    # pin that the compression changed storage, never values. If a future symbol enters the frame
+    # that is genuinely N³ of information, the walk below stops being zero and the floor must move.
     N = 8
     for strategy in (TwoThirds(), HouLi(), PhaseShift())
       domain = FixedDomain(N, 2π; dealiasing = strategy, element_type = Float64, array_type = Array)
       m = domain.multipliers
 
-      # (a) |κ|² is the outer sum of three axis vectors — 2·(N/2+1) + 4·N stored numbers standing in
-      #     for an (N/2+1)·N² array. This is the reconstruction the lazy symbol would evaluate.
-      κ² = [m.squared_wavenumber_1[i] + m.squared_wavenumber_2[j] + m.squared_wavenumber_3[k]
-            for i in axes(domain.squared_wavenumber, 1), j in axes(domain.squared_wavenumber, 2),
-                k in axes(domain.squared_wavenumber, 3)]
-      @test domain.squared_wavenumber ≈ κ²
-      @test length(m.squared_wavenumber_1) + length(m.squared_wavenumber_2) +
-            length(m.squared_wavenumber_3) < length(domain.squared_wavenumber)
+      # (a) The frame holds nothing at field scale — the achieved floor, per strategy.
+      @test all(class -> getproperty(_counts((domain,), N), class) == 0, CLASSES)
 
-      # (b) The Dirichlet weight is that same array again, in a complex container: a duplicate, not
-      #     a second symbol. Exact equality, so this is the strong form of the claim.
-      @test field_data(domain.squared_wavenumber_kernel) == complex.(domain.squared_wavenumber)
+      # (b) The lazy |κ|² symbol equals the outer sum of the three axis vectors — the
+      #     reconstruction the stored array once pinned, now pinning the kernel's evaluation.
+      κ²_kernel = field_data(materialize_kernel(domain.squared_wavenumber_kernel).field)
+      κ² = [m.squared_wavenumber_1[i] + m.squared_wavenumber_2[j] + m.squared_wavenumber_3[k]
+            for i in axes(κ²_kernel, 1), j in axes(κ²_kernel, 2), k in axes(κ²_kernel, 3)]
+      @test κ²_kernel == complex.(κ²)
 
       # (c) The de-alias mask is radial — constant on the level sets of |κ|² — for every strategy,
-      #     sharp, smooth, or spherical alike. That is the property that makes it a symbol of one
-      #     scalar argument, hence evaluable in register from (a) without storing the field.
-      mask = field_data(domain.dealias)
+      #     sharp, smooth, or spherical alike: the property that makes it a symbol of one scalar
+      #     argument, evaluable in register with no stored field.
+      mask = field_data(materialize_kernel(domain.dealias).field)
       @test all(iszero, imag.(mask))                    # real-valued content in a complex container
       by_level = Dict{Float64, Float64}()
       radial = true
-      for i in eachindex(mask, domain.squared_wavenumber)
-        level, v = domain.squared_wavenumber[i], real(mask[i])
+      for i in eachindex(mask, κ²)
+        level, v = κ²[i], real(mask[i])
         haskey(by_level, level) ? (radial &= by_level[level] ≈ v) : (by_level[level] = v)
       end
       @test radial
       @test length(by_level) < length(mask)             # non-vacuous: levels genuinely collapse modes
     end
 
-    # The gap is therefore the whole frame, and it is claimed by the symbol holder — the same one
-    # the pass floor's second tier carries, so the frame retires when the traffic does.
-    domain = FixedDomain(N, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
-    frame = _counts((domain,), N)
-    @test any(class -> getproperty(frame, class) > 0, CLASSES)   # a live gap…
-    @test MATERIALIZED_SYMBOLS in ALL_HOLDERS                    # …and it is claimed
+    # The frame's residency claim of the symbol holder is thereby RETIRED; the holder itself stays,
+    # narrowed to the pass floor's second tier (the integrating factor is still a materialized
+    # symbol until the fused-exponential adoption), which the stale-holder testset checks.
+    @test MATERIALIZED_SYMBOLS in ALL_HOLDERS
   end
 
   @testset "no stale holder — every holder still names a live gap" begin

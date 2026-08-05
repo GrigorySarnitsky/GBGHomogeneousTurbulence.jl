@@ -239,7 +239,9 @@ struct Linear{M, T} <: AbstractForcing
 end
 
 function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
-  mask = real.(field_data(_shell_band(domain, lowest_shell, highest_shell)))
+  # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
+  # indicator is materialized once here — the same stored mask this forcing always carried.
+  mask = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
   return Linear(mask, float(rate))
 end
 
@@ -263,13 +265,18 @@ diagnostics: `dissipation` ``\\varepsilon`` for the velocity, `scalar_dissipatio
 ``\\varepsilon_\\varphi`` for the scalar. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
-struct ConstantPower{K, T} <: AbstractForcing
-  band::K              # band-pass kernel — serves both the band observable and the rate's indicator
+struct ConstantPower{K, I, T} <: AbstractForcing
+  band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
+  indicator::I         # the band indicator as a real array — the rate fill's factor
   target::T            # the dissipation rate to hold: dissipation (velocity) or scalar_dissipation (scalar)
 end
 
 function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
-  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(target))
+  band = _shell_band(domain, lowest_shell, highest_shell)
+  # The kernel is lazy and carries no coefficients to read, so the rate fill's indicator is
+  # materialized once here as a real array (half the complex field the stored band once was).
+  indicator = real.(field_data(materialize_kernel(band).field))
+  return ConstantPower(band, indicator, float(target))
 end
 
 uses_linear_rate(::ConstantPower) = true
@@ -278,9 +285,7 @@ function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDom
   T = eltype(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
   amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
-  # The band indicator is the real part of the kernel already held for the observable — taken
-  # lazily in the fill rather than stored a second time.
-  rate .= T(amplitude) .* real.(field_data(forcing.band))
+  rate .= T(amplitude) .* forcing.indicator
   return true
 end
 

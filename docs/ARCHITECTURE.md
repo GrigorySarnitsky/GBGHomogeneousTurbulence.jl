@@ -174,9 +174,11 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube, realized by
   the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
   velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
-  spectral multipliers, the squared-wavenumber array ``\lvert\boldsymbol{\kappa}\rvert^2`` (in spectral
-  space, ``-\nabla^2`` acts as multiplication by ``\lvert\boldsymbol{\kappa}\rvert^2``), and the dealias
-  kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default). The name marks what can vary: a `FixedDomain` has time-independent,
+  spectral multipliers, ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel (in spectral
+  space, ``-\nabla^2`` acts as multiplication by it; evaluated per mode from the multipliers, resident
+  in no array — decision 38), and the dealias
+  kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default; every
+  strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `element_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
@@ -1337,6 +1339,25 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     re-merging the two sets fails the suite rather than silently re-certifying the tautology. The
     same test pins that the split is confined to its class — excluding the charts changes neither
     spectral class, confirming the state's extension was never the defect.
+38. **(2026-08) The frame compresses to zero field-scale arrays: every per-mode symbol is lazy.** The
+    `GBGPeriodicFields` pin moved to a master that ships compressed kernel classes (its decisions
+    50/51/60), and the `FixedDomain` adopted them: the de-alias mask of every strategy is a
+    `RadialKernel` (`TwoThirds`/`PhaseShift` via `spectral_cutoff`, `HouLi` as its own radial symbol),
+    the Dirichlet-energy weight is `radial_kernel(identity, …)`, the stored real ``|\kappa|^2`` array
+    is gone (its consumers — the initial-condition envelopes, now composed radial kernels folded with
+    the truncation; the integrating-factor builds, a transitional lazy broadcast; the backend/eltype
+    template, now the multipliers' axis arrays), and the phase-shift translation kernels are per-axis
+    `SeparableKernel`s. Decision 36's frame floor of zero is thereby **achieved** — 322.5 MiB retired
+    at ``256^3``/`Float64`, ``|\kappa|^2`` no longer resident twice — and the optimality audit's
+    reconstruction demonstration inverted into a correctness pin: the lazy symbols, materialized on
+    demand, must equal the explicit axis-vector reconstruction. Knock-on residency wins recorded in
+    the same re-freeze: every band forcing's kernel is lazy (`BandRescaling` and `StochasticOU` store
+    none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill),
+    and the seed/spectrum episodes shrank because `GBGPeriodicFields` delivered the guard-free aliased
+    projection and fused its `radial_spectrum` staging. The bare `ScalarFieldSpectral` integrating
+    factor is wrapped in `StoredKernel` at its apply sites — a transitional form; the fused
+    exponential adoption that deletes the factor machinery is the recorded next step, and the
+    `MATERIALIZED_SYMBOLS` holder narrows to exactly that remaining traffic.
 
 ---
 

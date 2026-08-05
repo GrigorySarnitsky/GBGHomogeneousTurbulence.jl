@@ -36,7 +36,8 @@ module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
-                          spectral_vector, physical_vector, scalar_spectral, scalar_physical
+                          spectral_vector, physical_vector, scalar_spectral, scalar_physical,
+                          _real_type, _blank, _squared_wavenumber_lazy
 using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing,
                  set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
@@ -115,7 +116,9 @@ function _forcing_rate(domain::FixedDomain, forcing)
                           "would be given no rate array to fill and would never be applied"))
     return nothing
   end
-  return fill!(similar(domain.squared_wavenumber), zero(eltype(domain.squared_wavenumber)))
+  # A real array of spectral-scalar shape on the domain's backend (the shape the armed rate A(κ)
+  # multiplies mode by mode), zeroed so an un-set rate acts as no forcing.
+  return _blank(domain, _real_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0)))
 end
 
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
@@ -308,9 +311,9 @@ representation by the per-mode multiplier
 with ``A = 0`` when no linear forcing is active, so multiplying a field by `ℰ` advances its viscous
 (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a scheme's
 explicit stage combination carries truncation error. The [`ResolvedGenerator`](@ref) `generator`
-supplies ``\\nu`` and the armed rate; the `domain` (a [`FixedDomain`](@ref)) supplies the
-squared-wavenumber field ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` — in spectral representation
-``-\\nabla^{2}`` acts as multiplication by it.
+supplies ``\\nu`` and the armed rate; the `domain` (a [`FixedDomain`](@ref)) supplies
+``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` through its multipliers, evaluated per mode — in spectral
+representation ``-\\nabla^{2}`` acts as multiplication by it.
 """
 velocity_factor!(ℰ, generator::ResolvedGenerator, domain::FixedDomain, τ::Real) =
   _integrating_factor!(ℰ, domain, generator.conditions.viscosity, τ,
@@ -330,13 +333,16 @@ scalar_factor!(ℰ, generator::ResolvedGenerator, domain::FixedDomain, τ::Real)
 
 
 # The shared kernel of the factor pair: ℰ(κ) = exp((A(κ) − D|κ|²)τ), the exact solution of the
-# diffusion ∂ₜf = D∇²f (+ the linear forcing rate A when armed) over τ.
+# diffusion ∂ₜf = D∇²f (+ the linear forcing rate A when armed) over τ. The |κ|² enters as the lazy
+# per-axis broadcast (nothing field-sized is read or built for it); the whole build goes away with
+# the stage-1b `exponential_convolve!` adoption, which applies this factor without materializing it.
 function _integrating_factor!(factor, domain::FixedDomain, diffusivity::Real, dt::Real, rate = nothing)
   T = real(eltype(field_data(factor)))
+  κ2 = _squared_wavenumber_lazy(domain)
   if rate === nothing
-    field_data(factor) .= complex.(exp.(T(-diffusivity * dt) .* domain.squared_wavenumber))
+    field_data(factor) .= complex.(exp.(T(-diffusivity * dt) .* κ2))
   else
-    field_data(factor) .= complex.(exp.(T(dt) .* (rate .- T(diffusivity) .* domain.squared_wavenumber)))
+    field_data(factor) .= complex.(exp.(T(dt) .* (rate .- T(diffusivity) .* κ2)))
   end
   return factor
 end

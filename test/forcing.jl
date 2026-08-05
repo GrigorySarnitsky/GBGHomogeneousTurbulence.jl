@@ -6,7 +6,8 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
-using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner,
+                         spectral_field_shape
 using Random
 using Test
 
@@ -48,7 +49,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   @testset "Linear rate amplitude" begin
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
-    rate = fill!(similar(domain.squared_wavenumber), 0.0)
+    rate = zeros(spectral_field_shape(domain.grid, domain.layout, Val(0)))
     @test set_forcing_rate!(forcing, rate, û0, domain)
     @test maximum(rate) ≈ A                         # A on the band
     @test minimum(rate) == 0                        # zero outside the band
@@ -58,7 +59,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     power = 0.3
     forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    rate = fill!(similar(domain.squared_wavenumber), 0.0)
+    rate = zeros(spectral_field_shape(domain.grid, domain.layout, Val(0)))
     set_forcing_rate!(forcing, rate, û0, domain)
     A = maximum(rate)
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
