@@ -302,10 +302,11 @@ spline by default, so the sampled velocity is continuously differentiable along 
 Both states are always present — the fluid's and the probes'. Tracers consume a field and produce
 values at points; they hold no field. The table below lists the observables of this system, one row
 each. Its **Cached** column takes four values: *yes*, the schedule leaves the observable at the
-boundary; *depends*, the observable survives in some configurations and not in others; *no*, an
-observable the iteration does not surface, one act away at an observation; and *never*, failing
-§1.2's kind or materialization tests. Its **Built** column says whether the package holds the
-observable today, and reads `—` wherever *Cached* is not *yes*.
+boundary; *depends*, the observable survives in some configurations and not in others; *no*, a
+genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
+observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —
+there is no time to stamp, so no act at an observation builds it either. Its **Built** column says
+whether the package holds the observable today, and reads `—` wherever *Cached* is not *yes*.
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
 |---|---|---|---|---|
@@ -321,9 +322,10 @@ observable today, and reads `—` wherever *Cached* is not *yes*.
 | ``E(\kappa)`` | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
-| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | never | — | not materialized: formed pointwise inside the maximum-speed reduction and kept nowhere (§1.2) |
-| ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | never | — | not computed: applied as a multiplier (§2.2) |
-| ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}``; a rescaling forcing | — | never | — | not computed: the rate exists, the product does not; a rescaling has no rate |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not materialized: formed pointwise inside the maximum-speed reduction and kept nowhere; whole, it would cost a pass the iteration does not perform (§1.2) |
+| ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | — | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
+| ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | — | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
+| a rescaling forcing's equivalent field | — | never | — | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |
 | an additive stochastic ``\boldsymbol{f}`` | spectral, grid | never | — | not an observable: depends on the forcing's internal variables |
 | stage values of ``\boldsymbol{u}``, ``\boldsymbol{\omega}``, ``\varphi`` | physical, grid | never | — | not an observable: carries ``\Delta t`` and the scheme's coefficients |
 | velocity at the predicted particle position | ``M\times3`` at points | never | — | not an observable: the probe occupies no such position |
