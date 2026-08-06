@@ -176,9 +176,10 @@ end
 # flux uφ from the stage's physical scalar, transform, take the divergence into `out`, and dealias.
 # At stage 1 the physical scalar is the deposited boundary chart, read as is (`recover = false`); at
 # a later stage the caller first recovers the stage scalar into the taken chart slot, through the
-# scheme's dead spectral register `sscratch`. PhaseShift adds the displaced flux divergence — note it
-# RE-recovers the displaced velocity from `uspec` even though velocity_rhs! left it fresh in the same
-# stage (the recorded transform gap of the compute audit's bound table).
+# scheme's dead spectral register `sscratch`. PhaseShift adds the displaced flux divergence, reading
+# the displaced velocity the SAME stage's velocity assembly left fresh in `ushift` (the freshness
+# contract of decision 45 — the re-recovery that once cost three inverse transforms per stage is
+# gone, and the transform ledger sits at exactly double the mask cells everywhere).
 function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb_nl, phase_shift = false)
   ops = Op[]
   recover && append!(ops, [
@@ -193,9 +194,6 @@ function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb
   ])
   if phase_shift
     append!(ops, [
-      Op("shift û",            [uspec],          [:vshift]),
-      Op("shifted copy",       [:vshift],        [:ps]),
-      Op("shifted u recovery", [:ps],            [:ushift]),
       Op("shift φ̂",           [φspec],          [:sshift]),
       Op("shifted copy φ̂",    [:sshift],        [:scopy]),
       Op("shifted φ recovery", [:scopy],         [:pshift]),

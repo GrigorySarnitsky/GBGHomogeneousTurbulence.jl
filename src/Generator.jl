@@ -176,6 +176,7 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const scalar_rate::SR
   velocity_rate_active::Bool
   scalar_rate_active::Bool
+  displaced_velocity_fresh::Bool   # PhaseShift: u_shifted still holds THIS stage's displaced velocity
 end
 
 ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false) =
@@ -184,7 +185,7 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
-                    false, false)
+                    false, false, false)
 
 
 """
@@ -198,6 +199,7 @@ stages; the stage evaluations and the integrating factors then consume what it p
 `generator`.
 """
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
+  generator.displaced_velocity_fresh = false        # a new step opens with the displaced scratch stale
   conditions = generator.conditions
   prepare_forcing!(conditions.velocity_forcing, state.velocity, domain, dt)
   generator.velocity_rate_active = generator.velocity_rate === nothing ? false :
@@ -267,15 +269,13 @@ forcing are advanced exactly by the integrating factor ([`velocity_factor`](@ref
     and the operation allocates nothing.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain) =
-  (_velocity_nonlinear!(domain.dealiasing, N̂, û, u, ω, domain,
-                        generator.product_spectral, generator.phase_shift);
+  (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω, domain);
    add_forcing_source!(generator.conditions.velocity_forcing, N̂, domain))
 
 # Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
 # projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
-function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, û, u, ω, domain::FixedDomain,
-                              product_spectral, phase_shift)
-  _velocity_lamb!(nonlinear, u, ω, domain, product_spectral, domain.dealias)
+function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, u, ω, domain::FixedDomain)
+  _velocity_lamb!(nonlinear, u, ω, domain, generator.product_spectral, domain.dealias)
   return nonlinear
 end
 
@@ -284,13 +284,18 @@ end
 # into the passes rather than swept separately — the primary carries it inside its projection, and
 # the displaced term picks it up through the composed shift-back∘truncation kernel of the averaging
 # convolve, so no whole-field truncation pass remains.
-function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedDomain,
-                              product_spectral, phase_shift)
+function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω, domain::FixedDomain)
+  phase_shift = generator.phase_shift
+  product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
   _velocity_lamb!(nonlinear, u, ω, domain, product_spectral, domain.dealias)                          # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
   velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
+  # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
+  # deletes its re-recovery, decision 45).
+  generator.displaced_velocity_fresh = true
   _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_spectral)
   # Shift-back, two-grid average, and truncation in ONE α/β convolve: ½·(𝔻⊙back)⊙(displaced) +
   # ½·(primary, already truncated) — the composed kernel is built once at construction.
@@ -378,7 +383,9 @@ plus the per-stage additive source of the generator's scalar forcing (its `add_f
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û` and `φ̂` unused;
 [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced half a cell —
-using `û`, `φ̂`, and the generator's displaced-evaluation scratch — before the spherical truncation.
+using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced velocity the
+same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no preceding
+velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
 `N̂`: they are advanced exactly by [`scalar_factor`](@ref).
 
@@ -389,15 +396,13 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
     the generator, and the operation allocates nothing.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u, φ, domain::FixedDomain) =
-  (_scalar_nonlinear!(domain.dealiasing, N̂, û, φ̂, u, φ, domain,
-                      generator.product_spectral, generator.phase_shift);
+  (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u, φ, domain);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, domain))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
 # sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.
-function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
-                            product_spectral, phase_shift)
-  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_spectral, domain.dealias, -1)
+function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, φ̂, u, φ, domain::FixedDomain)
+  _scalar_flux_divergence!(nonlinear, u, φ, domain, generator.product_spectral, domain.dealias, -1)
   return nonlinear
 end
 
@@ -406,12 +411,19 @@ end
 # both inside its divergence, the displaced term picks the truncation up through the composed
 # shift-back∘truncation kernel and the sign through the averaging α — so no whole-field truncation
 # pass remains.
-function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
-                            product_spectral, phase_shift)
+function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u, φ, domain::FixedDomain)
+  phase_shift = generator.phase_shift
+  product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
   _scalar_flux_divergence!(nonlinear, u, φ, domain, product_spectral, domain.dealias, -1)               # primary −𝔻∇·(uφ)
-  convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                     # û on the displaced grid
-  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
+  # Lamb consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
+  # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
+  if !generator.displaced_velocity_fresh
+    convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
+    velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  end
+  generator.displaced_velocity_fresh = false        # the flux below consumes u_shifted
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
   scalar_to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain, phase_shift.scalar_copy)
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain)                # (u_s φ_s)^, formed over u_s

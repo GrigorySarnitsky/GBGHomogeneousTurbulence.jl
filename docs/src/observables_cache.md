@@ -264,9 +264,9 @@ each quadratic term pseudospectrally, then removes the aliasing that the evaluat
 according to its **dealiasing rule**. [`TwoThirds`](@ref) and [`HouLi`](@ref) are **mask rules**,
 discarding or tapering the aliased wavenumbers in one per-wavenumber multiplication.
 [`PhaseShift`](@ref) evaluates the term a second time on a half-cell-displaced grid and averages,
-cancelling the aliases rather than filtering them, at twice the transforms — and, with the scalar,
-nine inverse transforms more than twice, because the scalar term re-recovers a displaced velocity the
-velocity term already built.
+cancelling the aliases rather than filtering them, at exactly twice the transforms — for the
+velocity and the scalar alike, since the scalar term reads the displaced velocity its stage's
+velocity term has just built.
 
 Under a mask rule one **evaluation** of the velocity term proceeds in five operations: recover
 ``\boldsymbol{u}`` (3 inverse transforms); form
@@ -277,7 +277,7 @@ transform it back (3 forward); apply ``\mathbb P`` and the mask, both per-wavenu
 | dealiasing rule | velocity only | with the scalar |
 |---|---|---|
 | `TwoThirds`, `HouLi` | 18 inverse, 9 forward | 21 inverse, 18 forward |
-| `PhaseShift` | 36 inverse, 18 forward | 51 inverse, 36 forward |
+| `PhaseShift` | 36 inverse, 18 forward | 42 inverse, 36 forward |
 
 **No count depends on what the cache holds.** The deposit replaces the next iteration's first-stage
 work rather than adding to it, so an iteration recovers a field once whether or not it is cached.

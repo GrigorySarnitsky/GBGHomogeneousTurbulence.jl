@@ -49,28 +49,29 @@ include("audit_ops.jl")     # the op model AND its cost model — shared with th
 # for the velocity (u and ω recovered, six component fields, one c2r each; the Lamb product back,
 # three r2c) plus (1, 3) for the scalar (φ recovered; the flux vector back); PhaseShift doubles the
 # velocity ((12, 6): the displaced recovery and product have no cheaper route than their own
-# transforms) and adds (4, 3) for the scalar as implemented — (1, 3) for the displaced flux and
-# recovery, plus the 3 c2r re-recovery of the displaced velocity the bound table charges as a gap.
+# transforms) and exactly doubles the scalar too ((2, 6): the displaced φ recovery and flux — the
+# displaced velocity is the same stage's, left fresh by velocity_rhs! under decision 45's
+# freshness contract, so no re-recovery exists).
 const TRANSFORMS_BASE = Dict(
   (:RK3, :TwoThirds,  false) => (c2r = 18, r2c = 9),
   (:RK3, :TwoThirds,  true)  => (c2r = 21, r2c = 18),
   (:RK3, :HouLi,      false) => (c2r = 18, r2c = 9),
   (:RK3, :HouLi,      true)  => (c2r = 21, r2c = 18),
   (:RK3, :PhaseShift, false) => (c2r = 36, r2c = 18),
-  (:RK3, :PhaseShift, true)  => (c2r = 51, r2c = 36),
+  (:RK3, :PhaseShift, true)  => (c2r = 42, r2c = 36),
   (:RK2, :TwoThirds,  false) => (c2r = 12, r2c = 6),
   (:RK2, :TwoThirds,  true)  => (c2r = 14, r2c = 12),
   (:RK2, :HouLi,      false) => (c2r = 12, r2c = 6),
   (:RK2, :HouLi,      true)  => (c2r = 14, r2c = 12),
   (:RK2, :PhaseShift, false) => (c2r = 24, r2c = 12),
-  (:RK2, :PhaseShift, true)  => (c2r = 34, r2c = 24),
+  (:RK2, :PhaseShift, true)  => (c2r = 28, r2c = 24),
 )
 
 # The per-evaluation transform cost of each right-hand-side family (the derivation above).
 _per_eval(dealiasing, scalar) = begin
   velocity = dealiasing === :PhaseShift ? (c2r = 12, r2c = 6) : (c2r = 6, r2c = 3)
   scalar || return velocity
-  φ = dealiasing === :PhaseShift ? (c2r = 5, r2c = 6) : (c2r = 1, r2c = 3)
+  φ = dealiasing === :PhaseShift ? (c2r = 2, r2c = 6) : (c2r = 1, r2c = 3)
   (c2r = velocity.c2r + φ.c2r, r2c = velocity.r2c + φ.r2c)
 end
 
@@ -78,21 +79,15 @@ end
 # every right-hand side evaluated at the stage state, shift-averaged PhaseShift): each physical
 # component field an evaluation consumes costs one c2r (there is no cheaper route to a displaced or
 # underived physical field than its own inverse transform), each spectral product component one r2c.
-# Every mask cell and the PhaseShift velocity sit AT the bound. The one gap: under PhaseShift with a
-# scalar, scalar_rhs! re-shifts and re-recovers the displaced velocity that velocity_rhs! left
-# fresh in the generator's `u_shifted` at the same stage state (3 c2r per evaluation) — reusing it
-# needs a same-stage freshness contract on the displaced scratch across the two protocol verbs, a
-# recorded candidate, not an oversight.
-const TRANSFORM_BOUND = Dict(
-  key => (key[2] === :PhaseShift && key[3]) ?
-         (c2r = base.c2r - 3 * _evals(key[1]), r2c = base.r2c) : base
-  for (key, base) in TRANSFORMS_BASE
-)
+# EVERY cell sits AT the bound since decision 45 closed the last gap: the SHIFTED-VELOCITY REUSE
+# holder — scalar_rhs! re-recovering the displaced velocity velocity_rhs! left fresh at the same
+# stage (3 c2r per evaluation) — retired when the same-stage freshness contract landed on the
+# displaced scratch, and PhaseShift now costs exactly double its mask cell for the velocity and the
+# scalar alike (the memory↔compute trade priced clean on both sides).
+const TRANSFORM_BOUND = Dict(key => base for (key, base) in TRANSFORMS_BASE)
 
-const TRANSFORM_GAP_HOLDERS = Dict(
-  (:RK3, :PhaseShift, true) => "SHIFTED-VELOCITY REUSE (scalar_rhs! re-recovers the displaced velocity, 3 c2r × 3 stages)",
-  (:RK2, :PhaseShift, true) => "SHIFTED-VELOCITY REUSE (scalar_rhs! re-recovers the displaced velocity, 3 c2r × 2 stages)",
-)
+# (SHIFTED-VELOCITY REUSE retired 2026-08-06, decision 45 — the register empty is the assertion.)
+const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, String}()
 
 
 # ---------------------------------------------------------------- the frozen pass ledger
@@ -116,13 +111,13 @@ const PASSES_BASE = Dict(
   (:RK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
   (:RK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 90, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 78, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :HouLi,      true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :PhaseShift, false) => (spectral_vector = 47, physical_vector = 13, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 59, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 51, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).

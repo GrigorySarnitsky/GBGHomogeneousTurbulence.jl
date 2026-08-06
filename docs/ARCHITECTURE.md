@@ -1526,6 +1526,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     displaced scratch recovers all nine inverse transforms — stage 1's three included — which is
     the roadmap's next step.
 
+45. **(2026-08) The displaced velocity is reused within the stage: `PhaseShift` costs exactly twice
+    a mask, scalar included.** The last transform gap — `scalar_rhs!` re-shifting and re-recovering
+    the displaced velocity that `velocity_rhs!` had left fresh at the same stage state (3 c2r per
+    evaluation, the `SHIFTED-VELOCITY REUSE` holder) — closes by the same-stage freshness contract
+    the holder prescribed: `velocity_rhs!` marks the generator's `u_shifted` fresh after its
+    displaced recovery (its displaced Lamb consumes only `ω_shifted`, decision 41), the same
+    stage's `scalar_rhs!` consumes the mark and reads the register directly (its flux is
+    `u_shifted`'s last consumer), and `prepare!` opens every step with the mark cleared. The
+    contract is opportunistic, not load-bearing for correctness: a bare `scalar_rhs!` with no
+    preceding velocity evaluation finds the mark cleared and rebuilds the displaced velocity
+    itself, value-identically. The transform ledger now sits **at its lower bound in every cell**
+    — `TRANSFORM_GAP_HOLDERS` is empty, `PhaseShift` is exactly ``2\times`` its mask cell for
+    velocity and scalar alike (RK3 ``51 \to 42`` c2r, RK2 ``34 \to 28``), and the `PhaseShift`
+    scalar pass cells drop the deleted shift and recovery passes with it. This completes the
+    dealiasing axis's memory↔compute pricing: a mask spends a per-mode multiplication, `PhaseShift`
+    spends exactly one extra evaluation of each term, and nothing else.
+
 ---
 
 ## References
