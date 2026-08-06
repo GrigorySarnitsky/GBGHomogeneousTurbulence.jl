@@ -261,7 +261,7 @@ end
 Allocate a single zeroed vector field in spectral representation on `domain`'s backend and element type.
 """
 spectral_vector(domain::FixedDomain) =
-  VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid)
+  VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid, domain.layout)
 
 
 """
@@ -270,7 +270,7 @@ spectral_vector(domain::FixedDomain) =
 Allocate a single zeroed vector field in physical representation on `domain`'s backend and element type.
 """
 physical_vector(domain::FixedDomain) =
-  VectorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(1))), domain.grid)
+  VectorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(1))), domain.grid, domain.layout)
 
 
 """
@@ -279,7 +279,7 @@ physical_vector(domain::FixedDomain) =
 Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type.
 """
 scalar_spectral(domain::FixedDomain) =
-  ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid)
+  ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid, domain.layout)
 
 
 """
@@ -288,7 +288,7 @@ scalar_spectral(domain::FixedDomain) =
 Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type.
 """
 scalar_physical(domain::FixedDomain) =
-  ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid)
+  ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid, domain.layout)
 
 
 """
@@ -297,7 +297,7 @@ scalar_physical(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in spectral representation on `domain`'s backend and element type.
 """
 tensor_spectral(domain::FixedDomain) =
-  TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid)
+  TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid, domain.layout)
 
 
 """
@@ -306,7 +306,7 @@ tensor_spectral(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in physical representation on `domain`'s backend and element type.
 """
 tensor_physical(domain::FixedDomain) =
-  TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid)
+  TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid, domain.layout)
 
 
 """
