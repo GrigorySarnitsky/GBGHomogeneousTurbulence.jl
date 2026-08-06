@@ -96,7 +96,7 @@ using Test
                                   velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
         velocity_rhs!(out, ResolvedGenerator(domain, unforced), ûf, u, ω, domain)
       else
-        GEN._velocity_lamb!(out, u, ω, domain, SD.physical_vector(domain), SD.spectral_vector(domain))
+        GEN._velocity_lamb!(out, u, ω, domain, SD.spectral_vector(domain))   # consumes ω (decision 41)
       end
       field_data(out)
     end
