@@ -51,7 +51,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
     rate = new_scalar_field_spectral(domain)                  # the generator's rate slot: a scalar field in spectral representation
-    @test set_forcing_rate!(forcing, rate, û0, domain)
+    @test set_forcing_rate!(forcing, rate, û0, domain) === rate   # the hook returns its mutated argument
     @test maximum(real.(field_data(rate))) ≈ A      # A on the band
     @test minimum(real.(field_data(rate))) == 0     # zero outside the band
   end

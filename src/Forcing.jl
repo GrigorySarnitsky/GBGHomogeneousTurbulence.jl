@@ -66,10 +66,9 @@ step. The linear rate and the additive source are two channels of **one** forcin
 in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
 single strategy may legitimately use both.
 
-The hooks' return conventions differ deliberately: `set_forcing_rate!` returns a `Bool` — whether
-the rate it filled is armed for this step — while the other three return their mutated argument
-(`apply_forcing!` the field, `add_forcing_source!` the right-hand side) or `nothing`
-(`prepare_forcing!`).
+Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
+`add_forcing_source!` the right-hand side, `apply_forcing!` the field); `prepare_forcing!` returns
+`nothing`.
 
 !!! warning
     Construct one strategy instance per forced field. An instance owns per-field scratch and
@@ -106,18 +105,19 @@ end
 
 
 """
-    set_forcing_rate!(forcing, rate, field, domain) -> Bool
+    set_forcing_rate!(forcing, rate, field, domain) -> rate
 
 For a strategy `forcing` linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
-(the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
+(the forcing ``f = A \\texttt{field}``) and return `rate`; the integrator folds it into the diffusive
 integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
-(``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
-rate. The `field` is the start-of-step field in spectral representation; `domain` is the
+(``D`` the field's diffusivity). Only a forcing declaring [`uses_linear_rate`](@ref) is ever handed
+a rate array, so the default method is never reached in a run; it returns `rate` untouched. The
+`field` is the start-of-step field in spectral representation; `domain` is the
 [`FixedDomain`](@ref).
 """
-set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = false
+set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate
 
 
 """
@@ -279,7 +279,7 @@ uses_linear_rate(::Linear) = true
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
   rate .= T(forcing.rate) .* forcing.mask
-  return true
+  return rate
 end
 
 
@@ -317,7 +317,7 @@ function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDom
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
   amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
   rate .= T(amplitude) .* forcing.indicator
-  return true
+  return rate
 end
 
 

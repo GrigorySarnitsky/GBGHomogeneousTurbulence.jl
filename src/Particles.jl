@@ -61,7 +61,7 @@ point-value scratch, so the tracer push allocates no per-step memory.
 - `position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation.
 - `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
   boundary they occupy them: the genuine Lagrangian sample, and the observables cache's
-  trajectory-sample slot.
+  particle-velocities slot.
 - `predictor_velocity` — the interpolated velocity at the Heun **predictor** positions, which no
   tracer ever occupies: a stage register of the push, never a sample of the flow, and never exposed.
 - `scheme` — the velocity-interpolation scheme.
@@ -107,7 +107,7 @@ representation) onto the positions of the tracer set `tracers`, with the set's i
 scheme.
 
 The run layer calls it at the tail of each iteration, on the just-deposited boundary velocity at the
-just-advanced positions; the recorded values are the observables cache's trajectory-sample slot,
+just-advanced positions; the recorded values are the observables cache's particle-velocities slot,
 stamped there, and the next iteration's [`advect!`](@ref) reads them as the first half of its Heun
 pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
 cost ``N^{3} \\times 3``. What is recorded is the trajectory velocity the run's `particle_velocities`
@@ -154,7 +154,7 @@ function advect!(tracers::Tracers, velocity_end, domain::FixedDomain, dt::Real)
 
   v1 = point_values(tracers.trajectory_velocity)
   Xstar .= mod.(X .+ Δt .* v1, L)
-  # v₂ is evaluated at the PREDICTOR positions and is a stage register, never a trajectory sample —
+  # v₂ is evaluated at the PREDICTOR positions and is a stage register, never deposited particle velocities —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
   # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
   # the thing you measure).

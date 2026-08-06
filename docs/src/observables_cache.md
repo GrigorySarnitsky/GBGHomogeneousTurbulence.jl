@@ -122,7 +122,7 @@ tail would destroy the deposited velocity and vorticity, and keeping both would 
 minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
 step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
 schedule: the maximum velocity component is reduced from the just-deposited velocity for the next iteration's
-timestep choice, and the trajectory sample is interpolated from that velocity at each particle's new
+timestep choice, and the particle velocities are interpolated from that velocity at each particle's new
 position for the next push's predictor.
 
 **The observation comes before the iteration.** At each boundary the callback reads
@@ -296,8 +296,9 @@ into the velocity's. No third array exists, and the evaluation holds two vector 
 representation at once. The vorticity is deposited at the tail either way, so the reuse changes the
 run's residency, not the cache's contents.
 
-The tracer scheme consumes two velocity samples per push. The first, the **trajectory sample**
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the cache's deposit from the previous tail; the
+The tracer scheme consumes two velocity samples per push. The first — the **particle velocities**
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity sampled along the trajectories — is the
+cache's deposit from the previous tail; the
 second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
@@ -318,7 +319,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\boldsymbol{u}`` | physical, grid | yes | yes | the tail recovery; read by the timestep choice, the tracer push, the Lamb assembly, and observations |
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the tail recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the tail recovery; read by the flux assembly |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the particle velocities | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
 | the maximum velocity component ``\max_i\lvert u_i\rvert`` | one number | yes | yes | the tail reduction over the cached velocity; read by the next timestep choice |
 | ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
@@ -352,9 +353,9 @@ third — a number, obtained by summing over wavenumbers without building any fi
 [`dissipation`](@ref) returns when an observation applies it to the state. It may be written with
 either form precisely because they agree in the mean.
 
-**Only one tracer sample reflects the flow.** The trajectory sample
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` gives the velocity at the particle's own position and
-moment, and is what a Lagrangian statistic accumulates. The second, at a predicted position differing
+**Only one tracer sample reflects the flow.** The particle velocities
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` give the velocity at each particle's own position and
+moment, and are what a Lagrangian statistic accumulates. The second, at a predicted position differing
 from the endpoint by ``\mathcal O(\Delta t^{2})``, exists only to give the position update its
 second-order accuracy; it belongs to no instant along the trajectory and is not exposed.
 
@@ -376,7 +377,7 @@ no deposit is current. The tail [`deposit!`](@ref) closes an iteration (the run 
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`resolved_fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields, not a filtered subset of the scales — after which reads
-throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the trajectory sample —
+throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the particle velocities —
 a cached read like the fields' — and [`sample!`](@ref) interpolates any physical field at the
 particle positions.
 
@@ -388,7 +389,7 @@ cache  = ObservablesCache(domain; scalar = true)   # the slots follow the config
 ### 3.2 What is not built
 
 The cache itself is built as §§1–2 describe: automatic contents, tail deposits stamped at the new
-boundary — the trajectory sample included, stamped against both epochs — three-valued stamps that
+boundary — the particle velocities included, stamped against both epochs — three-valued stamps that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the boundary
 completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes every boundary the run reaches — ``n`` iterations, ``n + 1``

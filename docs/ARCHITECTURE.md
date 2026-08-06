@@ -199,7 +199,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   is homed here with the state it reads. Its values land in the **`ObservablesCache`** (its own
   module, `Cache`, between `State` and `Forcing`): the stamped boundary storage each iteration
   deposits its observables into at its tail — the physical velocity, vorticity, and scalar, the
-  maximum velocity component, and, when tracers ride the run, the trajectory sample
+  maximum velocity component, and, when tracers ride the run, the particle velocities
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
   substage recovery registers mid-iteration (their stamps go to *scratch*, so a mid-iteration read

@@ -163,10 +163,10 @@ run). The `Simulation` front door builds one for you.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``
-  (`prepare!` fills them). Each is `nothing` unless that field's forcing declares
+  (`prepare!` fills them each step; a non-`nothing` rate is the armed offset the factor verbs
+  return). Each is `nothing` unless that field's forcing declares
   `uses_linear_rate`, so a field driven by a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
-- `velocity_rate_active`, `scalar_rate_active` — whether `prepare!` armed each rate this step.
 - `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
   displaced velocity, left fresh by [`velocity_rhs!`](@ref) for the same stage's
   [`scalar_rhs!`](@ref) to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
@@ -178,8 +178,6 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const phase_shift::PB
   const velocity_rate::RK
   const scalar_rate::SR
-  velocity_rate_active::Bool
-  scalar_rate_active::Bool
   displaced_velocity_fresh::Bool   # PhaseShift: u_shifted still holds THIS stage's displaced velocity
 end
 
@@ -189,7 +187,7 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
-                    false, false, false)
+                    false)
 
 
 """
@@ -206,11 +204,11 @@ function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::
   generator.displaced_velocity_fresh = false        # a new step opens with the displaced scratch stale
   conditions = generator.conditions
   prepare_forcing!(conditions.velocity_forcing, state.velocity, domain, dt)
-  generator.velocity_rate_active = generator.velocity_rate === nothing ? false :
+  generator.velocity_rate === nothing ||
     set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity, domain)
   if state.scalar !== nothing
     prepare_forcing!(conditions.scalar_forcing, state.scalar, domain, dt)
-    generator.scalar_rate_active = generator.scalar_rate === nothing ? false :
+    generator.scalar_rate === nothing ||
       set_forcing_rate!(conditions.scalar_forcing, generator.scalar_rate, state.scalar, domain)
   end
   return generator
@@ -352,7 +350,7 @@ sub-interval the stage advances.
 """
 velocity_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
-   offset = generator.velocity_rate_active ? generator.velocity_rate : nothing)
+   offset = generator.velocity_rate)
 
 
 """
@@ -366,7 +364,7 @@ The passive scalar's exact linear subflow over a substep `τ` — the same expon
 scalar_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -(generator.conditions.viscosity / generator.conditions.schmidt) * τ,
    offset_scale = τ,
-   offset = generator.scalar_rate_active ? generator.scalar_rate : nothing)
+   offset = generator.scalar_rate)
 
 
 """

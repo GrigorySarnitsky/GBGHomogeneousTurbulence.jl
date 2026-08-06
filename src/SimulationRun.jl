@@ -10,7 +10,7 @@
 # tail `deposit!` recovers the boundary observables into the cache and stamps them, and the boundary
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
 # arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
-# trajectory sample the PREVIOUS tail deposited (read checked), v₂ interpolates the just-deposited
+# particle velocities the PREVIOUS tail deposited (read checked), v₂ interpolates the just-deposited
 # u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
 # same field, closing the boundary; only M-sized point values are held, never a second field copy.
 
@@ -230,7 +230,7 @@ function Simulation(domain::FixedDomain;
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
 
   cache = ObservablesCache(domain; scalar,
-                             trajectory_sample = tracers === nothing ? nothing : tracers.trajectory_velocity)
+                             particle_velocities = tracers === nothing ? nothing : tracers.trajectory_velocity)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
   tracers === nothing ||
     (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
@@ -291,8 +291,8 @@ resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.cach
 
 function deposit!(sim::Simulation)
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-  # The trajectory sample rides the same re-deposit: the positions are unchanged, so re-recording
-  # from the freshly deposited velocity restores the sample the announcement made stale.
+  # The particle velocities ride the same re-deposit: the positions are unchanged, so re-recording
+  # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
     (record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache));
      deposit_sample!(sim.cache))
@@ -399,9 +399,9 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # The checked read at the head boundary: the push's v₁ must be the trajectory sample the previous
-  # tail deposited. It is consumed mid-iteration (after the step, as the solver's own scratch), so
-  # the stamp is verified here, at tₙ, where the sample is the current boundary observable.
+  # The checked read at the head boundary: the push's v₁ must be the particle velocities the previous
+  # tail deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
+  # the stamp is verified here, at tₙ, where they are the current boundary observable.
   sim.tracers === nothing || particle_velocities(sim.cache)
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)

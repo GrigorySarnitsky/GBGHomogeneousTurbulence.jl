@@ -326,7 +326,7 @@ end
     end
 
     fu, fφ, gen = factors(1.0, NoForcing())                       # Sc = 1, no armed rate
-    @test !gen.velocity_rate_active && !gen.scalar_rate_active
+    @test gen.velocity_rate === nothing && gen.scalar_rate === nothing
     @test fu.offset === nothing && fφ.offset === nothing
     @test fu.coefficient == fφ.coefficient                        # Sc = 1 ⇒ equal parameters
 
@@ -334,7 +334,7 @@ end
     @test fu.coefficient != fφ.coefficient
 
     fu, fφ, gen = factors(1.0, Linear(domain; rate = 0.5))        # Sc = 1, velocity rate ARMED
-    @test gen.velocity_rate_active && !gen.scalar_rate_active
+    @test gen.velocity_rate !== nothing && gen.scalar_rate === nothing
     @test fu.offset !== nothing && fφ.offset === nothing          # the rate reaches only its field
   end
 end
