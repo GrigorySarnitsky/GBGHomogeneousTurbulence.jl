@@ -191,13 +191,13 @@ a real decision: a vector field on the grid is ``3N^{3}`` reals, 384 MiB at ``N 
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
 third of a gigabyte; a number costs nothing worth counting.
 
-For scale: a velocity-only run under `TwoThirds` or `HouLi` carries seven vector-shaped fields —
-four in spectral representation and three in physical — about 2.8 GiB at ``256^{3}`` in double
-precision, before the scalar-shaped registers. It carried ten before the slot-and-register merge
-landed: two physical vectors existed only because a slot and its producer's register were separate
-arrays, and a third, spectral one was the cache's private recovery scratch — all three are gone, and
-the ledger now sits at the schedule's own lower bound. Landing §2.3's register reuse would remove
-one more array.
+For scale: a velocity-only run under `TwoThirds` or `HouLi` carries six vector-shaped fields — four
+in spectral representation and two in physical — about 2.4 GiB at ``256^{3}`` in double precision,
+before the scalar-shaped registers. It carried ten before this design landed: two physical vectors
+existed only because a slot and its producer's register were separate arrays, a spectral one was the
+cache's private recovery scratch, and a fourth held the quadratic products that now form in place
+over the slots (§2.3) — all four are gone, and the ledger sits at the schedule's own lower bound in
+every class.
 
 ---
 
@@ -283,14 +283,12 @@ work rather than adding to it, so an iteration recovers a field once whether or 
 These transforms carry essentially all of the arithmetic: a scalar transform costs of order ``10^{2}``
 floating-point operations per grid point, a pointwise multiplication of order ten.
 
-Because the pointwise product writes into a third array, the vorticity survives the evaluation — three
-vector arrays in physical representation at once. Assembling the Lamb vector into the vorticity's own
-array, as §1.3 describes, would need two. The backend's cross product no longer blocks that: its
-kernel reads each grid point's whole fiber before writing, so the destination may be one of its own
-operands, and taking the reuse is now a scheduling change here rather than a backend request. It is
-not yet taken `(not yet — §3.2)`; while the third array stands, the vorticity slot is untouched by
-the assembly, and the vorticity is deposited at the tail either way — what the reuse changes is the
-product array, not the cache's contents.
+The pointwise product writes into one of its own operands: the backend's cross product reads each
+grid point's whole fiber before writing, so the Lamb vector is assembled into the vorticity's own
+array — the slot, taken as the producer's scratch exactly as §1.3 describes — and the scalar flux
+into the velocity's. No third array exists, and the evaluation holds two vector arrays in physical
+representation at once. The vorticity is deposited at the tail either way, so the reuse changes the
+run's residency, not the cache's contents.
 
 The tracer scheme consumes two velocity samples per push. The first, the **trajectory sample**
 ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the cache's deposit from the previous tail
@@ -395,7 +393,6 @@ remain, each a piece of the run layer's redesign rather than of the cache:
   nonlinear terms are still assembled at the next step's first stage, not deposited at the tail.
 - **The trajectory sample lives with the particle set.** The sample's values are the boundary values
   (it is interpolated from the deposited velocity chart), but it is stored on the tracers and its
-  own documentation states whether it is current, rather than a stamp carrying that status; the
-  register reuse of §2.3 travels with the same strand.
+  own documentation states whether it is current, rather than a stamp carrying that status.
 
 The decisions behind each are in the [architecture notes](architecture.md).

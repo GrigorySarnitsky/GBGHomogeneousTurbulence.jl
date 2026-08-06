@@ -273,8 +273,10 @@ puts on any closure: net dissipation lives in the diffusion term alone, so a sub
 *remove* energy through that half (§8).
 
 The generator is **reified**: **`ResolvedGenerator`** bundles the `FlowConditions` with the assembly
-scratch its evaluations write through (the quadratic-product fields, the `PhaseShift`
-displaced-evaluation buffers, the per-mode forcing-rate arrays), behind a six-verb protocol —
+scratch its evaluations write through (the quadratic products' spectral image, the `PhaseShift`
+displaced-evaluation buffers, the per-mode forcing-rate arrays — in physical representation each
+quadratic product forms in place over an operand's own register, §11 decision 41), behind a six-verb
+protocol —
 `prepare!` opens the step (advances each forcing's internal state, arms the linear rates),
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
 (dealiased nonlinear term plus additive forcing source), `velocity_factor` / `scalar_factor` supply
@@ -1426,6 +1428,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     representation-first (`spectral_scalar`, `physical_scalar`, `spectral_tensor`,
     `physical_tensor`) so the shape-named allocators and the physics-named observables accessors
     cannot collide.
+
+41. **(2026-08) The quadratic products form in place over an operand's register: `product_physical`
+    is deleted.** The backend's index-shuffling kernels are alias-safe by construction (each output
+    element's whole fiber is read before anything is written — the PF sweep that retired its
+    aliasing guard), so `cross!(ω, u, ω)` lands the Lamb vector in the vorticity's own register, and
+    the flux ``\boldsymbol{u}\varphi`` lands in the velocity's through the backend's pointwise
+    `multiply!` — which also replaces the raw broadcast `_scalar_flux!` had carried, a
+    reimplementation of a shipped PF operation (invariant 2). The displaced PhaseShift evaluations
+    reuse their own shifted registers the same way. `velocity_rhs!` therefore **consumes** its `ω`
+    argument and `scalar_rhs!` its `u` (documented in both docstrings; `step!` takes the
+    corresponding cache slots before the stage-1 assembly), and `ResolvedGenerator` keeps only the
+    spectral product image: one physical vector retired from **every** configuration — 402 MiB at
+    ``256^3``/Float64 — bringing the physical-vector floor to **two** registers (the chart slots,
+    now serving as recovery registers *and* product targets), with the archived OU's physical
+    ownership gap closing as a side effect (no product register remains for its noise to alias).
+    This is the reuse §2.3 of the design page recorded as blocked before the backend's alias-safe
+    kernels landed; passes and transforms are untouched — the decision moves residency only.
 
 ---
 

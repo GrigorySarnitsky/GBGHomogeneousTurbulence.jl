@@ -224,6 +224,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     if i == 1
       u = velocity_physical(derived)                     # the boundary observables, deposited by the
       ω = vorticity_physical(derived)                    # previous iteration's tail (never recomputed)
+      take_vorticity!(derived)                           # the assembly forms the Lamb vector in ω's register
+      has_scalar && take_velocity!(derived)              # …and, with a scalar, the flux in u's register
     else
       # From stage 2 on the cache slots ARE the recovery registers: take them (their stamps go to
       # scratch, so a mid-iteration read throws) and recover the stage state into them. The spectral
@@ -325,9 +327,13 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
   # stage 1 — right-hand sides at the boundary state, read from the cache (deposited by the previous
-  # iteration's tail; never recomputed)
+  # iteration's tail; never recomputed). The assemblies consume the chart registers — the Lamb vector
+  # forms in the vorticity's, and the scalar flux in the velocity's — so those slots are taken first.
   u = velocity_physical(derived)
-  velocity_rhs!(buffers.stage1, generator, û, u, vorticity_physical(derived), domain)  # N̂_u,1
+  ω = vorticity_physical(derived)
+  take_vorticity!(derived)
+  has_scalar && take_velocity!(derived)
+  velocity_rhs!(buffers.stage1, generator, û, u, ω, domain)                      # N̂_u,1
   if has_scalar
     scalar_rhs!(sb.stage1, generator, û, φ̂, u, scalar_physical(derived), domain)  # N̂_φ,1
   end

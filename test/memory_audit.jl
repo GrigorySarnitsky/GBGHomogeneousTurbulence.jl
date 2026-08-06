@@ -70,7 +70,9 @@ end
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar,
 # real_spectral_scalar.
-# Re-frozen 2026-08-06 (decision 40, the deposit-driven cache — slot IS the producer's register):
+# Re-frozen 2026-08-06 (decisions 40 and 41 — the deposit-driven cache, then the in-place quadratic
+# products: the Lamb vector forms over the vorticity register and the scalar flux over the
+# velocity's, so `product_physical` is deleted outright, −1 pv in every cell on top of the merge):
 # the cache's chart slots ARE the step's substage recovery registers, so the two physical vectors
 # the old IntegratorBuffers carried beside the charts are gone (−2 pv in every cell, 768 MiB at
 # 256³ / Float64 — exactly the gap decision 37 uncovered); the cache's spectral scratch is gone
@@ -84,18 +86,18 @@ end
 # default configuration, whose BandRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 4, spectral_scalar = 6, physical_scalar = 2, real_spectral_scalar = 0),
 )
 # (History: the PhaseShift displaced-velocity register was once tried on the generator's spent
 # product scratch and REVERTED (2026-07-31) — the then-guarded `cross!` allocated per stage; the
@@ -191,11 +193,12 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 #   SCALAR REGISTERS — the scalar's copy register could share a slot; it is deleted outright.
 #   (SHARED FACTOR was retired 2026-08-06 with decision 39.)
 # Every unforced cell now sits AT its liveness bound in every class. The one remaining gap is the
-# archived OU's: its noise pair could alias the generator's product registers but lives on the
-# forcing across an ownership boundary — one spectral and one physical vector.
+# archived OU's spectral noise: it could alias the generator's spectral registers but lives on the
+# forcing across an ownership boundary — one spectral vector. (Its physical twin closed with
+# decision 41: there is no physical product register left for the noise to alias, so the bound rose
+# to meet the ledger and the holder retired.)
 const GAP_HOLDERS = Dict(
-  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (OU noise ↔ nonlinear/product)",
-                           :physical_vector => "OWNERSHIP (OU noise ↔ product)"),
+  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (OU noise ↔ nonlinear/product)"),
 )
 
 
@@ -325,7 +328,10 @@ const EPISODE_UNITS = [
     # products on ResolvedGenerator, spectral stage registers on IntegratorBuffers/ScalarBuffers,
     # the OU's state and noise on the forcing.
     @test all(f -> f in fieldnames(ObservablesCache), (:velocity, :vorticity, :scalar, :max_speed))
-    @test all(f -> f in fieldnames(ResolvedGenerator), (:product_physical, :product_spectral))
+    @test :product_spectral in fieldnames(ResolvedGenerator)
+    # The physical product register is gone (decision 41): the Lamb vector forms over the vorticity
+    # slot and the scalar flux over the velocity slot — in place, alias-safe.
+    @test !(:product_physical in fieldnames(ResolvedGenerator))
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
     SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers
     @test all(f -> f in fieldnames(IB), (:stage1, :stage2, :velocity_star_spectral, :nonlinear))
@@ -367,13 +373,14 @@ const EPISODE_UNITS = [
       end
     end
     @test ou_achieved.spectral_vector - ou_bound.spectral_vector == 1
-    @test ou_achieved.physical_vector - ou_bound.physical_vector == 1
+    @test ou_achieved.physical_vector == ou_bound.physical_vector
 
-    # The physical-vector floor, in numbers: three registers — the two chart slots (doubling as the
-    # substage recovery registers) plus the product register — with the 768 MiB the old two-vector
-    # chart gap cost at 256³ / Float64 banked, not held.
+    # The physical-vector floor, in numbers: TWO registers — the chart slots, doubling as the
+    # substage recovery registers AND as the quadratic products' in-place targets (decision 41) —
+    # with the three vectors retired since decision 37 (the two-chart gap + the product register,
+    # 1.15 GiB at 256³ / Float64) banked, not held.
     for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      @test peak_liveness(ops_of(scalar)).physical_vector == 3
+      @test peak_liveness(ops_of(scalar)).physical_vector == 2
     end
   end
 

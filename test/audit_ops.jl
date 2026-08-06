@@ -89,7 +89,7 @@ const VALUE_CLASS = Dict(
   :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
   :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
   :vshift => :spectral_vector,
-  :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
+  :chart_u => :physical_vector, :chart_ω => :physical_vector,
   :noise_p => :physical_vector,
   :ushift => :physical_vector, :ωshift => :physical_vector,
   :φ̂ => :spectral_scalar,
@@ -137,16 +137,18 @@ end
 
 
 # The velocity right-hand side at a stage (velocity_rhs! in src/Generator.jl), reading the physical
-# (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. A mask
-# strategy (TwoThirds / HouLi) evaluates once and low-passes; PhaseShift also reads the stage's
-# SPECTRAL velocity `uspec` for the half-cell-displaced evaluation through the generator's
-# PhaseShiftBuffers registers, averages the two grids (the shift-back riding the averaging convolve
-# as one fused α/β pass — the PF-triage free win, 2026-07-19), and truncates spherically. `source`
-# appends the additive-forcing read (the OU's per-stage add_forcing_source!).
+# (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. The Lamb
+# vector forms IN PLACE over ω's register (decision 41 — the alias-safe cross), so the assembly
+# consumes ω and owns no physical product array. A mask strategy (TwoThirds / HouLi) evaluates once
+# and low-passes; PhaseShift also reads the stage's SPECTRAL velocity `uspec` for the
+# half-cell-displaced evaluation through the generator's PhaseShiftBuffers registers, averages the
+# two grids (the shift-back riding the averaging convolve as one fused α/β pass — the PF-triage free
+# win, 2026-07-19), and truncates spherically. `source` appends the additive-forcing read (the OU's
+# per-stage add_forcing_source!).
 function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = false)
   ops = [
-    Op("cross u×ω",        [u, ω],        [:pp]),
-    Op("flux→spectral",    [:pp],         [:ps]),
+    Op("cross u×ω",        [u, ω],        [ω]),
+    Op("flux→spectral",    [ω],           [:ps]),
     Op("Leray projection", [:ps],         [out]),
   ]
   if phase_shift
@@ -156,8 +158,8 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
       Op("shifted u recovery", [:ps],              [:ushift]),
       Op("shifted curl",       [:vshift],          [:ps]),
       Op("shifted ω recovery", [:ps],              [:ωshift]),
-      Op("cross u×ω",          [:ushift, :ωshift], [:pp]),
-      Op("flux→spectral",      [:pp],              [:ps]),
+      Op("cross u×ω",          [:ushift, :ωshift], [:ωshift]),
+      Op("flux→spectral",      [:ωshift],          [:ps]),
       Op("Leray projection",   [:ps],              [:vshift]),
       Op("shift-back average", [out, :vshift],     [out]),
     ])
@@ -183,9 +185,10 @@ function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb
     Op("copy φ̂",       [φspec],    [sscratch]),
     Op("φ recovery",    [sscratch], [:chart_φ]),
   ])
+  # The flux forms IN PLACE over u's register (decision 41), so the assembly consumes u.
   append!(ops, [
-    Op("flux uφ",       [u, :chart_φ], [:pp]),
-    Op("flux→spectral", [:pp],         [:ps]),
+    Op("flux uφ",       [u, :chart_φ], [u]),
+    Op("flux→spectral", [u],           [:ps]),
     Op("divergence",    [:ps],         [out]),
   ])
   if phase_shift
@@ -196,8 +199,8 @@ function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb
       Op("shift φ̂",           [φspec],          [:sshift]),
       Op("shifted copy φ̂",    [:sshift],        [:scopy]),
       Op("shifted φ recovery", [:scopy],         [:pshift]),
-      Op("flux uφ",            [:ushift, :pshift], [:pp]),
-      Op("flux→spectral",      [:pp],            [:ps]),
+      Op("flux uφ",            [:ushift, :pshift], [:ushift]),
+      Op("flux→spectral",      [:ushift],        [:ps]),
       Op("divergence",         [:ps],            [:sshift]),
       Op("shift-back average", [out, :sshift],   [out]),
     ])
