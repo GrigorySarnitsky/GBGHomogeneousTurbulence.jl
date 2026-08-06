@@ -8,133 +8,216 @@ one check or one file, and do not ask which check to run. Cover every cell, fix 
 one pass, rebuild, and report the matrix. `CLAUDE.md` (§Documentation policy, §Style, the doc-edit
 checklist) holds the authoritative definitions; this command runs all of them.
 
+## Cost modes — cheap lanes by default; the fix is never economized
+
+The scan/review lanes run on a **cheaper agent model by default** (the economy mode is the standard
+one — Sonnet-class lanes; lane cost is the ONLY thing it reduces; the reviewer-model policy of
+2026-08-01). Run the lanes at full strength only when the user explicitly asks for it (in any words —
+"strong lanes", "full-price scan", "expensive lanes"). In EVERY mode the **fix phase is never
+reduced**: the main thread — at its own (strongest) model, full effort — verifies every finding and
+closes every one in the same run, as *fixed* or as *dismissed with a written reason*, including the
+expensive judgment calls (cold-reader glosses, argument-coverage triage, the class sweeps the findings
+demand). Deferring findings to a later session is NOT an outcome of any mode. All modes produce the
+identical end state — zero open findings, clean build — and differ only in what the lanes cost.
+(Ported from PF 2026-08-06, with its postmortem: an economy run once deferred its judgment tail as a
+standing remainder — the failure mode this paragraph forbids.)
+
 ## Surfaces (ALL of them)
 
-1. `docs/ARCHITECTURE.md` — every section and §References.
-2. Every docstring in `src/*.jl` — `SimulationDomain`, `State`, `Generator`, `Observables`, `Forcing`,
-   `Propagator`, `Particles`, `SimulationRun`, `Phenomenology` (and its `Spectra` / `StructureFunctions` /
-   `Scalings` submodules), and the umbrella `GBGIsotropicTurbulence.jl` (module **and** function
-   docstrings; `#` comments are exempt — not rendered).
-3. Every page in `docs/src/` — `index.md`, `notation.md`, `api.md`, and all `docs/src/api/*.md`
-   (hand-written prose and `@docs` groupings; skip the `@autodocs` / `@example` / `@repl` / `@index`
-   blocks themselves).
+1. `docs/ARCHITECTURE.md` — every section and §References. (The decision log §11 is append-only
+   HISTORY: an old entry naming a superseded API records what was decided then — only the
+   current-state sections must match the code.)
+2. Every docstring in `src/*.jl` — `SimulationDomain`, `State`, `Cache`, `Generator`, `Observables`,
+   `Forcing`, `Propagator`, `Particles`, `SimulationRun`, `Phenomenology` (and its `Spectra` /
+   `StructureFunctions` / `Scalings` submodules), and the umbrella `GBGIsotropicTurbulence.jl` (module
+   **and** function docstrings; `#` comments are exempt — not rendered).
+3. Every page in `docs/src/` — `index.md`, `notation.md`, `observables_cache.md`, `api.md`, and all
+   `docs/src/api/*.md` (hand-written prose and `@docs` groupings; skip the `@autodocs` / `@example` /
+   `@repl` / `@index` blocks themselves). The gitignored `docs/src/architecture.md` is a regenerated
+   *copy* — exclude it (edit `docs/ARCHITECTURE.md`, not the copy).
+4. **The BUILT HTML** — `docs/build/api/*/index.html`, after `julia --project=docs docs/make.jl`.
+   This is a surface in its own right, not a rendering of surface 3: what each `@docs` block actually
+   collected, whether every export landed on exactly one page, and whether a section's hand-written
+   blurb still matches its block's contents are visible only here (ported from PF, where two defect
+   classes lived exactly in this gap).
 
 ## Checks (ALL of them, on every surface)
 
 Run each as a POSITIVE procedure — enumerate, then verify each item. A defect that is absent-by-omission
-(an unbound symbol; a false-but-plausible formula; a missing argument) does not announce itself on a
-read-through, so passive reading is not a check.
+(an unbound symbol, a false-but-plausible formula) does not announce itself on a read-through, so passive
+reading is not a check.
 
-1. **Correct** — enumerate every formula, normalization constant (the `1/N`, `2ν`, `2ϰ`, the `½` in the
-   energy, Parseval / spectral factors), conservation / adjoint relation, complexity claim, and quantifier
-   (*exact / all / never / allocation-free*); verify EACH against the implementation in `src/` (read it,
-   quote the decisive line) or by derivation. Confirm the **diagnostic is consistent with the physical
-   quantity it claims to measure** (the estimator computes what the leading formula states). Flag false /
-   imprecise / overclaim. For a nontrivial statement the sharpest method is to write it formally on scratch
-   (types from the code) and expand it. **Also flag the category/type-error class** — invisible to a
-   value-check (a sentence can be perfectly formatted and read true yet conflate two *kinds* of object): a
-   **field** conflated with its **representation** (physical vs spectral — "field in spectral
-   representation", not "spectral field"); a **diagnostic scalar** with the **field** it reduces (the
-   dissipation *rate* `ε = ν⟨|ω|²⟩`, a number, vs a dissipation field; `k` vs the spectrum `E(κ)`); an
-   **operator** with its **parameter** (the integrating factor vs `ν`; the Leray projection `ℙ` vs a
-   Mori–Zwanzig `𝒫`); a **rate** vs its **time-integral**; a per-`κ` **spectral density** `E(κ)` vs a bulk
-   **energy**; a dimensionally-incomplete reference law (a bare `κ^-5/3` slope vs `C_K ε^2/3 κ^-5/3`). Type
-   every object from the code. Cross-check a load-bearing claim against `ARCHITECTURE.md` (its decision log
-   and the physics) and against the enforcing test.
-2. **Self-contained** — enumerate every symbol, sub / superscript, operator name, and bold / blackboard
-   letter; cite the clause (on the page or in `notation.md`) that binds each; flag any unbound.
-   (Universally standard math — `∇`, `Δ`, `∫`, `⟨·⟩`, `π`, the imaginary unit — needs no binding.) **And,
-   separately, from each docstring's *signature*:** enumerate every argument (positional *and* keyword)
-   and cite where the body documents it — an argument mentioned only *inside a formula* reads as
-   bound-by-use and is `UNDOCUMENTED` (`ops` / `ws` once slipped this way). **And the same bar binds
-   *terms of art*, not only symbols:** a noun naming a package concept (an *integrating factor*, a
-   *de-alias kernel*, the *Lamb vector*, a *stage register*) must be explained on the page or `@ref`-linked
-   — the **cold read** (parse the docstring with the module source withheld) is the test. Run this in the
-   cold-reader lane.
-3. **Notation — one symbol per concept, one concept per symbol** — flag a concept wearing two symbols; a
-   glyph with two meanings in one section. Enforce the house set: vectors / tensors `\boldsymbol` (never
-   `\mathbf`); the wavenumber clash kept distinct — `\boldsymbol{\kappa}` vector, `\kappa` magnitude, `k`
-   kinetic energy, `\varkappa` scalar diffusivity; `\varphi` the scalar (never `\theta`); `\partial_{x_i}`
-   (never `\partial_i`); upright `\mathrm{i}`; `\mathbb P` Leray, `\mathcal P` Mori–Zwanzig. And the code
-   **naming convention** (math variables `u` / `ω` / `φ` / `û` / `φ̂`, storage slots descriptive) — a
-   docstring signature or example that reintroduces `velocity` / `uh` for a math variable is stale.
-4. **Formatted (bidirectional)** — math is LaTeX, never backticks (incl. ASCII-math like `Re = 1/nu` that
-   carries no glyph); every code identifier / type / module name is backticked, never bare; check BOTH
-   directions. Markdown tables top-level, never indented in a list. Also the *silent* failures (source
-   looks right, page renders broken): a code name never *inside* a ``…`` span, a formula never split
-   across a ``…`` / `` `code` `` boundary, inline math on one source line, no `\mathbf`, and no > 88-col
-   signature or wide unbroken display block (horizontal scroll). Inline-math-on-one-line, `\partial_i`,
-   and `\mathbf` are **build-enforced** (`docs/make.jl`'s `lint_inline_math()` / `lint_notation_variants()`
-   error), so the rebuild below IS those guards; the **argument-coverage** sweep runs inside check 2.
+1. **Correct** — enumerate every formula, normalization (the `1/N`, the ``2\varkappa``, the ``\tfrac{1}{2}``
+   in the energy, Parseval / spectral factors), conservation / adjoint relation, and quantifier
+   (*exact / all / never*) true and precise, verified against `src/` (quote the decisive line) or by
+   derivation; the diagnostic consistent with the physical quantity it claims to measure; and free of
+   **category/type errors** (a field vs its representation, an operator vs its parameter, a rate vs its
+   time-integral, a diagnostic scalar vs the field it reduces, a per-``\kappa`` density vs an energy —
+   type each object from the code).
+2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
+   every signature argument documented** — enumerated *from the signature* (positional + keyword), each
+   its own entry, so an "obvious" `domain` or `dt` cannot be skipped. A **term of art** naming a package
+   concept (a *boundary*, a *deposit*, a *stamp*, an *epoch*, a *slot*, an *observation*, an
+   *integrating factor*) is explained or `@ref`-linked, not left correct only to a reader who already
+   knows the code — the **cold read** (the docstring parsed with the module source withheld) is the
+   test. Run this in the cold-reader lane.
+3. **Notation** — one symbol per concept, one concept per symbol; the house glyphs (`\boldsymbol`, the
+   `\boldsymbol{\kappa}` / `\kappa` / `k` / `\varkappa` set, `\varphi`, `\partial_{x_i}`, `\mathrm{i}`,
+   `\mathbb P` / `\mathcal P`); standard notation; the naming convention (math variables symbolic,
+   storage descriptive).
+4. **Formatted (bidirectional)** — math is LaTeX never backticks; every code identifier backticked
+   never bare; markdown tables top-level; and the *silent* failures — a code name never inside a math
+   span, a formula never split across a math / `` `code` `` boundary, inline math on one source line
+   (build-enforced), no `\mathbf` (build-enforced), no > 88-col signature or wide display block. **And
+   the TeX idiom set** (adopted 2026-08-06, every scan empty at adoption): braced group arguments
+   (``\tfrac{1}{2}``, ``\boldsymbol{u}`` — never `\tfrac12`, `\boldsymbol u`); the thin space ``\,``
+   reserved for the differential (``\,\mathrm d\kappa``) — never between plain factors; no manual
+   ``\;`` / ``\:`` spacing around relations or between factors; no ``\left``/``\right`` auto-sizing
+   (an Inner atom that adds a spurious gap — size by hand with ``\bigl``/``\Bigl``; the system
+   ``\left\{ \dots \right.`` and the arrow commands are exempt); no ``\mathbb`` on a digit; a
+   conditional bar is ``\mid``, never a spaced `|`.
 5. **Current & complete** — every claim matches the code's present state; no stale
    *future / deferred / none-exist*; and a docstring or summary that names only a *subset* of what the
-   code now provides is stale even if literally true (a module docstring naming one of two integrator or
-   forcing families; a capability list missing a builder). Check each module / operation / summary still
-   names everything added since it was written, against the current `export`s / method set.
-6. **Cited** — context-standard author–year; ≤ 3 authors named, `First et al.` for 4+; inline references
-   verbatim-consistent with the `ARCHITECTURE.md` §References entry. **Bidirectional:** every inline
-   author–year cite in a `src/*.jl` docstring has a matching `§References` entry — a cite with no entry is
-   a defect; an entry citing no docstring is stale. The extraction-bound `Phenomenology` leaf is
-   **exempt**: each reference law carries its own self-contained `Reference` value, so its cites are *not*
-   duplicated in `§References`. **Never cite an inaccessible source** (the private notes under
-   `inspiration/` are working material, not citable).
-7. **Consistent across variant pairs** (the `src/` docstrings — *relational*, not per-surface) — group
-   each operation's generics (allocating `f` / in-place `f!`, physical / spectral, getter / `set_…!`) and
-   confirm the defining math (formula, spectral kernel) lives in **one home**, every other variant a thin
-   `@ref`-linking wrapper — no second copy of the formula, no notation that drifts across the pair
-   (`\partial_i` vs `\partial_{x_i}`, `velocity` vs `u`). Checks 1–6 each run inside one string and cannot
-   see this; run it in the family lane.
+   code now provides is stale even if literally true. Check each still names everything added since it
+   was written, against the current `export`s / method set.
+6. **Cited** — context-standard author–year; ≤ 3 authors named, `First et al.` for 4+; inline
+   references verbatim-consistent with the `ARCHITECTURE.md` §References entry (the `Phenomenology`
+   leaf is exempt, carrying its own self-contained `Reference` values); never an inaccessible source.
+7. **Consistent across variant pairs** (the `src/` docstrings — *relational*, not per-surface): each
+   operation's `f` / `f!` (getter / `set_…!`) share **one home** for the formula, the other a thin
+   `@ref` wrapper, with no notation that drifts across the pair. Run it in the family lane.
 
 ## Mechanism
 
-- Fan out subagents across the surfaces in parallel — each runs checks 1–6 on its surface via the
-  positive procedures above, reading `src/` as ground truth, and returns genuine findings with evidence
-  and a proposed fix.
-- Two **cross-cutting lanes** (their grouping is not per-surface, so the surface agents cannot run them):
-  a **family lane** that enumerates each operation's `f` / `f!` (physical / spectral) generics and diffs
-  their docstrings for one-home + notation (check 7); and a **cold-reader lane** — an agent handed each
-  exported docstring's text *alone, without the module source*, reporting every term of art it cannot
-  parse (check 2's audience half). **Substrate rule for the cold-reader lane:** feed it the reader's
-  *actual* `?name` view — include the **module docstring** (`?Module`) and **every** method docstring of a
-  generic, never one collapsed docstring; a substrate that skips the module docstring or shows one method
-  of a multi-method generic over-flags things documented centrally or on a sibling method, so **verify
+- Fan out subagents across the surfaces in parallel, **on the cheaper (economy) lane model by
+  default** (see Cost modes) — each runs checks 1–6 on its surface via the positive procedures,
+  reading `src/` as ground truth, and returns genuine findings with evidence and a proposed fix.
+- Two **cross-cutting lanes** (their grouping is not per-surface, so the surface agents cannot run
+  them): the **family lane** (check 7) and the **cold-reader lane** (check 2's audience half).
+  **Substrate rule for the cold-reader lane:** feed it the reader's *actual* `?name` view — include
+  the **module docstring** (`?Module`) and **every** method docstring of a generic, never one
+  collapsed docstring; a substrate that skips the module docstring or shows one method of a
+  multi-method generic over-flags things documented centrally or on a sibling method, so **verify
   every cold-reader finding against source before fixing**.
-- Run the deterministic grep guards below, plus a bare-module-name scan and a glyph-vs-backtick scan
-  (Unicode math *outside* a backtick span), a **code-in-math scan** (a 2+-letter lowercase run *inside* a
-  ``…`` span that is neither a `\command` nor `\texttt`/`\mathrm`-wrapped — it renders as a letter-product),
-  a **split-formula scan** (a ``…`` math span abutting a `` `code` `` span — the silent rule-(b) failure),
-  and a deterministic **argument-coverage** backstop: a short Julia helper that splits each `"""…"""`,
-  parses the signature's positional + keyword parameters, and flags any never mentioned as a backticked
-  `` `arg` `` in the body (then triage).
+- Run the deterministic scans below. The block has two tiers: **must-be-empty** scans and **triage**
+  heuristics whose hits mix real signal with false positives.
+  **NEVER pipe a triage scan through `head`/`tail`.** Adding a limit to keep the output readable is
+  how a class gets half-swept and reported closed (PF, 2026-08-04: a scan run with `| head -5` showed
+  5, and there were 31). Count first (`| wc -l`), then read the whole list.
 
 ```bash
-grep -rnE '^[[:space:]]+\|[-:| ]+\|' docs                              # tables top-level only — must be empty
-grep -rnE '`[^`]*[≤≥≠∈∉∇Δ⟨⟩‖√×⋅][^`]*`' src/*.jl docs/src docs/*.md    # formula-in-backticks → should be ``LaTeX``
+DOCS_MD="docs/ARCHITECTURE.md docs/src/notation.md docs/src/index.md docs/src/api.md \
+         docs/src/observables_cache.md docs/src/api/*.md docs/src/api/phenomenology/*.md"
+
+# ---- must come back EMPTY ----
+grep -rnE '^[[:space:]]+\|[-:| ]+\|' docs                              # tables top-level only
+grep -rniE '\b(knobs?|tweaks?)\b' docs src                             # neutral register
+grep -rnE '\\partial_[ijk]' src/*.jl $DOCS_MD                          # bare-index ∂ → \partial_{x_i}; build-enforced
+grep -rnE '\\mathbf' src/*.jl $DOCS_MD                                 # upright bold → \boldsymbol; build-enforced
+grep -rnP '\\\\,(?!\\\\mathrm[ {]d)' src/*.jl; grep -rnP '\\,(?!\\mathrm[ {]d)' $DOCS_MD  # gratuitous thin space → keep only the differential \,\mathrm d; else a plain space (never delete: \varepsilon\,r → \varepsilon r, not \varepsilonr)
+grep -rnP '\\\\[dt]?frac[0-9]' src/*.jl; grep -rnP '\\[dt]?frac[0-9]' $DOCS_MD  # unbraced fraction numerator → \tfrac{1}{2}
+grep -rnP '\\\\boldsymbol [A-Za-z\\\\]' src/*.jl; grep -rnP '\\boldsymbol [A-Za-z\\]' $DOCS_MD  # unbraced \boldsymbol u → \boldsymbol{u}
+grep -rnP '\\\\!\\\\!' src/*.jl; grep -rnP '\\!\\!' $DOCS_MD           # \!\! double negative thin → juxtapose
+grep -rnP '\\\\mathbb\s*\{?\s*[0-9]' src/*.jl; grep -rnP '\\mathbb\s*\{?\s*[0-9]' $DOCS_MD  # \mathbb on a digit falls back to a plain glyph → \mathbf{1}
+grep -rnP '\\\\(left|right)(?![a-zA-Z])' src/*.jl; grep -rnP '\\(left|right)(?![a-zA-Z])' $DOCS_MD  # \left/\right auto-sizing → \bigl/\Bigl by hand (the \left\{ … \right. system idiom and \leftarrow/\rightarrow are exempt — none in this corpus today)
+
+# ---- TRIAGE (real signal mixed with false positives — COUNT first with wc -l, then read ALL) ----
+grep -rnE '`[^`]*[≤≥≠∈∉∇Δ⟨⟩‖√×⋅][^`]*`' src/*.jl docs/src docs/*.md    # formula-in-backticks → ``LaTeX`` (FP: real Julia operators ×/⋅/≈)
 grep -rnE '\$[^$]*[\\_^{}][^$]*\$' docs                                # stray TeX $…$ → use ``…`` / ```math```
-grep -rniE '\bknobs?\b' docs src                                       # neutral register — must be empty
-grep -rnE '\\partial_[ijk]' src/*.jl docs/*.md docs/src                # bare-index ∂ → \partial_{x_i}; build-enforced, must be empty
-grep -rnE '\\mathbf' src/*.jl docs/*.md docs/src                       # upright bold → \boldsymbol; build-enforced, must be empty
-grep -rnP '\\\\,(?!\\\\mathrm d)' src/*.jl; grep -rnP '\\,(?!\\mathrm d)' docs/src docs/*.md  # gratuitous thin space → keep only the differential \,\mathrm d, else use a plain space; must be empty
-grep -rnP '\\\\([dt]?frac[0-9]|boldsymbol\s*[A-Za-z\\])' src/*.jl; grep -rnP '\\([dt]?frac[0-9]|boldsymbol\s*[A-Za-z\\])' docs/src docs/*.md  # unbraced group arg → brace it (\tfrac45→\tfrac{4}{5}, \boldsymbol u→\boldsymbol{u}); must be empty
-grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.velocity|_forcing|_spectral|_physical|_field|_copy|_star|_start|_rate|_nonlinear|_plans|velocity_|vorticity_|`|the |physical |a velocity'  # stale math-variable names (triage: keep struct fields / function names / prose)
+grep -rnP '\\\\[;:](?![a-zA-Z])' src/*.jl; grep -rnP '\\[;:](?![a-zA-Z])' $DOCS_MD  # manual \;/\: spacing → let TeX space the operator (FP: a \; separating args after a comma)
+grep -rnoP '``[^`]*``' src/*.jl $DOCS_MD | grep -P '(?<![\\A-Za-z])(?<!\{)[a-z]{2,}' | grep -vP '\\(mathrm|texttt|text|operatorname|hat|[dt]?frac|sqrt|langle|rangle|partial|nabla|Delta|kappa|varkappa|varepsilon|varphi|omega|lambda|boldsymbol|mathcal|mathbb|lvert|rvert|sum|prod|int|equiv|cdot|times|otimes|le|ge|to|mapsto|quad|exp|log|max|min|sin|cos|det|tr|mid|infty|approx|propto|leftarrow|rightarrow)'  # code-in-math: a bare multi-letter run inside a math span renders as a letter-product → \mathrm{…}/\texttt{…}; subscript index runs and #-comments are fine
+grep -rnwE 'uh|phih|velocity|vorticity' src/*.jl | grep -vE 'ws\.|sim\.|\.velocity|_forcing|_spectral|_physical|_field|_copy|_star|_start|_rate|_nonlinear|_plans|velocity_|vorticity_|`|the |physical |a velocity'  # stale math-variable names (triage: struct fields / function names / prose are fine)
 awk '/^"""/{d=!d;s=d;next} s&&/^[^ ]/{s=0} s&&/^    [A-Za-z_].*\(/&&length>88{print FILENAME":"FNR}' src/*.jl  # wide docstring signatures — FNR (per-file)
-grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring: a §-number / design-doc path (drop #-comment hits) — must be empty
-grep -rnzE 'References?:[^"]*;' src/*.jl                                # crammed citation block (two citations joined by `;`) → one per bullet line
-comm -23 <(grep -rhoE '\((19|20)[0-9]{2}' src/SimulationDomain.jl src/Propagator.jl src/Generator.jl src/Observables.jl src/Forcing.jl src/State.jl | grep -oE '(19|20)[0-9]{2}' | sort -u) <(sed -n '/^## References/,$p' docs/ARCHITECTURE.md | grep -oE '\((19|20)[0-9]{2}' | grep -oE '(19|20)[0-9]{2}' | sort -u)  # §4: a dynamics-side cite year with no §References entry (Phenomenology leaf exempt) — triage each
-grep -rnE '\. `[a-z][a-z_]+!?`' src/*.jl docs/src docs/*.md | grep -vE ':[0-9]+:[[:space:]]*#'  # prose sentence opens with a lowercase code identifier (incl. an `f!` form) → capitalize the lead word or reword (triage: bullets / args / signatures exempt)
+grep -rnE '§[0-9]|docs/src/|inspiration/|ARCHITECTURE\.md' src/*.jl | grep -vE ':[0-9]+:[[:space:]]*#'  # dead ref on a user-facing docstring — must read complete at the REPL (drop #-comment hits)
+grep -rnzE 'References?:[^"]*;' src/*.jl                                # crammed citation block → one per bullet line
+grep -rnE '\. (`[a-z]|``)' src/*.jl docs/src docs/*.md | grep -vE ':[0-9]+:[[:space:]]*#'  # prose sentence opens with a lowercase identifier or a formula → reword with a capitalized lead (bullets/args/signatures exempt)
+```
+
+Two deterministic backstops that are not one-line greps:
+
+```bash
+# DOI / citation cross-check — every DOI cited in a src docstring must appear (verbatim) in
+# ARCHITECTURE.md §References (the Phenomenology leaf is exempt: its Reference values are
+# self-contained by design and are checked for well-formedness instead).
+python3 - <<'PY'
+import re, glob
+arch = open('docs/ARCHITECTURE.md').read()
+for f in glob.glob('src/*.jl'):
+    exempt = 'Phenomenology' in f
+    for m in re.findall(r'doi\.org/[^\s\)\]"`]+', open(f).read()):
+        d = m.rstrip('.,);')
+        if not exempt and d not in arch:
+            print('DOI in a docstring but not in ARCHITECTURE §References:', f, d)
+PY
+
+# Argument coverage — from each docstring SIGNATURE, every positional + keyword parameter must be
+# mentioned as a backticked `arg` in the body (an arg named only inside a formula reads as
+# bound-by-use). Triage the hits: a thin wrapper that @ref-links its home may name a math variable
+# in a ``…`` span; internal `_helpers` are looser.
+julia --startup-file=no -e '
+for file in filter(f->endswith(f,".jl"), readdir("src"; join=true))
+  s = read(file, String)
+  for m in eachmatch(r"\"\"\"\n(.*?)\n\"\"\""s, s)
+    body = m.captures[1]; sig = strip(first(split(body, "\n")))
+    (occursin("(", sig) && occursin(")", sig)) || continue
+    o = findfirst("(", sig).start; c = findlast(")", sig).start
+    inside = sig[nextind(sig, o):prevind(sig, c)]   # prevind, NOT c-1: û/φ̂/ω are multibyte, and a
+                                                    # StringIndexError aborts the sweep at the FIRST
+                                                    # file while the run still looks complete
+    for raw in split(inside, ",")
+      p = strip(split(split(raw, "::")[1], "=")[1]); p = strip(split(p, ";")[end])
+      occursin(r"^[A-Za-zα-ωΑ-Ω][A-Za-z0-9_!α-ωΑ-Ω̂]*$", p) || continue
+      occursin(Regex("`\\Q"*p*"\\E`"), body) || println(file, ": ", sig, "  UNDOCUMENTED `", p, "`")
+    end
+  end
+end'
+```
+
+```bash
+# ---- SURFACE 4: the built API pages. Run AFTER `julia --project=docs docs/make.jl`. ----
+# Buckets every rendered docstring by page and reports the two mechanical questions; the third
+# (blurb vs contents) is a read, not a grep — do it from this script's own output.
+python3 - <<'PYEOF'
+import re, html, glob, os, collections
+where = collections.defaultdict(list)
+for page in sorted(glob.glob('docs/build/api/**/index.html', recursive=True)):
+    mod = os.path.relpath(os.path.dirname(page), 'docs/build/api'); s = open(page).read()
+    names = [html.unescape(m.group(1)).split('-')[0]
+             for m in re.finditer(r'<summary id="([^"]+)"><a class="docstring-binding"', s)]
+    for n in names: where[n].append(mod)
+    print(f"{mod:28s} rendered={len(set(names))}")
+dups = {n: p for n, p in where.items() if len(set(p)) > 1}             # question 1: once and only once
+print("DUPLICATES:", dups if dups else "none")
+print("rendered-name count:", len({n.split('.')[-1] for n in where}))
+PYEOF
+# question 2 — every umbrella export has a home on some api page: diff the rendered names against
+julia --project -e 'using GBGIsotropicTurbulence;
+  println(join(sort(String.(names(GBGIsotropicTurbulence))), "\n"))' | sort > /tmp/exports.txt
+# compare /tmp/exports.txt against the rendered names above; checkdocs=:exports guards the docstring
+# EXISTING, this guards it LANDING on a page. Question 3 — each api page/section blurb (the
+# hand-written ## prose) still matches what its @docs block holds: read them against the output.
 ```
 
 - Triage (drop false positives — universally standard math; the real Julia operators `×` / `⋅` / `≈`;
   pervasive shorthand `L²` / `N³` / `O(N²)`; `#`-comment hits; kwarg names correctly backticked; the
-  `velocity`/`vorticity` inside a *storage field* or *function name* or *prose*), then fix EVERY genuine
-  finding in one pass.
-- Rebuild: `julia --project=docs docs/make.jl` (`checkdocs = :exports` + both lints + render) — must be
-  clean; then `git checkout docs/Project.toml`.
+  `velocity`/`vorticity` inside a *storage field* or *function name* or *prose*), then fix EVERY
+  genuine finding in one pass — and **fix the class, not the line** (a flagged instance is a sample
+  of a sweepable class).
+- Rebuild: `julia --project=docs docs/make.jl` (`checkdocs = :exports` plus the two build lints) —
+  **verify by EXIT CODE, never by grepping the output** (a lint failure prints `ERROR: LoadError:`,
+  which does not match a `^┌ Error` pattern; PF let three consecutive false "docs clean" reports
+  stand on exactly that mismatch). Use
+  `julia --project=docs docs/make.jl > /tmp/build.log 2>&1; echo $?` and require `0`. Then revert the
+  transient dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list
+  `docs/Manifest.toml`.
 - Commit + push on `main` (no `[skip ci]`; the docs site must redeploy).
 
 ## Report
 
-Report the full matrix: which surfaces × checks were run, the findings (class and count) with fixes, and
-what was verified clean — including the **family lane**'s one-home / notation audit of each `f` / `f!`
-pair and the **cold-reader lane**'s pass over the exported docstrings. A flagged instance is a *sample of
-a class* — fix the class, not the line. Done only when every cell is covered and the build is clean.
+Report the full matrix: which surfaces × checks were run, the findings (class and count) with fixes,
+and what was verified clean — including the **family lane**'s one-home / notation audit of each
+`f` / `f!` pair, the **cold-reader lane**'s pass over the exported docstrings, and **surface 4**'s
+placement audit of the built API pages (nothing rendered twice, every export landed on a page, every
+blurb matching its block). A flagged instance is a *sample of a class* — fix the class, not the line.
+Done only when every cell is covered, every finding is closed (fixed, or dismissed with its reason),
+and the build is clean — in ANY cost mode.

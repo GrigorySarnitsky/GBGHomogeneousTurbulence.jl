@@ -70,7 +70,7 @@ argument and is bound by the same rule.
 
 This is where the artifacts of the discretization fall out, and they are worth naming because they
 look observable and are not. A Runge–Kutta stage value
-``\boldsymbol{u}^{*} = \boldsymbol{u}_n + a\,\Delta t\,\boldsymbol{f}(\boldsymbol{u}_n)`` carries
+``\boldsymbol{u}^{*} = \boldsymbol{u}_n + a \Delta t \boldsymbol{f}(\boldsymbol{u}_n)`` carries
 ``\Delta t`` and the scheme's coefficient ``a``; change the coefficients and it changes while the
 trajectory does not, so it is the flow at no time at all. The velocity a tracer scheme evaluates at a
 *predicted* position is the same failure in different clothes: the field value is genuine, but the
@@ -225,7 +225,7 @@ and the gradient ``\nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2})``; the sys
 ```math
 \begin{aligned}
 \frac{\partial \boldsymbol{u}}{\partial t}
-  &= \mathbb P\,(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
+  &= \mathbb P(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
 &\qquad \nabla\cdot\boldsymbol{u} &= 0, \\[4pt]
 \frac{\partial \varphi}{\partial t}
   &= -\nabla\cdot(\boldsymbol{u}\varphi) + \varkappa\nabla^{2}\varphi + f_\varphi, \\[4pt]

@@ -598,7 +598,7 @@ generalization is built for them until a second concrete case forces the abstrac
   four roles are already carved to receive it — but, per invariant 9, no generality is built until a second
   rung forces it. Each is discriminated from DNS by statistical commutation; the canonical acceptance test
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark). The natural first
-  *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \,|\, \kappa_c)`` at the truncation
+  *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \mid \kappa_c)`` at the truncation
   wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a **per-mode linear rate**, a
   negative linear-forcing citizen folded into the integrating factor exactly as the armed forcing rate
   is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_c)/\kappa_c}`` scale updated
@@ -1209,7 +1209,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     r2c) per step, frozen per scheme × dealiasing × scalar cell with the chart recomputes amortized
     in (each chart is recovered once per fields epoch, wherever first read — which is also why the
     **tracer transform delta is zero**: the Heun endpoints ride the epoch cache, the observation
-    layer's compute dividend). Transforms carry the flops — ``\tfrac52 N^3\log_2 N^3`` per scalar
+    layer's compute dividend). Transforms carry the flops — ``\tfrac{5}{2} N^3\log_2 N^3`` per scalar
     transform against O(1–20) flops per point for every pointwise kernel, far under the roofline
     machine balance — so **flops are derived from the count, never an independent frozen axis**.
     The counts are per-evaluation × evaluations (asserted structurally), the mask evaluation is
@@ -1397,7 +1397,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
     mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
     (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
-    the stage update ``\hat{\boldsymbol u} \leftarrow \mathcal E\,(\hat{\boldsymbol u} + B_i h)`` is
+    the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal E(\hat{\boldsymbol{u}} + B_i h)`` is
     the backend's **two-operand** exponential form, one pass where combine-build-rotate were three, and
     a velocity-only working set now holds *nothing scalar-shaped at all*; (2) an armed linear forcing
     rate became a scalar field in spectral representation holding real values (the fused exponential's
@@ -1413,7 +1413,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     to save; its guard lesson — key any dedup on the full ``(D, \tau, \text{rate})`` tuple, never
     ``\mathrm{Sc}`` alone — survives as the armed-rate pin in the factor-verb test). The
     `derivative_skewness` diagnostic also stopped materializing its determinant field
-    (``\langle\det\boldsymbol S\rangle`` is the fused mapped mean), and transforms are untouched
+    (``\langle\det\boldsymbol{S}\rangle`` is the fused mapped mean), and transforms are untouched
     everywhere — this decision moves passes and residency only.
 
 40. **(2026-08) The observables cache is deposit-driven, and a slot is its producer's register.** The
@@ -1575,7 +1575,7 @@ no-guessed-citation rule). The extraction-bound
   Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
 - Chollet, J.-P. & Lesieur, M. (1981). Parameterization of small scales of three-dimensional isotropic
   turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
-  viscosity ``\nu_e(\kappa\,|\,\kappa_c)``; the deferred spectral large-eddy rung, §7.)*
+  viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.

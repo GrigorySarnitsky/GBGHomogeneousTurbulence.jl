@@ -2,8 +2,10 @@
 # Consolidate a Documenter-built site into reader-text manuscripts for the /check-consistency panel.
 #
 #   Usage: consolidate.py <build_dir> <out_full.md> <out_siteonly.md>
-#     full     — every rendered page, INCLUDING the Architecture page.
-#     siteonly — every page EXCEPT Architecture (for the no-architecture hats).
+#     full     — every rendered page, INCLUDING the design docs (Architecture + the observables-cache
+#                design page).
+#     siteonly — every page EXCEPT the design docs (for the no-design-doc hats: structure-consistency
+#                and cold-reader judge the user-facing site without the design docs as a crutch).
 #
 # Documenter renders KaTeX client-side, so each formula's raw TeX sits in the HTML text — this emits it
 # verbatim (a latex/notation hat reads it as source). Headings, code, tables, admonition titles, and
@@ -97,11 +99,11 @@ for title, path, rel in pages:
     banner = f"\n\n===== PAGE: {title} =====\n"
     text = page_text(path)
     full.append(banner); full.append(text)
-    if 'architecture' not in rel.lower():
+    if not any(d in rel.lower() for d in ("architecture", "observables_cache")):
         site.append(banner); site.append(text)
 
 open(OUT_FULL, 'w', encoding='utf-8').write(''.join(full))
 open(OUT_SITE, 'w', encoding='utf-8').write(''.join(site))
 print(f"pages: {len(pages)}")
 print(f"full     : {sum(len(x) for x in full)} chars -> {OUT_FULL}")
-print(f"siteonly : {sum(len(x) for x in site)} chars (architecture withheld) -> {OUT_SITE}")
+print(f"siteonly : {sum(len(x) for x in site)} chars (design docs withheld) -> {OUT_SITE}")

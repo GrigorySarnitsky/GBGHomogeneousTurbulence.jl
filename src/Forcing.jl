@@ -300,7 +300,7 @@ Stochastic (Eswaran–Pope) forcing: each forced Fourier mode in the band
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
 
 ```math
-\\hat f \\leftarrow \\theta \\hat f + \\sqrt{\\sigma^{2}(1-\\theta^{2})}\\;\\xi,
+\\hat f \\leftarrow \\theta \\hat f + \\sqrt{\\sigma^{2}(1-\\theta^{2})} \\xi,
 \\qquad \\theta = \\exp(-\\Delta t / T_L),
 ```
 

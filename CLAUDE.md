@@ -204,10 +204,15 @@ long docstring signature with a hanging indent under the first argument; break a
 with `aligned` / `gathered` / `split` (neither a code block nor display math auto-wraps). (e) A backtick
 span holds only **well-formed Julia** — a name, type, call, or expression; math that merely looks
 code-ish (a half-open interval `[a, b)`, an inequality `κ ≥ 2`, a lone `≤` / `·` / `−` glyph) is LaTeX,
-not backticks.
+not backticks. (f) **TeX idiom** (adopted from PF 2026-08-06; the first three build-enforced): braced
+group arguments — ``\tfrac{1}{2}``, ``\boldsymbol{u}``, never `\tfrac12` / `\boldsymbol u`; no
+``\mathbb`` on a digit; the thin space ``\,`` reserved for the differential ``\,\mathrm dx``, never
+between plain factors; no manual ``\;`` / ``\:`` spacing around relations; no ``\left``/``\right``
+auto-sizing (size by hand with ``\bigl``/``\Bigl``; the ``\left\{ \dots \right.`` system idiom and
+the arrow commands are exempt); a conditional bar is ``\mid``.
 
 **Correctness is verified, not asserted.** Check every formula, normalization (the ``1/N``, the
-``2\varkappa``, the ``\tfrac12`` in the energy, Parseval / spectral factors), and every "X is just Y"
+``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval / spectral factors), and every "X is just Y"
 equivalence by expanding it against the code — a plausible claim is false until the expansion matches.
 Two examples from this codebase: the derivative-skewness "divergence" bug (a repeated index read as
 ``\nabla\cdot\boldsymbol u = 0``), and the coordinate-free skewness constant

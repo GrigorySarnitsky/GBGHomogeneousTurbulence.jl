@@ -66,7 +66,13 @@ function lint_notation_variants()
     (r"\\partial_[ijk]",
      "bare-index partial — write \\partial_{x_i} (subscript the coordinate, not the fiber index)"),
     (r"\\mathbf",
-     "upright-bold \\mathbf — vectors are bold italic \\boldsymbol (e.g. \\boldsymbol u, \\boldsymbol{\\kappa} for the wavenumber)"),
+     "upright-bold \\mathbf — vectors are bold italic \\boldsymbol{u} (\\boldsymbol{\\kappa} for the wavenumber)"),
+    (r"\\[dt]?frac[0-9]",
+     "unbraced fraction numerator — write \\tfrac{1}{2}, never \\tfrac12"),
+    (r"\\boldsymbol [A-Za-z\\]",
+     "unbraced \\boldsymbol argument — write \\boldsymbol{u}, never \\boldsymbol u"),
+    (r"\\mathbb\s*\{?\s*[0-9]",
+     "\\mathbb on a digit falls back to a plain glyph — the indicator/identity is \\mathbf{1}"),
   ]
   srcs = _doc_lint_sources()
   problems = String[]

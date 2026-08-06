@@ -433,7 +433,7 @@ step, the last after the final one, with statistics recorded before the stop.
 Stopping is the observation's decision on observables, never a run option: a budget is a callback
 that accumulates what it budgets. A span of simulation time compares [`current_time`](@ref) against
 a target; a step budget compares [`current_step`](@ref); an eddy-turnover budget accumulates
-``\\Delta t\\,\\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
+``\\Delta t \\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
 packaged [`StationarityCriterion`](@ref). Whatever the callback needs beyond the cached observables
 it computes itself, at its own cadence, with the exported reductions and recoveries.
 
@@ -568,7 +568,7 @@ three-line callback — see `run!`).
 At each boundary it measures the dissipation ``\\varepsilon`` (one reduction — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
 clamps ``k`` flat and a fixed-injection forcing makes it ring), accumulates the eddy-turnover clock
-``\\Delta t\\,\\varepsilon/k``, and tests flatness over a trailing window; it stops the run when
+``\\Delta t \\varepsilon/k``, and tests flatness over a trailing window; it stops the run when
 every gate holds, or gives up with a warning at `max_turnovers`.
 
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
