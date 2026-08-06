@@ -33,7 +33,7 @@ module Propagator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
-                          spectral_vector, physical_vector, scalar_spectral, scalar_physical
+                          spectral_vector, physical_vector, spectral_scalar, physical_scalar
 using ..Generator: ResolvedGenerator, prepare!, finalize!,
                    velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor
 using ..State: ResolvedFields, ObservablesCache, physical_velocity, physical_vorticity,
@@ -360,12 +360,12 @@ end
 # IFLowStorageRK3 uses stage1 + nonlinear; IFRK2 uses stage1 + stage2 + velocity_star_spectral; each
 # leaves the other scheme's registers `nothing`.
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
-  scalar_spectral(domain), nothing, nothing, scalar_spectral(domain),           # stage1, stage2, star_spectral, nonlinear
-  scalar_spectral(domain), scalar_physical(domain),                             # copy, field
+  spectral_scalar(domain), nothing, nothing, spectral_scalar(domain),           # stage1, stage2, star_spectral, nonlinear
+  spectral_scalar(domain), physical_scalar(domain),                             # copy, field
 )
 ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
-  scalar_spectral(domain), scalar_spectral(domain), scalar_spectral(domain), nothing,   # stage1, stage2, star_spectral, nonlinear
-  scalar_spectral(domain), scalar_physical(domain),                             # copy, field
+  spectral_scalar(domain), spectral_scalar(domain), spectral_scalar(domain), nothing,   # stage1, stage2, star_spectral, nonlinear
+  spectral_scalar(domain), physical_scalar(domain),                             # copy, field
 )
 
 allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(

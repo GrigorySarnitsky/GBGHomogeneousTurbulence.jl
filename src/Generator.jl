@@ -36,7 +36,7 @@ module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
-                          spectral_vector, physical_vector, scalar_spectral, scalar_physical
+                          spectral_vector, physical_vector, spectral_scalar, physical_scalar
 using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing,
                  set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
@@ -94,7 +94,7 @@ end
 # translates a vector or scalar field alike.
 function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
   δ = 0.5 .* domain.grid.grid_spacing
-  reference = scalar_spectral(domain)
+  reference = spectral_scalar(domain)
   back = translation_kernel(reference, domain.multipliers, δ)
   return PhaseShiftBuffers(
     translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
@@ -102,9 +102,9 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
     convolve(domain.dealias, back),                           # 𝔻 ∘ back — kilobytes, never a field
     spectral_vector(domain),
     physical_vector(domain), physical_vector(domain),
-    scalar ? scalar_spectral(domain) : nothing,
-    scalar ? scalar_spectral(domain) : nothing,
-    scalar ? scalar_physical(domain) : nothing,
+    scalar ? spectral_scalar(domain) : nothing,
+    scalar ? spectral_scalar(domain) : nothing,
+    scalar ? physical_scalar(domain) : nothing,
   )
 end
 
@@ -122,7 +122,7 @@ function _forcing_rate(domain::FixedDomain, forcing)
   end
   # A scalar field in spectral representation holding REAL values (the complex container is what the
   # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
-  return scalar_spectral(domain)
+  return spectral_scalar(domain)
 end
 
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing

@@ -185,7 +185,7 @@ using Test
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
-    state = ResolvedFields(û, scalar_spectral(domain))
+    state = ResolvedFields(û, spectral_scalar(domain))
     derived = ObservablesCache(domain)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions; scalar = true)

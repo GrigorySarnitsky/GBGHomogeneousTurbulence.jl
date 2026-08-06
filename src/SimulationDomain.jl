@@ -14,7 +14,7 @@ The discretized periodic box a run lives on — the reusable, read-only frame:
   and the lazy ``\\lvert\\boldsymbol{\\kappa}\\rvert^2`` and dealias kernels).
 - [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref), [`HouLi`](@ref), or
   [`PhaseShift`](@ref), and the cutoff it sets, [`max_wavenumber`](@ref).
-- [`spectral_vector`](@ref), [`scalar_spectral`](@ref), … — the field-sized scratch allocators.
+- [`spectral_vector`](@ref), [`spectral_scalar`](@ref), … — the field-sized scratch allocators.
 - [`dealias!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
 
 Precision and backend enter here and flow everywhere from here.
@@ -24,8 +24,8 @@ module SimulationDomain
 using GBGPeriodicFields
 
 export FixedDomain,
-       spectral_vector, physical_vector, scalar_spectral, scalar_physical,
-       tensor_spectral, tensor_physical,
+       spectral_vector, physical_vector, spectral_scalar, physical_scalar,
+       spectral_tensor, physical_tensor,
        dealias!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift, max_wavenumber
 
 # ── Dealiasing strategies ────────────────────────────────────────────────────────────────────────
@@ -184,11 +184,11 @@ function FixedDomain(grid_points_per_axis::Integer, side_length::Real;
 
   velocity_physical = VectorFieldPhysical((x, y, z) -> (zero(T), zero(T), zero(T)), grid; array_type)
   velocity_spectral = VectorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(1))), grid)
-  scalar_physical = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
+  scalar_physical_template = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
   scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(0))), grid)
 
   velocity_plans = FieldTransformPlans(velocity_physical, velocity_spectral)
-  scalar_plans = FieldTransformPlans(scalar_physical, scalar_spectral_storage)
+  scalar_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage)
   tensor_physical_template = TensorFieldPhysical(_zeros(array_type, T, physical_field_shape(grid, Val(2))), grid)
   tensor_spectral_template = TensorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(2))), grid)
   tensor_plans = FieldTransformPlans(tensor_physical_template, tensor_spectral_template)
@@ -274,38 +274,38 @@ physical_vector(domain::FixedDomain) =
 
 
 """
-    scalar_spectral(domain)
+    spectral_scalar(domain)
 
 Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type.
 """
-scalar_spectral(domain::FixedDomain) =
+spectral_scalar(domain::FixedDomain) =
   ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid, domain.layout)
 
 
 """
-    scalar_physical(domain)
+    physical_scalar(domain)
 
 Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type.
 """
-scalar_physical(domain::FixedDomain) =
+physical_scalar(domain::FixedDomain) =
   ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid, domain.layout)
 
 
 """
-    tensor_spectral(domain)
+    spectral_tensor(domain)
 
 Allocate a single zeroed second-order tensor field in spectral representation on `domain`'s backend and element type.
 """
-tensor_spectral(domain::FixedDomain) =
+spectral_tensor(domain::FixedDomain) =
   TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid, domain.layout)
 
 
 """
-    tensor_physical(domain)
+    physical_tensor(domain)
 
 Allocate a single zeroed second-order tensor field in physical representation on `domain`'s backend and element type.
 """
-tensor_physical(domain::FixedDomain) =
+physical_tensor(domain::FixedDomain) =
   TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid, domain.layout)
 
 

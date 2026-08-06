@@ -32,7 +32,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 
   run_velocity(conditions, nsteps; dt = 0.01) = begin
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
-    state = ResolvedFields(û, scalar_spectral(domain))
+    state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = ObservablesCache(domain)
     for _ in 1:nsteps
@@ -42,13 +42,13 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   end
 
   k0 = 2π / L
-  band = spectral_band(scalar_spectral(domain), domain.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
+  band = spectral_band(spectral_scalar(domain), domain.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
   band_energy(field) = (tmp = spectral_vector(domain); convolve!(tmp, field, band); 0.5 * inner(tmp, tmp))
 
   @testset "Linear rate amplitude" begin
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
-    rate = scalar_spectral(domain)                  # the generator's rate slot: a scalar field in spectral representation
+    rate = spectral_scalar(domain)                  # the generator's rate slot: a scalar field in spectral representation
     @test set_forcing_rate!(forcing, rate, û0, domain)
     @test maximum(real.(field_data(rate))) ≈ A      # A on the band
     @test minimum(real.(field_data(rate))) == 0     # zero outside the band
@@ -58,7 +58,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     power = 0.3
     forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    rate = scalar_spectral(domain)
+    rate = spectral_scalar(domain)
     set_forcing_rate!(forcing, rate, û0, domain)
     A = maximum(real.(field_data(rate)))
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
@@ -84,11 +84,11 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 
   @testset "scalar Linear forcing builds variance" begin
     û_zero = spectral_vector(domain)             # no velocity ⇒ pure linear growth of the scalar band
-    φ̂0 = scalar_spectral(domain)
+    φ̂0 = spectral_scalar(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
     conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, velocity_forcing = NoForcing())
-    φ̂ = scalar_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
+    φ̂ = spectral_scalar(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     state = ResolvedFields(û_zero, φ̂)
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = ObservablesCache(domain)
@@ -130,7 +130,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     dealias!(û, domain)
-    state = ResolvedFields(û, scalar_spectral(domain))
+    state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = ObservablesCache(domain)
     for n in 1:200

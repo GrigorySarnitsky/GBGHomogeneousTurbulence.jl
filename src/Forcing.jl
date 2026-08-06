@@ -39,7 +39,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, scalar_spectral, spectral_vector, scalar_physical, physical_vector
+using ..SimulationDomain: FixedDomain, spectral_scalar, spectral_vector, physical_scalar, physical_vector
 
 export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,
        set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
@@ -145,7 +145,7 @@ add_forcing_source!(::AbstractForcing, nonlinear, domain::FixedDomain) = nonline
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
 function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
   k0 = 2π / domain.grid.domain_size[1]
-  return spectral_band(scalar_spectral(domain), domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
+  return spectral_band(spectral_scalar(domain), domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
 end
 
 
@@ -340,9 +340,9 @@ function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Rea
 end
 
 _ou_state(::VectorFieldSpectral, domain) = spectral_vector(domain)
-_ou_state(::ScalarFieldSpectral, domain) = scalar_spectral(domain)
+_ou_state(::ScalarFieldSpectral, domain) = spectral_scalar(domain)
 _ou_noise(::VectorFieldSpectral, domain) = (physical_vector(domain), spectral_vector(domain))
-_ou_noise(::ScalarFieldSpectral, domain) = (scalar_physical(domain), scalar_spectral(domain))
+_ou_noise(::ScalarFieldSpectral, domain) = (physical_scalar(domain), spectral_scalar(domain))
 _ou_plans(::VectorFieldSpectral, domain) = domain.velocity_plans
 _ou_plans(::ScalarFieldSpectral, domain) = domain.scalar_plans
 

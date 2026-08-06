@@ -122,7 +122,7 @@ using Test
     domain = FixedDomain(Nc, L; element_type = Float64, dealiasing = PhaseShift(), array_type = Array)
     û0 = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
+    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.spectral_scalar(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
@@ -132,7 +132,7 @@ using Test
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       derived = ObservablesCache(domain)
       û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
-      φ̂ = GBGIsotropicTurbulence.SimulationDomain.scalar_spectral(domain)
+      φ̂ = GBGIsotropicTurbulence.SimulationDomain.spectral_scalar(domain)
       copyto!(field_data(û), field_data(û0))
       copyto!(field_data(φ̂), field_data(φ̂0))
       state = ResolvedFields(û, φ̂)

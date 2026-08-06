@@ -41,10 +41,10 @@ element type.
 ```@docs
 spectral_vector
 physical_vector
-scalar_spectral
-scalar_physical
-tensor_spectral
-tensor_physical
+spectral_scalar
+physical_scalar
+spectral_tensor
+physical_tensor
 ```
 
 ## Dealias filtering

@@ -101,7 +101,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)
-    state = ResolvedFields(û, scalar_spectral(domain))
+    state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = ObservablesCache(domain)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))

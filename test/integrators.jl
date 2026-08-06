@@ -17,7 +17,7 @@ function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   derived = ObservablesCache(domain)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
-  state = ResolvedFields(û, scalar_spectral(domain))
+  state = ResolvedFields(û, spectral_scalar(domain))
   for _ in 1:nsteps
     step!(integrator, state, generator, domain, buffers, derived, dt)
   end
@@ -69,7 +69,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     derived = ObservablesCache(domain)
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))
-    state = ResolvedFields(û, scalar_spectral(domain))
+    state = ResolvedFields(û, spectral_scalar(domain))
     Δx = L / N
     cfl = recommended_cfl(integrator, domain)
     energies = T[]

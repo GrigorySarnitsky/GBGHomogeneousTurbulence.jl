@@ -16,7 +16,7 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   generator = ResolvedGenerator(domain, conditions; scalar = true)
   derived = ObservablesCache(domain)
   û = spectral_vector(domain)
-  φ̂ = scalar_spectral(domain)
+  φ̂ = spectral_scalar(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   state = ResolvedFields(û, φ̂)
@@ -41,7 +41,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     Sc = 0.7
     κ = ν / Sc
     û0 = spectral_vector(domain)                                   # zero velocity
-    φ̂0 = scalar_spectral(domain)
+    φ̂0 = spectral_scalar(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     conditions = FlowConditions(viscosity = ν, schmidt = Sc, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())               # unforced
     dt = 0.02
@@ -61,7 +61,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     û0 = spectral_vector(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
     dealias!(û0, domain)
-    φ̂0 = scalar_spectral(domain)
+    φ̂0 = spectral_scalar(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())                             # Sc = 1, unforced
 
@@ -79,7 +79,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     û0 = spectral_vector(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
     dealias!(û0, domain)
-    φ̂0 = scalar_spectral(domain)
+    φ̂0 = spectral_scalar(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
     field_data(φ̂0)[1, 1, 1] = 3.0 + 0.0im                    # impose a nonzero mean (the k=0 mode)
     mean_before = field_data(φ̂0)[1, 1, 1]
@@ -93,7 +93,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "scalar dissipation = Dirichlet energy" begin
     Sc = 0.7
     κ = ν / Sc
-    φ̂ = scalar_spectral(domain)
+    φ̂ = spectral_scalar(domain)
     random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
 
     # ground truth: 2κ⟨|∇φ|²⟩ from the explicit physical gradient (the pre-fusion computation)

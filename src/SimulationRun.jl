@@ -27,7 +27,7 @@ module SimulationRun
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, spectral_vector, scalar_spectral, physical_vector,
+using ..SimulationDomain: FixedDomain, spectral_vector, spectral_scalar, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, ObservablesCache, random_solenoidal_velocity!, random_scalar!
 import ..State: physical_velocity, physical_vorticity, resolved_fields_modified!

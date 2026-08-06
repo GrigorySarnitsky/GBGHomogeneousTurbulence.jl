@@ -420,7 +420,7 @@ const EPISODE_UNITS = [
     unit = 8 * N^3
     û = spectral_vector(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂ = scalar_spectral(domain)
+    φ̂ = spectral_scalar(domain)
     random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
     episodes = Dict(

@@ -29,7 +29,7 @@ module State
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, physical_vector,
-                          scalar_spectral, scalar_physical, _real_type
+                          spectral_scalar, physical_scalar, _real_type
 
 export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
        velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!,
@@ -56,7 +56,7 @@ struct ResolvedFields{UH, PH}
 end
 
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
-  ResolvedFields(spectral_vector(domain), scalar ? scalar_spectral(domain) : nothing)
+  ResolvedFields(spectral_vector(domain), scalar ? spectral_scalar(domain) : nothing)
 
 
 """
@@ -331,7 +331,7 @@ function random_scalar!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
-  noise = scalar_physical(domain)
+  noise = physical_scalar(domain)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(0))...))
   to_spectral!(φ̂, noise, domain.scalar_plans)
 
