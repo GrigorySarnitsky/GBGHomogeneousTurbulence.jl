@@ -64,8 +64,9 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
 ``f_\\eta \\to 1`` as ``\\kappa\\eta \\to 0``. Evaluated by [`dissipation_factor`](@ref);
 [`PopeDissipation`](@ref) is Pope's form.
 
-!!! note "Bottleneck models deferred"
-    These factors are inertial-normalized cutoffs. Models of the near-dissipation *bottleneck* — a bump
+!!! note
+    These factors are inertial-normalized cutoffs; bottleneck models are deliberately deferred.
+    Models of the near-dissipation *bottleneck* — a bump
     before the cutoff (Qian 1984; Ishihara et al. 2005; Kraichnan 1959, all of the form
     ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma < 0``) — do not satisfy
     ``f_\\eta\\to 1`` and need a richer spectrum structure; they are deliberately deferred.
@@ -96,10 +97,14 @@ function dissipation_factor end
 """
     PopeLargeScale(c_L, p₀)
 
-Pope's large-scale roll-off ``f_L(\\kappa L) = \\left(\\frac{\\kappa L}{\\sqrt{(\\kappa L)^2 + c_L}}\\right)^{5/3 + p_0}``,
-which tends to `1` in the inertial range and rolls the spectrum off below the integral scale. `c_L` is
-set by the requirement that the spectrum integrate to the kinetic energy; `p₀` fixes the low-wavenumber
-slope (Pope 2000).
+Pope's large-scale roll-off ``f_L(\\kappa L) = \\Bigl(\\frac{\\kappa L}{\\sqrt{(\\kappa L)^2 + c_L}}\\Bigr)^{5/3 + p_0}``,
+which tends to `1` in the inertial range and rolls the spectrum off below the integral scale. The
+coefficient `c_L` is set by the requirement that the spectrum integrate to the kinetic energy; `p₀`
+fixes the low-wavenumber slope (Pope 2000).
+
+# Fields
+- `c_L` — the large-scale coefficient, set by the energy normalization.
+- `p₀` — the low-wavenumber slope exponent.
 """
 struct PopeLargeScale <: LargeScaleFactor
   c_L::Float64
@@ -117,6 +122,10 @@ Pope's dissipation-range roll-off
 which tends to `1` in the inertial range and cuts the spectrum off near the Kolmogorov scale. `c_η` is
 set by the requirement that the spectrum yield the dissipation rate; `β` fixes the sharpness of the
 cutoff (Pope 2000).
+
+# Fields
+- `c_η` — the dissipation-range coefficient, set by the dissipation normalization.
+- `β` — the cutoff-sharpness exponent.
 """
 struct PopeDissipation <: DissipationFactor
   c_η::Float64
@@ -130,9 +139,12 @@ dissipation_factor(f::PopeDissipation, κη) = exp(-f.β * ((κη^4 + f.c_η^4)^
     VonKarmanLarge(c_L)
 
 The von Kármán large-scale roll-off
-``f_L(\\kappa L) = \\left(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\right)^{17/6}``, which tends to `1`
+``f_L(\\kappa L) = \\Bigl(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\Bigr)^{17/6}``, which tends to `1`
 in the inertial range and produces the classic ``\\kappa^4`` energy-containing range at low wavenumber
 (``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^4``); `c_L` fixes the peak scale (von Kármán 1948).
+
+# Fields
+- `c_L` — the coefficient fixing the peak scale.
 """
 struct VonKarmanLarge <: LargeScaleFactor
   c_L::Float64
@@ -170,6 +182,9 @@ Pao's dissipation-range roll-off
 ``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\tfrac{3}{2} \\alpha (\\kappa\\eta)^{4/3}\\big)``, from the
 hypothesis that the spectral energy flux stays constant through the dissipation range; `α` is the
 Kolmogorov constant ``C_K`` (Pao 1965).
+
+# Fields
+- `α` — the Kolmogorov constant the flux hypothesis reuses.
 """
 struct PaoDissipation <: DissipationFactor
   α::Float64
@@ -189,6 +204,9 @@ spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & 
 ``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``). The
 near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara et al.
 2005), a different form this factor does not model.
+
+# Fields
+- `β` — the exponential decay rate.
 """
 struct ExponentialDissipation <: DissipationFactor
   β::Float64
@@ -232,6 +250,12 @@ Meneveau 2008); the large-scale roll-off sets the low-wavenumber slope
 ``E(\\kappa\\to 0)\\propto\\kappa^\\sigma`` — ``\\sigma = 2`` (the Saffman-type ``\\kappa^{2}`` low-wavenumber
 spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelor-type ``\\kappa^{4}``,
 [`VonKarmanLarge`](@ref)).
+
+# Fields
+- `C_K` — the Kolmogorov constant of the inertial-range core.
+- `large_scale` — the `LargeScaleFactor` giving ``f_L``.
+- `dissipation` — the `DissipationFactor` giving ``f_\\eta``.
+- `ref` — the `Reference` reported as the model's provenance.
 """
 struct ModelSpectrum{L<:LargeScaleFactor, D<:DissipationFactor} <: EnergySpectrum
   C_K::Float64
@@ -278,7 +302,7 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 
 ```math
 E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
-             \\left(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\right)^{17/6},
+             \\Bigl(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\Bigr)^{17/6},
 ```
 
 the classic interpolation between the ``\\kappa^4`` energy-containing range and the ``\\kappa^{-5/3}``
@@ -338,9 +362,13 @@ Sreenivasan 1996, *Phys. Fluids* **8**, 189), quoted — unlike Yaglom's classic
 ``4/3`` — for the *full*-variance scalar dissipation ``2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``,
 so it pairs directly with this package's full-variance ``\\varepsilon_\\varphi`` (`scalar_dissipation`)
 with no factor-of-two conversion. The name is a dual eponym — Obukhov
-(1949) and Corrsin (independently, 1951); the `1949` handle is Obukhov's year. [`spectrum`](@ref) reads
+(1949) and Corrsin (independently, 1951); the `1949` handle is Obukhov's year. Evaluating
+[`spectrum`](@ref) reads
 the scalar dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
 kinetic-energy dissipation ``\\varepsilon`` from `fp`.
+
+# Fields
+- `C_OC` — the Obukhov–Corrsin constant.
 """
 struct ObukhovCorrsin1949 <: ScalarSpectrum
   C_OC::Float64

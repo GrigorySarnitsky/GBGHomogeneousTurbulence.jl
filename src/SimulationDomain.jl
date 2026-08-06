@@ -42,8 +42,8 @@ export FixedDomain,
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through `recommended_cfl`, the advective-CFL
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default),
-[`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average with
-spherical ``2\\sqrt2/3`` truncation).
+[`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
+truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``).
 """
 abstract type DealiasingStrategy end
 
@@ -76,9 +76,10 @@ the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3
 automatically by `recommended_cfl`. The smooth spectral filter is due to Hou & Li (2007).
 
 # Fields
-The plain constructor `HouLi(order, strength)` takes the two fields directly: `order` — the
-exponent of the spectral roll-off; `strength` — the damping at the Nyquist mode, or `nothing` for
-the element-type default described above.
+The plain constructor `HouLi(order, strength)` takes the two fields directly:
+- `order` — the exponent of the spectral roll-off.
+- `strength` — the damping at the Nyquist mode, or `nothing` for the element-type default described
+  above.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
@@ -90,31 +91,29 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift dealiasing: assemble each quadratic nonlinear term on the grid **and** on a grid displaced
+Phase-shift dealiasing (Patterson & Orszag 1971; combined with spherical truncation by Rogallo
+1981): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
-``\\kappa_{\\max} = \\tfrac{\\sqrt2}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}}``
+``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
 average cancels the aliasing images — the spurious spectral replicas that the under-resolved
 quadratic product folds back into the resolved band — that wrap in an odd number of axes; the
 spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
-``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt2``
+``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt{2}``
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
 modes in the retained sphere).
 
 Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform per
 stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a spectral field per phase-shifted
 term). Opt-in, not the default. Because it retains energy out to
-``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
+``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
 ``2/3`` rule — handled automatically by `recommended_cfl`.
 
-!!! note "The Nyquist mistranslation does not bite"
+!!! note
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
-    cutoff at ``2\\sqrt2/3 \\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
+    cutoff at ``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
-
-Phase-shift dealiasing follows Patterson & Orszag (1971); the combination with spherical truncation is
-Rogallo (1981).
 """
 struct PhaseShift <: DealiasingStrategy end
 
@@ -149,6 +148,8 @@ the run-layer defaults (`side_length = 2π`, `dealiasing = TwoThirds()`, `elemen
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
 
 # Fields
+The machinery types below are [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl)
+objects, each linked to its own documentation.
 - `grid`, `layout` — the [`Grid3D`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.Grid3D) and its
   [`RealFourierLayout`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.RealFourierLayout) memory layout.
 - `velocity_plans`, `scalar_plans`, `tensor_plans` — the real-to-complex
@@ -252,7 +253,7 @@ The highest wavenumber magnitude that `domain` actually evolves — the dealiasi
 ```
 
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
-[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt2/3`` for `PhaseShift`).
+[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt{2}/3`` for `PhaseShift`).
 It is the cutoff the
 dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself; the modes above it are
 zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
@@ -326,7 +327,7 @@ Apply the run's dealias low-pass `domain.dealias` to `field` in place — a coef
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
-``2\\sqrt2/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
+``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation.
 """
 dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)

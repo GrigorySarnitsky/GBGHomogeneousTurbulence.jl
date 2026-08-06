@@ -8,7 +8,7 @@ here; the rendered symbol glossary is [`docs/src/notation.md`](notation.md).
 The document is self-contained — every symbol, mathematical or `code`, is introduced in plain language at
 first use — and reads top to bottom. Mathematics follows the glossary's notation: the wavenumber vector
 is ``\boldsymbol{\kappa}`` with magnitude ``\kappa``; the turbulent kinetic energy is ``k``; the scalar
-diffusivity is ``\varkappa``; the integrating factor is ``\mathcal E``. Pope (2000) is a standard
+diffusivity is ``\varkappa``; the integrating factor is ``\mathcal{E}``. Pope (2000) is a standard
 reference for turbulence notation (§References).
 
 ---
@@ -180,7 +180,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
   velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
   spectral multipliers, ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel (in spectral
-  space, ``-\nabla^2`` acts as multiplication by it; evaluated per mode from the multipliers, resident
+  space, ``-\nabla^{2}`` acts as multiplication by it; evaluated per mode from the multipliers, resident
   in no array — decision 38), and the dealias
   kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default; every
   strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
@@ -198,8 +198,9 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   `velocity_to_physical!`, `vorticity_to_physical!`, `scalar_to_physical!` that evaluate those functions —
   is homed here with the state it reads. Its values land in the **`ObservablesCache`** (its own
   module, `Cache`, between `State` and `Forcing`): the stamped boundary storage each iteration
-  deposits its observables into at its tail — the physical velocity, vorticity, and scalar, and the
-  maximum speed — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
+  deposits its observables into at its tail — the physical velocity, vorticity, and scalar, the
+  maximum velocity component, and, when tracers ride the run, the trajectory sample
+  ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
   substage recovery registers mid-iteration (their stamps go to *scratch*, so a mid-iteration read
   throws instead of serving a stage intermediate), and the tail `deposit!` re-fills and stamps them
@@ -231,11 +232,11 @@ it (§8) — and the numerical split is built to honor it. The incompressible mo
 advanced in **rotational (Lamb-vector) form**: writing the convective term through the identity
 ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) - \boldsymbol{u}\times\boldsymbol{\omega}``
 (with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}``) and letting the Leray–Helmholtz
-projection ``\mathbb P`` onto divergence-free fields absorb the pressure and the kinetic-energy gradient,
+projection ``\mathbb{P}`` onto divergence-free fields absorb the pressure and the kinetic-energy gradient,
 the equation becomes
 
 ```math
-\partial_t\boldsymbol{u} = \mathbb P (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^2\boldsymbol{u} + \boldsymbol{f} .
+\partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f} .
 ```
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
@@ -243,29 +244,29 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
 - **The reversible term.** The recoveries (`velocity_to_physical!`, `vorticity_to_physical!`, homed with
   the state, §4.1) produce the physical velocity and vorticity from
   ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
-  ``\mathbb P (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
+  ``\mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
   Orszag 1971). Rotational form is the cheap, energy-conserving way to compute the advection spectrally,
   and incompressible Euler is genuinely Hamiltonian — so this term is the flow's *reversible*,
   energy-conserving generator, stepped explicitly.
-- **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol{u}`` is the flow's *irreversible*,
+- **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
-  ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
   — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
-  forcing rate (the source, below). ``\mathcal E`` is **never materialized** (decision 39): the factor
+  forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
   pair `velocity_factor` / `scalar_factor` supplies its *parameters* — the coefficient on
   ``\lvert\boldsymbol{\kappa}\rvert^2``, the rate's scale, the armed rate field — and the backend's
-  fused exponential convolution evaluates ``\mathcal E`` per mode as it applies it, advancing the
-  diffusion with no stability restriction and no kernel field built or stored. ``\mathcal E`` is a *propagator*, a flow map over a step, not a generator;
+  fused exponential convolution evaluates ``\mathcal{E}`` per mode as it applies it, advancing the
+  diffusion with no stability restriction and no kernel field built or stored. ``\mathcal{E}`` is a *propagator*, a flow map over a step, not a generator;
   keeping the two apart is exactly the Generator/Propagator distinction of §4.5.
 - **The source.** ``\boldsymbol{f}`` is the forcing, an external drive that is neither seam half (§4.4).
   When a forcing is *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``), its rate
   ``A(\boldsymbol{\kappa})`` is diagonal and linear like the diffusion, so it folds into the same
-  exponential ``\mathcal E`` for exactness — and there it *injects* energy, ``\mathcal E > 1`` wherever
-  ``A > D\lvert\boldsymbol{\kappa}\rvert^2``. So ``\mathcal E`` cross-cuts the seam: it carries the
+  exponential ``\mathcal{E}`` for exactness — and there it *injects* energy, ``\mathcal{E} > 1`` wherever
+  ``A > D\lvert\boldsymbol{\kappa}\rvert^2``. So ``\mathcal{E}`` cross-cuts the seam: it carries the
   irreversible diffusion and, when the drive is linear, the source. The seam is a decomposition of the
-  right-hand side, not of ``\mathcal E``.
+  right-hand side, not of ``\mathcal{E}``.
 
 The passive scalar rides the same generator: `scalar_to_physical!` transforms ``\hat\varphi`` to the
 physical ``\varphi`` at each stage, and `scalar_rhs!` assembles the advection in conservative form
@@ -288,7 +289,7 @@ protocol —
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
 (dealiased nonlinear term plus additive forcing source), `velocity_factor` / `scalar_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
-`velocity_rhs!` and `velocity_factor` are the required core; `prepare!` and `finalize!` default to
+The required core is `velocity_rhs!` and `velocity_factor`; `prepare!` and `finalize!` default to
 no-ops. A scheme consumes the physics only through this protocol, so it can never assemble the
 right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
 reification (§11 decisions 29, 31).
@@ -302,11 +303,14 @@ states the physical quantity first, then the reduction that computes it:
   ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle``;
 - `scalar_variance` ``\langle\varphi^2\rangle`` and `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
-- `max_speed`, which sets the advective-CFL;
-- `derivative_skewness`, the K41 marker ``S \approx -0.5`` of developed turbulence, computed
+- `max_speed`, which sets the advective-CFL (one generic shared with `Cache`, where the cached read
+  lives — the reduction is homed here);
+- `derivative_skewness`, the classical marker ``S \approx -0.5`` of developed turbulence (an
+  empirical, weakly Reynolds-number-dependent value — K41 implies a constant skewness but fixes no
+  number), computed
   coordinate-free as the normalized third invariant of the strain rate ``\boldsymbol{S}``,
   ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
-  isotropy constant ``C = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
+  isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
 - `energy_spectrum` ``E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
   derived from it.
@@ -321,23 +325,23 @@ Forcing is the System's energy-injection strategy — the source term ``\boldsym
 deliberately designed-in extension point. `AbstractForcing` is the supertype; a forcing enters the
 step through a small interface whose four methods each default to doing nothing:
 
+- `prepare_forcing!` — advance internal state once per step (a stochastic process);
 - `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
-- `prepare_forcing!` — advance internal state once per step (a stochastic process);
 - `apply_forcing!` — apply a post-step projection or rescale.
 
 The four hooks form one per-step lifecycle with a fixed order — `prepare_forcing!` and
 `set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `apply_forcing!` after the
 completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
-part folded into ``\mathcal E``, the remainder added at stages). A strategy owns whatever scratch its
+part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
 hooks need; none receives the integrator's buffers (§11 decision 32).
 
 `NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed — a deterministic
 clamp, fit for spin-up and amplitude-holding but not a faithful stationary sampler; its docstring
 carries the Berendsen-class caveat, Bussi, Donadio & Parrinello 2007), `Linear`
 (fixed-rate negative damping, Lundgren 2003), and `ConstantPower` (its rate reset each step to hold the
-injection rate) — the two linear forcings folded into ``\mathcal E`` — are provided; a stochastic Eswaran–Pope
+injection rate) — the two linear forcings folded into ``\mathcal{E}`` — are provided; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
@@ -428,9 +432,10 @@ Over it:
   trailing-window flatness test, reading ``\varepsilon`` rather than the clampable ``k(t)``; when
   the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
   its one-line sugar. A fixed budget is a three-line callback, not a run option.
-- **`velocity_spectral(sim)`**, **`scalar_spectral(sim)`**, and the cache accessors
+- **`velocity_spectral(sim)`**, **`scalar_spectral(sim)`**, the cache accessors
   (`velocity_physical`, `vorticity_physical`, `scalar_physical`, `max_speed`,
-  `particle_velocities`, `particle_positions`) form the uniform read surface: a function names what
+  `particle_velocities`), and `particle_positions` — the probes' own state, not a stamped
+  slot — form the uniform read surface: a function names what
   the run holds, wherever it lives — reading needs no knowledge of the state/cache split, while
   *writing* stays on the dot path (`sim.state`), where the danger demands the knowledge.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
@@ -534,7 +539,7 @@ is deferred (§7).
 dividing line is **domain-neutrality**, not "thinness":
 
 - **To `GBGPeriodicFields`** — every field operation: the transforms, `curl!` / `cross!` / `divergence!`,
-  the Leray–Helmholtz projection `helmholtz_projection!` (``\mathbb P``), `convolve!` and the dealias/band kernels,
+  the Leray–Helmholtz projection `helmholtz_projection!` (``\mathbb{P}``), `convolve!` and the dealias/band kernels,
   the reductions (`inner`, the radial spectrum and correlation), and grid↔point interpolation. The rule
   *everything diagonal in Fourier is a `GBGPeriodicFields` operator* is followed in the code.
 - **To `GBGStreamingStatistics`** — every estimator: histograms, densities, conditional means and
@@ -615,7 +620,7 @@ generalization is built for them until a second concrete case forces the abstrac
   out — so a strategy may restructure *how* the product is computed, not merely filter its output. The
   sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; **`PhaseShift`**
   (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
-  ``\tfrac{\sqrt2}{3}N``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
+  ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
   ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganizes the quadratic product
   to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
   scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
@@ -750,7 +755,7 @@ one usually encodes a decision.
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
   exact/ideal form, *then* the discrete realization — as `velocity_factor` leads with
-  ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_rhs!` with
+  ``\partial_t f = D\nabla^{2} f`` before ``\mathcal{E}(\boldsymbol{\kappa})``, and `velocity_rhs!` with
   the Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
 - **Coordinate-free where a coordinate-free form exists.** Homogeneous isotropic turbulence is
@@ -774,7 +779,7 @@ one usually encodes a decision.
   own package docs (the `DocumenterInterLinks` setup).
 - **Verification is by numerical oracle, not a formalization ledger.** Because the package introduces no
   novel mathematical *objects* (they are `GBGPeriodicFields`' and `GBGStreamingStatistics`'), its
-  nontrivial claims are *dynamical* — the exactness of ``\mathcal E``, the order of the integrator,
+  nontrivial claims are *dynamical* — the exactness of ``\mathcal{E}``, the order of the integrator,
   imaginary-axis stability, mean conservation — and are pinned by numerical oracle tests (a Taylor–Green
   order study, unforced energy decay, exact diffusion). This is why the package follows the
   `GBGCloudPhysics` consumer pattern with **no `FORMALIZATION.md`**; a typed-statement ledger is a
@@ -785,8 +790,8 @@ one usually encodes a decision.
 - **Category/type errors are their own correctness class.** A claim can be perfectly formatted and read
   true yet conflate two *kinds* of object — a field with its representation (physical vs spectral); a
   diagnostic scalar with the field it reduces (the rate ``\varepsilon``, a number, vs a dissipation
-  field; ``k`` vs the spectrum ``E(\kappa)``); an operator with its parameter (``\mathcal E`` vs ``\nu``;
-  ``\mathbb P`` vs ``\mathcal P``); a rate with its time-integral; a spectral density ``E(\kappa)`` with an
+  field; ``k`` vs the spectrum ``E(\kappa)``); an operator with its parameter (``\mathcal{E}`` vs ``\nu``;
+  ``\mathbb{P}`` vs ``\mathcal P``); a rate with its time-integral; a spectral density ``E(\kappa)`` with an
   energy. Type each object from the code and expand the statement — the physics mirror of the sibling
   backends' type-error guard (`GBGStreamingStatistics`' density-vs-measure, estimator-vs-estimand).
 - **The `/check-docs` battery.** Documentation quality is enforced by a full matrix — (Correct /
@@ -807,7 +812,7 @@ one usually encodes a decision.
 Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 1. **(2026-06) Integrating-factor split with exact diffusion.** The stiff viscous/diffusive part is
-   integrated exactly by ``\mathcal E(\boldsymbol{\kappa})``; only the advection is explicit. Removes the
+   integrated exactly by ``\mathcal{E}(\boldsymbol{\kappa})``; only the advection is explicit. Removes the
    diffusive stability limit and preserves scheme order under linear forcing.
 2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
    advection; the reversible generator of the geometric lens.
@@ -854,7 +859,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     — decision 25.)*
 15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
     `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
-    to pin the whole-field energy — hence the r.m.s. velocity ``u'`` and ``\mathrm{Re}_\lambda`` — the
+    to pin the whole-field energy — hence the r.m.s. velocity ``u'``, setting the scale of
+    ``\mathrm{Re}_\lambda`` (whose value still fluctuates with ``\varepsilon``) — the
     constant-total-energy forcing convention. A modeling choice with two defensible answers, so it is a selectable
     option rather than a fixed default.
 16. **(2026-07) Modules named from the Mori–Zwanzig lens; `Equations` split into `Dynamics` +
@@ -871,7 +877,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     per-step band energy in the forcings and expresses `scalar_dissipation` as the Dirichlet energy, with
     no ``\nabla\varphi`` materialized. And `derivative_skewness` becomes the normalized third invariant of
     the strain rate ``\boldsymbol{S}``, ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}``,
-    with the exact isotropy constant ``C = \tfrac{4}{7}\sqrt{15/2}\approx 1.5649`` reproducing the classical
+    with the exact isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}\approx 1.5649`` reproducing the classical
     ``S\approx-0.5`` — the axis-picking longitudinal form was coordinate-dependent, the invariant is the
     honest object, and `symmetric_gradient` forms the strain without the full velocity-gradient tensor.
     The physical strain tensor is unavoidable (cubic ⇒ non-Parseval), so this diagnostic allocates its
@@ -1024,9 +1030,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     spherical ``2/3``). Each quadratic nonlinear term is assembled twice — on the grid and on a grid
     displaced half a cell — and averaged, cancelling the aliasing images that wrap in an *odd* number of
     axes; a spherical truncation at
-    ``\kappa_{\max} = \tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L} \approx 0.94 \kappa_{\mathrm{Ny}}`` removes the
+    ``\kappa_{\max} = \tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L} \approx 0.94 \kappa_{\mathrm{Ny}}`` removes the
     surviving *two-axis* images (a single half-cell shift is exact only in 1-D; Patterson & Orszag 1971,
-    Rogallo 1981). It keeps a ``\sqrt2`` wider band than the ``2/3`` rule (``\approx 2.8\times`` the modes
+    Rogallo 1981). It keeps a ``\sqrt{2}`` wider band than the ``2/3`` rule (``\approx 2.8\times`` the modes
     in the retained sphere) at ``2\times`` the nonlinear-term transforms and a displaced-evaluation scratch
     field. This realizes the deferred D6 assembly generalization (§7) for this sibling: `DealiasingStrategy`
     now dispatches the whole ``\hat{\boldsymbol{u}}\to`` dealiased-term computation, not only a post-multiply
@@ -1254,7 +1260,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     equivalent expressions is evaluated at all (Parseval for a quadratic reduction, the Dirichlet
     form for a gradient energy, the solenoidal identity for enstrophy, a spectrum that already
     integrates to the energy). Cubic and nonlinear invariants are floors, not gaps: the Lamb vector,
-    the scalar flux, and ``\det S`` have no quadratic shortcut.
+    the scalar flux, and ``\det\boldsymbol{S}`` have no quadratic shortcut.
 
     Two structural consequences beyond the ledgers. The op model must extend **past `step!`** to
     every surface a run touches — the initial-condition seeders, the observables, the run-loop
@@ -1397,17 +1403,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the stage update is one fused exponential pass.** The protocol's factor half changed shape:
     `velocity_factor` / `scalar_factor` (the `!` is gone — nothing is mutated) return the exponential's
     parameters — `coefficient` ``= -D\tau``, `offset_scale` ``= \tau``, `offset` ``= \hat A`` or
-    `nothing` — and the schemes apply ``\mathcal E`` through `GBGPeriodicFields`'
+    `nothing` — and the schemes apply ``\mathcal{E}`` through `GBGPeriodicFields`'
     `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
     mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
     (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
-    the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal E(\hat{\boldsymbol{u}} + B_i h)`` is
+    the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal{E}(\hat{\boldsymbol{u}} + B_i h)`` is
     the backend's **two-operand** exponential form, one pass where combine-build-rotate were three, and
     a velocity-only working set now holds *nothing scalar-shaped at all*; (2) an armed linear forcing
     rate became a scalar field in spectral representation holding real values (the fused exponential's
     per-mode offset), read once per application instead of once per build; (3) the de-alias/truncation
     passes folded into their producers — a mask strategy's kernel rides the projection's own pass (the
-    kernel-composed ``\mathbb P`` and ``\nabla\cdot`` arities, the latter absorbing the ``-\nabla\cdot``
+    kernel-composed ``\mathbb{P}`` and ``\nabla\cdot`` arities, the latter absorbing the ``-\nabla\cdot``
     sign in ``\alpha``), and the phase-shift tail applies shift-back, average, and truncation in one
     convolve through a `back ∘ truncation` kernel composed once at construction. Three audit holders
     retired in the same commit, each because its gap **closed**: `SHARED FACTOR` (the register it
@@ -1466,7 +1472,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     reuse their own shifted registers the same way. The verb `velocity_rhs!` therefore **consumes** its `ω`
     argument and `scalar_rhs!` its `u` (documented in both docstrings; `step!` takes the
     corresponding cache slots before the stage-1 assembly), and `ResolvedGenerator` keeps only the
-    spectral product image: one physical vector retired from **every** configuration — 402 MiB at
+    spectral product image: one physical vector retired from **every** configuration — 384 MiB at
     ``256^3``/Float64 — bringing the physical-vector floor to **two** registers (the chart slots,
     now serving as recovery registers *and* product targets), with the archived OU's physical
     ownership gap closing as a side effect (no product register remains for its noise to alias).
@@ -1517,12 +1523,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 44. **(2026-08) The tail relocation stops at the recoveries: the nonlinear terms are not cached.**
     The cache design's full relocation — assembling the dealiased
-    ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})`` and
+    ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})`` and
     ``-\nabla\cdot(\boldsymbol{u}\varphi)`` at the tail, so the next first stage reads them — was
     written in the third-array world and is **incompatible with decision 41**: the products now form
     in place over the velocity and vorticity slots, so a tail assembly would destroy the deposited
     charts the observation exists to serve, and keeping both would re-add the product array
-    (one physical vector, 402 MiB at ``256^3``/Float64). Minimal footprint trumps compute
+    (one physical vector, 384 MiB at ``256^3``/Float64). Minimal footprint trumps compute
     (invariant 4), and the relocation buys no compute — transform counts are identical either way —
     so the products stay in the first stage and the design page's §2.4 rows go to *no* by the
     design's own survival test (contents are a property of the solver's storage decisions). The

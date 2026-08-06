@@ -4,8 +4,9 @@
 Dimensionless turbulence constants and their Reynolds-number trends, evaluated by [`scaling`](@ref).
 
 - [`ScalingLaw`](@ref) — the family root every law below subtypes.
-- [`Sreenivasan1998`](@ref) — the normalized dissipation constant ``C_\\varepsilon = \\varepsilon L/u'^3``,
-  a high-Reynolds-number plateau with an optional finite-Reynolds-number correction.
+- [`Sreenivasan1998`](@ref) — the normalized dissipation constant ``C_\\varepsilon = \\varepsilon L_{11}/u'^3``
+  (``L_{11}`` the longitudinal integral scale), a high-Reynolds-number plateau with an optional
+  finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
 - [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted,
@@ -49,19 +50,25 @@ const _SREENIVASAN = Reference("Sreenivasan (1998), *Phys. Fluids* **10**, 528";
 """
     Sreenivasan1998(; asymptote = 0.5, correction = 0.0)
 
-The normalized dissipation constant ``C_\\varepsilon = \\varepsilon L/u'^3`` as a high-Reynolds-number
-plateau with an optional finite-Reynolds-number correction,
+The normalized dissipation constant ``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` — normalized on the
+longitudinal integral scale ``L_{11}``, not the box side — as a high-Reynolds-number plateau with an
+optional finite-Reynolds-number correction,
 
 ```math
-C_\\varepsilon(\\mathrm{Re}_\\lambda) = C_{\\varepsilon\\infty}\\left(1 + \\frac{a}{\\mathrm{Re}_\\lambda}\\right),
+C_\\varepsilon(\\mathrm{Re}_\\lambda) = C_{\\varepsilon\\infty}\\Bigl(1 + \\frac{a}{\\mathrm{Re}_\\lambda}\\Bigr),
 ```
 
 with `asymptote` the plateau ``C_{\\varepsilon\\infty}`` and `correction` the coefficient ``a`` of the
 ``1/\\mathrm{Re}_\\lambda`` correction. Sreenivasan (1998) established that ``C_\\varepsilon`` approaches a
 constant of order ``0.5`` (the default; the precise value depends on the integral-scale definition)
 above ``\\mathrm{Re}_\\lambda \\sim 50``. The correction defaults to `0` (the pure plateau); set it to a
-positive value to model the low-Reynolds-number rise. [`scaling`](@ref)`(law, fp)` reads
+positive value to model the low-Reynolds-number rise. Evaluating [`scaling`](@ref)`(law, fp)` reads
 ``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref).
+
+# Fields
+The plain constructor `Sreenivasan1998(asymptote, correction)` takes the two fields directly:
+- `asymptote` — the plateau ``C_{\\varepsilon\\infty}``.
+- `correction` — the ``1/\\mathrm{Re}_\\lambda`` coefficient ``a``.
 """
 struct Sreenivasan1998 <: ScalingLaw
   asymptote::Float64
@@ -86,6 +93,10 @@ The three-dimensional Kolmogorov constant ``C_K`` of the inertial-range energy s
 the experimental and numerical record, Sreenivasan (1995) found it close to universal, a reliable
 estimate being ``C_K = 1.5 \\pm 0.1`` (the default; Sagaut & Cambon 2018), with no significant
 Reynolds-number trend; [`scaling`](@ref)`(law, fp)` returns it, independent of `fp`.
+
+# Fields
+The plain constructor `Sreenivasan1995(C_K)` takes the field directly:
+- `C_K` — the Kolmogorov constant.
 """
 struct Sreenivasan1995 <: ScalingLaw
   C_K::Float64
@@ -125,6 +136,10 @@ The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law,
 inverted, [`stationary_dissipation`](@ref)`(law, energy, side_length)` predicts the dissipation a
 stationary run of energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the
 run layer uses to set the viscosity from the grid and target energy.
+
+# Fields
+The plain constructor `Li2008(constant)` takes the field directly:
+- `constant` — the group value ``G``.
 """
 struct Li2008 <: ScalingLaw
   constant::Float64

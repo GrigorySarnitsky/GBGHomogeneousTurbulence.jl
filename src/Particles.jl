@@ -18,8 +18,9 @@ Lagrangian tracer tracking:
 - [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
   [`scalar_buffer`](@ref) allocate its `out` buffers.
 - [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
-  trajectory velocities are read from the run's observables cache, where the tail deposit stamps
-  them).
+  trajectory velocities are read from the run's observables cache through
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the tail
+  deposit stamps them).
 """
 module Particles
 

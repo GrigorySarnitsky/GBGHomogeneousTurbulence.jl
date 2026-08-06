@@ -1,11 +1,11 @@
 # GBGIsotropicTurbulence
 
-The umbrella module: it sets the include order and re-exports the public surface of the submodules.
-
 ```@autodocs
 Modules = [GBGIsotropicTurbulence]
 Order   = [:module]
 ```
+
+The umbrella module sets the include order and re-exports the public surface of the submodules.
 
 ## Index
 

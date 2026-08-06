@@ -86,9 +86,10 @@ computes it at an observation (§2.4).
 
 **Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.
-The maximum-speed reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once, forming the
-speed at every grid point and keeping only the largest, so the *maximum* is materialized — one number
-— while the speed *field* is never whole anywhere and cannot be cached.
+The [`max_speed`](@ref) reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once and keeps
+only the largest component magnitude ``\max_i\lvert u_i\rvert`` — the advective-CFL bound, within
+``\sqrt{3}`` of the true peak speed — so the *maximum* is materialized — one number — while no
+per-point field is ever whole anywhere and none can be cached.
 
 **Surviving — the schedule must leave it at the boundary, in a register the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
@@ -120,7 +121,7 @@ count — but they form in place over the velocity and vorticity slots (§2.3), 
 tail would destroy the deposited velocity and vorticity, and keeping both would cost the product array the
 minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
 step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
-schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
+schedule: the maximum velocity component is reduced from the just-deposited velocity for the next iteration's
 timestep choice, and the trajectory sample is interpolated from that velocity at each particle's new
 position for the next push's predictor.
 
@@ -147,8 +148,8 @@ the only repair is to fix the schedule.
 
 **A slot belongs to the component that produces it**; that component owes a correct
 value and stamp at every boundary. Any component may take the array as scratch mid-iteration, and taking it
-clears the stamp; this is what would let the Lamb vector be assembled into the vorticity's own slot
-rather than the third array §2.3 accounts for. While the slot holds the Lamb vector its stamp says
+clears the stamp; this is what lets the Lamb vector be assembled into the vorticity's own slot,
+with no product array of its own (§2.3). While the slot holds the Lamb vector its stamp says
 *scratch*, so a read throws rather than returning a mislabelled field. Taking a slot costs no
 transform, since the owner deposits at the tail from the state it has just produced, which it would
 recover anyway. What it costs is reads: a slot taken before the last reader of that observable makes
@@ -167,7 +168,7 @@ until the next deposit. That interval belongs to whoever made the change: the re
 exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
 buffer.
 
-**The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
+**The numbers follow the same rule on the same schedule.** The maximum velocity component is a cache entry like
 any other — deposited at the tail, stamped there, and read by the next iteration's timestep choice,
 which does scalar arithmetic on it and measures nothing. It is the only number the
 iteration produces, so it is the only number the cache holds; ``\varepsilon``, ``k``, or a variance
@@ -222,13 +223,13 @@ passive scalar and tracer particles. The convective term is written through
   = \nabla\big(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\big) - \boldsymbol{u}\times\boldsymbol{\omega}
 ```
 
-and the Leray–Helmholtz projection ``\mathbb P`` onto divergence-free fields absorbs both the pressure
+and the Leray–Helmholtz projection ``\mathbb{P}`` onto divergence-free fields absorbs both the pressure
 and the gradient ``\nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2})``; the system then reads
 
 ```math
 \begin{aligned}
 \frac{\partial \boldsymbol{u}}{\partial t}
-  &= \mathbb P(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
+  &= \mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
 &\qquad \nabla\cdot\boldsymbol{u} &= 0, \\[4pt]
 \frac{\partial \varphi}{\partial t}
   &= -\nabla\cdot(\boldsymbol{u}\varphi) + \varkappa\nabla^{2}\varphi + f_\varphi, \\[4pt]
@@ -246,11 +247,11 @@ transforms below.
 
 ### 2.2 How a step treats each term
 
-- **The quadratic terms** ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})`` and
+- **The quadratic terms** ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})`` and
   ``-\nabla\cdot(\boldsymbol{u}\varphi)``: evaluated as fields.
 - **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
-  ``\mathcal E(\boldsymbol{\kappa}) = \exp\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\big)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\big)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a field-proportional forcing's
   rate, and ``\tau`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A field-proportional one folds its rate into that
@@ -273,12 +274,13 @@ velocity term has just built.
 
 Under a mask rule one **evaluation** of the velocity term proceeds in five operations: recover
 ``\boldsymbol{u}`` (3 inverse transforms); form
-``\hat{\boldsymbol{\omega}} = \mathrm i\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and recover
-``\boldsymbol{\omega}`` (3 inverse); multiply pointwise into a third array, giving the Lamb vector;
-transform it back (3 forward); apply ``\mathbb P`` and the mask, both per-wavenumber multiplications.
+``\hat{\boldsymbol{\omega}} = \mathrm{i}\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and recover
+``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the Lamb vector forming in place over the
+vorticity's own array, as below — and transform it back (3 forward); apply ``\mathbb{P}`` and the
+mask, both per-wavenumber multiplications.
 
 | dealiasing rule | velocity only | with the scalar |
-|---|---|---|
+|:---|:---|:---|
 | `TwoThirds`, `HouLi` | 18 inverse, 9 forward | 21 inverse, 18 forward |
 | `PhaseShift` | 36 inverse, 18 forward | 42 inverse, 36 forward |
 
@@ -312,20 +314,20 @@ there is no time to stamp, so no act at an observation builds it either. Its **B
 whether the package holds the observable today, and reads `—` wherever *Cached* is not *yes*.
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---|
 | ``\boldsymbol{u}`` | physical, grid | yes | yes | the tail recovery; read by the timestep choice, the tracer push, the Lamb assembly, and observations |
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the tail recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the tail recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the maximum speed | one number | yes | yes | the tail reduction over the cached velocity; read by the next timestep choice |
-| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
+| the maximum velocity component ``\max_i\lvert u_i\rvert`` | one number | yes | yes | the tail reduction over the cached velocity; read by the next timestep choice |
+| ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
 | ``E(\kappa)`` | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
-| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not materialized: formed pointwise inside the maximum-speed reduction and kept nowhere; whole, it would cost a pass the iteration does not perform (§1.2) |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed: no component forms it, even pointwise — the [`max_speed`](@ref) reduction takes the largest component magnitude directly — and whole, it would cost a pass the iteration does not perform (§1.2) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | — | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | — | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
 | a rescaling forcing's equivalent field | — | never | — | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |
@@ -367,14 +369,14 @@ second-order accuracy; it belongs to no instant along the trajectory and is not 
 ### 3.1 The calls
 
 [`run!`](@ref) is the observation-first loop: at every boundary the callback reads the run and its
-return decides continuation. [`velocity_physical`](@ref), [`vorticity_physical`](@ref), and
-[`scalar_physical`](@ref) return the
+return decides continuation. The accessors [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
+and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
-no deposit is current. [`deposit!`](@ref) closes an iteration (the run layer's `advance!` calls it
+no deposit is current. The tail [`deposit!`](@ref) closes an iteration (the run layer's `advance!` calls it
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`resolved_fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields, not a filtered subset of the scales — after which reads
-throw until an explicit `deposit!`. [`particle_velocities`](@ref) returns the trajectory sample —
+throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the trajectory sample —
 a cached read like the fields' — and [`sample!`](@ref) interpolates any physical field at the
 particle positions.
 

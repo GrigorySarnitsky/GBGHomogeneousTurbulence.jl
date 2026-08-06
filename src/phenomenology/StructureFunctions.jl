@@ -40,7 +40,7 @@ const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301";
     Kolmogorov1941(; C₂ = 2.0)
 
 The Kolmogorov (1941) inertial-range structure-function laws for the longitudinal velocity increment
-``\\delta u_L``. [`structure_function`](@ref)`(law, r, fp; order)` returns:
+``\\delta u_L``. Evaluating [`structure_function`](@ref)`(law, r, fp; order)` returns:
 
   * `order = 2` — the **2/3 law** ``D_{LL}(r) = C_2 (\\varepsilon r)^{2/3}``, the second-order
     increment; the constant ``C_2 \\approx 2.0`` is empirical (default `2.0`).
@@ -52,6 +52,10 @@ Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`Flo
 supplies the dissipation rate ``\\varepsilon``; any other `order` throws (K41 fixes only these two
 longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law; order)` gives the self-similar
 K41 exponent ``\\zeta_p = p/3``.
+
+# Fields
+The plain constructor `Kolmogorov1941(C₂)` takes the field directly:
+- `C₂` — the empirical 2/3-law constant.
 """
 struct Kolmogorov1941 <: StructureFunction
   C₂::Float64
@@ -81,7 +85,7 @@ The She–Lévêque (1994) intermittency model for the inertial-range scaling ex
 [`scaling_exponent`](@ref)`(law; order)` gives the anomalous exponent
 
 ```math
-\\zeta_p = \\frac{p}{9} + 2\\left[1 - \\left(\\tfrac{2}{3}\\right)^{p/3}\\right]
+\\zeta_p = \\frac{p}{9} + 2\\Bigl[1 - \\bigl(\\tfrac{2}{3}\\bigr)^{p/3}\\Bigr]
 ```
 
 of the ``p``-th-order longitudinal structure function ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``. It is
@@ -112,6 +116,10 @@ by Obukhov (1962, *J. Fluid Mech.* **13**, 77) in the same issue. Its
 with `μ` the intermittency exponent (``\\approx 0.25``). Like [`SheLeveque1994`](@ref) it is exact at
 ``\\zeta_3 = 1`` and bends below the self-similar ``p/3`` for ``p > 3``, but as a quadratic in ``p`` (the
 log-normal ansatz) rather than She–Lévêque's log-Poisson form.
+
+# Fields
+The plain constructor `Kolmogorov1962(μ)` takes the field directly:
+- `μ` — the intermittency exponent.
 """
 struct Kolmogorov1962 <: StructureFunction
   μ::Float64
@@ -142,7 +150,7 @@ half-energy ``k``. This package's ``\\varepsilon_\\varphi = 2\\varkappa\\langle\
 \\langle\\delta u_L (\\delta\\varphi)^2\\rangle(r) = -\\tfrac{2}{3} \\varepsilon_\\varphi r.
 ```
 
-[`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar dissipation
+Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar dissipation
 ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order` throws.
 """
 struct Yaglom1949 <: StructureFunction end
@@ -166,14 +174,14 @@ The finite-Reynolds-number correction to the 4/5 law for the third-order longitu
 structure function,
 
 ```math
-D_{LLL}(r) = -\\left(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\right)\\varepsilon r,
+D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\Bigr)\\varepsilon r,
 ```
 
 which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
 ``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
 asymptotic 4/5 slope (Lundgren 2002; Sagaut & Cambon 2018, Table 4.5).
-[`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading ``\\mathrm{Re}_\\lambda`` from
-`fp` via [`taylor_reynolds`](@ref); any other `order` throws.
+Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading
+``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref); any other `order` throws.
 """
 struct Lundgren2002 <: StructureFunction end
 

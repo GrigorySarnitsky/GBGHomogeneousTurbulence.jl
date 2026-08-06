@@ -1,7 +1,7 @@
 # State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
-# velocity and scalar — the single source of truth; the physical fields are derived, never stored),
-# the recovery map that recovers the physical representations, and the random initial conditions that
-# seed a run. The boundary storage the recoveries fill lives in `Cache` (`ObservablesCache`); the
+# velocity and scalar — the single source of truth; the physical fields are recovered from it, never
+# held here), the recovery map that recovers the physical representations, and the random initial
+# conditions that seed a run. The boundary storage the recoveries fill lives in `Cache` (`ObservablesCache`); the
 # per-step scratch lives with the integrator (`IntegratorBuffers` in `Propagator`). Everything is
 # sized to a `FixedDomain` from `SimulationDomain`.
 
@@ -10,7 +10,8 @@
 
 The evolving state a run advances, and how it is recovered and seeded:
 - [`ResolvedFields`](@ref) — the inert record of the evolving velocity and scalar in spectral
-  representation (the single source of truth; the physical fields are derived, never stored).
+  representation (the single source of truth; the physical fields are recovered from it, never held
+  here).
 - [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
   recover the velocity, vorticity, and scalar in physical representation from the spectral state.
 - [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
@@ -33,10 +34,12 @@ export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
 """
     ResolvedFields(domain; scalar = false)
 
-The inert record of the evolving fields a run advances, in spectral representation — the single source
-of truth, from which the velocity, vorticity, and scalar in physical representation are derived on demand
-and never stored, so the state cannot go stale. Build it on a [`FixedDomain`](@ref); pass `scalar = true`
-to carry a passive scalar.
+The inert record of the evolving fields a run advances, in spectral representation — the single
+source of truth. The velocity, vorticity, and scalar in physical representation are recoveries of
+it, not part of it: the iteration recovers them into the stamped slots of the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its tail (never on a
+read — a cached read serves the deposited value or throws), so the state itself cannot go stale.
+Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
 - `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
@@ -106,7 +109,8 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes (zeroed
+at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so the mean mode stays empty), whose
 characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
 amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
@@ -167,12 +171,13 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-`scalar_variance`. The mean vanishes by construction: the envelope is zero at
+`scalar_variance`. The mean vanishes by construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
-``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes, whose
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes — zeroed,
+as above, at the origin — whose
 characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
 amplitudes, the shell-summed scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).

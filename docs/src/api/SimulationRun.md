@@ -30,8 +30,10 @@ warmup!
 
 ## The state's uniform reads
 
-The evolving state itself, read as functions of the run (the cached boundary observables —
-`velocity_physical`, `particle_velocities`, … — live on the [Cache](Cache.md) page).
+The evolving state itself, read as functions of the run — *uniform* because they are always
+serveable: the state is always current, so unlike a cached boundary read these never throw (the
+cached observables — `velocity_physical`, `particle_velocities`, … — live on the
+[Cache](Cache.md) page).
 
 ```@docs
 velocity_spectral

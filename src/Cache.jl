@@ -11,7 +11,8 @@
     Cache
 
 The observables cache — the stamped storage where the iteration leaves the observables it produces,
-for the run's own components and any observation to read. A **boundary** is the instant between
+for the run's own components and any observation to read. An **iteration** is one advance of the
+run — one `step!` and the `deposit!` that closes it; a **boundary** is the instant between
 iterations — the state at one ``t_n``, after one advance and before the next (an instant of the
 run's clock, not a face of the periodic box); a slot's **stamp** records which boundary its value
 belongs to, so a read can be refused rather than served stale. The cache's operations:
@@ -25,8 +26,10 @@ belongs to, so a read can be refused rather than served stale. The cache's opera
 - [`resolved_fields_modified!`](@ref) — announce a state mutation made outside the iteration, so
   every stamp is cleared and reads throw until the next deposit.
 
-The deposit and take verbs (`deposit_velocity!`, `take_velocity!`, …) are the solver components'
-side of the contract; a caller reads through the accessors and never deposits.
+The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
+— homed in `Propagator`, with the iteration it closes — which fills and stamps every slot at the
+iteration's tail; internal per-slot deposit and take verbs move the individual stamps. A caller
+reads through the accessors and never deposits.
 """
 module Cache
 
@@ -64,7 +67,8 @@ writes it). The `Simulation` front door builds, wires, and seeds one for you.
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
 Nothing in the cache is ever recomputed: a read that finds a stale, taken, or never-deposited slot
-reports a scheduling error, and the only repair is to fix the schedule that failed to deposit.
+reports a scheduling error — it throws an `ErrorException` whose message names the slot and which
+of the three states it is in — and the only repair is to fix the schedule that failed to deposit.
 
 !!! note
     A slot is also its producer's register: between deposits the step works in the same array, so a

@@ -13,14 +13,16 @@ The measured functions of the flow state:
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
   developed cascade.
-- [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step.
+- [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step (one
+  generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
 Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
 distribution over wavenumber); none dealiases first — the quadratic reductions are exactly
-alias-free on a dealiased state (see `kinetic_energy`), and the cubic skewness carries the slight
-residual its own docstring prices.
+alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition; `HouLi` meets
+it only to machine precision), and the cubic skewness carries the slight residual its own docstring
+prices.
 """
 module Observables
 
@@ -43,8 +45,11 @@ the normalized inner product, so by Parseval's theorem it accepts `u` in either
 representation. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
 `scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
 exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
-zero mode folds in nothing when ``2\\kappa_{\\max} < N`` — satisfied by the ``2/3`` rule and every
-narrower band.
+zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —
+satisfied by the ``2/3`` rule, by `PhaseShift`'s wider ``\\sqrt{2}N/3`` band, and by every narrower
+band. `HouLi` keeps the full band ``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero
+are Nyquist modes its taper has already damped to machine precision — alias-free in practice, not
+exactly.
 """
 kinetic_energy(u) = 0.5 * inner(u, u)
 
@@ -68,7 +73,7 @@ Two routes to the same rate; take the one whose input is already in hand.
 
   * `dissipation(ω, viscosity)` — from a vorticity field `ω` ``\\boldsymbol{\\omega}`` in either
     representation, as the normalized inner product (Parseval). Use it when
-    ``\\boldsymbol{\\omega}`` exists for its own sake: the cached velocity, or a vorticity
+    ``\\boldsymbol{\\omega}`` exists for its own sake: the cached vorticity, or a vorticity
     the caller supplies.
   * `dissipation(û, domain, viscosity)` — straight from the velocity in spectral representation `û`
     ``\\hat{\\boldsymbol{u}}``, with the [`FixedDomain`](@ref) `domain` supplying the multiplier, and
@@ -166,9 +171,9 @@ is the scalar skewness, the bold ``\\boldsymbol{S}`` the strain-rate tensor):
 
 ```math
 \\begin{aligned}
-S &= C \\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
-   = 3C \\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}, \\\\
-C &= \\tfrac{4}{7}\\sqrt{15/2} \\approx 1.5649.
+S &= C_S \\frac{\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}
+   = 3C_S \\frac{\\langle\\det\\boldsymbol{S}\\rangle}{\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle^{3/2}}, \\\\
+C_S &= \\tfrac{4}{7}\\sqrt{15/2} \\approx 1.5649.
 \\end{aligned}
 ```
 

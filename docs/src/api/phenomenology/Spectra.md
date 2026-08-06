@@ -61,7 +61,10 @@ ObukhovCorrsin1949
 
 The published provenance of each preset on this page, read from its
 [`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)` — the extraction-bound leaf
-carries its own citations, so these are not duplicated in the `ARCHITECTURE.md` reference list.
+carries its own citations, so these are not duplicated in the `ARCHITECTURE.md` reference list. This
+list is scoped to the laws' own provenance; sources cited inline for an individual coefficient or a
+comparison (e.g. Sagaut & Cambon, *Homogeneous Turbulence Dynamics*, 2nd ed., Springer, 2018) are
+cited in place and deliberately not repeated here.
 
 ```@eval
 import GBGIsotropicTurbulence.Phenomenology as Phen

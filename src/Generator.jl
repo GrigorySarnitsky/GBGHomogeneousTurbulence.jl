@@ -337,7 +337,7 @@ representation by the per-mode multiplier
 \\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\big),
 ```
 
-with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\mathcal E`` advances its
+with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\mathcal{E}`` advances its
 viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
 scheme's explicit stage combination carries truncation error. Since the multiplier is the exponential
 of a radial symbol (plus the armed per-mode rate), a scheme applies it through the backend's fused
@@ -347,9 +347,8 @@ stored, or swept for it. Accordingly this verb returns the exponential's paramet
 ``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = \\hat A`` (the armed rate field, or `nothing` when no
 linear forcing is active) — exactly the arguments the fused exponential takes.
 
-The arguments are:
-- `generator` — the [`ResolvedGenerator`](@ref), supplying ``\\nu`` and the armed rate.
-- `τ` — the sub-interval the stage advances.
+The `generator` (a [`ResolvedGenerator`](@ref)) supplies ``\\nu`` and the armed rate; `τ` is the
+sub-interval the stage advances.
 """
 velocity_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
@@ -385,7 +384,7 @@ component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by de
 untouched.
 
 It is computed pseudospectrally as
-``- \\mathrm{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
+``- \\operatorname{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
 plus the per-stage additive source of the generator's scalar forcing (its `add_forcing_source!` hook).
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û` and `φ̂` unused;

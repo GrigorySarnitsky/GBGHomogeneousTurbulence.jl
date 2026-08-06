@@ -75,7 +75,9 @@ the assembly scratch), the chosen integrator, the [`ResolvedFields`](@ref) state
 [`ObservablesCache`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
-`Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
+`Simulation` at ``t = 0`` ("front door" names exactly this convenience form throughout — the
+constructor that builds every component for you); the second takes a `FixedDomain` you built
+yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
 observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`) or through the cache's
 boundary observables ([`velocity_physical`](@ref)`(sim)`, [`vorticity_physical`](@ref)`(sim)`),
@@ -126,9 +128,11 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
   (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
-- `scalar = false`, `scalar_variance = 1.0`, `peak_wavenumber = 2.0` — whether to evolve a passive
-  scalar (a mean-zero ``\\varphi``), its initial variance, and the large-scale envelope wavenumber
-  ``\\kappa_p`` of the initial condition (the shell-summed spectrum peaks at ``\\kappa_p/\\sqrt2``).
+- `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
+  ``\\varphi``), and its initial variance.
+- `peak_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
+  condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
+  ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale `initial_spectrum` is evaluated at.
 - `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
   `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
@@ -595,9 +599,11 @@ build a fresh one per run.
 
 # Fields
 The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn,
-last_time, started)` is internal: `monitor` holds the sampled signals and gates, `max_turnovers`
-the give-up cap, `gate_scalar` the requested scalar gate (applied only when the run's scalar is
-forced), and the remaining fields the turnover clock's state.
+last_time, started)` is internal:
+- `monitor` — the sampled signals and gates.
+- `max_turnovers` — the give-up cap.
+- `gate_scalar` — the requested scalar gate (applied only when the run's scalar is forced).
+- `elapsed_turn`, `last_time`, `started` — the turnover clock's state.
 """
 mutable struct StationarityCriterion
   const monitor::StationarityMonitor

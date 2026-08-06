@@ -20,12 +20,13 @@
 The interchangeable energy-injection strategies:
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle below.
 
-A strategy acts on the step through up to four methods, each defaulting to doing nothing:
+A strategy acts on the step through up to four methods, each defaulting to doing nothing (listed in
+the order the step fires them):
+- [`prepare_forcing!`](@ref) — a per-step internal-state advance.
 - [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor;
   [`uses_linear_rate`](@ref) declares that a forcing supplies one.
-- [`apply_forcing!`](@ref) — a post-step projection or rescale.
-- [`prepare_forcing!`](@ref) — a per-step internal-state advance.
 - [`add_forcing_source!`](@ref) — an additive per-stage source.
+- [`apply_forcing!`](@ref) — a post-step projection or rescale.
 
 The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
 [`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
@@ -50,12 +51,12 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
 """
     AbstractForcing
 
-Supertype of the energy-injection strategies. A strategy may implement any of [`set_forcing_rate!`](@ref)
+Supertype of the energy-injection strategies. A strategy may implement any of
+[`prepare_forcing!`](@ref) (a per-step state advance), [`set_forcing_rate!`](@ref)
 (a linear forcing rate folded into the integrating factor — a strategy implementing it **must** also
 declare [`uses_linear_rate`](@ref), or it is never given a rate array to fill),
-[`apply_forcing!`](@ref) (a post-step
-projection), [`prepare_forcing!`](@ref) (a per-step state advance), and [`add_forcing_source!`](@ref) (an
-additive per-stage source); all default to doing nothing, and a strategy owns whatever scratch its hooks
+[`add_forcing_source!`](@ref) (an additive per-stage source), and [`apply_forcing!`](@ref) (a
+post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
 need.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
@@ -64,6 +65,16 @@ prepared here), `add_forcing_source!` runs at every stage, and `apply_forcing!` 
 step. The linear rate and the additive source are two channels of **one** forcing term — the part linear
 in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
 single strategy may legitimately use both.
+
+The hooks' return conventions differ deliberately: `set_forcing_rate!` returns a `Bool` — whether
+the rate it filled is armed for this step — while the other three return their mutated argument
+(`apply_forcing!` the field, `add_forcing_source!` the right-hand side) or `nothing`
+(`prepare_forcing!`).
+
+!!! warning
+    Construct one strategy instance per forced field. An instance owns per-field scratch and
+    internal state, so passing the same instance as both `velocity_forcing` and `scalar_forcing`
+    would silently conflate the two fields' bookkeeping.
 """
 abstract type AbstractForcing end
 
@@ -71,12 +82,21 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A deferred forcing. The operator-free keyword constructors — `Linear(; rate, …)`,
-`ConstantPower(; target, …)`, and `BandRescaling(; target, over, …)` — return a `DeferredForcing`
-capturing the same keywords as their `domain`-taking forms (the band `lowest_shell` / `highest_shell`, and
-`BandRescaling`'s `over`); it is materialized into the concrete `AbstractForcing` once the
-`FixedDomain` exists (done for you by `Simulation`). A forcing argument therefore accepts either a
-ready-built `AbstractForcing` (from the `domain`-taking constructor) or a `DeferredForcing`.
+A deferred forcing. The operator-free keyword constructors
+
+    Linear(; rate, lowest_shell = 1, highest_shell = 2)
+    ConstantPower(; target, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(; target, over = :band, lowest_shell = 1, highest_shell = 2)
+
+each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
+`domain`-taking forms documented on each strategy; it is materialized into the concrete
+`AbstractForcing` once the `FixedDomain` exists (done for you by `Simulation`). A forcing argument
+therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
+`DeferredForcing`.
+
+# Fields
+- `build` — the captured constructor closure: calling the `DeferredForcing` on a `FixedDomain`
+  invokes it, yielding the concrete strategy.
 """
 struct DeferredForcing{F}
   build::F
@@ -91,7 +111,7 @@ end
 For a strategy `forcing` linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
-integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor)), so the
+integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
 rate. The `field` is the start-of-step field in spectral representation; `domain` is the
@@ -184,12 +204,14 @@ The `over` keyword selects where the target applies:
   * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
     about its mean as the band feeds the cascade.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
-    `target` (for the velocity this pins the r.m.s. velocity ``u'`` and hence ``\\mathrm{Re}_\\lambda``).
+    `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
+    ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
     If the out-of-band value alone exceeds `target`, the band is zeroed (the closest reachable state).
 
 Rescaling preserves the divergence-free constraint either way.
 
-!!! note "A deterministic clamp, not a faithful stationary sampler"
+!!! note
+    This is a deterministic clamp, not a faithful stationary sampler.
     Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of
     stochastic velocity rescaling: it has no conserved quantity, is not associated with a well-defined
     ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
@@ -270,7 +292,8 @@ of the box's fundamental ``2\\pi/L``; default 1–2),
 whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
 injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
 diagnostics: `dissipation` ``\\varepsilon`` for the velocity, `scalar_dissipation`
-``\\varepsilon_\\varphi`` for the scalar. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
+``\\varepsilon_\\varphi`` for the scalar. (A rate — note the contrast with `BandRescaling`, whose
+`target` is a held amplitude.) The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
 struct ConstantPower{K, I, T} <: AbstractForcing
