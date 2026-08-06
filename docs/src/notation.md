@@ -40,7 +40,7 @@ a direct dependency.
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `conditions.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `conditions.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}``, ``\mathrm{Re}_\lambda`` | Reynolds number; Taylor-microscale Reynolds number | `1 / ν` (``\mathrm{Re}_\lambda`` measured) |
+| ``\mathrm{Re}`` | Reynolds number, set through the viscosity | `1 / ν` |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
@@ -78,6 +78,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm d\kappa / \int_0^\infty E\,\mathrm d\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | `integral_scale` |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
+| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number, measured from the flow state | `taylor_reynolds` |
 | ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | `taylor_microscale` |
 
 ## Numerics
@@ -88,7 +89,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C`` | advective-CFL ceiling, ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert`` | `recommended_cfl` |
-| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac N2\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
+| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt2}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
 | ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
 

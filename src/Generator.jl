@@ -154,7 +154,7 @@ carries a passive scalar (it allocates the scalar's forcing-rate array, required
 run). The `Simulation` front door builds one for you.
 
 # Fields
-- `conditions` — the [`FlowConditions`](@ref) parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
+- `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
 - `product_spectral` — the quadratic products' spectral image (the transformed Lamb vector
   ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, or the transformed scalar flux
   ``\\boldsymbol{u}\\varphi``). In physical representation each product is formed in place over an
@@ -163,10 +163,14 @@ run). The `Simulation` front door builds one for you.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``
-  ([`prepare!`](@ref) fills them). Each is `nothing` unless that field's forcing declares
+  (`prepare!` fills them). Each is `nothing` unless that field's forcing declares
   `uses_linear_rate`, so a field driven by a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
-- `velocity_rate_active`, `scalar_rate_active` — whether [`prepare!`](@ref) armed each rate this step.
+- `velocity_rate_active`, `scalar_rate_active` — whether `prepare!` armed each rate this step.
+- `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
+  displaced velocity, left fresh by [`velocity_rhs!`](@ref) for the same stage's
+  [`scalar_rhs!`](@ref) to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
+  rebuilds the recovery itself).
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
@@ -216,9 +220,10 @@ end
 """
     finalize!(generator, state, domain)
 
-Close a step of the generator: apply each forcing's post-step projection (its `apply_forcing!` hook —
+Close a step of the [`ResolvedGenerator`](@ref) `generator`: apply each of its forcings' post-step
+projections (the `apply_forcing!` hook —
 e.g. the energy rescale of a `BandRescaling`) to the advanced `state`, velocity first, then the scalar
-when the run carries one. A scheme calls this once after its final stage, so everything that follows
+when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
 the step — the diagnostics, the derived observables, the tracer push — sees the forced end-of-step fields.
 Returns `state`.
 """
@@ -234,8 +239,9 @@ end
 
 Assemble the explicit right-hand side of the momentum equation into `N̂` — the dealiased,
 Leray-projected rotational nonlinear term plus any additive forcing source — from the stage velocity
-`û` in spectral representation and its physical velocity `u` and vorticity `ω`, using the
-[`ResolvedGenerator`](@ref) `generator`'s conditions and scratch.
+`û` in spectral representation and its physical velocity `u` and vorticity `ω`, on the
+[`FixedDomain`](@ref) `domain`, using the [`ResolvedGenerator`](@ref) `generator`'s conditions and
+scratch.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -337,8 +343,8 @@ scheme's explicit stage combination carries truncation error. Since the multipli
 of a radial symbol (plus the armed per-mode rate), a scheme applies it through the backend's fused
 exponential convolution, which evaluates it per mode from the wavenumber arrays: nothing is built,
 stored, or swept for it. Accordingly this verb returns the exponential's parameters as a named tuple —
-`coefficient` ``= -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-`offset_scale` ``= \\tau`` and `offset` ``= \\hat A`` (the armed rate field, or `nothing` when no
+``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
+``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = \\hat A`` (the armed rate field, or `nothing` when no
 linear forcing is active) — exactly the arguments the fused exponential takes.
 
 The arguments are:
@@ -353,8 +359,9 @@ velocity_factor(generator::ResolvedGenerator, τ::Real) =
 """
     scalar_factor(generator, τ)
 
-The passive scalar's exact linear subflow over a substep ``\\tau`` — the same exponential parameters
-as [`velocity_factor`](@ref) with the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
+The passive scalar's exact linear subflow over a substep `τ` — the same exponential parameters
+[`velocity_factor`](@ref) returns for `generator`, with the scalar diffusivity
+``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
 ``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
 """
 scalar_factor(generator::ResolvedGenerator, τ::Real) =
@@ -368,12 +375,12 @@ scalar_factor(generator::ResolvedGenerator, τ::Real) =
 
 Assemble the explicit right-hand side of the passive-scalar equation into `N̂` — the dealiased
 advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
-spectral representation and their physical `u`, `φ`, using the [`ResolvedGenerator`](@ref)
-`generator`'s conditions and scratch.
+spectral representation and their physical `u`, `φ`, on the [`FixedDomain`](@ref) `domain`, using
+the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
 ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form
-conserves the scalar mean exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol 0``
+conserves the scalar mean exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``
 component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode
 untouched.
 

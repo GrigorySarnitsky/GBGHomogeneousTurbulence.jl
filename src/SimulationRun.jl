@@ -91,10 +91,11 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     chosen resolution criterion `k_max_η`.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
-    ``k``, `side_length` the side ``L``, and ``G`` the box-normalization group constant (``\\approx 0.9``),
+    ``k``, `side_length` the side ``L``, and ``G`` a dimensionless constant calibrated on
+    box-confined DNS (``\\approx 0.9``; Li et al. 2008),
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
-    **not** the grid Nyquist). Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` with ``f`` the
+    **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
     same grid at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
@@ -114,12 +115,13 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
   keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
-- `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives ``u' = 1``.
+- `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
+  an r.m.s. velocity ``u' = \\sqrt{2k/3} = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
 - `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
-- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\nu/\\mathrm{Sc}``).
+- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `DeferredForcing` from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
   (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
@@ -135,7 +137,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_tracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
   their interpolation scheme, forwarded to the `Tracers` constructor.
-- `rng` — the random stream for the initial condition and the tracer seeding.
+- `rng` — the random stream for the initial condition and the tracer seeding (defaults to
+  `Random.default_rng()`).
 
 # Examples
 ```julia
@@ -248,8 +251,8 @@ end
 """
     velocity_spectral(sim)
 
-The velocity ``\\hat{\\boldsymbol{u}}`` in spectral representation — the evolving state itself,
-always current (it is what the run advances, not a cached observable). Treat it as read-only: to
+The velocity ``\\hat{\\boldsymbol{u}}`` in spectral representation of the run `sim` — the evolving
+state itself, always current (it is what the run advances, not a cached observable). Treat it as read-only: to
 mutate the state out of band, write through `sim.state` and announce it with
 [`resolved_fields_modified!`](@ref).
 """
@@ -259,8 +262,8 @@ velocity_spectral(sim::Simulation) = sim.state.velocity
 """
     scalar_spectral(sim)
 
-The scalar ``\\hat\\varphi`` in spectral representation — the evolving state itself, always current,
-with exactly [`velocity_spectral`](@ref)'s contract. Throws an `ArgumentError` when the run carries
+The scalar ``\\hat\\varphi`` in spectral representation of the run `sim` — the evolving state
+itself, always current, with exactly [`velocity_spectral`](@ref)'s contract. Throws an `ArgumentError` when the run carries
 no passive scalar.
 """
 function scalar_spectral(sim::Simulation)
@@ -423,7 +426,8 @@ end
     run!(sim) do sim … end
 
 Observe and advance `sim` until the observation stops it, and return it. At every boundary the run
-reaches — the seeded initial state included — `callback(sim)` **observes** the run: it reads the
+reaches — a **boundary** being the instant between iterations, the seeded initial state included —
+the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
 to stop (any other return throws — the decision may not be left implicit). Only then does the next
 iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the tail
@@ -556,8 +560,8 @@ _scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.generato
 
 """
     StationarityCriterion(; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
-                          window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
-                          max_turnovers = 60)
+                            window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
+                            max_turnovers = 60)
 
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting

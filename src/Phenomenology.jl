@@ -15,7 +15,8 @@ that theory and experiment have established, each an author-year parametrization
 family. This is the *predicted* counterpart to the measured `Observables`: a provider the validation
 layer reads to compare a run against, never a comparer itself and never assumed by the dynamics.
 
-A law family is an abstract type; each parametrization is a named preset — usually a concrete subtype
+A law family is an abstract subtype of [`TurbulenceLaw`](@ref) (the root of every reference law
+here); each parametrization is a named preset — usually a concrete subtype
 carrying its fitted coefficients and its provenance, or (for the composed velocity spectra like
 `Spectra.Pope2000`) a factory function that assembles one. Choosing a law is choosing the preset (the
 published fit is the default); a name is disambiguated by its **submodule** (the quantity), its
@@ -188,7 +189,8 @@ function spectrum end
     scaling_exponent(law; order) -> Float64
 
 The inertial-range scaling exponent ``\\zeta_p`` of the order-``p`` longitudinal velocity structure
-function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, predicted by a `law` (a `StructureFunction`) — the
+function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, of the `order` ``p`` requested, predicted by a
+`law` (a `StructureFunction`) — the
 self-similar ``\\zeta_p = p/3`` of K41, or the anomalous exponent of an intermittency model. Its home is
 [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """

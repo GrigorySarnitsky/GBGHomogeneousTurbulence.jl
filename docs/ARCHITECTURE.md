@@ -249,13 +249,15 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   and incompressible Euler is genuinely Hamiltonian — so this term is the flow's *reversible*,
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol{u}`` is the flow's *irreversible*,
-  net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly*: the factor pair
-  `velocity_factor` / `scalar_factor` supplies the flow map
+  net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
   ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
   — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
-  forcing rate (the source, below) — and multiplying a field by ``\mathcal E`` advances its diffusion with
-  no stability restriction. ``\mathcal E`` is a *propagator*, a flow map over a step, not a generator;
+  forcing rate (the source, below). ``\mathcal E`` is **never materialized** (decision 39): the factor
+  pair `velocity_factor` / `scalar_factor` supplies its *parameters* — the coefficient on
+  ``\lvert\boldsymbol{\kappa}\rvert^2``, the rate's scale, the armed rate field — and the backend's
+  fused exponential convolution evaluates ``\mathcal E`` per mode as it applies it, advancing the
+  diffusion with no stability restriction and no kernel field built or stored. ``\mathcal E`` is a *propagator*, a flow map over a step, not a generator;
   keeping the two apart is exactly the Generator/Propagator distinction of §4.5.
 - **The source.** ``\boldsymbol{f}`` is the forcing, an external drive that is neither seam half (§4.4).
   When a forcing is *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``), its rate
@@ -359,8 +361,9 @@ Method (§3).
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
-- **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers and
-  the substage recovery pair — built by `allocate_buffers` dispatching on the
+- **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers,
+  and nothing in physical representation (the substage recoveries write into the cache's slots,
+  decision 40) — built by `allocate_buffers` dispatching on the
   concrete scheme, so each allocates exactly its working set. The right-hand-side *assembly* scratch
   lives with the generator on the `ResolvedGenerator` (§4.2), and the start-of-step physical fields are
   the observation cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
@@ -515,7 +518,8 @@ seam is real but uncrossed (decision 18).
 
 ### 4.9 Layout summary
 
-`SimulationDomain → State → Forcing → Generator → Observables → Propagator → Particles → SimulationRun`.
+`SimulationDomain → State → Cache → Forcing → Generator → Observables → Propagator → Particles →
+SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
 order as the dependency-light leaf the initial-condition, forcing, and validation consumers read.
 Statistics live consumer-side of this package too: the sampling in `Particles` and the observables in
@@ -907,7 +911,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
     sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
     wavenumber), not ``\eta/\Delta x`` (geometric): the former is dealiasing-aware through
-    ``\kappa_{\max} = f \tfrac N2\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
+    ``\kappa_{\max} = f \tfrac{N}{2}\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
     accuracy itself depends on the dealiasing.
 21. **(2026-07) The physics-first carving is checked against a formal structural model
     (`docs/architecture.als`).** The module carving and the Mori–Zwanzig role wiring were re-examined
@@ -1459,7 +1463,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the flux ``\boldsymbol{u}\varphi`` lands in the velocity's through the backend's pointwise
     `multiply!` — which also replaces the raw broadcast `_scalar_flux!` had carried, a
     reimplementation of a shipped PF operation (invariant 2). The displaced PhaseShift evaluations
-    reuse their own shifted registers the same way. `velocity_rhs!` therefore **consumes** its `ω`
+    reuse their own shifted registers the same way. The verb `velocity_rhs!` therefore **consumes** its `ω`
     argument and `scalar_rhs!` its `u` (documented in both docstrings; `step!` takes the
     corresponding cache slots before the stage-1 assembly), and `ResolvedGenerator` keeps only the
     spectral product image: one physical vector retired from **every** configuration — 402 MiB at
@@ -1485,7 +1489,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
     favor of the stamp, and the sample is read through the checked `particle_velocities`
     (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
-    user-settled accessor prefix). `predictor_velocity` is deliberately **not** readable — an
+    user-settled accessor prefix). The register `predictor_velocity` is deliberately **not** readable — an
     off-trajectory value must not be servable as a plausible-looking Lagrangian velocity — and the
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
     would approximate the measured observable at ``O(\Delta t^2)``; never approximate the thing you
@@ -1508,7 +1512,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `particle_positions` the probes' state — a **function names what the run holds, wherever it
     lives** (reading needs no knowledge of the state/cache split), while writing stays on the dot
     path, where the danger demands the knowledge. An accessor exists exactly for what the run holds:
-    `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol\omega}`` is
+    `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol{\omega}}`` is
     materialized nowhere), and a `MethodError` is the honest answer.
 
 44. **(2026-08) The tail relocation stops at the recoveries: the nonlinear terms are not cached.**
@@ -1590,8 +1594,9 @@ no-guessed-citation rule). The extraction-bound
 - Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
 - Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,
-  423–455; Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**,
-  215–220. *(The projection formalism, the foundation of §3 and §8.)*
+  423–455. *(The projection formalism, the foundation of §3 and §8.)*
+- Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**, 215–220.
+  *(The projection formalism, with Mori 1965.)*
 - Morrison, P. J. (1986). A paradigm for joined Hamiltonian and dissipative systems. *Physica D* **18**,
   410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
 - Öttinger, H. C. (2005). *Beyond Equilibrium Thermodynamics.* Wiley. *(GENERIC; the

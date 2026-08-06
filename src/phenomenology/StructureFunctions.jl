@@ -5,6 +5,7 @@ Inertial-range structure-function laws — parametrizations of the longitudinal 
 function ``D_{L\\dots}(r)`` and the mixed velocity–scalar structure function
 ``\\langle\\delta u_L (\\delta\\varphi)^2\\rangle`` (Yaglom), evaluated by [`structure_function`](@ref).
 
+- [`StructureFunction`](@ref) — the family root every law below subtypes.
 - [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
   self-similar exponents (via [`scaling_exponent`](@ref)).
 - [`Kolmogorov1962`](@ref) / [`SheLeveque1994`](@ref) — the K62 log-normal and She–Lévêque
@@ -100,7 +101,8 @@ const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82"; valid_R
 """
     Kolmogorov1962(; μ = 0.25)
 
-The Kolmogorov (1962) log-normal (refined-similarity) intermittency model. Its
+The Kolmogorov (1962) log-normal (refined-similarity) intermittency model, proposed independently
+by Obukhov (1962, *J. Fluid Mech.* **13**, 77) in the same issue. Its
 [`scaling_exponent`](@ref)`(law; order)` gives
 
 ```math

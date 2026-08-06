@@ -14,7 +14,8 @@ dissipation-range roll-off, each swappable.
   range, [`PaoDissipation`](@ref) Pao's cutoff, [`ExponentialDissipation`](@ref) the closure-predicted
   exponential cutoff, [`SaffmanDissipation`](@ref) a Gaussian cutoff, and [`UnitLargeScale`](@ref) /
   [`UnitDissipation`](@ref) are the trivial (no-roll-off) factors.
-- [`Pope2000`](@ref) / [`VonKarman1948`](@ref) / [`Pao1965`](@ref) — named velocity-spectrum presets of
+- [`EnergySpectrum`](@ref) — the velocity-spectrum family root; [`Pope2000`](@ref) /
+  [`VonKarman1948`](@ref) / [`Pao1965`](@ref) are its named presets, each a composed
   [`ModelSpectrum`](@ref).
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
@@ -247,7 +248,7 @@ spectrum(m::ModelSpectrum, κ, fp::FlowParameters) =
 provenance(m::ModelSpectrum) = m.ref
 
 
-const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* §6.5"; valid_Reλ = (30.0, Inf))
+const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* (Cambridge University Press), §6.5"; valid_Reλ = (30.0, Inf))
 
 """
     Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2)
@@ -319,7 +320,7 @@ density in wavenumber of the scalar variance ``\\langle\\varphi^2\\rangle``, eva
 abstract type ScalarSpectrum <: TurbulenceLaw end
 
 
-const _OBUKHOVCORRSIN = Reference("Obukhov (1949) / Corrsin (1951)"; valid_Reλ = (50.0, Inf))
+const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. Geogr. Geofiz.* **13**, 58 / Corrsin (1951), *J. Appl. Phys.* **22**, 469"; valid_Reλ = (50.0, Inf))
 
 """
     ObukhovCorrsin1949(; C_OC = 0.67)
@@ -332,7 +333,8 @@ E_\\varphi(\\kappa) = C_{OC} \\varepsilon_\\varphi \\varepsilon^{-1/3} \\kappa^{
 
 the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
 inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
-constant (``\\approx 0.67`` for the three-dimensional spectrum), quoted — unlike Yaglom's classical
+constant (``\\approx 0.67`` for the three-dimensional spectrum — the high-Reynolds-number value of
+Sreenivasan 1996, *Phys. Fluids* **8**, 189), quoted — unlike Yaglom's classical
 ``4/3`` — for the *full*-variance scalar dissipation ``2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``,
 so it pairs directly with this package's full-variance ``\\varepsilon_\\varphi`` (`scalar_dissipation`)
 with no factor-of-two conversion. The name is a dual eponym — Obukhov

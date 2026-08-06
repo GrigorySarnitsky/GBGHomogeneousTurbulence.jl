@@ -101,8 +101,9 @@ end
     record_trajectory_velocity!(tracers, u) -> tracers
 
 Record the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the flow velocity seen by
-each tracer where it currently sits — by interpolating the physical velocity field `u`
-``\\boldsymbol{u}`` onto the tracer positions with the set's interpolation scheme.
+each tracer where it currently sits — by interpolating the velocity field `u` (physical
+representation) onto the positions of the tracer set `tracers`, with the set's interpolation
+scheme.
 
 The run layer calls it at the tail of each iteration, on the just-deposited boundary velocity at the
 just-advanced positions; the recorded values are the observables cache's trajectory-sample slot,
@@ -120,10 +121,10 @@ end
 """
     advect!(tracers, velocity_end, domain, dt) -> tracers
 
-Advance the tracer positions by one step of size `dt`, in place, by Heun-in-time on the velocity at
-the two ends of the step — the start-of-step values that
-[`record_trajectory_velocity!`](@ref) put on record, and the end-of-step physical velocity field
-`velocity_end` ``= \\boldsymbol{u}(t_{n+1})``:
+Advance the positions of the tracer set `tracers` by one step of size `dt`, in place, by
+Heun-in-time on the velocity at the two ends of the step — the start-of-step values that
+[`record_trajectory_velocity!`](@ref) put on record, and the end-of-step velocity field
+``\\texttt{velocity\\_end} = \\boldsymbol{u}(t_{n+1})`` in physical representation:
 
 ```math
 \\begin{aligned}
@@ -169,8 +170,7 @@ end
 Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
-for the scalar ``\\varphi``), using the
-tracers' interpolation scheme. Used to gather a field along the trajectories for the forthcoming Lagrangian
+for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. Used to gather a field along the trajectories for the forthcoming Lagrangian
 statistics.
 """
 function sample!(out, field, tracers::Tracers)
@@ -181,8 +181,11 @@ end
 
 """
     particle_positions(tracers)
+    particle_positions(sim)
 
-The `(M, 3)` array of current tracer positions — the probes' own state.
+The `(M, 3)` array of current tracer positions — the probes' own state, read off the tracer set
+`tracers`. The second form reads a `Simulation`'s tracers (and throws an `ArgumentError` when the
+run advects none).
 """
 particle_positions(tracers::Tracers) = tracers.positions
 
@@ -190,7 +193,7 @@ particle_positions(tracers::Tracers) = tracers.positions
 """
     number_of_tracers(tracers)
 
-The number of tracers `M`.
+The number of tracers ``M`` in the tracer set `tracers`.
 """
 number_of_tracers(tracers::Tracers) = size(tracers.positions, 1)
 
@@ -199,7 +202,7 @@ number_of_tracers(tracers::Tracers) = size(tracers.positions, 1)
     velocity_buffer(tracers)
 
 Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) of
-shape `(M, 3)` matching the tracers, for use as the `out` of
+shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
 [`sample!`](@ref) when sampling the velocity along the trajectories.
 """
 velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
@@ -208,7 +211,7 @@ velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions)
     scalar_buffer(tracers)
 
 Allocate a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues) of
-length `M` matching the tracers, for use as the `out` of
+length ``M`` matching the tracer set `tracers`, for use as the `out` of
 [`sample!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
 """
 scalar_buffer(tracers::Tracers) =

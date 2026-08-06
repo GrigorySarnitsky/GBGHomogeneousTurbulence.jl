@@ -3,6 +3,7 @@
 
 Dimensionless turbulence constants and their Reynolds-number trends, evaluated by [`scaling`](@ref).
 
+- [`ScalingLaw`](@ref) — the family root every law below subtypes.
 - [`Sreenivasan1998`](@ref) — the normalized dissipation constant ``C_\\varepsilon = \\varepsilon L/u'^3``,
   a high-Reynolds-number plateau with an optional finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
@@ -97,7 +98,7 @@ scaling(m::Sreenivasan1995, ::FlowParameters) = m.C_K
 provenance(::Sreenivasan1995) = _SREENIVASAN1995
 
 
-const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB); dissipation-anomaly lineage Taylor 1935 / Sreenivasan 1998 / Kaneda et al. 2003";
+const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB)";
                           valid_Reλ = (100.0, Inf))
 
 """

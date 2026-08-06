@@ -1,8 +1,8 @@
 # API overview
 
 The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules. Its **re-exported**
-submodules, in dependency order, are `SimulationDomain` → `State` → `Forcing` → `Generator` →
-`Observables` → `Propagator` → `Particles` → `SimulationRun`; the extraction-bound `Phenomenology` leaf
+submodules, in dependency order, are `SimulationDomain` → `State` → `Cache` → `Forcing` →
+`Generator` → `Observables` → `Propagator` → `Particles` → `SimulationRun`; the extraction-bound `Phenomenology` leaf
 leads the include order but is **not** re-exported (reach it opt-in). The umbrella re-exports the public
 surface of the listed submodules, so `using GBGIsotropicTurbulence` brings everything into scope.
 
@@ -26,6 +26,7 @@ Pages = [
   "api/GBGIsotropicTurbulence.md",
   "api/SimulationDomain.md",
   "api/State.md",
+  "api/Cache.md",
   "api/Forcing.md",
   "api/Generator.md",
   "api/Observables.md",

@@ -7,7 +7,7 @@ Order   = [:module]
 
 ## The flow-state bundle
 
-The dimensionless flow state a law is evaluated against.
+The flow state a law is evaluated against — the dimensional quantities from which each law forms its dimensionless groups.
 
 ```@docs
 FlowParameters

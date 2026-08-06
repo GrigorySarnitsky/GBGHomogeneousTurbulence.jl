@@ -14,7 +14,10 @@ The discretized periodic box a run lives on — the reusable, read-only frame:
   and the lazy ``\\lvert\\boldsymbol{\\kappa}\\rvert^2`` and dealias kernels).
 - [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref), [`HouLi`](@ref), or
   [`PhaseShift`](@ref), and the cutoff it sets, [`max_wavenumber`](@ref).
-- [`new_vector_field_spectral`](@ref), [`new_scalar_field_spectral`](@ref), … — the field-sized scratch allocators.
+- [`new_vector_field_spectral`](@ref), [`new_vector_field_physical`](@ref),
+  [`new_scalar_field_spectral`](@ref), [`new_scalar_field_physical`](@ref),
+  [`new_tensor_field_spectral`](@ref), [`new_tensor_field_physical`](@ref) — the field allocators
+  (a zeroed field of the named kind and representation, on the domain's backend and element type).
 - [`dealias!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
 
 Precision and backend enter here and flow everywhere from here.
@@ -49,7 +52,7 @@ abstract type DealiasingStrategy end
 
 The sharp isotropic ``2/3``-rule truncation: keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
-``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
+``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
 of the quadratic nonlinearity, and the lean, GPU-friendly default.
 """
@@ -60,7 +63,7 @@ struct TwoThirds <: DealiasingStrategy end
 
 The smooth Hou–Li spectral filter, transfer function
 ``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
-with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
+with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
 damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
 (`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
@@ -71,6 +74,11 @@ than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly 
 hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
 automatically by `recommended_cfl`. The smooth spectral filter is due to Hou & Li (2007).
+
+# Fields
+The plain constructor `HouLi(order, strength)` takes the two fields directly: `order` — the
+exponent of the spectral roll-off; `strength` — the damping at the Nyquist mode, or `nothing` for
+the element-type default described above.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
@@ -85,9 +93,10 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 Phase-shift dealiasing: assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt2}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}}``
-(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac N2\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
-average cancels the aliasing images that wrap in an odd number of axes; the spherical cutoff removes the
-surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
+(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
+average cancels the aliasing images — the spurious spectral replicas that the under-resolved
+quadratic product folds back into the resolved band — that wrap in an odd number of axes; the
+spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
 ``\\tfrac{2\\sqrt2}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt2``
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
 modes in the retained sphere).
@@ -239,15 +248,16 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 The highest wavenumber magnitude that `domain` actually evolves — the dealiasing cutoff
 
 ```math
-\\kappa_{\\max} = f \\frac N2 \\frac{2\\pi}{L},
+\\kappa_{\\max} = f \\frac{N}{2} \\frac{2\\pi}{L},
 ```
 
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt2/3`` for `PhaseShift`).
 It is the cutoff the
-dealiasing sets — **not** the grid Nyquist ``\\tfrac N2\\tfrac{2\\pi}{L}`` itself; the modes above it are
+dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself; the modes above it are
 zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
-``\\kappa_{\\max}\\eta`` that a run is set up to meet.
+``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a run is set
+up to meet.
 """
 function max_wavenumber(domain::FixedDomain)
   N = physical_field_shape(domain.grid, Val(0))[1]

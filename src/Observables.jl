@@ -11,20 +11,16 @@ The measured functions of the flow state:
 - [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
   variance.
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
-- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the K41 (Kolmogorov 1941) marker of developed
-  turbulence.
+- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
+  developed cascade.
 - [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step.
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
 Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
-distribution over wavenumber); none dealiases first. The **quadratic** reductions (`kinetic_energy`,
-`dissipation`, `scalar_variance`, `scalar_dissipation`) are Parseval-exact: each is a normalized inner
-product, summed exactly from the spectral coefficients regardless of representation; the equivalent
-physical-space mean picks up no aliasing either, because the quadratic's zero mode folds in nothing when
-``2\\kappa_{\\max} < N`` (the ``2/3`` rule). The **cubic** `derivative_skewness` is not: its grid mean
-folds a small residual from the truncation edge back into the mean, so it carries a slight aliasing on a
-``2/3`` field (negligible when well-resolved; exact cubic dealiasing would need the ``1/2`` rule).
+distribution over wavenumber); none dealiases first — the quadratic reductions are exactly
+alias-free on a dealiased state (see `kinetic_energy`), and the cubic skewness carries the slight
+residual its own docstring prices.
 """
 module Observables
 
@@ -44,7 +40,11 @@ export kinetic_energy, dissipation, max_speed,
 The turbulent kinetic energy ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
 velocity field `u`. Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
 the normalized inner product, so by Parseval's theorem it accepts `u` in either
-representation.
+representation. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
+`scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
+exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
+zero mode folds in nothing when ``2\\kappa_{\\max} < N`` — satisfied by the ``2/3`` rule and every
+narrower band.
 """
 kinetic_energy(u) = 0.5 * inner(u, u)
 
@@ -105,17 +105,19 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 """
     max_speed(u)
     max_speed(cache)
+    max_speed(sim)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
 in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
-differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert`` by at most ``\\sqrt{3}``, a gap absorbed by the
+is within a factor ``\\sqrt{3}`` of the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``, a gap absorbed by the
 conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling (whose
 eigenvalue bound over-estimates the true spectral radius).
 
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the iteration's tail
 deposited it — the same quantity, measured once per iteration and served without a reduction (or a
-device readback); it throws when no deposit is current, like every cached read.
+device readback); it throws when no deposit is current, like every cached read. The third form
+reads a `Simulation`'s cache.
 """
 max_speed(u) = maximum(abs, field_data(u))
 
@@ -236,7 +238,7 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
 small scales do not fix. The integrals above are the idealized continuous definition; they are evaluated
-as sums over the measured [`energy_spectrum`](@ref) shells (whose per-shell energy makes the shell width
+as sums over the measured `energy_spectrum` shells (whose per-shell energy makes the shell width
 cancel in the ratio). The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 For reference, two related scales follow from the same spectrum. The **transverse** integral scale is

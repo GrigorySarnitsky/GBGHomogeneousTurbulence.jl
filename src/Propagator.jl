@@ -24,6 +24,7 @@ The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtype
 the `integrator` of its `Simulation`. All are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
+- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integrator` is chosen from.
 - [`IFLowStorageRK3`](@ref) (the default), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
   cheaper two-stage alternative, imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
@@ -139,8 +140,8 @@ end
 Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, dispatching on the concrete scheme so it
 allocates **exactly** its working set — never a register another scheme would use.
 [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`; [`IFRK2`](@ref) allocates `stage1`,
-`stage2`, and `velocity_star_spectral`. `scalar = true` adds the nested `ScalarBuffers`, likewise sized to
-the scheme.
+`stage2`, and `velocity_star_spectral`. Passing `scalar = true` adds the nested `ScalarBuffers`,
+likewise sized to the scheme.
 A scheme with no method here is a hard error — there is no over-allocating fallback. The run layer calls
 this when assembling a `Simulation`.
 """
@@ -161,7 +162,8 @@ the equations of motion, their conditions, and their assembly scratch), the `dom
 A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
 right-hand sides and exact linear factors through the generator protocol at each stage, and closes
 with the generator's `finalize!` — it never assembles the physics itself. The first stage reads the
-boundary velocity, vorticity, and scalar in physical representation from `derived` — deposited there
+boundary velocity, vorticity, and scalar in physical representation from `derived` (a **boundary**
+being the instant between iterations, where the cache's deposits are current) — deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
 stages take the same slots as their recovery registers, so the step allocates and resides nothing
 beyond its spectral stage registers. The cache's fields epoch is advanced when the step completes.
@@ -423,7 +425,8 @@ _recovery_scratch(sb::ScalarBuffers) =
     deposit!(derived, state, domain, buffers)
     deposit!(sim)
 
-Close an iteration: deposit every observable the schedule caches into `derived` (an
+Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
+configuration holds, the same set every iteration — into `derived` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
 `ResolvedFields`) the step has just produced, and stamp each slot at the current boundary. The
 deposits are the next iteration's first-stage work moved to the tail — the velocity, vorticity, and
@@ -458,7 +461,8 @@ end
 """
     recommended_cfl(integrator, domain)
 
-A conservative advective-CFL ceiling ``C`` for the scheme, for a timestep
+A conservative advective-CFL ceiling ``C`` for the scheme `integrator` on the
+[`FixedDomain`](@ref) `domain`, for a timestep
 ``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to

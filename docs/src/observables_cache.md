@@ -117,7 +117,7 @@ so it costs nothing: the next iteration reads instead of recovering. The move st
 recoveries by a storage decision, not a value obstruction: the quadratic products and their
 projection are state-only too, and would relocate value-identically at an unchanged transform
 count — but they form in place over the velocity and vorticity slots (§2.3), so running them at the
-tail would destroy the deposited charts, and keeping both would cost the product array the
+tail would destroy the deposited velocity and vorticity, and keeping both would cost the product array the
 minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
 step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
 schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
@@ -137,7 +137,10 @@ share of one first-stage evaluation, one reduction, and one interpolation, per r
 iteration.
 
 **A stamp says what a slot holds**, and takes three values: the observable at a
-named ``t_n``, or the producer's scratch, or nothing yet deposited. A read is served only in the
+named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code the named time is
+an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
+every step or announced mutation, the particles' with every push; a stamp is current when it equals
+its factor's epoch.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.
@@ -193,7 +196,7 @@ precision and 192 MiB in single, so a callback materializing a field-sized diagn
 third of a gigabyte; a number costs nothing worth counting.
 
 For scale: a velocity-only run under `TwoThirds` or `HouLi` carries six vector-shaped fields — four
-in spectral representation and two in physical — about 2.4 GiB at ``256^{3}`` in double precision,
+in spectral representation and two in physical — about 2.3 GiB at ``256^{3}`` in double precision,
 before the scalar-shaped registers. It carried ten before this design landed: two physical vectors
 existed only because a slot and its producer's register were separate arrays, a spectral one was the
 cache's private recovery scratch, and a fourth held the quadratic products that now form in place
@@ -315,7 +318,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\varphi`` | physical, grid | yes | yes | the tail recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
 | the maximum speed | one number | yes | yes | the tail reduction over the cached velocity; read by the next timestep choice |
-| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited charts — keeping both needs a product array the minimal-memory schedule does not carry |
+| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
@@ -390,5 +393,5 @@ completeness check, and the slot=register merge. The loop is the observation-fir
 observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
 stopping is the caller's decision on observables and the budget vocabulary is gone. What §1.3
 records as the storage decision — the nonlinear terms stay in the first stage because the in-place
-products would otherwise destroy the deposited charts — closes the list: the page and the code
+products would otherwise destroy the deposited fields — closes the list: the page and the code
 agree. The decision record is in the [architecture notes](architecture.md).

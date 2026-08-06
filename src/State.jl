@@ -168,7 +168,7 @@ end
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
 `scalar_variance`. The mean vanishes by construction: the envelope is zero at
-``\\boldsymbol{\\kappa}=\\boldsymbol 0``, and that mode's coefficient *is* the spatial mean
+``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
