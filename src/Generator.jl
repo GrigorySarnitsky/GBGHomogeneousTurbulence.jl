@@ -36,7 +36,7 @@ module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
-                          spectral_vector, physical_vector, spectral_scalar, physical_scalar
+                          new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing,
                  set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
@@ -94,17 +94,17 @@ end
 # translates a vector or scalar field alike.
 function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
   δ = 0.5 .* domain.grid.grid_spacing
-  reference = spectral_scalar(domain)
+  reference = new_scalar_field_spectral(domain)
   back = translation_kernel(reference, domain.multipliers, δ)
   return PhaseShiftBuffers(
     translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
     back,
     convolve(domain.dealias, back),                           # 𝔻 ∘ back — kilobytes, never a field
-    spectral_vector(domain),
-    physical_vector(domain), physical_vector(domain),
-    scalar ? spectral_scalar(domain) : nothing,
-    scalar ? spectral_scalar(domain) : nothing,
-    scalar ? physical_scalar(domain) : nothing,
+    new_vector_field_spectral(domain),
+    new_vector_field_physical(domain), new_vector_field_physical(domain),
+    scalar ? new_scalar_field_spectral(domain) : nothing,
+    scalar ? new_scalar_field_spectral(domain) : nothing,
+    scalar ? new_scalar_field_physical(domain) : nothing,
   )
 end
 
@@ -122,7 +122,7 @@ function _forcing_rate(domain::FixedDomain, forcing)
   end
   # A scalar field in spectral representation holding REAL values (the complex container is what the
   # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
-  return spectral_scalar(domain)
+  return new_scalar_field_spectral(domain)
 end
 
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
@@ -181,7 +181,7 @@ end
 
 ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false) =
   ResolvedGenerator(conditions,
-                    spectral_vector(domain),
+                    new_vector_field_spectral(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,

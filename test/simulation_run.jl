@@ -192,14 +192,14 @@ using Test
   @testset "derivative skewness" begin
     domain = FixedDomain(24, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
-    û = spectral_vector(domain)
+    û = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
     dealias!(û, domain)
     S0 = derivative_skewness(û, domain)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
-    state = ResolvedFields(û, spectral_scalar(domain))
+    state = ResolvedFields(û, new_scalar_field_spectral(domain))
     derived = ObservablesCache(domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions; scalar = true)

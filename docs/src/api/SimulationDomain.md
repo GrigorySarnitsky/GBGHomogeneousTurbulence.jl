@@ -39,12 +39,12 @@ Allocate one zeroed velocity, scalar, or second-order tensor field on the domain
 element type.
 
 ```@docs
-spectral_vector
-physical_vector
-spectral_scalar
-physical_scalar
-spectral_tensor
-physical_tensor
+new_vector_field_spectral
+new_vector_field_physical
+new_scalar_field_spectral
+new_scalar_field_physical
+new_tensor_field_spectral
+new_tensor_field_physical
 ```
 
 ## Dealias filtering

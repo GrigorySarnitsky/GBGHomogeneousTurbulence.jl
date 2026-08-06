@@ -14,7 +14,7 @@ using Test
   N = 16
   L = 2π
   domain = FixedDomain(N, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
-  û = spectral_vector(domain)
+  û = new_vector_field_spectral(domain)
   random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
@@ -26,12 +26,12 @@ using Test
     @test_throws ErrorException max_speed(derived)
     deposit!(derived, state, domain, buffers)
     u = velocity_physical(derived)
-    u_reference = physical_vector(domain)
-    velocity_to_physical!(u_reference, û, domain, spectral_vector(domain))
+    u_reference = new_vector_field_physical(domain)
+    velocity_to_physical!(u_reference, û, domain, new_vector_field_spectral(domain))
     @test field_data(u) == field_data(u_reference)                 # the deposit is the recovery
     @test velocity_physical(derived) === u                         # second read: same storage, no work
-    ω_reference = physical_vector(domain)
-    vorticity_to_physical!(ω_reference, û, domain, spectral_vector(domain))
+    ω_reference = new_vector_field_physical(domain)
+    vorticity_to_physical!(ω_reference, û, domain, new_vector_field_spectral(domain))
     @test field_data(vorticity_physical(derived)) == field_data(ω_reference)
     @test max_speed(derived) == max_speed(u_reference)             # the cached number is the reduction
   end
@@ -56,8 +56,8 @@ using Test
     deposit!(derived, state, domain, buffers)
     after = field_data(velocity_physical(derived))
     @test after != before                                          # the new deposit is the new field
-    u_reference = physical_vector(domain)
-    velocity_to_physical!(u_reference, û, domain, spectral_vector(domain))
+    u_reference = new_vector_field_physical(domain)
+    velocity_to_physical!(u_reference, û, domain, new_vector_field_spectral(domain))
     @test after == field_data(u_reference)
   end
 

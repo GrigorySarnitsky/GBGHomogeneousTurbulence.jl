@@ -28,7 +28,7 @@ side of the contract; a caller reads through the accessors and never deposits.
 module Cache
 
 using GBGPeriodicFields: point_values
-using ..SimulationDomain: FixedDomain, physical_vector, physical_scalar
+using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
        particle_velocities, resolved_fields_modified!
@@ -100,8 +100,8 @@ mutable struct ObservablesCache{PV, PS, TS}
 end
 
 ObservablesCache(domain::FixedDomain; scalar::Bool = false, trajectory_sample = nothing) =
-  ObservablesCache(physical_vector(domain), physical_vector(domain),
-                   scalar ? physical_scalar(domain) : nothing,
+  ObservablesCache(new_vector_field_physical(domain), new_vector_field_physical(domain),
+                   scalar ? new_scalar_field_physical(domain) : nothing,
                    trajectory_sample,
                    NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
                    NaN, NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)

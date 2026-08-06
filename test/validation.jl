@@ -24,7 +24,7 @@ end
   fp = flow_parameters(SIM)
   @test fp isa FlowParameters
   @test fp.viscosity == 0.02
-  ω̂ = spectral_vector(SIM.domain)
+  ω̂ = new_vector_field_spectral(SIM.domain)
   curl!(ω̂, SIM.state.velocity, SIM.domain.multipliers)
   @test fp.dissipation ≈ dissipation(ω̂, SIM.generator.conditions.viscosity)
   @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity) / 3)
@@ -38,14 +38,14 @@ end
   # because |κ×û|² = |κ|²|û|² − |κ·û|² and the projected dynamics keeps κ·û = 0 — so the second
   # route is exact on any state the solver produces, and the run layer measures ε through it.
   ν = SIM.generator.conditions.viscosity
-  ω̂ = spectral_vector(SIM.domain)
+  ω̂ = new_vector_field_spectral(SIM.domain)
   curl!(ω̂, SIM.state.velocity, SIM.domain.multipliers)
   @test dissipation(SIM.state.velocity, SIM.domain, ν) ≈ dissipation(ω̂, ν) rtol = 1e-12
 
   # The discarded term is not vacuous: break the solenoidal condition and the routes part company.
   # This is the negative control behind the docstring's warning — the Dirichlet route is a claim
   # about divergence-free fields, not an identity for an arbitrary vector field.
-  û = spectral_vector(SIM.domain)
+  û = new_vector_field_spectral(SIM.domain)
   copyto!(field_data(û), field_data(SIM.state.velocity))
   @views field_data(û)[:, :, :, 1] .*= 2                     # no longer divergence-free
   curl!(ω̂, û, SIM.domain.multipliers)

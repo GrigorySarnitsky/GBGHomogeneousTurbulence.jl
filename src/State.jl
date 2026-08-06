@@ -23,8 +23,8 @@ module State
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, spectral_vector, physical_vector,
-                          spectral_scalar, physical_scalar, _real_type
+using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_vector_field_physical,
+                          new_scalar_field_spectral, new_scalar_field_physical, _real_type
 
 export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
        velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
@@ -49,7 +49,7 @@ struct ResolvedFields{UH, PH}
 end
 
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
-  ResolvedFields(spectral_vector(domain), scalar ? spectral_scalar(domain) : nothing)
+  ResolvedFields(new_vector_field_spectral(domain), scalar ? new_scalar_field_spectral(domain) : nothing)
 
 
 """
@@ -130,7 +130,7 @@ function random_solenoidal_velocity!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
                                      spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
-  noise = physical_vector(domain)
+  noise = new_vector_field_physical(domain)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(1))...))
   to_spectral!(û, noise, domain.velocity_plans)
 
@@ -195,7 +195,7 @@ function random_scalar!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
-  noise = physical_scalar(domain)
+  noise = new_scalar_field_physical(domain)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(0))...))
   to_spectral!(φ̂, noise, domain.scalar_plans)
 

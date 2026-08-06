@@ -98,10 +98,10 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
-    û = spectral_vector(domain)
+    û = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     dealias!(û, domain)
-    state = ResolvedFields(û, spectral_scalar(domain))
+    state = ResolvedFields(û, new_scalar_field_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     derived = ObservablesCache(domain; scalar = true)
     deposit!(derived, state, domain, buffers)

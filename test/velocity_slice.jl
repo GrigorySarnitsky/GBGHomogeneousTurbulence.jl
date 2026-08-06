@@ -22,10 +22,10 @@ using Test
   integrator = IFRK2()
   generator = ResolvedGenerator(domain, conditions; scalar = true)
 
-  û = spectral_vector(domain)
+  û = new_vector_field_spectral(domain)
   random_solenoidal_velocity!(û, domain; kinetic_energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
   dealias!(û, domain)
-  φ̂ = spectral_scalar(domain)                          # zero scalar (passive ⇒ stays zero)
+  φ̂ = new_scalar_field_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
   state = ResolvedFields(û, φ̂)
   derived = ObservablesCache(domain; scalar = true)
   deposit!(derived, state, domain, buffers)

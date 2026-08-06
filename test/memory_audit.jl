@@ -406,9 +406,9 @@ const EPISODE_UNITS = [
     N = 32
     domain = FixedDomain(N, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     unit = 8 * N^3
-    û = spectral_vector(domain)
+    û = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂ = spectral_scalar(domain)
+    φ̂ = new_scalar_field_spectral(domain)
     random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
     episodes = Dict(

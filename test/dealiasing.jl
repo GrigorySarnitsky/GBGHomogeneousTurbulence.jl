@@ -75,7 +75,7 @@ using Test
     d2  = FixedDomain(2Np, L; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)                                        # 2N oracle grid (raw product, no dealias)
     SD  = GBGIsotropicTurbulence.SimulationDomain
     GEN = GBGIsotropicTurbulence.Generator
-    û = SD.spectral_vector(dps)
+    û = SD.new_vector_field_spectral(dps)
     random_solenoidal_velocity!(û, dps; kinetic_energy = 0.5, peak_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
     half = Np ÷ 2
     mapidx(i) = i ≤ half + 1 ? i : i + Np                           # fft-freq index map, N → 2N
@@ -86,22 +86,22 @@ using Test
     restrict(B) = [B[i1, mapidx(i2), mapidx(i3), c] / 8
                    for i1 in 1:half+1, i2 in 1:Np, i3 in 1:Np, c in 1:3]
     function nlt(domain, ûf, phaseshift::Bool)
-      u = SD.physical_vector(domain); ω = SD.physical_vector(domain)
-      tmp = SD.spectral_vector(domain)
+      u = SD.new_vector_field_physical(domain); ω = SD.new_vector_field_physical(domain)
+      tmp = SD.new_vector_field_spectral(domain)
       velocity_to_physical!(u, ûf, domain, tmp)
       vorticity_to_physical!(ω, ûf, domain, tmp)
-      out = SD.spectral_vector(domain)
+      out = SD.new_vector_field_spectral(domain)
       if phaseshift
         unforced = FlowConditions(viscosity = 1.0, schmidt = 1.0,
                                   velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
         velocity_rhs!(out, ResolvedGenerator(domain, unforced), ûf, u, ω, domain)
       else
-        GEN._velocity_lamb!(out, u, ω, domain, SD.spectral_vector(domain))   # consumes ω (decision 41)
+        GEN._velocity_lamb!(out, u, ω, domain, SD.new_vector_field_spectral(domain))   # consumes ω (decision 41)
       end
       field_data(out)
     end
     Nps, Nraw = nlt(dps, û, true), nlt(dps, û, false)
-    û2 = SD.spectral_vector(d2); field_data(û2) .= embed(field_data(û))
+    û2 = SD.new_vector_field_spectral(d2); field_data(û2) .= embed(field_data(û))
     oracle = restrict(nlt(d2, û2, false))
     m = dps.multipliers   # |κ|² from the axis vectors — the stored array is gone (decision 38)
     κ² = reshape(m.squared_wavenumber_1, :, 1, 1) .+ reshape(m.squared_wavenumber_2, 1, :, 1) .+
@@ -120,9 +120,9 @@ using Test
     # assembly after the velocity update degrades the scalar to first order (ratio ≈ 2, not ≈ 8).
     Nc = 16
     domain = FixedDomain(Nc, L; element_type = Float64, dealiasing = PhaseShift(), array_type = Array)
-    û0 = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
+    û0 = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.spectral_scalar(domain)
+    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
@@ -131,8 +131,8 @@ using Test
       b = allocate_buffers(integrator, domain; scalar = true)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       derived = ObservablesCache(domain; scalar = true)
-      û = GBGIsotropicTurbulence.SimulationDomain.spectral_vector(domain)
-      φ̂ = GBGIsotropicTurbulence.SimulationDomain.spectral_scalar(domain)
+      û = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
+      φ̂ = GBGIsotropicTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
       copyto!(field_data(û), field_data(û0))
       copyto!(field_data(φ̂), field_data(φ̂0))
       state = ResolvedFields(û, φ̂)

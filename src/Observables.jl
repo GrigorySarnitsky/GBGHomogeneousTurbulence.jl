@@ -30,7 +30,7 @@ module Observables
 
 using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
-using ..SimulationDomain: FixedDomain, physical_tensor
+using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 import ..Cache: max_speed                 # one generic: the reduction here, the cached read in Cache
 
 export kinetic_energy, dissipation, max_speed,
@@ -194,7 +194,7 @@ gate of the warm-up detector.
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
-  strain_physical = physical_tensor(domain)
+  strain_physical = new_tensor_field_physical(domain)
   to_physical!(strain_physical, strain, domain.tensor_plans)            # S in physical space (Ŝ is consumed)
   ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
   ss <= 0 && return 0.0

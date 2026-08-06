@@ -1445,10 +1445,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     transforms froze **identical** in every cell. Public-surface consequences: the accessors are the
     noun-first checked reads `velocity_physical` / `vorticity_physical` / `scalar_physical` and the
     cached `max_speed` (one generic with the `Observables` reduction), `physical_velocity` /
-    `physical_vorticity` / `spectral_scratch` are gone, and the allocator family was renamed
-    representation-first (`spectral_scalar`, `physical_scalar`, `spectral_tensor`,
-    `physical_tensor`) so the shape-named allocators and the physics-named observables accessors
-    cannot collide.
+    `physical_vorticity` / `spectral_scratch` are gone, and the allocator family was renamed so the
+    allocators and the physics-named observables accessors cannot collide — settled (user, 2026-08)
+    as the constructor form `new_<Type>` after the PF field types: `new_vector_field_spectral`,
+    `new_vector_field_physical`, `new_scalar_field_spectral`, `new_scalar_field_physical`,
+    `new_tensor_field_spectral`, `new_tensor_field_physical` — the allocation verb explicit and the
+    returned type readable straight off the name.
 
 41. **(2026-08) The quadratic products form in place over an operand's register: `product_physical`
     is deleted.** The backend's index-shuffling kernels are alias-safe by construction (each output

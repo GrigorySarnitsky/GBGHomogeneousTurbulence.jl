@@ -15,8 +15,8 @@ using Test
 function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
   derived = ObservablesCache(domain; scalar = true)
-  û = spectral_vector(domain)
-  φ̂ = spectral_scalar(domain)
+  û = new_vector_field_spectral(domain)
+  φ̂ = new_scalar_field_spectral(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   state = ResolvedFields(û, φ̂)
@@ -42,8 +42,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "diffusion exactness (u = 0)" begin
     Sc = 0.7
     κ = ν / Sc
-    û0 = spectral_vector(domain)                                   # zero velocity
-    φ̂0 = spectral_scalar(domain)
+    û0 = new_vector_field_spectral(domain)                                   # zero velocity
+    φ̂0 = new_scalar_field_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(3))
     conditions = FlowConditions(viscosity = ν, schmidt = Sc, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())               # unforced
     dt = 0.02
@@ -60,10 +60,10 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   end
 
   @testset "temporal convergence (RK3, coupled)" begin
-    û0 = spectral_vector(domain)
+    û0 = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
     dealias!(û0, domain)
-    φ̂0 = spectral_scalar(domain)
+    φ̂0 = new_scalar_field_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())                             # Sc = 1, unforced
 
@@ -78,10 +78,10 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   end
 
   @testset "mean conservation (conservative form)" begin
-    û0 = spectral_vector(domain)
+    û0 = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(5))
     dealias!(û0, domain)
-    φ̂0 = spectral_scalar(domain)
+    φ̂0 = new_scalar_field_spectral(domain)
     random_scalar!(φ̂0, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(6))
     field_data(φ̂0)[1, 1, 1] = 3.0 + 0.0im                    # impose a nonzero mean (the k=0 mode)
     mean_before = field_data(φ̂0)[1, 1, 1]
@@ -95,12 +95,12 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "scalar dissipation = Dirichlet energy" begin
     Sc = 0.7
     κ = ν / Sc
-    φ̂ = spectral_scalar(domain)
+    φ̂ = new_scalar_field_spectral(domain)
     random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 3.0, rng = MersenneTwister(11))
 
     # ground truth: 2κ⟨|∇φ|²⟩ from the explicit physical gradient (the pre-fusion computation)
-    grad_spectral = spectral_vector(domain)
-    grad_physical = physical_vector(domain)
+    grad_spectral = new_vector_field_spectral(domain)
+    grad_physical = new_vector_field_physical(domain)
     gradient!(grad_spectral, φ̂, domain.multipliers)
     to_physical!(grad_physical, grad_spectral, domain.velocity_plans)
     expected = 2 * κ * inner(grad_physical, grad_physical)
