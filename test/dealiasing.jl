@@ -46,7 +46,7 @@ using Test
                      velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(7))
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)    # the domain-aware CFL flowed in
-    run!(sim; steps = 10)
+    run!(s -> current_step(s) < 10, sim)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
     # the resolution front door threads `dealiasing` through to the domain
     sim2 = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = HouLi(), scalar = false,
@@ -166,7 +166,7 @@ using Test
     @test sim.domain.dealiasing isa PhaseShift
     @test sim.generator.phase_shift !== nothing                      # the displaced-evaluation scratch was built
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)
-    run!(sim; steps = 8)
+    run!(s -> current_step(s) < 8, sim)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
     @test isfinite(scalar_variance(sim.state.scalar)) && scalar_variance(sim.state.scalar) > 0
   end

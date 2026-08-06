@@ -32,7 +32,7 @@ contains the **step**, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` an
 divided into the **stages** of the time scheme; the particle push and the deposits sit in the
 iteration but outside the step. At each boundary ``t_n``, before any iteration runs, sits the
 **observation**: the caller's callback reads the state and the cache, records what it wants, and
-decides whether the run continues `(not yet — §3.2)`. Every rule of the cache architecture below
+decides whether the run continues. Every rule of the cache architecture below
 follows from one design choice, stated here rather than derived:
 
 > **Caching an observable adds nothing to what an iteration computes, moves, or stores.**
@@ -123,7 +123,7 @@ schedule: the maximum speed is reduced from the just-deposited velocity for the 
 timestep choice, and the trajectory sample is interpolated from that velocity at each particle's new
 position for the next push's predictor.
 
-**The observation comes before the iteration** `(not yet — §3.2)`. At each boundary the callback reads
+**The observation comes before the iteration.** At each boundary the callback reads
 what it wants and answers whether the run continues; only then does the next iteration run. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
 instance, is a callback that accumulates ``\Delta t/\tau`` and says stop. Every boundary a run
@@ -362,7 +362,9 @@ second-order accuracy; it belongs to no instant along the trajectory and is not 
 
 ### 3.1 The calls
 
-[`velocity_physical`](@ref), [`vorticity_physical`](@ref), and [`scalar_physical`](@ref) return the
+[`run!`](@ref) is the observation-first loop: at every boundary the callback reads the run and its
+return decides continuation. [`velocity_physical`](@ref), [`vorticity_physical`](@ref), and
+[`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
 no deposit is current. [`deposit!`](@ref) closes an iteration (the run layer's `advance!` calls it
 after every step; the `Simulation` constructor makes the seeding deposit), and
@@ -382,16 +384,16 @@ cache  = ObservablesCache(domain; scalar = true)   # the slots follow the config
 The cache itself is built as §§1–2 describe: automatic contents, tail deposits stamped at the new
 boundary — the trajectory sample included, stamped against both epochs — three-valued stamps that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the boundary
-completeness check, and the slot=register merge. Two gaps remain, each a piece of the run layer's
-redesign rather than of the cache:
+completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
+`run!(callback, sim)` observes every boundary the run reaches — ``n`` iterations, ``n + 1``
+observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
+stopping is the caller's decision on observables and the budget vocabulary is gone. One gap
+remains:
 
-- **Stopping belongs to `run!`, not to the observation.** The loop takes its budget and stopping
-  condition as arguments (`turnovers`, `time`, `steps`, `stop`), measures ``\varepsilon`` and ``k``
-  itself when the budget or the stopping condition needs them, and ignores the callback's return
-  value, so a callback cannot stop the run.
-- **The callback fires only after the step.** A run of ``n`` iterations offers ``n`` observations of
-  its ``n+1`` boundaries; the initial state — the seeded spectrum a validation run most wants — is
-  never observed. With it comes the relocated first-stage evaluation of §1.3: the two dealiased
-  nonlinear terms are still assembled at the next step's first stage, not deposited at the tail.
+- **The relocated first-stage evaluation of §1.3 stops at the recoveries.** The two dealiased
+  nonlinear terms are still assembled at the next step's first stage, not deposited at the tail, so
+  the ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})`` and
+  ``-\nabla\cdot(\boldsymbol{u}\varphi)`` rows of §2.4 — and the displaced boundary fields a
+  `PhaseShift` tail would leave with them — are design, not code.
 
-The decisions behind each are in the [architecture notes](architecture.md).
+The decision record is in the [architecture notes](architecture.md).

@@ -37,9 +37,14 @@ using GBGIsotropicTurbulence
 sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
                                               # ν is chosen from the resolution criterion
 warmup!(sim)                                  # spin up to statistical stationarity
-run!(sim; turnovers = 5)                      # advance five eddy-turnover times
+
+t_end = current_time(sim) + 5.0               # observe and advance: the callback reads the run,
+run!(sim) do s                                # records what it wants, and decides continuation
+    current_time(s) < t_end
+end
 
 kinetic_energy(sim.state.velocity)            # read a measured observable off the state
+velocity_physical(sim)                        # a cached boundary observable (the physical velocity)
 flow_parameters(sim)                          # the run's measured flow state
 ```
 

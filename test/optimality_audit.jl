@@ -138,7 +138,8 @@ end
 #   deposit!                (src/Propagator.jl)    — the tail max-speed reduction, read back into the
 #                                                    cache's host number (cfl_timestep then does
 #                                                    scalar arithmetic on it — no crossing of its own)
-#   _turnover_time          (src/SimulationRun.jl) — dissipation and kinetic_energy, then ε > 0 and k/ε
+#   StationarityCriterion   (src/SimulationRun.jl) — the packaged observation's ε and k reductions
+#                                                    (a turnover-budget callback pays the same two)
 #   apply_forcing!          (src/Forcing.jl)       — BandRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
 #   set_forcing_rate!       (src/Forcing.jl)       — ConstantPower's band observable → the amplitude

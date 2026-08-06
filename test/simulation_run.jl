@@ -24,16 +24,27 @@ using Test
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
     @test isfinite(scalar_variance(sim.state.scalar)) && scalar_variance(sim.state.scalar) > 0
 
-    warmup!(sim; turnovers = 2)
+    # A fixed eddy-turnover budget is a three-line observation: accumulate Δt·ε/k, stop at the target.
+    let elapsed = Ref(0.0), last_t = Ref(current_time(sim))
+      run!(sim) do s
+        ε = dissipation(s.state.velocity, s.domain, s.generator.conditions.viscosity)
+        elapsed[] += (current_time(s) - last_t[]) * ε / kinetic_energy(s.state.velocity)
+        last_t[] = current_time(s)
+        elapsed[] < 2.0
+      end
+    end
     @test current_step(sim) > 0 && current_time(sim) > 0
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
 
-    samples = Float64[]
+    samples = Float64[]                                        # a coarser cadence is the callback's own business
     t0 = current_time(sim)
-    run!(sim; time = 0.3, every = 0.05) do s
-      push!(samples, kinetic_energy(s.state.velocity))
+    let next = Ref(t0)
+      run!(sim) do s
+        current_time(s) ≥ next[] && (push!(samples, kinetic_energy(s.state.velocity)); next[] += 0.05)
+        current_time(s) < t0 + 0.3
+      end
     end
-    @test !isempty(samples) && all(isfinite, samples)          # the interval callback fired
+    @test !isempty(samples) && all(isfinite, samples)          # the cadenced observation fired
     @test current_time(sim) ≥ t0 + 0.3
     @test all(0 .<= particle_positions(sim.tracers) .< L)        # tracers advected, still in the box
     @test isfinite(kinetic_energy(sim.state.velocity)) && isfinite(scalar_variance(sim.state.scalar))
@@ -43,7 +54,7 @@ using Test
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
                      scalar = false, velocity_forcing = NoForcing(), rng = MersenneTwister(2))
     k0 = kinetic_energy(sim.state.velocity)
-    run!(sim; steps = 40)
+    run!(s -> current_step(s) < 40, sim)
     @test current_step(sim) == 40
     @test isfinite(kinetic_energy(sim.state.velocity))
     @test kinetic_energy(sim.state.velocity) < k0                             # unforced ⇒ decays
@@ -78,13 +89,15 @@ using Test
     @test isapprox(sum(last(energy_spectrum(sim2.state.velocity, sim2.domain))), kinetic_energy(sim2.state.velocity); rtol = 1e-5)
   end
 
-  @testset "callback fires every step without `every`" begin
+  @testset "the observation fires at every boundary — n iterations, n+1 observations" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(7))
     count = Ref(0)
-    run!(sim; steps = 5) do _
+    run!(sim) do s
       count[] += 1
+      current_step(s) < 5
     end
-    @test count[] == 5
+    @test count[] == 6                              # t₀ and the stopping boundary both observed
+    @test current_step(sim) == 5
   end
 
   @testset "bring-your-own domain + fixed dt" begin
@@ -98,14 +111,14 @@ using Test
   @testset "Float32 case runs" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; element_type = Float32,
                      scalar = false, rng = MersenneTwister(4))
-    run!(sim; steps = 10)
+    run!(s -> current_step(s) < 10, sim)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
   end
 
-  @testset "stopping-condition guard" begin
+  @testset "the observation must decide — a non-Bool return throws" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(5))
-    @test_throws ArgumentError run!(sim)                                  # none given
-    @test_throws ArgumentError run!(sim; steps = 3, time = 0.1)           # two given
+    @test_throws ArgumentError run!(s -> nothing, sim)     # recorded but did not decide
+    @test current_step(sim) == 0                           # nothing advanced
   end
 
   @testset "domain-free forcing spec" begin
@@ -117,7 +130,7 @@ using Test
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                      velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(20))
-    run!(sim; steps = 5)
+    run!(s -> current_step(s) < 5, sim)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
   end
 
@@ -155,9 +168,10 @@ using Test
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
     @test current_step(sim) > 0
-    # explicit budget still runs the fixed-budget path
+    # the criterion is an ordinary run! observation
     sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(22))
-    warmup!(sim2; turnovers = 2)
+    run!(StationarityCriterion(; gate_skewness = false, min_turnovers = 1, window_turnovers = 1,
+                               tol = 0.5, max_turnovers = 4), sim2)
     @test current_step(sim2) > 0
   end
 

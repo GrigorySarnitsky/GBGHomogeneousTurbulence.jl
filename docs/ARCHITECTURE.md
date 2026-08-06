@@ -57,21 +57,26 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
 # (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).
 warmup!(sim)
 
-# Advance and measure. The callback fires on a fixed interval with the current state.
-run!(sim; turnovers = 20, every = 0.1) do s
+# Observe and advance. The callback fires at every boundary with the current run; it records
+# what it wants and its return decides continuation — stopping is the caller's decision.
+t_end = current_time(sim) + 20.0
+run!(sim) do s
     accumulate_statistics!(my_stats, s)
+    current_time(s) < t_end
 end
 ```
 
-The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each step from
-the advective-CFL condition (§4.5), reads the physical fields through the `ObservablesCache` observation
-cache (§4.1 — recomputed exactly when stale, so nothing must be manually refreshed), and
-treats **warm-up as a first-class verb**. By default `warmup!` advances until the flow is statistically
-stationary, watching the running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness
-``S(t)`` — the small-scale signals that settle last — rather than the kinetic energy a constant-energy
-forcing clamps flat; a fixed turnover, time, or step budget is the explicit alternative, and §4.7 gives
-the exact stopping test. A forced flow must reach statistical stationarity before a structure function or
-a PDF taken over it means anything.
+The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each
+iteration from the advective-CFL condition over the cached maximum speed (§4.5), serves the boundary
+observables from the deposit-driven `ObservablesCache` (§4.1), and runs the **observation-first
+loop**: at every boundary the run reaches — ``n`` iterations, ``n+1`` observations, the seeded
+``t_0`` included — the callback reads the run and decides whether it continues (§11 decision 43).
+Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
+advances until the flow is statistically stationary, watching the running dissipation
+``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` — the small-scale signals that
+settle last — rather than the kinetic energy a constant-energy forcing clamps flat; §4.7 gives the
+exact stopping test. A forced flow must reach statistical stationarity before a structure function
+or a PDF taken over it means anything.
 
 The composable pieces stay fully exposed: a study that needs to run the loop by hand, swap a stage, or
 interleave a bespoke measurement drops straight to §4. The run layer is a convenience over that machinery,
@@ -409,14 +414,22 @@ Over it:
   scheme. The viscosity is set from the grid by default — the highest Reynolds number consistent with the
   chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
   Setup is a few numbers.
-- **`advance!(sim; dt)`** and **`run!(sim; ...)`** own the time loop: choose ``\Delta t`` from the
-  scheme's CFL and the current `max_speed` (read through the velocity chart), record the start-of-step
-  velocity along any trajectories, `step!`, push the tracers on the two endpoint velocities the
-  accessors serve, and fire a user callback on a fixed time interval.
-- **`warmup!(sim; ...)`** advances to statistical stationarity — by default until the running dissipation
-  ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` have both plateaued (a trailing-window
-  flatness test), reading ``\varepsilon`` rather than the clampable ``k(t)``, and, when the scalar is
-  forced, until ``\langle\varphi^2\rangle`` settles too; or a fixed turnover, time, or step budget.
+- **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
+  maximum speed (scalar arithmetic — the previous tail measured it), `step!`, the tail `deposit!`,
+  the tracer push on the sample and the deposited endpoint field, the new sample, and the boundary
+  completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
+  observes every boundary (the seeded ``t_0`` included) and its `Bool` return decides continuation —
+  stopping is the caller's decision on observables, never a run option (§11 decision 43).
+- **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
+  running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` (a
+  trailing-window flatness test, reading ``\varepsilon`` rather than the clampable ``k(t)``; when
+  the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
+  its one-line sugar. A fixed budget is a three-line callback, not a run option.
+- **`velocity_spectral(sim)`**, **`scalar_spectral(sim)`**, and the cache accessors
+  (`velocity_physical`, `vorticity_physical`, `scalar_physical`, `max_speed`,
+  `particle_velocities`, `particle_positions`) form the uniform read surface: a function names what
+  the run holds, wherever it lives — reading needs no knowledge of the state/cache split, while
+  *writing* stays on the dot path (`sim.state`), where the danger demands the knowledge.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity)`, `dissipation` on the recovered vorticity) the
   current-state diagnostics, for a callback to read.
@@ -1475,6 +1488,26 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
     would approximate the measured observable at ``O(\Delta t^2)``; never approximate the thing you
     measure).
+
+43. **(2026-08) The loop is observation-first, and stopping is the caller's decision on
+    observables.** `run!(callback, sim)` observes every boundary the run reaches — ``n`` iterations,
+    ``n+1`` observations, the seeded ``t_0`` included (the boundary a validation run most wants was
+    previously never observed) — and the callback's `Bool` return decides continuation; a non-`Bool`
+    return throws, so the decision cannot be left implicit. The stopping vocabulary
+    (`turnovers | time | steps | stop`, and the `every` cadence) leaves `run!` entirely: a budget is
+    a callback that accumulates what it budgets, a cadence is the callback's own business, and with
+    them go the loop's internal ``\varepsilon``/``k`` measurements — the iteration is closed
+    (everything it computes is a function of configuration and state, decision 40's automatic
+    contents depend on it). The one packaged observation is `StationarityCriterion` — the
+    researched spin-up judgment (``\varepsilon``-flatness with the skewness and scalar-variance
+    gates, the give-up cap) as a callable carrying its own observation state — with `warmup!` kept
+    as its one-line sugar. The uniform read surface completes the redesign: `velocity_spectral` /
+    `scalar_spectral` read the state itself, the cache accessors the boundary observables, and
+    `particle_positions` the probes' state — a **function names what the run holds, wherever it
+    lives** (reading needs no knowledge of the state/cache split), while writing stays on the dot
+    path, where the danger demands the knowledge. An accessor exists exactly for what the run holds:
+    `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol\omega}`` is
+    materialized nowhere), and a `MethodError` is the honest answer.
 
 ---
 

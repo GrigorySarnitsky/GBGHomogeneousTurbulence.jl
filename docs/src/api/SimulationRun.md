@@ -18,13 +18,24 @@ Simulation
 
 ## Advancing the run
 
-Advance one step, run to a stopping condition (with an optional per-interval callback), then spin up
-to statistical stationarity.
+Advance one iteration, or observe-and-advance until the callback stops the run; the packaged
+stationarity observation and its sugar spin a fresh run up to measurement readiness.
 
 ```@docs
 advance!
 run!
+StationarityCriterion
 warmup!
+```
+
+## The state's uniform reads
+
+The evolving state itself, read as functions of the run (the cached boundary observables —
+`velocity_physical`, `particle_velocities`, … — live on the [Cache](Cache.md) page).
+
+```@docs
+velocity_spectral
+scalar_spectral
 ```
 
 ## Clock accessors

@@ -19,8 +19,11 @@
 
 The run layer:
 - [`Simulation`](@ref) — the assembled state of a case.
-- [`advance!`](@ref), [`run!`](@ref), [`warmup!`](@ref) — advance one step, advance to a stopping
-  condition (with an optional per-interval callback), and spin up to statistical stationarity.
+- [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
+  callback stops the run (the callback is the observation, and its return decides continuation).
+- [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
+  observation, and its one-line sugar.
+- [`velocity_spectral`](@ref), [`scalar_spectral`](@ref) — the uniform reads of the state itself.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
 - [`validate_spectrum`](@ref) — compare the run's measured energy spectrum against a `Phenomenology` model.
@@ -43,12 +46,14 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, record_trajectory_velocity!, advect!
+import ..Particles: particle_positions
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
-export Simulation, advance!, run!, warmup!, current_time, current_step, flow_parameters,
-       validate_spectrum
+export Simulation, advance!, run!, warmup!, StationarityCriterion,
+       velocity_spectral, scalar_spectral,
+       current_time, current_step, flow_parameters, validate_spectrum
 
 
 mutable struct Clock
@@ -240,6 +245,36 @@ end
 # user's callback receives `sim` and reads the run, never the machinery path inside it.)
 
 
+"""
+    velocity_spectral(sim)
+
+The velocity ``\\hat{\\boldsymbol{u}}`` in spectral representation — the evolving state itself,
+always current (it is what the run advances, not a cached observable). Treat it as read-only: to
+mutate the state out of band, write through `sim.state` and announce it with
+[`resolved_fields_modified!`](@ref).
+"""
+velocity_spectral(sim::Simulation) = sim.state.velocity
+
+
+"""
+    scalar_spectral(sim)
+
+The scalar ``\\hat\\varphi`` in spectral representation — the evolving state itself, always current,
+with exactly [`velocity_spectral`](@ref)'s contract. Throws an `ArgumentError` when the run carries
+no passive scalar.
+"""
+function scalar_spectral(sim::Simulation)
+  sim.state.scalar === nothing &&
+    throw(ArgumentError("this run carries no passive scalar"))
+  return sim.state.scalar
+end
+
+
+particle_positions(sim::Simulation) =
+  sim.tracers === nothing ?
+    throw(ArgumentError("this run advects no tracers")) : particle_positions(sim.tracers)
+
+
 velocity_physical(sim::Simulation) = velocity_physical(sim.derived)
 vorticity_physical(sim::Simulation) = vorticity_physical(sim.derived)
 scalar_physical(sim::Simulation) = scalar_physical(sim.derived)
@@ -335,14 +370,6 @@ The number of steps `sim` has taken.
 current_step(sim::Simulation) = sim.clock.step
 
 
-# The eddy-turnover time τ = k/ε — the unit the warm-up and run budgets count in. ε is passed in
-# rather than measured here: the caller needs it for the stationarity detector as well, and both
-# read the same state, so measuring it once keeps one reduction (and, on a device, one blocking
-# readback) out of every iteration of a budgeted loop.
-_turnover_time(sim::Simulation, ε::Real) =
-  ε > 0 ? Float64(kinetic_energy(sim.state.velocity) / ε) : 1.0
-
-
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
 # makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
 # deposited number — the previous tail measured it — so choosing Δt is scalar arithmetic, not a pass.
@@ -391,70 +418,51 @@ function advance!(sim::Simulation; dt = nothing)
 end
 
 
-# Shared loop: advance until the single stopping condition is met, firing `callback(sim)` after each
-# step (or once per `every` time units, if given).
-function _run_loop!(sim::Simulation, callback; turnovers = nothing, time = nothing,
-                 steps = nothing, every = nothing, stop = nothing)
-  if stop === nothing
-    count(!isnothing, (turnovers, time, steps)) == 1 ||
-      throw(ArgumentError("give exactly one stopping condition: `turnovers`, `time`, or `steps`"))
-  end
-
-  target_time = time  === nothing ? nothing : sim.clock.time + Float64(time)
-  target_step = steps === nothing ? nothing : sim.clock.step + Int(steps)
-  target_turn = turnovers === nothing ? nothing : Float64(turnovers)
-  elapsed_turn = 0.0
-  next_output = every === nothing ? nothing : sim.clock.time + Float64(every)
-
-  while true
-    target_time !== nothing && sim.clock.time ≥ target_time && break
-    target_step !== nothing && sim.clock.step ≥ target_step && break
-    target_turn !== nothing && elapsed_turn ≥ target_turn && break
-    # One ε per iteration, shared by the two consumers below: nothing between them advances the
-    # state, so a second measurement would return the same number at the price of another reduction.
-    ε = (target_turn === nothing && stop === nothing) ? nothing :
-        dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
-    stop !== nothing && stop(sim, elapsed_turn, ε) && break
-    τ = ε === nothing ? nothing : _turnover_time(sim, ε)
-    Δt = cfl_timestep(sim)
-    advance!(sim; dt = Δt)
-    τ === nothing || (elapsed_turn += Δt / τ)
-
-    if callback !== nothing
-      if every === nothing
-        callback(sim)
-      elseif sim.clock.time ≥ next_output
-        callback(sim)
-        next_output += Float64(every)
-      end
-    end
-  end
-  return sim
-end
-
-
 """
-    run!(sim; turnovers | time | steps, every = nothing)
-    run!(sim; ...) do sim … end
+    run!(callback, sim)
+    run!(sim) do sim … end
 
-Advance `sim` until exactly one stopping condition is met — a number of eddy-turnover times
-(`turnovers`, in units of ``k/\\varepsilon``), a span of simulation `time`, or a number of `steps` —
-and return it. A callback (the `do` block, or a first positional function) fires with the current
-`Simulation` after every step, or once per `every` units of simulation time if `every` is given —
-the place to stream statistics along the run.
+Observe and advance `sim` until the observation stops it, and return it. At every boundary the run
+reaches — the seeded initial state included — `callback(sim)` **observes** the run: it reads the
+state and the cached observables, records what it wants, and returns `true` to continue or `false`
+to stop (any other return throws — the decision may not be left implicit). Only then does the next
+iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the tail
+deposits. A run of ``n`` iterations therefore observes ``n + 1`` boundaries — the first before any
+step, the last after the final one, with statistics recorded before the stop.
+
+Stopping is the observation's decision on observables, never a run option: a budget is a callback
+that accumulates what it budgets. A span of simulation time compares [`current_time`](@ref) against
+a target; a step budget compares [`current_step`](@ref); an eddy-turnover budget accumulates
+``\\Delta t\\,\\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
+packaged [`StationarityCriterion`](@ref). Whatever the callback needs beyond the cached observables
+it computes itself, at its own cadence, with the exported reductions and recoveries.
 
 # Examples
 ```julia
-run!(sim; turnovers = 10)                        # advance ten eddy-turnover times
-
-history = Float64[]                              # sample the kinetic energy every 0.1 time units
-run!(sim; time = 5.0, every = 0.1) do s
-    push!(history, kinetic_energy(s.state.velocity))
+run!(sim) do s
+    current_time(s) < 5.0                        # a span of simulation time
 end
+
+history = Float64[]                              # record k at every boundary, stop after 200 steps
+run!(sim) do s
+    push!(history, kinetic_energy(s.state.velocity))
+    current_step(s) < 200
+end
+
+run!(StationarityCriterion(), sim)               # spin up to statistical stationarity
 ```
 """
-run!(sim::Simulation; kwargs...) = _run_loop!(sim, nothing; kwargs...)
-run!(callback, sim::Simulation; kwargs...) = _run_loop!(sim, callback; kwargs...)
+function run!(callback, sim::Simulation)
+  while true
+    keep = callback(sim)
+    keep isa Bool ||
+      throw(ArgumentError("the observation callback must return a Bool — true to continue the " *
+                          "run, false to stop it; it returned a $(typeof(keep))"))
+    keep || break
+    advance!(sim)
+  end
+  return sim
+end
 
 
 # Stationarity detector. Warm-up completes when the running dissipation ``ε(t)`` — and, for a forced
@@ -547,52 +555,103 @@ _scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.generato
 
 
 """
+    StationarityCriterion(; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
+                          window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
+                          max_turnovers = 60)
+
+The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
+statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
+spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement on any freshly
+seeded run; write your own callback instead when the transient length is known (a fixed budget is a
+three-line callback — see `run!`).
+
+At each boundary it measures the dissipation ``\\varepsilon`` (one reduction — the small scales
+settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
+clamps ``k`` flat and a fixed-injection forcing makes it ring), accumulates the eddy-turnover clock
+``\\Delta t\\,\\varepsilon/k``, and tests flatness over a trailing window; it stops the run when
+every gate holds, or gives up with a warning at `max_turnovers`.
+
+- `gate_scalar` — when the run's scalar is forced, also require the scalar variance
+  ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
+  scalar has no stationary state and is never gated).
+- `gate_skewness` — also require the velocity-derivative skewness to have plateaued **and** reached
+  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal: a
+  random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
+  ``S \\approx -0.5``. The transform-heavy skewness is sampled at the storage cadence, not every
+  boundary.
+- `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
+  times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
+  trailing `window_turnovers`, relative drift below `tol`.
+- `skew_floor` — the minimum ``\\lvert S\\rvert`` for a plateau to count as developed turbulence.
+- `max_turnovers` — the give-up cap: reaching it stops the run with a warning rather than spinning
+  forever.
+
+The criterion carries its own observation state (the sampled signals and the turnover clock), so
+build a fresh one per run.
+
+# Fields
+The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn,
+last_time, started)` is internal: `monitor` holds the sampled signals and gates, `max_turnovers`
+the give-up cap, `gate_scalar` the requested scalar gate (applied only when the run's scalar is
+forced), and the remaining fields the turnover clock's state.
+"""
+mutable struct StationarityCriterion
+  const monitor::StationarityMonitor
+  const max_turnovers::Float64
+  const gate_scalar::Bool
+  elapsed_turn::Float64
+  last_time::Float64
+  started::Bool
+end
+
+function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool = true,
+                               min_turnovers::Real = 5, window_turnovers::Real = 4,
+                               tol::Real = 0.05, skew_floor::Real = 0.1,
+                               max_turnovers::Real = 60)
+  monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
+                                gate_scalar, gate_skew = gate_skewness, skew_floor)
+  return StationarityCriterion(monitor, Float64(max_turnovers), gate_scalar, 0.0, NaN, false)
+end
+
+function (criterion::StationarityCriterion)(sim::Simulation)
+  if !criterion.started
+    # The scalar gate binds only when the run's scalar is forced — resolved at the first boundary,
+    # where the criterion first sees the run it observes.
+    criterion.monitor.gate_scalar = criterion.gate_scalar && _scalar_forced(sim)
+    criterion.last_time = current_time(sim)
+    criterion.started = true
+  end
+  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
+  Δt = current_time(sim) - criterion.last_time
+  criterion.last_time = current_time(sim)
+  ε > 0 && (criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity)))
+  _observe_and_test!(criterion.monitor, sim, criterion.elapsed_turn, ε) && return false
+  if criterion.elapsed_turn ≥ criterion.max_turnovers
+    @warn "StationarityCriterion: hit the max_turnovers = $(criterion.max_turnovers) cap without detecting stationarity"
+    return false
+  end
+  return true
+end
+
+
+"""
     warmup!(sim; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
             window_turnovers = 4, tol = 0.05, skew_floor = 0.1, max_turnovers = 60)
-    warmup!(sim; turnovers | time | steps)
 
-Spin `sim` up to a statistically stationary state before measurement, and return it. By default it
-**detects stationarity**: it advances until the running dissipation ``\\varepsilon(t)`` stops drifting
-— a two-half-window mean test over the trailing `window_turnovers` eddy-turnover times, relative drift
-below `tol`, not tested before `min_turnovers` (past the start-up overshoot) — and gives up at
-`max_turnovers` with a warning. ``\\varepsilon`` (the small scales, which settle last) is read rather
-than the kinetic energy, which a constant-energy forcing clamps flat and a fixed-injection forcing
-makes ring.
-
-Two stricter gates are on by default. With `gate_skewness`, the velocity-derivative skewness
-([`derivative_skewness`](@ref)) must also have plateaued *and* reached
-``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal, since a
-random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches ``S \\approx -0.5``.
-With `gate_scalar`, when the
-scalar is forced, the scalar variance ``\\langle\\varphi^2\\rangle`` must be flat too (the scalar
-reaches stationarity after the velocity); an unforced scalar has no stationary state and is not gated.
-
-Passing an explicit `turnovers`, `time`, or `steps` instead runs a **fixed budget** (no detection) —
-the simple spin-up when the transient length is known.
+Spin `sim` up to a statistically stationary state before measurement, and return it — the one-line
+sugar for `run!(StationarityCriterion(; …), sim)`, forwarding every keyword to
+[`StationarityCriterion`](@ref) (the packaged detecting observation: a flat dissipation over a
+trailing window, with the scalar-variance and derivative-skewness gates on by default, giving up
+with a warning at `max_turnovers`). For a fixed spin-up budget, write the three-line budget
+callback instead (see [`run!`](@ref)).
 
 # Examples
 ```julia
 warmup!(sim)                          # detect stationarity (ε- and skewness-plateau gates)
 warmup!(sim; gate_skewness = false)   # relax the skewness gate (a shorter, looser spin-up)
-warmup!(sim; turnovers = 20)          # or a fixed eddy-turnover budget, no detection
 ```
 """
-function warmup!(sim::Simulation; turnovers = nothing, time = nothing, steps = nothing,
-                 gate_scalar::Bool = true, gate_skewness::Bool = true, min_turnovers::Real = 5,
-                 window_turnovers::Real = 4, tol::Real = 0.05, skew_floor::Real = 0.1,
-                 max_turnovers::Real = 60)
-  if turnovers !== nothing || time !== nothing || steps !== nothing
-    return _run_loop!(sim, nothing; turnovers, time, steps)
-  end
-  monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
-                                gate_scalar = gate_scalar && _scalar_forced(sim),
-                                gate_skew = gate_skewness, skew_floor)
-  _run_loop!(sim, nothing; turnovers = Float64(max_turnovers),
-          stop = (s, et, ε) -> _observe_and_test!(monitor, s, et, ε))
-  monitor.converged ||
-    @warn "warmup!: hit the max_turnovers = $(max_turnovers) cap without detecting stationarity"
-  return sim
-end
+warmup!(sim::Simulation; kwargs...) = run!(StationarityCriterion(; kwargs...), sim)
 
 
 end # module SimulationRun
