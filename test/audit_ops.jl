@@ -85,48 +85,55 @@ struct Op
 end
 
 const VALUE_CLASS = Dict(
-  :û => :spectral_vector, :scratch => :spectral_vector, :ps => :spectral_vector,
+  :û => :spectral_vector, :ps => :spectral_vector,
   :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
   :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
   :vshift => :spectral_vector,
   :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
-  :ustar => :physical_vector, :ωstar => :physical_vector, :noise_p => :physical_vector,
+  :noise_p => :physical_vector,
   :ushift => :physical_vector, :ωshift => :physical_vector,
-  :φ̂ => :spectral_scalar, :sb_copy => :spectral_scalar,
+  :φ̂ => :spectral_scalar,
   :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
   :φstar_spec => :spectral_scalar, :sshift => :spectral_scalar, :scopy => :spectral_scalar,
-  :sb_field => :physical_scalar, :pshift => :physical_scalar,
+  :chart_φ => :physical_scalar, :pshift => :physical_scalar,
 )
-# Values whose live range is extended past their last use in the op list. The split matters, and
-# conflating the two is how the physical-vector bound became a tautology (decision 37):
+# Values whose live range is extended past their last use in the op list — live because the DYNAMICS
+# of the iteration says so: the state is read and written by every stage and must persist between
+# steps, and the cache slots hold the boundary observables the NEXT iteration's first stage reads, so
+# their tail deposits must survive the list's end just as their previous deposits precede its start.
+# Extending each is a statement of fact, so the set belongs in a lower bound.
 #
-#   * DYNAMICS_LIVE — live because the DYNAMICS says so. The state is read and written by every
-#     stage and must persist between steps; there is no schedule in which it is not live. Extending
-#     it is a statement of fact, so it belongs in a lower bound.
-#   * CHART_CONTRACT_LIVE — live because a DESIGN CHOICE says so. The observation cache's charts are
-#     required to survive the step under the epoch-at-end design; a different design (refreshing the
-#     charts at the boundary and letting the substage registers reuse the slots) does not require it.
-#     Extending it is an assumption, so it belongs in a HOLDER, never in the bound it is measured
-#     against — the liveness projection therefore excludes it by default.
-const DYNAMICS_LIVE = Set([:û, :φ̂, :ou_state])
-const CHART_CONTRACT_LIVE = Set([:chart_u, :chart_ω])
+# (History: decision 37 split a CHART_CONTRACT_LIVE choice out of this set — the charts then survived
+# the step UNTOUCHED beside separate substage registers, an assumption that had turned the bound into
+# a tautology. The slot=register merge (decision 40) dissolved the choice: one register per chart now
+# serves both roles, so the extension no longer stacks registers on top of the stage need.)
+const DYNAMICS_LIVE = Set([:û, :φ̂, :ou_state, :chart_u, :chart_ω, :chart_φ])
 
-# The traffic model is a different question: a value written and still needed after a segment must
-# reach memory whatever the reason it survives, so the fusion bound uses the union.
-const CONTRACT_LIVE = union(DYNAMICS_LIVE, CHART_CONTRACT_LIVE)
+# The traffic model asks the same question of the same set: a value written and still needed after a
+# segment must reach memory.
+const CONTRACT_LIVE = DYNAMICS_LIVE
 
 
-# The start-of-step chart recomputes (physical_velocity / physical_vorticity in src/State.jl): each
-# chart is recovered once per fields epoch — i.e. once per advance! cycle, wherever first read (the
-# step's stage 1, a pre-step tracer read, an observable) — and served from the cache after that. The
-# liveness projection leaves them off (the charts are contract-live inputs there); the cost
-# projection turns them on, so a per-step ledger prices the recoveries exactly once.
-_chart_recomputes() = [
-  Op("copy û",           [:û],          [:scratch]),
-  Op("u chart recovery", [:scratch],    [:chart_u]),
-  Op("curl û",           [:û],          [:scratch]),
-  Op("ω chart recovery", [:scratch],    [:chart_ω]),
-]
+# The tail deposit (deposit! in src/Propagator.jl): the iteration closes by recovering the boundary
+# observables into the cache slots — the next iteration's first-stage recoveries moved to the tail —
+# and reducing the maximum speed from the just-deposited velocity (the number the next timestep
+# choice reads; the once-per-iteration host readback). The spectral working space is a stage register
+# that is dead once the step closes: `nl` for RK3, `stage2` for RK2 (`sb_nl` / `sb_stage2` for the
+# scalar's copy).
+function _tail_deposit(scalar; scratch, sscratch)
+  ops = [
+    Op("copy û",           [:û],       [scratch]),
+    Op("u chart recovery", [scratch],  [:chart_u]),
+    Op("curl û",           [:û],       [scratch]),
+    Op("ω chart recovery", [scratch],  [:chart_ω]),
+  ]
+  scalar && append!(ops, [
+    Op("copy φ̂",          [:φ̂],      [sscratch]),
+    Op("φ chart recovery", [sscratch], [:chart_φ]),
+  ])
+  push!(ops, Op("max speed", [:chart_u], Symbol[]))
+  return ops
+end
 
 
 # The velocity right-hand side at a stage (velocity_rhs! in src/Generator.jl), reading the physical
@@ -163,19 +170,24 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
 end
 
 
-# The scalar right-hand side at a stage (scalar_rhs! in src/Generator.jl): recover φ at the stage
-# state, form the conservative flux uφ, transform, take the divergence into `out`, and dealias.
-# PhaseShift adds the displaced flux divergence — note it RE-recovers the displaced velocity from
-# `uspec` even though velocity_rhs! left it fresh in the same stage (the recorded transform gap of
-# the compute audit's bound table).
-function _scalar_assembly(uspec, φspec, u, out; phase_shift = false)
-  ops = [
-    Op("copy φ̂",       [φspec],        [:sb_copy]),
-    Op("φ recovery",    [:sb_copy],     [:sb_field]),
-    Op("flux uφ",       [u, :sb_field], [:pp]),
-    Op("flux→spectral", [:pp],          [:ps]),
-    Op("divergence",    [:ps],          [out]),
-  ]
+# The scalar right-hand side at a stage (scalar_rhs! in src/Generator.jl): form the conservative
+# flux uφ from the stage's physical scalar, transform, take the divergence into `out`, and dealias.
+# At stage 1 the physical scalar is the deposited boundary chart, read as is (`recover = false`); at
+# a later stage the caller first recovers the stage scalar into the taken chart slot, through the
+# scheme's dead spectral register `sscratch`. PhaseShift adds the displaced flux divergence — note it
+# RE-recovers the displaced velocity from `uspec` even though velocity_rhs! left it fresh in the same
+# stage (the recorded transform gap of the compute audit's bound table).
+function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb_nl, phase_shift = false)
+  ops = Op[]
+  recover && append!(ops, [
+    Op("copy φ̂",       [φspec],    [sscratch]),
+    Op("φ recovery",    [sscratch], [:chart_φ]),
+  ])
+  append!(ops, [
+    Op("flux uφ",       [u, :chart_φ], [:pp]),
+    Op("flux→spectral", [:pp],         [:ps]),
+    Op("divergence",    [:ps],         [out]),
+  ])
   if phase_shift
     append!(ops, [
       Op("shift û",            [uspec],          [:vshift]),
@@ -197,13 +209,15 @@ end
 
 # The substage recoveries (velocity_to_physical! / vorticity_to_physical! in src/State.jl) from the
 # spectral stage state `src` — û itself for the in-place IFLowStorageRK3 stages, the spectral
-# predictor for IFRK2's stage 2. The plain recovery copies first (the in-place inverse transform
-# consumes its spectral source); the curl fuses that copy into its derivative multiply.
-_recoveries(src) = [
-  Op("copy û",       [src],       [:scratch]),
-  Op("u recovery",   [:scratch],  [:ustar]),
-  Op("curl û",       [src],       [:scratch]),
-  Op("ω recovery",   [:scratch],  [:ωstar]),
+# predictor for IFRK2's stage 2 — into the cache slots taken as the stage registers, through the
+# scheme's dead spectral register `scratch` (`nl` for RK3, `stage2` for RK2). The plain recovery
+# copies first (the in-place inverse transform consumes its spectral source); the curl fuses that
+# copy into its derivative multiply.
+_recoveries(src; scratch) = [
+  Op("copy û",       [src],      [scratch]),
+  Op("u recovery",   [scratch],  [:chart_u]),
+  Op("curl û",       [src],      [scratch]),
+  Op("ω recovery",   [scratch],  [:chart_ω]),
 ]
 
 
@@ -241,35 +255,36 @@ _ou_prepare() = [
 ]
 
 
-# IFLowStorageRK3: stage 1 reads the observables; stages 2–3 recover into the substage registers.
-# `charts` prepends the once-per-epoch chart recomputes (the cost projection); `phase_shift`
-# switches the assemblies to the displaced-evaluation form; `ou` adds the forcing's prepare phase
-# and per-stage source.
-function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, charts::Bool = false)
+# IFLowStorageRK3 as one ITERATION: stage 1 reads the boundary observables the previous tail
+# deposited (the charts are live-in), stages 2–3 take the chart slots and recover the stage states
+# into them, and the tail deposit closes the iteration (`tail = true`; off for a bare-`step!`
+# analysis). `phase_shift` switches the assemblies to the displaced-evaluation form; `ou` adds the
+# forcing's prepare phase and per-stage source.
+function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, tail::Bool = true)
   ops = Op[]
-  charts && append!(ops, _chart_recomputes())
   ou && append!(ops, _ou_prepare())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
   append!(ops, _velocity_update(:nl; first = true))
   scalar && append!(ops, _scalar_update(; first = true))
   for i in 2:3
-    append!(ops, _recoveries(:û))
-    append!(ops, _velocity_assembly(:û, :ustar, :ωstar, :nl; source = ou, phase_shift))
-    scalar && append!(ops, _scalar_assembly(:û, :φ̂, :ustar, :sb_nl; phase_shift))
+    append!(ops, _recoveries(:û; scratch = :nl))
+    append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
+    scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; recover = true, sscratch = :sb_nl, phase_shift))
     append!(ops, _velocity_update(:nl; last = i == 3))
     scalar && append!(ops, _scalar_update(; last = i == 3))
   end
   push!(ops, Op("finalize", [:û], [:û]))
+  tail && append!(ops, _tail_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
 
 
-# IFRK2 (Heun): stage 1 through the observables, the predictor pair, the stage-2 assembly at the
-# predictor state, then the corrector combinations.
-function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
+# IFRK2 (Heun) as one iteration: stage 1 through the deposited boundary observables, the predictor
+# pair, the stage-2 assembly at the predictor state (recovered into the taken chart slots), the
+# corrector combinations, then the tail deposit.
+function rk2_ops(scalar::Bool; phase_shift::Bool = false, tail::Bool = true)
   ops = Op[]
-  charts && append!(ops, _chart_recomputes())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; phase_shift))     # N̂_u,1 → nl plays stage1's role
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
   # Each field's ℰ is at the one substep Δt throughout the step; the predictor combination fuses
@@ -284,9 +299,9 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
     Op("rotate N̂_φ,1",      [:sb_nl],       [:sb_nl]),
     Op("rotate φ̂",           [:φ̂],          [:φ̂]),
   ])
-  append!(ops, _recoveries(:ustar_spec))
-  append!(ops, _velocity_assembly(:ustar_spec, :ustar, :ωstar, :stage2; phase_shift))
-  scalar && append!(ops, _scalar_assembly(:ustar_spec, :φstar_spec, :ustar, :sb_stage2; phase_shift))
+  append!(ops, _recoveries(:ustar_spec; scratch = :stage2))
+  append!(ops, _velocity_assembly(:ustar_spec, :chart_u, :chart_ω, :stage2; phase_shift))
+  scalar && append!(ops, _scalar_assembly(:ustar_spec, :φstar_spec, :chart_u, :sb_stage2; recover = true, sscratch = :sb_stage2, phase_shift))
   append!(ops, [
     Op("û corrector 1",   [:û, :nl],          [:û]),
     Op("û corrector 2",   [:û, :stage2],      [:û]),
@@ -296,21 +311,18 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
     Op("φ̂ corrector 2",  [:φ̂, :sb_stage2],  [:φ̂]),
   ])
   push!(ops, Op("finalize", [:û], [:û]))
+  tail && append!(ops, _tail_deposit(scalar; scratch = :stage2, sscratch = :sb_stage2))
   return ops
 end
 
 
 # Peak simultaneous liveness per shape class: a value is live from its first write (or from the
-# start, if extended or read before written) to its last read (or the end, if extended).
-#
-# `charts_live` selects WHICH values get their range extended, and the default is the point of
-# decision 37. With `false` (the bound) only DYNAMICS_LIVE is extended, so the result is a genuine
-# lower bound on the registers this operation order needs. With `true` the chart contract is added —
-# not a bound but a description of the present design, useful only for showing that the assumption
-# is load-bearing. Feeding the `true` value into a bound is how the physical-vector cell came to
-# report `achieved == bound` while the honest floor was two registers lower.
-function peak_liveness(ops; charts_live::Bool = false)
-  extended = charts_live ? CONTRACT_LIVE : DYNAMICS_LIVE
+# start, if extended or read before written) to its last read (or the end, if extended). Only
+# DYNAMICS_LIVE values are extended — every extension is a fact of the iteration contract (decision
+# 37's charts_live choice dissolved with the slot=register merge, decision 40) — so the result is a
+# genuine lower bound on the registers this operation order needs.
+function peak_liveness(ops)
+  extended = DYNAMICS_LIVE
   first_use = Dict{Symbol, Int}()
   last_use = Dict{Symbol, Int}()
   for (i, op) in enumerate(ops), v in Iterators.flatten((op.reads, op.writes))
@@ -361,10 +373,12 @@ const OP_COST = Dict(
   "shifted u recovery" => _cost(:transform; c2r = 3),
   "shifted ω recovery" => _cost(:transform; c2r = 3),
   "φ recovery"         => _cost(:transform; c2r = 1),
+  "φ chart recovery"   => _cost(:transform; c2r = 1),
   "shifted φ recovery" => _cost(:transform; c2r = 1),
   # reductions — a fusion barrier like a transform (the scalar result gates the next kernel), but
   # the read passes are real and irreducible
   "normalize"          => _cost(:reduction),
+  "max speed"          => _cost(:reduction),
   # Since the PF adoption (decisions 38/39) every kernel a base op applies is a compressed symbol —
   # a radial closure or O(N) per-axis factors — so no op reads a field-scale configuration array and
   # the `extra` column of this table is empty: the pass ledger IS the physical floor.
@@ -481,8 +495,8 @@ const DEALIASINGS = (:TwoThirds, :HouLi, :PhaseShift)
 
 _ops(scheme, dealiasing, scalar; ou = false) =
   scheme === :RK3 ?
-    rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift, charts = true) :
-    rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift, charts = true)
+    rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift) :
+    rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift)
 
 _evals(scheme)  = scheme === :RK3 ? 3 : 2     # right-hand-side evaluations per step
 _applies(scheme) = scheme === :RK3 ? 5 : 3    # fused-exponential applications per field per step

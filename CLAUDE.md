@@ -30,12 +30,15 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
 - `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
-  spectral representation, the single source of truth), the physical recoveries (the chart map), the
-  `DerivedFields` observation cache (stamped charts, epoch freshness, `resolved_fields_modified!`),
-  and the random initial conditions.
+  spectral representation, the single source of truth), the physical recoveries, and the random
+  initial conditions.
+- `Cache` — the observables cache (`ObservablesCache`): the stamped boundary storage the iteration
+  deposits its observables into at its tail (no-recompute — a read serves the deposited value or
+  throws; a slot doubles as its producer's stage register; `resolved_fields_modified!` announces an
+  out-of-band state mutation). The design is `docs/src/observables_cache.md`.
 - `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor, reified as `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
-  `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_factor!` / `scalar_factor!` / `finalize!`.
+  `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_factor` / `scalar_factor` / `finalize!`.
   The MZ *generator*.
 - `Observables` — the measured functions of state (kinetic energy, dissipation, derivative skewness,
   scalar variance and dissipation, max speed, energy spectrum, integral scale). The MZ *observables*.
@@ -45,8 +48,8 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `Particles` — Lagrangian tracer tracking (`Tracers`).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
-Include order: `SimulationDomain → State → Forcing → Generator → Observables → Propagator → Particles →
-SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
+Include order: `SimulationDomain → State → Cache → Forcing → Generator → Observables → Propagator →
+Particles → SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
 only through explicit `using ..Module: name` — never a bare `using`.
 
 A **`Phenomenology`** submodule — the reference turbulence laws (model spectra, structure-function laws,

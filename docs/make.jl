@@ -143,6 +143,7 @@ makedocs(
       "SimulationRun"          => "api/SimulationRun.md",
       "SimulationDomain"       => "api/SimulationDomain.md",
       "State"                  => "api/State.md",
+      "Cache"                  => "api/Cache.md",
       "Forcing"                => "api/Forcing.md",
       "Generator"              => "api/Generator.md",
       "Observables"            => "api/Observables.md",

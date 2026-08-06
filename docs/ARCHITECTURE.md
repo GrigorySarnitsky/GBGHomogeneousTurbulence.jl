@@ -191,20 +191,28 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
   carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recoveries
   `velocity_to_physical!`, `vorticity_to_physical!`, `scalar_to_physical!` that evaluate those functions —
-  is homed here with the state it reads, and **`ObservablesCache`** memoizes its values: an observation cache
-  of stamped observable slots (opt-in, an undeclared observable is an error) with one epoch counter per dynamical
-  factor of the run (fields, particles). An accessor (`physical_velocity`, `physical_vorticity`) returns
-  the stored field when its stamp matches the fields epoch and recomputes it first otherwise, so a stale
-  read is impossible; `step!` advances the epoch as it completes, and an out-of-band mutation of the
-  spectral state is declared through `resolved_fields_modified!` — the one freshness event the cache
-  cannot detect itself (§11 decision 30). Its initial conditions seed the state:
+  is homed here with the state it reads. Its values land in the **`ObservablesCache`** (its own
+  module, `Cache`, between `State` and `Forcing`): the stamped boundary storage each iteration
+  deposits its observables into at its tail — the physical velocity, vorticity, and scalar, and the
+  maximum speed — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
+  §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
+  substage recovery registers mid-iteration (their stamps go to *scratch*, so a mid-iteration read
+  throws instead of serving a stage intermediate), and the tail `deposit!` re-fills and stamps them
+  from the state the step just produced. An accessor (`velocity_physical`, `vorticity_physical`,
+  `scalar_physical`, the cached `max_speed`) serves the deposited value or throws — there is no path
+  by which reading causes a computation — and the cache keeps one epoch counter per dynamical factor
+  of the run (fields, particles); `step!` advances the fields epoch as it completes, and an
+  out-of-band mutation of the spectral state is declared through `resolved_fields_modified!` — the
+  one freshness event the cache cannot detect itself (§11 decision 30) — followed by a `deposit!`
+  before the run advances again. The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar!` fills a mean-zero scalar to a target variance. The
   per-step scratch is **not** state: the scheme's registers live with the integrator (`IntegratorBuffers`
   in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
   preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
   to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
-  composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in place.
+  composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in
+  place — each iteration a `step!` closed by the tail `deposit!`.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -1384,6 +1392,40 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `derivative_skewness` diagnostic also stopped materializing its determinant field
     (``\langle\det\boldsymbol S\rangle`` is the fused mapped mean), and transforms are untouched
     everywhere — this decision moves passes and residency only.
+
+40. **(2026-08) The observables cache is deposit-driven, and a slot is its producer's register.** The
+    cache moves to its own module (`Cache`, between `State` and `Forcing`) and is rebuilt to the
+    design of `docs/src/observables_cache.md`: the schedule is fixed at construction and identical on
+    every iteration; **everything is deposited at the tail of the iteration** (`deposit!` — the next
+    iteration's first-stage recoveries relocated, plus the maximum-speed reduction the next timestep
+    choice reads); a read serves the stamped value or **throws** — there is no path, internal or on
+    request, by which reading causes a computation (the recompute-on-staleness accessors of
+    decision 30 are retired; `resolved_fields_modified!` now opens an interval in which reads throw,
+    closed by an explicit `deposit!`). Contents are **automatic** — the constructor derives them from
+    the configuration (the `observables` declaration keyword is gone); the three-valued stamp
+    (value-at-boundary / producer's scratch / never deposited) polices the mid-iteration window, and
+    the boundary completeness check refuses to close an iteration with an undeposited slot. The
+    storage consequence is the **slot=register merge**: the step's substage recovery registers ARE
+    the cache's chart arrays (taken at stage 2, re-deposited at the tail), which deletes
+    `IntegratorBuffers`' two physical vectors — precisely the honest gap decision 37 uncovered,
+    768 MiB at ``256^3``/Float64 — along with the cache's spectral scratch and the scalar's copy
+    register (the tail and substage recoveries write through a stage register that is dead at that
+    point of the schedule). Every unforced ledger cell now sits **at** its liveness bound in every
+    class, so three holders retire in this commit (`CHART CONTRACT` — by exactly the boundary
+    refresh its text prescribed — `OWNERSHIP`, and `SCALAR REGISTERS`), and `DYNAMICS_LIVE` absorbs
+    the charts as facts of the deposit-persistence contract (the `charts_live` choice parameter is
+    gone; the falsifiability guard now pins the tail-deposit structure instead). The audited op model
+    widens from the step to the **iteration** (step + tail), which surfaces the once-per-iteration
+    maximum-speed readback in the pass and synchronization ledgers (+1 physical-vector pass in every
+    cell; a hand-fixed-``\Delta t`` iteration still pays it — held by the new `UNIFORM DEPOSIT
+    SCHEDULE` design holder, the price of a schedule that never varies with how the run is driven);
+    transforms froze **identical** in every cell. Public-surface consequences: the accessors are the
+    noun-first checked reads `velocity_physical` / `vorticity_physical` / `scalar_physical` and the
+    cached `max_speed` (one generic with the `Observables` reduction), `physical_velocity` /
+    `physical_vorticity` / `spectral_scratch` are gone, and the allocator family was renamed
+    representation-first (`spectral_scalar`, `physical_scalar`, `spectral_tensor`,
+    `physical_tensor`) so the shape-named allocators and the physics-named observables accessors
+    cannot collide.
 
 ---
 

@@ -53,13 +53,12 @@ const N_AUDIT = 8
 
 # Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
 # one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
-function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool;
-                observables = (:velocity, :vorticity))
+function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
   state = ResolvedFields(domain; scalar)
   velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity, domain, 0.01)
   scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar, domain, 0.01)
-  owners = Any[state, ObservablesCache(domain; observables), ResolvedGenerator(domain, conditions; scalar),
+  owners = Any[state, ObservablesCache(domain; scalar), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
     push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
@@ -71,36 +70,38 @@ end
 # updates this spec (and, for a structural change, the op lists below) in the same commit, citing the
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar,
 # real_spectral_scalar.
-# The PhaseShift cells carry a register of their own for the displaced velocity. Landing it on the
-# generator's spent physical product scratch instead was tried and REVERTED (2026-07-31): the
-# backend's `cross!` guards destination/operand aliasing by allocating a temporary and copying back,
-# so the saved register cost a full physical vector of TRANSIENT allocation per stage and broke the
-# allocation-free hot loop. Retaking it needs an alias-safe kernel from the backend, not a rewiring
-# here — the allocation guard below is what now holds the claim.
+# Re-frozen 2026-08-06 (decision 40, the deposit-driven cache — slot IS the producer's register):
+# the cache's chart slots ARE the step's substage recovery registers, so the two physical vectors
+# the old IntegratorBuffers carried beside the charts are gone (−2 pv in every cell, 768 MiB at
+# 256³ / Float64 — exactly the gap decision 37 uncovered); the cache's spectral scratch is gone
+# (−1 sv — the tail and substage recoveries write through a dead stage register); the scalar's
+# copy register is gone (−1 ss) and its physical field register IS the scalar chart now (φ moved
+# from the buffers to the cache, net zero). The PhaseShift cells still carry the displaced-
+# evaluation scratch on top (+1 sv, +2 pv; scalar +2 ss +1 ps).
 # The real_spectral_scalar column is ZERO throughout, and the zero is the point (2026-07-28,
 # decision 35): a rate
 # array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
 # default configuration, whose BandRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 6, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 7, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 3, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 3, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 2, real_spectral_scalar = 0),
 )
-# (PF adoption, 2026-08-05/06: the PhaseShift cells lost the two stored translation kernels — PF's
-# decision 50 returns them as per-axis `SeparableKernel`s, three O(N) factors each, below field
-# scale — and decision 39 then removed the integrating-factor register from EVERY cell: the fused
-# exponential evaluates the factor per mode, so a velocity-only working set holds nothing
-# scalar-shaped at all.)
+# (History: the PhaseShift displaced-velocity register was once tried on the generator's spent
+# product scratch and REVERTED (2026-07-31) — the then-guarded `cross!` allocated per stage; the
+# alias-safe kernel has since landed PF-side and the retake is the Lamb-into-vorticity candidate of
+# the cache strand. PF adoption 2026-08-05/06: the stored translation kernels and the
+# integrating-factor register left the cells (PF decision 50, IT decision 39).)
 
 # The frozen forcing DELTAS, per slot. Every band kernel is now a lazy radial symbol (PF adoption,
 # 2026-08-05 — PF decision 51), so a band-selecting forcing stores no field-scale kernel; the OU's
@@ -129,13 +130,9 @@ _forcing_delta(tag, slot) =
 # field to an untracked one. This zero is the assertion, not a placeholder.
 const TRACER_DELTA = ZERO
 
-# The observables axis of the cache: each declared observable is one resident physical vector; the
-# spectral scratch is unconditional. The base table pins the default (both observables) — the rotational
-# generator's declared working set requires both to step, so for a stepping run the axis is pinned by
-# the physics; it is live at the API level (observation-only uses) and becomes a run axis when
-# per-component chart declarations or further charts land.
-_observable_delta(observables) = (spectral_vector = 0, physical_vector = length(observables) - 2,
-                        spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0)
+# There is no observables axis any more (decision 40): the cache's contents are automatic — exactly
+# what the configuration's iteration computes, materializes, and leaves at the boundary — so the
+# only degree of freedom it carries is the scalar slot, which follows the run's `scalar` axis.
 
 _build_forcing(tag, domain) =
   tag === :none  ? NoForcing() :
@@ -180,35 +177,24 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 # The gap register: achieved working buffers (kernels, masks, and rate arrays are configuration, not
 # working values, and are excluded on both sides) minus the liveness bound, with a named holder for
-# every nonzero gap. An unclaimed gap is a finding, and the test fails. Recorded holders
-# (decision 33): OWNERSHIP — buffers that could alias in this schedule but live across a
-# deliberately kept boundary (the cache's recovery scratch vs the generator's product/nonlinear
-# registers; the OU's noise buffers vs the generator's products); CHART CONTRACT — the charts are
-# required to survive the whole step under the epoch-at-end design, which costs TWO physical vectors
-# against the bound (768 MiB at 256³ / Float64); SHARED FACTOR — the factor register could be deleted
-# by a fused exponential-convolve (raised to GBGPeriodicFields); SCALAR REGISTERS — the scalar's
-# copy/nonlinear/factor registers could share one transient slot.
+# every nonzero gap. An unclaimed gap is a finding, and the test fails; a holder left behind after
+# its gap closes fails too (the register works in both directions).
 #
-# CHART CONTRACT was recorded in this comment from the start and never bound to a cell, because the
-# liveness projection extended the charts' live range across the step and then reported the result as
-# the bound (decision 37). That made `achieved == bound` a tautology in the physical-vector class and
-# the suite asserted it. The projection now extends only DYNAMICS_LIVE, so the assumption shows up
-# where it belongs — as a claimed gap.
-# SHARED FACTOR was retired 2026-08-06 (decision 39): the factor register it priced no longer
-# exists — the fused exponential closed the gap the holder held open, which is the register working
-# in both directions.
+# Retired 2026-08-06 (decision 40 — the deposit-driven cache), all three in the same commit that
+# closed their gaps:
+#   CHART CONTRACT   — the charts survived the step BESIDE separate substage registers; the slot=
+#                      register merge made the charts the registers, closing exactly the two
+#                      physical vectors decision 37 uncovered (768 MiB at 256³ / Float64).
+#   OWNERSHIP        — the cache's recovery scratch sat across a kept seam from the generator's
+#                      registers; the scratch is deleted (recoveries write through a dead stage
+#                      register), so there is no boundary left to hold a gap open.
+#   SCALAR REGISTERS — the scalar's copy register could share a slot; it is deleted outright.
+#   (SHARED FACTOR was retired 2026-08-06 with decision 39.)
+# Every unforced cell now sits AT its liveness bound in every class. The one remaining gap is the
+# archived OU's: its noise pair could alias the generator's product registers but lives on the
+# forcing across an ownership boundary — one spectral and one physical vector.
 const GAP_HOLDERS = Dict(
-  (:RK3, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)"),
-  (:RK3, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SCALAR REGISTERS (copy/nonlinear/stage could share a transient slot)"),
-  (:RK2, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)"),
-  (:RK2, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SCALAR REGISTERS (copy/nonlinear/stage could share a transient slot)"),
-  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (scratch, OU noise ↔ product/nonlinear)",
+  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (OU noise ↔ nonlinear/product)",
                            :physical_vector => "OWNERSHIP (OU noise ↔ product)"),
 )
 
@@ -281,14 +267,6 @@ const EPISODE_UNITS = [
     end
   end
 
-  @testset "ledger — the observables axis (API-level; pinned to both for a stepping run)" begin
-    for scheme in (:RK3, :RK2), scalar in (false, true),
-        observables in ((), (:velocity,), (:velocity, :vorticity))
-      counts = ledger(domains[:TwoThirds], _scheme(scheme), scalar, NoForcing(), NoForcing(), false; observables)
-      @test counts == _add(BASE[(scheme, :TwoThirds, scalar)], _observable_delta(observables))
-    end
-  end
-
   @testset "frame ledger — the frozen per-mode symbols, invariant in strategy and precision" begin
     for tag in (:TwoThirds, :HouLi, :PhaseShift), T in (Float64, Float32)
       domain = FixedDomain(N_AUDIT, 2π; element_type = T, array_type = Array,
@@ -343,75 +321,78 @@ const EPISODE_UNITS = [
   end
 
   @testset "op lists name real registers" begin
-    # The symbolic values must correspond to actual storage: charts + scratch on ObservablesCache,
-    # products on ResolvedGenerator, registers on IntegratorBuffers/ScalarBuffers, the OU's state
-    # and noise on the forcing.
-    @test :spectral_scratch in fieldnames(ObservablesCache)
+    # The symbolic values must correspond to actual storage: the chart slots on ObservablesCache,
+    # products on ResolvedGenerator, spectral stage registers on IntegratorBuffers/ScalarBuffers,
+    # the OU's state and noise on the forcing.
+    @test all(f -> f in fieldnames(ObservablesCache), (:velocity, :vorticity, :scalar, :max_speed))
     @test all(f -> f in fieldnames(ResolvedGenerator), (:product_physical, :product_spectral))
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
     SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers
-    @test all(f -> f in fieldnames(IB),
-              (:stage1, :stage2, :velocity_star_spectral, :nonlinear,
-               :vorticity_physical, :velocity_star))
-    # The integrating factor has NO register: the fused exponential applies it per mode (decision 39).
+    @test all(f -> f in fieldnames(IB), (:stage1, :stage2, :velocity_star_spectral, :nonlinear))
+    # The integrating factor has NO register (decision 39), and the physical-representation
+    # registers moved onto the cache slots (decision 40) — a step recovers INTO the charts it takes.
     @test !(:integrating_factor in fieldnames(IB))
-    @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :star_spectral, :nonlinear, :copy, :field))
+    @test isempty(intersect((:velocity_star, :vorticity_physical), fieldnames(IB)))
+    @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :star_spectral, :nonlinear))
+    @test isempty(intersect((:copy, :field), fieldnames(SB)))
     @test all(f -> f in fieldnames(StochasticOU), (:state, :noise_physical, :noise_spectral))
   end
 
   @testset "liveness bounds and the gap register" begin
-    cases = [(:RK3, rk3_ops(false), BASE[(:RK3, :TwoThirds, false)], (:RK3, false)),
-             (:RK3, rk3_ops(true),  BASE[(:RK3, :TwoThirds, true)],  (:RK3, true)),
-             (:RK2, rk2_ops(false), BASE[(:RK2, :TwoThirds, false)], (:RK2, false)),
-             (:RK2, rk2_ops(true),  BASE[(:RK2, :TwoThirds, true)],  (:RK2, true)),
-             (:RK3, rk3_ops(false; ou = true),
-              _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:ou, :velocity)), (:RK3_OU, false))]
-    for (scheme, ops, achieved, holder_key) in cases
-      bound = peak_liveness(ops)
-      holders = GAP_HOLDERS[holder_key]
-      for class in (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar)
-        # Kernels/masks/rates are configuration, not working values. Since the PF adoption every
-        # band kernel is lazy (no stored coefficients), so no forcing delta carries a configuration
-        # entry to subtract any more — the ledger rows ARE working values.
-        working = getproperty(achieved, class)
-        b = getproperty(bound, class)
-        @test b <= working                        # a bound above the ledger is a bookkeeping error
-        if working - b > 0
-          @test haskey(holders, class)            # every gap carries a named holder (decision 33)
-        end
+    # Every unforced cell sits AT its bound in every class (decision 40): the slot=register merge
+    # closed the chart gap, deleting the cache's spectral scratch closed the ownership gap, and
+    # deleting the scalar copy register closed the scalar gap — each holder retired in the same
+    # commit. This equality CAN fail: extend a register's life past the schedule's need (or add a
+    # resident buffer) and the ledger rises off the bound with no holder to claim it.
+    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
+      @test peak_liveness(ops_of(scalar)) == BASE[(scheme, :TwoThirds, scalar)]
+    end
+    # PhaseShift's displaced-evaluation registers are working values like any other, and its cells
+    # sit at the bound too.
+    @test peak_liveness(rk3_ops(true; phase_shift = true)) == BASE[(:RK3, :PhaseShift, true)]
+
+    # The one remaining gap: the archived OU's noise pair lives on the forcing, across an ownership
+    # boundary from the generator registers it could alias — one spectral and one physical vector,
+    # both held.
+    ou_ops = rk3_ops(false; ou = true)
+    ou_achieved = _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:ou, :velocity))
+    ou_bound = peak_liveness(ou_ops)
+    holders = GAP_HOLDERS[(:RK3_OU, false)]
+    for class in (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar)
+      working = getproperty(ou_achieved, class)
+      b = getproperty(ou_bound, class)
+      @test b <= working                        # a bound above the ledger is a bookkeeping error
+      if working - b > 0
+        @test haskey(holders, class)            # every gap carries a named holder (decision 33)
       end
     end
-    # The physical-vector class, stated as the numbers rather than as an equality that cannot fail.
-    # The bound is three — the two substage recoveries plus the product register — and the ledger
-    # carries five, because the charts are additionally required to survive the step. That difference
-    # is the CHART CONTRACT holder, and it is two physical vectors: 768 MiB at 256³ / Float64.
+    @test ou_achieved.spectral_vector - ou_bound.spectral_vector == 1
+    @test ou_achieved.physical_vector - ou_bound.physical_vector == 1
+
+    # The physical-vector floor, in numbers: three registers — the two chart slots (doubling as the
+    # substage recovery registers) plus the product register — with the 768 MiB the old two-vector
+    # chart gap cost at 256³ / Float64 banked, not held.
     for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
-      ops = ops_of(scalar)
-      @test peak_liveness(ops).physical_vector == 3
-      @test BASE[(scheme, :TwoThirds, scalar)].physical_vector - peak_liveness(ops).physical_vector == 2
-      @test haskey(GAP_HOLDERS[(scheme, scalar)], :physical_vector)
+      @test peak_liveness(ops_of(scalar)).physical_vector == 3
     end
   end
 
-  @testset "the liveness bound is not self-fulfilling" begin
-    # The guard decision 37 exists to install. Extending the charts' live range across the whole step
-    # and calling the result a bound made `achieved == bound` true by construction in this class —
-    # the assumption under test was an input to the test. Assert that the assumption is LOAD-BEARING
-    # (adding it back changes the number, and changes it exactly onto the ledger), so a future
-    # re-merge of the two sets fails here rather than silently re-certifying the tautology.
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
+  @testset "the bound still encodes a falsifiable contract" begin
+    # Decision 37's lesson, restated for the merged design: the charts' extension in DYNAMICS_LIVE
+    # is a FACT only while the schedule really deposits them at the tail — the extension asserts the
+    # deposits must persist to the next iteration's first stage. Pin the structure that makes it a
+    # fact: the op lists end with the tail deposits (so the extension covers a real write), and the
+    # charts are read at the head before any write (so the previous deposit is really consumed).
+    for ops_of in (rk3_ops, rk2_ops), scalar in (false, true)
       ops = ops_of(scalar)
-      bound    = peak_liveness(ops)                      # DYNAMICS_LIVE only — the honest floor
-      described = peak_liveness(ops; charts_live = true)  # + the chart contract — the present design
-      @test described.physical_vector > bound.physical_vector
-      @test described.physical_vector == BASE[(scheme, :TwoThirds, scalar)].physical_vector
-      # …and the split is confined to that class: the state's extension is a fact, not a choice, so
-      # it changes nothing when the charts are excluded.
-      @test bound.spectral_vector == described.spectral_vector
-      @test bound.spectral_scalar == described.spectral_scalar
+      @test any(op -> op.name == "u chart recovery", ops)
+      @test any(op -> op.name == "ω chart recovery", ops)
+      @test ops[end].name == "max speed"                 # the tail closes the iteration
+      first_touch = findfirst(op -> :chart_u in op.reads || :chart_u in op.writes, ops)
+      @test :chart_u in ops[first_touch].reads           # read as the boundary value, not scratch
     end
-    @test isempty(intersect(DYNAMICS_LIVE, CHART_CONTRACT_LIVE))
-    @test CONTRACT_LIVE == union(DYNAMICS_LIVE, CHART_CONTRACT_LIVE)
+    @test issubset(Set([:chart_u, :chart_ω]), DYNAMICS_LIVE)
+    @test CONTRACT_LIVE == DYNAMICS_LIVE                 # no choice-extension set remains
   end
 
   @testset "episode ledger — transient peaks, frozen and attributed" begin

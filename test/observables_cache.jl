@@ -1,76 +1,101 @@
-# ObservablesCache tests — the observation-cache contract: accessors recompute exactly when stale
-# (stamp behind the fields epoch), memoize otherwise; `resolved_fields_modified!` is the out-of-band
-# invalidation verb; an undeclared observable is an error; `step!` advances the epoch.
+# ObservablesCache tests — the no-recompute contract: a read serves the deposited value or throws
+# (never rebuilds); slots double as the step's registers (taken mid-iteration, re-deposited at the
+# tail); `resolved_fields_modified!` announces an out-of-band mutation and `deposit!` restores the
+# boundary; the boundary check refuses an iteration that left a slot undeposited.
 
 using GBGIsotropicTurbulence
+using GBGIsotropicTurbulence.Cache: take_velocity!, check_boundary
 using GBGPeriodicFields: field_data
 using Random
 using Test
 
 
-@testset "derived fields" begin
+@testset "observables cache" begin
   N = 16
   L = 2π
   domain = FixedDomain(N, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
   û = spectral_vector(domain)
   random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)
+  buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
 
-  @testset "accessors recompute once and memoize" begin
+  @testset "a read before any deposit throws; the deposit serves it" begin
     derived = ObservablesCache(domain)
-    u = physical_velocity(derived, state, domain)
+    @test_throws ErrorException velocity_physical(derived)
+    @test_throws ErrorException vorticity_physical(derived)
+    @test_throws ErrorException max_speed(derived)
+    deposit!(derived, state, domain, buffers)
+    u = velocity_physical(derived)
     u_reference = physical_vector(domain)
     velocity_to_physical!(u_reference, û, domain, spectral_vector(domain))
-    @test field_data(u) == field_data(u_reference)                 # the recompute is the recovery
-    @test physical_velocity(derived, state, domain) === u          # second read: memoized, same storage
-    ω = physical_vorticity(derived, state, domain)
+    @test field_data(u) == field_data(u_reference)                 # the deposit is the recovery
+    @test velocity_physical(derived) === u                         # second read: same storage, no work
     ω_reference = physical_vector(domain)
     vorticity_to_physical!(ω_reference, û, domain, spectral_vector(domain))
-    @test field_data(ω) == field_data(ω_reference)
+    @test field_data(vorticity_physical(derived)) == field_data(ω_reference)
+    @test max_speed(derived) == max_speed(u_reference)             # the cached number is the reduction
   end
 
-  @testset "out-of-band mutation needs the invalidation verb" begin
+  @testset "a taken slot refuses reads until re-deposited" begin
     derived = ObservablesCache(domain)
-    before = copy(field_data(physical_velocity(derived, state, domain)))
+    deposit!(derived, state, domain, buffers)
+    take_velocity!(derived)                                        # a producer claims the register
+    @test_throws ErrorException velocity_physical(derived)
+    @test field_data(vorticity_physical(derived)) isa Any          # the other slot is untouched
+    deposit!(derived, state, domain, buffers)
+    @test velocity_physical(derived) isa Any
+  end
+
+  @testset "out-of-band mutation: announce, then re-deposit" begin
+    derived = ObservablesCache(domain)
+    deposit!(derived, state, domain, buffers)
+    before = copy(field_data(velocity_physical(derived)))
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.7, peak_wavenumber = 3.0, rng = MersenneTwister(2))
-    # Without the verb the chart still serves the previous fields — the documented contract.
-    @test field_data(physical_velocity(derived, state, domain)) == before
     resolved_fields_modified!(derived)
-    after = field_data(physical_velocity(derived, state, domain))
-    @test after != before                                          # recomputed from the new û
+    @test_throws ErrorException velocity_physical(derived)         # stale: nothing is recomputed
+    deposit!(derived, state, domain, buffers)
+    after = field_data(velocity_physical(derived))
+    @test after != before                                          # the new deposit is the new field
     u_reference = physical_vector(domain)
     velocity_to_physical!(u_reference, û, domain, spectral_vector(domain))
     @test after == field_data(u_reference)
   end
 
-  @testset "an undeclared chart is an error; charts are opt-in" begin
-    velocity_only = ObservablesCache(domain; observables = (:velocity,))
-    @test physical_velocity(velocity_only, state, domain) isa Any   # allocated chart reads fine
-    @test_throws ArgumentError physical_vorticity(velocity_only, state, domain)
-    @test_throws ArgumentError ObservablesCache(domain; observables = (:velocity, :enstrophy))
+  @testset "a scalar-free cache has no scalar slot" begin
+    derived = ObservablesCache(domain)
+    @test_throws ArgumentError scalar_physical(derived)
+    with_scalar = ObservablesCache(domain; scalar = true)
+    @test with_scalar.scalar !== nothing
   end
 
-  @testset "step! advances the fields epoch" begin
+  @testset "step! leaves the cache mid-iteration; deposit! closes it" begin
     derived = ObservablesCache(domain)
-    buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
+    deposit!(derived, state, domain, buffers)
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions)
     epoch0 = derived.fields_epoch
-    u_before = copy(field_data(physical_velocity(derived, state, domain)))
+    u_before = copy(field_data(velocity_physical(derived)))
     step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.01)
     @test derived.fields_epoch == epoch0 + 1
-    @test field_data(physical_velocity(derived, state, domain)) != u_before   # recomputed post-step
+    @test_throws ErrorException velocity_physical(derived)         # taken as a stage register
+    @test_throws ErrorException check_boundary(derived)            # the iteration is not closed
+    deposit!(derived, state, domain, buffers)
+    @test check_boundary(derived) === derived
+    @test field_data(velocity_physical(derived)) != u_before       # the advanced state's recovery
   end
 
-  @testset "Simulation-level accessors" begin
+  @testset "Simulation-level accessors forward to the cache" begin
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = false, rng = MersenneTwister(4))
-    u = physical_velocity(sim)
-    @test field_data(u) == field_data(physical_velocity(sim.derived, sim.state, sim.domain))
-    @test physical_vorticity(sim) === physical_vorticity(sim.derived, sim.state, sim.domain)
+    u = velocity_physical(sim)                                     # the constructor's seeding deposit
+    @test u === velocity_physical(sim.derived)
+    @test vorticity_physical(sim) === vorticity_physical(sim.derived)
+    @test max_speed(sim) == max_speed(sim.derived)
     random_solenoidal_velocity!(sim.state.velocity, sim.domain; kinetic_energy = 0.9,
                                 peak_wavenumber = 2.0, rng = MersenneTwister(5))
     resolved_fields_modified!(sim)
-    @test kinetic_energy(physical_velocity(sim)) ≈ kinetic_energy(sim.state.velocity)
+    @test_throws ErrorException velocity_physical(sim)
+    deposit!(sim)
+    @test kinetic_energy(velocity_physical(sim)) ≈ kinetic_energy(sim.state.velocity)
   end
 end

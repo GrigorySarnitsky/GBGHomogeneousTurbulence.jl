@@ -27,17 +27,19 @@ using Test
   dealias!(û, domain)
   φ̂ = spectral_scalar(domain)                          # zero scalar (passive ⇒ stays zero)
   state = ResolvedFields(û, φ̂)
-  derived = ObservablesCache(domain)
+  derived = ObservablesCache(domain; scalar = true)
+  deposit!(derived, state, domain, buffers)
 
   Δx = L / N
   cfl = 0.5
   nsteps = 300
   energies = T[]
   for n in 1:nsteps
-    u = physical_velocity(derived, state, domain)
-    dt = cfl * Δx / max(max_speed(u), 1e-6)
+    u = velocity_physical(derived)
+    dt = cfl * Δx / max(max_speed(derived), 1e-6)
     push!(energies, kinetic_energy(u))
     step!(integrator, state, generator, domain, buffers, derived, dt)
+    deposit!(derived, state, domain, buffers)
   end
 
   @test all(isfinite, energies)
@@ -53,9 +55,11 @@ using Test
 
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
-  dt = cfl * Δx / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
+  dt = cfl * Δx / max(max_speed(derived), 1e-6)
   step!(integrator, state, generator, domain, buffers, derived, dt)                            # warm up
+  deposit!(derived, state, domain, buffers)
   step_bytes = @allocated step!(integrator, state, generator, domain, buffers, derived, dt)
+  deposit_bytes = @allocated deposit!(derived, state, domain, buffers)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
-  @test step_bytes < field_bytes
+  @test step_bytes + deposit_bytes < field_bytes
 end

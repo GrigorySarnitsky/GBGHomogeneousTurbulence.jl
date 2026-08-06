@@ -103,22 +103,24 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dealias!(û, domain)
     state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = ObservablesCache(domain)
+    derived = ObservablesCache(domain; scalar = true)
+    deposit!(derived, state, domain, buffers)
     tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
 
     Δx = L / N
     for _ in 1:50
-      u = physical_velocity(derived, state, domain)
-      dt = 0.4 * Δx / max(max_speed(u), 1e-6)
+      u = velocity_physical(derived)
+      dt = 0.4 * Δx / max(max_speed(derived), 1e-6)
       record_trajectory_velocity!(tracers, u)                           # u(tₙ), onto the tracers
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
-      advect!(tracers, physical_velocity(derived, state, domain), domain, dt)   # u(tₙ₊₁)
+      deposit!(derived, state, domain, buffers)
+      advect!(tracers, velocity_physical(derived), domain, dt)          # u(tₙ₊₁), the tail deposit
     end
     @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)
     @test all(isfinite, tracer_velocities(tracers))
 
     # allocation-free advection step — both verbs of the push
-    u = physical_velocity(derived, state, domain)
+    u = velocity_physical(derived)
     bytes = @allocated (record_trajectory_velocity!(tracers, u); advect!(tracers, u, domain, 0.001))
     @test bytes < 4096
   end

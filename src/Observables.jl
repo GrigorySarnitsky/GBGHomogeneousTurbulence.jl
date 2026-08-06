@@ -31,6 +31,7 @@ module Observables
 using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
 using ..SimulationDomain: FixedDomain, physical_tensor
+import ..Cache: max_speed                 # one generic: the reduction here, the cached read in Cache
 
 export kinetic_energy, dissipation, max_speed,
        scalar_variance, scalar_dissipation, derivative_skewness,
@@ -103,12 +104,18 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 
 """
     max_speed(u)
+    max_speed(cache)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
 in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
 differs from the true ``\\sup\\lvert\\boldsymbol{u}\\rvert`` by at most ``\\sqrt{3}``, a gap absorbed by the
 conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling (whose
 eigenvalue bound over-estimates the true spectral radius).
+
+The second form reads the number back from an
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the iteration's tail
+deposited it — the same quantity, measured once per iteration and served without a reduction (or a
+device readback); it throws when no deposit is current, like every cached read.
 """
 max_speed(u) = maximum(abs, field_data(u))
 

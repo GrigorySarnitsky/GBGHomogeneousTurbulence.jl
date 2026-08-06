@@ -28,10 +28,12 @@ allocate_buffers
 
 ## Time stepping
 
-One in-place step of the coupled velocity and passive scalar together through the shared RK stages.
+One in-place step of the coupled velocity and passive scalar together through the shared RK stages,
+and the tail deposit that closes the iteration.
 
 ```@docs
 step!
+deposit!
 ```
 
 ## Timestep ceiling

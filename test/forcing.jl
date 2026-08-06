@@ -34,9 +34,11 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     û = spectral_vector(domain); copyto!(field_data(û), field_data(û0))
     state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = ObservablesCache(domain)
+    derived = ObservablesCache(domain; scalar = true)
+    deposit!(derived, state, domain, buffers)
     for _ in 1:nsteps
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
+      deposit!(derived, state, domain, buffers)
     end
     û
   end
@@ -91,9 +93,11 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     φ̂ = spectral_scalar(domain); copyto!(field_data(φ̂), field_data(φ̂0))
     state = ResolvedFields(û_zero, φ̂)
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = ObservablesCache(domain)
+    derived = ObservablesCache(domain; scalar = true)
+    deposit!(derived, state, domain, buffers)
     for _ in 1:40
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.01)
+      deposit!(derived, state, domain, buffers)
     end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
   end
@@ -132,10 +136,12 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     dealias!(û, domain)
     state = ResolvedFields(û, spectral_scalar(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = ObservablesCache(domain)
+    derived = ObservablesCache(domain; scalar = true)
+    deposit!(derived, state, domain, buffers)
     for n in 1:200
-      dt = 0.4 * (L / N) / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
+      dt = 0.4 * (L / N) / max(max_speed(derived), 1e-6)
       step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, dt)
+      deposit!(derived, state, domain, buffers)
     end
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0.05   # forcing kept it from decaying away
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)

@@ -66,7 +66,8 @@ include("audit_ops.jl")
 
 struct Holder
   name::String
-  disposition::Symbol      # :FIX — a local win, retire on taking it; :PF_RAISE — a backend request
+  disposition::Symbol      # :FIX — a local win, retire on taking it; :PF_RAISE — a backend request;
+                           # :DESIGN — a user-adopted design cost, citing its decision
   what::String
 end
 
@@ -99,23 +100,29 @@ const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
   "operand and needs its own pass.")
 
-const CHART_CONTRACT = Holder(
-  "CHART CONTRACT", :FIX,
-  "The observation cache's charts are required to stay live across the whole step, so the two " *
-  "substage recoveries cannot reuse their slots and the run carries two physical vectors above the " *
-  "liveness bound (768 MiB at 256³ / Float64). This is a design choice, not a constraint from the " *
-  "physics: the rotational form needs the VALUES of u and ω at the stage state, not stamped chart " *
-  "slots. Refreshing the charts at the step boundary — where the same recovery happens anyway, on " *
-  "the identical state — lets a chart and its substage register be one array, with the chart " *
-  "readable at every boundary and undefined inside a step.")
+# CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the boundary refresh its text
+# prescribed: the iteration now deposits the charts at its tail and the step takes the same slots as
+# its substage recovery registers, so a chart and its register are one array and every unforced cell
+# sits AT its liveness bound (the two physical vectors — 768 MiB at 256³ / Float64 — banked; the
+# memory audit asserts the equality).
+
+const UNIFORM_DEPOSIT_SCHEDULE = Holder(
+  "UNIFORM DEPOSIT SCHEDULE", :DESIGN,
+  "The observables cache deposits every slot at every tail — the schedule is fixed at construction " *
+  "and identical on every iteration (decision 40, the no-recompute design the user adopted) — so " *
+  "an iteration advanced with a hand-fixed Δt still reduces the maximum speed and reads it back, " *
+  "one crossing above that path's zero floor. The uniform schedule is what makes stale reads " *
+  "impossible and the frozen ledgers exact; a configuration-dependent deposit set would trade this " *
+  "one number for a schedule that varies with how the run is driven.")
 
 const ALL_HOLDERS = (UNUSED_FUSION,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
-                     CHART_CONTRACT)
+                     UNIFORM_DEPOSIT_SCHEDULE)
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
-const OPEN_LOCAL_WINS = ("CHART CONTRACT",)
+# (Empty since CHART CONTRACT was taken, 2026-08-06.)
+const OPEN_LOCAL_WINS = ()
 
 
 # ---------------------------------------------------------------- the synchronization ledger
@@ -128,7 +135,9 @@ struct Sync
 end
 
 # Per-step synchronization sites, by configuration. Transcribed from:
-#   cfl_timestep            (src/SimulationRun.jl) — Float64(max_speed(u)), then isfinite / > 0 on the host
+#   deposit!                (src/Propagator.jl)    — the tail max-speed reduction, read back into the
+#                                                    cache's host number (cfl_timestep then does
+#                                                    scalar arithmetic on it — no crossing of its own)
 #   _turnover_time          (src/SimulationRun.jl) — dissipation and kinetic_energy, then ε > 0 and k/ε
 #   apply_forcing!          (src/Forcing.jl)       — BandRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
@@ -147,7 +156,11 @@ end
 function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,
                   turnover_budget::Bool = false, monitor::Symbol = :none)
   syncs = Sync[]
-  adaptive_dt && push!(syncs, Sync("cfl max_speed", 1, nothing))
+  # The tail deposit reduces the maximum speed on EVERY iteration (the uniform schedule): with an
+  # adaptive timestep the crossing is the irreducible Δt choice; with a hand-fixed Δt its floor is
+  # zero and the design holder claims it.
+  push!(syncs, Sync("tail max-speed deposit", adaptive_dt ? 1 : 0,
+                    adaptive_dt ? nothing : UNIFORM_DEPOSIT_SCHEDULE))
   if turnover_budget || monitor !== :none
     # One barrier serves the whole quadratic family if the reduction is fused; the first carries the
     # floor, the rest are the unfused remainder.
@@ -187,7 +200,7 @@ const SYNC_LEDGER = (
   (name = "adaptive dt, BandRescaling :band",
    cfg = (; adaptive_dt = true, velocity_forcing = :band),                       achieved = 2, floor = 1),
   (name = "fixed dt, unforced",
-   cfg = (; adaptive_dt = false, velocity_forcing = :none),                      achieved = 0, floor = 0),
+   cfg = (; adaptive_dt = false, velocity_forcing = :none),                      achieved = 1, floor = 0),
   (name = "adaptive dt, unforced",
    cfg = (; adaptive_dt = true, velocity_forcing = :none),                       achieved = 1, floor = 1),
   (name = "adaptive dt, ConstantPower",
@@ -198,7 +211,7 @@ const SYNC_LEDGER = (
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total,
             turnover_budget = true),                                             achieved = 5, floor = 2),
   (name = "turnover-budgeted, fixed dt, unforced",
-   cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 2, floor = 1),
+   cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 3, floor = 1),
   # The warm-up surface — past step!, where the stationarity detector samples. ε is measured once
   # per iteration and shared with the turnover clock, so it appears here once, not twice.
   (name = "warm-up sample, BandRescaling :total",
@@ -305,17 +318,8 @@ const SYNC_LEDGER = (
     # (MATERIALIZED_SYMBOLS retired 2026-08-06 — its former liveness check is now the
     # "symbol tier stays closed" equality above.)
 
-    # The chart contract's gap is live exactly while the assumption is load-bearing: extending the
-    # charts' live range across the step must still raise the physical-vector count. When the
-    # boundary refresh lands and a chart shares its substage register, these become equal and
-    # CHART_CONTRACT must be retired here in the same commit.
-    charts_live = any((:RK3, :RK2)) do scheme
-      any((false, true)) do scalar
-        ops = scheme === :RK3 ? rk3_ops(scalar) : rk2_ops(scalar)
-        peak_liveness(ops; charts_live = true).physical_vector > peak_liveness(ops).physical_vector
-      end
-    end
-    @test charts_live                       # else retire CHART_CONTRACT
+    # (CHART_CONTRACT retired 2026-08-06: the boundary refresh landed, and the memory audit now
+    # asserts achieved == bound in every unforced cell — the equality this register demanded.)
 
     sync_holders = Set{String}()
     for row in SYNC_LEDGER, s in _syncs(; row.cfg...)
@@ -323,6 +327,7 @@ const SYNC_LEDGER = (
     end
     @test HOST_SIDE_FORCING_SCALARS.name in sync_holders
     @test UNFUSED_QUADRATIC_REDUCTIONS.name in sync_holders
+    @test UNIFORM_DEPOSIT_SCHEDULE.name in sync_holders
   end
 
   @testset "retired holders stay retired" begin
@@ -385,8 +390,13 @@ const SYNC_LEDGER = (
 
   @testset "every holder is dispositioned and described" begin
     for h in ALL_HOLDERS
-      @test h.disposition in (:FIX, :PF_RAISE)
+      @test h.disposition in (:FIX, :PF_RAISE, :DESIGN)
       @test !isempty(h.name) && length(h.what) > 40      # a holder names the cause, not just a label
+    end
+    # A `:DESIGN` holder must cite the decision that adopted the cost — it records a user choice,
+    # never a silent acceptance.
+    for h in ALL_HOLDERS
+      h.disposition === :DESIGN && @test occursin("decision", h.what)
     end
     # A `:FIX` holder is a local win left open, and the frozen list is what stops it becoming an
     # accepted cost by default: adding one requires editing OPEN_LOCAL_WINS, and taking the win

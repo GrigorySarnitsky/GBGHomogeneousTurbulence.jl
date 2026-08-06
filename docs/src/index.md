@@ -80,9 +80,11 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
-  advances, its physical recoveries, the `ObservablesCache` observation cache (stamped charts of the
-  physical velocity and vorticity, recomputed exactly when stale), and the random initial conditions —
-  a divergence-free velocity and a mean-zero scalar.
+  advances, its physical recoveries, and the random initial conditions — a divergence-free velocity
+  and a mean-zero scalar.
+- [`Cache`](api/Cache.md): the `ObservablesCache` — the stamped boundary storage each iteration
+  deposits its observables into at its tail; a read serves the deposited value or throws, and
+  nothing is recomputed on a read.
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes

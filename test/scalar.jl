@@ -14,14 +14,16 @@ using Test
 
 function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
-  derived = ObservablesCache(domain)
+  derived = ObservablesCache(domain; scalar = true)
   û = spectral_vector(domain)
   φ̂ = spectral_scalar(domain)
   copyto!(field_data(û), field_data(û0))
   copyto!(field_data(φ̂), field_data(φ̂0))
   state = ResolvedFields(û, φ̂)
+  deposit!(derived, state, domain, buffers)
   for _ in 1:nsteps
     step!(integrator, state, generator, domain, buffers, derived, dt)
+    deposit!(derived, state, domain, buffers)
   end
   return û, φ̂
 end

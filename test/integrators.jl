@@ -14,12 +14,14 @@ using Test
 function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   buffers = allocate_buffers(integrator, domain; scalar = true)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
-  derived = ObservablesCache(domain)
+  derived = ObservablesCache(domain; scalar = true)
   û = spectral_vector(domain)
   copyto!(field_data(û), field_data(û0))
   state = ResolvedFields(û, spectral_scalar(domain))
+  deposit!(derived, state, domain, buffers)                 # the seeding deposit
   for _ in 1:nsteps
     step!(integrator, state, generator, domain, buffers, derived, dt)
+    deposit!(derived, state, domain, buffers)               # the tail closes the iteration
   end
   return û
 end
@@ -66,29 +68,33 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     integrator = IFLowStorageRK3()
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    derived = ObservablesCache(domain)
+    derived = ObservablesCache(domain; scalar = true)
     û = spectral_vector(domain)
     copyto!(field_data(û), field_data(û0))
     state = ResolvedFields(û, spectral_scalar(domain))
+    deposit!(derived, state, domain, buffers)
     Δx = L / N
     cfl = recommended_cfl(integrator, domain)
     energies = T[]
     for _ in 1:200
-      u = physical_velocity(derived, state, domain)
-      dt = cfl * Δx / max(max_speed(u), 1e-6)
+      u = velocity_physical(derived)
+      dt = cfl * Δx / max(max_speed(derived), 1e-6)
       push!(energies, kinetic_energy(u))
       step!(integrator, state, generator, domain, buffers, derived, dt)
+      deposit!(derived, state, domain, buffers)
     end
     @test all(isfinite, energies)
     @test 0.05 < energies[end] < 10.0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
     @test rel_div < 1e-8
 
-    dt = cfl * Δx / max(max_speed(physical_velocity(derived, state, domain)), 1e-6)
+    dt = cfl * Δx / max(max_speed(derived), 1e-6)
     step!(integrator, state, generator, domain, buffers, derived, dt)                       # warm up
+    deposit!(derived, state, domain, buffers)
     bytes = @allocated step!(integrator, state, generator, domain, buffers, derived, dt)
+    deposit_bytes = @allocated deposit!(derived, state, domain, buffers)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
-    @test bytes < field_bytes
+    @test bytes + deposit_bytes < field_bytes
   end
 
   @testset "recommended_cfl" begin

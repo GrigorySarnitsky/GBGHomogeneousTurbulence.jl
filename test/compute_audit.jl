@@ -105,19 +105,24 @@ const TRANSFORM_GAP_HOLDERS = Dict(
 # kernel-composed projection/divergence or the composed shift-back kernel; and every kernel a base
 # op applies is a compressed symbol, so no op reads a field-scale configuration array. A
 # velocity-only step now moves NOTHING scalar-shaped at all — the zero columns are the assertion.
+# Re-frozen 2026-08-06 (decision 40, the deposit-driven cache): the op lists now model the full
+# ITERATION (step! + the tail deposit!), so the once-per-iteration maximum-speed reduction — always
+# performed, previously the run layer's un-audited pass — enters the ledger as +1 physical_vector in
+# every cell. Transforms froze IDENTICAL: the tail deposits are the former first-stage recoveries
+# relocated, never added.
 const PASSES_BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 9, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 42, physical_vector = 15, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 9, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 15, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 18, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 90, physical_vector = 30, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 25, physical_vector = 6, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 27, physical_vector = 10, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 25, physical_vector = 6, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 27, physical_vector = 10, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 47, physical_vector = 12, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 59, physical_vector = 20, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 90, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 47, physical_vector = 13, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 59, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).

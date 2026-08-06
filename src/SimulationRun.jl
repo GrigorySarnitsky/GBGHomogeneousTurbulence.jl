@@ -6,11 +6,12 @@
 # so a case is a few lines to set up and run, warm-up included, while every piece stays reachable for a
 # hand-run loop.
 #
-# Freshness is the observation cache's job, not a loop invariant: the physical u / ω are read through
-# the `ObservablesCache` accessors, which recompute an observable exactly when its stamp is behind the fields
-# epoch that `step!` advances. The tracer push interpolates u(tₙ) onto the tracers before the step and
-# u(tₙ₊₁) after it — Heun on the two endpoint velocities, both read through the accessors. Only the M
-# interpolated vectors are held across the step, never a second copy of the field.
+# The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
+# tail `deposit!` recovers the boundary observables into the cache and stamps them, and the boundary
+# completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
+# arithmetic, no grid pass. The tracer push interpolates u(tₙ) onto the tracers before the step (from
+# the boundary chart) and u(tₙ₊₁) after the tail deposit — Heun on the two endpoint velocities; only
+# the M interpolated vectors are held across the step, never a second copy of the field.
 
 """
     SimulationRun
@@ -29,14 +30,17 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, spectral_scalar, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
-using ..State: ResolvedFields, ObservablesCache, random_solenoidal_velocity!, random_scalar!
-import ..State: physical_velocity, physical_vorticity, resolved_fields_modified!
+using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
+using ..Cache: ObservablesCache, check_boundary, particles_modified!
+import ..Cache: velocity_physical, vorticity_physical, scalar_physical, max_speed,
+                resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
-                     integral_scale, derivative_skewness, max_speed
+                     integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
 using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
+import ..Propagator: deposit!
 using ..Particles: Tracers, record_trajectory_velocity!, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -67,8 +71,9 @@ the assembly scratch), the chosen integrator, the [`ResolvedFields`](@ref) state
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
-observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`) or through the cached
-physical views ([`physical_velocity`](@ref)`(sim)`, [`physical_vorticity`](@ref)`(sim)`), summarize it
+observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`) or through the cache's
+boundary observables ([`velocity_physical`](@ref)`(sim)`, [`vorticity_physical`](@ref)`(sim)`),
+summarize it
 with [`flow_parameters`](@ref), and track its progress with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
@@ -145,7 +150,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `derived` — the [`ObservablesCache`](@ref) observation cache (the stamped physical velocity/vorticity observables).
+- `derived` — the [`ObservablesCache`](@ref): the stamped boundary observables the iteration deposits at its tail.
 - `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
@@ -211,7 +216,9 @@ function Simulation(domain::FixedDomain;
 
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
 
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, ObservablesCache(domain),
+  derived = ObservablesCache(domain; scalar)
+  deposit!(derived, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, derived,
                     tracers, Float64(cfl), Clock(0.0, 0))
 end
 
@@ -222,17 +229,19 @@ function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
 end
 
 
-# Observables are functions of the state, not the `Simulation`: to diagnose a run, the caller supplies the
-# state fields and parameters explicitly — `kinetic_energy(sim.state.velocity)`, or `dissipation(ω, ν)`
-# after curling `sim.state.velocity` into the cache's spectral scratch. The run-layer functions below do
-# exactly that; the observable generics themselves never take a `Simulation`. (The `physical_velocity` /
-# `physical_vorticity` / `resolved_fields_modified!` `sim` methods are accessors of the observation
-# cache, not observables — they unpack `sim` for the `State` generics, whose docstrings are the home.)
+# Observables are functions of the state, not the `Simulation`: to diagnose a run, the caller supplies
+# the state fields and parameters explicitly — `kinetic_energy(sim.state.velocity)`. The run-layer
+# functions below do exactly that; the observable generics themselves never take a `Simulation`. (The
+# `sim` methods below are thin forwarders to the cache accessors, whose docstrings are the home: the
+# user's callback receives `sim` and reads the run, never the machinery path inside it.)
 
 
-physical_velocity(sim::Simulation) = physical_velocity(sim.derived, sim.state, sim.domain)
-physical_vorticity(sim::Simulation) = physical_vorticity(sim.derived, sim.state, sim.domain)
+velocity_physical(sim::Simulation) = velocity_physical(sim.derived)
+vorticity_physical(sim::Simulation) = vorticity_physical(sim.derived)
+scalar_physical(sim::Simulation) = scalar_physical(sim.derived)
+max_speed(sim::Simulation) = max_speed(sim.derived)
 resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.derived); sim)
+deposit!(sim::Simulation) = (deposit!(sim.derived, sim.state, sim.domain, sim.buffers); sim)
 
 
 """
@@ -321,12 +330,12 @@ _turnover_time(sim::Simulation, ε::Real) =
 
 
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
-# makes diffusion exact, so only the advective limit applies).
+# makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
+# deposited number — the previous tail measured it — so choosing Δt is scalar arithmetic, not a pass.
 function cfl_timestep(sim::Simulation)
-  u = physical_velocity(sim)
-  N = size(field_data(u), 1)
+  N = size(field_data(sim.derived.velocity), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
-  speed = Float64(max_speed(u))
+  speed = max_speed(sim.derived)
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
   return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
 end
@@ -342,16 +351,20 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # Put u(tₙ) on record along the trajectories before the step advances the fields epoch — M
-  # interpolated vectors, so the endpoint velocity never costs a second copy of the field.
+  # Put u(tₙ) on record along the trajectories before the step takes the boundary chart as scratch —
+  # M interpolated vectors, so the endpoint velocity never costs a second copy of the field.
   sim.tracers === nothing ||
-    record_trajectory_velocity!(sim.tracers, physical_velocity(sim))
+    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived))
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.derived, Δt)
 
-  # The accessor recomputes u(tₙ₊₁) from the advanced û — the end-of-step field of the Heun pair.
+  # The tail: deposit the boundary observables from the state the step just produced, then complete
+  # the tracer push from the deposited u(tₙ₊₁) — the end-of-step field of the Heun pair.
+  deposit!(sim.derived, sim.state, sim.domain, sim.buffers)
   sim.tracers === nothing ||
-    advect!(sim.tracers, physical_velocity(sim), sim.domain, Δt)
+    (advect!(sim.tracers, velocity_physical(sim.derived), sim.domain, Δt);
+     particles_modified!(sim.derived))
+  check_boundary(sim.derived)
 
   sim.clock.time += Δt
   sim.clock.step += 1

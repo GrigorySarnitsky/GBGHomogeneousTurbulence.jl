@@ -12,8 +12,10 @@
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
 # the instruments, the run layer, and the reference laws are named by their job.
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
-#   State            — the spectral state + its physical recoveries + the ObservablesCache observation
-#                      cache + initial conditions (the MZ State role)
+#   State            — the spectral state + its physical recoveries + initial conditions (the MZ
+#                      State role)
+#   Cache            — the ObservablesCache: the stamped boundary storage the iteration deposits its
+#                      observables into (no-recompute; slots double as the step's registers)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
 #                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!)
@@ -49,6 +51,7 @@ include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
 include("State.jl")
+include("Cache.jl")
 include("Forcing.jl")
 include("Generator.jl")
 include("Observables.jl")
@@ -77,13 +80,15 @@ using .State:
   velocity_to_physical!,
   vorticity_to_physical!,
   scalar_to_physical!,
-  ObservablesCache,
-  physical_velocity,
-  physical_vorticity,
-  resolved_fields_modified!,
-  spectral_scratch,
   random_solenoidal_velocity!,
   random_scalar!
+
+using .Cache:
+  ObservablesCache,
+  velocity_physical,
+  vorticity_physical,
+  scalar_physical,
+  resolved_fields_modified!
 
 using .Generator:
   FlowConditions,
@@ -125,6 +130,7 @@ using .Propagator:
   IntegratorBuffers,
   allocate_buffers,
   step!,
+  deposit!,
   recommended_cfl
 
 using .Particles:
@@ -152,10 +158,10 @@ using .SimulationRun:
 export FixedDomain,
        ResolvedFields,
        ObservablesCache,
-       physical_velocity,
-       physical_vorticity,
+       velocity_physical,
+       vorticity_physical,
+       scalar_physical,
        resolved_fields_modified!,
-       spectral_scratch,
        spectral_vector,
        physical_vector,
        spectral_scalar,
@@ -205,6 +211,7 @@ export FixedDomain,
        IntegratorBuffers,
        allocate_buffers,
        step!,
+       deposit!,
        recommended_cfl,
        FlowConditions,
        Tracers,
