@@ -635,15 +635,20 @@ end
 
 
 """
-    warmup!(sim; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
-            window_turnovers = 4, tol = 0.05, skew_floor = 0.1, max_turnovers = 60)
+    warmup!(sim; kwargs...)
 
-Spin `sim` up to a statistically stationary state before measurement, and return it — the one-line
-sugar for `run!(StationarityCriterion(; …), sim)`, forwarding every keyword to
-[`StationarityCriterion`](@ref) (the packaged detecting observation: a flat dissipation over a
-trailing window, with the scalar-variance and derivative-skewness gates on by default, giving up
-with a warning at `max_turnovers`). For a fixed spin-up budget, write the three-line budget
-callback instead (see [`run!`](@ref)).
+Sugar, and nothing more: `warmup!(sim; kwargs...)` is exactly
+
+```julia
+run!(StationarityCriterion(; kwargs...), sim)
+```
+
+— it spins `sim` up to a statistically stationary state before measurement and returns it, by
+running the observation-first loop with the packaged stationarity observation. Every keyword is
+passed through to [`StationarityCriterion`](@ref) untouched; its docstring is the home for what is
+detected (the flat dissipation, the scalar-variance and derivative-skewness gates, the give-up cap)
+and for every option. For a fixed spin-up budget, write the three-line budget callback instead
+(see [`run!`](@ref)).
 
 # Examples
 ```julia
