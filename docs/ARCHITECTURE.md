@@ -1509,6 +1509,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol\omega}`` is
     materialized nowhere), and a `MethodError` is the honest answer.
 
+44. **(2026-08) The tail relocation stops at the recoveries: the nonlinear terms are not cached.**
+    The cache design's full relocation — assembling the dealiased
+    ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})`` and
+    ``-\nabla\cdot(\boldsymbol{u}\varphi)`` at the tail, so the next first stage reads them — was
+    written in the third-array world and is **incompatible with decision 41**: the products now form
+    in place over the velocity and vorticity slots, so a tail assembly would destroy the deposited
+    charts the observation exists to serve, and keeping both would re-add the product array
+    (one physical vector, 402 MiB at ``256^3``/Float64). Minimal footprint trumps compute
+    (invariant 4), and the relocation buys no compute — transform counts are identical either way —
+    so the products stay in the first stage and the design page's §2.4 rows go to *no* by the
+    design's own survival test (contents are a property of the solver's storage decisions). The
+    `PhaseShift` transform saving that motivated the relocation (the scalar assembly's re-recovery
+    of the displaced velocity the velocity assembly left fresh) does not need it: the two
+    assemblies are adjacent *within every stage*, so a same-stage freshness contract on the
+    displaced scratch recovers all nine inverse transforms — stage 1's three included — which is
+    the roadmap's next step.
+
 ---
 
 ## References

@@ -113,12 +113,13 @@ than averages over a run, and the frozen ledgers report the true cost.
 
 **Everything is deposited at the tail of the iteration, from the state it has just produced.**
 For a field the deposit is the next iteration's first-stage recovery moved earlier,
-so it costs nothing: the next iteration reads instead of recovering. The move is more general than
-the recoveries. Everything in the next step's first stage that depends on the state alone — the
-recoveries, the quadratic products, their dealiasing and projection — can run at the tail,
-value-identical because nothing between the tail and the next first stage touches the state, and at
-an unchanged transform count; only the forcing's contribution stays behind, since it needs the step
-size the next iteration has not yet chosen. The numbers and the particle sample ride the same
+so it costs nothing: the next iteration reads instead of recovering. The move stops at the
+recoveries by a storage decision, not a value obstruction: the quadratic products and their
+projection are state-only too, and would relocate value-identically at an unchanged transform
+count — but they form in place over the velocity and vorticity slots (§2.3), so running them at the
+tail would destroy the deposited charts, and keeping both would cost the product array the
+minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
+step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
 schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
 timestep choice, and the trajectory sample is interpolated from that velocity at each particle's new
 position for the next push's predictor.
@@ -314,9 +315,9 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\varphi`` | physical, grid | yes | yes | the tail recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the trajectory sample | ``M\times3`` at points | yes | yes | the tail interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
 | the maximum speed | one number | yes | yes | the tail reduction over the cached velocity; read by the next timestep choice |
-| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | yes | no | the relocated first-stage evaluation (§1.3); read by the next step's first stage |
-| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | yes | no | the relocated first-stage evaluation (§1.3); read by the next step's first stage |
-| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | depends | — | survives the tail of a velocity-only run; with a scalar, the flux ``\boldsymbol{u}\varphi`` reuses its register and is the survivor instead |
+| ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the tail would destroy the deposited charts — keeping both needs a product array the minimal-memory schedule does not carry |
+| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
+| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
 | ``E(\kappa)`` | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
@@ -387,13 +388,7 @@ throw on a stale, taken, or never-deposited read, the seeding deposit at constru
 completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes every boundary the run reaches — ``n`` iterations, ``n + 1``
 observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
-stopping is the caller's decision on observables and the budget vocabulary is gone. One gap
-remains:
-
-- **The relocated first-stage evaluation of §1.3 stops at the recoveries.** The two dealiased
-  nonlinear terms are still assembled at the next step's first stage, not deposited at the tail, so
-  the ``\mathbb P(\boldsymbol{u}\times\boldsymbol{\omega})`` and
-  ``-\nabla\cdot(\boldsymbol{u}\varphi)`` rows of §2.4 — and the displaced boundary fields a
-  `PhaseShift` tail would leave with them — are design, not code.
-
-The decision record is in the [architecture notes](architecture.md).
+stopping is the caller's decision on observables and the budget vocabulary is gone. What §1.3
+records as the storage decision — the nonlinear terms stay in the first stage because the in-place
+products would otherwise destroy the deposited charts — closes the list: the page and the code
+agree. The decision record is in the [architecture notes](architecture.md).
