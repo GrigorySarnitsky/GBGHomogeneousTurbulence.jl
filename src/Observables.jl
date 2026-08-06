@@ -217,8 +217,9 @@ end
 
 The measured kinetic-energy spectrum ``E(\\kappa)`` of the velocity field `û` (in spectral
 representation) — the turbulent kinetic energy resolved over wavenumber-magnitude shells,
-``k = \\sum_\\kappa E(\\kappa)``. Returns `(κ, E)`: the shell-center wavenumber magnitudes and the energy
-in each shell (brought to the host, an occasional diagnostic). It is the `GBGPeriodicFields` radial
+``k = \\sum_\\kappa E(\\kappa)``. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
+wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (brought to the host, an
+occasional diagnostic; positional destructuring `κ, E = energy_spectrum(û, domain)` also works). It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
@@ -226,7 +227,7 @@ spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
-  return Array(shells), Array(0.5 .* spec)
+  return (; wavenumbers = Array(shells), energy = Array(0.5 .* spec))
 end
 
 

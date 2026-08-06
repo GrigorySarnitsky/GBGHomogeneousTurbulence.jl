@@ -56,7 +56,7 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, state, generator, domain, buffers, derived, dt)`, advancing the `state`'s
+[`step!`](@ref)`(integrator, state, generator, domain, buffers, cache, dt)`, advancing the `state`'s
 velocity ``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one
 timestep in place, and may specialize
 [`recommended_cfl`](@ref).
@@ -152,24 +152,29 @@ function allocate_buffers end
 
 
 """
-    step!(integrator, state, generator, domain, buffers, derived, dt)
+    step!(integrator, state, generator, domain, buffers, cache, dt)
 
 Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
 reified `generator` (a [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
 the equations of motion, their conditions, and their assembly scratch), the `domain`, the scheme's
-`buffers`, and the run's observables cache `derived` (an
+`buffers`, and the run's observables cache `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`).
 
 A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
 right-hand sides and exact linear factors through the generator protocol at each stage, and closes
 with the generator's `finalize!` — it never assembles the physics itself. The first stage reads the
-boundary velocity, vorticity, and scalar in physical representation from `derived` (a **boundary**
+boundary velocity, vorticity, and scalar in physical representation from `cache` (a **boundary**
 being the instant between iterations, where the cache's deposits are current) — deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
 stages take the same slots as their recovery registers, so the step allocates and resides nothing
 beyond its spectral stage registers. The cache's fields epoch is advanced when the step completes.
+
+The argument order is shared with [`deposit!`](@ref), the call that closes the iteration: the
+dispatch object leads (the scheme here, the cache there), the common arguments follow in the fixed
+order `state`, `domain`, `buffers` (with `generator` after `state` and `cache`, `dt` closing this
+signature), so the chained pair transposes nothing.
 
 !!! note
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
@@ -214,7 +219,7 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
-               domain::FixedDomain, buffers::IntegratorBuffers, derived::ObservablesCache, dt::Real)
+               domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -229,15 +234,15 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
 
   for i in 1:3
     if i == 1
-      u = velocity_physical(derived)                     # the boundary observables, deposited by the
-      ω = vorticity_physical(derived)                    # previous iteration's tail (never recomputed)
-      take_vorticity!(derived)                           # the assembly forms the Lamb vector in ω's register
-      has_scalar && take_velocity!(derived)              # …and, with a scalar, the flux in u's register
+      u = velocity_physical(cache)                     # the boundary observables, deposited by the
+      ω = vorticity_physical(cache)                    # previous iteration's tail (never recomputed)
+      take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
+      has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
     else
       # From stage 2 on the cache slots ARE the recovery registers: take them (their stamps go to
       # scratch, so a mid-iteration read throws) and recover the stage state into them. The spectral
       # scratch is `nonlinear` — dead here, consumed into the accumulator at the previous stage.
-      u, ω = take_velocity!(derived), take_vorticity!(derived)
+      u, ω = take_velocity!(cache), take_vorticity!(cache)
       velocity_to_physical!(u, û, domain, buffers.nonlinear)
       vorticity_to_physical!(ω, û, domain, buffers.nonlinear)
     end
@@ -249,9 +254,9 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     velocity_rhs!(buffers.nonlinear, generator, û, u, ω, domain)                  # N̂_u
     if has_scalar
       if i == 1
-        φ = scalar_physical(derived)                                             # the boundary scalar
+        φ = scalar_physical(cache)                                             # the boundary scalar
       else
-        φ = take_scalar!(derived)
+        φ = take_scalar!(cache)
         scalar_to_physical!(φ, φ̂, domain, sb.nonlinear)                          # φ at the stage state
       end
       scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, φ, domain)                   # N̂_φ (N̂_u already banked)
@@ -283,7 +288,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(derived)                     # the step advanced the fields — the cache goes stale
+  resolved_fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 
@@ -323,7 +328,7 @@ struct IFRK2 <: AbstractIntegrator end
 
 
 function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
-               domain::FixedDomain, buffers::IntegratorBuffers, derived::ObservablesCache, dt::Real)
+               domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity, state.scalar
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
@@ -336,13 +341,13 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # stage 1 — right-hand sides at the boundary state, read from the cache (deposited by the previous
   # iteration's tail; never recomputed). The assemblies consume the chart registers — the Lamb vector
   # forms in the vorticity's, and the scalar flux in the velocity's — so those slots are taken first.
-  u = velocity_physical(derived)
-  ω = vorticity_physical(derived)
-  take_vorticity!(derived)
-  has_scalar && take_velocity!(derived)
+  u = velocity_physical(cache)
+  ω = vorticity_physical(cache)
+  take_vorticity!(cache)
+  has_scalar && take_velocity!(cache)
   velocity_rhs!(buffers.stage1, generator, û, u, ω, domain)                      # N̂_u,1
   if has_scalar
-    scalar_rhs!(sb.stage1, generator, û, φ̂, u, scalar_physical(derived), domain)  # N̂_φ,1
+    scalar_rhs!(sb.stage1, generator, û, φ̂, u, scalar_physical(cache), domain)  # N̂_φ,1
   end
 
   # Predictors û*, φ̂*, and the corrector's integrating-factor rotations banked in the same visit.
@@ -363,12 +368,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
 
   # stage 2 — right-hand sides at the predictor state. The cache slots are taken as the recovery
   # registers (stamps to scratch); `stage2` is the spectral scratch, written by the assembly just after.
-  u_star, ω_star = take_velocity!(derived), take_vorticity!(derived)
+  u_star, ω_star = take_velocity!(cache), take_vorticity!(cache)
   velocity_to_physical!(u_star, buffers.velocity_star_spectral, domain, buffers.stage2)
   vorticity_to_physical!(ω_star, buffers.velocity_star_spectral, domain, buffers.stage2)
   velocity_rhs!(buffers.stage2, generator, buffers.velocity_star_spectral, u_star, ω_star, domain)  # N̂_u,2
   if has_scalar
-    φ_star = take_scalar!(derived)
+    φ_star = take_scalar!(cache)
     scalar_to_physical!(φ_star, sb.star_spectral, domain, sb.stage2)
     scalar_rhs!(sb.stage2, generator, buffers.velocity_star_spectral, sb.star_spectral, u_star, φ_star, domain)  # N̂_φ,2
   end
@@ -384,7 +389,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(derived)                     # the step advanced the fields — the cache goes stale
+  resolved_fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 
@@ -427,11 +432,11 @@ _recovery_scratch(sb::ScalarBuffers) =
 
 
 """
-    deposit!(derived, state, domain, buffers)
+    deposit!(cache, state, domain, buffers)
     deposit!(sim)
 
 Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
-configuration holds, the same set every iteration — into `derived` (an
+configuration holds, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
 `ResolvedFields`) the step has just produced, and stamp each slot at the current boundary. The
 deposits are the next iteration's first-stage work moved to the tail — the velocity, vorticity, and
@@ -442,24 +447,26 @@ spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is de
 
 Every iteration ends with this call: the run layer's `advance!` performs it after `step!`, a
 hand-run loop calls it itself, and the `Simulation` constructor makes the seeding deposit so the
-first iteration finds the initial state's observables. After mutating the state out of band, announce
+first iteration finds the initial state's observables. The argument order is shared with `step!` —
+the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
+same fixed order as there. After mutating the state out of band, announce
 it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
 """
-function deposit!(derived::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
+function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)
-  u = take_velocity!(derived)
+  u = take_velocity!(cache)
   velocity_to_physical!(u, state.velocity, domain, _recovery_scratch(buffers))
-  deposit_velocity!(derived)
-  ω = take_vorticity!(derived)
+  deposit_velocity!(cache)
+  ω = take_vorticity!(cache)
   vorticity_to_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
-  deposit_vorticity!(derived)
-  if state.scalar !== nothing && derived.scalar !== nothing
-    φ = take_scalar!(derived)
+  deposit_vorticity!(cache)
+  if state.scalar !== nothing && cache.scalar !== nothing
+    φ = take_scalar!(cache)
     scalar_to_physical!(φ, state.scalar, domain, _recovery_scratch(buffers.scalar))
-    deposit_scalar!(derived)
+    deposit_scalar!(cache)
   end
-  deposit_max_speed!(derived, max_speed(u))
-  return derived
+  deposit_max_speed!(cache, max_speed(u))
+  return cache
 end
 
 

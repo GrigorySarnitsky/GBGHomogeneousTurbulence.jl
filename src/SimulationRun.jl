@@ -1,6 +1,6 @@
 # SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, the reified
 # generator (the equations of motion with their conditions and assembly scratch), the integrator, the
-# spectral state (û, φ̂), the derived-field observation cache, and any tracers;
+# spectral state (û, φ̂), the observables cache, and any tracers;
 # `advance!`/`run!`/`warmup!` own the CFL-adaptive time loop. It holds no physics or numerics of its
 # own — it wires the pieces of SimulationDomain/State/Generator/Observables/Forcing/Propagator/Particles
 # so a case is a few lines to set up and run, warm-up included, while every piece stays reachable for a
@@ -163,7 +163,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `derived` — the [`ObservablesCache`](@ref): the stamped boundary observables the iteration deposits at its tail.
+- `cache` — the [`ObservablesCache`](@ref): the stamped boundary observables the iteration deposits at its tail.
 - `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
@@ -173,7 +173,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR}
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   integrator::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
-  derived::DF              # ObservablesCache: the stamped observation cache over the state
+  cache::DF              # ObservablesCache: the stamped observation cache over the state
   tracers::TR              # Tracers, or nothing
   cfl::Float64
   clock::Clock
@@ -229,12 +229,12 @@ function Simulation(domain::FixedDomain;
 
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
 
-  derived = ObservablesCache(domain; scalar,
+  cache = ObservablesCache(domain; scalar,
                              trajectory_sample = tracers === nothing ? nothing : tracers.trajectory_velocity)
-  deposit!(derived, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
+  deposit!(cache, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
   tracers === nothing ||
-    (record_trajectory_velocity!(tracers, velocity_physical(derived)); deposit_sample!(derived))
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, derived,
+    (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, cache,
                     tracers, Float64(cfl), Clock(0.0, 0))
 end
 
@@ -282,20 +282,20 @@ particle_positions(sim::Simulation) =
     throw(ArgumentError("this run advects no tracers")) : particle_positions(sim.tracers)
 
 
-velocity_physical(sim::Simulation) = velocity_physical(sim.derived)
-vorticity_physical(sim::Simulation) = vorticity_physical(sim.derived)
-scalar_physical(sim::Simulation) = scalar_physical(sim.derived)
-max_speed(sim::Simulation) = max_speed(sim.derived)
-particle_velocities(sim::Simulation) = particle_velocities(sim.derived)
-resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.derived); sim)
+velocity_physical(sim::Simulation) = velocity_physical(sim.cache)
+vorticity_physical(sim::Simulation) = vorticity_physical(sim.cache)
+scalar_physical(sim::Simulation) = scalar_physical(sim.cache)
+max_speed(sim::Simulation) = max_speed(sim.cache)
+particle_velocities(sim::Simulation) = particle_velocities(sim.cache)
+resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.cache); sim)
 
 function deposit!(sim::Simulation)
-  deposit!(sim.derived, sim.state, sim.domain, sim.buffers)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   # The trajectory sample rides the same re-deposit: the positions are unchanged, so re-recording
   # from the freshly deposited velocity restores the sample the announcement made stale.
   sim.tracers === nothing ||
-    (record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived));
-     deposit_sample!(sim.derived))
+    (record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache));
+     deposit_sample!(sim.cache))
   return sim
 end
 
@@ -381,9 +381,9 @@ current_step(sim::Simulation) = sim.clock.step
 # makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
 # deposited number — the previous tail measured it — so choosing Δt is scalar arithmetic, not a pass.
 function cfl_timestep(sim::Simulation)
-  N = size(field_data(sim.derived.velocity), 1)
+  N = size(field_data(sim.cache.velocity), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
-  speed = max_speed(sim.derived)
+  speed = max_speed(sim.cache)
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
   return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
 end
@@ -402,22 +402,22 @@ function advance!(sim::Simulation; dt = nothing)
   # The checked read at the head boundary: the push's v₁ must be the trajectory sample the previous
   # tail deposited. It is consumed mid-iteration (after the step, as the solver's own scratch), so
   # the stamp is verified here, at tₙ, where the sample is the current boundary observable.
-  sim.tracers === nothing || particle_velocities(sim.derived)
+  sim.tracers === nothing || particle_velocities(sim.cache)
 
-  step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.derived, Δt)
+  step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
   # The tail: deposit the boundary observables from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
   # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
   # positions from the same deposited field, closing the boundary.
-  deposit!(sim.derived, sim.state, sim.domain, sim.buffers)
+  deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
-    advect!(sim.tracers, velocity_physical(sim.derived), sim.domain, Δt)
-    particles_modified!(sim.derived)
-    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived))
-    deposit_sample!(sim.derived)
+    advect!(sim.tracers, velocity_physical(sim.cache), sim.domain, Δt)
+    particles_modified!(sim.cache)
+    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))
+    deposit_sample!(sim.cache)
   end
-  check_boundary(sim.derived)
+  check_boundary(sim.cache)
 
   sim.clock.time += Δt
   sim.clock.step += 1

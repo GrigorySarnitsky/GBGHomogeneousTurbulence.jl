@@ -200,13 +200,13 @@ using Test
 
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
-    derived = ObservablesCache(domain; scalar = true)
+    cache = ObservablesCache(domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions; scalar = true)
-    deposit!(derived, state, domain, buffers)
+    deposit!(cache, state, domain, buffers)
     for _ in 1:80
-      step!(IFLowStorageRK3(), state, generator, domain, buffers, derived, 0.012)
-      deposit!(derived, state, domain, buffers)
+      step!(IFLowStorageRK3(), state, generator, domain, buffers, cache, 0.012)
+      deposit!(cache, state, domain, buffers)
     end
     S = derivative_skewness(û, domain)
     @test isfinite(S) && -1.5 < S < -0.05

@@ -130,16 +130,16 @@ using Test
     function integrate(integrator, dt, nsteps)
       b = allocate_buffers(integrator, domain; scalar = true)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
-      derived = ObservablesCache(domain; scalar = true)
+      cache = ObservablesCache(domain; scalar = true)
       û = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
       φ̂ = GBGIsotropicTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
       copyto!(field_data(û), field_data(û0))
       copyto!(field_data(φ̂), field_data(φ̂0))
       state = ResolvedFields(û, φ̂)
-      deposit!(derived, state, domain, b)
+      deposit!(cache, state, domain, b)
       for _ in 1:nsteps
-        step!(integrator, state, generator, domain, b, derived, dt)
-        deposit!(derived, state, domain, b)
+        step!(integrator, state, generator, domain, b, cache, dt)
+        deposit!(cache, state, domain, b)
       end
       return û, φ̂
     end
