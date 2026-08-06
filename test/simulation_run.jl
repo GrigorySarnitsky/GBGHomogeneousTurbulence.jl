@@ -35,7 +35,7 @@ using Test
     end
     @test !isempty(samples) && all(isfinite, samples)          # the interval callback fired
     @test current_time(sim) ≥ t0 + 0.3
-    @test all(0 .<= tracer_positions(sim.tracers) .< L)        # tracers advected, still in the box
+    @test all(0 .<= particle_positions(sim.tracers) .< L)        # tracers advected, still in the box
     @test isfinite(kinetic_energy(sim.state.velocity)) && isfinite(scalar_variance(sim.state.scalar))
   end
 

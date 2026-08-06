@@ -291,8 +291,8 @@ representation at once. The vorticity is deposited at the tail either way, so th
 run's residency, not the cache's contents.
 
 The tracer scheme consumes two velocity samples per push. The first, the **trajectory sample**
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the cache's deposit from the previous tail
-`(not yet — §3.2)`; the second is evaluated at ``t_{n+1}``, at a predicted position the particle never
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the cache's deposit from the previous tail; the
+second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
@@ -368,8 +368,9 @@ no deposit is current. [`deposit!`](@ref) closes an iteration (the run layer's `
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`resolved_fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields, not a filtered subset of the scales — after which reads
-throw until an explicit `deposit!`. [`tracer_velocities`](@ref) returns the trajectory sample, and
-[`sample!`](@ref) interpolates any physical field at the particle positions.
+throw until an explicit `deposit!`. [`particle_velocities`](@ref) returns the trajectory sample —
+a cached read like the fields' — and [`sample!`](@ref) interpolates any physical field at the
+particle positions.
 
 ```julia
 domain = FixedDomain(64, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
@@ -379,9 +380,10 @@ cache  = ObservablesCache(domain; scalar = true)   # the slots follow the config
 ### 3.2 What is not built
 
 The cache itself is built as §§1–2 describe: automatic contents, tail deposits stamped at the new
-boundary, three-valued stamps that throw on a stale, taken, or never-deposited read, the seeding
-deposit at construction, the boundary completeness check, and the slot=register merge. Three gaps
-remain, each a piece of the run layer's redesign rather than of the cache:
+boundary — the trajectory sample included, stamped against both epochs — three-valued stamps that
+throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the boundary
+completeness check, and the slot=register merge. Two gaps remain, each a piece of the run layer's
+redesign rather than of the cache:
 
 - **Stopping belongs to `run!`, not to the observation.** The loop takes its budget and stopping
   condition as arguments (`turnovers`, `time`, `steps`, `stop`), measures ``\varepsilon`` and ``k``
@@ -391,8 +393,5 @@ remain, each a piece of the run layer's redesign rather than of the cache:
   its ``n+1`` boundaries; the initial state — the seeded spectrum a validation run most wants — is
   never observed. With it comes the relocated first-stage evaluation of §1.3: the two dealiased
   nonlinear terms are still assembled at the next step's first stage, not deposited at the tail.
-- **The trajectory sample lives with the particle set.** The sample's values are the boundary values
-  (it is interpolated from the deposited velocity chart), but it is stored on the tracers and its
-  own documentation states whether it is current, rather than a stamp carrying that status.
 
 The decisions behind each are in the [architecture notes](architecture.md).

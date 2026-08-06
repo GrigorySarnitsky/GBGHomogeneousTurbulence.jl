@@ -348,8 +348,8 @@ const SYNC_LEDGER = (
     @test all(a -> !(a isa AbstractArray) || length(a) <= 3 * tracer_count, owned)
     # …including the point-value buffers, which is where a retained field would have to hide: the
     # recorded start-of-step velocity is M interpolated vectors, read back through the public readout.
-    @test size(tracer_positions(sim.tracers)) == (tracer_count, 3)
-    @test size(tracer_velocities(sim.tracers)) == (tracer_count, 3)
+    @test size(particle_positions(sim.tracers)) == (tracer_count, 3)
+    @test size(particle_velocities(sim.derived)) == (tracer_count, 3)
 
     # (b) An unforced field carries no linear-rate array: the storage tracks the physics.
     unforced = ResolvedGenerator(domain, FlowConditions(; viscosity = 0.1, schmidt = 1.0,

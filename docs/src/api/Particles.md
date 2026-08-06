@@ -16,8 +16,7 @@ Tracers
 ```
 
 ```@docs
-tracer_positions
-tracer_velocities
+particle_positions
 number_of_tracers
 ```
 

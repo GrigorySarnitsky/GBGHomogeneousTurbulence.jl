@@ -17,6 +17,8 @@ for the run's own components and any observation to read:
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - `max_speed` — the cached maximum speed, the number the timestep choice reads (one generic with
   the field reduction in `Observables`, whose docstring is the home).
+- [`particle_velocities`](@ref) — the checked read of the trajectory sample
+  ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the Lagrangian velocity along each trajectory.
 - [`resolved_fields_modified!`](@ref) — announce a state mutation made outside the iteration, so
   every stamp is cleared and reads throw until the next deposit.
 
@@ -25,10 +27,11 @@ side of the contract; a caller reads through the accessors and never deposits.
 """
 module Cache
 
+using GBGPeriodicFields: point_values
 using ..SimulationDomain: FixedDomain, physical_vector, physical_scalar
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       resolved_fields_modified!
+       particle_velocities, resolved_fields_modified!
 
 
 # Stamp sentinels. A slot's stamp is the fields epoch it was deposited at; the sentinels mark the
@@ -39,18 +42,21 @@ const SCRATCH = -1
 
 
 """
-    ObservablesCache(domain; scalar = false)
+    ObservablesCache(domain; scalar = false, trajectory_sample = nothing)
 
 The observables cache of a run — the stamped storage where each iteration deposits, at its tail, the
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
-representation when the run carries one, and the maximum speed ``\\max_i\\lvert u_i\\rvert`` (the
-number the next timestep choice reads). The contents are automatic — derived from the configuration,
-never declared: the cache holds exactly what the iteration computes, materializes, and leaves alive
-at the boundary, and nothing may be added on any cost axis.
+representation when the run carries one, the maximum speed ``\\max_i\\lvert u_i\\rvert`` (the
+number the next timestep choice reads), and — when the run advects tracers — the trajectory sample
+``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
+configuration, never declared: the cache holds exactly what the iteration computes, materializes,
+and leaves alive at the boundary, and nothing may be added on any cost axis.
 
 Build it on a [`FixedDomain`](@ref) `domain`; pass `scalar = true` when the run evolves a passive
-scalar (it adds the scalar's slot). The `Simulation` front door builds and seeds one for you.
+scalar (it adds the scalar's slot), and `trajectory_sample` — the tracer set's own point-value
+storage — when the run advects tracers (the slot IS that storage, stamped here; the tracers' push
+writes it). The `Simulation` front door builds, wires, and seeds one for you.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
@@ -69,29 +75,36 @@ reports a scheduling error, and the only repair is to fix the schedule that fail
 - `velocity_stamp`, `vorticity_stamp`, `scalar_stamp`, `max_speed_stamp` — each slot's stamp: the
   fields epoch it was deposited at, or a sentinel (never deposited / in use as scratch).
 - `max_speed` — the cached maximum speed (a host number).
+- `trajectory_sample` — the trajectory-sample slot (the tracer set's `(M, 3)` point values), or
+  `nothing` for a tracer-free run; `sample_fields_stamp` / `sample_particles_stamp` are its stamps
+  against BOTH epochs, since the sample is a function of the state and the positions together.
 - `fields_epoch` — the state's epoch: advanced by every completed step and by
   [`resolved_fields_modified!`](@ref); a stamp is current exactly when it equals this.
-- `particles_epoch` — the tracer positions' epoch (advanced by the tracer push), for the
-  trajectory-bound observables.
+- `particles_epoch` — the tracer positions' epoch (advanced by the tracer push), the second
+  freshness axis of the trajectory-bound slots.
 """
-mutable struct ObservablesCache{PV, PS}
+mutable struct ObservablesCache{PV, PS, TS}
   const velocity::PV
   const vorticity::PV
   const scalar::PS
+  const trajectory_sample::TS
   velocity_stamp::Int
   vorticity_stamp::Int
   scalar_stamp::Int
   max_speed::Float64
   max_speed_stamp::Int
+  sample_fields_stamp::Int
+  sample_particles_stamp::Int
   fields_epoch::Int
   particles_epoch::Int
 end
 
-ObservablesCache(domain::FixedDomain; scalar::Bool = false) =
+ObservablesCache(domain::FixedDomain; scalar::Bool = false, trajectory_sample = nothing) =
   ObservablesCache(physical_vector(domain), physical_vector(domain),
                    scalar ? physical_scalar(domain) : nothing,
+                   trajectory_sample,
                    NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
-                   NaN, NEVER_DEPOSITED, 1, 1)
+                   NaN, NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
 
 
 # The checked read shared by every accessor: serve the slot only when its stamp names the current
@@ -166,6 +179,35 @@ function max_speed(cache::ObservablesCache)
 end
 
 
+"""
+    particle_velocities(cache)
+    particle_velocities(sim)
+
+The trajectory sample ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the current boundary — the
+``(M, 3)`` array of the flow velocity at the position each tracer occupies, at the boundary it
+occupies it: the genuine Lagrangian velocity the statistics accumulate. The checked read of the
+[`ObservablesCache`](@ref) `cache`'s trajectory-sample slot: it serves the deposited values or
+throws, like every cached read — the sample depends on the state **and** the positions, so it is
+current only when both epochs match its stamps. Throws an `ArgumentError` when the run advects no
+tracers. The second form reads a `Simulation`'s cache.
+
+!!! note
+    This is never the second velocity of the tracer push's Heun pair: that one is evaluated at a
+    *predicted* position no tracer ever occupies — a stage register of the scheme, not a sample of
+    the flow — and it is not readable.
+"""
+function particle_velocities(cache::ObservablesCache)
+  cache.trajectory_sample === nothing &&
+    throw(ArgumentError("this run advects no tracers, so the cache has no trajectory-sample slot"))
+  cache.sample_fields_stamp == cache.fields_epoch &&
+    cache.sample_particles_stamp == cache.particles_epoch ||
+    error("the cached trajectory sample is stale: the state or the tracer positions have advanced " *
+          "past the deposited values, and nothing in the cache is ever recomputed; read at a " *
+          "boundary, after the tail deposit")
+  return point_values(cache.trajectory_sample)
+end
+
+
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The producers' side: take a slot as scratch (clearing its stamp), deposit into it (stamping it at
 # the current fields epoch). Deposits happen at the tail of the iteration, from the state it has
@@ -184,6 +226,9 @@ deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_stamp = cache.fie
 deposit_scalar!(cache::ObservablesCache) = (cache.scalar_stamp = cache.fields_epoch; cache.scalar)
 deposit_max_speed!(cache::ObservablesCache, value::Real) =
   (cache.max_speed = Float64(value); cache.max_speed_stamp = cache.fields_epoch; value)
+deposit_sample!(cache::ObservablesCache) =
+  (cache.sample_fields_stamp = cache.fields_epoch;
+   cache.sample_particles_stamp = cache.particles_epoch; cache.trajectory_sample)
 
 
 # The boundary completeness check: every slot the configuration carries must be stamped at the
@@ -199,6 +244,10 @@ function check_boundary(cache::ObservablesCache)
     error("iteration closed with the scalar slot undeposited — a solver scheduling bug")
   cache.max_speed_stamp == cache.fields_epoch ||
     error("iteration closed with the maximum speed undeposited — a solver scheduling bug")
+  cache.trajectory_sample === nothing ||
+    (cache.sample_fields_stamp == cache.fields_epoch &&
+     cache.sample_particles_stamp == cache.particles_epoch) ||
+    error("iteration closed with the trajectory sample undeposited — a solver scheduling bug")
   return cache
 end
 

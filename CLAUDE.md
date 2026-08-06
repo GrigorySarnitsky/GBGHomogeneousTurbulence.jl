@@ -91,7 +91,7 @@ inverse. Operators and extended Base functions are imported before being extende
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
-`buffers.velocity_star`, `generator.product_physical`, `state.velocity`, `Tracers.velocity1` — as do
+`cache.vorticity`, `generator.product_spectral`, `state.velocity`, `Tracers.trajectory_velocity` — as do
 function names (`velocity_to_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)

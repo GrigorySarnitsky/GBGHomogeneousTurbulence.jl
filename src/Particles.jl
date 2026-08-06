@@ -17,7 +17,9 @@ Lagrangian tracer tracking:
 - [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the start- and end-of-step velocity).
 - [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
   [`scalar_buffer`](@ref) allocate its `out` buffers.
-- [`tracer_positions`](@ref), [`tracer_velocities`](@ref), [`number_of_tracers`](@ref) — the trajectory readouts.
+- [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
+  trajectory velocities are read from the run's observables cache, where the tail deposit stamps
+  them).
 """
 module Particles
 
@@ -26,7 +28,7 @@ using Random
 using ..SimulationDomain: FixedDomain, _reference, _real_type
 
 export Tracers, record_trajectory_velocity!, advect!, sample!,
-       tracer_positions, tracer_velocities, number_of_tracers, velocity_buffer, scalar_buffer
+       particle_positions, number_of_tracers, velocity_buffer, scalar_buffer
 
 
 """
@@ -47,16 +49,20 @@ acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil
 The `rng` (first form only) is the random stream seeding the uniformly-random tracer positions; it
 defaults to `Random.default_rng()`.
 
-Read the tracer state with [`tracer_positions`](@ref), [`tracer_velocities`](@ref), and
-[`number_of_tracers`](@ref); the remaining fields are preallocated predictor and point-value scratch, so
-the tracer push allocates no per-step memory.
+Read the particle state with [`particle_positions`](@ref) and [`number_of_tracers`](@ref); the
+trajectory velocities are read from the run's observables cache (`particle_velocities`), where the
+iteration's tail deposit stamps them. The remaining fields are preallocated predictor and
+point-value scratch, so the tracer push allocates no per-step memory.
 
 # Fields
-- `positions` — the `(M, 3)` tracer positions (read with [`tracer_positions`](@ref)).
-- `predictor` — `(M, 3)` scratch for the Heun predictor.
+- `positions` — the `(M, 3)` tracer positions (read with [`particle_positions`](@ref)).
+- `predictor` — `(M, 3)` scratch for the Heun predictor positions.
 - `position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation.
-- `velocity1`, `velocity2` — the interpolated velocities at the start-of-step and predictor positions;
-  `velocity1` is the retained trajectory velocity (read with [`tracer_velocities`](@ref)).
+- `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
+  boundary they occupy them: the genuine Lagrangian sample, and the observables cache's
+  trajectory-sample slot.
+- `predictor_velocity` — the interpolated velocity at the Heun **predictor** positions, which no
+  tracer ever occupies: a stage register of the push, never a sample of the flow, and never exposed.
 - `scheme` — the velocity-interpolation scheme.
 """
 struct Tracers{P, PSX, PSP, VV, S}
@@ -64,8 +70,8 @@ struct Tracers{P, PSX, PSP, VV, S}
   predictor::P              # (M, 3) scratch for the Heun predictor
   position_points::PSX      # PointSet wrapping `positions`
   predictor_points::PSP     # PointSet wrapping `predictor`
-  velocity1::VV             # VectorPointValues: velocity at the start-of-step positions
-  velocity2::VV             # VectorPointValues: velocity at the predictor positions
+  trajectory_velocity::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
+  predictor_velocity::VV    # VectorPointValues: u at the predictor positions — a stage register
   scheme::S
 end
 
@@ -98,18 +104,15 @@ Record the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the
 each tracer where it currently sits — by interpolating the physical velocity field `u`
 ``\\boldsymbol{u}`` onto the tracer positions with the set's interpolation scheme.
 
-Call it on the start-of-step velocity, before the field solver advances the state; [`advect!`](@ref)
-then completes the push from the recorded values and the end-of-step field. The push is split across
-these two verbs because a run holds only one physical velocity field: the observation cache
-recomputes that field in place once the state has advanced, so the start-of-step values must be taken
-off it while it still holds ``\\boldsymbol{u}(t_n)``. Recording them costs ``M \\times 3`` values for
-``M`` tracers, where keeping the field itself would cost ``N^{3} \\times 3``.
-
-What is recorded is also the trajectory velocity read back by [`tracer_velocities`](@ref), and the
-quantity the Lagrangian statistics accumulate.
+The run layer calls it at the tail of each iteration, on the just-deposited boundary velocity at the
+just-advanced positions; the recorded values are the observables cache's trajectory-sample slot,
+stamped there, and the next iteration's [`advect!`](@ref) reads them as the first half of its Heun
+pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
+cost ``N^{3} \\times 3``. What is recorded is the trajectory velocity the run's `particle_velocities`
+returns, and the quantity the Lagrangian statistics accumulate.
 """
 function record_trajectory_velocity!(tracers::Tracers, u)
-  interpolate!(tracers.velocity1, u, tracers.position_points, tracers.scheme)
+  interpolate!(tracers.trajectory_velocity, u, tracers.position_points, tracers.scheme)
   return tracers
 end
 
@@ -136,10 +139,10 @@ with positions wrapped into ``[0, L)``, where the box side ``L`` is read from `d
 velocity alone would be first order.
 
 !!! note
-    ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here, so
-    `record_trajectory_velocity!` must already have run against ``\\boldsymbol{u}(t_n)`` for this
-    step. Calling `advect!` twice without re-recording pushes the second step off a stale
-    ``\\boldsymbol{v}_1``.
+    ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
+    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by [`record_trajectory_velocity!`](@ref)
+    at the previous boundary. In a run the observables cache stamps that sample and the run layer
+    reads it checked before pushing; a hand-run loop must re-record between pushes itself.
 """
 function advect!(tracers::Tracers, velocity_end, domain::FixedDomain, dt::Real)
   L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
@@ -147,10 +150,14 @@ function advect!(tracers::Tracers, velocity_end, domain::FixedDomain, dt::Real)
   X = tracers.positions
   Xstar = tracers.predictor
 
-  v1 = point_values(tracers.velocity1)
+  v1 = point_values(tracers.trajectory_velocity)
   Xstar .= mod.(X .+ Δt .* v1, L)
-  interpolate!(tracers.velocity2, velocity_end, tracers.predictor_points, tracers.scheme)
-  v2 = point_values(tracers.velocity2)
+  # v₂ is evaluated at the PREDICTOR positions and is a stage register, never a trajectory sample —
+  # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
+  # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
+  # the thing you measure).
+  interpolate!(tracers.predictor_velocity, velocity_end, tracers.predictor_points, tracers.scheme)
+  v2 = point_values(tracers.predictor_velocity)
   X .= mod.(X .+ (Δt / 2) .* (v1 .+ v2), L)
   return tracers
 end
@@ -173,27 +180,11 @@ end
 
 
 """
-    tracer_positions(tracers)
+    particle_positions(tracers)
 
-The `(M, 3)` array of current tracer positions.
+The `(M, 3)` array of current tracer positions — the probes' own state.
 """
-tracer_positions(tracers::Tracers) = tracers.positions
-
-
-"""
-    tracer_velocities(tracers)
-
-The `(M, 3)` array of the most recent trajectory velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` —
-the velocity at the positions the tracers occupy, at the instant they occupy them, put on record by
-[`record_trajectory_velocity!`](@ref) before the step. This is the Lagrangian velocity the statistics
-accumulate.
-
-!!! note
-    Not the second velocity of the Heun pair. That one is evaluated at the *predicted* position, which
-    the tracer never reaches, so it is a stage value of the integration scheme rather than a sample of
-    the flow along the trajectory, and it is not read back.
-"""
-tracer_velocities(tracers::Tracers) = point_values(tracers.velocity1)
+particle_positions(tracers::Tracers) = tracers.positions
 
 
 """

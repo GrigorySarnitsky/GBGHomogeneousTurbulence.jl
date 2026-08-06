@@ -30,7 +30,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       record_trajectory_velocity!(tracers, uniform)
       advect!(tracers, uniform, domain, dt)
     end
-    X = tracer_positions(tracers)
+    X = particle_positions(tracers)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
     @test X[:, 2] ≈ X0[:, 2]                                  # transverse components unchanged
     @test X[:, 3] ≈ X0[:, 3]
@@ -53,7 +53,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         record_trajectory_velocity!(tracers, u_start)
         advect!(tracers, u_end, domain, dt)
       end
-      tracer_positions(tracers)[1, 1]
+      particle_positions(tracers)[1, 1]
     end
 
     error_coarse = abs(final_x(8) - exact_x)
@@ -69,7 +69,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       record_trajectory_velocity!(tracers, uniform)
       advect!(tracers, uniform, domain, 0.02)
     end
-    X = tracer_positions(tracers)
+    X = particle_positions(tracers)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
   end
 
@@ -81,7 +81,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         record_trajectory_velocity!(tracers, uniform)
         advect!(tracers, uniform, domain, 0.01)
       end
-      X = tracer_positions(tracers)
+      X = particle_positions(tracers)
       @test all(isfinite, X) && all(0 .<= X .< L)
     end
   end
@@ -116,8 +116,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(derived, state, domain, buffers)
       advect!(tracers, velocity_physical(derived), domain, dt)          # u(tₙ₊₁), the tail deposit
     end
-    @test all(isfinite, tracer_positions(tracers)) && all(0 .<= tracer_positions(tracers) .< L)
-    @test all(isfinite, tracer_velocities(tracers))
+    @test all(isfinite, particle_positions(tracers)) && all(0 .<= particle_positions(tracers) .< L)
+    @test all(isfinite, point_values(tracers.trajectory_velocity))
 
     # allocation-free advection step — both verbs of the push
     u = velocity_physical(derived)

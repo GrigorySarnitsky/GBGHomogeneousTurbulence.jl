@@ -367,17 +367,25 @@ Particles are **instruments** — probes of the turbulence — not a second phys
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme; the push is Heun-in-time on
-the velocity at the start and end of the step (the fields the solver already produces), split across
-`record_trajectory_velocity!` (before the step) and `advect!` (after it); `sample!` reads any field
-along the trajectories for Lagrangian statistics.
+the velocity at the two boundaries of the iteration: ``\boldsymbol{v}_1`` is the **trajectory
+sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous tail deposited — the genuine
+Lagrangian velocity, held in `Tracers.trajectory_velocity` and stamped in the observables cache
+(against BOTH epochs, since it is a function of the state and the positions together; read through
+`particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
+``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
+`Tracers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
+not readable. After the push, `record_trajectory_velocity!` records the new sample at the new
+positions from the same deposited field, closing the boundary; `sample!` reads any field along the
+trajectories for Lagrangian statistics.
 
-The split is what keeps an ``M``-point instrument at ``M``-point cost. A run holds one physical
-velocity field — the observation cache's chart, recomputed in place once the state advances — so a
-single-call push would need the start-of-step field retained, an ``N^{3}\times3`` resident buffer and
-an ``N^{3}\times3`` copy per step to serve an ``M\times3`` interpolation. Interpolating onto the
-tracers *before* the step instead records the same information in the ``M\times3`` buffer the tracer
-set already owns. Tracked and untracked runs therefore have identical field-scale residency and
-per-step traffic — the zero both audits now assert.
+The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
+onto the tracers stores ``M\times3`` values where retaining the endpoint field would cost an
+``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
+field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
+recorded as **forbidden**: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
+differs from the next sample only at ``O(\Delta t^2)``, so reusing it as the next
+``\boldsymbol{v}_1`` looks like a free interpolation saved — but it corrupts the recorded observable
+the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes. Two axes matter: the
 trajectory integrator — today a single second-order Heun push, with higher-order pushers the studied
@@ -1445,6 +1453,28 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ownership gap closing as a side effect (no product register remains for its noise to alias).
     This is the reuse §2.3 of the design page recorded as blocked before the backend's alias-safe
     kernels landed; passes and transforms are untouched — the decision moves residency only.
+
+42. **(2026-08) The trajectory sample is a cache slot, and the tracer velocity registers are named
+    for what they are.** `Tracers.velocity1` / `velocity2` were categorically different objects
+    wearing sequence numbers: the first is the **trajectory sample**
+    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable at a boundary —
+    the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
+    register, substage on the position argument alone. They are renamed `trajectory_velocity` /
+    `predictor_velocity`, and the sample becomes the observables cache's first trajectory-bound
+    slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
+    storage (the slot IS the register, as everywhere else) and stamped against **both** epochs,
+    since the sample is a function of the state and the positions together. The push's schedule
+    moves fully onto the boundaries: `advance!` checks the sample at the head (the previous tail's
+    deposit is ``\boldsymbol{v}_1``), pushes after the tail field deposits
+    (``\boldsymbol{v}_2`` from the deposited ``\boldsymbol{u}(t_{n+1})``), then records and stamps
+    the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
+    favor of the stamp, and the sample is read through the checked `particle_velocities`
+    (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
+    user-settled accessor prefix). `predictor_velocity` is deliberately **not** readable — an
+    off-trajectory value must not be servable as a plausible-looking Lagrangian velocity — and the
+    tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
+    would approximate the measured observable at ``O(\Delta t^2)``; never approximate the thing you
+    measure).
 
 ---
 

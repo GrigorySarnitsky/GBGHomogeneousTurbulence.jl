@@ -9,9 +9,10 @@
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
 # tail `deposit!` recovers the boundary observables into the cache and stamps them, and the boundary
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
-# arithmetic, no grid pass. The tracer push interpolates u(tₙ) onto the tracers before the step (from
-# the boundary chart) and u(tₙ₊₁) after the tail deposit — Heun on the two endpoint velocities; only
-# the M interpolated vectors are held across the step, never a second copy of the field.
+# arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
+# trajectory sample the PREVIOUS tail deposited (read checked), v₂ interpolates the just-deposited
+# u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
+# same field, closing the boundary; only M-sized point values are held, never a second field copy.
 
 """
     SimulationRun
@@ -31,9 +32,9 @@ using Random
 using ..SimulationDomain: FixedDomain, spectral_vector, spectral_scalar, physical_vector,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
-using ..Cache: ObservablesCache, check_boundary, particles_modified!
+using ..Cache: ObservablesCache, check_boundary, particles_modified!, deposit_sample!
 import ..Cache: velocity_physical, vorticity_physical, scalar_physical, max_speed,
-                resolved_fields_modified!
+                particle_velocities, resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
@@ -216,8 +217,11 @@ function Simulation(domain::FixedDomain;
 
   tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
 
-  derived = ObservablesCache(domain; scalar)
+  derived = ObservablesCache(domain; scalar,
+                             trajectory_sample = tracers === nothing ? nothing : tracers.trajectory_velocity)
   deposit!(derived, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
+  tracers === nothing ||
+    (record_trajectory_velocity!(tracers, velocity_physical(derived)); deposit_sample!(derived))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, derived,
                     tracers, Float64(cfl), Clock(0.0, 0))
 end
@@ -240,8 +244,18 @@ velocity_physical(sim::Simulation) = velocity_physical(sim.derived)
 vorticity_physical(sim::Simulation) = vorticity_physical(sim.derived)
 scalar_physical(sim::Simulation) = scalar_physical(sim.derived)
 max_speed(sim::Simulation) = max_speed(sim.derived)
+particle_velocities(sim::Simulation) = particle_velocities(sim.derived)
 resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.derived); sim)
-deposit!(sim::Simulation) = (deposit!(sim.derived, sim.state, sim.domain, sim.buffers); sim)
+
+function deposit!(sim::Simulation)
+  deposit!(sim.derived, sim.state, sim.domain, sim.buffers)
+  # The trajectory sample rides the same re-deposit: the positions are unchanged, so re-recording
+  # from the freshly deposited velocity restores the sample the announcement made stale.
+  sim.tracers === nothing ||
+    (record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived));
+     deposit_sample!(sim.derived))
+  return sim
+end
 
 
 """
@@ -351,19 +365,24 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # Put u(tₙ) on record along the trajectories before the step takes the boundary chart as scratch —
-  # M interpolated vectors, so the endpoint velocity never costs a second copy of the field.
-  sim.tracers === nothing ||
-    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived))
+  # The checked read at the head boundary: the push's v₁ must be the trajectory sample the previous
+  # tail deposited. It is consumed mid-iteration (after the step, as the solver's own scratch), so
+  # the stamp is verified here, at tₙ, where the sample is the current boundary observable.
+  sim.tracers === nothing || particle_velocities(sim.derived)
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.derived, Δt)
 
-  # The tail: deposit the boundary observables from the state the step just produced, then complete
-  # the tracer push from the deposited u(tₙ₊₁) — the end-of-step field of the Heun pair.
+  # The tail: deposit the boundary observables from the state the step just produced; the tracer
+  # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
+  # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
+  # positions from the same deposited field, closing the boundary.
   deposit!(sim.derived, sim.state, sim.domain, sim.buffers)
-  sim.tracers === nothing ||
-    (advect!(sim.tracers, velocity_physical(sim.derived), sim.domain, Δt);
-     particles_modified!(sim.derived))
+  if sim.tracers !== nothing
+    advect!(sim.tracers, velocity_physical(sim.derived), sim.domain, Δt)
+    particles_modified!(sim.derived)
+    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.derived))
+    deposit_sample!(sim.derived)
+  end
   check_boundary(sim.derived)
 
   sim.clock.time += Δt
