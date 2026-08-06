@@ -16,3 +16,10 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   closure, high-Schmidt machinery** (any round): recorded deferrals (ARCHITECTURE §7), not gaps.
 - **`vorticity_spectral(sim)` does not exist** (any round): deliberate — an accessor exists exactly
   for what the run holds, and the spectral vorticity is materialized nowhere (decision 43).
+- **`Lundgren2002` "missing" from the StructureFunctions `## References`** (round 2): a
+  manuscript-extraction artifact — the rendered page's `@eval` block lists all five citations,
+  including "Lundgren (2002), *Phys. Fluids* **14**, 638"; verified in the built HTML.
+- **`deposit_velocity!` / `take_velocity!` "do not exist"** (round 2): they exist — internal,
+  undocumented-by-design verbs in `src/Cache.jl`, consumed by `Propagator`. (Whether the Cache
+  module map should name undocumented internals is a separate, open finding — do not re-flag their
+  *existence*.)
