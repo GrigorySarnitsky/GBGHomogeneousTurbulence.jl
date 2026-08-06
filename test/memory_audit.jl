@@ -83,23 +83,24 @@ end
 # default configuration, whose BandRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 7, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 6, physical_scalar = 1, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 8, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 5, physical_vector = 5, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 6, physical_vector = 7, spectral_scalar = 6, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 6, physical_vector = 5, spectral_scalar = 5, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 7, physical_vector = 7, spectral_scalar = 7, physical_scalar = 2, real_spectral_scalar = 0),
 )
-# (PF adoption, 2026-08-05: the PhaseShift cells lost the two stored translation kernels — PF's
+# (PF adoption, 2026-08-05/06: the PhaseShift cells lost the two stored translation kernels — PF's
 # decision 50 returns them as per-axis `SeparableKernel`s, three O(N) factors each, below field
-# scale — so the PhaseShift spectral-scalar column now differs from a mask strategy's only by the
-# displaced-evaluation scratch.)
+# scale — and decision 39 then removed the integrating-factor register from EVERY cell: the fused
+# exponential evaluates the factor per mode, so a velocity-only working set holds nothing
+# scalar-shaped at all.)
 
 # The frozen forcing DELTAS, per slot. Every band kernel is now a lazy radial symbol (PF adoption,
 # 2026-08-05 — PF decision 51), so a band-selecting forcing stores no field-scale kernel; the OU's
@@ -107,8 +108,8 @@ const BASE = Dict(
 _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
   tag === :band  ? ZERO :
-  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 2) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 2) :
+  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
+  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
   slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0) :
                        (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2, physical_scalar = 1, real_spectral_scalar = 0)
 # (:ou — in the forced field's shape, the OU state f̂ and the two noise buffers; its band is lazy.)
@@ -118,6 +119,9 @@ _forcing_delta(tag, slot) =
 # indicator on top: with the band kernel lazy there are no stored coefficients for the rate fill to
 # read, so the indicator is built once at construction (half the complex field the stored band once
 # was; the pre-adoption ConstantPower read its indicator lazily from that stored kernel instead).
+# The rate itself is a scalar FIELD in spectral representation since decision 39 — the complex
+# container the fused exponential's per-mode offset takes — so a rate-armed forcing shows one
+# spectral scalar (the rate) plus one real array (the indicator/mask).
 
 # Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
 # and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the
@@ -190,22 +194,22 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 # the bound (decision 37). That made `achieved == bound` a tautology in the physical-vector class and
 # the suite asserted it. The projection now extends only DYNAMICS_LIVE, so the assumption shows up
 # where it belongs — as a claimed gap.
+# SHARED FACTOR was retired 2026-08-06 (decision 39): the factor register it priced no longer
+# exists — the fused exponential closed the gap the holder held open, which is the register working
+# in both directions.
 const GAP_HOLDERS = Dict(
   (:RK3, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)"),
   (:RK3, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
                         :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SHARED FACTOR + SCALAR REGISTERS"),
+                        :spectral_scalar => "SCALAR REGISTERS (copy/nonlinear/stage could share a transient slot)"),
   (:RK2, false) => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
-                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
+                        :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)"),
   (:RK2, true)  => Dict(:physical_vector => "CHART CONTRACT (charts survive the step; boundary refresh is the candidate)",
                         :spectral_vector => "OWNERSHIP (scratch ↔ product/nonlinear)",
-                        :spectral_scalar => "SHARED FACTOR + SCALAR REGISTERS"),
+                        :spectral_scalar => "SCALAR REGISTERS (copy/nonlinear/stage could share a transient slot)"),
   (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (scratch, OU noise ↔ product/nonlinear)",
-                           :physical_vector => "OWNERSHIP (OU noise ↔ product)",
-                           :spectral_scalar => "SHARED FACTOR (PF fused-exponential request)"),
+                           :physical_vector => "OWNERSHIP (OU noise ↔ product)"),
 )
 
 
@@ -224,7 +228,8 @@ const GAP_HOLDERS = Dict(
 #                                  raise to GBGPeriodicFields landed as its guard-free one-pass
 #                                  projection. Construction-time only.
 #   seeding (scalar)      ≈ 2.1 (3.1) — noise scalar 1.0 + host randn staging 1.0; envelope lazy.
-#   derivative_skewness   ≈ 19.6 — spectral tensor 9 × 1.06 + physical tensor 9 + det field 1: the
+#   derivative_skewness   ≈ 18.6 (19.6) — spectral tensor 9 × 1.06 + physical tensor 9; the det
+#                                  field (was 1) is gone — ⟨det S⟩ is the fused mapped mean now: the
 #                                  DOMINANT episode (~ +55 % over the default resident set), and ON
 #                                  BY DEFAULT during warmup!'s skewness gate — the binding device
 #                                  peak of a default warm-up at the largest N that fits. Invariant
@@ -238,7 +243,7 @@ const GAP_HOLDERS = Dict(
 const EPISODE_UNITS = [
   ("seed velocity",       6.1, 1.0),
   ("seed scalar",         2.1, 0.5),
-  ("derivative_skewness", 19.6, 1.0),
+  ("derivative_skewness", 18.6, 1.0),
   ("energy_spectrum",     0.0, 0.2),
   ("integral_scale",      0.0, 0.2),
   ("flow_parameters",     0.0, 0.2),
@@ -346,8 +351,10 @@ const EPISODE_UNITS = [
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
     SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers
     @test all(f -> f in fieldnames(IB),
-              (:stage1, :stage2, :velocity_star_spectral, :nonlinear, :integrating_factor,
+              (:stage1, :stage2, :velocity_star_spectral, :nonlinear,
                :vorticity_physical, :velocity_star))
+    # The integrating factor has NO register: the fused exponential applies it per mode (decision 39).
+    @test !(:integrating_factor in fieldnames(IB))
     @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :star_spectral, :nonlinear, :copy, :field))
     @test all(f -> f in fieldnames(StochasticOU), (:state, :noise_physical, :noise_spectral))
   end

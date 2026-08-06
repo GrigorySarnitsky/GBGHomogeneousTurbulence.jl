@@ -237,7 +237,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^2\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly*: the factor pair
-  `velocity_factor!` / `scalar_factor!` builds the flow map
+  `velocity_factor` / `scalar_factor` supplies the flow map
   ``\mathcal E(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
   — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
@@ -269,9 +269,9 @@ scratch its evaluations write through (the quadratic-product fields, the `PhaseS
 displaced-evaluation buffers, the per-mode forcing-rate arrays), behind a six-verb protocol —
 `prepare!` opens the step (advances each forcing's internal state, arms the linear rates),
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
-(dealiased nonlinear term plus additive forcing source), `velocity_factor!` / `scalar_factor!` build
+(dealiased nonlinear term plus additive forcing source), `velocity_factor` / `scalar_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
-`velocity_rhs!` and `velocity_factor!` are the required core; `prepare!` and `finalize!` default to
+`velocity_rhs!` and `velocity_factor` are the required core; `prepare!` and `finalize!` default to
 no-ops. A scheme consumes the physics only through this protocol, so it can never assemble the
 right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
 reification (§11 decisions 29, 31).
@@ -344,8 +344,8 @@ Method (§3).
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
-- **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers, the
-  factor register, and the substage recovery pair — built by `allocate_buffers` dispatching on the
+- **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers and
+  the substage recovery pair — built by `allocate_buffers` dispatching on the
   concrete scheme, so each allocates exactly its working set. The right-hand-side *assembly* scratch
   lives with the generator on the `ResolvedGenerator` (§4.2), and the start-of-step physical fields are
   the observation cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
@@ -714,7 +714,7 @@ one usually encodes a decision.
 ## 10. Conventions
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
-  exact/ideal form, *then* the discrete realization — as `velocity_factor!` leads with
+  exact/ideal form, *then* the discrete realization — as `velocity_factor` leads with
   ``\partial_t f = D\nabla^2 f`` before ``\mathcal E(\boldsymbol{\kappa})``, and `velocity_rhs!` with
   the Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
@@ -1358,6 +1358,32 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     factor is wrapped in `StoredKernel` at its apply sites — a transitional form; the fused
     exponential adoption that deletes the factor machinery is the recorded next step, and the
     `MATERIALIZED_SYMBOLS` holder narrows to exactly that remaining traffic.
+39. **(2026-08) The integrating factor is never materialized: the factor verbs supply parameters, and
+    the stage update is one fused exponential pass.** The protocol's factor half changed shape:
+    `velocity_factor` / `scalar_factor` (the `!` is gone — nothing is mutated) return the exponential's
+    parameters — `coefficient` ``= -D\tau``, `offset_scale` ``= \tau``, `offset` ``= \hat A`` or
+    `nothing` — and the schemes apply ``\mathcal E`` through `GBGPeriodicFields`'
+    `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
+    mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
+    (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
+    the stage update ``\hat{\boldsymbol u} \leftarrow \mathcal E\,(\hat{\boldsymbol u} + B_i h)`` is
+    the backend's **two-operand** exponential form, one pass where combine-build-rotate were three, and
+    a velocity-only working set now holds *nothing scalar-shaped at all*; (2) an armed linear forcing
+    rate became a scalar field in spectral representation holding real values (the fused exponential's
+    per-mode offset), read once per application instead of once per build; (3) the de-alias/truncation
+    passes folded into their producers — a mask strategy's kernel rides the projection's own pass (the
+    kernel-composed ``\mathbb P`` and ``\nabla\cdot`` arities, the latter absorbing the ``-\nabla\cdot``
+    sign in ``\alpha``), and the phase-shift tail applies shift-back, average, and truncation in one
+    convolve through a `back ∘ truncation` kernel composed once at construction. Three audit holders
+    retired in the same commit, each because its gap **closed**: `SHARED FACTOR` (the register it
+    priced no longer exists), `MATERIALIZED_SYMBOLS` (both its residency and traffic claims delivered —
+    the pass ledger's fused bound now *equals* the physical floor, asserted as an equality), and the
+    `COINCIDENT INTEGRATING FACTORS` residual (nothing is built for the ``\mathrm{Sc} = 1`` coincidence
+    to save; its guard lesson — key any dedup on the full ``(D, \tau, \text{rate})`` tuple, never
+    ``\mathrm{Sc}`` alone — survives as the armed-rate pin in the factor-verb test). The
+    `derivative_skewness` diagnostic also stopped materializing its determinant field
+    (``\langle\det\boldsymbol S\rangle`` is the fused mapped mean), and transforms are untouched
+    everywhere — this decision moves passes and residency only.
 
 ---
 

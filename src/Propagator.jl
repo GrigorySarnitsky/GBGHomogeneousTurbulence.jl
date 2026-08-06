@@ -2,7 +2,7 @@
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
 # is advanced exactly through exp(-diffusivity·|k|²Δt), and the nonlinear term is advanced explicitly
 # by a Runge–Kutta stage combination. A scheme consumes the physics only through the ResolvedGenerator
-# protocol (prepare!/velocity_rhs!/scalar_rhs!/velocity_factor!/scalar_factor!/finalize!) — it does
+# protocol (prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!) — it does
 # stage arithmetic and stage-state recoveries, never assembling the right-hand side itself.
 #
 # `step!` advances the velocity û and the passive scalar φ̂ *together* through the same RK stages: the
@@ -35,7 +35,7 @@ using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
                           spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..Generator: ResolvedGenerator, prepare!, finalize!,
-                   velocity_rhs!, scalar_rhs!, velocity_factor!, scalar_factor!
+                   velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor
 using ..State: ResolvedFields, ObservablesCache, physical_velocity, physical_vorticity,
                resolved_fields_modified!, spectral_scratch,
                velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
@@ -82,7 +82,6 @@ Shared — every scheme allocates these:
   representation (the start-of-step fields come from the run's `ObservablesCache` observables).
 - `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
   first stage for [`IFRK2`](@ref)).
-- `integrating_factor` — the register the exact linear subflow is written into each substep.
 
 Scheme-specific — allocated only for the scheme that uses it, else `nothing`:
 - `nonlinear` — the assembled right-hand side ([`IFLowStorageRK3`](@ref) only).
@@ -93,20 +92,41 @@ Nested:
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated.
 
-The right-hand-side **assembly** scratch (the quadratic products, the phase-shift buffers, the
-forcing-rate arrays) lives with the generator, on the
+There is deliberately **no integrating-factor register**: the exact linear subflow is applied by the
+backend's fused exponential convolution, evaluated per mode from the factor's parameters, so no
+kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
+products, the phase-shift buffers, the forcing-rate fields) lives with the generator, on the
 [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here are
 only the scheme's own stage registers.
 """
-struct IntegratorBuffers{VS, ST2, VSS, NL, SS, VP, SB}
+struct IntegratorBuffers{VS, ST2, VSS, NL, VP, SB}
   stage1::VS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
   velocity_star_spectral::VSS    # IFRK2 only
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
-  integrating_factor::SS
   vorticity_physical::VP
   velocity_star::VP
   scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
+end
+
+
+# The two shapes the fused exponential serves in a stage, branching once on whether a linear forcing
+# rate is armed (the factor's `offset`): the update fuses a weighted combination with the factor —
+# dest ← E ⊙ (α a + β b) — and the rotation applies the factor alone. Both evaluate
+# E = exp(coefficient·|κ|² [+ offset_scale·Â]) per mode from the wavenumber arrays; no kernel field
+# exists.
+function _exponential_update!(dest, α, a, β, b, domain::FixedDomain, ℰ)
+  ℰ.offset === nothing ?
+    exponential_convolve!(dest, α, a, β, b, domain.multipliers, ℰ.coefficient) :
+    exponential_convolve!(dest, α, a, β, b, domain.multipliers, ℰ.coefficient, ℰ.offset_scale, ℰ.offset)
+  return dest
+end
+
+function _exponential_rotate!(field, domain::FixedDomain, ℰ)
+  ℰ.offset === nothing ?
+    exponential_convolve!(field, field, domain.multipliers, ℰ.coefficient) :
+    exponential_convolve!(field, field, domain.multipliers, ℰ.coefficient, ℰ.offset_scale, ℰ.offset)
+  return field
 end
 
 """
@@ -148,10 +168,11 @@ function step! end
     IFLowStorageRK3()
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
-integrating factor ``\\mathcal{E}_D(\\tau)`` built by the generator's
-[`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!) /
-[`scalar_factor!`](@ref GBGIsotropicTurbulence.Generator.scalar_factor!) over a substep
-interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar)
+integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
+[`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor) /
+[`scalar_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_factor) over a substep
+interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and
+applied per mode by the fused exponential, never built as a field —
 and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
 ``\\hat q`` and a single accumulator
 ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
@@ -214,13 +235,11 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     else
       combine!(hu, a[i], hu, dt_T, buffers.nonlinear)                             # hu ← Aᵢ hu + Δt N̂_u
     end
-    combine!(û, one(T), û, b[i], hu)                                       # ûᵢ ← ûᵢ + Bᵢ hu
-    # The `StoredKernel` wrap puts the factor field in the kernel role (a bare field no longer
-    # dispatches as one); the wrap holds a reference and costs nothing per apply. Transitional —
-    # the stage-1b `exponential_convolve!` adoption removes the factor build and this wrap with it.
-    ℰ = StoredKernel(velocity_factor!(buffers.integrating_factor, generator, domain, d[i] * dt))
-    convolve!(û, û, ℰ)                                                            # E_ν(dᵢΔt)
-    i < 3 && convolve!(hu, hu, ℰ)
+    # The stage update and its integrating-factor rotation fuse into ONE pass: the fused exponential
+    # evaluates E(dᵢΔt) per mode from the factor's parameters — nothing built, stored, or swept.
+    ℰ = velocity_factor(generator, d[i] * dt)
+    _exponential_update!(û, one(T), û, b[i], hu, domain, ℰ)                       # ûᵢ ← E_ν (ûᵢ + Bᵢ hu)
+    i < 3 && _exponential_rotate!(hu, domain, ℰ)
 
     # The passive scalar rides the same stages (skipped, with its buffers unallocated, when absent).
     if has_scalar
@@ -230,10 +249,9 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       else
         combine!(hφ, a[i], hφ, dt_T, sb.nonlinear)
       end
-      combine!(φ̂, one(T), φ̂, b[i], hφ)
-      ℰφ = StoredKernel(scalar_factor!(buffers.integrating_factor, generator, domain, d[i] * dt))
-      convolve!(φ̂, φ̂, ℰφ)                                                         # E_κ(dᵢΔt)
-      i < 3 && convolve!(hφ, hφ, ℰφ)
+      ℰφ = scalar_factor(generator, d[i] * dt)
+      _exponential_update!(φ̂, one(T), φ̂, b[i], hφ, domain, ℰφ)                    # φ̂ᵢ ← E_κ (φ̂ᵢ + Bᵢ hφ)
+      i < 3 && _exponential_rotate!(hφ, domain, ℰφ)
     end
   end
 
@@ -248,8 +266,8 @@ end
 
 Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
 factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the generator's
-[`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!) /
-[`scalar_factor!`](@ref GBGIsotropicTurbulence.Generator.scalar_factor!) at ``D = \\nu`` and
+[`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor) /
+[`scalar_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_factor) at ``D = \\nu`` and
 ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
 ``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a
 field ``\\hat q`` with
@@ -297,23 +315,19 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   # Predictors û*, φ̂*, and the corrector's integrating-factor rotations banked in the same visit.
-  # Every use of a field's ℰ over the whole step is at the one substep Δt, so each factor is built
-  # ONCE and all four of its consumers run while it occupies the single register: ûₙ and N̂_u,1 are
-  # rotated here rather than after stage 2 (neither is read by the stage-2 assembly, which works off
-  # the predictor), which halves the factor builds without a second register. The rotations follow
-  # the predictor combination, which needs ûₙ and N̂_u,1 unrotated.
-  # The `StoredKernel` wrap puts the factor field in the kernel role (transitional; see the RK3 twin).
-  ℰ = StoredKernel(velocity_factor!(buffers.integrating_factor, generator, domain, dt))          # E_ν
-  combine!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1)                      # û* ← ûₙ + Δt N̂_u,1
-  convolve!(buffers.velocity_star_spectral, buffers.velocity_star_spectral, ℰ)
-  convolve!(buffers.stage1, buffers.stage1, ℰ)                                                   # E_ν N̂_u,1
-  convolve!(û, û, ℰ)                                                                             # E_ν ûₙ
+  # Every use of a field's ℰ over the whole step is at the one substep Δt: the predictor combination
+  # fuses with its rotation into one exponential pass, and ûₙ and N̂_u,1 are rotated here rather than
+  # after stage 2 (neither is read by the stage-2 assembly, which works off the predictor). The
+  # factor is never materialized — the fused exponential evaluates it per mode from its parameters.
+  ℰ = velocity_factor(generator, dt)                                                             # E_ν parameters
+  _exponential_update!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1, domain, ℰ)  # û* ← E_ν(ûₙ + Δt N̂_u,1)
+  _exponential_rotate!(buffers.stage1, domain, ℰ)                                                # E_ν N̂_u,1
+  _exponential_rotate!(û, domain, ℰ)                                                             # E_ν ûₙ
   if has_scalar
-    ℰφ = StoredKernel(scalar_factor!(buffers.integrating_factor, generator, domain, dt))         # E_κ
-    combine!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1)                                       # φ̂* ← φ̂ₙ + Δt N̂_φ,1
-    convolve!(sb.star_spectral, sb.star_spectral, ℰφ)
-    convolve!(sb.stage1, sb.stage1, ℰφ)                                                          # E_κ N̂_φ,1
-    convolve!(φ̂, φ̂, ℰφ)                                                                          # E_κ φ̂ₙ
+    ℰφ = scalar_factor(generator, dt)                                                            # E_κ parameters
+    _exponential_update!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1, domain, ℰφ)               # φ̂* ← E_κ(φ̂ₙ + Δt N̂_φ,1)
+    _exponential_rotate!(sb.stage1, domain, ℰφ)                                                  # E_κ N̂_φ,1
+    _exponential_rotate!(φ̂, domain, ℰφ)                                                          # E_κ φ̂ₙ
   end
 
   # stage 2 — right-hand sides at the predictor state
@@ -359,7 +373,6 @@ allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) =
   nothing,                                                # stage2 (IFRK2 only)
   nothing,                                                # velocity_star_spectral (IFRK2 only)
   spectral_vector(domain),                                # nonlinear
-  scalar_spectral(domain),                                # integrating_factor
   physical_vector(domain), physical_vector(domain),       # vorticity_physical, velocity_star
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
 )
@@ -369,7 +382,6 @@ allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = Integrato
   spectral_vector(domain),                                # stage2
   spectral_vector(domain),                                # velocity_star_spectral
   nothing,                                                # nonlinear (IFLowStorageRK3 only)
-  scalar_spectral(domain),                                # integrating_factor
   physical_vector(domain), physical_vector(domain),       # vorticity_physical, velocity_star
   scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
 )

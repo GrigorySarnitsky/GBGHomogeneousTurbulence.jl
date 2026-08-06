@@ -6,8 +6,7 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
-using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner,
-                         spectral_field_shape
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner
 using Random
 using Test
 
@@ -49,19 +48,19 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   @testset "Linear rate amplitude" begin
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
-    rate = zeros(spectral_field_shape(domain.grid, domain.layout, Val(0)))
+    rate = scalar_spectral(domain)                  # the generator's rate slot: a scalar field in spectral representation
     @test set_forcing_rate!(forcing, rate, û0, domain)
-    @test maximum(rate) ≈ A                         # A on the band
-    @test minimum(rate) == 0                        # zero outside the band
+    @test maximum(real.(field_data(rate))) ≈ A      # A on the band
+    @test minimum(real.(field_data(rate))) == 0     # zero outside the band
   end
 
   @testset "ConstantPower sets injection rate = power" begin
     power = 0.3
     forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    rate = zeros(spectral_field_shape(domain.grid, domain.layout, Val(0)))
+    rate = scalar_spectral(domain)
     set_forcing_rate!(forcing, rate, û0, domain)
-    A = maximum(rate)
+    A = maximum(real.(field_data(rate)))
     @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
   end
 

@@ -32,7 +32,7 @@ and the exact linear factors at each stage, close with `finalize!`.
 prepare!
 velocity_rhs!
 scalar_rhs!
-velocity_factor!
-scalar_factor!
+velocity_factor
+scalar_factor
 finalize!
 ```

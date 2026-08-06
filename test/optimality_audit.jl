@@ -76,15 +76,13 @@ const UNUSED_FUSION = Holder(
   "fused per-mode kernel could read (product, state) and write (state, accumulator) once. The " *
   "passes between those boundaries are pure intermediate traffic.")
 
-const MATERIALIZED_SYMBOLS = Holder(
-  "MATERIALIZED PER-MODE SYMBOLS", :PF_RAISE,
-  "One per-mode symbol is still stored as an N³ array and swept per use: the integrating factor, " *
-  "built into its register each stage though it is a closed-form function of the O(N) axis " *
-  "multipliers (plus the armed rate). The holder now covers only that traffic — the pass floor's " *
-  "second tier — and retires with the fused-exponential (`exponential_convolve!`) adoption of the " *
-  "stage updates. Its former residency claim is CLOSED: the PF adoption (2026-08-05, PF decisions " *
-  "50/51/60) made the de-alias mask, the phase-shift translation kernels, and |κ|² lazy kernels, " *
-  "and the frame ledger is zero field-scale arrays — 322.5 MiB retired at 256³ / Float64.")
+# MATERIALIZED PER-MODE SYMBOLS — RETIRED 2026-08-06 (decisions 38/39), both claims closed by the
+# PF adoption: the residency claim when the de-alias mask, the phase-shift translation kernels, and
+# |κ|² became lazy kernels (the frame ledger is zero field-scale arrays — 322.5 MiB retired at
+# 256³ / Float64), and the traffic claim when the fused exponential replaced the integrating-factor
+# register (the pass floor's second tier collapsed onto the fused bound: bound == floor in every
+# cell, asserted below). The lazy per-mode symbol apply this holder requested of the backend was
+# delivered in full.
 
 const HOST_SIDE_FORCING_SCALARS = Holder(
   "HOST-SIDE FORCING SCALARS", :PF_RAISE,
@@ -111,7 +109,7 @@ const CHART_CONTRACT = Holder(
   "the identical state — lets a chart and its substage register be one array, with the chart " *
   "readable at every boundary and undefined inside a step.")
 
-const ALL_HOLDERS = (UNUSED_FUSION, MATERIALIZED_SYMBOLS,
+const ALL_HOLDERS = (UNUSED_FUSION,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      CHART_CONTRACT)
 
@@ -225,29 +223,25 @@ const SYNC_LEDGER = (
       for class in CLASSES
         a, b, f = getproperty(achieved, class), getproperty(bound, class), getproperty(floor, class)
         @test a >= b >= f
-        # Every unit above the floor is claimed: the fusion tier by kernel granularity, the symbol
-        # tier by the absent lazy per-mode apply. Deleting a holder from the register while its gap
-        # is still open fails here — an unclaimed gap is a silent cost.
+        # Every unit above the floor is claimed: the fusion tier by kernel granularity. The symbol
+        # tier is CLOSED — the lazy per-mode apply landed (decisions 38/39), so the fused bound IS
+        # the physical floor, and that closure is asserted as an equality rather than held open.
         @test a == b || UNUSED_FUSION in ALL_HOLDERS
-        @test b == f || MATERIALIZED_SYMBOLS in ALL_HOLDERS
+        @test b == f
       end
     end
   end
 
-  @testset "the two tiers have different owners" begin
-    # The decomposition is informative, not decorative: it says WHICH change closes WHICH cost.
-    # Spectral-vector traffic is entirely a fusion question — its bound already sits at its floor,
-    # so no lazy symbol would help it. The real-spectral-scalar class is the mirror image: achieved sits AT
-    # the fused bound (nothing to fuse) and the whole of it is |κ|² swept once per factor build, so
-    # a lazy symbol deletes the class outright. Losing either property means the holders above have
-    # stopped describing the code.
+  @testset "the symbol tier stays closed" begin
+    # The retired MATERIALIZED_SYMBOLS holder's closure, held as an invariant: with every per-mode
+    # symbol lazy, the fused bound equals the physical floor in every class and every cell, and the
+    # real-spectral-scalar class — once entirely |κ|² swept per factor build — is empty outright. A
+    # future op that reads a field-scale configuration array reopens the tier and must bring a new
+    # holder with it.
     for scheme in (:RK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
       ops = _ops(scheme, dealiasing, scalar)
-      bound = _fusion_bound(ops)
-      floor = _fusion_bound(ops; materialize_symbols = false)
-      @test bound.spectral_vector == floor.spectral_vector      # no materialized symbol in this class
-      @test floor.real_spectral_scalar == 0                                     # …and this class is nothing else
-      @test _passes(ops).real_spectral_scalar == bound.real_spectral_scalar                     # already perfectly fused, still N³ traffic
+      @test _fusion_bound(ops) == _fusion_bound(ops; materialize_symbols = false)
+      @test _passes(ops).real_spectral_scalar == 0
     end
   end
 
@@ -290,10 +284,8 @@ const SYNC_LEDGER = (
       @test length(by_level) < length(mask)             # non-vacuous: levels genuinely collapse modes
     end
 
-    # The frame's residency claim of the symbol holder is thereby RETIRED; the holder itself stays,
-    # narrowed to the pass floor's second tier (the integrating factor is still a materialized
-    # symbol until the fused-exponential adoption), which the stale-holder testset checks.
-    @test MATERIALIZED_SYMBOLS in ALL_HOLDERS
+    # The symbol holder is retired in full (decisions 38/39): residency closed here, traffic closed
+    # by the fused exponential — the "symbol tier stays closed" testset holds the equality.
   end
 
   @testset "no stale holder — every holder still names a live gap" begin
@@ -302,18 +294,16 @@ const SYNC_LEDGER = (
     # looking like an accepted cost.
     cells = [(s, d, sc) for s in (:RK3, :RK2) for d in DEALIASINGS for sc in (false, true)]
     fusion_live = false
-    symbols_live = false
     for (scheme, dealiasing, scalar) in cells
       ops = _ops(scheme, dealiasing, scalar)
       achieved, bound = _passes(ops), _fusion_bound(ops)
-      floor = _fusion_bound(ops; materialize_symbols = false)
       for class in CLASSES
         getproperty(achieved, class) > getproperty(bound, class) && (fusion_live = true)
-        getproperty(bound, class) > getproperty(floor, class) && (symbols_live = true)
       end
     end
     @test fusion_live                       # else retire UNUSED_FUSION
-    @test symbols_live                      # else retire MATERIALIZED_SYMBOLS
+    # (MATERIALIZED_SYMBOLS retired 2026-08-06 — its former liveness check is now the
+    # "symbol tier stays closed" equality above.)
 
     # The chart contract's gap is live exactly while the assumption is load-bearing: extending the
     # charts' live range across the step must still raise the physical-vector count. When the

@@ -92,7 +92,7 @@ const VALUE_CLASS = Dict(
   :chart_u => :physical_vector, :chart_ω => :physical_vector, :pp => :physical_vector,
   :ustar => :physical_vector, :ωstar => :physical_vector, :noise_p => :physical_vector,
   :ushift => :physical_vector, :ωshift => :physical_vector,
-  :φ̂ => :spectral_scalar, :fac => :spectral_scalar, :sb_copy => :spectral_scalar,
+  :φ̂ => :spectral_scalar, :sb_copy => :spectral_scalar,
   :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
   :φstar_spec => :spectral_scalar, :sshift => :spectral_scalar, :scopy => :spectral_scalar,
   :sb_field => :physical_scalar, :pshift => :physical_scalar,
@@ -155,7 +155,9 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
       Op("shift-back average", [out, :vshift],     [out]),
     ])
   end
-  push!(ops, Op("dealias", [out], [out]))
+  # No separate dealias op: a mask strategy folds the kernel into the projection's own pass, and
+  # PhaseShift's truncation rides the primary projection and the composed shift-back kernel
+  # (decision 39) — the kernels are compressed symbols, no field-scale configuration read either way.
   source && push!(ops, Op("add OU source", [out, :ou_state], [out]))
   return ops
 end
@@ -188,7 +190,7 @@ function _scalar_assembly(uspec, φspec, u, out; phase_shift = false)
       Op("shift-back average", [out, :sshift],   [out]),
     ])
   end
-  push!(ops, Op("dealias", [out], [out]))
+  # No separate dealias op — folded as in the velocity assembly (decision 39).
   return ops
 end
 
@@ -208,24 +210,20 @@ _recoveries(src) = [
 # The IFLowStorageRK3 stage update, faithful to step!: stage 1 SEEDS the accumulator (`multiply!`,
 # no read of the dead register), later stages accumulate; the accumulator's own rotation is skipped
 # at the last stage (`i < 3 &&` — it is dead after).
+# The stage update and its integrating-factor rotation are ONE fused exponential pass (decision 39):
+# E is evaluated per mode from the O(N) wavenumber arrays (plus, when a linear forcing is armed, the
+# rate field — priced on the forcing axis, not in these unforced base lists), so no factor is built,
+# stored, or read.
 function _velocity_update(rhs; first = false, last = false)
   ops = [first ? Op("seed hu", [rhs], [:hu]) : Op("accumulate hu", [rhs, :hu], [:hu])]
-  append!(ops, [
-    Op("û += B·hu",      [:û, :hu],     [:û]),
-    Op("build E_ν",      Symbol[],      [:fac]),
-    Op("rotate û",       [:û, :fac],    [:û]),
-  ])
-  last || push!(ops, Op("rotate hu", [:hu, :fac], [:hu]))
+  push!(ops, Op("û ← E(û+B·hu)", [:û, :hu], [:û]))
+  last || push!(ops, Op("rotate hu", [:hu], [:hu]))
   return ops
 end
 function _scalar_update(; first = false, last = false)
   ops = [first ? Op("seed hφ", [:sb_nl], [:sb_h]) : Op("accumulate hφ", [:sb_nl, :sb_h], [:sb_h])]
-  append!(ops, [
-    Op("φ̂ += B·hφ",     [:φ̂, :sb_h],  [:φ̂]),
-    Op("build E_κ",      Symbol[],      [:fac]),
-    Op("rotate φ̂",      [:φ̂, :fac],   [:φ̂]),
-  ])
-  last || push!(ops, Op("rotate hφ", [:sb_h, :fac], [:sb_h]))
+  push!(ops, Op("φ̂ ← E(φ̂+B·hφ)", [:φ̂, :sb_h], [:φ̂]))
+  last || push!(ops, Op("rotate hφ", [:sb_h], [:sb_h]))
   return ops
 end
 
@@ -274,21 +272,17 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, charts::Bool = false)
   charts && append!(ops, _chart_recomputes())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; phase_shift))     # N̂_u,1 → nl plays stage1's role
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
-  # Each field's ℰ is at the one substep Δt throughout the step, so it is built once and all four of
-  # its consumers (the predictor, N̂₁, the field itself) run in that one visit to the register.
+  # Each field's ℰ is at the one substep Δt throughout the step; the predictor combination fuses
+  # with its rotation into one exponential pass, and no factor is built (decision 39).
   append!(ops, [
-    Op("build E_ν",       Symbol[],           [:fac]),
-    Op("û* predictor",    [:û, :nl],          [:ustar_spec]),
-    Op("rotate û*",       [:ustar_spec, :fac],[:ustar_spec]),
-    Op("rotate N̂_u,1",   [:nl, :fac],        [:nl]),
-    Op("rotate û",        [:û, :fac],         [:û]),
+    Op("û* ← E(û+Δt·N̂₁)", [:û, :nl],     [:ustar_spec]),
+    Op("rotate N̂_u,1",     [:nl],          [:nl]),
+    Op("rotate û",          [:û],           [:û]),
   ])
   scalar && append!(ops, [
-    Op("build E_κ",       Symbol[],           [:fac]),
-    Op("φ̂* predictor",   [:φ̂, :sb_nl],      [:φstar_spec]),
-    Op("rotate φ̂*",      [:φstar_spec, :fac],[:φstar_spec]),
-    Op("rotate N̂_φ,1",   [:sb_nl, :fac],     [:sb_nl]),
-    Op("rotate φ̂",       [:φ̂, :fac],        [:φ̂]),
+    Op("φ̂* ← E(φ̂+Δt·N̂₁)", [:φ̂, :sb_nl], [:φstar_spec]),
+    Op("rotate N̂_φ,1",      [:sb_nl],       [:sb_nl]),
+    Op("rotate φ̂",           [:φ̂],          [:φ̂]),
   ])
   append!(ops, _recoveries(:ustar_spec))
   append!(ops, _velocity_assembly(:ustar_spec, :ustar, :ωstar, :stage2; phase_shift))
@@ -371,14 +365,9 @@ const OP_COST = Dict(
   # reductions — a fusion barrier like a transform (the scalar result gates the next kernel), but
   # the read passes are real and irreducible
   "normalize"          => _cost(:reduction),
-  # pointwise ops with a field-scale configuration read
-  "dealias"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "shift û"            => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "shift φ̂"           => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "shift-back average" => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "band-limit"         => _cost(:pointwise; extra = _ex(spectral_scalar = 1)),
-  "build E_ν"          => _cost(:pointwise; extra = _ex(real_spectral_scalar = 1)),
-  "build E_κ"          => _cost(:pointwise; extra = _ex(real_spectral_scalar = 1)),
+  # Since the PF adoption (decisions 38/39) every kernel a base op applies is a compressed symbol —
+  # a radial closure or O(N) per-axis factors — so no op reads a field-scale configuration array and
+  # the `extra` column of this table is empty: the pass ledger IS the physical floor.
   # the unforced finalize is a no-op (the forcing deltas price the real hooks)
   "finalize"           => _cost(:noop),
 )
@@ -387,9 +376,11 @@ const OP_COST = Dict(
 # recorded defect, raised to GBGPeriodicFields.)
 for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl û", "shifted curl",
              "cross u×ω", "Leray projection", "divergence", "flux uφ",
-             "seed hu", "seed hφ", "accumulate hu", "accumulate hφ", "û += B·hu", "φ̂ += B·hφ",
-             "rotate û", "rotate hu", "rotate φ̂", "rotate hφ", "rotate û*", "rotate φ̂*",
-             "rotate N̂_u,1", "rotate N̂_φ,1", "û* predictor", "φ̂* predictor",
+             "shift û", "shift φ̂", "shift-back average", "band-limit",
+             "seed hu", "seed hφ", "accumulate hu", "accumulate hφ",
+             "û ← E(û+B·hu)", "φ̂ ← E(φ̂+B·hφ)", "û* ← E(û+Δt·N̂₁)", "φ̂* ← E(φ̂+Δt·N̂₁)",
+             "rotate û", "rotate hu", "rotate φ̂", "rotate hφ",
+             "rotate N̂_u,1", "rotate N̂_φ,1",
              "û corrector 1", "û corrector 2", "φ̂ corrector 1", "φ̂ corrector 2",
              "draw noise", "project noise", "f̂ ← θf̂ + sξ", "add OU source")
   OP_COST[name] = _cost(:pointwise)
@@ -494,4 +485,6 @@ _ops(scheme, dealiasing, scalar; ou = false) =
     rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift, charts = true)
 
 _evals(scheme)  = scheme === :RK3 ? 3 : 2     # right-hand-side evaluations per step
-_builds(scheme) = scheme === :RK3 ? 3 : 2     # integrating-factor builds per field per step
+_applies(scheme) = scheme === :RK3 ? 5 : 3    # fused-exponential applications per field per step
+                                              # (RK3: 3 state updates + 2 accumulator rotations;
+                                              #  RK2: predictor + first-stage + state rotations)

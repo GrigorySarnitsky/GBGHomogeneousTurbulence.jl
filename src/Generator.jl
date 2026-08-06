@@ -24,7 +24,7 @@ Its contents (each formula lives in the operation's own docstring):
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (the
   dealiased, Leray-projected momentum term and the scalar advection, each plus its additive forcing
   source) at a stage state.
-- [`velocity_factor!`](@ref), [`scalar_factor!`](@ref) — build each field's exact linear subflow (the
+- [`velocity_factor`](@ref), [`scalar_factor`](@ref) — supply each field's exact linear subflow (the
   viscous/diffusive integrating factor, with any linear forcing rate folded in).
 - [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
 
@@ -36,15 +36,14 @@ module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
-                          spectral_vector, physical_vector, scalar_spectral, scalar_physical,
-                          _real_type, _blank, _squared_wavenumber_lazy
+                          spectral_vector, physical_vector, scalar_spectral, scalar_physical
 using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
 using ..Forcing: AbstractForcing, NoForcing,
                  set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
                  add_forcing_source!
 
 export FlowConditions, ResolvedGenerator,
-       prepare!, velocity_rhs!, scalar_rhs!, velocity_factor!, scalar_factor!, finalize!
+       prepare!, velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor, finalize!
 
 
 """
@@ -77,9 +76,10 @@ FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
 # Phase-shift dealiasing scratch + the two translation kernels (present only when `dealiasing isa
 # PhaseShift`). The kernels are built once from the half-cell displacement; the scalar fields are
 # `nothing` for a velocity-only run.
-struct PhaseShiftBuffers{K, VS, VP, SS, SP}
+struct PhaseShiftBuffers{K, KB, VS, VP, SS, SP}
   to_shifted::K                   # translation kernel: recover a field on the grid displaced by +½ cell
   back::K                         # translation kernel: shift a displaced term back to the grid
+  back_dealiased::KB              # back ∘ the spherical truncation, composed once — the tail's kernel
   velocity_shifted::VS            # û on the displaced grid, then the displaced nonlinear term
   u_shifted::VP                   # velocity recovered on the displaced grid
   omega_shifted::VP               # vorticity recovered on the displaced grid
@@ -88,14 +88,18 @@ struct PhaseShiftBuffers{K, VS, VP, SS, SP}
   phi_shifted::SP                 # scalar recovered on the displaced grid (or nothing)
 end
 
-# Build the two translation kernels once (offset = half a cell) and the displaced-evaluation scratch; the
-# scalar fields only when a scalar is evolved. A scalar kernel translates a vector or scalar field alike.
+# Build the two translation kernels once (offset = half a cell), their composition with the
+# spherical truncation (the averaging convolve applies both in one pass), and the
+# displaced-evaluation scratch; the scalar fields only when a scalar is evolved. A scalar kernel
+# translates a vector or scalar field alike.
 function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
   δ = 0.5 .* domain.grid.grid_spacing
   reference = scalar_spectral(domain)
+  back = translation_kernel(reference, domain.multipliers, δ)
   return PhaseShiftBuffers(
     translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
-    translation_kernel(reference, domain.multipliers,   δ),   # shift a displaced term back to the grid
+    back,
+    convolve(domain.dealias, back),                           # 𝔻 ∘ back — kilobytes, never a field
     spectral_vector(domain),
     physical_vector(domain), physical_vector(domain),
     scalar ? scalar_spectral(domain) : nothing,
@@ -116,9 +120,9 @@ function _forcing_rate(domain::FixedDomain, forcing)
                           "would be given no rate array to fill and would never be applied"))
     return nothing
   end
-  # A real array of spectral-scalar shape on the domain's backend (the shape the armed rate A(κ)
-  # multiplies mode by mode), zeroed so an un-set rate acts as no forcing.
-  return _blank(domain, _real_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0)))
+  # A scalar field in spectral representation holding REAL values (the complex container is what the
+  # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
+  return scalar_spectral(domain)
 end
 
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
@@ -141,7 +145,7 @@ The reified right-hand side of the resolved dynamics — the flow's generator as
 through (the quadratic-product fields, the displaced-evaluation buffers when the domain dealiases by
 `PhaseShift`, and the per-mode forcing-rate arrays). A time-marching scheme consumes it through the
 generator protocol — [`prepare!`](@ref) once per step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref)
-at each stage state, [`velocity_factor!`](@ref) / [`scalar_factor!`](@ref) for the exact linear
+at each stage state, [`velocity_factor`](@ref) / [`scalar_factor`](@ref) for the exact linear
 subflows, [`finalize!`](@ref) after the completed step — and itself does only stage arithmetic, so a
 scheme can never assemble the right-hand side from a mismatched intermediate state.
 
@@ -253,7 +257,7 @@ recovered on a grid displaced by half a cell (using `û` and the generator's dis
 scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
 
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
-forcing are advanced exactly by the integrating factor ([`velocity_factor!`](@ref)). The Lamb vector
+forcing are advanced exactly by the integrating factor ([`velocity_factor`](@ref)). The Lamb vector
 and its transform are held in the generator's own product scratch, so the operation allocates nothing.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain) =
@@ -261,46 +265,51 @@ velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain)
                         generator.product_physical, generator.product_spectral, generator.phase_shift);
    add_forcing_source!(generator.conditions.velocity_forcing, N̂, domain))
 
-# Mask strategies (TwoThirds / HouLi): one evaluation, post-multiplied by the low-pass kernel.
+# Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
+# projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
 function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, û, u, ω, domain::FixedDomain,
                               product_physical, product_spectral, phase_shift)
-  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral)
-  convolve!(nonlinear, nonlinear, domain.dealias)
+  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral, domain.dealias)
   return nonlinear
 end
 
 # Phase-shift: average the primary and the half-cell-displaced evaluation (cancels the odd-parity
-# aliases), then the spherical `domain.dealias` truncation removes the surviving two-axis aliases.
+# aliases); the spherical `domain.dealias` truncation removes the surviving two-axis aliases, folded
+# into the passes rather than swept separately — the primary carries it inside its projection, and
+# the displaced term picks it up through the composed shift-back∘truncation kernel of the averaging
+# convolve, so no whole-field truncation pass remains.
 function _velocity_nonlinear!(::PhaseShift, nonlinear, û, u, ω, domain::FixedDomain,
                               product_physical, product_spectral, phase_shift)
   T = real(eltype(field_data(nonlinear)))
-  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral)                        # primary
+  _velocity_lamb!(nonlinear, u, ω, domain, product_physical, product_spectral, domain.dealias)        # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
   velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_physical, product_spectral)
-  # The shift-back and the two-grid average are one α/β convolve — ½·back ⊙ (displaced) + ½·(primary).
-  convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back, T(1 // 2), T(1 // 2))
-  convolve!(nonlinear, nonlinear, domain.dealias)                                                      # spherical truncation
+  # Shift-back, two-grid average, and truncation in ONE α/β convolve: ½·(𝔻⊙back)⊙(displaced) +
+  # ½·(primary, already truncated) — the composed kernel is built once at construction.
+  convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back_dealiased, T(1 // 2), T(1 // 2))
   return nonlinear
 end
 
-# The raw pseudospectral ℙ(u×ω) in spectral representation, with no dealiasing — the piece both
-# dealiasing strategies build.
-function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_physical, product_spectral)
+# The pseudospectral ℙ(u×ω) in spectral representation — with an optional dealias kernel folded into
+# the projection's own pass (the kernel-composed arity; `nothing` gives the raw projected term).
+function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_physical, product_spectral,
+                         kernel = nothing)
   cross!(product_physical, u, ω)
   to_spectral!(product_spectral, product_physical, domain.velocity_plans)
-  helmholtz_projection!(out, product_spectral, domain.multipliers)
+  kernel === nothing ? helmholtz_projection!(out, product_spectral, domain.multipliers) :
+                       helmholtz_projection!(out, product_spectral, domain.multipliers, kernel)
   return out
 end
 
 
 """
-    velocity_factor!(ℰ, generator, domain, τ)
+    velocity_factor(generator, τ)
 
-Write the velocity's exact linear subflow over a substep ``\\tau`` (`τ`) into `ℰ` (a scalar field in
-spectral representation). The linear part of the momentum equation — the diffusion
-``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
+The velocity's exact linear subflow over a substep ``\\tau`` (`τ`), as the **parameters of its
+exponential** rather than a materialized kernel. The linear part of the momentum equation — the
+diffusion ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
 ``A(\\boldsymbol{\\kappa})`` that [`prepare!`](@ref) armed — is solved exactly in spectral
 representation by the per-mode multiplier
 
@@ -308,44 +317,36 @@ representation by the per-mode multiplier
 \\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\big),
 ```
 
-with ``A = 0`` when no linear forcing is active, so multiplying a field by `ℰ` advances its viscous
-(and linear-forcing) part exactly — machine-exact, with no stability restriction; only a scheme's
-explicit stage combination carries truncation error. The [`ResolvedGenerator`](@ref) `generator`
-supplies ``\\nu`` and the armed rate; the `domain` (a [`FixedDomain`](@ref)) supplies
-``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` through its multipliers, evaluated per mode — in spectral
-representation ``-\\nabla^{2}`` acts as multiplication by it.
+with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\mathcal E`` advances its
+viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
+scheme's explicit stage combination carries truncation error. Since the multiplier is the exponential
+of a radial symbol (plus the armed per-mode rate), a scheme applies it through the backend's fused
+exponential convolution, which evaluates it per mode from the wavenumber arrays: nothing is built,
+stored, or swept for it. Accordingly this verb returns the exponential's parameters as a named tuple —
+`coefficient` ``= -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
+`offset_scale` ``= \\tau`` and `offset` ``= \\hat A`` (the armed rate field, or `nothing` when no
+linear forcing is active) — exactly the arguments the fused exponential takes.
+
+The arguments are:
+- `generator` — the [`ResolvedGenerator`](@ref), supplying ``\\nu`` and the armed rate.
+- `τ` — the sub-interval the stage advances.
 """
-velocity_factor!(ℰ, generator::ResolvedGenerator, domain::FixedDomain, τ::Real) =
-  _integrating_factor!(ℰ, domain, generator.conditions.viscosity, τ,
-                       generator.velocity_rate_active ? generator.velocity_rate : nothing)
+velocity_factor(generator::ResolvedGenerator, τ::Real) =
+  (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
+   offset = generator.velocity_rate_active ? generator.velocity_rate : nothing)
 
 
 """
-    scalar_factor!(ℰ, generator, domain, τ)
+    scalar_factor(generator, τ)
 
-Write the passive scalar's exact linear subflow over a substep ``\\tau`` into `ℰ` — the same per-mode
-multiplier as [`velocity_factor!`](@ref) with the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``
-in place of ``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
+The passive scalar's exact linear subflow over a substep ``\\tau`` — the same exponential parameters
+as [`velocity_factor`](@ref) with the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
+``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
 """
-scalar_factor!(ℰ, generator::ResolvedGenerator, domain::FixedDomain, τ::Real) =
-  _integrating_factor!(ℰ, domain, generator.conditions.viscosity / generator.conditions.schmidt, τ,
-                       generator.scalar_rate_active ? generator.scalar_rate : nothing)
-
-
-# The shared kernel of the factor pair: ℰ(κ) = exp((A(κ) − D|κ|²)τ), the exact solution of the
-# diffusion ∂ₜf = D∇²f (+ the linear forcing rate A when armed) over τ. The |κ|² enters as the lazy
-# per-axis broadcast (nothing field-sized is read or built for it); the whole build goes away with
-# the stage-1b `exponential_convolve!` adoption, which applies this factor without materializing it.
-function _integrating_factor!(factor, domain::FixedDomain, diffusivity::Real, dt::Real, rate = nothing)
-  T = real(eltype(field_data(factor)))
-  κ2 = _squared_wavenumber_lazy(domain)
-  if rate === nothing
-    field_data(factor) .= complex.(exp.(T(-diffusivity * dt) .* κ2))
-  else
-    field_data(factor) .= complex.(exp.(T(dt) .* (rate .- T(diffusivity) .* κ2)))
-  end
-  return factor
-end
+scalar_factor(generator::ResolvedGenerator, τ::Real) =
+  (coefficient = -(generator.conditions.viscosity / generator.conditions.schmidt) * τ,
+   offset_scale = τ,
+   offset = generator.scalar_rate_active ? generator.scalar_rate : nothing)
 
 
 """
@@ -370,7 +371,7 @@ The dealiasing strategy controls the aliasing of the quadratic product: a **mask
 [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced half a cell —
 using `û`, `φ̂`, and the generator's displaced-evaluation scratch — before the spherical truncation.
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
-`N̂`: they are advanced exactly by [`scalar_factor!`](@ref).
+`N̂`: they are advanced exactly by [`scalar_factor`](@ref).
 
 The scalar flux ``\\boldsymbol{u}\\varphi`` reuses the generator's momentum product scratch, so the
 operation allocates nothing.
@@ -380,20 +381,25 @@ scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u, φ, domain::FixedDom
                       generator.product_physical, generator.product_spectral, generator.phase_shift);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, domain))
 
-# Mask strategies: one flux evaluation, divergence, low-pass — the −1 folds in the −∇· sign.
+# Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
+# sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.
 function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
                             product_physical, product_spectral, phase_shift)
-  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral)
-  convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)
+  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral,
+                           domain.dealias, -1)
   return nonlinear
 end
 
 # Phase-shift: average the primary and half-cell-displaced flux divergences (cancels the odd-parity
-# aliases), then the spherical truncation (folding in the −∇· sign) removes the two-axis aliases.
+# aliases); the spherical truncation and the −∇· sign fold into the passes — the primary carries
+# both inside its divergence, the displaced term picks the truncation up through the composed
+# shift-back∘truncation kernel and the sign through the averaging α — so no whole-field truncation
+# pass remains.
 function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::FixedDomain,
                             product_physical, product_spectral, phase_shift)
   T = real(eltype(field_data(nonlinear)))
-  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral)                 # primary ∇·(uφ)
+  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_physical, product_spectral,
+                           domain.dealias, -1)                                                          # primary −𝔻∇·(uφ)
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                     # û on the displaced grid
   velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
@@ -401,16 +407,19 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, û, φ̂, u, φ, domain::Fi
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain, product_physical)   # (u_s φ_s)^
   divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·, still on the displaced grid
   # The shift-back symbol commutes through the iκ· contraction (iκ·(ĝ v̂) = ĝ (iκ·v̂)), so it rides
-  # the averaging convolve — ½·back ⊙ (displaced ∇·) + ½·(primary ∇·) — one pass, not shift + combine.
-  convolve!(nonlinear, phase_shift.scalar_shifted, phase_shift.back, T(1 // 2), T(1 // 2))
-  convolve!(nonlinear, nonlinear, domain.dealias, -1, 0)                                                 # spherical truncation, ×−1
+  # the averaging convolve with the truncation composed in and the sign on α:
+  # −½·(𝔻⊙back)⊙(displaced ∇·) + ½·(primary, already −𝔻∇·).
+  convolve!(nonlinear, phase_shift.scalar_shifted, phase_shift.back_dealiased, T(-1 // 2), T(1 // 2))
   return nonlinear
 end
 
-# Raw ∇·(uφ) in spectral representation, no dealiasing.
-function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_physical, product_spectral)
+# ∇·(uφ) in spectral representation — with an optional dealias kernel and sign folded into the
+# divergence's own pass (the kernel-composed arity; `nothing` gives the raw divergence).
+function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_physical, product_spectral,
+                                  kernel = nothing, α = 1)
   _scalar_flux!(product_spectral, u, φ, domain, product_physical)
-  divergence!(out, product_spectral, domain.multipliers)
+  kernel === nothing ? divergence!(out, product_spectral, domain.multipliers) :
+                       divergence!(out, product_spectral, domain.multipliers, kernel, α, 0)
   return out
 end
 

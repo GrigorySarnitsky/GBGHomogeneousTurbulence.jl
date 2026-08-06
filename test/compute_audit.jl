@@ -97,29 +97,27 @@ const TRANSFORM_GAP_HOLDERS = Dict(
 
 # ---------------------------------------------------------------- the frozen pass ledger
 
-# Full-field passes per shape class and step (reads + writes + configuration reads), transforms
-# excluded. Traffic in N³-real units ≈ 3·(SV + PV) + 1·(SS + PS) + ½·R at leading order in 1/N.
-# PhaseShift cells re-frozen 2026-07-19: the shift-back now rides the averaging convolve as one
-# α/β pass in both displaced chains (the PF-triage free win; for the scalar the shift-back symbol
-# commutes through the divergence contraction) — 2 spectral-vector passes fewer per evaluation.
-# RK2 cells re-frozen 2026-07-28 (decision 35): every use of a field's integrating factor over an
-# IFRK2 step is at the one substep Δt, so each factor is now built once and all of its consumers run
-# in that visit — 1 spectral-scalar write and 1 real-spectral-scalar read fewer per field per step (verified
-# bit-identical). This is the schedule-level half of the redundancy; the value-level half (at
-# Sc = 1 with both rates unarmed the two factors are the same field) stays a named floor holder.
+# Full-field passes per shape class and step (reads + writes), transforms excluded. Traffic in
+# N³-real units ≈ 3·(SV + PV) + 1·(SS + PS) + ½·R at leading order in 1/N.
+# ALL cells re-frozen 2026-08-06 at the PF adoption (decision 39): the stage update fuses with its
+# integrating-factor rotation into one exponential pass evaluated per mode (no factor built, stored,
+# or read — the register and its builds are gone); every dealias/truncation pass folds into the
+# kernel-composed projection/divergence or the composed shift-back kernel; and every kernel a base
+# op applies is a compressed symbol, so no op reads a field-scale configuration array. A
+# velocity-only step now moves NOTHING scalar-shaped at all — the zero columns are the assertion.
 const PASSES_BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, real_spectral_scalar = 3),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, real_spectral_scalar = 6),
-  (:RK3, :HouLi,      false) => (spectral_vector = 51, physical_vector = 9, spectral_scalar = 11, physical_scalar = 0, real_spectral_scalar = 3),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 54, physical_vector = 15, spectral_scalar = 64, physical_scalar = 3, real_spectral_scalar = 6),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 84, physical_vector = 18, spectral_scalar = 17, physical_scalar = 0, real_spectral_scalar = 3),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 102, physical_vector = 30, spectral_scalar = 103, physical_scalar = 6, real_spectral_scalar = 6),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, real_spectral_scalar = 1),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, real_spectral_scalar = 2),
-  (:RK2, :HouLi,      false) => (spectral_vector = 31, physical_vector = 6, spectral_scalar = 6, physical_scalar = 0, real_spectral_scalar = 1),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 33, physical_vector = 10, spectral_scalar = 37, physical_scalar = 2, real_spectral_scalar = 2),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 53, physical_vector = 12, spectral_scalar = 10, physical_scalar = 0, real_spectral_scalar = 1),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 65, physical_vector = 20, spectral_scalar = 63, physical_scalar = 4, real_spectral_scalar = 2),
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 9, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 42, physical_vector = 15, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 9, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 15, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 18, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 90, physical_vector = 30, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 25, physical_vector = 6, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 27, physical_vector = 10, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 25, physical_vector = 6, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 27, physical_vector = 10, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 47, physical_vector = 12, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 59, physical_vector = 20, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).
@@ -128,35 +126,22 @@ const PASSES_BASE = Dict(
 # two spectral classes, and every one is a PF-kernel-granularity artifact of the numpy model — the
 # schedule is already minimal in VALUES (the liveness audit); the passes above the fused ideal are
 # re-reads and re-writes between the op-per-kernel boundaries:
-#   spectral_vector / spectral_scalar — UNFUSED STAGE PIPELINE: Leray → dealias → accumulate →
-#     update → factor-rotate run as one kernel per op where one fused per-mode kernel could read
-#     (product, state) and write (state, accumulator) once; and FACTOR MATERIALIZATION — the
-#     integrating factor is built into a register and re-read per application where a fused
-#     exponential-multiply computes it in-register (the open GBGPeriodicFields request; its passes
-#     are pure-intermediate traffic the bound prices at zero).
+#   spectral_vector / spectral_scalar — UNFUSED STAGE PIPELINE: projection⊙dealias → accumulate →
+#     fused-exponential update still run as one kernel per op where one fused per-mode kernel could
+#     read (product, state) and write (state, accumulator) once. FACTOR MATERIALIZATION is RETIRED
+#     (decision 39): the fused exponential computes the factor in register, exactly what the holder
+#     asked of the backend — the pre-registered round-3 candidate (the two-output stage kernel) is
+#     what remains of this class.
 const FUSION_GAP_HOLDERS = Dict(
-  :spectral_vector => "UNFUSED STAGE PIPELINE + FACTOR MATERIALIZATION (PF kernel granularity)",
-  :spectral_scalar => "UNFUSED STAGE PIPELINE + FACTOR MATERIALIZATION (PF kernel granularity)",
+  :spectral_vector => "UNFUSED STAGE PIPELINE (PF kernel granularity)",
+  :spectral_scalar => "UNFUSED STAGE PIPELINE (PF kernel granularity)",
 )
 
-# A VALUE-level residual the schedule model above cannot see, recorded rather than exploited. The
-# two integrating factors coincide as fields, ℰ_ν(τ) ≡ ℰ_κ(τ), exactly when the diffusivities agree
-# AND both linear forcing rates are unarmed — that is, Sc = 1 with no rate-armed forcing on either
-# field, since an armed rate A(κ) enters the exponent and the velocity's and scalar's differ in
-# general. So the second build per stage is redundant only on that configuration, and the sound
-# O(1) guard is the conjunction, never `Sc == 1` alone: a bare Schmidt test would silently hand the
-# scalar the velocity's forcing rate — a physics error no Sc = 1 unforced test could catch.
-#
-# It is left unexploited by choice. Non-unit Sc is a fully supported configuration, not a fallback,
-# and the guard would make the hot loop's schedule depend on a runtime value — one code path fast,
-# the other not, and the op model above forced to fork. The saving is one pointwise exponential
-# kernel per field per stage, no transform. The general form of the fix (a stamped factor register:
-# rebuild only when the full argument tuple (D, τ, rate epoch, armed) changes, the ObservablesCache
-# epoch pattern) subsumes this case safely and is the route to take if the residual is ever paid
-# for; a Schmidt special case is not.
-const FACTOR_VALUE_HOLDER =
-  "COINCIDENT INTEGRATING FACTORS at Sc = 1 with both rates unarmed — one pointwise exponential per " *
-  "field per stage; unexploited (a value-dependent hot-loop branch; see the stamped-register route)"
+# The COINCIDENT-FACTORS residual (Sc = 1, both rates unarmed ⇒ ℰ_ν ≡ ℰ_κ) is RETIRED with the
+# factor itself (decision 39): no factor field is built for the coincidence to save — each fused
+# exponential evaluates its own parameters in register, and two coincident parameter tuples cost
+# nothing extra to "build twice". The retired holder's guard lesson stays worth its line: any future
+# value-level dedup must key on the FULL argument tuple (D, τ, rate epoch, armed), never Sc alone.
 
 
 # ---------------------------------------------------------------- the frozen deltas
@@ -169,30 +154,32 @@ _forcing_transform_delta(tag, slot) =
                 (c2r = 0, r2c = 0)
 
 # Pass deltas per forcing hook, derived from src/Forcing.jl (the OU-velocity column is
-# cross-checked against its op list below; the rest are frozen by derivation):
-#   band  — apply_forcing!: weighted_inner(field, band) [field + band] + the in-band rescale
-#           convolve [field r/w + band].
-#   linear — set_forcing_rate!: rate .= A·mask [mask + rate], then the armed factor build reads the
-#           rate once per build.
-#   power — set_forcing_rate!: weighted_inner(field, band) + rate .= a·mask + per-build rate reads.
+# cross-checked against its op list below; the rest are frozen by derivation). Every band kernel is
+# a lazy radial symbol since the PF adoption, so no hook reads a stored kernel; an ARMED rate is a
+# spectral-scalar field the fused exponential reads once per application (_applies below).
+#   band  — apply_forcing!: weighted_inner(field, band) [field read] + the in-band rescale
+#           convolve [field r/w].
+#   linear — set_forcing_rate!: rate .= A·mask [mask (real) read + rate (spectral scalar) write],
+#           then the armed exponential reads the rate once per application.
+#   power — set_forcing_rate!: weighted_inner(field, band) [field read] + rate .= a·indicator
+#           [indicator (real) read + rate write] + per-application rate reads.
 #   ou    — prepare_forcing!: draw + band-limit + project + normalize + state fold (8 slot-shaped
-#           passes + 1 kernel read + the physical noise write; the unit-variance rescale folds into
-#           the state combination's coefficient), then the per-stage additive source read/accumulate
+#           passes + the physical noise write; the unit-variance rescale folds into the state
+#           combination's coefficient), then the per-stage additive source read/accumulate
 #           (3 passes × evaluations).
 function _forcing_pass_delta(tag, slot, scheme)
   tag === :none && return ZERO
   if tag === :band
-    return slot === :velocity ? _ex(spectral_vector = 3, spectral_scalar = 2) :
-                                _ex(spectral_scalar = 5)
+    return slot === :velocity ? _ex(spectral_vector = 3) : _ex(spectral_scalar = 3)
   elseif tag === :linear
-    return _ex(real_spectral_scalar = 2 + _builds(scheme))
+    return _ex(spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1)
   elseif tag === :power
-    return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1, real_spectral_scalar = 2 + _builds(scheme)) :
-                                _ex(spectral_scalar = 2, real_spectral_scalar = 2 + _builds(scheme))
+    return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1) :
+                                _ex(spectral_scalar = 2 + _applies(scheme), real_spectral_scalar = 1)
   end
   return slot === :velocity ?
-    _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1, spectral_scalar = 1) :
-    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1, real_spectral_scalar = 0)
+    _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1) :
+    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1)
 end
 
 # Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache (the pre-step read
@@ -315,40 +302,39 @@ end
   @testset "op lists name real displaced registers" begin
     PB = GBGIsotropicTurbulence.Generator.PhaseShiftBuffers
     @test all(f -> f in fieldnames(PB),
-              (:to_shifted, :back, :velocity_shifted, :u_shifted, :omega_shifted,
+              (:to_shifted, :back, :back_dealiased, :velocity_shifted, :u_shifted, :omega_shifted,
                :scalar_shifted, :scalar_copy, :phi_shifted))
-    # `u_shifted` is a register the displaced evaluation genuinely needs. Landing the displaced
-    # velocity on the generator's spent product scratch instead removes it from the ledger and puts
-    # a larger transient back at every stage, because the backend's cross product guards
-    # destination/operand aliasing by allocating and copying rather than by reading the fiber first.
-    # The allocation guard in the memory audit is what enforces this; the field list records it.
+    # `u_shifted` remains a register the displaced evaluation needs today. The backend's cross
+    # product is now alias-safe by construction (its former guard is retired), so landing displaced
+    # values on spent registers is no longer blocked — that reuse is scheduled with the cache's
+    # slot-register merges (the boundary-refresh design), not as a drive-by here.
   end
 
-  @testset "the coincident-factor holder names the exact condition" begin
-    # Pins FACTOR_VALUE_HOLDER's premise: the two integrating factors coincide as fields under
-    # Sc = 1 AND both rates unarmed, and NOT under either relaxation. The third case is the one
-    # that matters — it is why the unexploited residual may never be guarded on `Sc == 1` alone.
+  @testset "the factor verbs supply parameters, never a field (decision 39)" begin
+    # The protocol's factor half is now a parameter supplier: it returns the exponential's
+    # (coefficient, offset_scale, offset) and touches no storage. The armed-rate branch is the one
+    # behavioral fork, so it is pinned here: unarmed gives `offset === nothing`; an armed velocity
+    # rate reaches ONLY the velocity's parameters (the guard lesson of the retired coincident-factor
+    # holder — a bare `Sc == 1` dedup would have handed the velocity's rate to φ).
     domain = FixedDomain(8, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
-    ℰ_u, ℰ_φ = scalar_spectral(domain), scalar_spectral(domain)
     factors(sc, force) = begin
       conditions = FlowConditions(; viscosity = 0.1, schmidt = sc, scalar_forcing = NoForcing(),
                                   velocity_forcing = force)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       prepare!(generator, ResolvedFields(domain; scalar = true), domain, 0.01)
-      velocity_factor!(ℰ_u, generator, domain, 0.01)
-      scalar_factor!(ℰ_φ, generator, domain, 0.01)
-      (field_data(ℰ_u), field_data(ℰ_φ), generator)
+      (velocity_factor(generator, 0.01), scalar_factor(generator, 0.01), generator)
     end
 
-    a, b, gen = factors(1.0, NoForcing())                         # Sc = 1, no armed rate
+    fu, fφ, gen = factors(1.0, NoForcing())                       # Sc = 1, no armed rate
     @test !gen.velocity_rate_active && !gen.scalar_rate_active
-    @test a == b                                                  # coincide — the recorded residual
+    @test fu.offset === nothing && fφ.offset === nothing
+    @test fu.coefficient == fφ.coefficient                        # Sc = 1 ⇒ equal parameters
 
-    a, b, _ = factors(0.7, NoForcing())                           # Sc ≠ 1 — the supported case
-    @test a != b
+    fu, fφ, _ = factors(0.7, NoForcing())                         # Sc ≠ 1 — the supported case
+    @test fu.coefficient != fφ.coefficient
 
-    a, b, gen = factors(1.0, Linear(domain; rate = 0.5))   # Sc = 1, velocity rate ARMED
+    fu, fφ, gen = factors(1.0, Linear(domain; rate = 0.5))        # Sc = 1, velocity rate ARMED
     @test gen.velocity_rate_active && !gen.scalar_rate_active
-    @test a != b            # a bare `Sc == 1` guard here would apply the velocity's rate to φ
+    @test fu.offset !== nothing && fφ.offset === nothing          # the rate reaches only its field
   end
 end

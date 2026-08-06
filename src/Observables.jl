@@ -29,7 +29,8 @@ folds a small residual from the truncation edge back into the mean, so it carrie
 module Observables
 
 using GBGPeriodicFields
-using ..SimulationDomain: FixedDomain, tensor_physical, scalar_physical
+using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
+using ..SimulationDomain: FixedDomain, tensor_physical
 
 export kinetic_energy, dissipation, max_speed,
        scalar_variance, scalar_dissipation, derivative_skewness,
@@ -174,7 +175,8 @@ From the velocity field `û` in spectral representation, the strain is formed di
 `symmetric_gradient` and the wavenumber `multipliers` of the [`FixedDomain`](@ref) bundle `domain`
 (skipping the full nine-component velocity gradient), carried to physical space by its rank-2 tensor
 transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
-``\\langle\\det\\boldsymbol{S}\\rangle`` (`det`); `domain` also sizes the per-call tensor and scalar scratch.
+``\\langle\\det\\boldsymbol{S}\\rangle`` (the fused mapped mean over the pointwise determinant, which
+materializes no determinant field); `domain` also sizes the per-call tensor scratch.
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free.
@@ -189,9 +191,9 @@ function derivative_skewness(û, domain::FixedDomain)
   to_physical!(strain_physical, strain, domain.tensor_plans)            # S in physical space (Ŝ is consumed)
   ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
   ss <= 0 && return 0.0
-  det_field = scalar_physical(domain)
-  det!(det_field, strain_physical)                                   # det S at each grid point
-  mean_det = sum(field_data(det_field)) / length(field_data(det_field))   # ⟨det S⟩
+  # ⟨det S⟩ as the fused mapped reduction: the determinant is formed per grid point in registers and
+  # consumed by the mean immediately, so no determinant field is materialized.
+  mean_det = mean(det, strain_physical)
   return 3 * _SKEWNESS_ISOTROPY_CONSTANT * mean_det / ss^1.5         # C · 3⟨det S⟩/⟨S:S⟩^{3/2}
 end
 

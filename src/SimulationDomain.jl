@@ -1,5 +1,6 @@
 # SimulationDomain — the discretized, periodic, cubic box a run lives on: the grid, the real–Fourier
-# layout, the transform plans, the spectral multipliers, the |k|² field, and the dealias kernel.
+# layout, the transform plans, the spectral multipliers, and the lazy per-mode kernels (|k|² and the
+# dealias mask — compressed symbols, resident in no array; decision 38).
 # Reusable and read-only; precision and backend enter here (element_type / array_type) and flow
 # everywhere from here. The concrete frame is `FixedDomain` (fixed, orthogonal, unsheared); a sheared
 # (Rogallo) frame is deferred (ARCHITECTURE §7). Field-sized allocators (spectral_vector, …) build
@@ -10,7 +11,7 @@
 
 The discretized periodic box a run lives on — the reusable, read-only frame:
 - [`FixedDomain`](@ref) — the fixed, unsheared cubic box (grid, transform plans, spectral multipliers,
-  squared-wavenumber field, dealias kernel).
+  and the lazy ``\\lvert\\boldsymbol{\\kappa}\\rvert^2`` and dealias kernels).
 - [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref), [`HouLi`](@ref), or
   [`PhaseShift`](@ref), and the cutoff it sets, [`max_wavenumber`](@ref).
 - [`spectral_vector`](@ref), [`scalar_spectral`](@ref), … — the field-sized scratch allocators.
@@ -230,17 +231,6 @@ _real_type(domain::FixedDomain) = eltype(_reference(domain))
 _complex_type(domain::FixedDomain) = complex(_real_type(domain))
 _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_reference(domain), S, dims), zero(S))
 
-
-# TRANSITIONAL — the integrating-factor builds are the one remaining consumer; the stage-1b adoption
-# of `exponential_convolve!` removes them and this helper with them. The lazy |κ|² broadcast over the
-# multipliers' three O(N) axis arrays, composable into a fused assignment (nothing field-sized built).
-function _squared_wavenumber_lazy(domain::FixedDomain)
-  m = domain.multipliers
-  return Base.broadcasted(+,
-    reshape(m.squared_wavenumber_1, :, 1, 1),
-    reshape(m.squared_wavenumber_2, 1, :, 1),
-    reshape(m.squared_wavenumber_3, 1, 1, :))
-end
 
 
 """

@@ -84,9 +84,10 @@ end
 """
     set_forcing_rate!(forcing, rate, field, domain) -> Bool
 
-For a forcing linear in the field, fill the real per-mode rate array `rate` with ``A(\\boldsymbol{\\kappa})``
+For a forcing linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
+representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `true`; the integrator folds it into the diffusive
-integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`velocity_factor!`](@ref GBGIsotropicTurbulence.Generator.velocity_factor!)), so the
+integrating factor ``\\mathcal E(\\boldsymbol{\\kappa})`` (see [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Return `false` (the default) when the forcing contributes no linear
 rate. The `field` is the start-of-step field in spectral representation; `domain` is the
@@ -248,7 +249,7 @@ end
 uses_linear_rate(::Linear) = true
 
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
-  T = eltype(rate)
+  T = field_scalar_type(rate)
   rate .= T(forcing.rate) .* forcing.mask
   return true
 end
@@ -282,7 +283,7 @@ end
 uses_linear_rate(::ConstantPower) = true
 
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
-  T = eltype(rate)
+  T = field_scalar_type(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
   amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
   rate .= T(amplitude) .* forcing.indicator

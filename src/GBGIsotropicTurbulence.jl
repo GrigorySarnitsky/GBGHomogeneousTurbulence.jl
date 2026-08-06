@@ -16,7 +16,7 @@
 #                      cache + initial conditions (the MZ State role)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
-#                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor!/scalar_factor!/finalize!)
+#                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!)
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
@@ -91,8 +91,8 @@ using .Generator:
   prepare!,
   velocity_rhs!,
   scalar_rhs!,
-  velocity_factor!,
-  scalar_factor!,
+  velocity_factor,
+  scalar_factor,
   finalize!
 
 using .Observables:
@@ -177,8 +177,8 @@ export FixedDomain,
        prepare!,
        velocity_rhs!,
        scalar_rhs!,
-       velocity_factor!,
-       scalar_factor!,
+       velocity_factor,
+       scalar_factor,
        finalize!,
        kinetic_energy,
        dissipation,
