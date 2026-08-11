@@ -104,8 +104,8 @@ further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}
 modes in the retained sphere).
 
 Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform per
-stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a spectral field per phase-shifted
-term). Opt-in, not the default. Because it retains energy out to
+stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale spectral-representation
+buffer per phase-shifted term). Opt-in, not the default. Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
 ``2/3`` rule — handled automatically by `recommended_cfl`.
 

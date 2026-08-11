@@ -49,7 +49,7 @@ new_tensor_field_physical
 
 ## Dealias filtering
 
-Apply the domain's dealias low-pass kernel to a spectral field in place.
+Apply the domain's dealias low-pass kernel to a field in spectral representation, in place.
 
 ```@docs
 dealias!

@@ -6,8 +6,8 @@ advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian
 and Eulerian + Lagrangian statistics.
 
 This package builds on [`GBGPeriodicFields.jl`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl),
-which supplies the underlying field representations, FFT transforms, fiberwise algebra, spectral
-differential operators, reductions, and grid↔point transfer.
+which supplies the underlying field representations, FFT transforms, fiberwise algebra, differential
+operators, reductions, and grid↔point transfer.
 
 The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary
 development took place.

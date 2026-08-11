@@ -7,7 +7,7 @@ forced, advanced by a choice of integrating-factor time-stepping scheme, with La
 tracking and field sampling.
 
 It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
-supplies every field operation — transforms, spectral differential operators, convolution,
+supplies every field operation — transforms, differential operators, convolution,
 interpolation, and reductions. The GPU is the primary target, so each time step is in-place and
 allocation-free over preallocated buffers (occasional diagnostics allocate per call).
 

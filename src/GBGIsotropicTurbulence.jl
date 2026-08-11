@@ -2,7 +2,7 @@
 #
 # This package is a small, focused pseudospectral DNS of homogeneous isotropic turbulence —
 # a velocity field plus a single passive scalar on a periodic box — built on GBGPeriodicFields,
-# which supplies every field operation (transforms, spectral operators, convolution, interpolation,
+# which supplies every field operation (transforms, differential operators, convolution, interpolation,
 # reductions). GBGPeriodicFields is deliberately time- and particle-free (its invariant 12); this
 # package is the consumer that owns time integration, forcing, the scalar transport, particle
 # tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
