@@ -125,7 +125,7 @@ _retained_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
 
 
 """
-    FixedDomain(grid_points_per_axis, side_length;
+    FixedDomain(; grid_points_per_axis, side_length,
                 dealiasing, element_type, array_type)
 
 The discretized periodic box a run lives on — the reusable, read-only frame: a cube of side length
@@ -133,9 +133,7 @@ The discretized periodic box a run lives on — the reusable, read-only frame: a
 pseudospectral method needs on that box.
 
 # Arguments
-`FixedDomain` carries **no defaults** — every argument is explicit; the `Simulation` front door supplies
-the run-layer defaults (`side_length = 2π`, `dealiasing = TwoThirds()`, `element_type = Float64`,
-`array_type = Array`).
+All keyword, all required:
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
 - `dealiasing` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule) and [`HouLi`](@ref)
@@ -183,10 +181,10 @@ end
 _zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef, dims...), zero(S))
 
 
-function FixedDomain(grid_points_per_axis::Integer, side_length::Real;
-                           dealiasing::DealiasingStrategy,
-                           element_type::Type{T},
-                           array_type) where {T<:AbstractFloat}
+function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
+                       dealiasing::DealiasingStrategy,
+                       element_type::Type{T},
+                       array_type) where {T<:AbstractFloat}
   N = Int(grid_points_per_axis)
   L = T(side_length)
   grid = Grid3D((N, N, N), (L, L, L))

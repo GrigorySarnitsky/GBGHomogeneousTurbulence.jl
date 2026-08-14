@@ -23,7 +23,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   N = 24
   L = 2π
   ν = 0.05
-  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)

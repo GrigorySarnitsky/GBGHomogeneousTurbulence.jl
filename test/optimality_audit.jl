@@ -270,7 +270,7 @@ const SYNC_LEDGER = (
     # that is genuinely N³ of information, the walk below stops being zero and the floor must move.
     N = 8
     for strategy in (TwoThirds(), HouLi(), PhaseShift())
-      domain = FixedDomain(N, 2π; dealiasing = strategy, element_type = Float64, array_type = Array)
+      domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = strategy, element_type = Float64, array_type = Array)
       m = domain.multipliers
 
       # (a) The frame holds nothing at field scale — the achieved floor, per strategy.
@@ -336,7 +336,7 @@ const SYNC_LEDGER = (
     # no bound had ever been held against, and both are now zero. A regression here would mean a
     # closed gap has reopened without a holder being written for it.
     #
-    domain = FixedDomain(8, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 
     # (a) Tracers cost nothing at field scale: the start-of-step velocity is interpolated onto the
     #     tracers before the step rather than retained as a field, so nothing the instrument owns

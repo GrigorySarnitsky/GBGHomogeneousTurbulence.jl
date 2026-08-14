@@ -13,7 +13,7 @@ using Test
 @testset "observables cache" begin
   N = 16
   L = 2π
-  domain = FixedDomain(N, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)

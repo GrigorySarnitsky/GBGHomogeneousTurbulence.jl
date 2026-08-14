@@ -54,9 +54,7 @@ the Reynolds number is ``\\mathrm{Re} = 1/\\nu``), the Schmidt number ``\\mathrm
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both `AbstractForcing`). Consumed by the time step (`step!`).
 
-Every argument is explicit — `FlowConditions` carries no defaults; the `Simulation` front door supplies
-the run-layer values (`schmidt = 1.0`, a stationary `BandRescaling` velocity forcing, and `NoForcing()`
-for the scalar).
+Every argument is required.
 
 # Fields
 - `viscosity`, `schmidt` — the kinematic viscosity ``\\nu`` and the Schmidt number ``\\mathrm{Sc}`` (both `Float64`).

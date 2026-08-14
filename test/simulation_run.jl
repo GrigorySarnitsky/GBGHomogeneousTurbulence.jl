@@ -101,7 +101,7 @@ using Test
   end
 
   @testset "bring-your-own domain + fixed dt" begin
-    domain = FixedDomain(16, L; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 16, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     sim = Simulation(domain; viscosity = 0.02, rng = MersenneTwister(3))
     advance!(sim; dt = 0.001)
     @test current_step(sim) == 1
@@ -190,7 +190,7 @@ using Test
   end
 
   @testset "derivative skewness" begin
-    domain = FixedDomain(24, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
@@ -236,7 +236,7 @@ using Test
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb.state.velocity)) && kinetic_energy(simb.state.velocity) > 0
     # the target symbol is validated at construction
-    domain = FixedDomain(16, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)
   end
 end

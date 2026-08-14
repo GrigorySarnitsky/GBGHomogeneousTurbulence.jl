@@ -382,7 +382,7 @@ a cached read like the fields' — and [`sample!`](@ref) interpolates any physic
 particle positions.
 
 ```julia
-domain = FixedDomain(64, 2π; dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration — nothing is declared
 ```
 

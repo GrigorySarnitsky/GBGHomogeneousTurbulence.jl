@@ -17,7 +17,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   T = Float64
   N = 16
   L = 2π
-  domain = FixedDomain(N, L; element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
   uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "uniform field advects exactly" begin

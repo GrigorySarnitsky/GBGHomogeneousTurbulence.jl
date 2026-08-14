@@ -240,7 +240,7 @@ const EPISODE_UNITS = [
 
 
 @testset "memory audit" begin
-  domains = Dict(tag => FixedDomain(N_AUDIT, 2π; element_type = Float64,
+  domains = Dict(tag => FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = Float64,
                                     dealiasing = tag === :TwoThirds ? TwoThirds() :
                                                  tag === :HouLi ? HouLi() : PhaseShift(),
                                     array_type = Array)
@@ -272,7 +272,7 @@ const EPISODE_UNITS = [
 
   @testset "frame ledger — the frozen per-mode symbols, invariant in strategy and precision" begin
     for tag in (:TwoThirds, :HouLi, :PhaseShift), T in (Float64, Float32)
-      domain = FixedDomain(N_AUDIT, 2π; element_type = T, array_type = Array,
+      domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = T, array_type = Array,
                            dealiasing = tag === :TwoThirds ? TwoThirds() :
                                         tag === :HouLi ? HouLi() : PhaseShift())
       @test frame_ledger(domain) == FRAME
@@ -404,7 +404,7 @@ const EPISODE_UNITS = [
 
   @testset "episode ledger — transient peaks, frozen and attributed" begin
     N = 32
-    domain = FixedDomain(N, 2π; element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     unit = 8 * N^3
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))

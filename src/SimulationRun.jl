@@ -154,7 +154,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  scalar = true, velocity_forcing = ConstantPower(target = 0.1))
 
 # Domain-first — build the frame yourself, then hand it to the second form:
-domain = FixedDomain(128, 2π; dealiasing = HouLi(), element_type = Float64, array_type = Array)
+domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(), element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 5e-3)
 ```
 
@@ -241,7 +241,7 @@ end
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     element_type::Type = Float64, array_type = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
-  return Simulation(FixedDomain(grid_points_per_axis, side_length; dealiasing, element_type, array_type); kwargs...)
+  return Simulation(FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type, array_type); kwargs...)
 end
 
 
