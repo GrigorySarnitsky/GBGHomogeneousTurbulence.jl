@@ -94,14 +94,14 @@ uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
 
 [[deps.GBGIsotropicTurbulence]]
-deps = ["GBGPeriodicFields", "Random"]
+deps = ["GBGPeriodicFields", "Random", "Statistics"]
 path = "."
 uuid = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
 version = "0.1.0"
 
 [[deps.GBGPeriodicFields]]
-deps = ["AbstractFFTs", "Atomix", "FFTW", "KernelAbstractions", "LinearAlgebra", "StaticArrays", "Statistics"]
-git-tree-sha1 = "326a873647420c78d3aebc5bd26edad5873c2009"
+deps = ["AbstractFFTs", "Adapt", "Atomix", "FFTW", "KernelAbstractions", "LinearAlgebra", "StaticArrays", "Statistics"]
+git-tree-sha1 = "facb18cca82f9d0f95479af3d5a2c04e1cb35dcf"
 repo-rev = "master"
 repo-url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"
 uuid = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
