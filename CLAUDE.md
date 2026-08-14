@@ -30,18 +30,21 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
 - `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
-  spectral representation, the single source of truth), the physical recoveries, and the random
-  initial conditions.
-- `Cache` — the observables cache (`ObservablesCache`): the stamped boundary storage the iteration
-  deposits its observables into at its tail (no-recompute — a read serves the deposited value or
-  throws; a slot doubles as its producer's stage register; `resolved_fields_modified!` announces an
+  spectral representation, the single source of truth) and the random initial conditions. The
+  physical representations are recovered by PF's preserving `to_physical!` scratch arity at the
+  consuming sites; the vorticity by `Observables.vorticity_physical!` (decision 47).
+- `Observables` — the measured functions of state (energy and dissipation diagnostics of flow and
+  scalar, the spectrum-derived quantities, the CFL `max_speed`, the field-valued vorticity
+  recovery, …). The MZ *observables*; an observable with a cached value is one generic — the field
+  method measures, the cache method serves the deposit (decision 46).
+- `Cache` — the observables cache (`ObservablesCache`): the stamped storage the iteration deposits
+  its observables into at its end (no-recompute — the checked accessors serve the deposited value or
+  throw; a slot doubles as its producer's stage register; `resolved_fields_modified!` announces an
   out-of-band state mutation). The design is `docs/src/observables_cache.md`.
 - `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
   factor, reified as `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
   `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_factor` / `scalar_factor` / `finalize!`.
   The MZ *generator*.
-- `Observables` — the measured functions of state (kinetic energy, dissipation, derivative skewness,
-  scalar variance and dissipation, max speed, energy spectrum, integral scale). The MZ *observables*.
 - `Forcing` — pluggable energy-injection strategies (`AbstractForcing`).
 - `Propagator` — pluggable integrating-factor schemes (`AbstractIntegrator`) and the per-step scratch
   (`IntegratorBuffers`).
@@ -92,7 +95,7 @@ inverse. Operators and extended Base functions are imported before being extende
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
 `cache.vorticity`, `generator.product_spectral`, `state.velocity`, `Tracers.trajectory_velocity` — as do
-function names (`velocity_to_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
+function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
 

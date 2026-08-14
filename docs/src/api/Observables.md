@@ -40,6 +40,16 @@ invariant.
 max_speed
 ```
 
+## Vorticity recovery
+
+The vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` recovered in physical representation
+from the spectral state — the field-valued observable the iteration deposits (its cached read is
+[`vorticity_physical`](@ref)).
+
+```@docs
+vorticity_physical!
+```
+
 ## Spectrum and length scale
 
 The measured energy spectrum and the integral scale — the measured counterparts of a

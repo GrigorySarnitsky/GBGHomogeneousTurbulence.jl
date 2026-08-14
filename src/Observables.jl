@@ -1,8 +1,9 @@
 # Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
-# velocity-derivative skewness, the scalar variance and its dissipation, and the maximum component
-# speed (which feeds the CFL). In the Mori–Zwanzig reading (ARCHITECTURE §8) these are the observables
-# of the `Generator`: their plateaus gate warm-up and their statistics are to be tracked by
-# GBGStreamingStatistics. Each reduces a field to a scalar — a GBGPeriodicFields inner product or moment.
+# velocity-derivative skewness, the scalar variance and its dissipation, the maximum component
+# speed (which feeds the CFL), and the field-valued vorticity recovery. In the Mori–Zwanzig reading
+# (ARCHITECTURE §8) these are the observables of the `Generator`: their plateaus gate warm-up and
+# their statistics are to be tracked by GBGStreamingStatistics. Most reduce a field to a scalar — a
+# GBGPeriodicFields inner product or moment.
 
 """
     Observables
@@ -15,11 +16,15 @@ The measured functions of the flow state:
   developed cascade.
 - [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step (one
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
+- [`vorticity_physical!`](@ref) — the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}``
+  recovered in physical representation from the spectral state — the field-valued observable
+  (its cached read, `vorticity_physical`, lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
-Their plateaus gate warm-up (`warmup!`). Each reduces a field to a scalar (the energy spectrum, to a
-distribution over wavenumber); none dealiases first — the quadratic reductions are exactly
+Their plateaus gate warm-up (`warmup!`). Each is a function of the state: most reduce a field to a
+scalar (the energy spectrum, to a distribution over wavenumber; the vorticity recovery alone
+produces a field). None dealiases first — the quadratic reductions are exactly
 alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition; `HouLi` meets
 it only to machine precision), and the cubic skewness carries the slight residual its own docstring
 prices.
@@ -30,7 +35,7 @@ using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
 using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 
-export kinetic_energy, dissipation, max_speed,
+export kinetic_energy, dissipation, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
        energy_spectrum, integral_scale
 
@@ -126,6 +131,28 @@ reads a `Simulation`'s cache.
 function max_speed end
 
 max_speed(u) = maximum(abs, field_data(u))
+
+
+"""
+    vorticity_physical!(ω, û, domain, spectral_scratch)
+
+Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
+into `ω`, from the velocity `û` in spectral representation — the field-valued observable the
+iteration deposits into its cache. The curl is formed as
+``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` in `spectral_scratch` (a vector field
+in spectral representation, consumed — its coefficients are undefined on return) and transformed to
+physical representation by the [`FixedDomain`](@ref) `domain`'s plans; `û` is only read, so unlike a
+pure representation recovery no preservation copy is needed. Returns `ω`.
+
+The deposited value is read back with
+[`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical), which serves the
+iteration's deposit or throws — measure with this function, read with that one.
+"""
+function vorticity_physical!(ω, û, domain::FixedDomain, spectral_scratch)
+  curl!(spectral_scratch, û, domain.multipliers)
+  to_physical!(ω, spectral_scratch, domain.velocity_plans)
+  return ω
+end
 
 
 """

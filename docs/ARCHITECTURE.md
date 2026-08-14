@@ -194,10 +194,12 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
-  carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recoveries
-  `velocity_to_physical!`, `vorticity_to_physical!`, `scalar_to_physical!` that evaluate those functions —
-  is homed here with the state it reads. Its values land in the **`ObservablesCache`** (its own
-  module, `Cache`, between `State` and `Forcing`): the stamped boundary storage each iteration
+  carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recovery of the
+  physical representations — is not a package verb: the velocity and scalar are recovered by the
+  source-preserving scratch arity of `GBGPeriodicFields`' `to_physical!` at the sites that consume
+  them, and the derived vorticity by `Observables.vorticity_physical!` (decision 47). The values
+  land in the **`ObservablesCache`** (its own
+  module, `Cache`, after `Observables`): the stamped boundary storage each iteration
   deposits its observables into at its tail — the physical velocity, vorticity, and scalar, the
   maximum velocity component, and, when tracers ride the run, the particle velocities
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
@@ -241,9 +243,9 @@ the equation becomes
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
 
-- **The reversible term.** The recoveries (`velocity_to_physical!`, `vorticity_to_physical!`, homed with
-  the state, §4.1) produce the physical velocity and vorticity from
-  ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
+- **The reversible term.** The recoveries — the source-preserving `to_physical!` scratch arity and
+  the vorticity observable `vorticity_physical!` (decision 47) — produce the physical velocity and
+  vorticity from ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
   ``\mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
   Orszag 1971). Rotational form is the cheap, energy-conserving way to compute the advection spectrally,
@@ -268,8 +270,8 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   irreversible diffusion and, when the drive is linear, the source. The seam is a decomposition of the
   right-hand side, not of ``\mathcal{E}``.
 
-The passive scalar rides the same generator: `scalar_to_physical!` transforms ``\hat\varphi`` to the
-physical ``\varphi`` at each stage, and `scalar_rhs!` assembles the advection in conservative form
+The passive scalar rides the same generator: the preserving `to_physical!` arity recovers the
+physical ``\varphi`` from ``\hat\varphi`` at each stage, and `scalar_rhs!` assembles the advection in conservative form
 ``-\nabla\cdot(\boldsymbol{u}\varphi)`` (equal to ``-\boldsymbol{u}\cdot\nabla\varphi`` since
 ``\nabla\cdot\boldsymbol{u} = 0``); the conservative form conserves the scalar mean exactly under the
 ``2/3`` rule.
@@ -1573,6 +1575,31 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     measured values steer the loop *between* steps, and nothing hard forbids this order — it is a
     design choice for a diagnostics module that stays optional per slot while its generics stand
     upstream.
+47. **(2026-08, user-directed) The chart recoveries are not package verbs; the vorticity recovery is
+    an observable.** `velocity_to_physical!` and `scalar_to_physical!` are deleted: each was the
+    same two lines — copy the coefficients to scratch, transform — differing only in which of the
+    domain's plan sets it bound, and once that composition deserved a *name*, invariant 2 sent it to
+    the backend rather than keeping a physics-suffixed local copy. The general operation now lives
+    in `GBGPeriodicFields` as the scratch arity `to_physical!(physical, spectral, plans,
+    spectral_scratch)` (PF decision 64, raised as IT's round-3 request), and the call sites bind the
+    plans themselves — `to_physical!(u, û, domain.velocity_plans, scratch)` at the tail deposit, the
+    substage recoveries, and the displaced (`PhaseShift`) evaluations, where the preservation is
+    load-bearing: the displaced spectral velocity is read twice (velocity, then vorticity). The
+    supersession also retires decision 28's `X_to_physical!` naming convention and narrows
+    decision 30's "chart map homed in `State`" — the chart map is PF's operation; `State` keeps only
+    the state and its seeders. What remains a package verb is the one recovery that is *not* a chart:
+    **`vorticity_physical!`** — curl in scratch, then transform; no preservation copy, since the curl
+    only reads its source — homed in `Observables` as the field-valued observable whose cached read
+    is `Cache.vorticity_physical` (the f/`f!` pair decision 46's pattern implies; the `!` form is
+    the home). Two consequences delimit the change: the two recovery regimes are now explicit —
+    a consumable source calls the three-argument (destructive) form, as the strain diagnostic always
+    has; a source of truth calls the scratch arity — and no `to_spectral!` twin exists or is wanted,
+    because every forward transform in the package reads a consumable source by design (IC and
+    forcing noise, quadratic products formed in place over tail-refreshed registers). The umbrella
+    re-exports no `GBGPeriodicFields` name, this operation included — the recovery is reached
+    through the backend, as every other field operation is. Bit-identical: the arity performs
+    exactly the copy-then-transform the deleted wrappers performed, so the transform and pass
+    ledgers and the memory audit are unchanged.
 
 ---
 

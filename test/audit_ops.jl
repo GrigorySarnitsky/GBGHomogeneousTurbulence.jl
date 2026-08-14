@@ -14,7 +14,8 @@
 # file (OP_COST and the transform / pass / fusion-bound projections, shared by the latter two).
 #
 # Every op is transcribed from the step! bodies and the generator protocol (src/Propagator.jl,
-# src/Generator.jl, the src/State.jl recoveries, the src/Forcing.jl hooks) — re-derive on any change
+# src/Generator.jl, the recovery calls — PF's preserving to_physical! arity and
+# Observables.vorticity_physical! — and the src/Forcing.jl hooks) — re-derive on any change
 # there; a frozen table failing is the reminder. Ops act on SYMBOLIC values (VALUE_CLASS types them);
 # an op's NAME keys its cost entry (compute_audit.jl's OP_COST), so a renamed or added op must get a
 # cost entry in the same commit.
@@ -208,7 +209,7 @@ function _scalar_assembly(uspec, φspec, u, out; recover = false, sscratch = :sb
 end
 
 
-# The substage recoveries (velocity_to_physical! / vorticity_to_physical! in src/State.jl) from the
+# The substage recoveries (PF's preserving to_physical! arity / Observables.vorticity_physical!) from the
 # spectral stage state `src` — û itself for the in-place IFLowStorageRK3 stages, the spectral
 # predictor for IFRK2's stage 2 — into the cache slots taken as the stage registers, through the
 # scheme's dead spectral register `scratch` (`nl` for RK3, `stage2` for RK2). The plain recovery

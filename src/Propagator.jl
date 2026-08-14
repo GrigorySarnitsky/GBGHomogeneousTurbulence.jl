@@ -40,13 +40,12 @@ using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..Generator: ResolvedGenerator, prepare!, finalize!,
                    velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor
-using ..State: ResolvedFields,
-               velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
+using ..State: ResolvedFields
 using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
                resolved_fields_modified!,
                take_velocity!, take_vorticity!, take_scalar!,
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
-using ..Observables: max_speed
+using ..Observables: max_speed, vorticity_physical!
 
 export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
        deposit!, recommended_cfl
@@ -243,8 +242,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       # scratch, so a mid-iteration read throws) and recover the stage state into them. The spectral
       # scratch is `nonlinear` — dead here, consumed into the accumulator at the previous stage.
       u, ω = take_velocity!(cache), take_vorticity!(cache)
-      velocity_to_physical!(u, û, domain, buffers.nonlinear)
-      vorticity_to_physical!(ω, û, domain, buffers.nonlinear)
+      to_physical!(u, û, domain.velocity_plans, buffers.nonlinear)
+      vorticity_physical!(ω, û, domain, buffers.nonlinear)
     end
 
     # BOTH right-hand sides are evaluated at the stage state before either field is updated: the
@@ -257,7 +256,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
         φ = scalar_physical(cache)                                             # the boundary scalar
       else
         φ = take_scalar!(cache)
-        scalar_to_physical!(φ, φ̂, domain, sb.nonlinear)                          # φ at the stage state
+        to_physical!(φ, φ̂, domain.scalar_plans, sb.nonlinear)                          # φ at the stage state
       end
       scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, φ, domain)                   # N̂_φ (N̂_u already banked)
     end
@@ -369,12 +368,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # stage 2 — right-hand sides at the predictor state. The cache slots are taken as the recovery
   # registers (stamps to scratch); `stage2` is the spectral scratch, written by the assembly just after.
   u_star, ω_star = take_velocity!(cache), take_vorticity!(cache)
-  velocity_to_physical!(u_star, buffers.velocity_star_spectral, domain, buffers.stage2)
-  vorticity_to_physical!(ω_star, buffers.velocity_star_spectral, domain, buffers.stage2)
+  to_physical!(u_star, buffers.velocity_star_spectral, domain.velocity_plans, buffers.stage2)
+  vorticity_physical!(ω_star, buffers.velocity_star_spectral, domain, buffers.stage2)
   velocity_rhs!(buffers.stage2, generator, buffers.velocity_star_spectral, u_star, ω_star, domain)  # N̂_u,2
   if has_scalar
     φ_star = take_scalar!(cache)
-    scalar_to_physical!(φ_star, sb.star_spectral, domain, sb.stage2)
+    to_physical!(φ_star, sb.star_spectral, domain.scalar_plans, sb.stage2)
     scalar_rhs!(sb.stage2, generator, buffers.velocity_star_spectral, sb.star_spectral, u_star, φ_star, domain)  # N̂_φ,2
   end
 
@@ -455,14 +454,14 @@ it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form,
 function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)
   u = take_velocity!(cache)
-  velocity_to_physical!(u, state.velocity, domain, _recovery_scratch(buffers))
+  to_physical!(u, state.velocity, domain.velocity_plans, _recovery_scratch(buffers))
   deposit_velocity!(cache)
   ω = take_vorticity!(cache)
-  vorticity_to_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
+  vorticity_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
   deposit_vorticity!(cache)
   if state.scalar !== nothing && cache.scalar !== nothing
     φ = take_scalar!(cache)
-    scalar_to_physical!(φ, state.scalar, domain, _recovery_scratch(buffers.scalar))
+    to_physical!(φ, state.scalar, domain.scalar_plans, _recovery_scratch(buffers.scalar))
     deposit_scalar!(cache)
   end
   deposit_max_speed!(cache, max_speed(u))

@@ -24,7 +24,7 @@ a direct dependency.
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
-| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | `vorticity_to_physical!` |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | `vorticity_physical!` |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | `AbstractForcing` |

@@ -155,7 +155,9 @@ end
 The vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
 at the current boundary — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
 slot, with exactly [`velocity_physical`](@ref)'s contract (the deposited field or a throw; never a
-recomputation; read-only). The second form reads a `Simulation`'s cache.
+recomputation; read-only). The deposited value is produced by
+[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) — measure with
+that function, read with this one. The second form reads a `Simulation`'s cache.
 """
 function vorticity_physical(cache::ObservablesCache)
   _checked(cache, cache.vorticity_stamp, "vorticity")

@@ -77,9 +77,6 @@ using .SimulationDomain:
 
 using .State:
   ResolvedFields,
-  velocity_to_physical!,
-  vorticity_to_physical!,
-  scalar_to_physical!,
   random_solenoidal_velocity!,
   random_scalar!
 
@@ -105,6 +102,7 @@ using .Observables:
   kinetic_energy,
   dissipation,
   max_speed,
+  vorticity_physical!,
   scalar_variance,
   scalar_dissipation,
   derivative_skewness,
@@ -180,9 +178,7 @@ export FixedDomain,
        HouLi,
        PhaseShift,
        max_wavenumber,
-       velocity_to_physical!,
-       vorticity_to_physical!,
-       scalar_to_physical!,
+       vorticity_physical!,
        ResolvedGenerator,
        prepare!,
        velocity_rhs!,

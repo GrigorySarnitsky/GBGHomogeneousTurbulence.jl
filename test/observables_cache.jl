@@ -5,7 +5,7 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Cache: take_velocity!, check_boundary
-using GBGPeriodicFields: field_data
+using GBGPeriodicFields: field_data, to_physical!
 using Random
 using Test
 
@@ -27,11 +27,11 @@ using Test
     deposit!(cache, state, domain, buffers)
     u = velocity_physical(cache)
     u_reference = new_vector_field_physical(domain)
-    velocity_to_physical!(u_reference, û, domain, new_vector_field_spectral(domain))
+    to_physical!(u_reference, û, domain.velocity_plans, new_vector_field_spectral(domain))
     @test field_data(u) == field_data(u_reference)                 # the deposit is the recovery
     @test velocity_physical(cache) === u                         # second read: same storage, no work
     ω_reference = new_vector_field_physical(domain)
-    vorticity_to_physical!(ω_reference, û, domain, new_vector_field_spectral(domain))
+    vorticity_physical!(ω_reference, û, domain, new_vector_field_spectral(domain))
     @test field_data(vorticity_physical(cache)) == field_data(ω_reference)
     @test max_speed(cache) == max_speed(u_reference)             # the cached number is the reduction
   end
@@ -57,7 +57,7 @@ using Test
     after = field_data(velocity_physical(cache))
     @test after != before                                          # the new deposit is the new field
     u_reference = new_vector_field_physical(domain)
-    velocity_to_physical!(u_reference, û, domain, new_vector_field_spectral(domain))
+    to_physical!(u_reference, û, domain.velocity_plans, new_vector_field_spectral(domain))
     @test after == field_data(u_reference)
   end
 

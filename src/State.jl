@@ -1,23 +1,28 @@
 # State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
 # velocity and scalar — the single source of truth; the physical fields are recovered from it, never
-# held here), the recovery map that recovers the physical representations, and the random initial
-# conditions that seed a run. The boundary storage the recoveries fill lives in `Cache` (`ObservablesCache`); the
-# per-step scratch lives with the integrator (`IntegratorBuffers` in `Propagator`). Everything is
-# sized to a `FixedDomain` from `SimulationDomain`.
+# held in the state) and the random initial conditions that seed a run. The physical representations
+# are recovered where they are consumed — through the preserving scratch arity of PF's `to_physical!`
+# (the state is never consumed; PF decision 64) and, for the vorticity, `Observables.vorticity_physical!`
+# — and land in `Cache` (`ObservablesCache`); the per-step scratch lives with the integrator
+# (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
 
 """
     State
 
-The evolving state a run advances, and how it is recovered and seeded:
-- [`ResolvedFields`](@ref) — the inert record of the evolving velocity and scalar in spectral
-  representation (the single source of truth; the physical fields are recovered from it, never held
-  here).
-- [`velocity_to_physical!`](@ref), [`vorticity_to_physical!`](@ref), [`scalar_to_physical!`](@ref) —
-  recover the velocity, vorticity, and scalar in physical representation from the spectral state.
+The evolving state a run advances, and how it is seeded:
+- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation: a passive
+  record with every operation external (the single source of truth; the physical fields are
+  recovered from it, never held in the state).
 - [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
   (a divergence-free velocity, a mean-zero scalar) that seed it.
 
-All sized to a [`FixedDomain`](@ref). The boundary storage the recoveries fill is the
+All sized to a [`FixedDomain`](@ref). The physical representations are recovered from the state with
+the scratch (source-preserving) arity of
+[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the inverse
+transform consumes the coefficients it runs from (a property of the FFT backends), so the recovery
+copies into scratch and the state survives every recovery — and the vorticity with
+[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!); the recovered
+values are deposited into the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
 """
 module State
@@ -27,16 +32,15 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_vector_field_physical,
                           new_scalar_field_spectral, new_scalar_field_physical, _real_type
 
-export ResolvedFields, random_solenoidal_velocity!, random_scalar!,
-       velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
+export ResolvedFields, random_solenoidal_velocity!, random_scalar!
 
 
 """
     ResolvedFields(domain; scalar = false)
 
-The inert record of the evolving fields a run advances, in spectral representation — the single
-source of truth. The velocity, vorticity, and scalar in physical representation are recoveries of
-it, not part of it: the iteration recovers them into the stamped slots of the
+The record of the evolving fields a run advances, in spectral representation — the single source of
+truth, a passive container with every operation external. The velocity, vorticity, and scalar in
+physical representation are recoveries of it, not part of it: the iteration recovers them into the stamped slots of the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its tail (never on a
 read — a cached read serves the deposited value or throws), so the state itself cannot go stale.
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
@@ -53,50 +57,6 @@ end
 
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
   ResolvedFields(new_vector_field_spectral(domain), scalar ? new_scalar_field_spectral(domain) : nothing)
-
-
-"""
-    velocity_to_physical!(u, û, domain, spectral_scratch)
-
-Recover the velocity in physical representation into `u`, from the spectral `û` (left unchanged), on
-the [`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `spectral_scratch` (a
-vector field in spectral representation) is the working space.
-"""
-function velocity_to_physical!(u, û, domain::FixedDomain, spectral_scratch)
-  copyto!(field_data(spectral_scratch), field_data(û))  # copy û first — the in-place inverse transform consumes its spectral source
-  to_physical!(u, spectral_scratch, domain.velocity_plans)
-  return u
-end
-
-
-"""
-    vorticity_to_physical!(ω, û, domain, spectral_scratch)
-
-Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
-into `ω`, from the velocity `û` in spectral representation, leaving `û` untouched. The spectral vorticity
-``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` is formed in the scratch
-`spectral_scratch` (a vector field in spectral representation) and transformed to physical
-representation by the [`FixedDomain`](@ref) `domain`'s plans.
-"""
-function vorticity_to_physical!(ω, û, domain::FixedDomain, spectral_scratch)
-  curl!(spectral_scratch, û, domain.multipliers)
-  to_physical!(ω, spectral_scratch, domain.velocity_plans)
-  return ω
-end
-
-
-"""
-    scalar_to_physical!(φ, φ̂, domain, scalar_scratch)
-
-Recover the scalar in physical representation into `φ`, from the spectral `φ̂` (left unchanged), on the
-[`FixedDomain`](@ref) `domain` whose transform plans carry it. The scratch `scalar_scratch` (a scalar
-field in spectral representation) is the working space.
-"""
-function scalar_to_physical!(φ, φ̂, domain::FixedDomain, scalar_scratch)
-  copyto!(field_data(scalar_scratch), field_data(φ̂))  # copy φ̂ first — the in-place inverse transform consumes its spectral source
-  to_physical!(φ, scalar_scratch, domain.scalar_plans)
-  return φ
-end
 
 
 """

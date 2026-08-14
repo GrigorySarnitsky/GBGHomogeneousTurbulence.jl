@@ -3,7 +3,7 @@
 # active strategy (a strategy that keeps more modes takes a smaller step).
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data, materialize_kernel
+using GBGPeriodicFields: field_data, materialize_kernel, to_physical!
 using Random
 using Test
 
@@ -88,8 +88,8 @@ using Test
     function nlt(domain, ûf, phaseshift::Bool)
       u = SD.new_vector_field_physical(domain); ω = SD.new_vector_field_physical(domain)
       tmp = SD.new_vector_field_spectral(domain)
-      velocity_to_physical!(u, ûf, domain, tmp)
-      vorticity_to_physical!(ω, ûf, domain, tmp)
+      to_physical!(u, ûf, domain.velocity_plans, tmp)
+      vorticity_physical!(ω, ûf, domain, tmp)
       out = SD.new_vector_field_spectral(domain)
       if phaseshift
         unforced = FlowConditions(viscosity = 1.0, schmidt = 1.0,

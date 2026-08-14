@@ -28,16 +28,16 @@ Its contents (each formula lives in the operation's own docstring):
   viscous/diffusive integrating factor, with any linear forcing rate folded in).
 - [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
 
-The physical-representation recoveries the assemblies consume
-([`velocity_to_physical!`](@ref) and its siblings) live with the state, in
-[`State`](@ref GBGIsotropicTurbulence.State).
+The assemblies recover displaced fields in physical representation with the source-preserving
+scratch arity of [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!)
+and with [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!).
 """
 module Generator
 
 using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
-using ..State: velocity_to_physical!, vorticity_to_physical!, scalar_to_physical!
+using ..Observables: vorticity_physical!
 using ..Forcing: AbstractForcing, NoForcing,
                  set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
                  add_forcing_source!
@@ -294,8 +294,8 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω, dom
   T = real(eltype(field_data(nonlinear)))
   _velocity_lamb!(nonlinear, u, ω, domain, product_spectral, domain.dealias)                          # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
-  velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
-  vorticity_to_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
+  vorticity_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
   # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
   # deletes its re-recovery, decision 45).
@@ -425,11 +425,11 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u, φ,
   # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
   if !generator.displaced_velocity_fresh
     convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
-    velocity_to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+    to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
   end
   generator.displaced_velocity_fresh = false        # the flux below consumes u_shifted
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
-  scalar_to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain, phase_shift.scalar_copy)
+  to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain.scalar_plans, phase_shift.scalar_copy)
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain)                # (u_s φ_s)^, formed over u_s
   divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·, still on the displaced grid
   # The shift-back symbol commutes through the iκ· contraction (iκ·(ĝ v̂) = ĝ (iκ·v̂)), so it rides
