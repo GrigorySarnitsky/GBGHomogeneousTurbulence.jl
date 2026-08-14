@@ -9,7 +9,7 @@ function ``D_{L\\dots}(r)`` and the mixed velocity–scalar structure function
 - [`Kolmogorov1941`](@ref) — the K41 inertial-range laws: the exact 4/5 law, the 2/3 law, and the
   self-similar exponents (via [`scaling_exponent`](@ref)).
 - [`Kolmogorov1962`](@ref) / [`SheLeveque1994`](@ref) — the K62 log-normal and She–Lévêque
-  intermittency models: the anomalous scaling exponents ``\\zeta_p`` (via [`scaling_exponent`](@ref)).
+  intermittency models: the anomalous scaling exponents ``\\zeta_p`` (via `scaling_exponent`).
 - [`Yaglom1949`](@ref) — the exact 4/3 law for the mixed velocity–scalar structure function.
 - [`Lundgren2002`](@ref) — the finite-Reynolds-number correction to the 4/5 law.
 """

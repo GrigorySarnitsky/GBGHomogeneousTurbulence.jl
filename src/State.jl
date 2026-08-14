@@ -41,7 +41,8 @@ export ResolvedFields, random_solenoidal_velocity!, random_scalar!
 The record of the evolving fields a run advances, in spectral representation — the single source of
 truth, a passive container with every operation external. The velocity, vorticity, and scalar in
 physical representation are recoveries of it, not part of it: the iteration recovers them into the stamped slots of the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its end (never on a
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its end (a slot's stamp
+records the instant its value belongs to; never on a
 read — a cached read serves the deposited value or throws), so the state itself cannot go stale.
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 

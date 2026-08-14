@@ -97,7 +97,7 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     box-confined DNS (``\\approx 0.9``; Li et al. 2008),
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
-    **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` with ``f`` the
+    **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
     same grid at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
@@ -154,7 +154,8 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  scalar = true, velocity_forcing = ConstantPower(target = 0.1))
 
 # Domain-first — build the frame yourself, then hand it to the second form:
-domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(), element_type = Float64, array_type = Array)
+domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
+                     element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 5e-3)
 ```
 
@@ -451,7 +452,7 @@ run!(sim) do s
     current_time(s) < 5.0                        # a span of simulation time
 end
 
-history = Float64[]                              # record k at every observation, stop after 200 steps
+history = Float64[]                              # record k at every observation; stop at 200 steps
 run!(sim) do s
     push!(history, kinetic_energy(s.state.velocity))
     current_step(s) < 200
@@ -501,8 +502,8 @@ StationarityMonitor(; min_turnovers, window_turnovers, tol, gate_scalar, gate_sk
                       gate_scalar, gate_skew, Float64(skew_floor), Float64(window_turnovers) / 40,
                       Float64[], Float64[], Float64[], Float64[], false)
 
-# No net drift of the series `y(turn)` across the trailing window `[now-W, now]`:
-# ``|mean(2nd half) − mean(1st half)| / |mean| < tol``.
+# No net drift of the series y(turn) across the trailing window [now−W, now]:
+# |mean(2nd half) − mean(1st half)| / |mean| < tol.
 function _is_flat(turn, y, now, W, tol)
   mid = now - W / 2
   s1 = 0.0; n1 = 0; s2 = 0.0; n2 = 0

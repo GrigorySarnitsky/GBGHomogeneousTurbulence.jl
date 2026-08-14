@@ -159,8 +159,8 @@ objects, each linked to its own documentation.
   the spectral first-derivative operators.
 - `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` as a lazy
   [`RadialKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.RadialKernel) (in spectral
-  representation ``-\\nabla^{2}`` acts as multiplication by it) — the Dirichlet-energy weight the
-  weighted spectral reductions take; never materialized — evaluated per mode from the multipliers,
+  representation ``-\\nabla^{2}`` acts as multiplication by it) — the weight that turns a Parseval sum into a mean-square-gradient
+  (Dirichlet-energy) sum, which the weighted spectral reductions take; never materialized — evaluated per mode from the multipliers,
   with no array allocated.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
@@ -322,7 +322,8 @@ new_tensor_field_physical(domain::FixedDomain) =
 """
     dealias!(field, domain)
 
-Apply the run's dealias low-pass `domain.dealias` to `field` in place — a coefficientwise multiply that
+Apply the run's dealias low-pass kernel `domain.dealias` — `domain` a [`FixedDomain`](@ref) — to
+`field` in place: a coefficientwise multiply that
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical

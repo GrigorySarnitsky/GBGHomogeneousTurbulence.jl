@@ -253,8 +253,9 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \Delta t\big)``
-  — the exact propagator of the linear part over a step, with diffusivity ``D = \nu`` for the velocity and
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\big)``
+  — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep
+  ``d_i\Delta t``, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
   pair `velocity_factor` / `scalar_factor` supplies its *parameters* — the coefficient on
@@ -365,7 +366,7 @@ Method (§3).
   the same Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
-- **`IFLowStorageRK3`** (the Williamson 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
+- **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
   ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
@@ -531,7 +532,7 @@ seam is real but uncrossed (decision 18).
 `SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator → Particles →
 SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
-order as the dependency-light leaf the initial-condition, forcing, and validation consumers read.
+order as the dependency-light leaf the initial-condition and validation consumers read.
 Statistics live consumer-side of this package too: the sampling in `Particles` and the observables in
 `Observables` produce the *samples*, and a statistics bridge that streams them to `GBGStreamingStatistics`
 is deferred (§7).
@@ -671,11 +672,12 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
 *understanding* and set what the tool is built to *investigate*, not assume.
 
 - **Mori–Zwanzig — the foundation, elaborated.** §3 states the decomposition; here is its machinery. A
-  projection ``\mathcal P`` splits the full state into a resolved part and the rest, and applying it to the
-  exact dynamics gives the resolved variables a **generalized Langevin equation**: a streaming term (the
+  projection ``\mathcal{P}`` splits the full state into a resolved part and the rest, and applying it to the
+  exact dynamics gives the resolved variables a **generalized Langevin equation** (Mori 1965;
+  Zwanzig 1973): a streaming term (the
   projected drift), a **memory integral** over a kernel ``K(t-s)`` carrying the history the projection
   discarded, and a **colored-noise** term living in the unresolved subspace. A Model is a choice of
-  ``\mathcal P`` and a closure that approximates that kernel and that noise; DNS is the identity
+  ``\mathcal{P}`` and a closure that approximates that kernel and that noise; DNS is the identity
   projection, for which both vanish, so it needs no closure. The memory kernel ``K`` is the precise content
   of the tendency a coarse state cannot supply on its own (§3), and modeling it is the closure problem the
   tool exists to test.
@@ -700,7 +702,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   Hamiltonian (symplectic) bracket generating the reversible part, a dissipative (metric) bracket the
   irreversible — the lens says *why* the split is structure-preserving and constrains every closure to be
   net-dissipative. Here it is a lens rather than a literal thermodynamics: isothermal incompressible flow
-  has no genuine entropy (§4.2). The term is Morrison's (metric + symplectic); Öttinger's GENERIC
+  has no genuine entropy (§4.2). The term is Morrison's (1986; metric + symplectic); Öttinger's (2005) GENERIC
   is the same structure.
 - **Renormalization / scale invariance — a hypothesis, never a foundation.** Small-scale universality is
   what would make closure constants transferable, but it is approximate (intermittency), it fails for
@@ -796,7 +798,7 @@ one usually encodes a decision.
   true yet conflate two *kinds* of object — a field with its representation (physical vs spectral); a
   diagnostic scalar with the field it reduces (the rate ``\varepsilon``, a number, vs a dissipation
   field; ``k`` vs the spectrum ``E(\kappa)``); an operator with its parameter (``\mathcal{E}`` vs ``\nu``;
-  ``\mathbb{P}`` vs ``\mathcal P``); a rate with its time-integral; a spectral density ``E(\kappa)`` with an
+  ``\mathbb{P}`` vs ``\mathcal{P}``); a rate with its time-integral; a spectral density ``E(\kappa)`` with an
   energy. Type each object from the code and expand the statement — the physics mirror of the sibling
   backends' type-error guard (`GBGStreamingStatistics`' density-vs-measure, estimator-vs-estimand).
 - **The `/check-docs` battery.** Documentation quality is enforced by a full matrix — (Correct /

@@ -8,7 +8,7 @@ dissipation-range roll-off, each swappable.
 
 - [`ModelSpectrum`](@ref) — the composed velocity spectrum: a Kolmogorov constant, a
   [`LargeScaleFactor`](@ref), and a [`DissipationFactor`](@ref).
-- [`LargeScaleFactor`](@ref) / [`DissipationFactor`](@ref) — the swappable roll-off pieces, evaluated by
+- `LargeScaleFactor` / `DissipationFactor` — the swappable roll-off pieces, evaluated by
   [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /
   [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^4`` energy
   range, [`PaoDissipation`](@ref) Pao's cutoff, [`ExponentialDissipation`](@ref) the closure-predicted
@@ -16,7 +16,7 @@ dissipation-range roll-off, each swappable.
   [`UnitDissipation`](@ref) are the trivial (no-roll-off) factors.
 - [`EnergySpectrum`](@ref) — the velocity-spectrum family root; [`Pope2000`](@ref) /
   [`VonKarman1948`](@ref) / [`Pao1965`](@ref) are its named presets, each a composed
-  [`ModelSpectrum`](@ref).
+  `ModelSpectrum`.
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
 
@@ -328,7 +328,7 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
 
 covering the inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
 constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
-(unlike [`Pope2000`](@ref)). It has no energy-containing range; use [`Pope2000`](@ref) or
+(unlike [`Pope2000`](@ref)). It has no energy-containing range; use `Pope2000` or
 [`VonKarman1948`](@ref) when the large scales matter.
 """
 Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K), _PAO1965)

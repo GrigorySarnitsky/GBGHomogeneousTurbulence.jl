@@ -257,7 +257,7 @@ Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber 
 variant of Lundgren 2003, whose linear forcing acts at every wavenumber), built on the
 [`FixedDomain`](@ref) `domain`,
 with the fixed rate ``A = \\texttt{rate}`` on the integer shells `lowest_shell` to
-`highest_shell`. The rate is
+`highest_shell`, in units of the box's fundamental ``2\\pi/L``. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
 rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity). A positive `rate`
 amplifies the field.
@@ -325,8 +325,9 @@ end
     StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 0)
 
-Stochastic (Eswaran & Pope 1988) forcing, built on the [`FixedDomain`](@ref) `domain`: each forced Fourier mode in the band
-(``\\texttt{lowest\\_shell} \\le \\kappa \\le \\texttt{highest\\_shell}``) carries an
+Stochastic (Eswaran & Pope 1988) forcing, built on the [`FixedDomain`](@ref) `domain`: each forced
+Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
+box's fundamental ``2\\pi/L`` — carries an
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
 
 ```math

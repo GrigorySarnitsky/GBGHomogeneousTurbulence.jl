@@ -70,7 +70,9 @@ the kinematic `viscosity` ``\\nu``:
             = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
 ```
 
-the two forms equal for a homogeneous flow, with the strain-rate tensor
+the two forms equal for a homogeneous, divergence-free flow (periodicity alone removes the
+boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\boldsymbol{u}``, zero for
+the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
 Two routes to the same rate; take the one whose input is already in hand.

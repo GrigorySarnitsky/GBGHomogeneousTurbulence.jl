@@ -42,7 +42,8 @@ tracers uniformly at random in the periodic box of `domain`; the second wraps a 
 backend and element type. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
 evaluate the velocity (and any sampled field) at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
-(the `Simulation` front door's default `tracer_scheme`);
+(the default `tracer_scheme` of the `Simulation` front door, the build-everything convenience
+constructor);
 [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
 [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
 smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
@@ -122,7 +123,8 @@ end
 """
     advect!(tracers, velocity_end, domain, dt) -> tracers
 
-Advance the positions of the tracer set `tracers` by one step of size `dt`, in place, by
+Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
+below), in place, by
 Heun-in-time on the velocity at the two ends of the step — the start-of-step values that
 [`record_trajectory_velocity!`](@ref) put on record, and the end-of-step velocity field
 ``\\texttt{velocity\\_end} = \\boldsymbol{u}(t_{n+1})`` in physical representation:

@@ -149,7 +149,8 @@ scheme can never assemble the right-hand side from a mismatched intermediate sta
 
 Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
 carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
-run). The `Simulation` front door builds one for you.
+run). The `Simulation` front door — the build-everything convenience constructor — builds one for
+you.
 
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
@@ -166,8 +167,8 @@ run). The `Simulation` front door builds one for you.
   `uses_linear_rate`, so a field driven by a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
-  displaced velocity, left fresh by [`velocity_rhs!`](@ref) for the same stage's
-  [`scalar_rhs!`](@ref) to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
+  displaced velocity, left fresh by `velocity_rhs!` for the same stage's
+  `scalar_rhs!` to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
   rebuilds the recovery itself).
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
@@ -337,7 +338,9 @@ with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\m
 viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
 scheme's explicit stage combination carries truncation error. Since the multiplier is the exponential
 of a radial symbol (plus the armed per-mode rate), a scheme applies it through the backend's fused
-exponential convolution, which evaluates it per mode from the wavenumber arrays: nothing is built,
+exponential convolution
+([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
+which evaluates it per mode from the wavenumber arrays: nothing is built,
 stored, or swept for it. Accordingly this verb returns the exponential's parameters as a named tuple —
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
 ``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = \\hat A`` (the armed rate field, or `nothing` when no

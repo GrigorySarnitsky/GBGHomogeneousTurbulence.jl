@@ -34,7 +34,7 @@ domains: a velocity field and a single passive scalar, each optionally forced, a
 of integrating-factor time-stepping scheme, with Lagrangian particle tracking and field sampling for
 the forthcoming Eulerian + Lagrangian statistics.
 
-Built on [`GBGPeriodicFields`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl).
+Built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl).
 
 The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary
 development took place.

@@ -102,7 +102,9 @@ There are deliberately **no physical-representation registers** here: the substa
 vorticity, and scalar recoveries write into the run's `ObservablesCache` slots, taken as scratch
 mid-iteration and re-deposited at the iteration's end by [`deposit!`](@ref) — a slot IS its producer's register.
 Likewise there is **no integrating-factor register**: the exact linear subflow is applied by the
-backend's fused exponential convolution, evaluated per mode from the factor's parameters, so no
+backend's fused exponential convolution
+([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
+evaluated per mode from the factor's parameters, so no
 kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
 products, the phase-shift buffers, the forcing-rate fields) lives with the generator, on the
 [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here are
@@ -139,7 +141,9 @@ end
 """
     allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
 
-Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, dispatching on the concrete scheme so it
+Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, sized to the `domain` (a
+[`FixedDomain`](@ref), which fixes the grid, precision, and storage backend of every register),
+dispatching on the concrete scheme so it
 allocates **exactly** its working set — never a register another scheme would use.
 [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`; [`IFRK2`](@ref) allocates `stage1`,
 `stage2`, and `velocity_star_spectral`. Passing `scalar = true` adds the nested `ScalarBuffers`,
@@ -156,8 +160,9 @@ function allocate_buffers end
 Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
 reified `generator` (a [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
-the equations of motion, their conditions, and their assembly scratch), the `domain`, the scheme's
-`buffers`, and the run's observables cache `cache` (an
+the equations of motion, their conditions, and their assembly scratch), the `domain` (a
+[`FixedDomain`](@ref)), the scheme's `buffers` (an [`IntegratorBuffers`](@ref)), and the run's
+observables cache `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)). Dispatches on the concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`).
 
@@ -168,7 +173,8 @@ deposited velocity, vorticity, and scalar in physical representation from `cache
 the instant between iterations, where the cache's deposits are current, deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
 stages take the same slots as their recovery registers, so the step allocates and resides nothing
-beyond its spectral stage registers. The cache's fields epoch is advanced when the step completes.
+beyond its spectral stage registers. The cache's fields epoch — the freshness counter every new
+deposit is stamped with — is advanced when the step completes.
 
 The argument order is shared with [`deposit!`](@ref), the call that closes the iteration: the
 dispatch object leads (the scheme here, the cache there), the common arguments follow in the fixed
@@ -191,7 +197,7 @@ integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the 
 [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor) /
 [`scalar_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_factor) over a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and
-applied per mode by the fused exponential, never built as a field —
+applied per mode by the backend's fused exponential convolution, never built as a field —
 and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
 ``\\hat q`` and a single accumulator
 ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
@@ -437,7 +443,7 @@ _recovery_scratch(sb::ScalarBuffers) =
 Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
 configuration holds, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
-`ResolvedFields`) the step has just produced, and stamp each slot at the current epoch. The
+`ResolvedFields`) the step has just produced, and stamp each slot at the current epoch (the cache's freshness counter). The
 deposits are the next iteration's first-stage work moved to the iteration's end — the velocity, vorticity, and
 (when the run carries one) scalar recoveries in physical representation, then the maximum-speed
 reduction over the just-deposited velocity — so an iteration's transform and pass counts are
@@ -474,7 +480,7 @@ end
 
 A conservative advective-CFL ceiling ``C`` for the scheme `integrator` on the
 [`FixedDomain`](@ref) `domain`, for a timestep
-``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``.
+``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the

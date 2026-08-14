@@ -63,7 +63,8 @@ and leaves alive at the iteration's end, and nothing may be added on any cost ax
 Build it on a [`FixedDomain`](@ref) `domain`; pass `scalar = true` when the run evolves a passive
 scalar (it adds the scalar's slot), and `particle_velocities` — the tracer set's own point-value
 storage — when the run advects tracers (the slot IS that storage, stamped here; the tracers' push
-writes it). The `Simulation` front door builds, wires, and seeds one for you.
+writes it). The `Simulation` front door — the build-everything convenience constructor — builds,
+wires, and seeds one for you.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
@@ -83,7 +84,8 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `velocity_stamp`, `vorticity_stamp`, `scalar_stamp`, `max_speed_stamp` — each slot's stamp: the
   fields epoch it was deposited at, or a sentinel (never deposited / in use as scratch).
 - `max_speed` — the cached maximum velocity component (a host number).
-- `particle_velocities` — the particle-velocities slot (the tracer set's `(M, 3)` point values), or
+- `particle_velocities` — the particle-velocities slot (the tracer set's own point-value storage,
+  whose `(M, 3)` array the accessor extracts with `point_values`), or
   `nothing` for a tracer-free run; `sample_fields_stamp` / `sample_particles_stamp` are its stamps
   against BOTH epochs, since the sample is a function of the state and the positions together.
 - `fields_epoch` — the state's epoch: advanced by every completed step and by
@@ -203,8 +205,8 @@ current only when both epochs match its stamps. Throws an `ArgumentError` when t
 tracers. The second form reads a `Simulation`'s cache.
 
 !!! note
-    This is never the second velocity of the tracer position update (the corrector stage of its
-    Heun-in-time push): that one is evaluated at a *predicted* position no tracer ever occupies — a
+    This is never the second velocity of the tracer position update (the corrector stage of the
+    predictor–corrector push, [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!)): that one is evaluated at a *predicted* position no tracer ever occupies — a
     stage register of the scheme, not a sample of the flow — and it is not readable.
 """
 function particle_velocities(cache::ObservablesCache)

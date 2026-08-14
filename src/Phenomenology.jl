@@ -71,7 +71,8 @@ The flow-state bundle a law is evaluated against — the analogue of `FlowCondit
 isotropic state (``\\nu``, ``\\varepsilon``, ``u'``, ``L_{11}``); the small scales and the dimensionless
 Taylor-scale Reynolds number are [derived](@ref taylor_reynolds) from them, not stored.
 
-Fields (all keyword; a homogeneous-isotropic state fixes the rest):
+# Fields
+All keyword; a homogeneous-isotropic state fixes the rest:
 
   * `viscosity` — the kinematic viscosity ``\\nu``.
   * `dissipation` — the mean dissipation rate ``\\varepsilon = \\nu\\langle\\lvert\\boldsymbol{\\omega}\\rvert^2\\rangle``.
@@ -154,6 +155,11 @@ scalar_diffusivity(fp::FlowParameters) = fp.viscosity / fp.schmidt
 The provenance of a law: a `citation` string (a full author–year reference) and the
 Taylor-scale-Reynolds-number range `valid_Reλ = (lo, hi)` over which the fit is
 meant to hold. A comparison reads `valid_Reλ` so a law is not judged outside its stated domain.
+
+# Fields
+The plain constructor `Reference(citation, valid_Reλ)` takes the two fields directly:
+- `citation` — the full author–year reference the law is taken from.
+- `valid_Reλ` — the ``\\mathrm{Re}_\\lambda`` range `(lo, hi)` the fit is meant to hold over.
 """
 struct Reference
   citation::String
