@@ -180,15 +180,15 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
   velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
   spectral multipliers, ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel (in spectral
-  space, ``-\nabla^{2}`` acts as multiplication by it; evaluated per mode from the multipliers, resident
-  in no array — decision 38), and the dealias
+  space, ``-\nabla^{2}`` acts as multiplication by it; never materialized — evaluated per mode from
+  the multipliers, with no array allocated — decision 38), and the dealias
   kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default; every
   strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `element_type` fixes the real element type (`Float32` or `Float64`)
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
-- **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the inert
+- **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
   record of the evolving spectral fields — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
   scalar are functions of it, never independent state. No operation hangs
@@ -199,8 +199,8 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   source-preserving scratch arity of `GBGPeriodicFields`' `to_physical!` at the sites that consume
   them, and the derived vorticity by `Observables.vorticity_physical!` (decision 47). The values
   land in the **`ObservablesCache`** (its own
-  module, `Cache`, after `Observables`): the stamped boundary storage each iteration
-  deposits its observables into at its tail — the physical velocity, vorticity, and scalar, the
+  module, `Cache`, after `Observables`): the stamped storage each iteration
+  fills at its end with its observables — the physical velocity, vorticity, and scalar, the
   maximum velocity component, and, when tracers ride the run, the particle velocities
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
@@ -306,7 +306,10 @@ states the physical quantity first, then the reduction that computes it:
 - `scalar_variance` ``\langle\varphi^2\rangle`` and `scalar_dissipation`
   ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
 - `max_speed`, which sets the advective-CFL (one generic shared with `Cache`, where the cached read
-  lives — the reduction is homed here);
+  lives — the reduction is homed here, decision 46);
+- `vorticity_physical!` ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}``, the field-valued
+  observable — the vorticity recovered in physical representation, whose cached read is
+  `Cache.vorticity_physical` (decision 47);
 - `derivative_skewness`, the classical marker ``S \approx -0.5`` of developed turbulence (an
   empirical, weakly Reynolds-number-dependent value — K41 implies a constant skewness but fixes no
   number), computed

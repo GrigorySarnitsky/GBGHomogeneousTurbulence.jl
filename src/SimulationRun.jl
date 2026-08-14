@@ -163,7 +163,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `cache` — the [`ObservablesCache`](@ref): the stamped boundary observables the iteration deposits at its tail.
+- `cache` — the [`ObservablesCache`](@ref): the observables the iteration deposits and stamps at its end.
 - `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """

@@ -1,4 +1,4 @@
-# Cache — the observables cache: the stamped boundary storage where a component of the iteration
+# Cache — the observables cache: the stamped storage where a component of the iteration
 # puts a value another component (or an observation) will read. The design is the no-recompute rule
 # (docs/src/observables_cache.md): the schedule is fixed at construction and identical on every
 # iteration; every slot is deposited at the tail of the iteration from the state it has just
@@ -51,7 +51,7 @@ const SCRATCH = -1
 """
     ObservablesCache(domain; scalar = false, particle_velocities = nothing)
 
-The observables cache of a run — the stamped storage where each iteration deposits, at its tail, the
+The observables cache of a run — the stamped storage where each iteration deposits, at its end, the
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
 representation when the run carries one, the maximum velocity component (the `max_speed` number

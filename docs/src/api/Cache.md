@@ -7,7 +7,7 @@ Order   = [:module]
 
 ## The observables cache
 
-The stamped boundary storage the iteration deposits its observables into — every read serves the
+The stamped storage the iteration fills at its end with its observables — every read serves the
 deposited value or throws, and nothing is ever recomputed on a read.
 
 ```@docs

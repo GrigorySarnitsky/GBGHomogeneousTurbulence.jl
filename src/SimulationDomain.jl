@@ -1,6 +1,6 @@
 # SimulationDomain — the discretized, periodic, cubic box a run lives on: the grid, the real–Fourier
 # layout, the transform plans, the spectral multipliers, and the lazy per-mode kernels (|k|² and the
-# dealias mask — compressed symbols, resident in no array; decision 38).
+# dealias mask — compressed symbols, never materialized as arrays; decision 38).
 # Reusable and read-only; precision and backend enter here (element_type / array_type) and flow
 # everywhere from here. The concrete frame is `FixedDomain` (fixed, orthogonal, unsheared); a sheared
 # (Rogallo) frame is deferred (ARCHITECTURE §7). Field-sized allocators (new_vector_field_spectral, …) build
@@ -70,8 +70,8 @@ damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{str
 epsilon — ``\\approx 36`` for [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
 [`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps
 to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
-than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization,
-hence an opt-in, not the default. Applied isotropically in ``\\kappa``. Because it retains energy out to
+than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization.
+Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
 automatically by `recommended_cfl`. The smooth spectral filter is due to Hou & Li (2007).
 
@@ -105,7 +105,7 @@ modes in the retained sphere).
 
 Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform per
 stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale spectral-representation
-buffer per phase-shifted term). Opt-in, not the default. Because it retains energy out to
+buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
 ``2/3`` rule — handled automatically by `recommended_cfl`.
 
@@ -160,7 +160,8 @@ objects, each linked to its own documentation.
 - `squared_wavenumber_kernel` — ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` as a lazy
   [`RadialKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.RadialKernel) (in spectral
   representation ``-\\nabla^{2}`` acts as multiplication by it) — the Dirichlet-energy weight the
-  weighted spectral reductions take; evaluated per mode from the multipliers, resident in no array.
+  weighted spectral reductions take; never materialized — evaluated per mode from the multipliers,
+  with no array allocated.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
   mode) and the [`DealiasingStrategy`](@ref) that built it.

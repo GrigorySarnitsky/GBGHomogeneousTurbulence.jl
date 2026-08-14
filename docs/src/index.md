@@ -86,12 +86,14 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
-- [`Observables`](api/Observables.md): the measured functions of state (`kinetic_energy`,
-  `dissipation`, `derivative_skewness`, `scalar_variance`, `scalar_dissipation`, the
-  Courant–Friedrichs–Lewy (CFL) helper `max_speed`, and the `energy_spectrum` / `integral_scale`).
-- [`Cache`](api/Cache.md): the `ObservablesCache` — the stamped boundary storage each iteration
-  deposits its observables into at its tail; a read serves the deposited value or throws, and
-  nothing is recomputed on a read.
+- [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
+  diagnostics of the flow and the scalar (`kinetic_energy`, `dissipation`, …), the spectrum-derived
+  scales (`energy_spectrum`, `integral_scale`), the advective-CFL `max_speed`, and the field-valued
+  vorticity recovery.
+- [`Cache`](api/Cache.md): the `ObservablesCache` — the stamped storage each iteration fills at its
+  end with the observables of the state it just produced; the checked accessors
+  (`velocity_physical`, `max_speed`, …) serve the deposited value or throw, and nothing is
+  recomputed on a read.
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
