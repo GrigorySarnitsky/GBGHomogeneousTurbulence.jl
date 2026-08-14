@@ -29,7 +29,6 @@ module Observables
 using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
 using ..SimulationDomain: FixedDomain, new_tensor_field_physical
-import ..Cache: max_speed                 # one generic: the reduction here, the cached read in Cache
 
 export kinetic_energy, dissipation, max_speed,
        scalar_variance, scalar_dissipation, derivative_skewness,
@@ -124,6 +123,8 @@ deposited it — the same quantity, measured once per iteration and served witho
 device readback); it throws when no deposit is current, like every cached read. The third form
 reads a `Simulation`'s cache.
 """
+function max_speed end
+
 max_speed(u) = maximum(abs, field_data(u))
 
 

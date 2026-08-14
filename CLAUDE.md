@@ -48,7 +48,7 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `Particles` — Lagrangian tracer tracking (`Tracers`).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
-Include order: `SimulationDomain → State → Cache → Forcing → Generator → Observables → Propagator →
+Include order: `SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator →
 Particles → SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
 only through explicit `using ..Module: name` — never a bare `using`.
 

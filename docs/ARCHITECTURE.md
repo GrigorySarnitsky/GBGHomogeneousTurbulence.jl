@@ -523,7 +523,7 @@ seam is real but uncrossed (decision 18).
 
 ### 4.9 Layout summary
 
-`SimulationDomain → State → Cache → Forcing → Generator → Observables → Propagator → Particles →
+`SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator → Particles →
 SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
 order as the dependency-light leaf the initial-condition, forcing, and validation consumers read.
@@ -1554,6 +1554,25 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     scalar pass cells drop the deleted shift and recovery passes with it. This completes the
     dealiasing axis's memory↔compute pricing: a mask spends a per-mode multiplication, `PhaseShift`
     spends exactly one extra evaluation of each term, and nothing else.
+46. **(2026-08, user-directed) `Observables` precedes `Cache`: the measurement functions are the
+    generics the cached reads extend.** The include order becomes `State → Observables → Cache`, and
+    an observable with both a measurement and a cached value is **one generic with two method
+    families** — the field-argument reduction computes ("measure now"), the `ObservablesCache`
+    method serves the deposited value or throws — with the bare binding and the docstring homed in
+    `Observables` and `Cache` extending it (`max_speed` today; the pattern is the rule for any
+    future cached observable). Dispatch by argument type is the mode selector: a considered
+    `observable(state, cache, compute::Bool)` form was rejected — the flag conflates an ``O(1)``
+    read with an ``O(N^3)`` measurement, and "return it if stored in the state" is empty, since the
+    state stores no observables. Two boundaries survive unchanged: reads never compute (decision 40's
+    no-recompute contract), and ``\varepsilon``, ``k``, ``E(\kappa)`` still never become resident
+    slots. The recorded homing rationale is also corrected here: the placement criterion for what
+    lives upstream of `Generator` is **consumption inside `step!`** (the assembly's per-stage
+    inputs), *not* a "measurement never feeds the dynamics" principle — that principle is false in
+    mechanics (the Hamiltonian, an observable, generates the flow) and false in this package
+    (`max_speed` sets the adaptive ``\Delta t``; `BandRescaling` holds a measured band energy);
+    measured values steer the loop *between* steps, and nothing hard forbids this order — it is a
+    design choice for a diagnostics module that stays optional per slot while its generics stand
+    upstream.
 
 ---
 

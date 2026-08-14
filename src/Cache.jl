@@ -35,6 +35,7 @@ module Cache
 
 using GBGPeriodicFields: point_values
 using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
+import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
        particle_velocities, resolved_fields_modified!
@@ -179,10 +180,8 @@ function scalar_physical(cache::ObservablesCache)
 end
 
 
-# The cached-number read of the maximum speed. The generic is owned here (the field-reduction method
-# lives in `Observables`, which extends this binding); the docstring home is on the reduction.
-function max_speed end
-
+# The cached-number read of the maximum speed. The generic and its docstring are homed in
+# `Observables` (the field reduction); this method extends it with the checked cached read.
 function max_speed(cache::ObservablesCache)
   _checked(cache, cache.max_speed_stamp, "maximum velocity component")
   return cache.max_speed

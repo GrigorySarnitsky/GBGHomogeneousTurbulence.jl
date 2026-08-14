@@ -12,14 +12,14 @@
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
 # the instruments, the run layer, and the reference laws are named by their job.
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
-#   State            — the spectral state + its physical recoveries + initial conditions (the MZ
-#                      State role)
-#   Cache            — the ObservablesCache: the stamped boundary storage the iteration deposits its
-#                      observables into (no-recompute; slots double as the step's registers)
+#   State            — the spectral state + initial conditions (the MZ State role)
+#   Observables      — the measured functions of state (energy, dissipation, skewness, …), including
+#                      the field-valued vorticity recovery
+#   Cache            — the ObservablesCache: the stamped storage the iteration deposits its
+#                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
 #                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!)
-#   Observables      — the measured functions of state (energy, dissipation, skewness, …)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
 #   Particles        — Lagrangian tracer tracking (instruments)
@@ -51,10 +51,10 @@ include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
 include("State.jl")
+include("Observables.jl")
 include("Cache.jl")
 include("Forcing.jl")
 include("Generator.jl")
-include("Observables.jl")
 include("Propagator.jl")
 include("Particles.jl")
 include("SimulationRun.jl")
