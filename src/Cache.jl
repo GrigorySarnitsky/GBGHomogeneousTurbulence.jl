@@ -1,10 +1,10 @@
 # Cache — the observables cache: the stamped storage where a component of the iteration
 # puts a value another component (or an observation) will read. The design is the no-recompute rule
 # (docs/src/observables_cache.md): the schedule is fixed at construction and identical on every
-# iteration; every slot is deposited at the tail of the iteration from the state it has just
+# iteration; every slot is deposited at the end of the iteration from the state it has just
 # produced; a read either finds the stamped value or throws — there is no path, internal or on
 # request, by which reading causes a computation. A slot IS the register its producer computes in:
-# mid-iteration the step takes the array as stage scratch (clearing the stamp), and the tail deposit
+# mid-iteration the step takes the array as stage scratch (clearing the stamp), and the closing deposit
 # re-fills it, so caching adds nothing to what an iteration computes, moves, or stores.
 
 """
@@ -12,10 +12,10 @@
 
 The observables cache — the stamped storage where the iteration leaves the observables it produces,
 for the run's own components and any observation to read. An **iteration** is one advance of the
-run — one `step!` and the `deposit!` that closes it; a **boundary** is the instant between
-iterations — the state at one ``t_n``, after one advance and before the next (an instant of the
-run's clock, not a face of the periodic box); a slot's **stamp** records which boundary its value
-belongs to, so a read can be refused rather than served stale. The cache's operations:
+run — one `step!` and the `deposit!` that closes it; between iterations the run stands at one
+``t_n``, after one advance and before the next — an instant of the run's clock, not a face of the
+periodic box; a slot's **stamp** records which of these instants its value belongs to, so a read
+can be refused rather than served stale. The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their stamps, and the epoch counters.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
@@ -28,7 +28,7 @@ belongs to, so a read can be refused rather than served stale. The cache's opera
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
 — homed in `Propagator`, with the iteration it closes — which fills and stamps every slot at the
-iteration's tail; internal per-slot deposit and take verbs move the individual stamps. A caller
+iteration's end; internal per-slot deposit and take verbs move the individual stamps. A caller
 reads through the accessors and never deposits.
 """
 module Cache
@@ -58,7 +58,7 @@ representation when the run carries one, the maximum velocity component (the `ma
 the next timestep choice reads), and — when the run advects tracers — the particle velocities
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
 configuration, never declared: the cache holds exactly what the iteration computes, materializes,
-and leaves alive at the boundary, and nothing may be added on any cost axis.
+and leaves alive at the iteration's end, and nothing may be added on any cost axis.
 
 Build it on a [`FixedDomain`](@ref) `domain`; pass `scalar = true` when the run evolves a passive
 scalar (it adds the scalar's slot), and `particle_velocities` — the tracer set's own point-value
@@ -73,7 +73,7 @@ of the three states it is in — and the only repair is to fix the schedule that
 
 !!! note
     A slot is also its producer's register: between deposits the step works in the same array, so a
-    cached field is only valid at the boundaries between iterations. Treat every returned array as
+    cached field is only valid between iterations. Treat every returned array as
     read-only — it is the storage the next iteration will work in.
 
 # Fields
@@ -121,13 +121,13 @@ function _checked(cache::ObservablesCache, stamp::Int, what::String)
   stamp == cache.fields_epoch && return nothing
   if stamp == SCRATCH
     error("the cached $what is in use as a producer's scratch: mid-iteration the slot holds a " *
-          "stage intermediate, not the observable; read it only at the boundaries between iterations")
+          "stage intermediate, not the observable; read it only between iterations")
   elseif stamp == NEVER_DEPOSITED
     error("the cached $what was never deposited: the schedule of this run does not fill the slot " *
           "before this read (a fresh cache is seeded by its deposit at construction)")
   else
     error("the cached $what is stale: the state has advanced past the deposited value, and " *
-          "nothing in the cache is ever recomputed; read at a boundary, after the tail deposit")
+          "nothing in the cache is ever recomputed; read between iterations, after the closing deposit")
   end
 end
 
@@ -136,7 +136,7 @@ end
     velocity_physical(cache)
     velocity_physical(sim)
 
-The velocity ``\\boldsymbol{u}`` in physical representation at the current boundary — the checked
+The velocity ``\\boldsymbol{u}`` in physical representation at the current epoch — the checked
 read of the [`ObservablesCache`](@ref) `cache`'s velocity slot. Returns the deposited field when its
 stamp is current, and throws otherwise (the slot is mid-iteration scratch, stale, or was never
 deposited); nothing is ever recomputed on a read. Treat the returned field as read-only — it is the
@@ -153,7 +153,7 @@ end
     vorticity_physical(sim)
 
 The vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
-at the current boundary — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
+at the current epoch — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
 slot, with exactly [`velocity_physical`](@ref)'s contract (the deposited field or a throw; never a
 recomputation; read-only). The deposited value is produced by
 [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) — measure with
@@ -169,7 +169,7 @@ end
     scalar_physical(cache)
     scalar_physical(sim)
 
-The scalar ``\\varphi`` in physical representation at the current boundary — the checked read of the
+The scalar ``\\varphi`` in physical representation at the current epoch — the checked read of the
 [`ObservablesCache`](@ref) `cache`'s scalar slot, with exactly [`velocity_physical`](@ref)'s
 contract (the deposited field or a throw; never a recomputation; read-only). Throws an
 `ArgumentError` when the run carries no scalar. The second form reads a `Simulation`'s cache.
@@ -194,8 +194,8 @@ end
     particle_velocities(cache)
     particle_velocities(sim)
 
-The particle velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the current boundary — the
-``(M, 3)`` array of the flow velocity sampled at the position each tracer occupies at that boundary:
+The particle velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the current epoch — the
+``(M, 3)`` array of the flow velocity sampled at the position each tracer occupies at that instant:
 the genuine Lagrangian velocity the statistics accumulate. The checked read of the
 [`ObservablesCache`](@ref) `cache`'s particle-velocities slot: it serves the deposited values or
 throws, like every cached read — the sample depends on the state **and** the positions, so it is
@@ -213,16 +213,16 @@ function particle_velocities(cache::ObservablesCache)
   cache.sample_fields_stamp == cache.fields_epoch &&
     cache.sample_particles_stamp == cache.particles_epoch ||
     error("the cached particle velocities are stale: the state or the tracer positions have advanced " *
-          "past the deposited values, and nothing in the cache is ever recomputed; read at a " *
-          "boundary, after the tail deposit")
+          "past the deposited values, and nothing in the cache is ever recomputed; read " *
+          "between iterations, after the closing deposit")
   return point_values(cache.particle_velocities)
 end
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The producers' side: take a slot as scratch (clearing its stamp), deposit into it (stamping it at
-# the current fields epoch). Deposits happen at the tail of the iteration, from the state it has
-# just produced; the boundary check refuses to close an iteration with an undeposited slot.
+# the current fields epoch). Deposits happen at the end of the iteration, from the state it has
+# just produced; the completeness check refuses to close an iteration with an undeposited slot.
 
 # Take a slot's array as mid-iteration scratch. The stamp goes to SCRATCH, so a read between the
 # take and the next deposit throws instead of returning a stage intermediate.
@@ -242,11 +242,11 @@ deposit_sample!(cache::ObservablesCache) =
    cache.sample_particles_stamp = cache.particles_epoch; cache.particle_velocities)
 
 
-# The boundary completeness check: every slot the configuration carries must be stamped at the
+# The deposit-completeness check: every slot the configuration carries must be stamped at the
 # current epoch when an iteration closes. No caller can fail this — a slot exists only because the
 # schedule fills it — so a throw here names a solver bug at its source rather than letting the slot
 # hold scratch for the rest of the run.
-function check_boundary(cache::ObservablesCache)
+function check_deposits(cache::ObservablesCache)
   cache.velocity_stamp == cache.fields_epoch ||
     error("iteration closed with the velocity slot undeposited — a solver scheduling bug")
   cache.vorticity_stamp == cache.fields_epoch ||
@@ -273,7 +273,7 @@ Advances the fields epoch of `cache`, so every cached observable is stale and re
 the next deposit; that interval belongs to whoever made the change. Returns `cache` (or `sim`).
 
 The sanctioned mutators call this for you: `step!` advances the epoch itself when it completes, and
-the iteration's tail deposit then restores the cache. After a hand-made mutation, re-deposit with the
+the iteration's closing deposit then restores the cache. After a hand-made mutation, re-deposit with the
 run layer's `deposit!` before advancing again — the timestep choice reads the cached maximum speed.
 """
 resolved_fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)

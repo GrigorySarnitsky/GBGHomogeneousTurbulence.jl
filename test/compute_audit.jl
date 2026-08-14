@@ -101,9 +101,9 @@ const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, String}()
 # op applies is a compressed symbol, so no op reads a field-scale configuration array. A
 # velocity-only step now moves NOTHING scalar-shaped at all — the zero columns are the assertion.
 # Re-frozen 2026-08-06 (decision 40, the deposit-driven cache): the op lists now model the full
-# ITERATION (step! + the tail deposit!), so the once-per-iteration maximum-speed reduction — always
+# ITERATION (step! + the closing deposit!), so the once-per-iteration maximum-speed reduction — always
 # performed, previously the run layer's un-audited pass — enters the ledger as +1 physical_vector in
-# every cell. Transforms froze IDENTICAL: the tail deposits are the former first-stage recoveries
+# every cell. Transforms froze IDENTICAL: the closing deposits are the former first-stage recoveries
 # relocated, never added.
 const PASSES_BASE = Dict(
   (:RK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
@@ -307,7 +307,7 @@ end
     # `u_shifted` remains a register the displaced evaluation needs today. The backend's cross
     # product is now alias-safe by construction (its former guard is retired), so landing displaced
     # values on spent registers is no longer blocked — that reuse is scheduled with the cache's
-    # slot-register merges (the boundary-refresh design), not as a drive-by here.
+    # slot-register merges (the closing-refresh design), not as a drive-by here.
   end
 
   @testset "the factor verbs supply parameters, never a field (decision 39)" begin

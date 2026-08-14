@@ -77,7 +77,7 @@ FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
 struct PhaseShiftBuffers{K, KB, VS, VP, SS, SP}
   to_shifted::K                   # translation kernel: recover a field on the grid displaced by +½ cell
   back::K                         # translation kernel: shift a displaced term back to the grid
-  back_dealiased::KB              # back ∘ the spherical truncation, composed once — the tail's kernel
+  back_dealiased::KB              # back ∘ the spherical truncation, composed once — the final averaging convolve's kernel
   velocity_shifted::VS            # û on the displaced grid, then the displaced nonlinear term
   u_shifted::VP                   # velocity recovered on the displaced grid
   omega_shifted::VP               # vorticity recovered on the displaced grid

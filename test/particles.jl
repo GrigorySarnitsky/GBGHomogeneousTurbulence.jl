@@ -114,7 +114,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       record_trajectory_velocity!(tracers, u)                           # u(tₙ), onto the tracers
       step!(IFLowStorageRK3(), state, generator, domain, buffers, cache, dt)
       deposit!(cache, state, domain, buffers)
-      advect!(tracers, velocity_physical(cache), domain, dt)          # u(tₙ₊₁), the tail deposit
+      advect!(tracers, velocity_physical(cache), domain, dt)          # u(tₙ₊₁), the closing deposit
     end
     @test all(isfinite, particle_positions(tracers)) && all(0 .<= particle_positions(tracers) .< L)
     @test all(isfinite, point_values(tracers.trajectory_velocity))

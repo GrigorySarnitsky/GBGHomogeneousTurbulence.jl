@@ -1,10 +1,10 @@
 # ObservablesCache tests — the no-recompute contract: a read serves the deposited value or throws
 # (never rebuilds); slots double as the step's registers (taken mid-iteration, re-deposited at the
-# tail); `resolved_fields_modified!` announces an out-of-band mutation and `deposit!` restores the
-# boundary; the boundary check refuses an iteration that left a slot undeposited.
+# end); `resolved_fields_modified!` announces an out-of-band mutation and `deposit!` restores the
+# deposits; the completeness check refuses an iteration that left a slot undeposited.
 
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: take_velocity!, check_boundary
+using GBGIsotropicTurbulence.Cache: take_velocity!, check_deposits
 using GBGPeriodicFields: field_data, to_physical!
 using Random
 using Test
@@ -79,9 +79,9 @@ using Test
     step!(IFLowStorageRK3(), state, generator, domain, buffers, cache, 0.01)
     @test cache.fields_epoch == epoch0 + 1
     @test_throws ErrorException velocity_physical(cache)         # taken as a stage register
-    @test_throws ErrorException check_boundary(cache)            # the iteration is not closed
+    @test_throws ErrorException check_deposits(cache)            # the iteration is not closed
     deposit!(cache, state, domain, buffers)
-    @test check_boundary(cache) === cache
+    @test check_deposits(cache) === cache
     @test field_data(velocity_physical(cache)) != u_before       # the advanced state's recovery
   end
 

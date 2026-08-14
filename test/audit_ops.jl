@@ -100,8 +100,8 @@ const VALUE_CLASS = Dict(
 )
 # Values whose live range is extended past their last use in the op list — live because the DYNAMICS
 # of the iteration says so: the state is read and written by every stage and must persist between
-# steps, and the cache slots hold the boundary observables the NEXT iteration's first stage reads, so
-# their tail deposits must survive the list's end just as their previous deposits precede its start.
+# steps, and the cache slots hold the deposited observables the NEXT iteration's first stage reads, so
+# their closing deposits must survive the list's end just as their previous deposits precede its start.
 # Extending each is a statement of fact, so the set belongs in a lower bound.
 #
 # (History: decision 37 split a CHART_CONTRACT_LIVE choice out of this set — the charts then survived
@@ -115,13 +115,13 @@ const DYNAMICS_LIVE = Set([:û, :φ̂, :ou_state, :chart_u, :chart_ω, :chart_φ
 const CONTRACT_LIVE = DYNAMICS_LIVE
 
 
-# The tail deposit (deposit! in src/Propagator.jl): the iteration closes by recovering the boundary
-# observables into the cache slots — the next iteration's first-stage recoveries moved to the tail —
+# The closing deposit (deposit! in src/Propagator.jl): the iteration closes by recovering its
+# observables into the cache slots — the next iteration's first-stage recoveries moved to the iteration's end —
 # and reducing the maximum speed from the just-deposited velocity (the number the next timestep
 # choice reads; the once-per-iteration host readback). The spectral working space is a stage register
 # that is dead once the step closes: `nl` for RK3, `stage2` for RK2 (`sb_nl` / `sb_stage2` for the
 # scalar's copy).
-function _tail_deposit(scalar; scratch, sscratch)
+function _closing_deposit(scalar; scratch, sscratch)
   ops = [
     Op("copy û",           [:û],       [scratch]),
     Op("u chart recovery", [scratch],  [:chart_u]),
@@ -175,7 +175,7 @@ end
 
 # The scalar right-hand side at a stage (scalar_rhs! in src/Generator.jl): form the conservative
 # flux uφ from the stage's physical scalar, transform, take the divergence into `out`, and dealias.
-# At stage 1 the physical scalar is the deposited boundary chart, read as is (`recover = false`); at
+# At stage 1 the physical scalar is the deposited chart, read as is (`recover = false`); at
 # a later stage the caller first recovers the stage scalar into the taken chart slot, through the
 # scheme's dead spectral register `sscratch`. PhaseShift adds the displaced flux divergence, reading
 # the displaced velocity the SAME stage's velocity assembly left fresh in `ushift` (the freshness
@@ -257,12 +257,12 @@ _ou_prepare() = [
 ]
 
 
-# IFLowStorageRK3 as one ITERATION: stage 1 reads the boundary observables the previous tail
+# IFLowStorageRK3 as one ITERATION: stage 1 reads the deposited observables the previous closing deposit
 # deposited (the charts are live-in), stages 2–3 take the chart slots and recover the stage states
-# into them, and the tail deposit closes the iteration (`tail = true`; off for a bare-`step!`
+# into them, and the closing deposit closes the iteration (`closing = true`; off for a bare-`step!`
 # analysis). `phase_shift` switches the assemblies to the displaced-evaluation form; `ou` adds the
 # forcing's prepare phase and per-stage source.
-function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, tail::Bool = true)
+function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, closing::Bool = true)
   ops = Op[]
   ou && append!(ops, _ou_prepare())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
@@ -277,15 +277,15 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, tail
     scalar && append!(ops, _scalar_update(; last = i == 3))
   end
   push!(ops, Op("finalize", [:û], [:û]))
-  tail && append!(ops, _tail_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
+  closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
 
 
-# IFRK2 (Heun) as one iteration: stage 1 through the deposited boundary observables, the predictor
+# IFRK2 (Heun) as one iteration: stage 1 through the deposited observables, the predictor
 # pair, the stage-2 assembly at the predictor state (recovered into the taken chart slots), the
-# corrector combinations, then the tail deposit.
-function rk2_ops(scalar::Bool; phase_shift::Bool = false, tail::Bool = true)
+# corrector combinations, then the closing deposit.
+function rk2_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)
   ops = Op[]
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; phase_shift))     # N̂_u,1 → nl plays stage1's role
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
@@ -313,7 +313,7 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, tail::Bool = true)
     Op("φ̂ corrector 2",  [:φ̂, :sb_stage2],  [:φ̂]),
   ])
   push!(ops, Op("finalize", [:û], [:û]))
-  tail && append!(ops, _tail_deposit(scalar; scratch = :stage2, sscratch = :sb_stage2))
+  closing && append!(ops, _closing_deposit(scalar; scratch = :stage2, sscratch = :sb_stage2))
   return ops
 end
 

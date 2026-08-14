@@ -100,15 +100,15 @@ const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
   "operand and needs its own pass.")
 
-# CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the boundary refresh its text
-# prescribed: the iteration now deposits the charts at its tail and the step takes the same slots as
+# CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the closing refresh its text
+# prescribed: the iteration now deposits the charts at its end and the step takes the same slots as
 # its substage recovery registers, so a chart and its register are one array and every unforced cell
 # sits AT its liveness bound (the two physical vectors — 768 MiB at 256³ / Float64 — banked; the
 # memory audit asserts the equality).
 
 const UNIFORM_DEPOSIT_SCHEDULE = Holder(
   "UNIFORM DEPOSIT SCHEDULE", :DESIGN,
-  "The observables cache deposits every slot at every tail — the schedule is fixed at construction " *
+  "The observables cache deposits every slot at every iteration's end — the schedule is fixed at construction " *
   "and identical on every iteration (decision 40, the no-recompute design the user adopted) — so " *
   "an iteration advanced with a hand-fixed Δt still reduces the maximum speed and reads it back, " *
   "one crossing above that path's zero floor. The uniform schedule is what makes stale reads " *
@@ -135,7 +135,7 @@ struct Sync
 end
 
 # Per-step synchronization sites, by configuration. Transcribed from:
-#   deposit!                (src/Propagator.jl)    — the tail max-speed reduction, read back into the
+#   deposit!                (src/Propagator.jl)    — the closing max-speed reduction, read back into the
 #                                                    cache's host number (cfl_timestep then does
 #                                                    scalar arithmetic on it — no crossing of its own)
 #   StationarityCriterion   (src/SimulationRun.jl) — the packaged observation's ε and k reductions
@@ -157,10 +157,10 @@ end
 function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,
                   turnover_budget::Bool = false, monitor::Symbol = :none)
   syncs = Sync[]
-  # The tail deposit reduces the maximum speed on EVERY iteration (the uniform schedule): with an
+  # The closing deposit reduces the maximum speed on EVERY iteration (the uniform schedule): with an
   # adaptive timestep the crossing is the irreducible Δt choice; with a hand-fixed Δt its floor is
   # zero and the design holder claims it.
-  push!(syncs, Sync("tail max-speed deposit", adaptive_dt ? 1 : 0,
+  push!(syncs, Sync("closing max-speed deposit", adaptive_dt ? 1 : 0,
                     adaptive_dt ? nothing : UNIFORM_DEPOSIT_SCHEDULE))
   if turnover_budget || monitor !== :none
     # One barrier serves the whole quadratic family if the reduction is fused; the first carries the
@@ -319,7 +319,7 @@ const SYNC_LEDGER = (
     # (MATERIALIZED_SYMBOLS retired 2026-08-06 — its former liveness check is now the
     # "symbol tier stays closed" equality above.)
 
-    # (CHART_CONTRACT retired 2026-08-06: the boundary refresh landed, and the memory audit now
+    # (CHART_CONTRACT retired 2026-08-06: the closing refresh landed, and the memory audit now
     # asserts achieved == bound in every unforced cell — the equality this register demanded.)
 
     sync_holders = Set{String}()

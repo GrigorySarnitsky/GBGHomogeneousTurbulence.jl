@@ -12,8 +12,8 @@
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
 # IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
-# imaginary-axis unstable for advection (see its docstring). Each `step!` reads the boundary velocity
-# and vorticity from the `ObservablesCache` (deposited by the previous iteration's tail `deposit!`,
+# imaginary-axis unstable for advection (see its docstring). Each `step!` reads the deposited velocity
+# and vorticity from the `ObservablesCache` (deposited by the previous iteration's closing `deposit!`,
 # nothing recomputed), takes the same slots as its stage recovery registers from stage 2 on, and
 # advances the cache's fields epoch on completion; the caller closes the iteration with `deposit!`.
 
@@ -29,7 +29,7 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
   cheaper two-stage alternative, imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
-- [`deposit!`](@ref) — close the iteration: recover the boundary observables into the cache and stamp
+- [`deposit!`](@ref) — close the iteration: recover the deposited observables into the cache and stamp
   them.
 - [`recommended_cfl`](@ref) — a scheme's advective-CFL ceiling.
 """
@@ -100,7 +100,7 @@ Nested:
 
 There are deliberately **no physical-representation registers** here: the substage velocity,
 vorticity, and scalar recoveries write into the run's `ObservablesCache` slots, taken as scratch
-mid-iteration and re-deposited at the tail by [`deposit!`](@ref) — a slot IS its producer's register.
+mid-iteration and re-deposited at the iteration's end by [`deposit!`](@ref) — a slot IS its producer's register.
 Likewise there is **no integrating-factor register**: the exact linear subflow is applied by the
 backend's fused exponential convolution, evaluated per mode from the factor's parameters, so no
 kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
@@ -164,8 +164,8 @@ the equations of motion, their conditions, and their assembly scratch), the `dom
 A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
 right-hand sides and exact linear factors through the generator protocol at each stage, and closes
 with the generator's `finalize!` — it never assembles the physics itself. The first stage reads the
-boundary velocity, vorticity, and scalar in physical representation from `cache` (a **boundary**
-being the instant between iterations, where the cache's deposits are current) — deposited there
+deposited velocity, vorticity, and scalar in physical representation from `cache` — the values of
+the instant between iterations, where the cache's deposits are current, deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
 stages take the same slots as their recovery registers, so the step allocates and resides nothing
 beyond its spectral stage registers. The cache's fields epoch is advanced when the step completes.
@@ -233,8 +233,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
 
   for i in 1:3
     if i == 1
-      u = velocity_physical(cache)                     # the boundary observables, deposited by the
-      ω = vorticity_physical(cache)                    # previous iteration's tail (never recomputed)
+      u = velocity_physical(cache)                     # the deposited observables, deposited by the
+      ω = vorticity_physical(cache)                    # previous iteration's closing deposit (never recomputed)
       take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
       has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
     else
@@ -253,7 +253,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     velocity_rhs!(buffers.nonlinear, generator, û, u, ω, domain)                  # N̂_u
     if has_scalar
       if i == 1
-        φ = scalar_physical(cache)                                             # the boundary scalar
+        φ = scalar_physical(cache)                                             # the deposited scalar
       else
         φ = take_scalar!(cache)
         to_physical!(φ, φ̂, domain.scalar_plans, sb.nonlinear)                          # φ at the stage state
@@ -337,8 +337,8 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
 
   prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
-  # stage 1 — right-hand sides at the boundary state, read from the cache (deposited by the previous
-  # iteration's tail; never recomputed). The assemblies consume the chart registers — the Lamb vector
+  # stage 1 — right-hand sides at the state between iterations, read from the cache (deposited by the previous
+  # iteration's closing deposit; never recomputed). The assemblies consume the chart registers — the Lamb vector
   # forms in the vorticity's, and the scalar flux in the velocity's — so those slots are taken first.
   u = velocity_physical(cache)
   ω = vorticity_physical(cache)
@@ -421,7 +421,7 @@ allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = Integrato
 )
 
 
-# The tail deposit's spectral working space is a stage register that is dead once the step closes
+# The closing deposit's spectral working space is a stage register that is dead once the step closes
 # (and, before the first step, merely zeroed): `nonlinear` for IFLowStorageRK3, `stage2` for IFRK2 —
 # each consumed into its update before `step!` returns.
 _recovery_scratch(buffers::IntegratorBuffers) =
@@ -437,12 +437,12 @@ _recovery_scratch(sb::ScalarBuffers) =
 Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
 configuration holds, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
-`ResolvedFields`) the step has just produced, and stamp each slot at the current boundary. The
-deposits are the next iteration's first-stage work moved to the tail — the velocity, vorticity, and
+`ResolvedFields`) the step has just produced, and stamp each slot at the current epoch. The
+deposits are the next iteration's first-stage work moved to the iteration's end — the velocity, vorticity, and
 (when the run carries one) scalar recoveries in physical representation, then the maximum-speed
 reduction over the just-deposited velocity — so an iteration's transform and pass counts are
 unchanged by caching; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
-spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the tail.
+spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
 
 Every iteration ends with this call: the run layer's `advance!` performs it after `step!`, a
 hand-run loop calls it itself, and the `Simulation` constructor makes the seeding deposit so the

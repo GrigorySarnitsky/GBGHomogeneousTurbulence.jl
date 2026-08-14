@@ -19,7 +19,7 @@ Lagrangian tracer tracking:
   [`scalar_buffer`](@ref) allocate its `out` buffers.
 - [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
-  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the tail
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit stamps them).
 """
 module Particles
@@ -52,7 +52,7 @@ defaults to `Random.default_rng()`.
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_tracers`](@ref); the
 trajectory velocities are read from the run's observables cache (`particle_velocities`), where the
-iteration's tail deposit stamps them. The remaining fields are preallocated predictor and
+iteration's closing deposit stamps them. The remaining fields are preallocated predictor and
 point-value scratch, so the tracer push allocates no per-step memory.
 
 # Fields
@@ -60,7 +60,7 @@ point-value scratch, so the tracer push allocates no per-step memory.
 - `predictor` — `(M, 3)` scratch for the Heun predictor positions.
 - `position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation.
 - `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
-  boundary they occupy them: the genuine Lagrangian sample, and the observables cache's
+  instant they occupy them: the genuine Lagrangian sample, and the observables cache's
   particle-velocities slot.
 - `predictor_velocity` — the interpolated velocity at the Heun **predictor** positions, which no
   tracer ever occupies: a stage register of the push, never a sample of the flow, and never exposed.
@@ -106,7 +106,7 @@ each tracer where it currently sits — by interpolating the velocity field `u` 
 representation) onto the positions of the tracer set `tracers`, with the set's interpolation
 scheme.
 
-The run layer calls it at the tail of each iteration, on the just-deposited boundary velocity at the
+The run layer calls it at the end of each iteration, on the just-deposited velocity at the
 just-advanced positions; the recorded values are the observables cache's particle-velocities slot,
 stamped there, and the next iteration's [`advect!`](@ref) reads them as the first half of its Heun
 pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
@@ -143,7 +143,7 @@ velocity alone would be first order.
 !!! note
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
     ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by [`record_trajectory_velocity!`](@ref)
-    at the previous boundary. In a run the observables cache stamps that sample and the run layer
+    at the previous iteration's end. In a run the observables cache stamps that sample and the run layer
     reads it checked before pushing; a hand-run loop must re-record between pushes itself.
 """
 function advect!(tracers::Tracers, velocity_end, domain::FixedDomain, dt::Real)

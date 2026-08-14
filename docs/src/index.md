@@ -44,7 +44,7 @@ run!(sim) do s                                # records what it wants, and decid
 end
 
 kinetic_energy(sim.state.velocity)            # read a measured observable off the state
-velocity_physical(sim)         # a cached observable at the boundary (the instant between steps)
+velocity_physical(sim)         # a cached observable at the iteration's end (the instant between steps)
 flow_parameters(sim)                          # the run's measured flow state
 ```
 

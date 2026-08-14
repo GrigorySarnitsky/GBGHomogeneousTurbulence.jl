@@ -76,7 +76,7 @@ end
 # the cache's chart slots ARE the step's substage recovery registers, so the two physical vectors
 # the old IntegratorBuffers carried beside the charts are gone (−2 pv in every cell, 768 MiB at
 # 256³ / Float64 — exactly the gap decision 37 uncovered); the cache's spectral scratch is gone
-# (−1 sv — the tail and substage recoveries write through a dead stage register); the scalar's
+# (−1 sv — the closing and substage recoveries write through a dead stage register); the scalar's
 # copy register is gone (−1 ss) and its physical field register IS the scalar chart now (φ moved
 # from the buffers to the cache, net zero). The PhaseShift cells still carry the displaced-
 # evaluation scratch on top (+1 sv, +2 pv; scalar +2 ss +1 ps).
@@ -133,7 +133,7 @@ _forcing_delta(tag, slot) =
 const TRACER_DELTA = ZERO
 
 # There is no observables axis any more (decision 40): the cache's contents are automatic — exactly
-# what the configuration's iteration computes, materializes, and leaves at the boundary — so the
+# what the configuration's iteration computes, materializes, and leaves at the iteration's end — so the
 # only degree of freedom it carries is the scalar slot, which follows the run's `scalar` axis.
 
 _build_forcing(tag, domain) =
@@ -386,17 +386,17 @@ const EPISODE_UNITS = [
 
   @testset "the bound still encodes a falsifiable contract" begin
     # Decision 37's lesson, restated for the merged design: the charts' extension in DYNAMICS_LIVE
-    # is a FACT only while the schedule really deposits them at the tail — the extension asserts the
+    # is a FACT only while the schedule really deposits them at the iteration's end — the extension asserts the
     # deposits must persist to the next iteration's first stage. Pin the structure that makes it a
-    # fact: the op lists end with the tail deposits (so the extension covers a real write), and the
+    # fact: the op lists end with the closing deposits (so the extension covers a real write), and the
     # charts are read at the head before any write (so the previous deposit is really consumed).
     for ops_of in (rk3_ops, rk2_ops), scalar in (false, true)
       ops = ops_of(scalar)
       @test any(op -> op.name == "u chart recovery", ops)
       @test any(op -> op.name == "ω chart recovery", ops)
-      @test ops[end].name == "max speed"                 # the tail closes the iteration
+      @test ops[end].name == "max speed"                 # the closing deposit ends the iteration
       first_touch = findfirst(op -> :chart_u in op.reads || :chart_u in op.writes, ops)
-      @test :chart_u in ops[first_touch].reads           # read as the boundary value, not scratch
+      @test :chart_u in ops[first_touch].reads           # read as the deposited value, not scratch
     end
     @test issubset(Set([:chart_u, :chart_ω]), DYNAMICS_LIVE)
     @test CONTRACT_LIVE == DYNAMICS_LIVE                 # no choice-extension set remains

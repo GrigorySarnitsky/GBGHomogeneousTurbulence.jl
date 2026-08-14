@@ -7,12 +7,12 @@
 # hand-run loop.
 #
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
-# tail `deposit!` recovers the boundary observables into the cache and stamps them, and the boundary
+# closing `deposit!` recovers the deposited observables into the cache and stamps them, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
 # arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
-# particle velocities the PREVIOUS tail deposited (read checked), v₂ interpolates the just-deposited
+# particle velocities the PREVIOUS closing deposit deposited (read checked), v₂ interpolates the just-deposited
 # u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
-# same field, closing the boundary; only M-sized point values are held, never a second field copy.
+# same field, completing the iteration's deposits; only M-sized point values are held, never a second field copy.
 
 """
     SimulationRun
@@ -35,7 +35,7 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
-using ..Cache: ObservablesCache, check_boundary, particles_modified!, deposit_sample!
+using ..Cache: ObservablesCache, check_deposits, particles_modified!, deposit_sample!
 import ..Cache: velocity_physical, vorticity_physical, scalar_physical, max_speed,
                 particle_velocities, resolved_fields_modified!
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
@@ -80,7 +80,7 @@ constructor that builds every component for you); the second takes a `FixedDomai
 yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
 observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`) or through the cache's
-boundary observables ([`velocity_physical`](@ref)`(sim)`, [`vorticity_physical`](@ref)`(sim)`),
+deposited observables ([`velocity_physical`](@ref)`(sim)`, [`vorticity_physical`](@ref)`(sim)`),
 summarize it
 with [`flow_parameters`](@ref), and track its progress with [`current_time`](@ref) / [`current_step`](@ref).
 
@@ -231,7 +231,7 @@ function Simulation(domain::FixedDomain;
 
   cache = ObservablesCache(domain; scalar,
                              particle_velocities = tracers === nothing ? nothing : tracers.trajectory_velocity)
-  deposit!(cache, state, domain, buffers)        # the seeding deposit: the first boundary observed is t₀
+  deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, cache,
@@ -379,7 +379,7 @@ current_step(sim::Simulation) = sim.clock.step
 
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
 # makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
-# deposited number — the previous tail measured it — so choosing Δt is scalar arithmetic, not a pass.
+# deposited number — the previous closing deposit measured it — so choosing Δt is scalar arithmetic, not a pass.
 function cfl_timestep(sim::Simulation)
   N = size(field_data(sim.cache.velocity), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
@@ -399,17 +399,17 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # The checked read at the head boundary: the push's v₁ must be the particle velocities the previous
-  # tail deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
-  # the stamp is verified here, at tₙ, where they are the current boundary observable.
+  # The checked read at the iteration's start: the push's v₁ must be the particle velocities the previous
+  # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
+  # the stamp is verified here, at tₙ, where they are the current epoch observable.
   sim.tracers === nothing || particle_velocities(sim.cache)
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
-  # The tail: deposit the boundary observables from the state the step just produced; the tracer
+  # The closing deposit: deposit the deposited observables from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
   # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
-  # positions from the same deposited field, closing the boundary.
+  # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
     advect!(sim.tracers, velocity_physical(sim.cache), sim.domain, Δt)
@@ -417,7 +417,7 @@ function advance!(sim::Simulation; dt = nothing)
     record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)
   end
-  check_boundary(sim.cache)
+  check_deposits(sim.cache)
 
   sim.clock.time += Δt
   sim.clock.step += 1
@@ -429,13 +429,13 @@ end
     run!(callback, sim)
     run!(sim) do sim … end
 
-Observe and advance `sim` until the observation stops it, and return it. At every boundary the run
-reaches — a **boundary** being the instant between iterations, the seeded initial state included —
+Observe and advance `sim` until the observation stops it, and return it. After every iteration —
+and once at the seeded initial state, before any advance —
 the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
 to stop (any other return throws — the decision may not be left implicit). Only then does the next
-iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the tail
-deposits. A run of ``n`` iterations therefore observes ``n + 1`` boundaries — the first before any
+iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the closing
+deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
 step, the last after the final one, with statistics recorded before the stop.
 
 Stopping is the observation's decision on observables, never a run option: a budget is a callback
@@ -451,7 +451,7 @@ run!(sim) do s
     current_time(s) < 5.0                        # a span of simulation time
 end
 
-history = Float64[]                              # record k at every boundary, stop after 200 steps
+history = Float64[]                              # record k at every observation, stop after 200 steps
 run!(sim) do s
     push!(history, kinetic_energy(s.state.velocity))
     current_step(s) < 200
@@ -573,7 +573,7 @@ spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement 
 seeded run; write your own callback instead when the transient length is known (a fixed budget is a
 three-line callback — see `run!`).
 
-At each boundary it measures the dissipation ``\\varepsilon`` (one reduction — the small scales
+At each observation it measures the dissipation ``\\varepsilon`` (one reduction — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
 clamps ``k`` flat and a fixed-injection forcing makes it ring), accumulates the eddy-turnover clock
 ``\\Delta t \\varepsilon/k``, and tests flatness over a trailing window; it stops the run when
@@ -586,7 +586,7 @@ every gate holds, or gives up with a warning at `max_turnovers`.
   ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal: a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
   ``S \\approx -0.5``. The transform-heavy skewness is sampled at the storage cadence, not every
-  boundary.
+  observation.
 - `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tol`.
@@ -625,7 +625,7 @@ end
 
 function (criterion::StationarityCriterion)(sim::Simulation)
   if !criterion.started
-    # The scalar gate binds only when the run's scalar is forced — resolved at the first boundary,
+    # The scalar gate binds only when the run's scalar is forced — resolved at the first observation,
     # where the criterion first sees the run it observes.
     criterion.monitor.gate_scalar = criterion.gate_scalar && _scalar_forced(sim)
     criterion.last_time = current_time(sim)

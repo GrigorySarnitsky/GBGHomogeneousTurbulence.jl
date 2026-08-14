@@ -21,7 +21,7 @@ function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   deposit!(cache, state, domain, buffers)                 # the seeding deposit
   for _ in 1:nsteps
     step!(integrator, state, generator, domain, buffers, cache, dt)
-    deposit!(cache, state, domain, buffers)               # the tail closes the iteration
+    deposit!(cache, state, domain, buffers)               # the closing deposit ends the iteration
   end
   return û
 end

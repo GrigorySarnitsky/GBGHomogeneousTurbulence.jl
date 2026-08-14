@@ -31,7 +31,7 @@ a direct dependency.
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | [`particle_positions`](@ref) |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the particle velocities — the velocity sampled at each tracer's position at the iteration boundary ``t_n`` | [`particle_velocities`](@ref) |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the particle velocities — the velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`particle_velocities`](@ref) |
 | ``M`` | the number of tracer particles | [`number_of_tracers`](@ref) |
 
 ## Parameters

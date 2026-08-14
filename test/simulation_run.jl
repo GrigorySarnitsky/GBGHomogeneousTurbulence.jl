@@ -89,14 +89,14 @@ using Test
     @test isapprox(sum(last(energy_spectrum(sim2.state.velocity, sim2.domain))), kinetic_energy(sim2.state.velocity); rtol = 1e-5)
   end
 
-  @testset "the observation fires at every boundary — n iterations, n+1 observations" begin
+  @testset "the observation fires after every iteration — n iterations, n+1 observations" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(7))
     count = Ref(0)
     run!(sim) do s
       count[] += 1
       current_step(s) < 5
     end
-    @test count[] == 6                              # t₀ and the stopping boundary both observed
+    @test count[] == 6                              # t₀ and the stopping instant both observed
     @test current_step(sim) == 5
   end
 

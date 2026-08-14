@@ -57,7 +57,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
 # (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).
 warmup!(sim)
 
-# Observe and advance. The callback fires at every boundary with the current run; it records
+# Observe and advance. The callback fires after every iteration (and once at the start); it records
 # what it wants and its return decides continuation — stopping is the caller's decision.
 t_end = current_time(sim) + 20.0
 run!(sim) do s
@@ -67,10 +67,10 @@ end
 ```
 
 The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each
-iteration from the advective-CFL condition over the cached maximum speed (§4.5), serves the boundary
+iteration from the advective-CFL condition over the cached maximum speed (§4.5), serves the deposited
 observables from the deposit-driven `ObservablesCache` (§4.1), and runs the **observation-first
-loop**: at every boundary the run reaches — ``n`` iterations, ``n+1`` observations, the seeded
-``t_0`` included — the callback reads the run and decides whether it continues (§11 decision 43).
+loop**: after every iteration, and once at the seeded ``t_0`` — ``n`` iterations, ``n+1``
+observations — the callback reads the run and decides whether it continues (§11 decision 43).
 Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
 advances until the flow is statistically stationary, watching the running dissipation
 ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` — the small-scale signals that
@@ -205,7 +205,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
   substage recovery registers mid-iteration (their stamps go to *scratch*, so a mid-iteration read
-  throws instead of serving a stage intermediate), and the tail `deposit!` re-fills and stamps them
+  throws instead of serving a stage intermediate), and the closing `deposit!` re-fills and stamps them
   from the state the step just produced. An accessor (`velocity_physical`, `vorticity_physical`,
   `scalar_physical`, the cached `max_speed`) serves the deposited value or throws — there is no path
   by which reading causes a computation — and the cache keeps one epoch counter per dynamical factor
@@ -220,7 +220,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
   to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
   composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in
-  place — each iteration a `step!` closed by the tail `deposit!`.
+  place — each iteration a `step!` closed by the closing `deposit!`.
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -384,15 +384,15 @@ Particles are **instruments** — probes of the turbulence — not a second phys
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme; the push is Heun-in-time on
-the velocity at the two boundaries of the iteration: ``\boldsymbol{v}_1`` is the **trajectory
-sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous tail deposited — the genuine
+the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
+sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous closing deposit deposited — the genuine
 Lagrangian velocity, held in `Tracers.trajectory_velocity` and stamped in the observables cache
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `Tracers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
 not readable. After the push, `record_trajectory_velocity!` records the new sample at the new
-positions from the same deposited field, closing the boundary; `sample!` reads any field along the
+positions from the same deposited field, completing the iteration's deposits; `sample!` reads any field along the
 trajectories for Lagrangian statistics.
 
 The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
@@ -427,10 +427,10 @@ Over it:
   chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
-  maximum speed (scalar arithmetic — the previous tail measured it), `step!`, the tail `deposit!`,
-  the tracer push on the sample and the deposited endpoint field, the new sample, and the boundary
+  maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
+  the tracer push on the sample and the deposited endpoint field, the new sample, and the deposit-
   completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
-  observes every boundary (the seeded ``t_0`` included) and its `Bool` return decides continuation —
+  observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
 - **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
   running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` (a
@@ -1376,7 +1376,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     **bound built out of the very thing it should test** is worse than a loose bound, because a loose
     bound at least fails honestly. The correction splits the set in two, admits only the dynamics half
     to the projection, and makes the chart contract a holder with a `FIX` disposition, so the gap is
-    claimed and retires when the boundary-refresh design closes it.
+    claimed and retires when the closing-refresh design closes it.
 
     Two details keep the fix honest. The traffic model of decision 34 keeps the **union**, because a
     value that outlives a fusion segment must reach memory whatever the reason it survives — so the
@@ -1419,7 +1419,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     per-mode offset), read once per application instead of once per build; (3) the de-alias/truncation
     passes folded into their producers — a mask strategy's kernel rides the projection's own pass (the
     kernel-composed ``\mathbb{P}`` and ``\nabla\cdot`` arities, the latter absorbing the ``-\nabla\cdot``
-    sign in ``\alpha``), and the phase-shift tail applies shift-back, average, and truncation in one
+    sign in ``\alpha``), and the phase-shift chain's final convolve applies shift-back, average, and truncation in one
     convolve through a `back ∘ truncation` kernel composed once at construction. Three audit holders
     retired in the same commit, each because its gap **closed**: `SHARED FACTOR` (the register it
     priced no longer exists), `MATERIALIZED_SYMBOLS` (both its residency and traffic claims delivered —
@@ -1434,26 +1434,26 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 40. **(2026-08) The observables cache is deposit-driven, and a slot is its producer's register.** The
     cache moves to its own module (`Cache`, between `State` and `Forcing`) and is rebuilt to the
     design of `docs/src/observables_cache.md`: the schedule is fixed at construction and identical on
-    every iteration; **everything is deposited at the tail of the iteration** (`deposit!` — the next
+    every iteration; **everything is deposited at the end of the iteration** (`deposit!` — the next
     iteration's first-stage recoveries relocated, plus the maximum-speed reduction the next timestep
     choice reads); a read serves the stamped value or **throws** — there is no path, internal or on
     request, by which reading causes a computation (the recompute-on-staleness accessors of
     decision 30 are retired; `resolved_fields_modified!` now opens an interval in which reads throw,
     closed by an explicit `deposit!`). Contents are **automatic** — the constructor derives them from
     the configuration (the `observables` declaration keyword is gone); the three-valued stamp
-    (value-at-boundary / producer's scratch / never deposited) polices the mid-iteration window, and
-    the boundary completeness check refuses to close an iteration with an undeposited slot. The
+    (deposited value / producer's scratch / never deposited) polices the mid-iteration window, and
+    the deposit-completeness check refuses to close an iteration with an undeposited slot. The
     storage consequence is the **slot=register merge**: the step's substage recovery registers ARE
-    the cache's chart arrays (taken at stage 2, re-deposited at the tail), which deletes
+    the cache's chart arrays (taken at stage 2, re-deposited at the iteration's end), which deletes
     `IntegratorBuffers`' two physical vectors — precisely the honest gap decision 37 uncovered,
     768 MiB at ``256^3``/Float64 — along with the cache's spectral scratch and the scalar's copy
-    register (the tail and substage recoveries write through a stage register that is dead at that
+    register (the closing and substage recoveries write through a stage register that is dead at that
     point of the schedule). Every unforced ledger cell now sits **at** its liveness bound in every
-    class, so three holders retire in this commit (`CHART CONTRACT` — by exactly the boundary
+    class, so three holders retire in this commit (`CHART CONTRACT` — by exactly the closing
     refresh its text prescribed — `OWNERSHIP`, and `SCALAR REGISTERS`), and `DYNAMICS_LIVE` absorbs
     the charts as facts of the deposit-persistence contract (the `charts_live` choice parameter is
-    gone; the falsifiability guard now pins the tail-deposit structure instead). The audited op model
-    widens from the step to the **iteration** (step + tail), which surfaces the once-per-iteration
+    gone; the falsifiability guard now pins the closing-deposit structure instead). The audited op model
+    widens from the step to the **iteration** (step + closing deposit), which surfaces the once-per-iteration
     maximum-speed readback in the pass and synchronization ledgers (+1 physical-vector pass in every
     cell; a hand-fixed-``\Delta t`` iteration still pays it — held by the new `UNIFORM DEPOSIT
     SCHEDULE` design holder, the price of a schedule that never varies with how the run is driven);
@@ -1487,15 +1487,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 42. **(2026-08) The trajectory sample is a cache slot, and the tracer velocity registers are named
     for what they are.** `Tracers.velocity1` / `velocity2` were categorically different objects
     wearing sequence numbers: the first is the **trajectory sample**
-    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable at a boundary —
+    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable between iterations —
     the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
     register, substage on the position argument alone. They are renamed `trajectory_velocity` /
     `predictor_velocity`, and the sample becomes the observables cache's first trajectory-bound
     slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
     storage (the slot IS the register, as everywhere else) and stamped against **both** epochs,
     since the sample is a function of the state and the positions together. The push's schedule
-    moves fully onto the boundaries: `advance!` checks the sample at the head (the previous tail's
-    deposit is ``\boldsymbol{v}_1``), pushes after the tail field deposits
+    moves fully onto the iteration ends: `advance!` checks the sample at the start (the previous
+    closing deposit recorded ``\boldsymbol{v}_1``), pushes after the closing field deposits
     (``\boldsymbol{v}_2`` from the deposited ``\boldsymbol{u}(t_{n+1})``), then records and stamps
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
     favor of the stamp, and the sample is read through the checked `particle_velocities`
@@ -1507,8 +1507,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     measure).
 
 43. **(2026-08) The loop is observation-first, and stopping is the caller's decision on
-    observables.** `run!(callback, sim)` observes every boundary the run reaches — ``n`` iterations,
-    ``n+1`` observations, the seeded ``t_0`` included (the boundary a validation run most wants was
+    observables.** `run!(callback, sim)` observes the run after every iteration and once at the seeded ``t_0`` —
+    ``n`` iterations, ``n+1`` observations (the instant a validation run most wants was
     previously never observed) — and the callback's `Bool` return decides continuation; a non-`Bool`
     return throws, so the decision cannot be left implicit. The stopping vocabulary
     (`turnovers | time | steps | stop`, and the `every` cadence) leaves `run!` entirely: a budget is
@@ -1519,19 +1519,19 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     researched spin-up judgment (``\varepsilon``-flatness with the skewness and scalar-variance
     gates, the give-up cap) as a callable carrying its own observation state — with `warmup!` kept
     as its one-line sugar. The uniform read surface completes the redesign: `velocity_spectral` /
-    `scalar_spectral` read the state itself, the cache accessors the boundary observables, and
+    `scalar_spectral` read the state itself, the cache accessors the deposited observables, and
     `particle_positions` the probes' state — a **function names what the run holds, wherever it
     lives** (reading needs no knowledge of the state/cache split), while writing stays on the dot
     path, where the danger demands the knowledge. An accessor exists exactly for what the run holds:
     `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol{\omega}}`` is
     materialized nowhere), and a `MethodError` is the honest answer.
 
-44. **(2026-08) The tail relocation stops at the recoveries: the nonlinear terms are not cached.**
+44. **(2026-08) The closing-deposit relocation stops at the recoveries: the nonlinear terms are not cached.**
     The cache design's full relocation — assembling the dealiased
     ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})`` and
-    ``-\nabla\cdot(\boldsymbol{u}\varphi)`` at the tail, so the next first stage reads them — was
+    ``-\nabla\cdot(\boldsymbol{u}\varphi)`` at the iteration's end, so the next first stage reads them — was
     written in the third-array world and is **incompatible with decision 41**: the products now form
-    in place over the velocity and vorticity slots, so a tail assembly would destroy the deposited
+    in place over the velocity and vorticity slots, so an end-of-iteration assembly would destroy the deposited
     charts the observation exists to serve, and keeping both would re-add the product array
     (one physical vector, 384 MiB at ``256^3``/Float64). Minimal footprint trumps compute
     (invariant 4), and the relocation buys no compute — transform counts are identical either way —
@@ -1568,7 +1568,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     future cached observable). Dispatch by argument type is the mode selector: a considered
     `observable(state, cache, compute::Bool)` form was rejected — the flag conflates an ``O(1)``
     read with an ``O(N^3)`` measurement, and "return it if stored in the state" is empty, since the
-    state stores no observables. Two boundaries survive unchanged: reads never compute (decision 40's
+    state stores no observables. Two contracts survive unchanged: reads never compute (decision 40's
     no-recompute contract), and ``\varepsilon``, ``k``, ``E(\kappa)`` still never become resident
     slots. The recorded homing rationale is also corrected here: the placement criterion for what
     lives upstream of `Generator` is **consumption inside `step!`** (the assembly's per-stage
@@ -1585,7 +1585,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the backend rather than keeping a physics-suffixed local copy. The general operation now lives
     in `GBGPeriodicFields` as the scratch arity `to_physical!(physical, spectral, plans,
     spectral_scratch)` (PF decision 64, raised as IT's round-3 request), and the call sites bind the
-    plans themselves — `to_physical!(u, û, domain.velocity_plans, scratch)` at the tail deposit, the
+    plans themselves — `to_physical!(u, û, domain.velocity_plans, scratch)` at the closing deposit, the
     substage recoveries, and the displaced (`PhaseShift`) evaluations, where the preservation is
     load-bearing: the displaced spectral velocity is read twice (velocity, then vorticity). The
     supersession also retires decision 28's `X_to_physical!` naming convention and narrows
@@ -1598,11 +1598,27 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     a consumable source calls the three-argument (destructive) form, as the strain diagnostic always
     has; a source of truth calls the scratch arity — and no `to_spectral!` twin exists or is wanted,
     because every forward transform in the package reads a consumable source by design (IC and
-    forcing noise, quadratic products formed in place over tail-refreshed registers). The umbrella
+    forcing noise, quadratic products formed in place over registers the closing deposit refreshes). The umbrella
     re-exports no `GBGPeriodicFields` name, this operation included — the recovery is reached
     through the backend, as every other field operation is. Bit-identical: the arity performs
     exactly the copy-then-transform the deleted wrappers performed, so the transform and pass
     ledgers and the memory audit are unchanged.
+48. **(2026-08, user-directed) The iteration vocabulary: "closing deposit", not "tail"; no
+    "boundary" for the instant between iterations.** Two informal house terms are retired from
+    every surface, prose and code alike, after the user's documentation read-through flagged both
+    as unclear ("tail" is not a standard term for the end of a loop body; "boundary" invites the
+    spatial reading — on a triple-periodic box, of all packages). The **closing deposit** is the
+    `deposit!` that ends an iteration ("tail deposit", "the tail", "at its tail" before); the
+    instant between iterations is named plainly — *between iterations*, *the iteration's end*,
+    *the instant* ``t_n`` — and the cache values carry the adjective **deposited** (the deposited
+    velocity, the deposited observables) where "boundary velocity/observables" stood.
+    `check_boundary` is renamed **`check_deposits`** (the deposit-completeness check), and the op
+    model's `_tail_deposit`/`tail` become `_closing_deposit`/`closing`. Untouched, being different
+    senses of the same words: the spatial box boundary, an ownership or kernel-granularity
+    boundary, a spectrum's ``\kappa^{2}`` tail, and the phase-shift chain's final convolve
+    (formerly "the phase-shift tail", now named for what it is). The rename swept the decision-log
+    prose as well, so the log reads in the current vocabulary; this entry is the record that the
+    older entries originally said "tail deposit" and "boundary".
 
 ---
 
