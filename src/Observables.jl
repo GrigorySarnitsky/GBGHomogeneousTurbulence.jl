@@ -123,8 +123,8 @@ conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommen
 eigenvalue bound over-estimates the true spectral radius).
 
 The second form reads the number back from an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the iteration's end
-deposited it — the same quantity, measured once per iteration and served without a reduction (or a
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
+left it — the same quantity, measured once per iteration and served without a reduction (or a
 device readback); it throws when no deposit is current, like every cached read. The third form
 reads a `Simulation`'s cache.
 """
