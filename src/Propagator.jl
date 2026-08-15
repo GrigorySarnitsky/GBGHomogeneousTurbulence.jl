@@ -185,6 +185,8 @@ signature), so the chained pair transposes nothing.
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
     the iteration with [`deposit!`](@ref), which re-fills and stamps every slot from the advanced
     state — a hand-run loop is `step!` then `deposit!`, and the run layer's `advance!` does both.
+
+Returns `state`.
 """
 function step! end
 
@@ -215,7 +217,8 @@ with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increment
 ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
 lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing is applied after
 the third stage.
-Three nonlinear evaluations per step, and — in Williamson's 2N-storage count — two field registers
+Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose ``N`` counts
+evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
 per field: the state's own array plus one accumulator (`stage1`; the raw-assembly register
 `nonlinear` is the dealiasing seam's addition, not the scheme's). The default workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
@@ -456,6 +459,8 @@ first iteration finds the initial state's observables. The argument order is sha
 the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
 same fixed order as there. After mutating the state out of band, announce
 it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
+
+Returns `cache` (or `sim`).
 """
 function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)
@@ -485,12 +490,13 @@ A conservative advective-CFL ceiling ``C`` for the scheme `integrator` on the
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
 scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
-maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap is absorbed by the conservative factor below, since the eigenvalue bound itself
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap and the looseness of the eigenvalue bound together justify the conservative factor below, since the eigenvalue bound itself
 over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
 calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
 conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
-relying on viscous damping), so a small ``0.25``.
+relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
+margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a

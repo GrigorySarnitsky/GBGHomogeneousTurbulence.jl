@@ -176,7 +176,7 @@ is each one reduction away from the cached fields, performed by the observation 
 
 ### 1.4 What caching costs
 
-It costs nothing, on any of the three axes. That is bookkeeping, not a slogan: every slot is a
+It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. That is bookkeeping, not a slogan: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
 read computes. The cache is a naming-and-stamping layer over storage the run already owns: removing
@@ -228,10 +228,10 @@ and the gradient ``\nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2})``; the sys
 
 ```math
 \begin{aligned}
-\frac{\partial \boldsymbol{u}}{\partial t}
+\partial_t \boldsymbol{u}
   &= \mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
 &\qquad \nabla\cdot\boldsymbol{u} &= 0, \\[4pt]
-\frac{\partial \varphi}{\partial t}
+\partial_t \varphi
   &= -\nabla\cdot(\boldsymbol{u}\varphi) + \varkappa\nabla^{2}\varphi + f_\varphi, \\[4pt]
 \frac{\mathrm{d}\boldsymbol{X}}{\mathrm{d}t} &= \boldsymbol{u}(t, \boldsymbol{X}(t)),
 \end{aligned}

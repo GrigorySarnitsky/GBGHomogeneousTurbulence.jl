@@ -17,7 +17,8 @@ The evolving state a run advances, and how it is seeded:
   (a divergence-free velocity, a mean-zero scalar) that seed it.
 
 All sized to a [`FixedDomain`](@ref). The physical representations are recovered from the state with
-the scratch (source-preserving) arity of
+the four-argument, source-preserving form (the extra argument is a scratch field the transform consumes
+in the state's place) of
 [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the inverse
 transform consumes the coefficients it runs from (a property of the FFT backends), so the recovery
 copies into scratch and the state survives every recovery — and the vorticity with

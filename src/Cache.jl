@@ -17,14 +17,15 @@ run — one `step!` and the `deposit!` that closes it; between iterations the ru
 periodic box; a slot's **stamp** records which of these instants its value belongs to, so a read
 can be refused rather than served stale. The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their stamps, and the epoch counters.
+- [`resolved_fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
+  mutation made outside the iteration, so the affected stamps go stale and reads throw until the
+  next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - `max_speed` — the cached maximum velocity component, the number the timestep choice reads (one
   generic with the field reduction in `Observables`, whose docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the particle velocities
   ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
-- [`resolved_fields_modified!`](@ref) — announce a state mutation made outside the iteration, so
-  every stamp is cleared and reads throw until the next deposit.
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
 — homed in `Propagator`, with the iteration it closes — which fills and stamps every slot at the
@@ -38,7 +39,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_fie
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       particle_velocities, resolved_fields_modified!
+       particle_velocities, resolved_fields_modified!, particles_modified!
 
 
 # Stamp sentinels. A slot's stamp is the fields epoch it was deposited at; the sentinels mark the
@@ -141,7 +142,8 @@ end
 The velocity ``\\boldsymbol{u}`` in physical representation at the current epoch — the checked
 read of the [`ObservablesCache`](@ref) `cache`'s velocity slot. Returns the deposited field when its
 stamp is current, and throws otherwise (the slot is mid-iteration scratch, stale, or was never
-deposited); nothing is ever recomputed on a read. Treat the returned field as read-only — it is the
+deposited): the throw is an `ErrorException` naming the slot and which of the three states it is in,
+and nothing is ever recomputed on a read. Treat the returned field as read-only — it is the
 storage the next iteration works in. The second form reads a `Simulation`'s cache.
 """
 function velocity_physical(cache::ObservablesCache)
@@ -269,7 +271,8 @@ end
     resolved_fields_modified!(cache)
     resolved_fields_modified!(sim)
 
-Announce that the resolved fields — the spectral ``\\hat{\\boldsymbol{u}}``, ``\\hat\\varphi`` —
+Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\varphi``, in spectral
+representation —
 were changed outside the iteration (a re-seeded velocity, any direct write to the state's storage).
 Advances the fields epoch of `cache`, so every cached observable is stale and reads throw until
 the next deposit; that interval belongs to whoever made the change. Returns `cache` (or `sim`).
@@ -281,8 +284,18 @@ run layer's `deposit!` before advancing again — the timestep choice reads the 
 resolved_fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
-# The tracer push's counterpart: the tracer positions advanced, so every trajectory-bound stamp is
-# stale. (The particle-velocities slot arrives with the particle strand.)
+"""
+    particles_modified!(cache)
+
+Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
+correction, any direct write to the tracer storage) — the particle counterpart of
+[`resolved_fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
+trajectory-bound observable is stale and reads throw until the next deposit. Returns `cache`.
+
+The sanctioned mutator calls it for you: the run layer's tracer push announces its own advance, and
+the closing deposit then re-stamps the sample. A hand-run loop that repositions tracers itself must
+call this, then re-record the trajectory sample before advancing.
+"""
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
 

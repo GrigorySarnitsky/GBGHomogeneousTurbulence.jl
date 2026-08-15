@@ -23,6 +23,8 @@ The interchangeable energy-injection strategies:
 A strategy acts on the step through up to four methods, each defaulting to doing nothing (listed in
 the order the step fires them):
 - [`prepare_forcing!`](@ref) — a per-step internal-state advance.
+- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
+  `Simulation` builds the domain.
 - [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor;
   [`uses_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — an additive per-stage source.
@@ -58,6 +60,10 @@ declare [`uses_linear_rate`](@ref), or it is never given a rate array to fill),
 [`add_forcing_source!`](@ref) (an additive per-stage source), and [`apply_forcing!`](@ref) (a
 post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
 need.
+
+Three of the four hooks mutate and return their second argument; `prepare_forcing!` is the exception —
+its `field` is read-only and what it advances is the forcing's own internal state, so it returns
+`nothing`.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
 `set_forcing_rate!` run once before the Runge–Kutta stages (the state a later hook consumes must be

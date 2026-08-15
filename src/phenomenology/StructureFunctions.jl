@@ -174,7 +174,7 @@ The finite-Reynolds-number correction to the 4/5 law for the third-order longitu
 structure function,
 
 ```math
-D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\frac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\Bigr)\\varepsilon r,
+D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\tfrac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\Bigr)\\varepsilon r,
 ```
 
 which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`](@ref) as

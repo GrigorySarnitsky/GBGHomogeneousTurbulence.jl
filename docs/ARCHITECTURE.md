@@ -189,7 +189,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
-  record of the evolving spectral fields — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
+  record of the evolving fields in spectral representation — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
   scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
@@ -315,7 +315,7 @@ states the physical quantity first, then the reduction that computes it:
   empirical, weakly Reynolds-number-dependent value — K41 implies a constant skewness but fixes no
   number), computed
   coordinate-free as the normalized third invariant of the strain rate ``\boldsymbol{S}``,
-  ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
+  ``3C_S\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
 - `energy_spectrum` ``E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
@@ -350,8 +350,9 @@ carries the Berendsen-class caveat, Bussi, Donadio & Parrinello 2007), `Linear`
 injection rate) — the two linear forcings folded into ``\mathcal{E}`` — are provided; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
-operators — the only field-specific step is the solenoidal (Leray) projection, applied to the velocity
-alone. Each forcing has an operator-taking constructor and an operator-free keyword form
+operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
+velocity, and none of the built strategies needs it — each preserves a divergence-free velocity by
+construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form
 (`ConstantPower(target = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
@@ -362,7 +363,7 @@ on the generator's reversible/irreversible seam. Its numerical schemes are the M
 Method (§3).
 
 - **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
-  advances the spectral velocity ``\hat{\boldsymbol{u}}`` and scalar ``\hat\varphi`` **together** through
+  advances the velocity ``\hat{\boldsymbol{u}}`` and scalar ``\hat\varphi``, both in spectral representation, **together** through
   the same Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
@@ -417,7 +418,7 @@ integrator** — the reversible generator of §8 again — so the split does not
 ### 4.7 `SimulationRun` — the front door
 
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
-spectral fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi`` the generator acts on), the `ObservablesCache`
+fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observation cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling, and a clock.
 Over it:
@@ -731,8 +732,9 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
 The public surface and these absences are the spec. Do not add a capability "for completeness"; a missing
 one usually encodes a decision.
 
-1. **No units.** Control is by ``\mathrm{Re}`` (through ``\nu``) and ``\mathrm{Sc}``; every diagnostic is
-   dimensionless.
+1. **No physical units.** Quantities are in box units; control is by ``\mathrm{Re}`` (through ``\nu``)
+   and ``\mathrm{Sc}``, and the reference constants a run is judged against (``C_K``, ``C_\varepsilon``,
+   ``G``) are dimensionless groups.
 2. **No field or statistics machinery reimplemented.** Field operations come from `GBGPeriodicFields`,
    estimators from `GBGStreamingStatistics` (§5).
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
@@ -883,7 +885,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the hand-rolled RK/OU `field_data` broadcasts (charter invariant 2). The `weighted_inner` op fuses the
     per-step band energy in the forcings and expresses `scalar_dissipation` as the Dirichlet energy, with
     no ``\nabla\varphi`` materialized. And `derivative_skewness` becomes the normalized third invariant of
-    the strain rate ``\boldsymbol{S}``, ``3C\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}``,
+    the strain rate ``\boldsymbol{S}``, ``3C_S\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}``,
     with the exact isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}\approx 1.5649`` reproducing the classical
     ``S\approx-0.5`` — the axis-picking longitudinal form was coordinate-dependent, the invariant is the
     honest object, and `symmetric_gradient` forms the strain without the full velocity-gradient tensor.
@@ -1004,7 +1006,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\approx 16`` for `Float32`), so the Nyquist mode always damps to that precision's epsilon —
     precision as a studied axis (invariant 4); an explicit `strength` overrides.
 26. **(2026-07) The state reified as `ResolvedFields`; the per-step scratch relocated to `Propagator`.**
-    The DNS state — the evolving spectral velocity ``\hat{\boldsymbol{u}}`` and optional scalar
+    The DNS state — the evolving velocity ``\hat{\boldsymbol{u}}`` and optional scalar
     ``\hat\varphi`` — is made first-class as **`ResolvedFields`** (module `State`), completing the
     Mori–Zwanzig triad whose State leg had been missing: the fields were scattered across the `Simulation`
     value while the diagnostics read the physical *scratch* as if it were state (`kinetic_energy(sim)` read
@@ -1317,7 +1319,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     The frame is not small. It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}``
     as a real array, the same ``\lvert\boldsymbol{\kappa}\rvert^{2}`` again as the `weighted_inner`
     weight, and the dealiasing kernel — 322.5 MiB at ``256^{3}`` in double precision, some 8 % on top
-    of the default working set, and 2.51 GiB at ``512^{3}``.
+    of the default working set, and 2.52 GiB at ``512^{3}``.
 
     What made the omission urgent rather than untidy is where the incoming lazy per-mode symbol work
     lands. The phase-shift translation kernels hang off the generator and were therefore *inside* the
@@ -1581,7 +1583,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     design choice for a diagnostics module that stays optional per slot while its generics stand
     upstream.
 47. **(2026-08, user-directed) The chart recoveries are not package verbs; the vorticity recovery is
-    an observable.** `velocity_to_physical!` and `scalar_to_physical!` are deleted: each was the
+    an observable.** The two chart recoveries `velocity_to_physical!` and `scalar_to_physical!` are deleted: each was the
     same two lines — copy the coefficients to scratch, transform — differing only in which of the
     domain's plan sets it bound, and once that composition deserved a *name*, invariant 2 sent it to
     the backend rather than keeping a physics-suffixed local copy. The general operation now lives
@@ -1589,7 +1591,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     spectral_scratch)` (PF decision 64, raised as IT's round-3 request), and the call sites bind the
     plans themselves — `to_physical!(u, û, domain.velocity_plans, scratch)` at the closing deposit, the
     substage recoveries, and the displaced (`PhaseShift`) evaluations, where the preservation is
-    load-bearing: the displaced spectral velocity is read twice (velocity, then vorticity). The
+    load-bearing: the displaced velocity in spectral representation is read twice (velocity, then vorticity). The
     supersession also retires decision 28's `X_to_physical!` naming convention and narrows
     decision 30's "chart map homed in `State`" — the chart map is PF's operation; `State` keeps only
     the state and its seeders. What remains a package verb is the one recovery that is *not* a chart:

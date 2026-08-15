@@ -86,7 +86,8 @@ using .Cache:
   vorticity_physical,
   scalar_physical,
   particle_velocities,
-  resolved_fields_modified!
+  resolved_fields_modified!,
+  particles_modified!
 
 using .Generator:
   FlowConditions,
@@ -164,6 +165,7 @@ export FixedDomain,
        scalar_physical,
        particle_velocities,
        resolved_fields_modified!,
+       particles_modified!,
        new_vector_field_spectral,
        new_vector_field_physical,
        new_scalar_field_spectral,

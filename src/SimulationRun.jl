@@ -7,7 +7,7 @@
 # hand-run loop.
 #
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
-# closing `deposit!` recovers the deposited observables into the cache and stamps them, and the deposit-
+# closing `deposit!` recovers the iteration's observables into the cache and stamps them, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
 # arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
 # particle velocities the PREVIOUS closing deposit deposited (read checked), v₂ interpolates the just-deposited
@@ -89,6 +89,12 @@ with [`flow_parameters`](@ref), and track its progress with [`current_time`](@re
 By default the run is **forced and stationary** — a `BandRescaling` holds the total (whole-field) energy
 at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from the grid rather than supplied:
 
+!!! note "The default holds ``k`` fixed, so ``k`` is not a measurable of the default run"
+    `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the target, which
+    pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and suppresses the physical fluctuation of
+    the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
+    ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
+
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with the
     chosen resolution criterion `k_max_η`.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
@@ -104,7 +110,10 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
-    run (`velocity_forcing = NoForcing()`) or manual control.
+    run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
+    forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
+    ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
+    law assumes.
 
 # Keywords
 
@@ -112,15 +121,16 @@ The keywords marked *(front door only)* configure the `FixedDomain` and are cons
 the rest are forwarded to the `Simulation(domain; …)` form.
 
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
-- `domain` — a pre-built [`FixedDomain`](@ref), the positional argument of the second form (the front
-  door builds one from `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
+- `domain` — a pre-built [`FixedDomain`](@ref). This one is **positional**, not a keyword: it is the
+  argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
+  `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
   keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
   an r.m.s. velocity ``u' = \\sqrt{2k/3} = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
-- `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door).
+- `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door only).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
@@ -136,7 +146,9 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
   `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
-  run's state (its integral scale set to `1/peak_wavenumber`) and normalized to `kinetic_energy`.
+  run's state (its integral scale set to `1/peak_wavenumber` (which is the Gaussian envelope's characteristic
+  wavenumber ``\\kappa_p``, not the shell-spectrum peak — that sits at ``\\kappa_p/\\sqrt{2}``; see
+  [`random_solenoidal_velocity!`](@ref))) and normalized to `kinetic_energy`.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_tracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
@@ -407,7 +419,7 @@ function advance!(sim::Simulation; dt = nothing)
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
-  # The closing deposit: deposit the deposited observables from the state the step just produced; the tracer
+  # The closing deposit: fill and stamp every slot from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
   # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
   # positions from the same deposited field, completing the iteration's deposits.
@@ -436,7 +448,8 @@ the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
 to stop (any other return throws — the decision may not be left implicit). Only then does the next
 iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the closing
-deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
+deposits. The schedule never varies with how the run is driven, so the closing deposit's maximum-speed
+reduction and its host readback happen every iteration even under a fixed `dt` that never reads them. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
 step, the last after the final one, with statistics recorded before the stop.
 
 Stopping is the observation's decision on observables, never a run option: a budget is a callback
@@ -574,10 +587,11 @@ spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement 
 seeded run; write your own callback instead when the transient length is known (a fixed budget is a
 three-line callback — see `run!`).
 
-At each observation it measures the dissipation ``\\varepsilon`` (one reduction — the small scales
+At each observation it measures the dissipation ``\\varepsilon`` — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
-clamps ``k`` flat and a fixed-injection forcing makes it ring), accumulates the eddy-turnover clock
-``\\Delta t \\varepsilon/k``, and tests flatness over a trailing window; it stops the run when
+clamps ``k`` flat and a fixed-injection forcing makes it ring, which is why ``k`` is kept out of the
+**gate** — and the kinetic energy ``k``, which normalizes the eddy-turnover clock
+``\\Delta t \\varepsilon/k`` it accumulates, and tests flatness over a trailing window; it stops the run when
 every gate holds, or gives up with a warning at `max_turnovers`.
 
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance

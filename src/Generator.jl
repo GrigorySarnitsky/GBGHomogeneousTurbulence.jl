@@ -28,8 +28,9 @@ Its contents (each formula lives in the operation's own docstring):
   viscous/diffusive integrating factor, with any linear forcing rate folded in).
 - [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
 
-The assemblies recover displaced fields in physical representation with the source-preserving
-scratch arity of [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!)
+The assemblies recover displaced fields in physical representation with the four-argument,
+source-preserving form (the extra argument is a scratch field the transform consumes in the source's
+place) of [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!)
 and with [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!).
 """
 module Generator
@@ -146,6 +147,12 @@ generator protocol — [`prepare!`](@ref) once per step, [`velocity_rhs!`](@ref)
 at each stage state, [`velocity_factor`](@ref) / [`scalar_factor`](@ref) for the exact linear
 subflows, [`finalize!`](@ref) after the completed step — and itself does only stage arithmetic, so a
 scheme can never assemble the right-hand side from a mismatched intermediate state.
+
+!!! note "One optimization crosses two verbs"
+    Under `PhaseShift`, [`velocity_rhs!`](@ref) leaves the stage's displaced velocity fresh for the same
+    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
+    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
+    rebuilds the displaced velocity itself, value-identically.
 
 Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
 carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
@@ -268,8 +275,12 @@ forcing are advanced exactly by the integrating factor ([`velocity_factor`](@ref
 !!! note
     The assembly **consumes `ω` as its own register**: the Lamb vector is formed in place over the
     vorticity's array (the backend's cross product may write into one of its operands), so on return
-    `ω` no longer holds the vorticity. Only the spectral product scratch remains on the generator,
-    and the operation allocates nothing.
+    `ω` no longer holds the vorticity — while `u` is only read. Which physical argument a right-hand
+    side consumes is stated in each verb's own note and follows the physics (the Lamb vector forms over
+    the vorticity, the scalar flux over the velocity), not the argument position. Only the spectral
+    product scratch remains on the generator, and the operation allocates nothing.
+
+Returns `N̂`.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω, domain);
@@ -397,8 +408,12 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
 !!! note
     The assembly **consumes `u` as its own register**: the flux ``\\boldsymbol{u}\\varphi`` is formed
     in place over the velocity's array (a pointwise product may write into an operand), so on return
-    `u` no longer holds the velocity; `φ` is only read. Only the spectral product scratch remains on
+    `u` no longer holds the velocity; `φ` is only read. As in [`velocity_rhs!`](@ref), the consumed
+    argument is fixed by the physics rather than by its position in the signature. Only the spectral
+    product scratch remains on
     the generator, and the operation allocates nothing.
+
+Returns `N̂`.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u, φ, domain::FixedDomain) =
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u, φ, domain);

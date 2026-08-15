@@ -9,6 +9,8 @@ Dimensionless turbulence constants and their Reynolds-number trends, evaluated b
   finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
+- [`stationary_dissipation`](@ref) — the dissipation a stationary run sustains, predicted from its
+  energy and box side.
 - [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted,
   via [`stationary_dissipation`](@ref)) predicts the dissipation a stationary run sustains from its energy
   and box side length.

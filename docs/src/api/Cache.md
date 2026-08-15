@@ -13,6 +13,7 @@ deposited value or throws, and nothing is ever recomputed on a read.
 ```@docs
 ObservablesCache
 resolved_fields_modified!
+particles_modified!
 ```
 
 ## The checked reads

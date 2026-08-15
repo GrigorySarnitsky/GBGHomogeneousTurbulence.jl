@@ -54,7 +54,7 @@ The sharp isotropic ``2/3``-rule truncation: keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, and the lean, GPU-friendly default.
+of the quadratic nonlinearity, and the lean, GPU-friendly default. The rule is due to Orszag (1971).
 """
 struct TwoThirds <: DealiasingStrategy end
 
@@ -254,8 +254,9 @@ The highest wavenumber magnitude that `domain` actually evolves — the dealiasi
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt{2}/3`` for `PhaseShift`).
 It is the cutoff the
-dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself; the modes above it are
-zeroed each step. It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
+dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself. The modes above it are
+zeroed each step by the two sharp strategies; [`HouLi`](@ref), whose band runs to the Nyquist wavenumber,
+damps them instead (to machine epsilon at Nyquist). It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
 ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a run is set
 up to meet.
 """
@@ -328,7 +329,7 @@ controls the aliasing of the quadratic nonlinearity. The kernel is whatever the 
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
 ``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
-scalar field in spectral representation.
+scalar field in spectral representation. Returns `field`.
 """
 dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 
