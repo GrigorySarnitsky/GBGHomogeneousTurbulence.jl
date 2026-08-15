@@ -23,3 +23,18 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   undocumented-by-design verbs in `src/Cache.jl`, consumed by `Propagator`. (Whether the Cache
   module map should name undocumented internals is a separate, open finding — do not re-flag their
   *existence*.)
+
+## Round 2026-08-14/15 — settled as NOT defects (do not re-flag)
+
+- **The host-device sync floor is not a contradiction.** The decision-35/37 entry gives the *floor*
+  ("none under a fixed step"); the decision-40 entry gives the *achieved* count and names the holder
+  (`UNIFORM DEPOSIT SCHEDULE`). Floor vs achieved with a named holder is the optimality register's own
+  bidirectional language, working as designed — not two claims about the same number.
+- **`integrator` as a SciML false cognate.** In OrdinaryDiffEq an `integrator` bundles state and
+  caches; here it is a stateless dispatch tag. Deliberate: the package's arrows-external style keeps the
+  state, cache, generator, and buffers as explicit arguments, and `AbstractIntegrator`/`IFRK2`/
+  `IFLowStorageRK3` name schemes consistently throughout.
+- **PascalCase spectrum factories** (`Pope2000`, `VonKarman1948`, `Pao1965` are functions returning a
+  composed `ModelSpectrum`). Deliberate: the author-year handle is the naming scheme for every reference
+  law, concrete subtype or composition alike, and the docs already direct users to test `spec isa
+  EnergySpectrum` rather than the preset name.
