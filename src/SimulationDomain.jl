@@ -61,7 +61,7 @@ struct TwoThirds <: DealiasingStrategy end
 """
     HouLi(; order = 36, strength = nothing)
 
-The smooth Hou–Li spectral filter, transfer function
+The smooth spectral filter of Hou & Li (2007), transfer function
 ``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
@@ -73,7 +73,7 @@ to that precision's machine epsilon; pass an explicit `strength` to override. It
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization.
 Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
-automatically by `recommended_cfl`. The smooth spectral filter is due to Hou & Li (2007).
+automatically by `recommended_cfl`.
 
 # Fields
 The plain constructor `HouLi(order, strength)` takes the two fields directly:

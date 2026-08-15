@@ -355,7 +355,7 @@ The Obukhov–Corrsin inertial-convective scalar spectrum
 E_\\varphi(\\kappa) = C_{OC} \\varepsilon_\\varphi \\varepsilon^{-1/3} \\kappa^{-5/3},
 ```
 
-the scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
+the Obukhov–Corrsin scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
 inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
 constant (``\\approx 0.67`` for the three-dimensional spectrum — the high-Reynolds-number value of
 Sreenivasan 1996, *Phys. Fluids* **8**, 189), quoted — unlike Yaglom's classical

@@ -115,9 +115,9 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
     law assumes.
 
-# Keywords
+# Arguments
 
-The keywords marked *(front door only)* configure the `FixedDomain` and are consumed by the first form;
+All keyword except `domain` (below). The ones marked *(front door only)* configure the `FixedDomain` and are consumed by the first form;
 the rest are forwarded to the `Simulation(domain; …)` form.
 
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
@@ -594,6 +594,8 @@ clamps ``k`` flat and a fixed-injection forcing makes it ring, which is why ``k`
 ``\\Delta t \\varepsilon/k`` it accumulates, and tests flatness over a trailing window; it stops the run when
 every gate holds, or gives up with a warning at `max_turnovers`.
 
+# Arguments
+All keyword:
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).

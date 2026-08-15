@@ -34,7 +34,8 @@ velocity increment across a separation ``r``) and the mixed velocity–scalar mo
 abstract type StructureFunction <: TurbulenceLaw end
 
 
-const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301"; valid_Reλ = (100.0, Inf))
+const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301–305 (the 2/3 law) " *
+                       "and **32**, 16–18 (the exact 4/5 law)"; valid_Reλ = (100.0, Inf))
 
 """
     Kolmogorov1941(; C₂ = 2.0)
@@ -170,8 +171,8 @@ const _LUNDGREN2002 = Reference("Lundgren (2002), *Phys. Fluids* **14**, 638"; v
 """
     Lundgren2002()
 
-The finite-Reynolds-number correction to the 4/5 law for the third-order longitudinal velocity
-structure function,
+Lundgren's (2002) finite-Reynolds-number correction to the 4/5 law for the third-order longitudinal
+velocity structure function,
 
 ```math
 D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\tfrac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\\Bigr)\\varepsilon r,
@@ -179,7 +180,7 @@ D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\tfrac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\
 
 which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
 ``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
-asymptotic 4/5 slope (Lundgren 2002; Sagaut & Cambon 2018, Table 4.5).
+asymptotic 4/5 slope (the coefficient as tabulated by Sagaut & Cambon 2018, Table 4.5).
 Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading
 ``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref); any other `order` throws.
 """
