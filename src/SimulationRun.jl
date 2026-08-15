@@ -20,7 +20,8 @@
 The run layer:
 - [`Simulation`](@ref) — the assembled state of a case.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
-  callback stops the run (the callback is the observation, and its return decides continuation).
+  callback stops the run (the callback *is* the observation — the thing that reads the run each
+  iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
   observation, and its one-line sugar.
 - [`velocity_spectral`](@ref), [`scalar_spectral`](@ref) — the uniform reads of the state itself.
@@ -106,7 +107,9 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
-    same grid at the same `k_max_η`. The `kinetic_energy` and `side_length` fix
+    same grid at the same `k_max_η` — which credits the whole retained band as clean signal, exact for
+    `TwoThirds` and `PhaseShift`, approximate for `HouLi`, whose top of band is damped rather than
+    exactly dealiased. The `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
@@ -344,7 +347,7 @@ Compare the measured energy spectrum of `sim` against a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum `model` (an
 `EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). The measured
 [`energy_spectrum`](@ref) is a per-shell energy (``k = \\sum_\\kappa E(\\kappa)``) while the model is a
-spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa``), so the density is multiplied by the
+spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), so the density is multiplied by the
 shell width ``\\Delta\\kappa = 2\\pi/L`` before comparison — making the two agree at any box side ``L`` (not
 only the default ``L = 2\\pi``, where ``\\Delta\\kappa = 1``). Returns a named tuple
 `(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the measured and
@@ -616,8 +619,11 @@ build a fresh one per run.
 
 # Fields
 The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn,
-last_time, started)` is internal:
-- `monitor` — the sampled signals and gates.
+last_time, started)` is internal. Note the keyword arguments above do **not** map one-to-one onto
+these fields: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and `skew_floor` are all
+stored inside `monitor`, which holds the sampled series together with the thresholds that judge them.
+- `monitor` — the sampled signals (``\\varepsilon``, ``k``, the scalar variance, the skewness) and the
+  gate settings and tolerances that test them.
 - `max_turnovers` — the give-up cap.
 - `gate_scalar` — the requested scalar gate (applied only when the run's scalar is forced).
 - `elapsed_turn`, `last_time`, `started` — the turnover clock's state.

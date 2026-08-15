@@ -248,7 +248,9 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   vorticity from ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
   ``\mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
-  Orszag 1971). Rotational form is the cheap, energy-conserving way to compute the advection spectrally,
+  Orszag 1971). Rotational form is the cheap way to compute the advection spectrally, and under a sharp mask the
+  truncation is exactly Galerkin, so the discrete advection conserves kinetic energy (`HouLi`, which
+  only damps, is the deliberately non-conservative strategy),
   and incompressible Euler is genuinely Hamiltonian — so this term is the flow's *reversible*,
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,

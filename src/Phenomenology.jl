@@ -83,7 +83,10 @@ All keyword; a homogeneous-isotropic state fixes the rest:
   * `schmidt` — the Schmidt number ``\\mathrm{Sc}`` (the scalar diffusivity is
     ``\\varkappa = \\nu/\\mathrm{Sc}``); default `1.0`.
   * `scalar_dissipation` — the scalar dissipation rate ``\\varepsilon_\\varphi`` (only scalar laws read
-    it); default `NaN` (unset).
+    it); default `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle a
+    plain, type-stable set of `Float64`s that a law can evaluate without a branch — the cost being that
+    a scalar law applied to a scalar-free state returns `NaN` rather than raising, so check the field
+    (or the run's `scalar`) before reading a scalar law's answer.
 """
 struct FlowParameters
   viscosity::Float64
@@ -184,7 +187,7 @@ function provenance end
 
 The reference spectrum predicted by a model `law` at wavenumber `κ` for the state `fp` (a
 [`FlowParameters`](@ref)) — the velocity energy spectrum ``E(\\kappa)`` for an `EnergySpectrum` (the
-density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa``), or the scalar
+density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), or the scalar
 spectrum ``E_\\varphi(\\kappa)`` for a `ScalarSpectrum`. Its home and the composed form are in
 [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
 """

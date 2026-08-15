@@ -4,16 +4,15 @@
 Dimensionless turbulence constants and their Reynolds-number trends, evaluated by [`scaling`](@ref).
 
 - [`ScalingLaw`](@ref) — the family root every law below subtypes.
-- [`Sreenivasan1998`](@ref) — the normalized dissipation constant ``C_\\varepsilon = \\varepsilon L_{11}/u'^3``
+- [`Sreenivasan1998`](@ref) — the normalized dissipation constant ``C_\\varepsilon``
   (``L_{11}`` the longitudinal integral scale), a high-Reynolds-number plateau with an optional
   finite-Reynolds-number correction.
 - [`Sreenivasan1995`](@ref) — the (three-dimensional) Kolmogorov constant ``C_K`` of the inertial-range
   spectrum.
 - [`stationary_dissipation`](@ref) — the dissipation a stationary run sustains, predicted from its
   energy and box side.
-- [`Li2008`](@ref) — the box-normalized dissipation group ``k/(L\\varepsilon)^{2/3}``, which (inverted,
-  via [`stationary_dissipation`](@ref)) predicts the dissipation a stationary run sustains from its energy
-  and box side length.
+- [`Li2008`](@ref) — the box-normalized dissipation group ``G``, the constant
+  [`stationary_dissipation`](@ref) inverts.
 """
 module Scalings
 
@@ -132,7 +131,9 @@ et al. 2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\vare
 normalized on the **integral** scale ``L_{11}``, not the box side ``L``. Formed on a common length the two
 are exactly related by ``G = \\tfrac{3}{2} C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
 ``G \\approx 0.9`` (box side) and ``C_\\varepsilon \\approx 0.5`` (integral scale) sit at *different*
-lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly.
+lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly — and,
+being fits to different datasets, they are not expected to close exactly: carrying
+``C_\\varepsilon \\approx 0.5`` across at that ratio gives ``G \\approx 0.81`` against the quoted ``0.9``.
 
 The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
 inverted, [`stationary_dissipation`](@ref)`(law, energy, side_length)` predicts the dissipation a

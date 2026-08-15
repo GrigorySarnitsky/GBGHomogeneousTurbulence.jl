@@ -144,7 +144,8 @@ _overrides_rate_hook(forcing) =
 """
     ResolvedGenerator(domain, conditions; scalar = false)
 
-The reified right-hand side of the resolved dynamics — the flow's generator as one object: the
+The right-hand side of the resolved dynamics made one object (reified) — the flow's generator as a
+value a scheme can hold: the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
 through (the quadratic-product fields, the displaced-evaluation buffers when the domain dealiases by
 `PhaseShift`, and the per-mode forcing-rate arrays). A time-marching scheme consumes it through the
@@ -205,7 +206,7 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
     prepare!(generator, state, domain, dt)
 
 Open a step of the generator: advance each forcing's internal state once (its per-step
-`prepare_forcing!` hook) and arm the per-mode linear forcing rates (its `set_forcing_rate!` hook,
+`prepare_forcing!` hook) and arm the per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing`) (its `set_forcing_rate!` hook,
 written into the generator's rate arrays) from the start-of-step `state` (a `ResolvedFields`) over the
 timestep `dt`, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once before its Runge–Kutta
 stages; the stage evaluations and the integrating factors then consume what it prepared. Returns

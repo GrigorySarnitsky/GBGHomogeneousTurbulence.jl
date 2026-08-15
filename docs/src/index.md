@@ -64,10 +64,10 @@ advective term carried by the Lamb vector ``\boldsymbol{u}\times\boldsymbol{\ome
 and the passive scalar ``\varphi`` by the advection–diffusion equation
 
 ```math
-\partial_t \varphi = -\nabla\cdot(\boldsymbol{u} \varphi) + \frac{\nu}{\mathrm{Sc}}\nabla^{2}\varphi + f_\varphi,
+\partial_t \varphi = -\nabla\cdot(\boldsymbol{u} \varphi) + \varkappa\nabla^{2}\varphi + f_\varphi,
 ```
 
-with ``\mathrm{Sc}`` the Schmidt number and ``f_\varphi`` a forcing on the scalar. In both
+with ``\varkappa = \nu/\mathrm{Sc}`` the scalar diffusivity, ``\mathrm{Sc}`` the Schmidt number, and ``f_\varphi`` a forcing on the scalar. In both
 equations the diffusive (stiff) term is integrated exactly through an integrating factor, the
 nonlinear term explicitly by a Runge–Kutta stage combination, and the quadratic product is
 dealiased by the default ``2/3`` rule (other strategies are available).

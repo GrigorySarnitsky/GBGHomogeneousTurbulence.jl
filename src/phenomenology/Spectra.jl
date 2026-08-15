@@ -10,7 +10,7 @@ dissipation-range roll-off, each swappable.
   [`LargeScaleFactor`](@ref), and a [`DissipationFactor`](@ref).
 - `LargeScaleFactor` / `DissipationFactor` — the swappable roll-off pieces, evaluated by
   [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /
-  [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^4`` energy
+  [`PopeDissipation`](@ref) are Pope's forms, [`VonKarmanLarge`](@ref) the classic ``\\kappa^{4}`` energy
   range, [`PaoDissipation`](@ref) Pao's cutoff, [`ExponentialDissipation`](@ref) the closure-predicted
   exponential cutoff, [`SaffmanDissipation`](@ref) a Gaussian cutoff, and [`UnitLargeScale`](@ref) /
   [`UnitDissipation`](@ref) are the trivial (no-roll-off) factors.
@@ -140,8 +140,8 @@ dissipation_factor(f::PopeDissipation, κη) = exp(-f.β * ((κη^4 + f.c_η^4)^
 
 The von Kármán large-scale roll-off
 ``f_L(\\kappa L) = \\Bigl(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\Bigr)^{17/6}``, which tends to `1`
-in the inertial range and produces the classic ``\\kappa^4`` energy-containing range at low wavenumber
-(``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^4``); `c_L` fixes the peak scale (von Kármán 1948).
+in the inertial range and produces the classic ``\\kappa^{4}`` energy-containing range at low wavenumber
+(``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^{4}``); `c_L` fixes the peak scale (von Kármán 1948).
 
 # Fields
 - `c_L` — the coefficient fixing the peak scale.
@@ -305,7 +305,7 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
              \\Bigl(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\Bigr)^{17/6},
 ```
 
-the classic interpolation between the ``\\kappa^4`` energy-containing range and the ``\\kappa^{-5/3}``
+the classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters). `C_K`
 is the Kolmogorov constant; `c_L` fixes the peak scale.
 """

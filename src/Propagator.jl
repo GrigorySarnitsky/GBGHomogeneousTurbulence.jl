@@ -213,6 +213,8 @@ and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carrie
 \\end{aligned}
 ```
 
+(the accumulator's rotation is skipped at the last stage, where nothing reads it again),
+
 with ``A = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node increments
 ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
 lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing is applied after
@@ -483,7 +485,7 @@ end
 """
     recommended_cfl(integrator, domain)
 
-A conservative advective-CFL ceiling ``C`` for the scheme `integrator` on the
+A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C`` for the scheme `integrator` on the
 [`FixedDomain`](@ref) `domain`, for a timestep
 ``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
 

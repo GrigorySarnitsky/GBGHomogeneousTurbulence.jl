@@ -50,7 +50,7 @@ The Kolmogorov (1941) inertial-range structure-function laws for the longitudina
     free constant.
 
 Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`FlowParameters`](@ref))
-supplies the dissipation rate ``\\varepsilon``; any other `order` throws (K41 fixes only these two
+supplies the dissipation rate ``\\varepsilon``; any other `order` throws an `ArgumentError` (K41 fixes only these two
 longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law; order)` gives the self-similar
 K41 exponent ``\\zeta_p = p/3``.
 
@@ -152,7 +152,7 @@ half-energy ``k``. This package's ``\\varepsilon_\\varphi = 2\\varkappa\\langle\
 ```
 
 Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading the scalar dissipation
-``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order` throws.
+``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set); any other `order` throws an `ArgumentError`.
 """
 struct Yaglom1949 <: StructureFunction end
 
@@ -182,7 +182,8 @@ which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`
 ``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
 asymptotic 4/5 slope (the coefficient as tabulated by Sagaut & Cambon 2018, Table 4.5).
 Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading
-``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref); any other `order` throws.
+``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref); any other `order` throws an
+`ArgumentError`.
 """
 struct Lundgren2002 <: StructureFunction end
 

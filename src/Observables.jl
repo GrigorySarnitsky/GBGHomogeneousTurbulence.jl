@@ -95,7 +95,8 @@ inner product against the `domain.squared_wavenumber_kernel` multiplier: from
   - \\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2},
 ```
 
-the enstrophy of a divergence-free velocity is its Dirichlet (``H^{1}``) energy,
+the mean-square vorticity of a divergence-free velocity is its **Dirichlet energy** — the mean square
+of its gradient, ``H^1`` in the Sobolev naming —
 ``\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = \\langle\\hat{\\boldsymbol{u}},\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat{\\boldsymbol{u}}\\rangle``.
 
 !!! warning
@@ -180,7 +181,9 @@ The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the
 `domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
 physical gradient ``\\nabla\\varphi`` materialized. It is the scalar twin of
 [`dissipation`](@ref)'s spectral route, and unconditional where that one needs a divergence-free
-velocity.
+velocity. There is only this one route: `dissipation`'s second form exists because the vorticity is a
+cached field a run already holds, while ``\\nabla\\varphi`` is never recovered or cached, so a
+field-argument twin would have nothing to consume.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
   2 * diffusivity * weighted_inner(φ̂, domain.squared_wavenumber_kernel)
@@ -268,7 +271,7 @@ The longitudinal integral length scale of the velocity field `û`, measured from
 [`energy_spectrum`](@ref) ``E(\\kappa)``,
 
 ```math
-L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa}.
+L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
 ```
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
@@ -283,7 +286,7 @@ velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdo
 
 ```math
 \\begin{aligned}
-L_E &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm d\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa} \\\\
+L_E &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa} \\\\
     &= \\tfrac{2}{3}L_{11} = \\tfrac{1}{3}(L_{11} + 2L_{22}),
 \\end{aligned}
 ```

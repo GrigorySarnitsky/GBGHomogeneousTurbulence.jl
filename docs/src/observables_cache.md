@@ -40,7 +40,7 @@ follows from one design choice, stated here rather than derived:
 To **compute** is to do arithmetic; to **move** is to carry bytes between memory and the processor;
 to **store** is to keep bytes resident. The first two are the halves of an iteration's cost in time,
 and on the GPU this package targets, the second usually dominates: a pointwise multiplication over a
-grid costs about ten arithmetic operations per point against twenty-four bytes moved. Traffic here
+grid costs one arithmetic operation per point against twenty-four bytes moved in double precision (twelve in single). Traffic here
 comes in whole-array sweeps, so the unit of movement is one **pass** over the grid — a traversal
 touching every grid point once. Storing is the cost in memory, the axis this package minimizes
 first.
@@ -128,7 +128,7 @@ position for the next push's predictor.
 **The observation comes before the iteration.** Between iterations the callback reads
 what it wants and answers whether the run continues; only then does the next iteration run. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
-instance, is a callback that accumulates ``\Delta t/\tau`` and says stop. Every instant a run
+instance, is a callback that accumulates ``\Delta t\,\varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
 reaches is observed exactly once: the first because a deposit seeding the initial state is made when
 the cache is built, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
@@ -272,7 +272,7 @@ cancelling the aliases rather than filtering them, at exactly twice the transfor
 velocity and the scalar alike, since the scalar term reads the displaced velocity its stage's
 velocity term has just built.
 
-Under a mask rule one **evaluation** of the velocity term proceeds in five operations: recover
+Under a mask rule one **evaluation** of the velocity term proceeds as follows: recover
 ``\boldsymbol{u}`` (3 inverse transforms); form
 ``\hat{\boldsymbol{\omega}} = \mathrm{i}\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and recover
 ``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the Lamb vector forming in place over the
@@ -287,7 +287,7 @@ mask, both per-wavenumber multiplications.
 **No count depends on what the cache holds.** The deposit replaces the next iteration's first-stage
 work rather than adding to it, so an iteration recovers a field once whether or not it is cached.
 These transforms carry essentially all of the arithmetic: a scalar transform costs of order ``10^{2}``
-floating-point operations per grid point, a pointwise multiplication of order ten.
+floating-point operations per grid point, a pointwise multiplication of order one.
 
 The pointwise product writes into one of its own operands: the backend's cross product reads each
 grid point's whole fiber before writing, so the Lamb vector is assembled into the vorticity's own

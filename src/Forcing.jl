@@ -137,7 +137,8 @@ The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only
 declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
 storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`, not an
 optimization: a forcing that fills a rate without declaring one is never given an array to fill, and
-the constructor rejects it rather than let the forcing go silently unapplied.
+the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) constructor rejects
+it rather than let the forcing go silently unapplied.
 """
 uses_linear_rate(::AbstractForcing) = false
 
