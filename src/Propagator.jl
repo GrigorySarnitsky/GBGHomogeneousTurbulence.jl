@@ -21,7 +21,8 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `integrator` of its `Simulation`. All are of the integrating-factor family: the stiff diffusive part
+the `integrator` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) . All
+are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integrator` is chosen from.
@@ -29,8 +30,7 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
   cheaper two-stage alternative, imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
-- [`deposit!`](@ref) — close the iteration: recover the deposited observables into the cache and stamp
-  them.
+- [`deposit!`](@ref) — close the iteration: recover the observables into the cache at the new epoch.
 - [`recommended_cfl`](@ref) — a scheme's advective-CFL ceiling.
 """
 module Propagator
@@ -99,7 +99,8 @@ Nested:
   and `nonlinear` (`IFLowStorageRK3` only).
 
 There are deliberately **no physical-representation registers** here: the substage velocity,
-vorticity, and scalar recoveries write into the run's `ObservablesCache` slots, taken as scratch
+vorticity, and scalar recoveries write into the run's
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) slots, taken as scratch
 mid-iteration and re-deposited at the iteration's end by [`deposit!`](@ref) — a slot IS its producer's register.
 Likewise there is **no integrating-factor register**: the exact linear subflow is applied by the
 backend's fused exponential convolution
@@ -107,7 +108,8 @@ backend's fused exponential convolution
 evaluated per mode from the factor's parameters, so no
 kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
 products, the phase-shift buffers, the forcing-rate fields) lives with the generator, on the
-[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here are
+[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here
+are
 only the scheme's own spectral stage registers.
 """
 struct IntegratorBuffers{VS, ST2, VSS, NL, SB}
@@ -145,7 +147,7 @@ end
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
 here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
-a `Simulation`.
+a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
 
 The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `integrator`
 needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
@@ -166,24 +168,28 @@ function allocate_buffers end
 """
     step!(integrator, state, generator, domain, buffers, cache, dt)
 
-Advance the `state` (a `ResolvedFields` holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
+Advance the `state` (a [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
-reified `generator` (a [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
+reified `generator` (a
+[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
 the equations of motion, their conditions, and their assembly scratch), the `domain` (a
 [`FixedDomain`](@ref)), the scheme's `buffers` (an [`IntegratorBuffers`](@ref)), and the run's
 observables cache `cache` (an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)). Dispatches on the concrete
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) ). Dispatches on the
+concrete
 `integrator` type (see `IFRK2`, `IFLowStorageRK3`).
 
-A scheme does only stage arithmetic: it opens the step with the generator's `prepare!`, evaluates the
+A scheme does only stage arithmetic: it opens the step with the generator's
+[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!) , evaluates the
 right-hand sides and exact linear factors through the generator protocol at each stage, and closes
-with the generator's `finalize!` — it never assembles the physics itself. The first stage reads the
+with the generator's [`finalize!`](@ref GBGIsotropicTurbulence.Generator.finalize!) — it never
+assembles the physics itself. The first stage reads the
 deposited velocity, vorticity, and scalar in physical representation from `cache` — the values of
 the instant between iterations, where the cache's deposits are current, deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
 stages take the same slots as their recovery registers, so the step allocates and resides nothing
 beyond its spectral stage registers. The cache's fields epoch — the freshness counter every new
-deposit is stamped with — is advanced when the step completes.
+deposit is recorded at — is advanced when the step completes.
 
 The argument order is shared with [`deposit!`](@ref), the call that closes the iteration: the
 dispatch object leads (the scheme here, the cache there), the common arguments follow in the fixed
@@ -192,8 +198,8 @@ signature), so the chained pair transposes nothing.
 
 !!! note
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
-    the iteration with [`deposit!`](@ref), which re-fills and stamps every slot from the advanced
-    state — a hand-run loop is `step!` then `deposit!`, and the run layer's `advance!` does both.
+    the iteration with [`deposit!`](@ref), which re-fills every slot, at the new epoch, from the advanced
+    state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does both.
 
 Returns `state`.
 """
@@ -206,7 +212,8 @@ function step! end
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
 [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
-[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over a substep
+[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over
+a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and
 applied per mode by the backend's fused exponential convolution, never built as a field —
 and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
@@ -258,7 +265,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
       has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
     else
-      # From stage 2 on the cache slots ARE the recovery registers: take them (their stamps go to
+      # From stage 2 on the cache slots ARE the recovery registers: take them (their epochs go to
       # scratch, so a mid-iteration read throws) and recover the stage state into them. The spectral
       # scratch is `nonlinear` — dead here, consumed into the accumulator at the previous stage.
       u, ω = take_velocity!(cache), take_vorticity!(cache)
@@ -386,7 +393,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   # stage 2 — right-hand sides at the predictor state. The cache slots are taken as the recovery
-  # registers (stamps to scratch); `stage2` is the spectral scratch, written by the assembly just after.
+  # registers (epochs to scratch); `stage2` is the spectral scratch, written by the assembly just after.
   u_star, ω_star = take_velocity!(cache), take_vorticity!(cache)
   to_physical!(u_star, buffers.velocity_star_spectral, domain.velocity_plans, buffers.stage2)
   vorticity_physical!(ω_star, buffers.velocity_star_spectral, domain, buffers.stage2)
@@ -457,15 +464,19 @@ _recovery_scratch(sb::ScalarBuffers) =
 Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
 configuration holds, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
-`ResolvedFields`) the step has just produced, and stamp each slot at the current epoch (the cache's freshness counter). The
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) the step has just produced,
+and record each slot at the current epoch (the cache's freshness counter). The
 deposits are the next iteration's first-stage work moved to the iteration's end — the velocity, vorticity, and
 (when the run carries one) scalar recoveries in physical representation, then the maximum-speed
 reduction over the just-deposited velocity — so an iteration's transform and pass counts are
 unchanged by caching; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
 spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
 
-Every iteration ends with this call: the run layer's `advance!` performs it after `step!`, a
-hand-run loop calls it itself, and the `Simulation` constructor makes the seeding deposit so the
+Every iteration ends with this call: the run layer's
+[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!` , a
+hand-run loop calls it itself, and the
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor makes the seeding
+deposit so the
 first iteration finds the initial state's observables. The argument order is shared with `step!` —
 the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
 same fixed order as there. After mutating the state out of band, announce
@@ -510,8 +521,8 @@ relying on viscous damping), which makes the formula degenerate — its ``0.25``
 margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
-to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
-proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
+to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 """
 function recommended_cfl end

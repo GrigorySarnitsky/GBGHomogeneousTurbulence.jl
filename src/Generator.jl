@@ -53,7 +53,9 @@ export FlowConditions, ResolvedGenerator,
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
 the Reynolds number is ``\\mathrm{Re} = 1/\\nu``), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
-(`velocity_forcing`, `scalar_forcing`, both `AbstractForcing`). Consumed by the time step (`step!`).
+(`velocity_forcing`, `scalar_forcing` , both
+[`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) ). Consumed by the time
+step ([`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)).
 
 # Arguments
 All keyword, all required:
@@ -148,7 +150,8 @@ The right-hand side of the resolved dynamics made one object (reified) — the f
 value a scheme can hold: the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
 through (the quadratic-product fields, the displaced-evaluation buffers when the domain dealiases by
-`PhaseShift`, and the per-mode forcing-rate arrays). A time-marching scheme consumes it through the
+[`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) , and the per-mode
+forcing-rate arrays). A time-marching scheme consumes it through the
 generator protocol — [`prepare!`](@ref) once per step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref)
 at each stage state, [`velocity_integrating_factor`](@ref) / [`scalar_integrating_factor`](@ref) for the exact linear
 subflows, [`finalize!`](@ref) after the completed step — and itself does only stage arithmetic, so a
@@ -162,7 +165,8 @@ scheme can never assemble the right-hand side from a mismatched intermediate sta
 
 Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
 carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
-run). The `Simulation` front door — the build-everything convenience constructor — builds one for
+run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door — the
+build-everything convenience constructor — builds one for
 you.
 
 # Fields
@@ -177,7 +181,8 @@ you.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``
   (`prepare!` fills them each step; a non-`nothing` rate is the armed offset the factor verbs
   return). Each is `nothing` unless that field's forcing declares
-  `uses_linear_rate`, so a field driven by a post-step projection, a stochastic source, or nothing at
+  [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate) , so a field driven by
+  a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
   displaced velocity, left fresh by `velocity_rhs!` for the same stage's
@@ -206,8 +211,11 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
     prepare!(generator, state, domain, dt)
 
 Open a step of the generator: advance each forcing's internal state once (its per-step
-`prepare_forcing!` hook) and arm the per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing`) (its `set_forcing_rate!` hook,
-written into the generator's rate arrays) from the start-of-step `state` (a `ResolvedFields`) over the
+[`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
+per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing` )
+(its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook,
+written into the generator's rate arrays) from the start-of-step `state` (a
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) over the
 timestep `dt`, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once before its Runge–Kutta
 stages; the stage evaluations and the integrating factors then consume what it prepared. Returns
 `generator`.
@@ -231,8 +239,9 @@ end
     finalize!(generator, state, domain)
 
 Close a step of the [`ResolvedGenerator`](@ref) `generator`: apply each of its forcings' post-step
-projections (the `apply_forcing!` hook —
-e.g. the energy rescale of a `BandRescaling`) to the advanced `state`, velocity first, then the scalar
+projections (the [`apply_forcing!`](@ref GBGIsotropicTurbulence.Forcing.apply_forcing!) hook —
+e.g. the energy rescale of a [`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) )
+to the advanced `state` , velocity first, then the scalar
 when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
 the step — the diagnostics, the derived observables, the tracer push — sees the forced end-of-step fields.
 Returns `state`.
@@ -269,7 +278,9 @@ becomes
 
 The term computed is the spectral image of ``\\mathbb{P} (\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref), plus the per-stage additive source of the
-generator's velocity forcing (its `add_forcing_source!` hook). A **mask** strategy ([`TwoThirds`](@ref),
+generator's velocity forcing (its
+[`add_forcing_source!`](@ref GBGIsotropicTurbulence.Forcing.add_forcing_source!) hook). A **mask**
+strategy ([`TwoThirds`](@ref),
 [`HouLi`](@ref)) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
 leaving `û` unused; [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
 recovered on a grid displaced by half a cell (using `û` and the generator's displaced-evaluation
@@ -401,7 +412,8 @@ untouched.
 
 It is computed pseudospectrally as
 ``- \\operatorname{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
-plus the per-stage additive source of the generator's scalar forcing (its `add_forcing_source!` hook).
+plus the per-stage additive source of the generator's scalar forcing (its
+[`add_forcing_source!`](@ref GBGIsotropicTurbulence.Forcing.add_forcing_source!) hook).
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û` and `φ̂` unused;
 [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced half a cell —

@@ -44,8 +44,8 @@ run!(sim) do s                                # records what it wants, and decid
     current_time(s) < t_end
 end
 
-kinetic_energy(sim.state.velocity_spectral)            # read a measured observable off the state
-velocity_physical(sim)                        # an observable the iteration deposited at its end
+kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
+velocity_physical(sim.cache)                  # an observable the iteration deposited at its end
 flow_parameters(sim)                          # the run's measured flow state
 ```
 
@@ -91,7 +91,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   diagnostics of the flow and the scalar (`kinetic_energy`, `dissipation`, …), the spectrum-derived
   scales (`energy_spectrum`, `integral_scale`), the advective-CFL `max_speed`, and the field-valued
   vorticity recovery.
-- [`Cache`](api/Cache.md): the `ObservablesCache` — the stamped storage each **iteration** (one
+- [`Cache`](api/Cache.md): the `ObservablesCache` — the storage each **iteration** (one
   advance of the run: a step plus the deposit that closes it) fills at its
   end with the observables of the state it just produced; the checked accessors
   (`velocity_physical`, `max_speed`, …) serve the deposited value or throw, and nothing is

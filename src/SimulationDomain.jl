@@ -40,7 +40,8 @@ export FixedDomain,
     DealiasingStrategy
 
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
-with one; it fixes the `domain.dealias` kernel and, through `recommended_cfl`, the advective-CFL
+with one; it fixes the `domain.dealias` kernel and, through
+[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) , the advective-CFL
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``).
@@ -73,7 +74,7 @@ to that precision's machine epsilon; pass an explicit `strength` to override. It
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization.
 Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
-automatically by `recommended_cfl`.
+automatically by [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
 # Fields
 The plain constructor `HouLi(order, strength)` takes the two fields directly:
@@ -107,7 +108,7 @@ Use it when that top third of wavenumbers is worth the price: a **second** nonli
 stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale spectral-representation
 buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
-``2/3`` rule — handled automatically by `recommended_cfl`.
+``2/3`` rule — handled automatically by [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
 !!! note
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
@@ -140,7 +141,8 @@ All keyword, all required:
   (the smooth Hou–Li filter) apply [`truncate_to_band!`](@ref) as a coefficientwise multiply, while
   [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller band at
   ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
-  advective-CFL ceiling through `recommended_cfl`.
+  advective-CFL ceiling through
+  [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) .
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
@@ -256,7 +258,9 @@ with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-
 It is the cutoff the
 dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself. The modes above it are
 zeroed each step by the two sharp strategies; [`HouLi`](@ref), whose band runs to the Nyquist wavenumber,
-damps them instead (to machine epsilon at Nyquist). It fixes both the advective-CFL step (`recommended_cfl`) and the resolution criterion
+damps them instead (to machine epsilon at Nyquist). It fixes both the advective-CFL step
+([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)) and the resolution
+criterion
 ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a run is set
 up to meet.
 """

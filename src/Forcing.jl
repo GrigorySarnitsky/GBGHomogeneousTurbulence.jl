@@ -24,7 +24,7 @@ A strategy acts on the step through up to four methods, each defaulting to doing
 the order the step fires them):
 - [`prepare_forcing!`](@ref) — a per-step internal-state advance.
 - [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
-  `Simulation` builds the domain.
+  [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) builds the domain.
 - [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor;
   [`uses_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — an additive per-stage source.
@@ -33,7 +33,8 @@ the order the step fires them):
 The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
 [`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
 scalar field), through tensor-order-generic field operators. The velocity and scalar are forced
-**independently**: [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate `velocity_forcing` and `scalar_forcing`
+**independently**: [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a
+separate `velocity_forcing` and `scalar_forcing`
 (each an `AbstractForcing`), so a run can force the velocity while the scalar decays freely, force both, or
 leave either unforced.
 
@@ -95,7 +96,9 @@ A deferred forcing. The operator-free keyword constructors
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is materialized into the concrete
-`AbstractForcing` once the `FixedDomain` exists (done for you by `Simulation`). A forcing argument
+`AbstractForcing` once the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain)
+exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) ). A
+forcing argument
 therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
 `DeferredForcing`.
 
@@ -137,7 +140,8 @@ The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only
 declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
 storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`, not an
 optimization: a forcing that fills a rate without declaring one is never given an array to fill, and
-the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) constructor rejects
+the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) constructor
+rejects
 it rather than let the forcing go silently unapplied.
 """
 uses_linear_rate(::AbstractForcing) = false
@@ -203,8 +207,8 @@ Fourier modes — the integer shells `lowest_shell` to `highest_shell`, in units
 fundamental ``2\\pi/L`` — are rescaled by a single factor to hold the `target`.
 
 The `target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
-energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` (`kinetic_energy`) for the velocity,
-the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` (`scalar_variance`) for the scalar — the field's
+energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` ([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)) for the velocity,
+the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` ([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the field's
 ``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
 
 The `over` keyword selects where the target applies:
@@ -298,7 +302,7 @@ forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highe
 of the box's fundamental ``2\\pi/L``; default 1–2),
 whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
 injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
-diagnostics: `dissipation` ``\\varepsilon`` for the velocity, `scalar_dissipation`
+diagnostics: [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) ``\\varepsilon`` for the velocity, [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)
 ``\\varepsilon_\\varphi`` for the scalar. (A rate — note the contrast with `BandRescaling`, whose
 `target` is a held amplitude.) The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.

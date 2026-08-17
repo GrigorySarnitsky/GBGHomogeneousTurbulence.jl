@@ -7,10 +7,10 @@
 # hand-run loop.
 #
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
-# closing `deposit!` recovers the iteration's observables into the cache and stamps them, and the deposit-
+# closing `deposit!` recovers the iteration's observables into the cache at the new epoch, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
 # arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
-# particle velocities the PREVIOUS closing deposit deposited (read checked), v₂ interpolates the just-deposited
+# particle velocities the PREVIOUS closing deposit left (read checked), v₂ interpolates the just-deposited
 # u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
 # same field, completing the iteration's deposits; only M-sized point values are held, never a second field copy.
 
@@ -85,8 +85,11 @@ with [`flow_parameters`](@ref), and track its progress with [`current_time`](@re
 
 # Setting the Reynolds number
 
-By default the run is **forced and stationary** — a `BandRescaling` holds the total (whole-field) energy
-at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from the grid rather than supplied:
+By default the run is **forced and stationary** — a
+[`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) holds the total (whole-field)
+energy
+at [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) (i.e. `over = :total`
+) — and the viscosity is chosen from the grid rather than supplied:
 
 !!! note "The default holds ``k`` fixed, so ``k`` is not a measurable of the default run"
     `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the target, which
@@ -106,7 +109,7 @@ at `kinetic_energy` (i.e. `over = :total`) — and the viscosity is chosen from 
     retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
     same grid at the same `k_max_η` — which credits the whole retained band as clean signal, exact for
-    `TwoThirds` and `PhaseShift`, approximate for `HouLi`, whose top of band is damped rather than
+    `TwoThirds` and [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped rather than
     exactly dealiased. The `kinetic_energy` and `side_length` fix
     the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
@@ -135,7 +138,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
-- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a `DeferredForcing` from an
+- `velocity_forcing` , `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
+  [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
   (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
@@ -155,7 +159,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
   their interpolation scheme, forwarded to the `Tracers` constructor.
 - `particle_integrator = EndpointHeun()` — the trajectory time-integration scheme
-  ([`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
+  ([`AbstractParticleIntegrator`](@ref
+  GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
   its registers are allocated for you.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
@@ -180,7 +185,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `cache` — the [`ObservablesCache`](@ref): the observables the iteration deposits and stamps at its end.
+- `cache` — the [`ObservablesCache`](@ref): the observables the iteration deposits at its end.
 - `tracers`, `particle_integrator`, `particle_buffers` — the [`Tracers`](@ref) being advected along
   with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
   when the run carries no tracers.
@@ -351,12 +356,12 @@ function advance!(sim::Simulation; dt = nothing)
 
   # The checked read at the iteration's start: the push's v₁ must be the particle velocities the previous
   # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
-  # the stamp is verified here, at tₙ, where they are the current epoch observable.
+  # the epoch is verified here, at tₙ, where they are the current-epoch observable.
   sim.tracers === nothing || particle_velocities(sim.cache)
 
   step!(sim.integrator, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
-  # The closing deposit: fill and stamp every slot from the state the step just produced; the tracer
+  # The closing deposit: fill every slot, at the new epoch, from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
   # interpolated at the predictor positions as v₂ — and the new sample is recorded at the new
   # positions from the same deposited field, completing the iteration's deposits.

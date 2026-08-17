@@ -23,7 +23,7 @@ Lagrangian tracer tracking:
 - [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
-  deposit stamps them).
+  deposit leaves them).
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
 - [`record_trajectory_velocity!`](@ref) — put the Lagrangian velocity at the new positions on record,
   for the next push's first half.
@@ -55,7 +55,9 @@ the ``x, y, z`` components), converted to `domain`'s backend and element type. S
 neither, is an `ArgumentError`. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
 evaluate the velocity (and any sampled field) at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
-(the default `tracer_scheme` of the `Simulation` front door, the build-everything convenience
+(the default `tracer_scheme` of the
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door, the
+build-everything convenience
 constructor);
 [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
 [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
@@ -66,7 +68,8 @@ The `rng` is the random stream seeding the uniformly-random tracer positions (us
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
 trajectory velocities are read from the run's observables cache, through
-[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the iteration's
+[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) , where the
+iteration's
 closing deposit leaves them.
 
 # Fields
@@ -187,9 +190,9 @@ scheme.
 
 The run layer calls it at the end of each iteration, on the just-deposited velocity at the
 just-advanced positions; the recorded values are the observables cache's particle-velocities slot,
-stamped there, and the next iteration's [`advect!`](@ref) reads them as the first half of its Heun
-pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
-cost ``N^{3} \\times 3``. What is recorded is the trajectory velocity the run's `particle_velocities`
+left there at that epoch, and the next iteration's [`advect!`](@ref) reads them back as the first
+half of its endpoint pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
+cost ``N^{3} \\times 3``. What is recorded is the trajectory velocity the run's [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities)
 returns, and the quantity the Lagrangian statistics accumulate.
 """
 function record_trajectory_velocity!(tracers::Tracers, u)
@@ -227,8 +230,8 @@ frozen start-of-step velocity alone would be first order.
 !!! note
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
     ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by [`record_trajectory_velocity!`](@ref)
-    at the previous iteration's end. In a run the observables cache stamps that sample and the run layer
-    reads it checked before pushing; a hand-run loop must re-record between pushes itself.
+    at the previous iteration's end. In a run the observables cache records that sample at its epoch
+    and the run layer reads it checked before pushing; a hand-run loop must re-record between pushes itself.
 """
 function advect! end
 

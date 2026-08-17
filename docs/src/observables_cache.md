@@ -95,7 +95,7 @@ per-point field is ever whole anywhere and none can be cached.
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
 the register its producer computed it in. An observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
-what removes one: a register overwritten before the iteration's end has nothing left to stamp. The contents
+what removes one: a register overwritten before the iteration's end has nothing left to deposit. The contents
 are consequently a property of the solver's storage decisions, not a promise — §2.3's blocked reuse
 keeps the vorticity in the cache today, and landing that reuse will take it out (§1.4).
 
@@ -137,39 +137,39 @@ to a solver with no cache serving only its own dynamics, the run pays one extra 
 share of one first-stage evaluation, one reduction, and one interpolation, per run rather than per
 iteration.
 
-**A stamp says what a slot holds**, and takes three values: the observable at a
+**A slot's epoch says what it holds**, and takes three values: the observable at a
 named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code the named time is
 an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
-every step or announced mutation, the particles' with every push; a stamp is current when it equals
+every step or announced mutation, the particles' with every push; a slot's epoch is current when it equals
 its factor's epoch.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.
 
 **A slot belongs to the component that produces it**; that component owes a correct
-value and stamp at every iteration's end. Any component may take the array as scratch mid-iteration, and taking it
-clears the stamp; this is what lets the Lamb vector be assembled into the vorticity's own slot,
-with no product array of its own (§2.3). While the slot holds the Lamb vector its stamp says
+value at every iteration's end. Any component may take the array as scratch mid-iteration, and taking it
+marks its epoch as scratch; this is what lets the Lamb vector be assembled into the vorticity's own slot,
+with no product array of its own (§2.3). While the slot holds the Lamb vector its epoch says
 *scratch*, so a read throws rather than returning a mislabelled field. Taking a slot costs no
 transform, since the owner deposits at the iteration's end from the state it has just produced, which it would
 recover anyway. What it costs is reads: a slot taken before the last reader of that observable makes
 that read throw, so the schedule must order the two.
 
 **Every slot is deposited on every iteration**, and the completeness check throws if a slot is still
-unstamped there. No caller can cause this — a slot exists only because the schedule fills it
+with its epoch cleared. No caller can cause this — a slot exists only because the schedule fills it
 — so the check guards the solver against itself: a slot nobody refilled would hold scratch for the
 rest of the run and throw on every later read, and the completeness check names the fault where it
 happened.
 
 Code that writes the state outside an iteration — a reseed, a filter — must announce the change by
-calling [`fields_modified!`](@ref), which clears every stamp, so that reads
+calling [`fields_modified!`](@ref), which advances the fields counter past every slot, so that reads
 throw
 until the next deposit. That interval belongs to whoever made the change: the recoveries are
 exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
 buffer.
 
 **The numbers follow the same rule on the same schedule.** The maximum velocity component is a cache entry like
-any other — deposited at the iteration's end, stamped there, and read by the next iteration's timestep choice,
+any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
 which does scalar arithmetic on it and measures nothing. It is the only number the
 iteration produces, so it is the only number the cache holds; ``\varepsilon``, ``k``, or a variance
 is each one reduction away from the cached fields, performed by the observation that wants it (§2.4).
@@ -179,7 +179,7 @@ is each one reduction away from the cached fields, performed by the observation 
 It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. That is bookkeeping, not a slogan: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
-read computes. The cache is a naming-and-stamping layer over storage the run already owns: removing
+read computes. The cache is a naming-and-dating layer over storage the run already owns: removing
 it would free no array, and the only work it adds is §1.3's final closing deposit — the one whose deposits no
 iteration consumes, kept because it serves the final observation, and paid per run rather than per
 iteration.
@@ -311,7 +311,7 @@ each. Its **Cached** column takes four values: *yes*, the schedule leaves the ob
 between iterations; *depends*, the observable survives in some configurations and not in others; *no*, a
 genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
 observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —
-there is no time to stamp, so no act at an observation builds it either. Its **Built** column says
+there is no moment to date it to, so no act at an observation builds it either. Its **Built** column says
 whether the package holds the observable today, and reads `—` wherever *Cached* is not *yes*.
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
@@ -388,8 +388,8 @@ cache  = ObservablesCache(domain; scalar = true)   # the slots follow the config
 
 ### 3.2 What is not built
 
-The cache itself is built as §§1–2 describe: automatic contents, closing deposits stamped at the new
-epoch — the particle velocities included, stamped against both epochs — three-valued stamps that
+The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
+epoch — the particle velocities included, against both epochs — three-valued slot epochs that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the deposit-
 completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes the run after every iteration and once before the first — ``n`` iterations, ``n + 1``

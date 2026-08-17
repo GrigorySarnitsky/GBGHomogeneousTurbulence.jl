@@ -15,7 +15,7 @@
 #   State            — the spectral state + initial conditions (the MZ State role)
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …), including
 #                      the field-valued vorticity recovery
-#   Cache            — the ObservablesCache: the stamped storage the iteration deposits its
+#   Cache            — the ObservablesCache: the storage the iteration deposits its
 #                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol

@@ -18,15 +18,18 @@ The measured functions of the flow state:
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`vorticity_physical!`](@ref) — the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}``
   recovered in physical representation from the spectral state — the field-valued observable
-  (its cached read, `vorticity_physical`, lives in `Cache`).
+  (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical) ,
+  lives in `Cache` ).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
 Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
 distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate
-the automatic warm-up (`warmup!`), which advances until the dissipation and the kinetic energy hold
+the automatic warm-up ([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which
+advances until the dissipation and the kinetic energy hold
 steady and the derivative skewness has reached its plateau. None dealiases first — the quadratic reductions are exactly
-alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition; `HouLi` meets
+alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition;
+[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets
 it only to machine precision), and the cubic skewness carries the slight residual its own docstring
 prices.
 """
@@ -51,8 +54,8 @@ representation. Like every quadratic reduction here (`dissipation`, `scalar_vari
 `scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
 exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
 zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —
-satisfied by the ``2/3`` rule, by `PhaseShift`'s wider ``\\sqrt{2}N/3`` band, and by every narrower
-band. `HouLi` keeps the full band ``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero
+satisfied by the ``2/3`` rule, by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift)'s wider ``\\sqrt{2}N/3`` band, and by every narrower
+band. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) keeps the full band ``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero
 are Nyquist modes its taper has already damped to machine precision — alias-free in practice, not
 exactly.
 """
@@ -262,7 +265,8 @@ them to the host yourself with
 [`adapt`](@extref GBGPeriodicFields Adapt.adapt) when you want them there. It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
-multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
+multipliers. This is the measured counterpart of a
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
 spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)

@@ -41,10 +41,10 @@ export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spect
 
 The record of the evolving fields a run advances, in spectral representation — the single source of
 truth, a passive container with every operation external. The velocity, vorticity, and scalar in
-physical representation are recoveries of it, not part of it: the iteration recovers them into the stamped slots of the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its end (a slot's stamp
-records the instant its value belongs to; never on a
-read — a cached read serves the deposited value or throws), so the state itself cannot go stale.
+physical representation are recoveries of it, not part of it. The iteration recovers them at its
+end into the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), never on a
+read: each cached slot records which epoch its value belongs to, and a read serves that value or
+throws. The state itself therefore cannot go stale.
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
@@ -67,7 +67,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
-``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy). The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
@@ -133,7 +133,8 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-`scalar_variance`. The mean vanishes by construction: the envelope is zeroed at
+[`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) . The mean vanishes by
+construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 

@@ -199,13 +199,13 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   source-preserving scratch arity of `GBGPeriodicFields`' `to_physical!` at the sites that consume
   them, and the derived vorticity by `Observables.vorticity_physical!` (decision 47). The values
   land in the **`ObservablesCache`** (its own
-  module, `Cache`, after `Observables`): the stamped storage each iteration
+  module, `Cache`, after `Observables`): the storage each iteration
   fills at its end with its observables — the physical velocity, vorticity, and scalar, the
   maximum velocity component, and, when tracers ride the run, the particle velocities
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
-  substage recovery registers mid-iteration (their stamps go to *scratch*, so a mid-iteration read
-  throws instead of serving a stage intermediate), and the closing `deposit!` re-fills and stamps them
+  substage recovery registers mid-iteration (their epochs go to *scratch*, so a mid-iteration read
+  throws instead of serving a stage intermediate), and the closing `deposit!` re-fills them at the new epoch
   from the state the step just produced. An accessor (`velocity_physical`, `vorticity_physical`,
   `scalar_physical`, the cached `max_speed`) serves the deposited value or throws — there is no path
   by which reading causes a computation — and the cache keeps one epoch counter per dynamical factor
@@ -393,7 +393,7 @@ scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on th
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous closing deposit deposited — the genuine
-Lagrangian velocity, held in `Tracers.trajectory_velocity` and stamped in the observables cache
+Lagrangian velocity, held in `Tracers.trajectory_velocity` and recorded in the observables cache
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
@@ -446,12 +446,12 @@ Over it:
   trailing-window flatness test, reading ``\varepsilon`` rather than the clampable ``k(t)``; when
   the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
   its one-line sugar. A fixed budget is a three-line callback, not a run option.
-- **`velocity_spectral(sim)`**, **`scalar_spectral(sim)`**, the cache accessors
-  (`velocity_physical`, `vorticity_physical`, `scalar_physical`, `max_speed`,
-  `particle_velocities`), and `particle_positions` — the probes' own state, not a stamped
-  slot — form the uniform read surface: a function names what
-  the run holds, wherever it lives — reading needs no knowledge of the state/cache split, while
-  *writing* stays on the dot path (`sim.state`), where the danger demands the knowledge.
+- **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
+  `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
+  `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
+  `particle_positions(sim.tracers)`. The run layer once carried forwarding methods that hid this
+  split; they bought a shorter call at the price of a second docstring per quantity, and of teaching
+  a surface rather than the two objects the package is built from.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) the
   current-state diagnostics, for a callback to read.
@@ -1090,12 +1090,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     under every strategy. The bug is the motivating instance for decision 31's seam — a stage that
     reads a mid-update intermediate is a malformed factorization, which a reified right-hand side makes
     unrepresentable.
-30. **(2026-07) The observation layer: `ObservablesCache` — stamped, memoized charts over the state; the
+30. **(2026-07) The observation layer: `ObservablesCache` — epoch-dated, memoized charts over the state; the
     recoveries move to `State`.** The physical recoveries are the **chart map** of the state — they
     read only ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and the frame — so they home in `State`
     (`Generator` imports them for its displaced evaluations; the new `Generator → State` edge respects
     the include order). `ObservablesCache` memoizes their values: preallocated slots (`:velocity`,
-    `:vorticity`), each stamped with the **fields epoch** it was computed at; an accessor
+    `:vorticity`), each carrying the **fields epoch** it was computed at; an accessor
     (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
     completes. An out-of-band mutation is declared through **`fields_modified!`**, named for
@@ -1105,7 +1105,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     loops to it. This kills the `step!` silent-precondition footgun — there is no caller prefill left
     to forget. **Epoch granularity is deliberately coarse**: one counter per dynamical factor of the
     tower (fields, particles), no finer — every production memoization precedent surveyed (LAMMPS
-    computes' timestep stamps, OpenFOAM's registry event numbers, Fluidsim's iteration stamps) uses a
+    computes' timestep tags, OpenFOAM's registry event numbers, Fluidsim's iteration counters) uses a
     single counter, within-step consistency is the seam's job (decision 31), and an over-fine epoch
     system is itself a silent-staleness surface. Observables are **opt-in** (an undeclared one errors —
     resident GPU memory is a choice), and the cache's shared spectral scratch replaces two
@@ -1447,11 +1447,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     design of `docs/src/observables_cache.md`: the schedule is fixed at construction and identical on
     every iteration; **everything is deposited at the end of the iteration** (`deposit!` — the next
     iteration's first-stage recoveries relocated, plus the maximum-speed reduction the next timestep
-    choice reads); a read serves the stamped value or **throws** — there is no path, internal or on
+    choice reads); a read serves the current-epoch value or **throws** — there is no path, internal or on
     request, by which reading causes a computation (the recompute-on-staleness accessors of
     decision 30 are retired; `fields_modified!` now opens an interval in which reads throw,
     closed by an explicit `deposit!`). Contents are **automatic** — the constructor derives them from
-    the configuration (the `observables` declaration keyword is gone); the three-valued stamp
+    the configuration (the `observables` declaration keyword is gone); the three-valued slot epoch
     (deposited value / producer's scratch / never deposited) polices the mid-iteration window, and
     the deposit-completeness check refuses to close an iteration with an undeposited slot. The
     storage consequence is the **slot=register merge**: the step's substage recovery registers ARE
@@ -1503,13 +1503,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     register, substage on the position argument alone. They are renamed `trajectory_velocity` /
     `predictor_velocity`, and the sample becomes the observables cache's first trajectory-bound
     slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
-    storage (the slot IS the register, as everywhere else) and stamped against **both** epochs,
+    storage (the slot IS the register, as everywhere else) and dated against **both** epochs,
     since the sample is a function of the state and the positions together. The push's schedule
     moves fully onto the iteration ends: `advance!` checks the sample at the start (the previous
     closing deposit recorded ``\boldsymbol{v}_1``), pushes after the closing field deposits
-    (``\boldsymbol{v}_2`` from the deposited ``\boldsymbol{u}(t_{n+1})``), then records and stamps
+    (``\boldsymbol{v}_2`` from the deposited ``\boldsymbol{u}(t_{n+1})``), then records at the new epoch
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
-    favor of the stamp, and the sample is read through the checked `particle_velocities`
+    favor of the slot epoch, and the sample is read through the checked `particle_velocities`
     (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
     user-settled accessor prefix). The register `predictor_velocity` is deliberately **not** readable — an
     off-trajectory value must not be servable as a plausible-looking Lagrangian velocity — and the
@@ -1630,6 +1630,82 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (formerly "the phase-shift tail", now named for what it is). The rename swept the decision-log
     prose as well, so the log reads in the current vocabulary; this entry is the record that the
     older entries originally said "tail deposit" and "boundary".
+
+49. **(2026-08, user-directed) A `Simulation` is a container, not a reading surface.** The run layer
+    carried eight forwarding reads — `velocity_spectral(sim)`, `scalar_spectral(sim)`,
+    `particle_positions(sim)`, `velocity_physical(sim)`, `vorticity_physical(sim)`,
+    `scalar_physical(sim)`, `max_speed(sim)`, `particle_velocities(sim)` — plus
+    `resolved_fields_modified!(sim)`. Every one is now removed. A quantity has exactly one route:
+    the state through `sim.state`, a deposited observable through `sim.cache`, each read by the
+    accessor that owns it. The forwarders bought a shorter call at the price of a second docstring
+    per quantity to drift from the first, and of teaching the user a surface instead of the two
+    objects the package is actually built from. The clock accessors `current_time` / `current_step`
+    stay: the clock is the run layer's own state, not a forwarded read. `flow_parameters(sim)` stays
+    for the same reason — it assembles a bundle from several owners rather than forwarding to one.
+    `validate_spectrum` leaves the package altogether, to `test/validation.jl` as `compare_to_model`:
+    comparing a run against a model spectrum answers "does this reproduce the literature", which is
+    what a validation suite asks and a solver never does.
+
+50. **(2026-08, user-directed) `Tracers` holds trajectory state; the trajectory scheme's registers
+    are allocated per scheme, as on the field side.** Three of `Tracers`' seven fields —
+    `predictor`, `predictor_points`, `predictor_velocity` — were one scheme's scratch, as its own
+    docstring conceded in calling `predictor_velocity` "a stage register of the push". The field
+    side had held the state/scratch line from the start (`ResolvedFields` versus `IntegratorBuffers`,
+    built by `allocate_buffers` dispatching per scheme); the Lagrangian side did not follow it, so
+    changing the pusher meant editing the state type. Now `AbstractParticleIntegrator` is the scheme
+    family, `EndpointHeun` its one member, and `allocate_buffers(pusher, tracers)` builds a
+    `ParticleIntegratorBuffers` — one generic across both sides, because it is one concept. The axis
+    is recorded as planned in §7, and the scratch genuinely varies along it: a higher-order
+    Runge–Kutta pusher wants several stage velocities, a multistep scheme wants a velocity *history*
+    and no predictor at all, and an inertial particle wants ``\boldsymbol{v}`` as **state** rather
+    than scratch. The split also disentangles `trajectory_velocity`'s two roles — the measured
+    Lagrangian observable, and "the first half of the next push" — so a history-based scheme would
+    not disturb the observable. Storage is unchanged, only reassigned: the memory audit now pins two
+    ``(M, 3)`` arrays on each side rather than four on one.
+
+51. **(2026-08, user-directed) *Particle* is the category, *tracer* the kind.** The public surface
+    used three nouns for one set of objects — `particle_positions` beside `number_of_tracers` in a
+    single export line, plus `trajectory_velocity` — with no convention stated anywhere. The rule is
+    now: **name by what the operation is true of.** Anything true of the whole deferred ladder of §7
+    takes *particle* — the positions, the count, the cache slot, interpolation at positions;
+    only what is specific to the massless, internal-degree-of-freedom-free kind takes *tracer* — the
+    `Tracers` type and its construction. Hence `number_of_tracers` becomes `number_of_particles` (a
+    count is true of any kind) and `sample!` becomes `interpolate_at_particles!` (an inertial
+    particle needs the same interpolation for its drag term, so the name survives the ladder
+    unchanged). `advect!` keeps its generic verb and dispatches per kind, its `EndpointHeun` method
+    carrying the tracer-specific assumption that the particle velocity *is* the fluid velocity.
+
+52. **(2026-08, user-directed) Constructor arguments: the object a value is derived from is
+    positional, its settings are keyword.** Asked twice across two documentation read-throughs why
+    some arguments were named and others not, and the honest first answer was that no rule was
+    written down. The rule is the one the code had already half-adopted: a `FixedDomain` (or a
+    `Tracers`, or the `FlowConditions` a generator wraps) is *what the value is built from* and
+    stays positional; everything that configures the result is keyword. Round 1 applied "make them
+    all named" to `FixedDomain` alone; the sweep now covers the class, and `Tracers` was its one
+    remaining violator — `number_of_particles` and `positions` are settings, not source objects.
+    One consequence is worth recording because it is not a free choice: keyword arguments do not
+    participate in dispatch, so two all-keyword forms cannot be two methods. `Tracers` is therefore
+    a single method requiring exactly one of `positions` or `number_of_particles`, with an
+    `ArgumentError` naming the choice — a better error than a missing-keyword one, but a merge
+    forced by the language rather than preferred.
+
+53. **(2026-08, user-directed) "Stamp" is retired; a slot carries an **epoch**, and an epoch is not
+    an iteration number.** The cache described itself as "stamped storage" and gave each slot a
+    `*_stamp` field, while the two counters those fields were compared against were called *epochs* —
+    two names for one integer, related only in a `#` comment. Asked whether "stamped storage" was a
+    clear and standard term, the honest answer was that it is a house coinage, and that it never said
+    stamped *with what*. One noun now serves both roles: the counters are epochs, and a slot's own
+    epoch is the one its value belongs to; a slot is readable exactly when the two agree. The
+    `*_stamp` fields become `*_epoch`, and the verb goes with the noun — a deposit *fills a slot and
+    sets its epoch* rather than "stamping" it.
+
+    The merge creates one hazard, so the `Cache` docstring now states it outright: **an epoch counts
+    changes to the state, not advances of the run.** A completed `step!` advances the fields epoch,
+    but so does any announced out-of-band mutation, so a run at step 2 may stand at epoch 4 — measured,
+    not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
+    far has the run gone?". As with decision 48, the sweep covered the decision log too, so the log
+    reads in the current vocabulary; this entry records that the older entries originally said
+    "stamp".
 
 ---
 
