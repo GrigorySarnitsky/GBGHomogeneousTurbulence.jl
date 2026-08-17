@@ -249,7 +249,9 @@ Rescaling preserves the divergence-free constraint either way.
     Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of
     stochastic velocity rescaling: it has no conserved quantity, is not associated with a well-defined
     ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
-    holds (Bussi, Donadio & Parrinello 2007, [doi:10.1063/1.2408420](https://doi.org/10.1063/1.2408420)). Use it to spin up or to pin an amplitude; when the held
+    holds (Bussi, Donadio & Parrinello 2007 — *Canonical sampling through velocity rescaling*,
+    *J. Chem. Phys.* **126**, 014101,
+    [doi:10.1063/1.2408420](https://doi.org/10.1063/1.2408420)). Use it to spin up or to pin an amplitude; when the held
     quantity is itself measured, prefer a fixed-injection forcing (`ConstantPower`), which leaves the
     energy free to fluctuate.
 """
@@ -327,9 +329,10 @@ of the box's fundamental ``2\\pi/L``; default 1–2),
 whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity
 the injection balances dissipation, so `target` is a number: the **value** of the dissipation rate to
 hold, chosen to agree with the diagnostics —
-[`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) ``\\varepsilon`` for the
-velocity, [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)
-``\\varepsilon_\\varphi`` for the scalar. Note what kind of quantity that is: here the held observable
+the rate ``\\varepsilon`` for the velocity (measured by
+[`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
+``\\varepsilon_\\varphi`` for the scalar (by
+[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). Note what kind of quantity that is: here the held observable
 is a **rate**, where `BandRescaling` holds an **amplitude**. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
@@ -362,7 +365,10 @@ end
     StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 0)
 
-Stochastic (Eswaran & Pope 1988, [doi:10.1016/0045-7930(88)90013-8](https://doi.org/10.1016/0045-7930%2888%2990013-8)) forcing, built on the [`FixedDomain`](@ref) `domain`: each forced
+Stochastic forcing — Eswaran & Pope (1988), *An examination of forcing in direct numerical
+simulations of turbulence*, *Computers & Fluids* **16**, 257–278,
+[doi:10.1016/0045-7930(88)90013-8](https://doi.org/10.1016/0045-7930%2888%2990013-8) — built on the
+[`FixedDomain`](@ref) `domain`: each forced
 Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
 box's fundamental ``2\\pi/L`` — carries an
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition

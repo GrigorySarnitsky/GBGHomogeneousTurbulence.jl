@@ -13,9 +13,14 @@ split formula and should be left alone.
 import re
 import glob
 
+# A code span may be BARE (`name`) or LINKED ([`name`](@ref …)); both render as a code run, so both
+# abut a math span the same way. The linked form was the gap in the first version of this scan — it
+# read as punctuation-plus-parenthesis and slipped through.
+CODE = r'(?:\[`[A-Za-z_][A-Za-z0-9_!]*`\]\([^)\n]*\)|`[A-Za-z_][A-Za-z0-9_!]*`)'
+MATH = r'``[^`\n]{1,60}``'
 PATTERN = re.compile(
-    r'(``[^`\n]{1,60}``\s*`[A-Za-z_][A-Za-z0-9_!]*`'      # math span, then a code span
-    r'|`[A-Za-z_][A-Za-z0-9_!]*`\s*``[^`\n]{1,60}``)'     # code span, then a math span
+    r'(' + MATH + r'\s*' + CODE          # math span, then a code span
+    + r'|' + CODE + r'\s*' + MATH + r')' # code span, then a math span
 )
 
 SURFACES = (sorted(glob.glob('src/*.jl'))

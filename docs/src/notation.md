@@ -21,13 +21,16 @@ a direct dependency.
 
 ## Physical variables
 
+
+Every **Code** entry naming a package object links to its documentation; the few that stay bare are constructor keywords, which have no object of their own to link to.
+
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
-| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | `vorticity_physical!` |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
-| ``\boldsymbol{f}`` | a body forcing on the momentum equation | `AbstractForcing` |
+| ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) |
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | [`particle_positions`](@ref) |
@@ -66,7 +69,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) |
-| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | `spectrum` |
+| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.spectrum) |
 | ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) |
@@ -77,12 +80,12 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | `flow_parameters` |
+| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGIsotropicTurbulence.SimulationRun.flow_parameters) |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
-| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
-| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
-| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number, measured from the flow state | `taylor_reynolds` |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | `taylor_microscale` |
+| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
+| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |
+| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number, measured from the flow state | [`taylor_reynolds`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_reynolds) |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_microscale) |
 
 ## Numerics
 
@@ -101,5 +104,5 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | `set_forcing_rate!` |
+| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
 | ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |

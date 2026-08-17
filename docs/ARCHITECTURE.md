@@ -1073,7 +1073,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       laundered smell — an IC seeder that defaulted `kinetic_energy = 0.5` while the front door supplied
       `1.5`, once documented "by design" rather than fixed.)
     - **`scalar_type` → `element_type`** (the keyword names the array element type, not the passive
-      scalar's type); **`Tracers(domain, positions)`**, so backend and precision flow from the domain.
+      scalar's type); **`Tracers(domain; positions)`**, so backend and precision flow from the domain
+      (all-keyword past `domain` since decision 52).
     - **`step!` advances the `State`** (`ResolvedFields`), not loose ``\hat{\boldsymbol{u}}`` / ``\hat\varphi``.
     - **Observables are functions of the state, not the `Simulation`.** No `f(sim)` form: an observable
       taking a `Simulation` reached across `state` / `buffers` / `conditions`, smearing the single source of

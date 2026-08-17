@@ -48,9 +48,12 @@ new_tensor_field_spectral
 new_tensor_field_physical
 ```
 
-## Dealias filtering
+## Band truncation
 
-Apply the domain's dealias low-pass kernel to a field in spectral representation, in place.
+Restrict a field in spectral representation to the retained band, in place, by the domain's
+low-pass kernel. Under `PhaseShift` this is only part of the dealiasing — the averaging of two
+displaced evaluations is the other half, and the generator performs it where it assembles the
+product.
 
 ```@docs
 truncate_to_band!

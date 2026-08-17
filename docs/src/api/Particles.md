@@ -68,7 +68,7 @@ advect!
 interpolate_at_particles!
 ```
 
-## Sample buffers
+## Point-value buffers
 
 Allocate the point-value `out` for `interpolate_at_particles!` — a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the

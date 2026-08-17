@@ -91,9 +91,11 @@ only the largest speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` — t
 bound — so the *maximum* is materialized — one number — while no
 per-point field is ever whole anywhere and none can be cached.
 
-**Surviving — the schedule must leave it at the iteration's end, in a register the iteration already
+**Surviving — the schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
-the register its producer computed it in. An observable is therefore cached exactly
+the register its producer computed it in — a **register** being storage a component computes one
+value into and overwrites at the next, holding nothing a reader should trust between times. An
+observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
 what removes one: a register overwritten before the iteration's end has nothing left to deposit. The contents
 are consequently a property of the solver's storage decisions, not a promise — §2.3's blocked reuse

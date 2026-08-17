@@ -1,7 +1,7 @@
 # Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
 # velocity-derivative skewness, the scalar variance and its dissipation, the maximum flow speed
 # (which feeds the CFL), and the field-valued vorticity recovery. In the Mori–Zwanzig reading
-# (ARCHITECTURE §8) these are the observables of the `Generator`: their plateaus gate warm-up and
+# (ARCHITECTURE §8) these are the observables of the `Generator`: three of them gate warm-up and
 # their statistics are to be tracked by GBGStreamingStatistics. Most reduce a field to a scalar — a
 # GBGPeriodicFields inner product or moment.
 
@@ -18,7 +18,7 @@ The measured functions of the flow state:
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
   spectral state, the one field-valued observable
-  (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical) ,
+  (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical),
   lives in `Cache` ).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
@@ -231,7 +231,9 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
 and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
-(Betchov 1956, [doi:10.1017/S0022112056000317](https://doi.org/10.1017/S0022112056000317)). So the
+(Betchov 1956 — *An inequality concerning the production of vorticity in isotropic turbulence*,
+*J. Fluid Mech.* **1**(5), 497–504,
+[doi:10.1017/S0022112056000317](https://doi.org/10.1017/S0022112056000317)). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 
@@ -291,7 +293,7 @@ end
     integral_scale(û, domain)
 
 The longitudinal integral length scale of the velocity field `û`, measured from its
-[`energy_spectrum`](@ref) ``E_n``,
+per-shell energies ``E_n`` (from [`energy_spectrum`](@ref)),
 
 ```math
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.

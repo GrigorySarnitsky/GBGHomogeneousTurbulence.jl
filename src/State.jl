@@ -40,7 +40,7 @@ export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spect
     ResolvedFields(domain; scalar = false)
 
 The record of the evolving fields a run advances, in spectral representation — the single source of
-truth, a passive container with every operation external. The velocity, vorticity, and scalar in
+truth. The velocity, vorticity, and scalar in
 physical representation are recoveries of it, not part of it. The iteration recovers them at its
 end into the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), never on a
 read: each cached slot records which epoch its value belongs to, and a read serves that value or
@@ -135,7 +135,7 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-[`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) . The mean vanishes by
+[`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance). The mean vanishes by
 construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.

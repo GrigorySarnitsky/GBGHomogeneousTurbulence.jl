@@ -21,7 +21,7 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) . All
+the `scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
@@ -180,7 +180,7 @@ concrete
 `scheme` type (see `IFRK2`, `IFLowStorageRK3`).
 
 A scheme does only stage arithmetic: it opens the step with the generator's
-[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!) , evaluates the
+[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!), evaluates the
 right-hand sides and exact linear factors through the generator protocol at each stage, and closes
 with the generator's [`finalize!`](@ref GBGIsotropicTurbulence.Generator.finalize!) — it never
 assembles the physics itself. The first stage reads the
@@ -209,7 +209,9 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, [doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9); 2N-storage). With the diffusive
+Integrating-factor third-order low-storage Runge–Kutta, 2N-storage — Williamson (1980),
+*Low-storage Runge–Kutta schemes*, *J. Comput. Phys.* **35**, 48–56,
+[doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
 [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
 [`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over
@@ -520,7 +522,7 @@ way. The speed in the denominator is
 continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger; and the eigenvalue
 bound over-estimates the true spectral radius, since not every mode carries the peak speed. The base
 ceiling is calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
-[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C_{\\mathrm{CFL}} \\lesssim 0.83``,
+[`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C_{\\mathrm{CFL}} \\lesssim 0.83``,
 taken conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
 margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.

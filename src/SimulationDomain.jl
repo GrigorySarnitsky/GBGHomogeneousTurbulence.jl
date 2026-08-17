@@ -41,7 +41,7 @@ export FixedDomain,
 
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
-[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) , the advective-CFL
+[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl), the advective-CFL
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
@@ -53,9 +53,10 @@ abstract type DealiasingStrategy end
 """
     TwoThirds()
 
-The sharp isotropic ``2/3``-rule truncation of Orszag (1971),
-[doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2):
-keep the modes
+The sharp isotropic ``2/3``-rule truncation of Orszag (1971) — *On the elimination of aliasing in
+finite-difference schemes by filtering high-wavenumber components*, *J. Atmos. Sci.* **28**, 1074,
+[doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2).
+Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
@@ -66,7 +67,9 @@ struct TwoThirds <: DealiasingStrategy end
 """
     HouLi(; order = 36, strength = nothing)
 
-The smooth spectral filter of Hou & Li (2007), [doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014) — transfer function
+The smooth spectral filter of Hou & Li (2007) — *Computing nearly singular solutions using
+pseudo-spectral methods*, *J. Comput. Phys.* **226**, 379–397,
+[doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014). Transfer function
 ``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
@@ -96,9 +99,10 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift dealiasing (Patterson & Orszag 1971,
-[doi:10.1063/1.1693365](https://doi.org/10.1063/1.1693365); combined with spherical truncation by
-Rogallo 1981, NASA TM-81315): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
+Phase-shift dealiasing — Patterson & Orszag (1971), *Spectral calculations of isotropic turbulence:
+efficient removal of aliasing interactions*, *Phys. Fluids* **14**, 2538–2541,
+[doi:10.1063/1.1693365](https://doi.org/10.1063/1.1693365), combined with the spherical truncation of
+Rogallo (1981), *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
@@ -147,7 +151,7 @@ All keyword, all required:
   [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller band at
   ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
   advective-CFL ceiling through
-  [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) .
+  [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).

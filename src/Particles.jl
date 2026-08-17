@@ -97,7 +97,7 @@ advect!(EndpointHeun(), tracers, buffers, u_end, domain, dt)
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
 trajectory velocities are read from the run's observables cache, through
-[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) , where the
+[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the
 iteration's
 closing deposit leaves them.
 

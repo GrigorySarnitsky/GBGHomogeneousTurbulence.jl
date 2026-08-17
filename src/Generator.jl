@@ -191,7 +191,7 @@ you.
   [`prepare!`](@ref) fills them at the start of each step; a rate that has been filled is one the
   integrating-factor verbs then return alongside the viscous coefficient, so the forcing rides the
   exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
-  [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate) , so a field driven by
+  [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate), so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
