@@ -183,8 +183,9 @@ The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
 in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
-The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` is the Dirichlet (``H^{1}``) energy
-``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle`` — a
+The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
+scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals
+``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``: a
 ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral inner product against the
 `domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
 physical gradient ``\\nabla\\varphi`` materialized. It is the scalar twin of

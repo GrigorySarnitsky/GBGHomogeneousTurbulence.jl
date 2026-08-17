@@ -91,7 +91,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``N`` | grid points per side | `grid_points_per_axis` |
 | ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
-| ``C`` | advective-CFL ceiling, ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert`` (the derivative-skewness isotropy constant wears the subscripted ``C_S``) | `recommended_cfl` |
+| ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | `recommended_cfl` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
 | ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3`; ``0`` for the imaginary-axis-unstable `IFRK2`) | `recommended_cfl` |

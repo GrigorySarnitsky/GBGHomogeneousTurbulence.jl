@@ -25,8 +25,8 @@ Lagrangian tracer tracking:
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit leaves them).
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
-- [`record_trajectory_velocity!`](@ref) — put the Lagrangian velocity at the new positions on record,
-  for the next push's first half.
+- [`record_trajectory_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
+  which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate its `out` buffers.
 """
@@ -138,7 +138,7 @@ abstract type AbstractParticleIntegrator end
 
 Second-order Heun-in-time on the velocity at the two **ends** of the step — the trajectory
 integrator a run uses by default. It advances the positions with the start-of-step Lagrangian
-velocity that [`record_trajectory_velocity!`](@ref) put on record and the end-of-step velocity field
+velocity that [`record_trajectory_velocity!`](@ref) stored and the end-of-step velocity field
 the solver has just produced, so it needs nothing from inside the field scheme's stages.
 
 Its registers are one predictor position set and the velocity interpolated there
@@ -164,7 +164,7 @@ rather than in [`Tracers`](@ref).
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
 - `predictor_velocity` — the velocity interpolated at the predicted positions: a stage register of
-  the push, never a sample of the flow, and never exposed as one.
+  the advance, never a sample of the flow, and never exposed as one.
 """
 struct ParticleIntegratorBuffers{P, PS, VV}
   predictor::P
@@ -183,17 +183,20 @@ end
 """
     record_trajectory_velocity!(tracers, u) -> tracers
 
-Record the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the flow velocity seen by
+Store the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the flow velocity seen by
 each tracer where it currently sits — by interpolating the velocity field `u` (physical
-representation) onto the positions of the tracer set `tracers`, with the set's interpolation
-scheme.
+representation) onto the positions of the tracer set `tracers`, with the set's interpolation scheme.
 
-The run layer calls it at the end of each iteration, on the just-deposited velocity at the
-just-advanced positions; the recorded values are the observables cache's particle-velocities slot,
-left there at that epoch, and the next iteration's [`advect!`](@ref) reads them back as the first
-half of its endpoint pair. Recording costs ``M \\times 3`` values for ``M`` tracers, where keeping the field itself would
-cost ``N^{3} \\times 3``. What is recorded is the trajectory velocity the run's [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities)
-returns, and the quantity the Lagrangian statistics accumulate.
+The values go into the tracer set's own `trajectory_velocity` storage, which is also the observables
+cache's particle-velocities slot; storing them here is therefore what makes
+[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Call it at
+the end of each iteration, on the just-deposited velocity at the just-advanced positions.
+
+The stored values serve twice: they are the quantity the Lagrangian statistics accumulate, and they
+are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
+an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
+``M \\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
+``N^{3} \\times 3``.
 """
 function record_trajectory_velocity!(tracers::Tracers, u)
   interpolate!(tracers.trajectory_velocity, u, tracers.position_points, tracers.scheme)
@@ -211,7 +214,7 @@ below), in place, under the trajectory integrator `pusher` (an
 supplies the box side the positions are wrapped into.
 
 Under [`EndpointHeun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
-step — the start-of-step values that [`record_trajectory_velocity!`](@ref) put on record, and the
+step — the start-of-step values that [`record_trajectory_velocity!`](@ref) stored, and the
 end-of-step velocity field ``\\texttt{velocity\\_end} = \\boldsymbol{u}(t_{n+1})`` in physical
 representation:
 
@@ -231,7 +234,8 @@ frozen start-of-step velocity alone would be first order.
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
     ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by [`record_trajectory_velocity!`](@ref)
     at the previous iteration's end. In a run the observables cache records that sample at its epoch
-    and the run layer reads it checked before pushing; a hand-run loop must re-record between pushes itself.
+    and the run layer reads it checked before each advance; a hand-run loop must call
+    [`record_trajectory_velocity!`](@ref) itself between advances.
 """
 function advect! end
 

@@ -1,7 +1,7 @@
 # State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
 # velocity and scalar — the single source of truth; the physical fields are recovered from it, never
 # held in the state) and the random initial conditions that seed a run. The physical representations
-# are recovered where they are consumed — through the preserving scratch arity of PF's `to_physical!`
+# are recovered where they are consumed — through the source-preserving four-argument form of PF's `to_physical!`
 # (the state is never consumed; PF decision 64) and, for the vorticity, `Observables.vorticity_physical!`
 # — and land in `Cache` (`ObservablesCache`); the per-step scratch lives with the integrator
 # (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.

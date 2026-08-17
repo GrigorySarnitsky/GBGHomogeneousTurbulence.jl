@@ -178,9 +178,10 @@ you.
   no physical product array exists.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
-- `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``
-  (`prepare!` fills them each step; a non-`nothing` rate is the armed offset the factor verbs
-  return). Each is `nothing` unless that field's forcing declares
+- `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``.
+  [`prepare!`](@ref) fills them at the start of each step; a rate that has been filled is one the
+  integrating-factor verbs then return alongside the viscous coefficient, so the forcing rides the
+  exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
   [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate) , so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.

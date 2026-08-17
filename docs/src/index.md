@@ -89,8 +89,8 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
   diagnostics of the flow and the scalar (`kinetic_energy`, `dissipation`, …), the spectrum-derived
-  scales (`energy_spectrum`, `integral_scale`), the advective-CFL `max_speed`, and the field-valued
-  vorticity recovery.
+  scales (`energy_spectrum`, `integral_scale`), the `max_speed` that sets the advective
+  Courant–Friedrichs–Lewy (CFL) timestep limit, and the field-valued vorticity recovery.
 - [`Cache`](api/Cache.md): the `ObservablesCache` — the storage each **iteration** (one
   advance of the run: a step plus the deposit that closes it) fills at its
   end with the observables of the state it just produced; the checked accessors
@@ -99,8 +99,9 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
-  right-hand side, the passive-scalar advection, and the exact viscous integrating factor — reified as
-  the `ResolvedGenerator` a scheme consumes through the generator protocol.
+  right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered
+  into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of verbs
+  rather than assembling the physics itself.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field

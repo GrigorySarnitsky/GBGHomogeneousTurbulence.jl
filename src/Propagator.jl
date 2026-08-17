@@ -78,8 +78,13 @@ end
 
 The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
 memory. Built per scheme by [`allocate_buffers`](@ref)`(integrator, domain; scalar)`, which allocates
-**exactly** that scheme's working set: a register another scheme would use is left `nothing`, never
+**exactly** that scheme's working set: an array another scheme would use is left `nothing`, never
 allocated.
+
+Each such array is a **register**: storage a scheme computes one stage into and overwrites at the
+next, holding nothing a caller should read between steps. The word is used in that sense throughout
+the package — including for the observables cache's slots, which double as the step's registers
+mid-iteration.
 
 # Fields
 Shared — every scheme allocates this:
@@ -187,8 +192,8 @@ assembles the physics itself. The first stage reads the
 deposited velocity, vorticity, and scalar in physical representation from `cache` — the values of
 the instant between iterations, where the cache's deposits are current, deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
-stages take the same slots as their recovery registers, so the step allocates and resides nothing
-beyond its spectral stage registers. The cache's fields epoch — the freshness counter every new
+stages compute their recoveries into those same slots, so the step allocates and resides nothing
+beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
 deposit is recorded at — is advanced when the step completes.
 
 The argument order is shared with [`deposit!`](@ref), the call that closes the iteration: the
@@ -505,24 +510,28 @@ end
 """
     recommended_cfl(integrator, domain)
 
-A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C`` for the scheme `integrator` on the
-[`FixedDomain`](@ref) `domain`, for a timestep
-``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
+A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C_{\\mathrm{CFL}}`` for the scheme
+`integrator` on the [`FixedDomain`](@ref) `domain`, for a timestep
+``\\Delta t = C_{\\mathrm{CFL}} \\Delta x / \\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}\\rvert``,
+with ``\\Delta x = L/N`` the grid spacing.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
-scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
-maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap and the looseness of the eigenvalue bound together justify the conservative factor below, since the eigenvalue bound itself
-over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
-calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
-[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
-conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times
+``C_{\\mathrm{CFL}}`` to stay within the scheme's imaginary-axis stability limit
+``y_{\\mathrm{s}}``. Two loosenesses justify the conservative factor below, and they pull the same
+way. The speed in the denominator is
+[`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid points, so the
+continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger; and the eigenvalue
+bound over-estimates the true spectral radius, since not every mode carries the peak speed. The base
+ceiling is calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
+[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C_{\\mathrm{CFL}} \\lesssim 0.83``,
+taken conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
 margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a
-proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
+proportionally smaller step, ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 """
 function recommended_cfl end

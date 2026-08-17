@@ -87,8 +87,8 @@ computes it at an observation (§2.4).
 **Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.
 The [`max_speed`](@ref) reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once and keeps
-only the largest component magnitude ``\max_i\lvert u_i\rvert`` — the advective-CFL bound, within
-``\sqrt{3}`` of the true peak speed — so the *maximum* is materialized — one number — while no
+only the largest speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` — the advective-CFL
+bound — so the *maximum* is materialized — one number — while no
 per-point field is ever whole anywhere and none can be cached.
 
 **Surviving — the schedule must leave it at the iteration's end, in a register the iteration already
@@ -121,9 +121,9 @@ count — but they form in place over the velocity and vorticity slots (§2.3), 
 iteration's end would destroy the deposited velocity and vorticity, and keeping both would cost the product array the
 minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
 step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
-schedule: the maximum velocity component is reduced from the just-deposited velocity for the next iteration's
+schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
 timestep choice, and the particle velocities are interpolated from that velocity at each particle's new
-position for the next push's predictor.
+position for the next advance's predictor.
 
 **The observation comes before the iteration.** Between iterations the callback reads
 what it wants and answers whether the run continues; only then does the next iteration run. Stopping
@@ -168,7 +168,7 @@ until the next deposit. That interval belongs to whoever made the change: the re
 exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
 buffer.
 
-**The numbers follow the same rule on the same schedule.** The maximum velocity component is a cache entry like
+**The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
 any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
 which does scalar arithmetic on it and measures nothing. It is the only number the
 iteration produces, so it is the only number the cache holds; ``\varepsilon``, ``k``, or a variance
@@ -320,7 +320,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the closing recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the particle velocities | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the maximum velocity component ``\max_i\lvert u_i\rvert`` | one number | yes | yes | the closing reduction over the cached velocity; read by the next timestep choice |
+| the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |

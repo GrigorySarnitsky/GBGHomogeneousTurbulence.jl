@@ -354,7 +354,7 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
-  # The checked read at the iteration's start: the push's v₁ must be the particle velocities the previous
+  # The checked read at the iteration's start: the advance's v₁ must be the particle velocities the previous
   # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
   # the epoch is verified here, at tₙ, where they are the current-epoch observable.
   sim.tracers === nothing || particle_velocities(sim.cache)

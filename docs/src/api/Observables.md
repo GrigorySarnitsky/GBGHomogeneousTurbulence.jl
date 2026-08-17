@@ -33,7 +33,7 @@ derivative_skewness
 
 ## Timestep control
 
-The maximum velocity component, which sets the advective-CFL step — a max-norm reduction, not a physics
+The fastest flow speed on the grid, which sets the advective-CFL step — a reduction, not a physics
 invariant.
 
 ```@docs

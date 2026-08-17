@@ -67,7 +67,7 @@ const SCRATCH = -1
 The observables cache of a run — the storage where each iteration deposits, at its end, the
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
-representation when the run carries one, the maximum velocity component (the
+representation when the run carries one, the fastest flow speed on the grid (the
 [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) number
 the next timestep choice reads), and — when the run advects tracers — the particle velocities
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
@@ -88,9 +88,9 @@ reports a scheduling error — it throws an `ErrorException` whose message names
 of the three states it is in — and the only repair is to fix the schedule that failed to deposit.
 
 !!! note
-    A slot is also its producer's register: between deposits the step works in the same array, so a
-    cached field is only valid between iterations. Treat every returned array as
-    read-only — it is the storage the next iteration will work in.
+    A slot is also the array its producer computes in: between deposits the step writes its own
+    stage values there, so a cached field is meaningful only between iterations. Treat every
+    returned array as read-only — it is the storage the next iteration will work in.
 
 # Fields
 - `velocity_physical`, `vorticity_physical` — the cached velocity and vorticity in physical
@@ -199,7 +199,7 @@ end
 # The cached-number read of the maximum speed. The generic and its docstring are homed in
 # `Observables` (the field reduction); this method extends it with the checked cached read.
 function max_speed(cache::ObservablesCache)
-  _checked(cache, cache.max_speed_epoch, "maximum velocity component")
+  _checked(cache, cache.max_speed_epoch, "maximum speed")
   return cache.max_speed
 end
 
@@ -263,7 +263,7 @@ function check_deposits(cache::ObservablesCache)
   cache.scalar_physical === nothing || cache.scalar_epoch == cache.fields_epoch ||
     error("iteration closed with the scalar slot undeposited — a solver scheduling bug")
   cache.max_speed_epoch == cache.fields_epoch ||
-    error("iteration closed with the maximum velocity component undeposited — a solver scheduling bug")
+    error("iteration closed with the maximum speed undeposited — a solver scheduling bug")
   cache.particle_velocities === nothing ||
     (cache.sample_fields_epoch == cache.fields_epoch &&
      cache.sample_particles_epoch == cache.particles_epoch) ||

@@ -20,15 +20,18 @@
 The interchangeable energy-injection strategies:
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle below.
 
-A strategy acts on the step through up to four methods, each defaulting to doing nothing (listed in
-the order the step fires them):
-- [`prepare_forcing!`](@ref) — a per-step internal-state advance.
-- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
-  [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) builds the domain.
-- [`set_forcing_rate!`](@ref) — a linear forcing rate folded into the integrating factor;
-  [`uses_linear_rate`](@ref) declares that a forcing supplies one.
-- [`add_forcing_source!`](@ref) — an additive per-stage source.
-- [`apply_forcing!`](@ref) — a post-step projection or rescale.
+A strategy acts on the step through up to four methods, each defaulting to doing nothing, listed in
+the order the step calls them:
+- [`prepare_forcing!`](@ref) — advance the forcing's own internal state, once per step.
+- [`set_forcing_rate!`](@ref) — supply a linear forcing rate to be folded into the integrating
+  factor; [`uses_linear_rate`](@ref) declares that a forcing supplies one.
+- [`add_forcing_source!`](@ref) — add a source term at each stage.
+- [`apply_forcing!`](@ref) — project or rescale the field after the step.
+
+A fifth name is not a hook: [`DeferredForcing`](@ref) is the operator-free keyword form of a
+strategy, materialized once the
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain. It exists
+at construction time and the step never calls it.
 
 The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
 [`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
@@ -55,7 +58,8 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
     AbstractForcing
 
 Supertype of the energy-injection strategies. A strategy may implement any of
-[`prepare_forcing!`](@ref) (a per-step state advance), [`set_forcing_rate!`](@ref)
+[`prepare_forcing!`](@ref) (advance the strategy's **own** internal state — a stochastic forcing's
+random process, say — never the simulation state), [`set_forcing_rate!`](@ref)
 (a linear forcing rate folded into the integrating factor — a strategy implementing it **must** also
 declare [`uses_linear_rate`](@ref), or it is never given a rate array to fill),
 [`add_forcing_source!`](@ref) (an additive per-stage source), and [`apply_forcing!`](@ref) (a
@@ -206,10 +210,13 @@ Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed
 Fourier modes — the integer shells `lowest_shell` to `highest_shell`, in units of the box's
 fundamental ``2\\pi/L`` — are rescaled by a single factor to hold the `target`.
 
-The `target` is the observable the forcing holds, chosen to agree with the diagnostics: the **kinetic
-energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` ([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)) for the velocity,
-the **scalar variance** ``\\langle\\varphi^{2}\\rangle`` ([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the field's
-``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
+The `target` is a number: the **value** the held observable is to keep. Which observable that is
+follows from the field, chosen to agree with the diagnostics — the **kinetic energy**
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle``
+([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)) for the velocity, the
+**scalar variance** ``\\langle\\varphi^{2}\\rangle``
+([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the
+field's ``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
 
 The `over` keyword selects where the target applies:
   * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
@@ -232,7 +239,7 @@ Rescaling preserves the divergence-free constraint either way.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
-  target::T            # the observable to hold: kinetic_energy (velocity) or scalar_variance (scalar)
+  target::T            # the VALUE to hold, of kinetic_energy (velocity) or scalar_variance (scalar)
   over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
 end
 
@@ -300,17 +307,19 @@ end
 Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a banded linear
 forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
-whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity the
-injection balances dissipation, so `target` is the **dissipation rate**, chosen to agree with the
-diagnostics: [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) ``\\varepsilon`` for the velocity, [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)
-``\\varepsilon_\\varphi`` for the scalar. (A rate — note the contrast with `BandRescaling`, whose
-`target` is a held amplitude.) The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
+whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity
+the injection balances dissipation, so `target` is a number: the **value** of the dissipation rate to
+hold, chosen to agree with the diagnostics —
+[`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) ``\\varepsilon`` for the
+velocity, [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)
+``\\varepsilon_\\varphi`` for the scalar. Note what kind of quantity that is: here the held observable
+is a **rate**, where `BandRescaling` holds an **amplitude**. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
 struct ConstantPower{K, I, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
   indicator::I         # the band indicator as a real array — the rate fill's factor
-  target::T            # the dissipation rate to hold: dissipation (velocity) or scalar_dissipation (scalar)
+  target::T            # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
 end
 
 function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)

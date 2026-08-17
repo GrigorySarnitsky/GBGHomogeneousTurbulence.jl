@@ -196,12 +196,13 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
   carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recovery of the
   physical representations — is not a package verb: the velocity and scalar are recovered by the
-  source-preserving scratch arity of `GBGPeriodicFields`' `to_physical!` at the sites that consume
+  source-preserving four-argument form of `GBGPeriodicFields`' `to_physical!` (the extra argument is
+  a scratch field the transform consumes in the state's place) at the sites that consume
   them, and the derived vorticity by `Observables.vorticity_physical!` (decision 47). The values
   land in the **`ObservablesCache`** (its own
   module, `Cache`, after `Observables`): the storage each iteration
   fills at its end with its observables — the physical velocity, vorticity, and scalar, the
-  maximum velocity component, and, when tracers ride the run, the particle velocities
+  maximum speed, and, when tracers ride the run, the particle velocities
   ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
   §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
   substage recovery registers mid-iteration (their epochs go to *scratch*, so a mid-iteration read
@@ -243,7 +244,7 @@ the equation becomes
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
 
-- **The reversible term.** The recoveries — the source-preserving `to_physical!` scratch arity and
+- **The reversible term.** The recoveries — the source-preserving four-argument `to_physical!` and
   the vorticity observable `vorticity_physical!` (decision 47) — produce the physical velocity and
   vorticity from ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
   ``\mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
@@ -372,7 +373,7 @@ Method (§3).
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
   damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
-  ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert``), which the run layer uses with `max_speed` to choose
+  ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers,
   and nothing in physical representation (the substage recoveries write into the cache's slots,
