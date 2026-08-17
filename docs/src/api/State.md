@@ -21,6 +21,6 @@ ResolvedFields
 Seed a large-scale-peaked, dealiased, rescaled random solenoidal velocity, or a mean-zero scalar.
 
 ```@docs
-random_solenoidal_velocity!
-random_scalar!
+random_solenoidal_velocity_spectral!
+random_scalar_spectral!
 ```

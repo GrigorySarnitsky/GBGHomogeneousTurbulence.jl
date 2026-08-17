@@ -23,8 +23,8 @@ using Test
   generator = ResolvedGenerator(domain, conditions; scalar = true)
 
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity!(û, domain; kinetic_energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
-  dealias!(û, domain)
+  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.6, peak_wavenumber = 2.0, rng = MersenneTwister(42))
+  truncate_to_band!(û, domain)
   φ̂ = new_scalar_field_spectral(domain)                          # zero scalar (passive ⇒ stays zero)
   state = ResolvedFields(û, φ̂)
   cache = ObservablesCache(domain; scalar = true)

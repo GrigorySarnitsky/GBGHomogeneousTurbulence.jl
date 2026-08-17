@@ -52,5 +52,5 @@ new_tensor_field_physical
 Apply the domain's dealias low-pass kernel to a field in spectral representation, in place.
 
 ```@docs
-dealias!
+truncate_to_band!
 ```

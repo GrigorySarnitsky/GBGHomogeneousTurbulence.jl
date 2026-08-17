@@ -2,7 +2,7 @@
 # dispatched by `step!`. All schemes are of the integrating-factor family: the stiff diffusive part
 # is advanced exactly through exp(-diffusivity·|k|²Δt), and the nonlinear term is advanced explicitly
 # by a Runge–Kutta stage combination. A scheme consumes the physics only through the ResolvedGenerator
-# protocol (prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!) — it does
+# protocol (prepare!/velocity_rhs!/scalar_rhs!/velocity_integrating_factor/scalar_integrating_factor/finalize!) — it does
 # stage arithmetic and stage-state recoveries, never assembling the right-hand side itself.
 #
 # `step!` advances the velocity û and the passive scalar φ̂ *together* through the same RK stages: the
@@ -39,10 +39,10 @@ using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, _retained_nyquist_fraction,
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..Generator: ResolvedGenerator, prepare!, finalize!,
-                   velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor
+                   velocity_rhs!, scalar_rhs!, velocity_integrating_factor, scalar_integrating_factor
 using ..State: ResolvedFields
 using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-               resolved_fields_modified!,
+               fields_modified!,
                take_velocity!, take_vorticity!, take_scalar!,
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
@@ -196,8 +196,8 @@ function step! end
 
 Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
-[`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor) /
-[`scalar_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_factor) over a substep
+[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over a substep
 interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and
 applied per mode by the backend's fused exponential convolution, never built as a field —
 and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
@@ -230,7 +230,7 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
-  û, φ̂ = state.velocity, state.scalar
+  û, φ̂ = state.velocity_spectral, state.scalar_spectral
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   a = (zero(T), T(-5 // 9), T(-153 // 128))
@@ -279,7 +279,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     end
     # The stage update and its integrating-factor rotation fuse into ONE pass: the fused exponential
     # evaluates E(dᵢΔt) per mode from the factor's parameters — nothing built, stored, or swept.
-    ℰ = velocity_factor(generator, d[i] * dt)
+    ℰ = velocity_integrating_factor(generator, d[i] * dt)
     _exponential_update!(û, one(T), û, b[i], hu, domain, ℰ)                       # ûᵢ ← E_ν (ûᵢ + Bᵢ hu)
     i < 3 && _exponential_rotate!(hu, domain, ℰ)
 
@@ -291,14 +291,14 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       else
         combine!(hφ, a[i], hφ, dt_T, sb.nonlinear)
       end
-      ℰφ = scalar_factor(generator, d[i] * dt)
+      ℰφ = scalar_integrating_factor(generator, d[i] * dt)
       _exponential_update!(φ̂, one(T), φ̂, b[i], hφ, domain, ℰφ)                    # φ̂ᵢ ← E_κ (φ̂ᵢ + Bᵢ hφ)
       i < 3 && _exponential_rotate!(hφ, domain, ℰφ)
     end
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
+  fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 
@@ -308,8 +308,8 @@ end
 
 Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
 factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the generator's
-[`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor) /
-[`scalar_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_factor) at ``D = \\nu`` and
+[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) at ``D = \\nu`` and
 ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
 ``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a
 field ``\\hat q`` with
@@ -339,7 +339,7 @@ struct IFRK2 <: AbstractIntegrator end
 
 function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
-  û, φ̂ = state.velocity, state.scalar
+  û, φ̂ = state.velocity_spectral, state.scalar_spectral
   T = real(eltype(field_data(û)))
   dt_T = T(dt)
   half = dt_T / 2
@@ -365,12 +365,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # fuses with its rotation into one exponential pass, and ûₙ and N̂_u,1 are rotated here rather than
   # after stage 2 (neither is read by the stage-2 assembly, which works off the predictor). The
   # factor is never materialized — the fused exponential evaluates it per mode from its parameters.
-  ℰ = velocity_factor(generator, dt)                                                             # E_ν parameters
+  ℰ = velocity_integrating_factor(generator, dt)                                                             # E_ν parameters
   _exponential_update!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1, domain, ℰ)  # û* ← E_ν(ûₙ + Δt N̂_u,1)
   _exponential_rotate!(buffers.stage1, domain, ℰ)                                                # E_ν N̂_u,1
   _exponential_rotate!(û, domain, ℰ)                                                             # E_ν ûₙ
   if has_scalar
-    ℰφ = scalar_factor(generator, dt)                                                            # E_κ parameters
+    ℰφ = scalar_integrating_factor(generator, dt)                                                            # E_κ parameters
     _exponential_update!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1, domain, ℰφ)               # φ̂* ← E_κ(φ̂ₙ + Δt N̂_φ,1)
     _exponential_rotate!(sb.stage1, domain, ℰφ)                                                  # E_κ N̂_φ,1
     _exponential_rotate!(φ̂, domain, ℰφ)                                                          # E_κ φ̂ₙ
@@ -399,7 +399,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  resolved_fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
+  fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
   return û, φ̂
 end
 
@@ -460,21 +460,21 @@ hand-run loop calls it itself, and the `Simulation` constructor makes the seedin
 first iteration finds the initial state's observables. The argument order is shared with `step!` —
 the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
 same fixed order as there. After mutating the state out of band, announce
-it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
+it with [`fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
 
 Returns `cache` (or `sim`).
 """
 function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)
   u = take_velocity!(cache)
-  to_physical!(u, state.velocity, domain.velocity_plans, _recovery_scratch(buffers))
+  to_physical!(u, state.velocity_spectral, domain.velocity_plans, _recovery_scratch(buffers))
   deposit_velocity!(cache)
   ω = take_vorticity!(cache)
-  vorticity_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
+  vorticity_physical!(ω, state.velocity_spectral, domain, _recovery_scratch(buffers))
   deposit_vorticity!(cache)
-  if state.scalar !== nothing && cache.scalar !== nothing
+  if state.scalar_spectral !== nothing && cache.scalar_physical !== nothing
     φ = take_scalar!(cache)
-    to_physical!(φ, state.scalar, domain.scalar_plans, _recovery_scratch(buffers.scalar))
+    to_physical!(φ, state.scalar_spectral, domain.scalar_plans, _recovery_scratch(buffers.scalar))
     deposit_scalar!(cache)
   end
   deposit_max_speed!(cache, max_speed(u))

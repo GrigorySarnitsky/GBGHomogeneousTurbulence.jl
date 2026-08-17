@@ -13,15 +13,15 @@
 
 Lagrangian tracer tracking:
 - [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
-- [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
+- [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit stamps them).
 - [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the velocity at both ends of the step).
 - [`record_trajectory_velocity!`](@ref) — put the Lagrangian velocity at the new positions on record,
   for the next push's first half.
-- [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
-  [`scalar_buffer`](@ref) allocate its `out` buffers.
+- [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
+  [`new_scalar_point_values`](@ref) allocate its `out` buffers.
 """
 module Particles
 
@@ -29,15 +29,15 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, _reference, _real_type
 
-export Tracers, record_trajectory_velocity!, advect!, sample!,
-       particle_positions, number_of_tracers, velocity_buffer, scalar_buffer
+export Tracers, record_trajectory_velocity!, advect!, interpolate_at_particles!,
+       particle_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
 """
-    Tracers(domain, number_of_tracers; scheme, rng = default_rng())
+    Tracers(domain, number_of_particles; scheme, rng = default_rng())
     Tracers(domain, positions; scheme)
 
-A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `number_of_tracers`
+A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `number_of_particles`
 tracers uniformly at random in the periodic box of `domain`; the second wraps a given `(M, 3)` array of
 `M` tracer positions (the three columns are the ``x, y, z`` components), converting it to `domain`'s
 backend and element type. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
@@ -52,7 +52,7 @@ acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil
 The `rng` (first form only) is the random stream seeding the uniformly-random tracer positions; it
 defaults to `Random.default_rng()`.
 
-Read the particle state with [`particle_positions`](@ref) and [`number_of_tracers`](@ref); the
+Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
 trajectory velocities are read from the run's observables cache (`particle_velocities`), where the
 iteration's closing deposit stamps them. The remaining fields are preallocated predictor and
 point-value scratch, so the tracer push allocates no per-step memory.
@@ -91,11 +91,11 @@ function Tracers(domain::FixedDomain, positions::AbstractMatrix; scheme)
                  scheme)
 end
 
-function Tracers(domain::FixedDomain, number_of_tracers::Integer; scheme, rng = Random.default_rng())
+function Tracers(domain::FixedDomain, number_of_particles::Integer; scheme, rng = Random.default_rng())
   T = _real_type(domain)
   L = T(domain.grid.domain_size[1])
-  positions = similar(_reference(domain), T, (Int(number_of_tracers), 3))
-  copyto!(positions, L .* rand(rng, T, Int(number_of_tracers), 3))
+  positions = similar(_reference(domain), T, (Int(number_of_particles), 3))
+  copyto!(positions, L .* rand(rng, T, Int(number_of_particles), 3))
   return Tracers(domain, positions; scheme)
 end
 
@@ -169,7 +169,7 @@ end
 
 
 """
-    sample!(out, field, tracers) -> out
+    interpolate_at_particles!(out, field, tracers) -> out
 
 Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
@@ -177,7 +177,7 @@ velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Po
 for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. Used to gather a field along the trajectories for the forthcoming Lagrangian
 statistics.
 """
-function sample!(out, field, tracers::Tracers)
+function interpolate_at_particles!(out, field, tracers::Tracers)
   interpolate!(out, field, tracers.position_points, tracers.scheme)
   return out
 end
@@ -185,41 +185,39 @@ end
 
 """
     particle_positions(tracers)
-    particle_positions(sim)
 
 The `(M, 3)` array of current tracer positions — the probes' own state, read off the tracer set
-`tracers`. The second form reads a `Simulation`'s tracers (and throws an `ArgumentError` when the
-run advects none).
+`tracers`.
 """
 particle_positions(tracers::Tracers) = tracers.positions
 
 
 """
-    number_of_tracers(tracers)
+    number_of_particles(tracers)
 
 The number of tracers ``M`` in the tracer set `tracers`.
 """
-number_of_tracers(tracers::Tracers) = size(tracers.positions, 1)
+number_of_particles(tracers::Tracers) = size(tracers.positions, 1)
 
 
 """
-    velocity_buffer(tracers)
+    new_vector_point_values(tracers)
 
 Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) of
 shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
-[`sample!`](@ref) when sampling the velocity along the trajectories.
+[`interpolate_at_particles!`](@ref) when sampling the velocity along the trajectories.
 """
-velocity_buffer(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
+new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
 
 """
-    scalar_buffer(tracers)
+    new_scalar_point_values(tracers)
 
 Allocate a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues) of
 length ``M`` matching the tracer set `tracers`, for use as the `out` of
-[`sample!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
+[`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
 """
-scalar_buffer(tracers::Tracers) =
-  ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), number_of_tracers(tracers)))
+new_scalar_point_values(tracers::Tracers) =
+  ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), number_of_particles(tracers)))
 
 
 end # module Particles

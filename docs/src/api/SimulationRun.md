@@ -9,7 +9,7 @@ Order   = [:module]
 
 The assembled, ready-to-run case — the front-door `Simulation(; grid_points_per_axis, viscosity, …)` and the
 domain-taking `Simulation(domain; …)` constructors. Read its measured state by applying the
-[`Observables`](Observables.md) to `sim.state` — for example `kinetic_energy(sim.state.velocity)` in a
+[`Observables`](Observables.md) to `sim.state` — for example `kinetic_energy(sim.state.velocity_spectral)` in a
 `run!` callback.
 
 ```@docs
@@ -28,18 +28,6 @@ StationarityCriterion
 warmup!
 ```
 
-## The state's uniform reads
-
-The evolving state itself, read as functions of the run — *uniform* because they are always
-serveable: the state is always current, so unlike a checked cache read these never throw (the
-cached observables — `velocity_physical`, `particle_velocities`, … — live on the
-[Cache](Cache.md) page).
-
-```@docs
-velocity_spectral
-scalar_spectral
-```
-
 ## Clock accessors
 
 The elapsed simulation time and the step count.
@@ -49,12 +37,11 @@ current_time
 current_step
 ```
 
-## Flow parameters and spectrum validation
+## Flow parameters
 
-Bridge the run's measured state to a [`Phenomenology`](../phenomenology.md) `FlowParameters`, and
-compare the measured energy spectrum against a model spectrum.
+Bridge the run's measured state to a [`Phenomenology`](../phenomenology.md) `FlowParameters`, so any
+reference law can be evaluated at the run's measured state.
 
 ```@docs
 flow_parameters
-validate_spectrum
 ```

@@ -210,11 +210,11 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   `scalar_physical`, the cached `max_speed`) serves the deposited value or throws — there is no path
   by which reading causes a computation — and the cache keeps one epoch counter per dynamical factor
   of the run (fields, particles); `step!` advances the fields epoch as it completes, and an
-  out-of-band mutation of the spectral state is declared through `resolved_fields_modified!` — the
+  out-of-band mutation of the spectral state is declared through `fields_modified!` — the
   one freshness event the cache cannot detect itself (§11 decision 30) — followed by a `deposit!`
   before the run advances again. The `State` module's initial conditions seed the state:
-  `random_solenoidal_velocity!` fills a divergence-free velocity with a large-scale spectral envelope,
-  rescaled to a target ``k``, and `random_scalar!` fills a mean-zero scalar to a target variance. The
+  `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
+  rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The
   per-step scratch is **not** state: the scheme's registers live with the integrator (`IntegratorBuffers`
   in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
   preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
@@ -260,7 +260,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   ``d_i\Delta t``, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
-  pair `velocity_factor` / `scalar_factor` supplies its *parameters* — the coefficient on
+  pair `velocity_integrating_factor` / `scalar_integrating_factor` supplies its *parameters* — the coefficient on
   ``\lvert\boldsymbol{\kappa}\rvert^2``, the rate's scale, the armed rate field — and the backend's
   fused exponential convolution evaluates ``\mathcal{E}`` per mode as it applies it, advancing the
   diffusion with no stability restriction and no kernel field built or stored. ``\mathcal{E}`` is a *propagator*, a flow map over a step, not a generator;
@@ -292,9 +292,9 @@ quadratic product forms in place over an operand's own register, §11 decision 4
 protocol —
 `prepare!` opens the step (advances each forcing's internal state, arms the linear rates),
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
-(dealiased nonlinear term plus additive forcing source), `velocity_factor` / `scalar_factor` supply
+(dealiased nonlinear term plus additive forcing source), `velocity_integrating_factor` / `scalar_integrating_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
-The required core is `velocity_rhs!` and `velocity_factor`; `prepare!` and `finalize!` default to
+The required core is `velocity_rhs!` and `velocity_integrating_factor`; `prepare!` and `finalize!` default to
 no-ops. A scheme consumes the physics only through this protocol, so it can never assemble the
 right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
 reification (§11 decisions 29, 31).
@@ -396,7 +396,7 @@ Lagrangian velocity, held in `Tracers.trajectory_velocity` and stamped in the ob
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `Tracers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
 not readable. After the push, `record_trajectory_velocity!` records the new sample at the new
-positions from the same deposited field, completing the iteration's deposits; `sample!` reads any field along the
+positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 
 The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
@@ -448,7 +448,7 @@ Over it:
   the run holds, wherever it lives — reading needs no knowledge of the state/cache split, while
   *writing* stays on the dot path (`sim.state`), where the danger demands the knowledge.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
-  `sim.state` (e.g. `kinetic_energy(sim.state.velocity)`, `dissipation` on the recovered vorticity) the
+  `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) the
   current-state diagnostics, for a callback to read.
 
 The layer wires §4.1–§4.6 together and holds no physics or numerics of its own.
@@ -765,7 +765,7 @@ one usually encodes a decision.
 ## 10. Conventions
 
 - **Docstrings are operator-first, then scheme.** State the continuous operator or PDE term and its
-  exact/ideal form, *then* the discrete realization — as `velocity_factor` leads with
+  exact/ideal form, *then* the discrete realization — as `velocity_integrating_factor` leads with
   ``\partial_t f = D\nabla^{2} f`` before ``\mathcal{E}(\boldsymbol{\kappa})``, and `velocity_rhs!` with
   the Lamb-vector identity before the pseudospectral product. This is the turbulence analogue of the
   siblings' physical-form-first / estimand-first rules.
@@ -1000,8 +1000,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     produces the physical `X`, its source shown in the signature). (b) **`ForcingSpec` is renamed
     `DeferredForcing`**, naming the object by its meaning — a forcing specified before the domain exists
     and materialized once it does — rather than the `spec` abbreviation (superseding the name minted in
-    decision 14). (c) **`random_scalar!` gains a `spectrum` keyword** mirroring
-    `random_solenoidal_velocity!`, seeding the scalar from a target radial scalar-variance spectrum (an
+    decision 14). (c) **`random_scalar_spectral!` gains a `spectrum` keyword** mirroring
+    `random_solenoidal_velocity_spectral!`, seeding the scalar from a target radial scalar-variance spectrum (an
     Obukhov–Corrsin form from `Phenomenology`) for spectrum-matched initial conditions and faster
     warm-up. (d) **`HouLi`'s `strength` defaults to `nothing`, meaning auto**: resolved at kernel-build
     time to ``-\log`` of the element type's machine epsilon (``\approx 36`` for `Float64`,
@@ -1093,7 +1093,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `:vorticity`), each stamped with the **fields epoch** it was computed at; an accessor
     (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
-    completes. An out-of-band mutation is declared through **`resolved_fields_modified!`**, named for
+    completes. An out-of-band mutation is declared through **`fields_modified!`**, named for
     the event that breaks the chart–state invariant (the naming lesson of SciML's `u_modified!` →
     `derivative_discontinuity!` rename: name the verb for the violated invariant, not the mutated
     slot); the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
@@ -1121,7 +1121,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     buffers, the forcing-rate arrays), the conditions, and the step lifecycle. The protocol:
     `prepare!` (open the step — advance forcing state, arm linear rates), `velocity_rhs!` /
     `scalar_rhs!` (each field's explicit right-hand side at a stage state: the dealiased nonlinear
-    term plus the additive forcing source), `velocity_factor!` / `scalar_factor!` (each field's exact
+    term plus the additive forcing source), `velocity_integrating_factor!` / `scalar_integrating_factor!` (each field's exact
     linear subflow — the generator is the semilinear split ``\partial_t \hat q = A\hat q + N(\hat q)``
     with a *diagonal, exact* linear operator, the exponential-integrator family's special case), and
     `finalize!` (close the step — the post-step forcing projections). The rhs/factor pairs are the
@@ -1412,7 +1412,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `MATERIALIZED_SYMBOLS` holder narrows to exactly that remaining traffic.
 39. **(2026-08) The integrating factor is never materialized: the factor verbs supply parameters, and
     the stage update is one fused exponential pass.** The protocol's factor half changed shape:
-    `velocity_factor` / `scalar_factor` (the `!` is gone — nothing is mutated) return the exponential's
+    `velocity_integrating_factor` / `scalar_integrating_factor` (the `!` is gone — nothing is mutated) return the exponential's
     parameters — `coefficient` ``= -D\tau``, `offset_scale` ``= \tau``, `offset` ``= \hat A`` or
     `nothing` — and the schemes apply ``\mathcal{E}`` through `GBGPeriodicFields`'
     `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
@@ -1444,7 +1444,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     iteration's first-stage recoveries relocated, plus the maximum-speed reduction the next timestep
     choice reads); a read serves the stamped value or **throws** — there is no path, internal or on
     request, by which reading causes a computation (the recompute-on-staleness accessors of
-    decision 30 are retired; `resolved_fields_modified!` now opens an interval in which reads throw,
+    decision 30 are retired; `fields_modified!` now opens an interval in which reads throw,
     closed by an explicit `deposit!`). Contents are **automatic** — the constructor derives them from
     the configuration (the `observables` declaration keyword is gone); the three-valued stamp
     (deposited value / producer's scratch / never deposited) polices the mid-iteration window, and

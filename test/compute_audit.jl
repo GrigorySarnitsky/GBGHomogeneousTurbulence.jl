@@ -322,7 +322,7 @@ end
                                   velocity_forcing = force)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       prepare!(generator, ResolvedFields(domain; scalar = true), domain, 0.01)
-      (velocity_factor(generator, 0.01), scalar_factor(generator, 0.01), generator)
+      (velocity_integrating_factor(generator, 0.01), scalar_integrating_factor(generator, 0.01), generator)
     end
 
     fu, fφ, gen = factors(1.0, NoForcing())                       # Sc = 1, no armed rate

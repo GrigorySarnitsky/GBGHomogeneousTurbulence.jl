@@ -117,7 +117,6 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 """
     max_speed(u)
     max_speed(cache)
-    max_speed(sim)
 
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
 in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
@@ -128,8 +127,7 @@ eigenvalue bound over-estimates the true spectral radius).
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
 left it — the same quantity, measured once per iteration and served without a reduction (or a
-device readback); it throws when no deposit is current, like every cached read. The third form
-reads a `Simulation`'s cache.
+device readback); it throws when no deposit is current, like every cached read.
 """
 function max_speed end
 

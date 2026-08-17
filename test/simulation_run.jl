@@ -18,46 +18,46 @@ using Test
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
                      velocity_forcing = domain -> ConstantPower(domain; target = 0.1),
-                     scalar = true, number_of_tracers = 50, rng = MersenneTwister(1))
+                     scalar = true, number_of_particles = 50, rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
-    @test isfinite(scalar_variance(sim.state.scalar)) && scalar_variance(sim.state.scalar) > 0
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
+    @test isfinite(scalar_variance(sim.state.scalar_spectral)) && scalar_variance(sim.state.scalar_spectral) > 0
 
     # A fixed eddy-turnover budget is a three-line observation: accumulate Δt·ε/k, stop at the target.
     let elapsed = Ref(0.0), last_t = Ref(current_time(sim))
       run!(sim) do s
-        ε = dissipation(s.state.velocity, s.domain, s.generator.conditions.viscosity)
-        elapsed[] += (current_time(s) - last_t[]) * ε / kinetic_energy(s.state.velocity)
+        ε = dissipation(s.state.velocity_spectral, s.domain, s.generator.conditions.viscosity)
+        elapsed[] += (current_time(s) - last_t[]) * ε / kinetic_energy(s.state.velocity_spectral)
         last_t[] = current_time(s)
         elapsed[] < 2.0
       end
     end
     @test current_step(sim) > 0 && current_time(sim) > 0
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
 
     samples = Float64[]                                        # a coarser cadence is the callback's own business
     t0 = current_time(sim)
     let next = Ref(t0)
       run!(sim) do s
-        current_time(s) ≥ next[] && (push!(samples, kinetic_energy(s.state.velocity)); next[] += 0.05)
+        current_time(s) ≥ next[] && (push!(samples, kinetic_energy(s.state.velocity_spectral)); next[] += 0.05)
         current_time(s) < t0 + 0.3
       end
     end
     @test !isempty(samples) && all(isfinite, samples)          # the cadenced observation fired
     @test current_time(sim) ≥ t0 + 0.3
     @test all(0 .<= particle_positions(sim.tracers) .< L)        # tracers advected, still in the box
-    @test isfinite(kinetic_energy(sim.state.velocity)) && isfinite(scalar_variance(sim.state.scalar))
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && isfinite(scalar_variance(sim.state.scalar_spectral))
   end
 
   @testset "free decay loses energy" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
                      scalar = false, velocity_forcing = NoForcing(), rng = MersenneTwister(2))
-    k0 = kinetic_energy(sim.state.velocity)
+    k0 = kinetic_energy(sim.state.velocity_spectral)
     run!(s -> current_step(s) < 40, sim)
     @test current_step(sim) == 40
-    @test isfinite(kinetic_energy(sim.state.velocity))
-    @test kinetic_energy(sim.state.velocity) < k0                             # unforced ⇒ decays
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral))
+    @test kinetic_energy(sim.state.velocity_spectral) < k0                             # unforced ⇒ decays
   end
 
   @testset "grid-resolved viscosity (grid mode)" begin
@@ -77,16 +77,16 @@ using Test
   @testset "initial condition from a spectrum" begin
     sim = Simulation(grid_points_per_axis = 48, viscosity = 0.01,
                      initial_spectrum = VonKarman1948(), rng = MersenneTwister(4))
-    κ, E = energy_spectrum(sim.state.velocity, sim.domain)
+    κ, E = energy_spectrum(sim.state.velocity_spectral, sim.domain)
     @test all(≥(0), E)
-    @test isapprox(sum(E), kinetic_energy(sim.state.velocity); rtol = 1e-5)   # shape normalized to `energy`
+    @test isapprox(sum(E), kinetic_energy(sim.state.velocity_spectral); rtol = 1e-5)   # shape normalized to `energy`
     @test κ[argmax(E)] < κ[end] / 2                            # energy concentrated at large scales
 
     # a raw κ -> E(κ) function is also accepted
     sim2 = Simulation(grid_points_per_axis = 32, viscosity = 0.02,
                       initial_spectrum = κ -> κ^4 * exp(-κ), rng = MersenneTwister(4))
-    @test kinetic_energy(sim2.state.velocity) > 0
-    @test isapprox(sum(last(energy_spectrum(sim2.state.velocity, sim2.domain))), kinetic_energy(sim2.state.velocity); rtol = 1e-5)
+    @test kinetic_energy(sim2.state.velocity_spectral) > 0
+    @test isapprox(sum(last(energy_spectrum(sim2.state.velocity_spectral, sim2.domain))), kinetic_energy(sim2.state.velocity_spectral); rtol = 1e-5)
   end
 
   @testset "the observation fires after every iteration — n iterations, n+1 observations" begin
@@ -112,7 +112,7 @@ using Test
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; element_type = Float32,
                      scalar = false, rng = MersenneTwister(4))
     run!(s -> current_step(s) < 10, sim)
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
   end
 
   @testset "the observation must decide — a non-Bool return throws" begin
@@ -131,7 +131,7 @@ using Test
                      velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(20))
     run!(s -> current_step(s) < 5, sim)
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
   end
 
   @testset "stationarity detector (unit)" begin
@@ -166,7 +166,7 @@ using Test
                      velocity_forcing = ConstantPower(target = 0.1), scalar = false,
                      rng = MersenneTwister(21))
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.3, max_turnovers = 10)
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test current_step(sim) > 0
     # the criterion is an ordinary run! observation
     sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(22))
@@ -183,7 +183,7 @@ using Test
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
     warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.35, max_turnovers = 10)
-    @test isfinite(scalar_variance(forced.state.scalar)) && scalar_variance(forced.state.scalar) > 0
+    @test isfinite(scalar_variance(forced.state.scalar_spectral)) && scalar_variance(forced.state.scalar_spectral) > 0
     @test current_step(forced) > 0
     plain = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(24))
     @test !D._scalar_forced(plain)                                        # unforced scalar not gated
@@ -193,8 +193,8 @@ using Test
     domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
-    dealias!(û, domain)
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
+    truncate_to_band!(û, domain)
     S0 = derivative_skewness(û, domain)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0
 
@@ -217,8 +217,8 @@ using Test
                      velocity_forcing = ConstantPower(target = 0.15), scalar = false,
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
-    @test isfinite(kinetic_energy(sim.state.velocity)) && kinetic_energy(sim.state.velocity) > 0
-    @test isfinite(derivative_skewness(sim.state.velocity, sim.domain))
+    @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
+    @test isfinite(derivative_skewness(sim.state.velocity_spectral, sim.domain))
     @test current_step(sim) > 0
   end
 
@@ -228,13 +228,13 @@ using Test
                      velocity_forcing = BandRescaling(target = 0.8, over = :total),
                      scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(sim; dt = 0.01)
-    @test kinetic_energy(sim.state.velocity) ≈ 0.8 rtol = 1e-3
+    @test kinetic_energy(sim.state.velocity_spectral) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
     simb = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
                       velocity_forcing = BandRescaling(target = 0.3, over = :band),
                       scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(simb; dt = 0.01)
-    @test isfinite(kinetic_energy(simb.state.velocity)) && kinetic_energy(simb.state.velocity) > 0
+    @test isfinite(kinetic_energy(simb.state.velocity_spectral)) && kinetic_energy(simb.state.velocity_spectral) > 0
     # the target symbol is validated at construction
     domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)

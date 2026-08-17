@@ -27,8 +27,8 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)
-  random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
-  dealias!(û0, domain)
+  random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(11))
+  truncate_to_band!(û0, domain)
 
   run_velocity(conditions, nsteps; dt = 0.01) = begin
     û = new_vector_field_spectral(domain); copyto!(field_data(û), field_data(û0))
@@ -87,7 +87,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
   @testset "scalar Linear forcing builds variance" begin
     û_zero = new_vector_field_spectral(domain)             # no velocity ⇒ pure linear growth of the scalar band
     φ̂0 = new_scalar_field_spectral(domain)
-    random_scalar!(φ̂0, domain; scalar_variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
+    random_scalar_spectral!(φ̂0, domain; scalar_variance = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(9))
     conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, velocity_forcing = NoForcing())
     φ̂ = new_scalar_field_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
@@ -132,8 +132,8 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
     conditions = FlowConditions(viscosity = ν, velocity_forcing = ou, schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
-    dealias!(û, domain)
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.1, peak_wavenumber = 2.0, rng = MersenneTwister(3))
+    truncate_to_band!(û, domain)
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)

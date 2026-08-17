@@ -56,8 +56,8 @@ const N_AUDIT = 8
 function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
   state = ResolvedFields(domain; scalar)
-  velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity, domain, 0.01)
-  scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar, domain, 0.01)
+  velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity_spectral, domain, 0.01)
+  scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar_spectral, domain, 0.01)
   owners = Any[state, ObservablesCache(domain; scalar), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
@@ -300,7 +300,7 @@ const EPISODE_UNITS = [
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
                        velocity_forcing = NoForcing(), integrator = _scheme(scheme),
-                       number_of_tracers = tracers, rng = MersenneTwister(1))
+                       number_of_particles = tracers, rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
             _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
                              tracers > 0 ? TRACER_DELTA : ZERO))
@@ -327,7 +327,8 @@ const EPISODE_UNITS = [
     # The symbolic values must correspond to actual storage: the chart slots on ObservablesCache,
     # products on ResolvedGenerator, spectral stage registers on IntegratorBuffers/ScalarBuffers,
     # the OU's state and noise on the forcing.
-    @test all(f -> f in fieldnames(ObservablesCache), (:velocity, :vorticity, :scalar, :max_speed))
+    @test all(f -> f in fieldnames(ObservablesCache),
+              (:velocity_physical, :vorticity_physical, :scalar_physical, :max_speed))
     @test :product_spectral in fieldnames(ResolvedGenerator)
     # The physical product register is gone (decision 41): the Lamb vector forms over the vorticity
     # slot and the scalar flux over the velocity slot — in place, alias-safe.
@@ -407,14 +408,14 @@ const EPISODE_UNITS = [
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     unit = 8 * N^3
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
     φ̂ = new_scalar_field_spectral(domain)
-    random_scalar!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
     episodes = Dict(
-      "seed velocity" => () -> random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5,
+      "seed velocity" => () -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
                                                            peak_wavenumber = 2.0, rng = MersenneTwister(1)),
-      "seed scalar" => () -> random_scalar!(φ̂, domain; scalar_variance = 1.0,
+      "seed scalar" => () -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
                                             peak_wavenumber = 2.0, rng = MersenneTwister(2)),
       "derivative_skewness" => () -> derivative_skewness(û, domain),
       "energy_spectrum" => () -> energy_spectrum(û, domain),

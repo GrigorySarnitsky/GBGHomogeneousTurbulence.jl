@@ -18,7 +18,7 @@ The discretized periodic box a run lives on — the reusable, read-only frame:
   [`new_scalar_field_spectral`](@ref), [`new_scalar_field_physical`](@ref),
   [`new_tensor_field_spectral`](@ref), [`new_tensor_field_physical`](@ref) — the field allocators
   (a zeroed field of the named kind and representation, on the domain's backend and element type).
-- [`dealias!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
+- [`truncate_to_band!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
 
 Precision and backend enter here and flow everywhere from here.
 """
@@ -29,11 +29,11 @@ using GBGPeriodicFields
 export FixedDomain,
        new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical,
        new_tensor_field_spectral, new_tensor_field_physical,
-       dealias!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift, max_wavenumber
+       truncate_to_band!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift, max_wavenumber
 
 # ── Dealiasing strategies ────────────────────────────────────────────────────────────────────────
 # How the aliasing of the quadratic nonlinearity is controlled. Each strategy builds the `domain.dealias`
-# kernel (applied by `dealias!`/`convolve!`) and declares the Nyquist fraction it keeps energetic,
+# kernel (applied by `truncate_to_band!`/`convolve!`) and declares the Nyquist fraction it keeps energetic,
 # which sets the advective-CFL ceiling (see `recommended_cfl`).
 
 """
@@ -137,7 +137,7 @@ All keyword, all required:
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
 - `dealiasing` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule) and [`HouLi`](@ref)
-  (the smooth Hou–Li filter) apply [`dealias!`](@ref) as a coefficientwise multiply, while
+  (the smooth Hou–Li filter) apply [`truncate_to_band!`](@ref) as a coefficientwise multiply, while
   [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller band at
   ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
   advective-CFL ceiling through `recommended_cfl`.
@@ -321,7 +321,7 @@ new_tensor_field_physical(domain::FixedDomain) =
 
 
 """
-    dealias!(field, domain)
+    truncate_to_band!(field, domain)
 
 Apply the run's dealias low-pass kernel `domain.dealias` — `domain` a [`FixedDomain`](@ref) — to
 `field` in place: a coefficientwise multiply that
@@ -331,6 +331,6 @@ the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spheri
 ``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation. Returns `field`.
 """
-dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
+truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 
 end # module SimulationDomain

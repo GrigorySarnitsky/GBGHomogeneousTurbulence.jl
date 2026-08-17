@@ -13,7 +13,7 @@ The evolving state a run advances, and how it is seeded:
 - [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation: a passive
   record with every operation external (the single source of truth; the physical fields are
   recovered from it, never held in the state).
-- [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
+- [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random initial conditions
   (a divergence-free velocity, a mean-zero scalar) that seed it.
 
 All sized to a [`FixedDomain`](@ref). The physical representations are recovered from the state with
@@ -33,7 +33,7 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_vector_field_physical,
                           new_scalar_field_spectral, new_scalar_field_physical, _real_type
 
-export ResolvedFields, random_solenoidal_velocity!, random_scalar!
+export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 
 
 """
@@ -53,8 +53,8 @@ Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive sca
   no passive scalar.
 """
 struct ResolvedFields{UH, PH}
-  velocity::UH                   # û (spectral) — the resolved velocity, the single source of truth
-  scalar::PH                     # φ̂ (spectral), or nothing when the run carries no scalar
+  velocity_spectral::UH          # û (spectral) — the resolved velocity, the single source of truth
+  scalar_spectral::PH            # φ̂ (spectral), or nothing when the run carries no scalar
 end
 
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
@@ -62,7 +62,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 
 """
-    random_solenoidal_velocity!(û, domain; kinetic_energy, peak_wavenumber,
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, peak_wavenumber,
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
@@ -88,11 +88,11 @@ stream (defaults to `Random.default_rng()`).
 
 !!! note
     Seeding into a running case mutates the resolved fields out of band — announce it with
-    [`resolved_fields_modified!`](@ref GBGIsotropicTurbulence.Cache.resolved_fields_modified!), and
+    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), and
     re-deposit with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing
     (cached reads throw in between; nothing is recomputed on a read).
 """
-function random_solenoidal_velocity!(û, domain::FixedDomain;
+function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
                                      spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
@@ -128,7 +128,7 @@ end
 
 
 """
-    random_scalar!(φ̂, domain; scalar_variance, peak_wavenumber,
+    random_scalar_spectral!(φ̂, domain; scalar_variance, peak_wavenumber,
                    spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
@@ -154,11 +154,11 @@ stream (defaults to `Random.default_rng()`).
 
 !!! note
     Seeding into a running case mutates the resolved fields out of band — announce it with
-    [`resolved_fields_modified!`](@ref GBGIsotropicTurbulence.Cache.resolved_fields_modified!), and
+    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), and
     re-deposit with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing
     (cached reads throw in between; nothing is recomputed on a read).
 """
-function random_scalar!(φ̂, domain::FixedDomain;
+function random_scalar_spectral!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)

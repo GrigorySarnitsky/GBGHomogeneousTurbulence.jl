@@ -1,6 +1,6 @@
 # ObservablesCache tests — the no-recompute contract: a read serves the deposited value or throws
 # (never rebuilds); slots double as the step's registers (taken mid-iteration, re-deposited at the
-# end); `resolved_fields_modified!` announces an out-of-band mutation and `deposit!` restores the
+# end); `fields_modified!` announces an out-of-band mutation and `deposit!` restores the
 # deposits; the completeness check refuses an iteration that left a slot undeposited.
 
 using GBGIsotropicTurbulence
@@ -15,7 +15,7 @@ using Test
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
 
@@ -50,8 +50,8 @@ using Test
     cache = ObservablesCache(domain)
     deposit!(cache, state, domain, buffers)
     before = copy(field_data(velocity_physical(cache)))
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.7, peak_wavenumber = 3.0, rng = MersenneTwister(2))
-    resolved_fields_modified!(cache)
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.7, peak_wavenumber = 3.0, rng = MersenneTwister(2))
+    fields_modified!(cache)
     @test_throws ErrorException velocity_physical(cache)         # stale: nothing is recomputed
     deposit!(cache, state, domain, buffers)
     after = field_data(velocity_physical(cache))
@@ -65,7 +65,7 @@ using Test
     cache = ObservablesCache(domain)
     @test_throws ArgumentError scalar_physical(cache)
     with_scalar = ObservablesCache(domain; scalar = true)
-    @test with_scalar.scalar !== nothing
+    @test with_scalar.scalar_physical !== nothing
   end
 
   @testset "step! leaves the cache mid-iteration; deposit! closes it" begin
@@ -85,17 +85,18 @@ using Test
     @test field_data(velocity_physical(cache)) != u_before       # the advanced state's recovery
   end
 
-  @testset "Simulation-level accessors forward to the cache" begin
+  # A `Simulation` carries the cache; it is not itself a reading surface (decision 49). The user
+  # reaches a deposited observable through `sim.cache` and the state through `sim.state`, so this
+  # exercises the out-of-band announce/re-deposit cycle on those two directly.
+  @testset "the announce/re-deposit cycle on a live run" begin
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = false, rng = MersenneTwister(4))
-    u = velocity_physical(sim)                                     # the constructor's seeding deposit
+    u = velocity_physical(sim.cache)                                # the constructor's seeding deposit
     @test u === velocity_physical(sim.cache)
-    @test vorticity_physical(sim) === vorticity_physical(sim.cache)
-    @test max_speed(sim) == max_speed(sim.cache)
-    random_solenoidal_velocity!(sim.state.velocity, sim.domain; kinetic_energy = 0.9,
+    random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain; kinetic_energy = 0.9,
                                 peak_wavenumber = 2.0, rng = MersenneTwister(5))
-    resolved_fields_modified!(sim)
-    @test_throws ErrorException velocity_physical(sim)
+    fields_modified!(sim.cache)
+    @test_throws ErrorException velocity_physical(sim.cache)
     deposit!(sim)
-    @test kinetic_energy(velocity_physical(sim)) ≈ kinetic_energy(sim.state.velocity)
+    @test kinetic_energy(velocity_physical(sim.cache)) ≈ kinetic_energy(sim.state.velocity_spectral)
   end
 end

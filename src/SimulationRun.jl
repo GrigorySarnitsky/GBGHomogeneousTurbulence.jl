@@ -24,10 +24,11 @@ The run layer:
   iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
   observation, and its one-line sugar.
-- [`velocity_spectral`](@ref), [`scalar_spectral`](@ref) — the uniform reads of the state itself.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
-- [`validate_spectrum`](@ref) — compare the run's measured energy spectrum against a `Phenomenology` model.
+
+A `Simulation` is a container, not a reading surface: read the state through `sim.state` and the
+deposited observables through `sim.cache`, with the observables and cache accessors that own them.
 """
 module SimulationRun
 
@@ -35,10 +36,9 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
-using ..State: ResolvedFields, random_solenoidal_velocity!, random_scalar!
-using ..Cache: ObservablesCache, check_deposits, particles_modified!, deposit_sample!
-import ..Cache: velocity_physical, vorticity_physical, scalar_physical, max_speed,
-                particle_velocities, resolved_fields_modified!
+using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
+using ..Cache: ObservablesCache, check_deposits, particles_modified!, deposit_sample!,
+               velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, BandRescaling
@@ -47,14 +47,12 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, record_trajectory_velocity!, advect!
-import ..Particles: particle_positions
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
-       velocity_spectral, scalar_spectral,
-       current_time, current_step, flow_parameters, validate_spectrum
+       current_time, current_step, flow_parameters
 
 
 mutable struct Clock
@@ -80,8 +78,8 @@ divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varp
 constructor that builds every component for you); the second takes a `FixedDomain` you built
 yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
-observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity)`) or through the cache's
-deposited observables ([`velocity_physical`](@ref)`(sim)`, [`vorticity_physical`](@ref)`(sim)`),
+observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or through the
+cache's deposited observables (`velocity_physical(sim.cache)`, `vorticity_physical(sim.cache)`),
 summarize it
 with [`flow_parameters`](@ref), and track its progress with [`current_time`](@ref) / [`current_step`](@ref).
 
@@ -151,10 +149,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
   run's state (its integral scale set to `1/peak_wavenumber` (which is the Gaussian envelope's characteristic
   wavenumber ``\\kappa_p``, not the shell-spectrum peak — that sits at ``\\kappa_p/\\sqrt{2}``; see
-  [`random_solenoidal_velocity!`](@ref))) and normalized to `kinetic_energy`.
+  [`random_solenoidal_velocity_spectral!`](@ref))) and normalized to `kinetic_energy`.
 - `integrator = IFLowStorageRK3()`, `cfl = recommended_cfl(integrator, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
-- `number_of_tracers = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
+- `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
   their interpolation scheme, forwarded to the `Tracers` constructor.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
@@ -212,7 +210,7 @@ function Simulation(domain::FixedDomain;
                     cfl::Real = recommended_cfl(integrator, domain),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
-                    number_of_tracers::Integer = 0, tracer_scheme = CatmullRom,
+                    number_of_particles::Integer = 0, tracer_scheme = CatmullRom,
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
@@ -240,10 +238,10 @@ function Simulation(domain::FixedDomain;
   elseif !isnothing(initial_spectrum)
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
-  random_solenoidal_velocity!(state.velocity, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  scalar && random_scalar!(state.scalar, domain; scalar_variance, peak_wavenumber, rng)
+  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
+  scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, peak_wavenumber, rng)
 
-  tracers = number_of_tracers > 0 ? Tracers(domain, number_of_tracers; scheme = tracer_scheme, rng) : nothing
+  tracers = number_of_particles > 0 ? Tracers(domain, number_of_particles; scheme = tracer_scheme, rng) : nothing
 
   cache = ObservablesCache(domain; scalar,
                              particle_velocities = tracers === nothing ? nothing : tracers.trajectory_velocity)
@@ -261,49 +259,12 @@ function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
 end
 
 
-# Observables are functions of the state, not the `Simulation`: to diagnose a run, the caller supplies
-# the state fields and parameters explicitly — `kinetic_energy(sim.state.velocity)`. The run-layer
-# functions below do exactly that; the observable generics themselves never take a `Simulation`. (The
-# `sim` methods below are thin forwarders to the cache accessors, whose docstrings are the home: the
-# user's callback receives `sim` and reads the run, never the machinery path inside it.)
+# A `Simulation` is a container, not a reading surface: it holds the state, the cache, and the run
+# machinery, and the user reads each of those directly — `kinetic_energy(sim.state.velocity_spectral)`
+# for a state observable, `velocity_physical(sim.cache)` for a deposited one. The run layer adds no
+# forwarding methods, so there is exactly one way to reach each quantity and no second docstring to
+# drift from the first.
 
-
-"""
-    velocity_spectral(sim)
-
-The velocity ``\\hat{\\boldsymbol{u}}`` in spectral representation of the run `sim` — the evolving
-state itself, always current (it is what the run advances, not a cached observable). Treat it as read-only: to
-mutate the state out of band, write through `sim.state` and announce it with
-[`resolved_fields_modified!`](@ref).
-"""
-velocity_spectral(sim::Simulation) = sim.state.velocity
-
-
-"""
-    scalar_spectral(sim)
-
-The scalar ``\\hat\\varphi`` in spectral representation of the run `sim` — the evolving state
-itself, always current, with exactly [`velocity_spectral`](@ref)'s contract. Throws an `ArgumentError` when the run carries
-no passive scalar.
-"""
-function scalar_spectral(sim::Simulation)
-  sim.state.scalar === nothing &&
-    throw(ArgumentError("this run carries no passive scalar"))
-  return sim.state.scalar
-end
-
-
-particle_positions(sim::Simulation) =
-  sim.tracers === nothing ?
-    throw(ArgumentError("this run advects no tracers")) : particle_positions(sim.tracers)
-
-
-velocity_physical(sim::Simulation) = velocity_physical(sim.cache)
-vorticity_physical(sim::Simulation) = vorticity_physical(sim.cache)
-scalar_physical(sim::Simulation) = scalar_physical(sim.cache)
-max_speed(sim::Simulation) = max_speed(sim.cache)
-particle_velocities(sim::Simulation) = particle_velocities(sim.cache)
-resolved_fields_modified!(sim::Simulation) = (resolved_fields_modified!(sim.cache); sim)
 
 function deposit!(sim::Simulation)
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
@@ -329,52 +290,14 @@ current state (the scalar dissipation is left `NaN` only for a scalar-free run, 
 laws do not apply).
 """
 function flow_parameters(sim::Simulation)
-  k = kinetic_energy(sim.state.velocity)
-  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
-  εφ = sim.state.scalar === nothing ? NaN :
-    scalar_dissipation(sim.state.scalar, sim.domain, sim.generator.conditions.viscosity / sim.generator.conditions.schmidt)
+  k = kinetic_energy(sim.state.velocity_spectral)
+  ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
+  εφ = sim.state.scalar_spectral === nothing ? NaN :
+    scalar_dissipation(sim.state.scalar_spectral, sim.domain, sim.generator.conditions.viscosity / sim.generator.conditions.schmidt)
   FlowParameters(; viscosity = sim.generator.conditions.viscosity, dissipation = ε,
                  rms_velocity = sqrt(2k / 3),
-                 integral_scale = integral_scale(sim.state.velocity, sim.domain),
+                 integral_scale = integral_scale(sim.state.velocity_spectral, sim.domain),
                  schmidt = sim.generator.conditions.schmidt, scalar_dissipation = εφ)
-end
-
-
-"""
-    validate_spectrum(sim, model)
-
-Compare the measured energy spectrum of `sim` against a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum `model` (an
-`EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). The measured
-[`energy_spectrum`](@ref) is a per-shell energy (``k = \\sum_\\kappa E(\\kappa)``) while the model is a
-spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), so the density is multiplied by the
-shell width ``\\Delta\\kappa = 2\\pi/L`` before comparison — making the two agree at any box side ``L`` (not
-only the default ``L = 2\\pi``, where ``\\Delta\\kappa = 1``). Returns a named tuple
-`(; wavenumbers, measured, predicted, relative_error)`: the resolved shell wavenumbers, the measured and
-predicted per-shell ``E(\\kappa)``, and the relative ``L^{2}`` discrepancy over the resolved (non-empty) shells.
-
-!!! note
-    A developed, well-resolved run agrees with a good model across the inertial range; at low Reynolds
-    number or coarse resolution the inertial range is narrow, so a large discrepancy is expected and
-    reflects the run, not the model.
-"""
-function validate_spectrum(sim::Simulation, model::EnergySpectrum)
-  fp = flow_parameters(sim)
-  κ, measured = energy_spectrum(sim.state.velocity, sim.domain)
-  # Measured is a per-shell energy (k = Σ E); the model is a density (k = ∫ E dκ). Bring the density to a
-  # per-shell energy by the shell width Δκ = 2π/L so the comparison is correct at any box side L.
-  Δκ = 2π / sim.domain.grid.domain_size[1]
-  predicted = similar(measured)
-  num = zero(eltype(measured))
-  den = zero(eltype(measured))
-  for i in eachindex(κ, measured)
-    predicted[i] = κ[i] > 0 ? spectrum(model, κ[i], fp) * Δκ : zero(eltype(measured))
-    if measured[i] > 0
-      num += (measured[i] - predicted[i])^2
-      den += measured[i]^2
-    end
-  end
-  return (; wavenumbers = κ, measured, predicted, relative_error = sqrt(num / den))
 end
 
 
@@ -397,7 +320,7 @@ current_step(sim::Simulation) = sim.clock.step
 # makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
 # deposited number — the previous closing deposit measured it — so choosing Δt is scalar arithmetic, not a pass.
 function cfl_timestep(sim::Simulation)
-  N = size(field_data(sim.cache.velocity), 1)
+  N = size(field_data(sim.cache.velocity_physical), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
   speed = max_speed(sim.cache)
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
@@ -470,7 +393,7 @@ end
 
 history = Float64[]                              # record k at every observation; stop at 200 steps
 run!(sim) do s
-    push!(history, kinetic_energy(s.state.velocity))
+    push!(history, kinetic_energy(s.state.velocity_spectral))
     current_step(s) < 200
 end
 
@@ -571,12 +494,12 @@ end
 # transforms) and test.
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
-  φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
-  S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
+  φ2 = m.gate_scalar ? (sim.state.scalar_spectral === nothing ? NaN : scalar_variance(sim.state.scalar_spectral)) : 0.0
+  S = m.gate_skew ? derivative_skewness(sim.state.velocity_spectral, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
-_scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.generator.conditions.scalar_forcing isa NoForcing)
+_scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim.generator.conditions.scalar_forcing isa NoForcing)
 
 
 """
@@ -654,10 +577,10 @@ function (criterion::StationarityCriterion)(sim::Simulation)
     criterion.last_time = current_time(sim)
     criterion.started = true
   end
-  ε = dissipation(sim.state.velocity, sim.domain, sim.generator.conditions.viscosity)
+  ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
   Δt = current_time(sim) - criterion.last_time
   criterion.last_time = current_time(sim)
-  ε > 0 && (criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity)))
+  ε > 0 && (criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity_spectral)))
   _observe_and_test!(criterion.monitor, sim, criterion.elapsed_turn, ε) && return false
   if criterion.elapsed_turn ≥ criterion.max_turnovers
     @warn "StationarityCriterion: hit the max_turnovers = $(criterion.max_turnovers) cap without detecting stationarity"

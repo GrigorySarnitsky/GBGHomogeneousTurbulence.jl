@@ -17,7 +17,7 @@ run — one `step!` and the `deposit!` that closes it; between iterations the ru
 periodic box; a slot's **stamp** records which of these instants its value belongs to, so a read
 can be refused rather than served stale. The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their stamps, and the epoch counters.
-- [`resolved_fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
+- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
   mutation made outside the iteration, so the affected stamps go stale and reads throw until the
   next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
@@ -39,7 +39,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_fie
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       particle_velocities, resolved_fields_modified!, particles_modified!
+       particle_velocities, fields_modified!, particles_modified!
 
 
 # Stamp sentinels. A slot's stamp is the fields epoch it was deposited at; the sentinels mark the
@@ -82,30 +82,30 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `velocity`, `vorticity` — the cached velocity and vorticity in physical representation (the arrays
   double as the step's stage recovery registers).
 - `scalar` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
-- `velocity_stamp`, `vorticity_stamp`, `scalar_stamp`, `max_speed_stamp` — each slot's stamp: the
+- `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — each slot's stamp: the
   fields epoch it was deposited at, or a sentinel (never deposited / in use as scratch).
 - `max_speed` — the cached maximum velocity component (a host number).
 - `particle_velocities` — the particle-velocities slot (the tracer set's own point-value storage,
   whose `(M, 3)` array the accessor extracts with `point_values`), or
-  `nothing` for a tracer-free run; `sample_fields_stamp` / `sample_particles_stamp` are its stamps
+  `nothing` for a tracer-free run; `sample_fields_epoch` / `sample_particles_epoch` are its stamps
   against BOTH epochs, since the sample is a function of the state and the positions together.
 - `fields_epoch` — the state's epoch: advanced by every completed step and by
-  [`resolved_fields_modified!`](@ref); a stamp is current exactly when it equals this.
+  [`fields_modified!`](@ref); a stamp is current exactly when it equals this.
 - `particles_epoch` — the tracer positions' epoch (advanced by the tracer push), the second
   freshness axis of the trajectory-bound slots.
 """
 mutable struct ObservablesCache{PV, PS, TS}
-  const velocity::PV
-  const vorticity::PV
-  const scalar::PS
+  const velocity_physical::PV
+  const vorticity_physical::PV
+  const scalar_physical::PS
   const particle_velocities::TS
-  velocity_stamp::Int
-  vorticity_stamp::Int
-  scalar_stamp::Int
+  velocity_epoch::Int
+  vorticity_epoch::Int
+  scalar_epoch::Int
   max_speed::Float64
-  max_speed_stamp::Int
-  sample_fields_stamp::Int
-  sample_particles_stamp::Int
+  max_speed_epoch::Int
+  sample_fields_epoch::Int
+  sample_particles_epoch::Int
   fields_epoch::Int
   particles_epoch::Int
 end
@@ -137,66 +137,62 @@ end
 
 """
     velocity_physical(cache)
-    velocity_physical(sim)
 
 The velocity ``\\boldsymbol{u}`` in physical representation at the current epoch — the checked
 read of the [`ObservablesCache`](@ref) `cache`'s velocity slot. Returns the deposited field when its
 stamp is current, and throws otherwise (the slot is mid-iteration scratch, stale, or was never
 deposited): the throw is an `ErrorException` naming the slot and which of the three states it is in,
 and nothing is ever recomputed on a read. Treat the returned field as read-only — it is the
-storage the next iteration works in. The second form reads a `Simulation`'s cache.
+storage the next iteration works in.
 """
 function velocity_physical(cache::ObservablesCache)
-  _checked(cache, cache.velocity_stamp, "velocity")
-  return cache.velocity
+  _checked(cache, cache.velocity_epoch, "velocity")
+  return cache.velocity_physical
 end
 
 
 """
     vorticity_physical(cache)
-    vorticity_physical(sim)
 
 The vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
 at the current epoch — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
 slot, with exactly [`velocity_physical`](@ref)'s contract (the deposited field or a throw; never a
 recomputation; read-only). The deposited value is produced by
 [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) — measure with
-that function, read with this one. The second form reads a `Simulation`'s cache.
+that function, read with this one.
 """
 function vorticity_physical(cache::ObservablesCache)
-  _checked(cache, cache.vorticity_stamp, "vorticity")
-  return cache.vorticity
+  _checked(cache, cache.vorticity_epoch, "vorticity")
+  return cache.vorticity_physical
 end
 
 
 """
     scalar_physical(cache)
-    scalar_physical(sim)
 
 The scalar ``\\varphi`` in physical representation at the current epoch — the checked read of the
 [`ObservablesCache`](@ref) `cache`'s scalar slot, with exactly [`velocity_physical`](@ref)'s
 contract (the deposited field or a throw; never a recomputation; read-only). Throws an
-`ArgumentError` when the run carries no scalar. The second form reads a `Simulation`'s cache.
+`ArgumentError` when the run carries no scalar.
 """
 function scalar_physical(cache::ObservablesCache)
-  cache.scalar === nothing &&
+  cache.scalar_physical === nothing &&
     throw(ArgumentError("this run carries no passive scalar, so the cache has no scalar slot"))
-  _checked(cache, cache.scalar_stamp, "scalar")
-  return cache.scalar
+  _checked(cache, cache.scalar_epoch, "scalar")
+  return cache.scalar_physical
 end
 
 
 # The cached-number read of the maximum speed. The generic and its docstring are homed in
 # `Observables` (the field reduction); this method extends it with the checked cached read.
 function max_speed(cache::ObservablesCache)
-  _checked(cache, cache.max_speed_stamp, "maximum velocity component")
+  _checked(cache, cache.max_speed_epoch, "maximum velocity component")
   return cache.max_speed
 end
 
 
 """
     particle_velocities(cache)
-    particle_velocities(sim)
 
 The particle velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the current epoch — the
 ``(M, 3)`` array of the flow velocity sampled at the position each tracer occupies at that instant:
@@ -204,7 +200,7 @@ the genuine Lagrangian velocity the statistics accumulate. The checked read of t
 [`ObservablesCache`](@ref) `cache`'s particle-velocities slot: it serves the deposited values or
 throws, like every cached read — the sample depends on the state **and** the positions, so it is
 current only when both epochs match its stamps. Throws an `ArgumentError` when the run advects no
-tracers. The second form reads a `Simulation`'s cache.
+tracers.
 
 !!! note
     This is never the second velocity of the tracer position update (the corrector stage of the
@@ -214,8 +210,8 @@ tracers. The second form reads a `Simulation`'s cache.
 function particle_velocities(cache::ObservablesCache)
   cache.particle_velocities === nothing &&
     throw(ArgumentError("this run advects no tracers, so the cache has no particle-velocities slot"))
-  cache.sample_fields_stamp == cache.fields_epoch &&
-    cache.sample_particles_stamp == cache.particles_epoch ||
+  cache.sample_fields_epoch == cache.fields_epoch &&
+    cache.sample_particles_epoch == cache.particles_epoch ||
     error("the cached particle velocities are stale: the state or the tracer positions have advanced " *
           "past the deposited values, and nothing in the cache is ever recomputed; read " *
           "between iterations, after the closing deposit")
@@ -230,20 +226,20 @@ end
 
 # Take a slot's array as mid-iteration scratch. The stamp goes to SCRATCH, so a read between the
 # take and the next deposit throws instead of returning a stage intermediate.
-take_velocity!(cache::ObservablesCache) = (cache.velocity_stamp = SCRATCH; cache.velocity)
-take_vorticity!(cache::ObservablesCache) = (cache.vorticity_stamp = SCRATCH; cache.vorticity)
-take_scalar!(cache::ObservablesCache) = (cache.scalar_stamp = SCRATCH; cache.scalar)
+take_velocity!(cache::ObservablesCache) = (cache.velocity_epoch = SCRATCH; cache.velocity_physical)
+take_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = SCRATCH; cache.vorticity_physical)
+take_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = SCRATCH; cache.scalar_physical)
 
 # Stamp a slot as holding the observable at the current fields epoch. The producer writes the value
 # into the slot's array first, then stamps.
-deposit_velocity!(cache::ObservablesCache) = (cache.velocity_stamp = cache.fields_epoch; cache.velocity)
-deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_stamp = cache.fields_epoch; cache.vorticity)
-deposit_scalar!(cache::ObservablesCache) = (cache.scalar_stamp = cache.fields_epoch; cache.scalar)
+deposit_velocity!(cache::ObservablesCache) = (cache.velocity_epoch = cache.fields_epoch; cache.velocity_physical)
+deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = cache.fields_epoch; cache.vorticity_physical)
+deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_epoch; cache.scalar_physical)
 deposit_max_speed!(cache::ObservablesCache, value::Real) =
-  (cache.max_speed = Float64(value); cache.max_speed_stamp = cache.fields_epoch; value)
+  (cache.max_speed = Float64(value); cache.max_speed_epoch = cache.fields_epoch; value)
 deposit_sample!(cache::ObservablesCache) =
-  (cache.sample_fields_stamp = cache.fields_epoch;
-   cache.sample_particles_stamp = cache.particles_epoch; cache.particle_velocities)
+  (cache.sample_fields_epoch = cache.fields_epoch;
+   cache.sample_particles_epoch = cache.particles_epoch; cache.particle_velocities)
 
 
 # The deposit-completeness check: every slot the configuration carries must be stamped at the
@@ -251,37 +247,36 @@ deposit_sample!(cache::ObservablesCache) =
 # schedule fills it — so a throw here names a solver bug at its source rather than letting the slot
 # hold scratch for the rest of the run.
 function check_deposits(cache::ObservablesCache)
-  cache.velocity_stamp == cache.fields_epoch ||
+  cache.velocity_epoch == cache.fields_epoch ||
     error("iteration closed with the velocity slot undeposited — a solver scheduling bug")
-  cache.vorticity_stamp == cache.fields_epoch ||
+  cache.vorticity_epoch == cache.fields_epoch ||
     error("iteration closed with the vorticity slot undeposited — a solver scheduling bug")
-  cache.scalar === nothing || cache.scalar_stamp == cache.fields_epoch ||
+  cache.scalar_physical === nothing || cache.scalar_epoch == cache.fields_epoch ||
     error("iteration closed with the scalar slot undeposited — a solver scheduling bug")
-  cache.max_speed_stamp == cache.fields_epoch ||
+  cache.max_speed_epoch == cache.fields_epoch ||
     error("iteration closed with the maximum velocity component undeposited — a solver scheduling bug")
   cache.particle_velocities === nothing ||
-    (cache.sample_fields_stamp == cache.fields_epoch &&
-     cache.sample_particles_stamp == cache.particles_epoch) ||
+    (cache.sample_fields_epoch == cache.fields_epoch &&
+     cache.sample_particles_epoch == cache.particles_epoch) ||
     error("iteration closed with the particle velocities undeposited — a solver scheduling bug")
   return cache
 end
 
 
 """
-    resolved_fields_modified!(cache)
-    resolved_fields_modified!(sim)
+    fields_modified!(cache)
 
 Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\varphi``, in spectral
 representation —
 were changed outside the iteration (a re-seeded velocity, any direct write to the state's storage).
 Advances the fields epoch of `cache`, so every cached observable is stale and reads throw until
-the next deposit; that interval belongs to whoever made the change. Returns `cache` (or `sim`).
+the next deposit; that interval belongs to whoever made the change. Returns `cache`.
 
 The sanctioned mutators call this for you: `step!` advances the epoch itself when it completes, and
 the iteration's closing deposit then restores the cache. After a hand-made mutation, re-deposit with the
 run layer's `deposit!` before advancing again — the timestep choice reads the cached maximum speed.
 """
-resolved_fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
+fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
 """
@@ -289,7 +284,7 @@ resolved_fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; c
 
 Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
 correction, any direct write to the tracer storage) — the particle counterpart of
-[`resolved_fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
+[`fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
 trajectory-bound observable is stale and reads throw until the next deposit. Returns `cache`.
 
 The sanctioned mutator calls it for you: the run layer's tracer push announces its own advance, and

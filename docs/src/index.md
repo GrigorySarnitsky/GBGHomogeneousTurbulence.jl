@@ -44,7 +44,7 @@ run!(sim) do s                                # records what it wants, and decid
     current_time(s) < t_end
 end
 
-kinetic_energy(sim.state.velocity)            # read a measured observable off the state
+kinetic_energy(sim.state.velocity_spectral)            # read a measured observable off the state
 velocity_physical(sim)                        # an observable the iteration deposited at its end
 flow_parameters(sim)                          # the run's measured flow state
 ```
@@ -107,8 +107,9 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   sampling along trajectories, with a selectable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
   runs it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
-  stationarity); it reports the measured flow state (`flow_parameters`) and compares the measured
-  energy spectrum to a `Phenomenology` model (`validate_spectrum`).
+  stationarity) and reports the measured flow state as a `Phenomenology` `FlowParameters`
+  (`flow_parameters`). A `Simulation` is a container rather than a reading surface: the state is read
+  through `sim.state`, the deposited observables through `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
   the umbrella), designed to be extractable into a standalone package.

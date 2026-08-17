@@ -7,19 +7,19 @@ Order   = [:module]
 
 ## Wiring tracers into a run
 
-Pass `number_of_tracers` to the front door and the run carries a tracer set: `advance!` pushes it
+Pass `number_of_particles` to the front door and the run carries a tracer set: `advance!` pushes it
 every iteration and records the Lagrangian sample, so the reads below are always current between
 iterations.
 
 ```julia
-sim = Simulation(grid_points_per_axis = 64, number_of_tracers = 4096)
+sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
 warmup!(sim)
 advance!(sim)
 
 particle_positions(sim)             # (M, 3) positions at the current instant
 particle_velocities(sim)            # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked cache read
-out = velocity_buffer(sim.tracers)  # allocate once, then reuse
-sample!(out, velocity_physical(sim), sim.tracers)
+out = new_vector_point_values(sim.tracers)  # allocate once, then reuse
+interpolate_at_particles!(out, velocity_physical(sim), sim.tracers)
 ```
 
 ## The tracer set
@@ -34,7 +34,7 @@ Tracers
 
 ```@docs
 particle_positions
-number_of_tracers
+number_of_particles
 ```
 
 ## The tracking loop
@@ -49,17 +49,17 @@ back as the first half of its pair.
 ```@docs
 record_trajectory_velocity!
 advect!
-sample!
+interpolate_at_particles!
 ```
 
 ## Sample buffers
 
-Allocate the point-value `out` for `sample!` — a
+Allocate the point-value `out` for `interpolate_at_particles!` — a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
 for the scalar.
 
 ```@docs
-velocity_buffer
-scalar_buffer
+new_vector_point_values
+new_scalar_point_values
 ```

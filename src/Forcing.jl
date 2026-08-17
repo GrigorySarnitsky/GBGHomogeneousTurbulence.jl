@@ -116,7 +116,7 @@ end
 For a strategy `forcing` linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `rate`; the integrator folds it into the diffusive
-integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_factor)), so the
+integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Only a forcing declaring [`uses_linear_rate`](@ref) is ever handed
 a rate array, so the default method is never reached in a run; it returns `rate` untouched. The

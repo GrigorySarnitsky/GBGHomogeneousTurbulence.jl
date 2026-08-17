@@ -162,7 +162,7 @@ rest of the run and throw on every later read, and the completeness check names 
 happened.
 
 Code that writes the state outside an iteration — a reseed, a filter — must announce the change by
-calling [`resolved_fields_modified!`](@ref), which clears every stamp, so that reads
+calling [`fields_modified!`](@ref), which clears every stamp, so that reads
 throw
 until the next deposit. That interval belongs to whoever made the change: the recoveries are
 exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
@@ -375,10 +375,10 @@ and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when
 no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's `advance!` calls it
 after every step; the `Simulation` constructor makes the seeding deposit), and
-[`resolved_fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
+[`fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields, not a filtered subset of the scales — after which reads
 throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the particle velocities —
-a cached read like the fields' — and [`sample!`](@ref) interpolates any physical field at the
+a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
 particle positions.
 
 ```julia

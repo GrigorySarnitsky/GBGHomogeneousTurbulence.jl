@@ -86,11 +86,11 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     end
   end
 
-  @testset "sample! reads a field along trajectories" begin
+  @testset "interpolate_at_particles! reads a field along trajectories" begin
     tracers = Tracers(domain, 40; scheme = CatmullRom, rng = MersenneTwister(2))
     constant = ScalarFieldPhysical((x, y, z) -> 2.5, domain.grid)
-    samples = scalar_buffer(tracers)
-    sample!(samples, constant, tracers)
+    samples = new_scalar_point_values(tracers)
+    interpolate_at_particles!(samples, constant, tracers)
     @test all(≈(2.5), point_values(samples))                  # a constant field samples exactly
   end
 
@@ -99,8 +99,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     conditions = FlowConditions(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
-    dealias!(û, domain)
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
+    truncate_to_band!(û, domain)
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)

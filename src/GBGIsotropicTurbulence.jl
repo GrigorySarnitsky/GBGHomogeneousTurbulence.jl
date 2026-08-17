@@ -19,7 +19,7 @@
 #                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
-#                      prepare!/velocity_rhs!/scalar_rhs!/velocity_factor/scalar_factor/finalize!)
+#                      prepare!/velocity_rhs!/scalar_rhs!/velocity_integrating_factor/scalar_integrating_factor/finalize!)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
 #   Particles        — Lagrangian tracer tracking (instruments)
@@ -68,7 +68,7 @@ using .SimulationDomain:
   new_scalar_field_physical,
   new_tensor_field_spectral,
   new_tensor_field_physical,
-  dealias!,
+  truncate_to_band!,
   DealiasingStrategy,
   TwoThirds,
   HouLi,
@@ -77,8 +77,8 @@ using .SimulationDomain:
 
 using .State:
   ResolvedFields,
-  random_solenoidal_velocity!,
-  random_scalar!
+  random_solenoidal_velocity_spectral!,
+  random_scalar_spectral!
 
 using .Cache:
   ObservablesCache,
@@ -86,7 +86,7 @@ using .Cache:
   vorticity_physical,
   scalar_physical,
   particle_velocities,
-  resolved_fields_modified!,
+  fields_modified!,
   particles_modified!
 
 using .Generator:
@@ -95,8 +95,8 @@ using .Generator:
   prepare!,
   velocity_rhs!,
   scalar_rhs!,
-  velocity_factor,
-  scalar_factor,
+  velocity_integrating_factor,
+  scalar_integrating_factor,
   finalize!
 
 using .Observables:
@@ -137,11 +137,11 @@ using .Particles:
   Tracers,
   record_trajectory_velocity!,
   advect!,
-  sample!,
+  interpolate_at_particles!,
   particle_positions,
-  number_of_tracers,
-  velocity_buffer,
-  scalar_buffer
+  number_of_particles,
+  new_vector_point_values,
+  new_scalar_point_values
 
 using .SimulationRun:
   Simulation,
@@ -149,12 +149,9 @@ using .SimulationRun:
   run!,
   warmup!,
   StationarityCriterion,
-  velocity_spectral,
-  scalar_spectral,
   current_time,
   current_step,
-  flow_parameters,
-  validate_spectrum
+  flow_parameters
 
 
 export FixedDomain,
@@ -164,7 +161,7 @@ export FixedDomain,
        vorticity_physical,
        scalar_physical,
        particle_velocities,
-       resolved_fields_modified!,
+       fields_modified!,
        particles_modified!,
        new_vector_field_spectral,
        new_vector_field_physical,
@@ -172,9 +169,9 @@ export FixedDomain,
        new_scalar_field_physical,
        new_tensor_field_spectral,
        new_tensor_field_physical,
-       random_solenoidal_velocity!,
-       random_scalar!,
-       dealias!,
+       random_solenoidal_velocity_spectral!,
+       random_scalar_spectral!,
+       truncate_to_band!,
        DealiasingStrategy,
        TwoThirds,
        HouLi,
@@ -185,8 +182,8 @@ export FixedDomain,
        prepare!,
        velocity_rhs!,
        scalar_rhs!,
-       velocity_factor,
-       scalar_factor,
+       velocity_integrating_factor,
+       scalar_integrating_factor,
        finalize!,
        kinetic_energy,
        dissipation,
@@ -219,22 +216,19 @@ export FixedDomain,
        Tracers,
        record_trajectory_velocity!,
        advect!,
-       sample!,
+       interpolate_at_particles!,
        particle_positions,
-       number_of_tracers,
-       velocity_buffer,
-       scalar_buffer,
+       number_of_particles,
+       new_vector_point_values,
+       new_scalar_point_values,
        Simulation,
        advance!,
        run!,
        warmup!,
        StationarityCriterion,
-       velocity_spectral,
-       scalar_spectral,
        current_time,
        current_step,
-       flow_parameters,
-       validate_spectrum
+       flow_parameters
 
 
 end # module GBGIsotropicTurbulence

@@ -24,7 +24,7 @@ Its contents (each formula lives in the operation's own docstring):
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (the
   dealiased, Leray-projected momentum term and the scalar advection, each plus its additive forcing
   source) at a stage state.
-- [`velocity_factor`](@ref), [`scalar_factor`](@ref) — supply each field's exact linear subflow (the
+- [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's exact linear subflow (the
   viscous/diffusive integrating factor, with any linear forcing rate folded in).
 - [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
 
@@ -44,7 +44,7 @@ using ..Forcing: AbstractForcing, NoForcing,
                  add_forcing_source!
 
 export FlowConditions, ResolvedGenerator,
-       prepare!, velocity_rhs!, scalar_rhs!, velocity_factor, scalar_factor, finalize!
+       prepare!, velocity_rhs!, scalar_rhs!, velocity_integrating_factor, scalar_integrating_factor, finalize!
 
 
 """
@@ -150,7 +150,7 @@ value a scheme can hold: the
 through (the quadratic-product fields, the displaced-evaluation buffers when the domain dealiases by
 `PhaseShift`, and the per-mode forcing-rate arrays). A time-marching scheme consumes it through the
 generator protocol — [`prepare!`](@ref) once per step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref)
-at each stage state, [`velocity_factor`](@ref) / [`scalar_factor`](@ref) for the exact linear
+at each stage state, [`velocity_integrating_factor`](@ref) / [`scalar_integrating_factor`](@ref) for the exact linear
 subflows, [`finalize!`](@ref) after the completed step — and itself does only stage arithmetic, so a
 scheme can never assemble the right-hand side from a mismatched intermediate state.
 
@@ -215,13 +215,13 @@ stages; the stage evaluations and the integrating factors then consume what it p
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
   generator.displaced_velocity_fresh = false        # a new step opens with the displaced scratch stale
   conditions = generator.conditions
-  prepare_forcing!(conditions.velocity_forcing, state.velocity, domain, dt)
+  prepare_forcing!(conditions.velocity_forcing, state.velocity_spectral, domain, dt)
   generator.velocity_rate === nothing ||
-    set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity, domain)
-  if state.scalar !== nothing
-    prepare_forcing!(conditions.scalar_forcing, state.scalar, domain, dt)
+    set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity_spectral, domain)
+  if state.scalar_spectral !== nothing
+    prepare_forcing!(conditions.scalar_forcing, state.scalar_spectral, domain, dt)
     generator.scalar_rate === nothing ||
-      set_forcing_rate!(conditions.scalar_forcing, generator.scalar_rate, state.scalar, domain)
+      set_forcing_rate!(conditions.scalar_forcing, generator.scalar_rate, state.scalar_spectral, domain)
   end
   return generator
 end
@@ -238,8 +238,8 @@ the step — the diagnostics, the derived observables, the tracer push — sees 
 Returns `state`.
 """
 function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)
-  apply_forcing!(generator.conditions.velocity_forcing, state.velocity, domain)
-  state.scalar === nothing || apply_forcing!(generator.conditions.scalar_forcing, state.scalar, domain)
+  apply_forcing!(generator.conditions.velocity_forcing, state.velocity_spectral, domain)
+  state.scalar_spectral === nothing || apply_forcing!(generator.conditions.scalar_forcing, state.scalar_spectral, domain)
   return state
 end
 
@@ -276,7 +276,7 @@ recovered on a grid displaced by half a cell (using `û` and the generator's dis
 scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
 
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
-forcing are advanced exactly by the integrating factor ([`velocity_factor`](@ref)).
+forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
 !!! note
     The assembly **consumes `ω` as its own register**: the Lamb vector is formed in place over the
@@ -339,7 +339,7 @@ end
 
 
 """
-    velocity_factor(generator, τ)
+    velocity_integrating_factor(generator, τ)
 
 The velocity's exact linear subflow over a substep ``\\tau`` (`τ`), as the **parameters of its
 exponential** rather than a materialized kernel. The linear part of the momentum equation — the
@@ -366,20 +366,20 @@ linear forcing is active) — exactly the arguments the fused exponential takes.
 The `generator` (a [`ResolvedGenerator`](@ref)) supplies ``\\nu`` and the armed rate; `τ` is the
 sub-interval the stage advances.
 """
-velocity_factor(generator::ResolvedGenerator, τ::Real) =
+velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
    offset = generator.velocity_rate)
 
 
 """
-    scalar_factor(generator, τ)
+    scalar_integrating_factor(generator, τ)
 
 The passive scalar's exact linear subflow over a substep `τ` — the same exponential parameters
-[`velocity_factor`](@ref) returns for `generator`, with the scalar diffusivity
+[`velocity_integrating_factor`](@ref) returns for `generator`, with the scalar diffusivity
 ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
 ``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
 """
-scalar_factor(generator::ResolvedGenerator, τ::Real) =
+scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -(generator.conditions.viscosity / generator.conditions.schmidt) * τ,
    offset_scale = τ,
    offset = generator.scalar_rate)
@@ -409,7 +409,7 @@ using `φ̂` and the generator's displaced-evaluation scratch, and reading the d
 same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no preceding
 velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
-`N̂`: they are advanced exactly by [`scalar_factor`](@ref).
+`N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
 !!! note
     The assembly **consumes `u` as its own register**: the flux ``\\boldsymbol{u}\\varphi`` is formed
