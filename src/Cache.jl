@@ -211,7 +211,8 @@ The particle velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the cu
 ``(M, 3)`` array of the flow velocity sampled at the position each tracer occupies at that instant:
 the genuine Lagrangian velocity the statistics accumulate. The checked read of the
 [`ObservablesCache`](@ref) `cache`'s particle-velocities slot: it serves the deposited values or
-throws, like every cached read — the sample depends on the state **and** the positions, so it is
+throws an `ErrorException`, like every cached read — the sample depends on the state **and** the
+positions, so it is
 current only when both counters match its own. Throws an `ArgumentError` when the run advects no
 tracers.
 

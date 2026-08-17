@@ -87,16 +87,11 @@ the package — including for the observables cache's slots, which double as the
 mid-iteration.
 
 # Fields
-Shared — every scheme allocates this:
-- `stage1` — the first Runge–Kutta stage register (the accumulator for [`IFLowStorageRK3`](@ref), the
-  first stage for [`IFRK2`](@ref)).
-
-Scheme-specific — allocated only for the scheme that uses it, else `nothing`:
-- `nonlinear` — the assembled right-hand side ([`IFLowStorageRK3`](@ref) only).
+- `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
+  [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
+- `nonlinear` — the assembled right-hand side; [`IFLowStorageRK3`](@ref) only, else `nothing`.
 - `stage2`, `velocity_star_spectral` — the second stage register and the substage velocity predictor
-  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation ([`IFRK2`](@ref) only).
-
-Nested:
+  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; [`IFRK2`](@ref) only, else `nothing`.
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
   fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
@@ -175,7 +170,7 @@ function allocate_buffers end
 
 Advance the `state` (a [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
 ``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
-reified `generator` (a
+`generator` (a
 [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
 the equations of motion, their conditions, and their assembly scratch), the `domain` (a
 [`FixedDomain`](@ref)), the scheme's `buffers` (an [`IntegratorBuffers`](@ref)), and the run's

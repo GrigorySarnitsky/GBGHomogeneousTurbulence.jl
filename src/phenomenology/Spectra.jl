@@ -67,7 +67,9 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
 !!! note
     These factors are inertial-normalized cutoffs; bottleneck models are deliberately deferred.
     Models of the near-dissipation *bottleneck* — a bump
-    before the cutoff (Qian 1984; Ishihara et al. 2005; Kraichnan 1959, all of the form
+    before the cutoff (Qian 1984, [doi:10.1063/1.864902](https://doi.org/10.1063/1.864902);
+Ishihara et al. 2005, [doi:10.1143/JPSJ.74.1464](https://doi.org/10.1143/JPSJ.74.1464);
+Kraichnan 1959, [doi:10.1017/S0022112059000362](https://doi.org/10.1017/S0022112059000362) — all of the form
     ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma < 0``) — do not satisfy
     ``f_\\eta\\to 1`` and need a richer spectrum structure; they are deliberately deferred.
 """
@@ -200,7 +202,9 @@ The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(
 — the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
 spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). It is the
 *far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
-``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018; consistent with Chen et al. 1993,
+``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018,
+[doi:10.1103/PhysRevFluids.3.082601](https://doi.org/10.1103/PhysRevFluids.3.082601); consistent with
+Chen et al. 1993, [doi:10.1103/PhysRevLett.70.3051](https://doi.org/10.1103/PhysRevLett.70.3051),
 ``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``). The
 near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara et al.
 2005), a different form this factor does not model.
@@ -219,8 +223,10 @@ dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
     SaffmanDissipation()
 
 A Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)`` — a simple,
-parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman (1963,
-appendix; about half the earlier Townsend 1951 spectrum), whose coefficient is skewness-dependent
+parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman
+(1963, appendix, [doi:10.1017/S0022112063000987](https://doi.org/10.1017/S0022112063000987); about
+half the earlier Townsend 1951 spectrum,
+[doi:10.1098/rspa.1951.0179](https://doi.org/10.1098/rspa.1951.0179)), whose coefficient is skewness-dependent
 (about 2.6 to 3.3) and is simplified downward to `2` here for a parameter-free, deliberately soft cutoff
 (retaining a little more near-cutoff energy than the physical range would).
 """

@@ -321,7 +321,8 @@ states the physical quantity first, then the reduction that computes it:
   ``3C_S\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
-- ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
+- ``\texttt{energy\_spectrum} \equiv E_n``, the halved `GBGPeriodicFields` radial spectrum (a
+  per-shell energy, not the density ``E(\kappa)`` a model law gives), and `integral_scale`
   derived from it.
 
 These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
@@ -444,8 +445,9 @@ Over it:
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
 - **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
   running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` (a
-  trailing-window flatness test, reading ``\varepsilon`` rather than the clampable ``k(t)``; when
-  the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
+  trailing-window flatness test that **gates** on ``\varepsilon`` rather than on the clampable
+  ``k(t)``; ``k`` is still measured, to normalize the eddy-turnover clock ``\Delta t\,\varepsilon/k``.
+  When the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
   its one-line sugar. A fixed budget is a three-line callback, not a run option.
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
@@ -831,8 +833,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 1. **(2026-06) Integrating-factor split with exact diffusion.** The stiff viscous/diffusive part is
    integrated exactly by ``\mathcal{E}(\boldsymbol{\kappa})``; only the advection is explicit. Removes the
    diffusive stability limit and preserves scheme order under linear forcing.
-2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap, energy-conserving spectral
-   advection; the reversible generator of the geometric lens.
+2. **(2026-06) Rotational (Lamb-vector) form for the advection.** Cheap spectral advection; the
+   reversible generator of the geometric lens. *(The energy conservation this entry originally
+   credited to the form is really the sharp mask's: under a truncating band the truncation is exactly
+   Galerkin, so the discrete advection conserves kinetic energy — `HouLi`, which tapers rather than
+   truncates, is deliberately non-conservative. §4.2.)*
 3. **(2026-06) `IFLowStorageRK3` (Williamson 2N / RKW3) is the default; per-scheme CFL.** Third-order,
    imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscously-stabilized
    option.
@@ -1677,7 +1682,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `Tracers` type and its construction. Hence `number_of_tracers` becomes `number_of_particles` (a
     count is true of any kind) and `sample!` becomes `interpolate_at_particles!` (an inertial
     particle needs the same interpolation for its drag term, so the name survives the ladder
-    unchanged). `advect!` keeps its generic verb and dispatches per kind, its `EndpointHeun` method
+    unchanged). The verb `advect!` stays generic and dispatches per kind, its `EndpointHeun` method
     carrying the tracer-specific assumption that the particle velocity *is* the fluid velocity.
 
 52. **(2026-08, user-directed) Constructor arguments: the object a value is derived from is

@@ -44,8 +44,10 @@ run!(sim) do s                                # records what it wants, and decid
     current_time(s) < t_end
 end
 
+# One ITERATION is one advance: a step, then the deposit that closes it. The state is always
+# current; the cache holds what the last deposit left, so its reads are valid between iterations.
 kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
-velocity_physical(sim.cache)                  # an observable the iteration deposited at its end
+velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
 flow_parameters(sim)                          # the run's measured flow state
 ```
 

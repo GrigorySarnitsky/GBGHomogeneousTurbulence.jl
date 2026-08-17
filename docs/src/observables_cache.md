@@ -325,7 +325,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
-| ``E(\kappa)`` | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
+| ``E_n``, the per-shell energy | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
 | the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed: no component forms it, even pointwise — the [`max_speed`](@ref) reduction takes the largest component magnitude directly — and whole, it would cost a pass the iteration does not perform (§1.2) |

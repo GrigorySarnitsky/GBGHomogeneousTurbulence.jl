@@ -18,7 +18,7 @@ integrating factor.
 Its contents (each formula lives in the operation's own docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
-- [`ResolvedGenerator`](@ref) — the reified generator: the conditions bundled with the assembly
+- [`ResolvedGenerator`](@ref) — the generator as one value: the conditions bundled with the assembly
   scratch its evaluations write through, consumed by a scheme through the protocol below.
 - [`prepare!`](@ref) — open a step: advance the forcings' internal state and arm the linear rates.
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (the

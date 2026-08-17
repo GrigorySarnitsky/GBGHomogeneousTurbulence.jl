@@ -1,4 +1,4 @@
-# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, the reified
+# SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, the
 # generator (the equations of motion with their conditions and assembly scratch), the integrator, the
 # spectral state (û, φ̂), the observables cache, and any tracers;
 # `advance!`/`run!`/`warmup!` own the CFL-adaptive time loop. It holds no physics or numerics of its

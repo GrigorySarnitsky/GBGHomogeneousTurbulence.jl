@@ -18,12 +18,12 @@
 
 Lagrangian tracer tracking:
 - [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
-- [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
-  schemes, and [`ParticleIntegratorBuffers`](@ref) their per-scheme registers.
 - [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit leaves them).
+- [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
+  schemes, and [`ParticleIntegratorBuffers`](@ref) their per-scheme registers.
 - [`record_trajectory_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
@@ -65,6 +65,34 @@ smoothness or interpolation order — at a wider stencil, useful for derivative-
 acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and smoothness parameters.
 The `rng` is the random stream seeding the uniformly-random tracer positions (used with
 `number_of_particles`, ignored with `positions`); it defaults to `Random.default_rng()`.
+
+# Examples
+
+A run carries tracers when the front door is given a count; `advance!` then advances them with the
+fields and records the Lagrangian velocity each iteration, so both reads below are current between
+iterations:
+
+```julia
+sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
+advance!(sim)
+
+X = particle_positions(sim.tracers)         # the (M, 3) positions at this instant
+v = particle_velocities(sim.cache)          # u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
+
+out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
+interpolate_at_particles!(out, scalar_physical(sim.cache), sim.tracers)
+```
+
+Building a set directly — to place tracers deliberately rather than at random, and to drive the push
+by hand — takes the `positions` form, and then the trajectory scheme's registers are yours to make:
+
+```julia
+tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], scheme = CatmullRom())
+buffers = allocate_buffers(EndpointHeun(), tracers)
+
+record_trajectory_velocity!(tracers, u)     # u(tₙ) at the current positions — do this first
+advect!(EndpointHeun(), tracers, buffers, u_end, domain, dt)
+```
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
 trajectory velocities are read from the run's observables cache, through

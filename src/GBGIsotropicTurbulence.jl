@@ -18,7 +18,7 @@
 #   Cache            — the ObservablesCache: the storage the iteration deposits its
 #                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
-#                      reified as ResolvedGenerator (FlowConditions + assembly scratch + the protocol
+#                      gathered into ResolvedGenerator (FlowConditions + assembly scratch + the protocol
 #                      prepare!/velocity_rhs!/scalar_rhs!/velocity_integrating_factor/scalar_integrating_factor/finalize!)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
