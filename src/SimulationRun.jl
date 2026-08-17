@@ -92,9 +92,9 @@ at [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) (i
 ) — and the viscosity is chosen from the grid rather than supplied:
 
 !!! note "The default holds ``k`` fixed, so ``k`` is not a measurable of the default run"
-    `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the target, which
-    pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and suppresses the physical fluctuation of
-    the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
+    `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
+    energy at the target **value**, which pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and
+    suppresses the physical fluctuation of the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
     ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
 
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with the

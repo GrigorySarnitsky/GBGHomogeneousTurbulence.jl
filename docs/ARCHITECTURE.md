@@ -373,7 +373,8 @@ Method (§3).
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
-  damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling ``C`` (for
+  damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling
+  ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers,
@@ -1104,10 +1105,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `:vorticity`), each carrying the **fields epoch** it was computed at; an accessor
     (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
-    completes. An out-of-band mutation is declared through **`fields_modified!`**, named for
-    the event that breaks the chart–state invariant (the naming lesson of SciML's `u_modified!` →
-    `derivative_discontinuity!` rename: name the verb for the violated invariant, not the mutated
-    slot); the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
+    completes. An out-of-band mutation is declared through **`fields_modified!`** — named for
+    *what was changed*, the resolved fields, which is the plain reading and the one the code follows.
+    *(This entry originally credited the name to SciML's `u_modified!` → `derivative_discontinuity!`
+    lesson, "name the verb for the violated invariant, not the mutated slot". That rationale is
+    backwards for this verb: `fields_modified!` names the mutated slot, and it earns its place by
+    saying plainly what a caller did, not by describing a downstream consequence the caller would
+    have to reason about.)* the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
     loops to it. This kills the `step!` silent-precondition footgun — there is no caller prefill left
     to forget. **Epoch granularity is deliberately coarse**: one counter per dynamical factor of the
     tower (fields, particles), no finer — every production memoization precedent surveyed (LAMMPS

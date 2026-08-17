@@ -24,10 +24,12 @@ The measured functions of the flow state:
   length scale derived from it.
 
 Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
-distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate
-the automatic warm-up ([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which
-advances until the dissipation and the kinetic energy hold
-steady and the derivative skewness has reached its plateau. None dealiases first — the quadratic reductions are exactly
+distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate the automatic warm-up
+([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which advances until the
+dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
+the scalar is forced — the scalar variance settles too. The kinetic energy is deliberately **not**
+among them: a constant-energy forcing clamps it flat and a fixed-injection forcing makes it ring, so
+it is measured (it normalizes the eddy-turnover clock) but never gated on. None dealiases first — the quadratic reductions are exactly
 alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets
 it only to machine precision), and the cubic skewness carries the slight residual its own docstring
@@ -85,8 +87,7 @@ Two routes to the same rate; take the one whose input is already in hand.
     representation, as the normalized inner product (Parseval). Use it when
     ``\\boldsymbol{\\omega}`` exists for its own sake: the cached vorticity, or a vorticity
     the caller supplies.
-  * `dissipation(û, domain, viscosity)` — straight from the velocity in spectral representation `û`
-    ``\\hat{\\boldsymbol{u}}``, with the [`FixedDomain`](@ref) `domain` supplying the multiplier, and
+  * `dissipation(û, domain, viscosity)` — straight from the velocity in spectral representation ``\\hat{\\boldsymbol{u}}`` (the `û` argument), with the [`FixedDomain`](@ref) `domain` supplying the multiplier, and
     no vorticity formed at all. Use it to measure off the state, where a
     ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
 
@@ -138,6 +139,14 @@ The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
 left it — the same quantity, measured once per iteration and served without a reduction (or a
 device readback); it throws an `ErrorException` when no deposit is current, like every cached read.
+
+!!! note "Why this observable alone has a cached form"
+    The cache holds exactly what the iteration already computes and leaves alive at its end — its
+    contents are derived from the schedule, never declared. The maximum speed qualifies because the
+    run itself needs it: the next timestep is chosen from it, so the reduction happens whether or not
+    anyone reads the value. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
+    because no part of the iteration computes them; caching either would mean adding a reduction the
+    run does not otherwise perform, which is the one thing the cache may not do.
 """
 function max_speed end
 
@@ -181,7 +190,7 @@ scalar_variance(φ) = inner(φ, φ)
 
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
+in spectral representation ``\\hat\\varphi`` (the `φ̂` argument), the [`FixedDomain`](@ref) bundle `domain`, and the
 scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` (the `diffusivity` argument).
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
 scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals

@@ -10,20 +10,20 @@
     State
 
 The evolving state a run advances, and how it is seeded:
-- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation: a passive
-  record with every operation external (the single source of truth; the physical fields are
-  recovered from it, never held in the state).
-- [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random initial conditions
-  (a divergence-free velocity, a mean-zero scalar) that seed it.
+- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation. This is the
+  single source of truth: the physical fields are recovered from it and never held in the state.
+- [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random
+  initial conditions (a divergence-free velocity, a mean-zero scalar) that seed it.
 
-All sized to a [`FixedDomain`](@ref). The physical representations are recovered from the state with
-the four-argument, source-preserving form (the extra argument is a scratch field the transform consumes
-in the state's place) of
-[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the inverse
-transform consumes the coefficients it runs from (a property of the FFT backends), so the recovery
-copies into scratch and the state survives every recovery — and the vorticity with
-[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!); the recovered
-values are deposited into the
+All sized to a [`FixedDomain`](@ref).
+
+The recoveries do not disturb the state. An inverse transform consumes the coefficients it runs from,
+which is a property of the FFT backends rather than a choice, so a naive recovery would destroy the
+state it read. Recovery therefore goes through the four-argument
+[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!), whose extra
+argument is a scratch field the transform consumes in the state's place; the vorticity comes from
+[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) instead. The
+recovered values are deposited into the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
 """
 module State
@@ -48,9 +48,9 @@ throws. The state itself therefore cannot go stale.
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
-- `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
-- `scalar` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the run carries
-  no passive scalar.
+- `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
+- `scalar_spectral` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the
+  run carries no passive scalar.
 """
 struct ResolvedFields{UH, PH}
   velocity_spectral::UH          # û (spectral) — the resolved velocity, the single source of truth
@@ -86,11 +86,13 @@ spectra, which the run layer can wire in for you.
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
 
-!!! note
-    Seeding into a running case mutates the resolved fields out of band — announce it with
-    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), and
-    re-deposit with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing
-    (cached reads throw in between; nothing is recomputed on a read).
+!!! note "Seeding a running case invalidates the observables cache"
+    The cache holds what the last deposit left, so a seed written into a live run makes every cached
+    observable wrong. Announce the change with
+    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
+    fields epoch so cached reads throw rather than serve stale values, then restore the cache with
+    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. Nothing is
+    recomputed on a read, so the interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
@@ -153,11 +155,13 @@ e.g. an Obukhov–Corrsin form from [`Phenomenology`](@ref GBGIsotropicTurbulenc
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
 
-!!! note
-    Seeding into a running case mutates the resolved fields out of band — announce it with
-    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), and
-    re-deposit with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing
-    (cached reads throw in between; nothing is recomputed on a read).
+!!! note "Seeding a running case invalidates the observables cache"
+    The cache holds what the last deposit left, so a seed written into a live run makes every cached
+    observable wrong. Announce the change with
+    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
+    fields epoch so cached reads throw rather than serve stale values, then restore the cache with
+    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. Nothing is
+    recomputed on a read, so the interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,

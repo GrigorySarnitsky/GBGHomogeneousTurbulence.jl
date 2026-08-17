@@ -53,7 +53,6 @@ self-containedness and structure without the design docs as a crutch.
 | 13 | `naming-policy` | the public surface against the **written** naming rules — the rulebook outranks the corpus | FULL + source + CLAUDE.md |
 | 14 | `doc-policy` | each docstring against the **written** documentation policy (map / home / constructor-first, physical-meaning-first, one home per f/f! pair) | FULL + source + CLAUDE.md |
 | 15 | `invariants-and-decisions` | the code and docs against the **recorded** invariants and §11 decision log, both directions | FULL + source + CLAUDE.md + §11 |
-| 12 | `plain-sense` | does each clause **mean** anything and **earn its place** — paraphrase, non-vacuity, unprovoked defence, the delete test, buried subject | FULL |
 
 **Why three hats hold the rulebook.** Hats 1–12 are deliberately blind to `CLAUDE.md`, and that
 blindness is what makes them fresh-eyed — but it leaves one class structurally invisible: a

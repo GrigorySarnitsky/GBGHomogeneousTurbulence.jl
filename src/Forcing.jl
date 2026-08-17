@@ -33,13 +33,17 @@ strategy, materialized once the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain. It exists
 at construction time and the step never calls it.
 
-The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
-[`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
-scalar field), through tensor-order-generic field operators. The velocity and scalar are forced
-**independently**: [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a
-separate `velocity_forcing` and `scalar_forcing`
-(each an `AbstractForcing`), so a run can force the velocity while the scalar decays freely, force both, or
-leave either unforced.
+The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref) and
+[`ConstantPower`](@ref), one implementation serving both the velocity and the scalar through
+tensor-order-generic field operators.
+
+Which keywords carry defaults follows one test: **does the value come from the method, or from this
+run?** A strategy's canonical band — `lowest_shell = 1`, `highest_shell = 2`, the large-scale band of
+homogeneous isotropic turbulence — is a property of the method and defaults. What a run holds fixed —
+`target`, `rate` — has no canonical value and is therefore required. So a default here never hides a
+choice you needed to make. The two fields are forced **independently**:
+[`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
+`velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
 
 An operator-free keyword constructor (`BandRescaling(; …)`, `Linear(; …)`, `ConstantPower(; …)`) returns
 a [`DeferredForcing`](@ref) that a `Simulation` materializes once the domain exists.
@@ -71,8 +75,8 @@ its `field` is read-only and what it advances is the forcing's own internal stat
 `nothing`.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
-`set_forcing_rate!` run once before the Runge–Kutta stages (the state a later hook consumes must be
-prepared here), `add_forcing_source!` runs at every stage, and `apply_forcing!` runs after the completed
+`set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook
+consumes must be prepared here), `add_forcing_source!` runs at every stage, and `apply_forcing!` runs after the completed
 step. The linear rate and the additive source are two channels of **one** forcing term — the part linear
 in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
 single strategy may legitimately use both.
@@ -225,6 +229,15 @@ The `over` keyword selects where the target applies:
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
     If the out-of-band value alone exceeds `target`, the band is zeroed (the closest reachable state).
+
+!!! note "`over` is the one default that does hide a choice"
+    By the method-versus-run test above, `over` is a **run** decision — what does your run hold
+    fixed? — which argues for requiring it rather than defaulting it. It is defaulted anyway, and the
+    two answers are not equivalent physics: `:band` lets the whole-field energy float, while
+    `:total` pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``. The
+    [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door overrides it to
+    `:total`, so the two surfaces disagree about which answer is natural. Set it explicitly when the
+    held quantity matters to what you are measuring.
 
 Rescaling preserves the divergence-free constraint either way.
 

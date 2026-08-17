@@ -11,7 +11,7 @@
 # diffusive one E_κ (κ = ν/Sc), both reaching the same lab time each substep. Advancing velocity
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
-# IFLowStorageRK3 (Williamson 2N) is the default workhorse; IFRK2 (Heun) is a cheaper option that is
+# IFLowStorageRK3 (Williamson 2N) is the general-purpose workhorse; IFRK2 (Heun) is a cheaper option that is
 # imaginary-axis unstable for advection (see its docstring). Each `step!` reads the deposited velocity
 # and vorticity from the `ObservablesCache` (deposited by the previous iteration's closing `deposit!`,
 # nothing recomputed), takes the same slots as its stage recovery registers from stage 2 on, and
@@ -26,7 +26,7 @@ are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integrator` is chosen from.
-- [`IFLowStorageRK3`](@ref) (the default), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
+- [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
   cheaper two-stage alternative, imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
@@ -238,7 +238,7 @@ the third stage.
 Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose ``N`` counts
 evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
 per field: the state's own array plus one accumulator (`stage1`; the raw-assembly register
-`nonlinear` is the dealiasing seam's addition, not the scheme's). The default workhorse:
+`nonlinear` is the dealiasing seam's addition, not the scheme's). The general-purpose workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
@@ -347,7 +347,7 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
     ``R(z) = 1 + z + z^{2}/2``, for which ``\\lvert R(\\mathrm{i}y)\\rvert^{2} = 1 + y^{4}/4 > 1``: the
     scheme is unstable on the imaginary axis, so it is stable only where the viscous damping of the
     integrating factor dominates. It is adequate
-    for well-resolved, modest-Reynolds-number runs but is **not** the default — prefer
+    for well-resolved, modest-Reynolds-number runs — prefer
     [`IFLowStorageRK3`](@ref) for high Reynolds number or marginal resolution.
 """
 struct IFRK2 <: AbstractIntegrator end

@@ -3,8 +3,8 @@
 Julia package: a small, focused **pseudospectral direct numerical simulation (DNS) of homogeneous
 isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
 ``\varphi`` on a triple-periodic box, each optionally forced, advanced by interchangeable
-integrating-factor time-stepping, with Lagrangian particle tracking and Eulerian + Lagrangian
-statistics. **GPU is the primary target**: the time loop is in-place and allocation-free over
+integrating-factor time-stepping, with Lagrangian particle tracking and field sampling along the
+trajectories (accumulating statistics over those values is the caller's analysis, not this package's). **GPU is the primary target**: the time loop is in-place and allocation-free over
 preallocated buffers, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
 
 Built on two sibling backends: **GBGPeriodicFields** ("PF", the field mathematics) and
@@ -31,24 +31,28 @@ functions of state); **realization / infrastructure** concerns are named by thei
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
 - `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
   spectral representation, the single source of truth) and the random initial conditions. The
-  physical representations are recovered by PF's preserving `to_physical!` scratch arity at the
-  consuming sites; the vorticity by `Observables.vorticity_physical!` (decision 47).
+  physical representations are recovered by the source-preserving four-argument form of PF's
+  `to_physical!` at the consuming sites; the vorticity by `Observables.vorticity_physical!` (decision 47).
 - `Observables` — the measured functions of state (energy and dissipation diagnostics of flow and
   scalar, the spectrum-derived quantities, the CFL `max_speed`, the field-valued vorticity
   recovery, …). The MZ *observables*; an observable with a cached value is one generic — the field
   method measures, the cache method serves the deposit (decision 46).
-- `Cache` — the observables cache (`ObservablesCache`): the stamped storage the iteration deposits
+- `Cache` — the observables cache (`ObservablesCache`): the storage the iteration deposits
   its observables into at its end (no-recompute — the checked accessors serve the deposited value or
-  throw; a slot doubles as its producer's stage register; `resolved_fields_modified!` announces an
+  throw; a slot doubles as its producer's stage register; `fields_modified!` announces an
   out-of-band state mutation). The design is `docs/src/observables_cache.md`.
 - `Generator` — the Navier–Stokes RHS (rotational form) + scalar advection + the exact integrating
-  factor, reified as `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
-  `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_factor` / `scalar_factor` / `finalize!`.
+  factor, gathered into `ResolvedGenerator` (conditions + assembly scratch) behind the protocol
+  `prepare!` / `velocity_rhs!` / `scalar_rhs!` / `velocity_integrating_factor` /
+  `scalar_integrating_factor` / `finalize!`.
   The MZ *generator*.
 - `Forcing` — pluggable energy-injection strategies (`AbstractForcing`).
 - `Propagator` — pluggable integrating-factor schemes (`AbstractIntegrator`) and the per-step scratch
   (`IntegratorBuffers`).
-- `Particles` — Lagrangian tracer tracking (`Tracers`).
+- `Particles` — Lagrangian particle tracking: the trajectory state (`Tracers`) held apart from the
+  pluggable trajectory integrator (`AbstractParticleIntegrator`, `EndpointHeun`) and its per-scheme
+  registers (`ParticleIntegratorBuffers`) — decision 50. *Particle* names anything true of the whole
+  deferred ladder, *tracer* only the massless kind (decision 51).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
 Include order: `SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator →
@@ -76,7 +80,7 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
    missing capability encodes a decision — the PF / SS discipline).
 4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free over the
    preallocated buffers (the state, the integrator's `IntegratorBuffers`, the generator's assembly
-   scratch, and the observation cache's charts); storage is generic
+   scratch, and the observables cache's slots); storage is generic
    `AbstractArray` (no scalar indexing of device arrays).
    **Minimal memory footprint trumps compute cost** — prefer low-storage integrators, and per-call
    allocation of an *occasional* diagnostic over resident scratch. Precision (`Float32` / `Float64`)
@@ -94,7 +98,8 @@ inverse. Operators and extended Base functions are imported before being extende
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
-`cache.vorticity`, `generator.product_spectral`, `state.velocity`, `Tracers.trajectory_velocity` — as do
+`cache.vorticity_physical`, `generator.product_spectral`, `state.velocity_spectral`,
+`Tracers.trajectory_velocity` — as do
 function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)

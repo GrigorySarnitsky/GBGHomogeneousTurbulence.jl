@@ -41,5 +41,37 @@ for path in sorted(glob.glob('src/*.jl')):
             mismatches += 1
             print(f'NOT IN §References: {path}  {doi}')
 
+# The reverse pass. The doc policy requires every inline cite to have a §References entry AND every
+# entry a citing docstring or body mention, so a one-directional check certifies half the rule.
+#
+# Parse the ENTRY, not the line the DOI happens to sit on: a reference bullet wraps across lines, and
+# taking the surname from the DOI's own line yields the middle of a journal title. Split §References
+# into bullets first, then read each bullet's leading surname.
+docstring_dois = set()
+for path in sorted(glob.glob('src/*.jl')):
+    if 'Phenomenology' in path:
+        continue
+    docstring_dois |= {urllib.parse.unquote(m) for m in INLINE.findall(open(path).read())}
+
+body, _, references = open(ARCH).read().partition('\n## References')
+entries = re.split(r'\n(?=- )', references)
+
+uncited = []
+for entry in entries:
+    if not entry.lstrip().startswith('- '):
+        continue
+    found = re.search(r'<https://(doi\.org/[^>]+)>', entry)
+    if not found:
+        continue                                   # the three works with no DOI
+    doi = urllib.parse.unquote(found.group(1))
+    if doi in docstring_dois:
+        continue                                   # cited by a docstring
+    surname = entry.lstrip('- ').split(',')[0].strip()
+    if surname and surname not in body:            # nor discussed in the design-doc body
+        uncited.append((doi, surname))
+
+for doi, surname in uncited:
+    print(f'IN §References, cited by no docstring and no body mention: {surname}  {doi}')
+
 print(f'docstring DOIs: {cited}   §References DOIs: {len(architecture_dois)}   '
-      f'mismatches: {mismatches}')
+      f'mismatches: {mismatches}   uncited entries: {len(uncited)}')

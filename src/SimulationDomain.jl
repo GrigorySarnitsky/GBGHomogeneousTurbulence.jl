@@ -59,7 +59,7 @@ keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, and the lean, GPU-friendly default.
+of the quadratic nonlinearity, and the leanest of the three on a GPU.
 """
 struct TwoThirds <: DealiasingStrategy end
 
@@ -339,6 +339,14 @@ controls the aliasing of the quadratic nonlinearity. The kernel is whatever the 
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
 ``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation. Returns `field`.
+
+!!! note "Truncating the band is not always the whole of dealiasing"
+    The name says what this call does — restrict the field to the retained band — and deliberately
+    does not claim to complete the dealiasing, because for one strategy it does not.
+    [`PhaseShift`](@ref) removes its aliases by *averaging two displaced evaluations* of the
+    quadratic product, and the spherical truncation is only the second half of that; the generator
+    performs the first half where it assembles the product. For [`TwoThirds`](@ref) the truncation
+    alone is exact, and for [`HouLi`](@ref) the taper damps rather than removes.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 

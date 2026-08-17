@@ -278,7 +278,7 @@ spectrum(m::ModelSpectrum, κ, fp::FlowParameters) =
 provenance(m::ModelSpectrum) = m.ref
 
 
-const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* (Cambridge University Press), §6.5"; valid_Reλ = (30.0, Inf))
+const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* (Cambridge University Press), §6.5. doi:10.1017/CBO9780511840531"; valid_Reλ = (30.0, Inf))
 
 """
     Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2)
@@ -298,7 +298,7 @@ Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2) =
   ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β), _POPE2000)
 
 
-const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530"; valid_Reλ = (0.0, Inf))
+const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530. doi:10.1073/pnas.34.11.530"; valid_Reλ = (0.0, Inf))
 
 """
     VonKarman1948(; C_K = 1.5, c_L = 1.0)
@@ -319,7 +319,7 @@ VonKarman1948(; C_K = 1.5, c_L = 1.0) =
   ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN1948)
 
 
-const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063"; valid_Reλ = (0.0, Inf))
+const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063. doi:10.1063/1.1761356"; valid_Reλ = (0.0, Inf))
 
 """
     Pao1965(; C_K = 1.5)
@@ -350,7 +350,8 @@ density in wavenumber of the scalar variance ``\\langle\\varphi^2\\rangle``, eva
 abstract type ScalarSpectrum <: TurbulenceLaw end
 
 
-const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. Geogr. Geofiz.* **13**, 58 / Corrsin (1951), *J. Appl. Phys.* **22**, 469"; valid_Reλ = (50.0, Inf))
+const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. Geogr. Geofiz.* **13**, 58 (no DOI) / " *
+                                  "Corrsin (1951), *J. Appl. Phys.* **22**, 469. doi:10.1063/1.1699986"; valid_Reλ = (50.0, Inf))
 
 """
     ObukhovCorrsin1949(; C_OC = 0.67)

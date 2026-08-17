@@ -46,7 +46,7 @@ viscosity can be set from its grid and target energy, rather than the reverse.
 function stationary_dissipation end
 
 
-const _SREENIVASAN = Reference("Sreenivasan (1998), *Phys. Fluids* **10**, 528"; valid_Reλ = (50.0, Inf))
+const _SREENIVASAN = Reference("Sreenivasan (1998), *Phys. Fluids* **10**, 528. doi:10.1063/1.869575"; valid_Reλ = (50.0, Inf))
 
 """
     Sreenivasan1998(; asymptote = 0.5, correction = 0.0)
@@ -84,7 +84,7 @@ scaling(m::Sreenivasan1998, fp::FlowParameters) =
 provenance(::Sreenivasan1998) = _SREENIVASAN
 
 
-const _SREENIVASAN1995 = Reference("Sreenivasan (1995), *Phys. Fluids* **7**, 2778"; valid_Reλ = (50.0, Inf))
+const _SREENIVASAN1995 = Reference("Sreenivasan (1995), *Phys. Fluids* **7**, 2778. doi:10.1063/1.868656"; valid_Reλ = (50.0, Inf))
 
 """
     Sreenivasan1995(; C_K = 1.5)
@@ -110,7 +110,7 @@ scaling(m::Sreenivasan1995, ::FlowParameters) = m.C_K
 provenance(::Sreenivasan1995) = _SREENIVASAN1995
 
 
-const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB)";
+const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB). doi:10.1080/14685240802376389";
                           valid_Reλ = (100.0, Inf))
 
 """

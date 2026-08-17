@@ -35,7 +35,8 @@ abstract type StructureFunction <: TurbulenceLaw end
 
 
 const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301–305 (the 2/3 law) " *
-                       "and **32**, 16–18 (the exact 4/5 law)"; valid_Reλ = (100.0, Inf))
+                       "and **32**, 16–18 (the exact 4/5 law); no DOI, the 1941 Doklady notes " *
+                       "predate the system"; valid_Reλ = (100.0, Inf))
 
 """
     Kolmogorov1941(; C₂ = 2.0)
@@ -77,7 +78,7 @@ provenance(::Kolmogorov1941) = _K41
 scaling_exponent(::Kolmogorov1941; order::Real) = order / 3    # self-similar K41 exponent ζ_p = p/3
 
 
-const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**, 336"; valid_Reλ = (200.0, Inf))
+const _SHELEVEQUE = Reference("She & Lévêque (1994), *Phys. Rev. Lett.* **72**, 336. doi:10.1103/PhysRevLett.72.336"; valid_Reλ = (200.0, Inf))
 
 """
     SheLeveque1994()
@@ -101,7 +102,7 @@ scaling_exponent(::SheLeveque1994; order::Real) = order / 9 + 2 * (1 - (2 / 3)^(
 provenance(::SheLeveque1994) = _SHELEVEQUE
 
 
-const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82"; valid_Reλ = (200.0, Inf))
+const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82. doi:10.1017/S0022112062000518"; valid_Reλ = (200.0, Inf))
 
 """
     Kolmogorov1962(; μ = 0.25)
@@ -133,7 +134,7 @@ scaling_exponent(m::Kolmogorov1962; order::Real) = order / 3 - (m.μ / 18) * ord
 provenance(::Kolmogorov1962) = _K62
 
 
-const _YAGLOM = Reference("Yaglom (1949), *Dokl. Akad. Nauk SSSR* **69**, 743"; valid_Reλ = (100.0, Inf))
+const _YAGLOM = Reference("Yaglom (1949), *Dokl. Akad. Nauk SSSR* **69**, 743 (no DOI: a 1949 Doklady note)"; valid_Reλ = (100.0, Inf))
 
 """
     Yaglom1949()
@@ -166,7 +167,7 @@ end
 provenance(::Yaglom1949) = _YAGLOM
 
 
-const _LUNDGREN2002 = Reference("Lundgren (2002), *Phys. Fluids* **14**, 638"; valid_Reλ = (50.0, Inf))
+const _LUNDGREN2002 = Reference("Lundgren (2002), *Phys. Fluids* **14**, 638. doi:10.1063/1.1429965"; valid_Reλ = (50.0, Inf))
 
 """
     Lundgren2002()

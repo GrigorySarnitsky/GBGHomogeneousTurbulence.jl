@@ -23,7 +23,7 @@ Lagrangian tracer tracking:
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit leaves them).
 - [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
-  schemes, and [`ParticleIntegratorBuffers`](@ref) their per-scheme registers.
+  schemes, and [`ParticleIntegratorBuffers`](@ref) the per-step storage each one needs.
 - [`record_trajectory_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
@@ -68,7 +68,8 @@ The `rng` is the random stream seeding the uniformly-random tracer positions (us
 
 # Examples
 
-A run carries tracers when the front door is given a count; `advance!` then advances them with the
+A run carries tracers when the front door is given a count;
+[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) then advances them with the
 fields and records the Lagrangian velocity each iteration, so both reads below are current between
 iterations:
 
@@ -83,8 +84,8 @@ out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every it
 interpolate_at_particles!(out, scalar_physical(sim.cache), sim.tracers)
 ```
 
-Building a set directly — to place tracers deliberately rather than at random, and to drive the push
-by hand — takes the `positions` form, and then the trajectory scheme's registers are yours to make:
+Building a set directly — to place tracers deliberately rather than at random, and to advance them
+by hand — takes the `positions` form, and then the scheme's per-step storage is yours to allocate:
 
 ```julia
 tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], scheme = CatmullRom())
@@ -110,7 +111,7 @@ closing deposit leaves them.
   particle-velocities slot.
 - `scheme` — the velocity-interpolation scheme.
 
-The trajectory integrator's own registers are **not** here: they are allocated per scheme into a
+The trajectory integrator's own working storage is **not** here: it is allocated per scheme into a
 [`ParticleIntegratorBuffers`](@ref), so changing the scheme changes no part of this type.
 """
 struct Tracers{P, PSX, VV, S}
@@ -153,7 +154,7 @@ over one step, the Lagrangian counterpart of the field side's
 [`AbstractIntegrator`](@ref GBGIsotropicTurbulence.Propagator.AbstractIntegrator). A scheme is a
 value (`EndpointHeun()`), passed to [`advect!`](@ref) and to
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which builds exactly
-the registers that scheme needs.
+the working storage that scheme needs.
 
 Today the family has one member, [`EndpointHeun`](@ref). Higher-order pushers are the studied future
 axis; the supertype exists so that adding one changes no other type.
@@ -169,7 +170,7 @@ integrator a run uses by default. It advances the positions with the start-of-st
 velocity that [`record_trajectory_velocity!`](@ref) stored and the end-of-step velocity field
 the solver has just produced, so it needs nothing from inside the field scheme's stages.
 
-Its registers are one predictor position set and the velocity interpolated there
+It needs one set of predicted positions and the velocity interpolated there
 ([`ParticleIntegratorBuffers`](@ref)); the formula is given with [`advect!`](@ref).
 """
 struct EndpointHeun <: AbstractParticleIntegrator end
@@ -178,21 +179,21 @@ struct EndpointHeun <: AbstractParticleIntegrator end
 """
     ParticleIntegratorBuffers
 
-The per-step registers of a trajectory integrator, sized to a tracer set and allocated once — so the
-tracer push allocates no per-step memory. Build it with
+The per-step storage a trajectory integrator computes in, sized to a tracer set and allocated once,
+so advancing the tracers allocates nothing. Build it with
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(pusher, tracers)`,
 which allocates exactly what `pusher` needs and nothing more; a run builds it for you.
 
-These registers are the scheme's, not the trajectory's: a different pusher wants a different set
-(a multistep scheme wants a velocity history and no predictor at all), which is why they live here
-rather than in [`Tracers`](@ref).
+This storage belongs to the scheme, not to the trajectory: a different integrator wants a different
+set — a multistep scheme wants a velocity history and no predicted positions at all — which is why it
+lives here rather than in [`Tracers`](@ref).
 
 # Fields
 - `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
-- `predictor_velocity` — the velocity interpolated at the predicted positions: a stage register of
-  the advance, never a sample of the flow, and never exposed as one.
+- `predictor_velocity` — the velocity interpolated at the predicted positions: an intermediate value
+  the scheme works with, never a sample of the flow, and never exposed as one.
 """
 struct ParticleIntegratorBuffers{P, PS, VV}
   predictor::P
@@ -237,7 +238,7 @@ end
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
 below), in place, under the trajectory integrator `pusher` (an
-[`AbstractParticleIntegrator`](@ref)), using its registers `buffers` (a
+[`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (a
 [`ParticleIntegratorBuffers`](@ref) built for that scheme). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
 
