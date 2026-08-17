@@ -185,6 +185,23 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    site and not at the site the reader reaches first**. A cold read is ordered, so a fix that ignores
    the order closes nothing.
 
+   **Loop until it converges, and know what convergence looks like.** One pass is never enough: a
+   fix pass introduces its own defects, so verify → fix → verify again until the numbers stop moving.
+   Measured over ten runs (2026-08-17, six of `verify-fixes.js` and four of `verify.js`), the honored
+   fraction went 43 → 69 → 76 → 95 → 93 → 90 %. **Converged means three rounds flat within noise,
+   each surfacing *different* marginal items** — at that point the residue is the auditor's own
+   resolution, and further rounds buy variance rather than information. Stopping at the first
+   plateau is wrong: round 2 looked like progress and hid eleven `LINE-ONLY`s.
+
+   Two artifacts of the measurement, both of which cost a wrong reading before being understood:
+
+   - **Normalize to a percentage.** The auditors subdivide findings, so the denominator moves — one
+     round returned 48 entries for 42 findings, and the raw honored count fell while the fraction
+     rose.
+   - **A per-hat count of zero means the agent died, not that the hat is clean.** One run adjudicated
+     77 of 85 and reported success; a hat had returned no verdicts and the total simply shrank. Check
+     the per-hat counts against the previous run before reading any total.
+
 7. **Audit the fixes themselves** with `verify-fixes.js` when the findings came from a *human* read
    (a doc-reading pile), where the reader's verbatim words are the specification. This one is the
    deliberate inverse of `verify.js`: it **sees the diff**, because it audits an **act** rather than a

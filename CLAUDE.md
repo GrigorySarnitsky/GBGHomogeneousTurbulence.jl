@@ -261,6 +261,10 @@ The battery the `/check-docs` command (`.claude/commands/check-docs.md`) encodes
 unbound symbol, a false-but-plausible formula) does not announce itself on a read-through. A flagged
 instance is a *sample of a class* — fix the class, not the line.
 
+**Order the work: code before docs.** When a round of findings mixes renames, signature changes and
+prose, land the code first — the docs describe the code, so the reverse order writes every affected
+docstring twice. (2026-08: ten renames landed first, and the doc phase then touched each surface once.)
+
 1. **Correct** — every formula, normalization, conservation / adjoint relation, and quantifier
    (*exact / all / never*) true and precise, verified against `src/` (quote the decisive line) or by
    derivation; the diagnostic consistent with the physical quantity it claims to measure; and free of
@@ -373,3 +377,25 @@ actively check for it.
   no bound challenging it and the ``N^3``-for-``M\times3`` spend violates the "minimal footprint trumps
   compute" invariant. The user: "Stop taking what is in place as an indication that it should be like
   that. Probably you should ask before you dismiss something."
+
+- **Fixing the instance, not the class — and being unable to see it from the inside.** This one is
+  different in kind from the others: the rule is *already written down* ("a flagged instance is a
+  sample of a class — fix the class, not the line"), I know it, I quote it, and I break it anyway. In
+  one measured round of `verify-fixes.js`, **eleven of thirteen deficiencies were `LINE-ONLY`** — the
+  flagged site fixed, the class alive on surfaces the finding had *already named*. The lesson is
+  therefore not another statement of the rule. It is that **stating it does not work and measuring it
+  does**: the class-sweep claim has to be *checked by something that is not me*, which is what the
+  verifier pair exists for. Three shapes recur, none visible from inside the edit:
+  (a) **the sweep that skips its own surfaces** — every rename swept `src/` and `docs/` and stopped,
+  leaving `CLAUDE.md` and `README.md` untouched for rounds, the latter holding the *worst* instance of
+  the very claim being fixed; (b) **the fix that creates the defect it closes** — a gloss defining
+  "register" asserted a corpus-wide usage whose flagship example the same pass had deleted two commits
+  earlier, and a rewrite that purged the banned "the run stands at ``t_n``" reintroduced the identical
+  construction three sentences later; (c) **the fix that contradicts itself** — a link sweep added the
+  policy sentence "every Code entry naming a package object links" and left its own table disobeying
+  it, because the regex required a cell to be exactly one backticked name. The rule: **after any class
+  fix, enumerate the surfaces from the finding's own text — not from memory — and re-run the
+  verifier; a class claimed swept but not re-measured is an instance fix wearing a class's name.**
+  Instances (2026-08-17): the eleven above, plus a scan I wrote that caught only the form I had first
+  noticed (bare `` `code` `` beside math, not the linked `[`code`](@ref …)` form), certifying clean
+  while three sites stood.
