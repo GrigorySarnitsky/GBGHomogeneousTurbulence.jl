@@ -1109,9 +1109,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
     completes. An out-of-band mutation is declared through **`fields_modified!`** — named for
     *what was changed*, the resolved fields, which is the plain reading and the one the code follows.
-    *(This entry originally credited the name to SciML's `u_modified!` → `derivative_discontinuity!`
-    lesson, "name the verb for the violated invariant, not the mutated slot". That rationale is
-    backwards for this verb: `fields_modified!` names the mutated slot, and it earns its place by
+    *(Two corrections to this entry's original text, both recorded rather than made silently. The verb
+    was named `resolved_fields_modified!` when the decision was taken; decision 24 shortened it, and
+    the sweep updated the log to the current name as decisions 48 and 53 did for their vocabulary.
+    And the entry credited the name to SciML's `u_modified!` → `derivative_discontinuity!` lesson,
+    "name the verb for the violated invariant, not the mutated slot" — a rationale that is backwards
+    for this verb: `fields_modified!` names the mutated slot, and it earns its place by
     saying plainly what a caller did, not by describing a downstream consequence the caller would
     have to reason about.)* the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
     loops to it. This kills the `step!` silent-precondition footgun — there is no caller prefill left

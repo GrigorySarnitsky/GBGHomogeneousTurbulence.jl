@@ -82,9 +82,9 @@ memory. Built per scheme by [`allocate_buffers`](@ref)`(scheme, domain; scalar)`
 allocated.
 
 Each such array is a **register**: storage a scheme computes one stage into and overwrites at the
-next, holding nothing a caller should read between steps. The word is used in that sense throughout
-the package — including for the observables cache's slots, which double as the step's registers
-mid-iteration.
+next, holding nothing a caller should read between steps. The observables cache's slots serve the
+same purpose mid-iteration — the step computes its stage recoveries into them — which is why a cached
+field is meaningful only between iterations.
 
 # Fields
 - `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for

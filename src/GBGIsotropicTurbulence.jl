@@ -4,8 +4,9 @@
 # a velocity field plus a single passive scalar on a periodic box — built on GBGPeriodicFields,
 # which supplies every field operation (transforms, differential operators, convolution, interpolation,
 # reductions). GBGPeriodicFields is deliberately time- and particle-free (its invariant 12); this
-# package is the consumer that owns time integration, forcing, the scalar transport, particle
-# tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
+# package is the consumer that owns time integration, forcing, the scalar transport, and particle
+# tracking. Accumulating statistics over what it produces is the caller's analysis, not this
+# package's. GPU is the primary target, so the time loop is in-place and
 # allocation-free over preallocated buffers.
 #
 # Module layout (each concern its own file). Physics concerns take their names from the Mori–Zwanzig
