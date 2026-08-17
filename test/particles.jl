@@ -101,7 +101,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "advect in a real HIT velocity field" begin
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     conditions = FlowConditions(viscosity = 0.05,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
+                      velocity_forcing = BandRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
     truncate_to_band!(û, domain)

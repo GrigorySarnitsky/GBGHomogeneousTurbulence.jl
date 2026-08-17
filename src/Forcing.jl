@@ -40,7 +40,7 @@ tensor-order-generic field operators.
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A strategy's canonical band — `lowest_shell = 1`, `highest_shell = 2`, the large-scale band of
 homogeneous isotropic turbulence — is a property of the method and defaults. What a run holds fixed —
-`target`, `rate` — has no canonical value and is therefore required. So a default here never hides a
+`target`, `rate`, and `BandRescaling`'s `over` — has no canonical value and is therefore required. So a default here never hides a
 choice you needed to make. The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
 `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
@@ -100,7 +100,7 @@ A deferred forcing. The operator-free keyword constructors
 
     Linear(; rate, lowest_shell = 1, highest_shell = 2)
     ConstantPower(; target, lowest_shell = 1, highest_shell = 2)
-    BandRescaling(; target, over = :band, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is materialized into the concrete
@@ -207,7 +207,7 @@ struct NoForcing <: AbstractForcing end
 
 
 """
-    BandRescaling(domain; target, over = :band, lowest_shell = 1, highest_shell = 2)
+    BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
 Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed, built on the
 [`FixedDomain`](@ref) `domain`. Each step the in-band
@@ -222,22 +222,25 @@ follows from the field, chosen to agree with the diagnostics — the **kinetic e
 ([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the
 field's ``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
 
-The `over` keyword selects where the target applies:
-  * `:band` (default) — hold the band's own value; the whole-field value then floats, oscillating slowly
-    about its mean as the band feeds the cascade.
+The `over` keyword selects where the target applies. It is **required**: a deterministic clamp
+destroys the physical fluctuation of whatever it holds, so this choice decides which quantity your
+run may no longer measure, and there is no answer that is right for every run.
+  * `:band` — hold the band's own value; the whole-field value then floats, oscillating slowly
+    about its mean as the band feeds the cascade. The band's energy is then an artifact of the
+    forcing, while ``k`` remains a measurable of the flow.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
-    If the out-of-band value alone exceeds `target`, the band is zeroed (the closest reachable state).
+    If the out-of-band value alone exceeds `target`, the band is zeroed — the closest reachable
+    state, and a step with no forcing at all. Here ``k`` is the artifact and the band is free.
 
-!!! note "`over` is the one default that does hide a choice"
-    By the method-versus-run test above, `over` is a **run** decision — what does your run hold
-    fixed? — which argues for requiring it rather than defaulting it. It is defaulted anyway, and the
-    two answers are not equivalent physics: `:band` lets the whole-field energy float, while
-    `:total` pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``. The
-    [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door overrides it to
-    `:total`, so the two surfaces disagree about which answer is natural. Set it explicitly when the
-    held quantity matters to what you are measuring.
+!!! note "Which one a run wants depends on what else reads ``k``"
+    The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door passes
+    `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the *assumed* kinetic
+    energy, through the box-normalized dissipation law, so the resolution criterion
+    ``\\kappa_{\\max}\\eta`` is only self-consistent if the run really holds ``k`` there — which is
+    exactly what `:total` guarantees. A hand-built forcing that nothing downstream calibrates
+    against has no such constraint, and `:band` is then the gentler clamp.
 
 Rescaling preserves the divergence-free constraint either way.
 
@@ -256,7 +259,7 @@ struct BandRescaling{K, T} <: AbstractForcing
   over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
 end
 
-function BandRescaling(domain::FixedDomain; target::Real, over::Symbol = :band,
+function BandRescaling(domain::FixedDomain; target::Real, over::Symbol,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
   over in (:band, :total) ||
     throw(ArgumentError("BandRescaling `over` must be :band or :total; got :$over"))
@@ -447,7 +450,7 @@ Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
 ConstantPower(; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> ConstantPower(domain; target, lowest_shell, highest_shell))
 
-BandRescaling(; target::Real, over::Symbol = :band, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+BandRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> BandRescaling(domain; target, over, lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,

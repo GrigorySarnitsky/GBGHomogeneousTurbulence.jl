@@ -881,7 +881,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     return type `ForcingSpec`; both since renamed — `power` → `target`, `ForcingSpec` → `DeferredForcing`
     — decision 25.)*
 15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
-    `:band` (default) fixes the forced band's energy and lets the total float; `:total` rescales the band
+    `:band` fixes the forced band's energy and lets the total float; `:total` rescales the band
     to pin the whole-field energy — hence the r.m.s. velocity ``u'``, setting the scale of
     ``\mathrm{Re}_\lambda`` (whose value still fluctuates with ``\varepsilon``) — the
     constant-total-energy forcing convention. A modeling choice with two defensible answers, so it is a selectable
@@ -1720,6 +1720,31 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     far has the run gone?". As with decision 48, the sweep covered the decision log too, so the log
     reads in the current vocabulary; this entry records that the older entries originally said
     "stamp".
+
+54. **(2026-08, user-directed) `BandRescaling`'s `over` is required, and the front door's `:total` is
+    a calibration constraint rather than a preference.** Decision 15 called `over` "a modeling choice
+    with two defensible answers, so it is a selectable option rather than a fixed default" — and then
+    defaulted it to `:band`, contradicting itself inside one sentence. It is now required, which the
+    package's own defaults test (decision 28: method-canonical defaults, run-specific is required)
+    demanded all along: *what does your run hold fixed?* is not a property of the method.
+
+    The reason it matters more than an ergonomic slip: a deterministic clamp destroys the physical
+    fluctuation of whatever it holds, so `over` decides **which quantity the run may no longer
+    measure**. Under `:total` the kinetic energy is an artifact of the forcing and the band is free;
+    under `:band` the band is the artifact and ``k`` is a measurable of the flow. A default silently
+    made that choice for a user who might be measuring exactly the clamped quantity.
+
+    The two surfaces had also disagreed — the constructor defaulted to `:band`, the `Simulation` front
+    door overrode to `:total` — and investigating why settled the design. The override is **load
+    bearing**: in grid mode the front door chooses ``\nu`` from the *assumed* kinetic energy through
+    the box-normalized dissipation law, so the resolution criterion ``\kappa_{\max}\eta`` is
+    self-consistent only if the run really holds ``k`` at that value, which is precisely what
+    `:total` guarantees and `:band` does not. A hand-built forcing that nothing downstream calibrates
+    against carries no such constraint, and `:band` is then the gentler clamp. The right answer
+    genuinely differs by context — the strongest argument that no single default was right.
+
+    Recorded alongside: `:total` zeroes the band when the out-of-band energy alone exceeds `target`,
+    a step with no forcing at all, which the docstring now states.
 
 ---
 

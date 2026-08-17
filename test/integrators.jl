@@ -65,7 +65,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
+                      velocity_forcing = BandRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     integrator = IFLowStorageRK3()
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)

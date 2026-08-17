@@ -123,7 +123,7 @@ using Test
 
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(target = 0.1), Linear(rate = 0.5),
-                 BandRescaling(target = 0.5), StochasticOU(variance = 1.0, correlation_time = 0.3))
+                 BandRescaling(target = 0.5, over = :band), StochasticOU(variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing

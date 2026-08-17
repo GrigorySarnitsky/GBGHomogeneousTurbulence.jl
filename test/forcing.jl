@@ -153,7 +153,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     # rate gets an A(κ) array. A post-step projection (BandRescaling — the run layer's default), a
     # stochastic source, and no forcing at all carry none.
     rate_driven = (Linear(domain; rate = 0.5), ConstantPower(domain; target = 0.1))
-    other = (NoForcing(), BandRescaling(domain; target = 0.5),
+    other = (NoForcing(), BandRescaling(domain; target = 0.5, over = :band),
              StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
     generator(f) = ResolvedGenerator(domain, FlowConditions(; viscosity = ν, schmidt = 1.0,
                      velocity_forcing = f, scalar_forcing = NoForcing()); scalar = false)
