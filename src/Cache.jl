@@ -80,7 +80,7 @@ scalar (it adds the scalar's slot), and `particle_velocities` — the tracer set
 storage — when the run advects tracers: the slot IS that storage, so the tracers' push writes the
 values and the cache only records which epochs they belong to. The
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door —
-the build-everything convenience constructor — builds,
+the convenience constructor that builds every component — builds,
 wires, and seeds one for you.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),

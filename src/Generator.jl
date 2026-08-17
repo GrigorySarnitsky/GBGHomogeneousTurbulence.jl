@@ -175,7 +175,7 @@ it can never assemble the right-hand side from a mismatched intermediate state.
 Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
 carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
 run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door — the
-build-everything convenience constructor — builds one for
+convenience constructor that builds every component — builds one for
 you.
 
 # Fields

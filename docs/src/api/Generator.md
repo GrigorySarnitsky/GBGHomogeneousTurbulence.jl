@@ -14,7 +14,7 @@ scalar forcings.
 FlowConditions
 ```
 
-## The reified generator
+## The generator as one value
 
 The right-hand side as one object — the conditions bundled with the assembly scratch its evaluations
 write through. A time-marching scheme consumes it only through the protocol below.
