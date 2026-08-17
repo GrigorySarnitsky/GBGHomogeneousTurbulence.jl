@@ -30,7 +30,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (11 hats)
+## The panel (12 hats)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -49,9 +49,22 @@ self-containedness and structure without the design docs as a crutch.
 | 9 | `citations-integrity` | consistent author-year, inline↔References matching, no inaccessible source, no overclaim | FULL |
 | 10 | `style-editor` | internal uniformity (majority style) **+** the raw built HTML for silent-render failures | FULL + raw HTML |
 | 11 | `cold-reader` | a first-year grad student's top-to-bottom cold read — undefined symbols/terms (a *boundary*, a *deposit*, a *stamp*, an *epoch*), self-containedness | SITEONLY |
+| 12 | `plain-sense` | does each clause **mean** anything and **earn its place** — paraphrase, non-vacuity, unprovoked defence, the delete test, buried subject | FULL |
 
 The hats live in `.claude/commands/check-consistency/panel.js` (their personas are the source of truth;
-this table is the map). The physics pair sits adjacent by design — `turbulence-theoretician` (the
+this table is the map). The **`plain-sense` hat exists because every other rubric presumes the sentence belongs**: the others ask
+whether text is correct, consistent, complete or well-formed, each measuring it against something else
+(its siblings, the code, the literature, a template). None asks whether a clause means anything or earns
+its place — so a well-formed, sibling-consistent, fully-defined sentence that says nothing passes all
+eleven. It was added 2026-08-17 after a user read-through in which **six of the flagged items were "this
+clause should not exist"**, none of which any hat had produced — including a sentence
+("an instant of the run's clock, not a face of the periodic box") that the `cold-reader` hat quoted
+**approvingly**, as the standard against which it measured another page. Its decisive test is deletion:
+strike the clause and re-read; if nothing is lost, the finding is *cut*, not *reword*. That test also
+catches **rename fossils** — scaffolding (a disambiguation, a contrast, a "not to be confused with")
+left behind when the term it defended was retired, which now introduces the reading it denies.
+
+The physics pair sits adjacent by design — `turbulence-theoretician` (the
 physical laws and the category/type errors) with `dimensional` (the factors) — the first catching the
 structurally-false-but-plausible sentence, the second the concrete normalization slip. Scale the panel
 to the ask: the full 11-hat run is the "thorough audit" (tens of minutes; cost per the modes below);
@@ -59,13 +72,18 @@ for a quick check, run a subset.
 
 ## Cost modes (mirrors `/check-docs` — ported from PF 2026-08-06)
 
-**Economy is the DEFAULT.** Nine of the eleven hats run on the cheap scan model (Sonnet); the two
-physics hats — `turbulence-theoretician` and `dimensional` — are **anchors** that always run at the
-session's full-strength model. The asymmetry is deliberate: a cheap hat's *false positive* is caught
+**Economy is the DEFAULT.** Nine of the twelve hats run on the cheap scan model (Sonnet); three are
+**anchors** that always run at the session's full-strength model — the two physics hats,
+`turbulence-theoretician` and `dimensional`, and **`plain-sense`**. The asymmetry is deliberate: a cheap hat's *false positive* is caught
 downstream (the discipline already verifies every Tier-1/2 finding against `src/` and the built HTML in
 the main thread, at full strength), but a *false negative* — a subtle category error or a
 plausible-but-wrong factor read past — has no downstream verifier, and those two hats exist precisely
-for that class. The other nine lenses are enumerative or rule-anchored (matrix-diffing, template
+for that class. **`plain-sense` is anchored on the same criterion, with direct evidence**: its failure
+mode is a *false negative* — reading past prose that says nothing — and that has no downstream verifier
+either. Eleven hats, the full `/check-docs` battery and repeated author reads all passed over the same
+meaningless clause, and the one hat that quoted it (`cold-reader`, economized) cited it **approvingly**,
+as the standard for judging another page. Deciding whether a clause earns its place is judgment, not
+pattern-matching. The other nine lenses are enumerative or rule-anchored (matrix-diffing, template
 outliers, arg coverage, citations, style, the written house-rulebook typesetting, the cold read) — the
 kind of narrow evidence-cited scan the cheap lanes are strong at — and the panel's cross-hat redundancy
 means the anchors' domains overlap most of what a cheap hat could miss. Net: roughly a 3–4× panel-cost
