@@ -126,7 +126,7 @@ All keyword except `domain` (below). The ones marked *(front door only)* configu
 the rest are forwarded to the `Simulation(domain; …)` form.
 
 - `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
-- `domain` — a pre-built [`FixedDomain`](@ref). This one is **positional**, not a keyword: it is the
+- `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
   argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
 - `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
@@ -158,9 +158,11 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`random_solenoidal_velocity_spectral!`](@ref))) and normalized to `kinetic_energy`.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
-- `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
-  their interpolation scheme, forwarded to the `Tracers` constructor.
-- `particle_scheme = EndpointHeun()` — the trajectory time-integration scheme
+- `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
+  the **spatial** scheme that evaluates a field at their positions, forwarded to the `Tracers`
+  constructor as its `interpolation_scheme`.
+- `particle_scheme = EndpointHeun()` — the **temporal** scheme that advances the trajectories, a
+  different axis from `tracer_scheme` despite the neighbouring names
   ([`AbstractParticleIntegrator`](@ref
   GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
   its registers are allocated for you.
@@ -183,12 +185,12 @@ sim = Simulation(domain; viscosity = 5e-3)
 ```
 
 # Fields
-- `domain`, `buffers`, `generator`, `scheme` — the [`FixedDomain`](@ref), [`IntegratorBuffers`](@ref),
-  the [`ResolvedGenerator`](@ref) (whose `conditions` field is the run's [`FlowConditions`](@ref)), and
+- `domain`, `buffers`, `generator`, `scheme` — the `FixedDomain`, `IntegratorBuffers`,
+  the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
-- `cache` — the [`ObservablesCache`](@ref): the observables the iteration deposits at its end.
-- `tracers`, `particle_scheme`, `particle_buffers` — the [`Tracers`](@ref) being advected along
+- `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
+- `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
+- `tracers`, `particle_scheme`, `particle_buffers` — the `Tracers` being advected along
   with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
   when the run carries no tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
@@ -553,8 +555,8 @@ All keyword:
 - `gate_skewness` — also require the velocity-derivative skewness to have plateaued **and** reached
   ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal: a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
-  ``S \\approx -0.5``. The transform-heavy skewness is sampled at the storage cadence, not every
-  observation.
+  ``S \\approx -0.5``. The skewness costs transforms, so it is measured on the criterion's own
+  sampling interval rather than every iteration.
 - `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tol`.

@@ -89,9 +89,9 @@ field is meaningful only between iterations.
 # Fields
 - `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
   [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
-- `nonlinear` — the assembled right-hand side; [`IFLowStorageRK3`](@ref) only, else `nothing`.
+- `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
 - `stage2`, `velocity_star_spectral` — the second stage register and the substage velocity predictor
-  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; [`IFRK2`](@ref) only, else `nothing`.
+  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFRK2` only, else `nothing`.
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
   fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
@@ -191,14 +191,14 @@ stages compute their recoveries into those same slots, so the step allocates and
 beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
 deposit is recorded at — is advanced when the step completes.
 
-The argument order is shared with [`deposit!`](@ref), the call that closes the iteration: the
+The argument order is shared with `deposit!`, the call that closes the iteration: the
 dispatch object leads (the scheme here, the cache there), the common arguments follow in the fixed
 order `state`, `domain`, `buffers` (with `generator` after `state` and `cache`, `dt` closing this
 signature), so the chained pair transposes nothing.
 
 !!! note
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
-    the iteration with [`deposit!`](@ref), which re-fills every slot, at the new epoch, from the advanced
+    the iteration with `deposit!`, which re-fills every slot, at the new epoch, from the advanced
     state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does both.
 
 Returns `state`.

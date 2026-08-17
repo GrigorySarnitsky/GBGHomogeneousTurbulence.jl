@@ -324,7 +324,14 @@ end
 Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a banded linear
 forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
-whose rate ``A`` is set each step so the field's injection rate holds the `target`. In stationarity
+whose rate ``A`` is set each step so the field's injection rate holds the `target`. A linear rate
+injects at ``2 A E_{\\mathrm{band}}``, with ``E_{\\mathrm{band}}`` the band's own observable, so the
+rate that holds the target is
+
+```math
+A = \\frac{\\texttt{target}}{2 E_{\\mathrm{band}}}.
+```
+ In stationarity
 the injection balances dissipation, so `target` is a number: the **value** of the dissipation rate to
 hold, chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by

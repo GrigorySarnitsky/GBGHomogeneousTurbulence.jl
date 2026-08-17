@@ -295,8 +295,9 @@ protocol —
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
 (dealiased nonlinear term plus additive forcing source), `velocity_integrating_factor` / `scalar_integrating_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
-The required core is `velocity_rhs!` and `velocity_integrating_factor`; `prepare!` and `finalize!` default to
-no-ops. A scheme consumes the physics only through this protocol, so it can never assemble the
+The required core is `velocity_rhs!` and `velocity_integrating_factor`; `prepare!` and `finalize!`
+always run, and do nothing observable only when the configured forcing's own hooks are the
+`AbstractForcing` defaults. A scheme consumes the physics only through this protocol, so it can never assemble the
 right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the
 reification (§11 decisions 29, 31).
 
@@ -447,7 +448,7 @@ Over it:
 - **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
   running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` (a
   trailing-window flatness test that **gates** on ``\varepsilon`` rather than on the clampable
-  ``k(t)``; ``k`` is still measured, to normalize the eddy-turnover clock ``\Delta t\,\varepsilon/k``.
+  ``k(t)``; ``k`` is still measured, to normalize the eddy-turnover clock ``\Delta t \varepsilon/k``.
   When the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
   its one-line sugar. A fixed budget is a three-line callback, not a run option.
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
@@ -511,7 +512,8 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
   family, not yet built.
 
 Three exist now — enough for the validation checklist — and the count caps near six: `PDFs`, `Decay` (``k \sim t^{-n}``),
-and `Lagrangian` are named future seams (§7), not owed. A single `FlowParameters` bundle carries the
+and `Lagrangian` are named future seams, not owed — named here rather than in §7, which lists the
+deferred *capabilities* rather than the submodules that would carry them. A single `FlowParameters` bundle carries the
 quantities a law reads (``\varepsilon``, ``\nu``, ``L_{11}``, ``u'``, ``\mathrm{Sc}``, ``\varepsilon_\varphi``),
 with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
 helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
@@ -608,8 +610,8 @@ These are **named so they are not precluded, and deliberately left un-abstracted
 generalization is built for them until a second concrete case forces the abstraction. None is a gap.
 
 - **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
-  added to the RHS. *Built and validated, then archived* from the public surface (un-exported,
-  undocumented) to be re-added; it owns its noise scratch (decision 32), and its host-side random
+  added to the RHS. *Built and validated, then archived* from the public surface — un-exported, and
+  absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
   increment is the one allocation-free exception
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
@@ -1659,7 +1661,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     accessor that owns it. The forwarders bought a shorter call at the price of a second docstring
     per quantity to drift from the first, and of teaching the user a surface instead of the two
     objects the package is actually built from. The clock accessors `current_time` / `current_step`
-    stay: the clock is the run layer's own state, not a forwarded read. `flow_parameters(sim)` stays
+    stay: the clock is the run layer's own state, not a forwarded read. The bundle `flow_parameters(sim)` stays
     for the same reason — it assembles a bundle from several owners rather than forwarding to one.
     `validate_spectrum` leaves the package altogether, to `test/validation.jl` as `compare_to_model`:
     comparing a run against a model spectrum answers "does this reproduce the literature", which is
@@ -1776,7 +1778,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     interest paid on a naming decision. They are now type aliases —
     `const Pope2000 = ModelSpectrum{PopeLargeScale, PopeDissipation}` — which required no wrapper and
     no forwarding, because `ModelSpectrum` was already parameterized on exactly the two factors that
-    distinguish a preset. `spec isa Pope2000` and `spec isa EnergySpectrum` now both hold, every
+    distinguish a preset. Both `spec isa Pope2000` and `spec isa EnergySpectrum` now hold, every
     preset is a type, and the note is deleted. A preset therefore names a functional *form*; the
     fitted coefficients and the citation remain in the value.
 
@@ -1837,6 +1839,11 @@ cites.
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
   turbulence. *Computers & Fluids* **16**, 257–278. <https://doi.org/10.1016/0045-7930(88)90013-8> *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Li, Y., Perlman, E., Wan, M., Yang, Y., Meneveau, C., Burns, R., Chen, S., Szalay, A. & Eyink, G.
+  (2008). A public turbulence database cluster and applications to study Lagrangian evolution of
+  velocity increments in turbulence. *J. Turbulence* **9**, N31.
+  <https://doi.org/10.1080/14685240802376389> *(The box-normalized dissipation law `Li2008`, which
+  sets ``\nu`` in the run layer's grid mode.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.

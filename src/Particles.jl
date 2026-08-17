@@ -74,7 +74,7 @@ fields and records the Lagrangian velocity each iteration, so both reads below a
 iterations:
 
 ```julia
-sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
+sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
 advance!(sim)
 
 X = particle_positions(sim.tracers)         # the (M, 3) positions at this instant
@@ -102,7 +102,7 @@ iteration's
 closing deposit leaves them.
 
 # Fields
-- `positions` — the `(M, 3)` tracer positions (read with [`particle_positions`](@ref)).
+- `positions` — the `(M, 3)` tracer positions (read with `particle_positions`).
 - `position_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `positions`: the
   form the interpolation reads them in.
@@ -243,8 +243,8 @@ below), in place, under the trajectory scheme `scheme` (an
 supplies the box side the positions are wrapped into.
 
 Under [`EndpointHeun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
-step — the start-of-step values that [`record_trajectory_velocity!`](@ref) stored, and the
-end-of-step velocity field ``\\texttt{velocity\\_end} = \\boldsymbol{u}(t_{n+1})`` in physical
+step — the start-of-step values that [`record_trajectory_velocity!`](@ref) stored, and
+`velocity_end`, the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical
 representation:
 
 ```math
@@ -261,10 +261,10 @@ frozen start-of-step velocity alone would be first order.
 
 !!! note
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
-    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by [`record_trajectory_velocity!`](@ref)
+    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by `record_trajectory_velocity!`
     at the previous iteration's end. In a run the observables cache records that sample at its epoch
     and the run layer reads it checked before each advance; a hand-run loop must call
-    [`record_trajectory_velocity!`](@ref) itself between advances.
+    `record_trajectory_velocity!` itself between advances.
 """
 function advect! end
 

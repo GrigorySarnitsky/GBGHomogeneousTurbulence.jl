@@ -281,7 +281,7 @@ them to the host yourself with
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
+`Phenomenology` model
 spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)

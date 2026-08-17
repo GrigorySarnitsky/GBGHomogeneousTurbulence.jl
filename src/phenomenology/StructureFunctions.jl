@@ -93,7 +93,7 @@ The She–Lévêque (1994) intermittency model for the inertial-range scaling ex
 of the ``p``-th-order longitudinal structure function ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``. It is
 parameter-free, exact at ``\\zeta_3 = 1`` (the 4/5 law), and bends below the self-similar ``p/3`` for
 ``p > 3`` — the signature of small-scale intermittency. It predicts exponents, not amplitudes, so it
-implements [`scaling_exponent`](@ref) but not [`structure_function`](@ref).
+implements `scaling_exponent` but not [`structure_function`](@ref).
 """
 struct SheLeveque1994 <: StructureFunction end
 

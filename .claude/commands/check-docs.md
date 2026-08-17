@@ -167,7 +167,12 @@ for file in filter(f->endswith(f,".jl"), readdir("src"; join=true))
     for raw in split(inside, ",")
       p = strip(split(split(raw, "::")[1], "=")[1]); p = strip(split(p, ";")[end])
       occursin(r"^[A-Za-zα-ωΑ-Ω][A-Za-z0-9_!α-ωΑ-Ω̂]*$", p) || continue
-      occursin(Regex("`\\Q"*p*"\\E`"), body) || println(file, ": ", sig, "  UNDOCUMENTED `", p, "`")
+      # A mention counts in either form: `name` alone, or `name = value` (four docstrings document a
+      # keyword as "pass `scalar = true` to …", which names the argument and its effect perfectly
+      # well). Requiring the bare span would push prose around to satisfy the regex.
+      mentioned = occursin(Regex("`\\Q"*p*"\\E`"), body) ||
+                  occursin(Regex("`\\Q"*p*"\\E\\s*="), body)
+      mentioned || println(file, ": ", sig, "  UNDOCUMENTED `", p, "`")
     end
   end
 end'

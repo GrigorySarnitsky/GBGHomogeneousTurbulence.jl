@@ -67,7 +67,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
-``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy). The Leray–Helmholtz
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals the requested [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy). The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
@@ -90,7 +90,8 @@ stream (defaults to `Random.default_rng()`).
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
-    fields epoch so cached reads throw rather than serve stale values, then restore the cache with
+    fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
+    values, then restore the cache with
     [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
     interval between the two calls is yours to close.
 """
@@ -135,7 +136,8 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-[`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance). The mean vanishes by
+the requested [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) . The
+mean vanishes by
 construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
@@ -159,7 +161,8 @@ stream (defaults to `Random.default_rng()`).
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
-    fields epoch so cached reads throw rather than serve stale values, then restore the cache with
+    fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
+    values, then restore the cache with
     [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
     interval between the two calls is yours to close.
 """

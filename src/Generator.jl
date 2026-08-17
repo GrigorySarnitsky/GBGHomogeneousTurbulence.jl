@@ -167,7 +167,7 @@ subflows, and [`finalize!`](@ref) after the completed step. The scheme does only
 it can never assemble the right-hand side from a mismatched intermediate state.
 
 !!! note "One optimization crosses two verbs"
-    Under `PhaseShift`, [`velocity_rhs!`](@ref) leaves the stage's displaced velocity fresh for the same
+    Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
     stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
     either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
     rebuilds the displaced velocity itself, value-identically.
@@ -183,12 +183,12 @@ you.
 - `product_spectral` — the quadratic products' spectral image (the transformed Lamb vector
   ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, or the transformed scalar flux
   ``\\boldsymbol{u}\\varphi``). In physical representation each product is formed in place over an
-  operand's own register — the Lamb vector over the vorticity's, the flux over the velocity's — so
+  operand's own array — the Lamb vector over the vorticity's, the flux over the velocity's — so
   no physical product array exists.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``.
-  [`prepare!`](@ref) fills them at the start of each step; a rate that has been filled is one the
+  `prepare!` fills them at the start of each step; a rate that has been filled is one the
   integrating-factor verbs then return alongside the viscous coefficient, so the forcing rides the
   exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
   [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate), so a field driven by
@@ -202,7 +202,7 @@ you.
 !!! warning "The constructor rejects a misdeclared forcing"
     A forcing that implements
     [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) without also
-    declaring [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate) is given no
+    declaring `uses_linear_rate` is given no
     rate array to fill, so its forcing would silently never be applied. Building a
     `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
     the run proceed quietly wrong.
@@ -450,7 +450,7 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
 !!! note
     The assembly **consumes `u_consumed`**: the flux ``\\boldsymbol{u}\\varphi`` is formed
     in place over the velocity's array (a pointwise product may write into an operand), so on return
-    `u_consumed` no longer holds the velocity; `φ` is only read. As in [`velocity_rhs!`](@ref), the
+    `u_consumed` no longer holds the velocity; `φ` is only read. As in `velocity_rhs!`, the
     consumed argument is fixed by the physics rather than by its position in the signature, and is
     named for it. Only the spectral
     product scratch remains on

@@ -130,7 +130,7 @@ position for the next advance's predictor.
 **The observation comes before the iteration.** Between iterations the callback reads
 what it wants and answers whether the run continues; only then does the next iteration run. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
-instance, is a callback that accumulates ``\Delta t\,\varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
+instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
 reaches is observed exactly once: the first because a deposit seeding the initial state is made when
 the cache is built, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last

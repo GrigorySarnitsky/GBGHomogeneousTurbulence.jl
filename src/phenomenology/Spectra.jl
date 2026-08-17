@@ -21,7 +21,7 @@ dissipation-range roll-off, each swappable.
   inertial-convective range.
 
 Every preset is a type with a keyword constructor, invoked as `Name(; …)`. The velocity-spectrum
-presets `Pope2000` / `VonKarman1948` / `Pao1965` name the [`ModelSpectrum`](@ref) specialization
+presets `Pope2000` / `VonKarman1948` / `Pao1965` name the `ModelSpectrum` specialization
 carrying their large-scale and dissipation factors, so a preset is the composition rather than a
 wrapper around one; the scalar preset `ObukhovCorrsin1949`, like the structure-function and scaling
 laws, is a plain struct.
@@ -69,8 +69,8 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
     These factors are inertial-normalized cutoffs; bottleneck models are deliberately deferred.
     Models of the near-dissipation *bottleneck* — a bump
     before the cutoff (Qian 1984, [doi:10.1063/1.864902](https://doi.org/10.1063/1.864902);
-Ishihara et al. 2005, [doi:10.1143/JPSJ.74.1464](https://doi.org/10.1143/JPSJ.74.1464);
-Kraichnan 1959, [doi:10.1017/S0022112059000362](https://doi.org/10.1017/S0022112059000362) — all of the form
+    Ishihara et al. 2005, [doi:10.1143/JPSJ.74.1464](https://doi.org/10.1143/JPSJ.74.1464);
+    Kraichnan 1959, [doi:10.1017/S0022112059000362](https://doi.org/10.1017/S0022112059000362) — all of the form
     ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma < 0``) — do not satisfy
     ``f_\\eta\\to 1`` and need a richer spectrum structure; they are deliberately deferred.
 """
@@ -81,7 +81,7 @@ abstract type DissipationFactor end
     large_scale_factor(f, κL) -> Float64
 
 Evaluate the dimensionless large-scale roll-off `f` (a [`LargeScaleFactor`](@ref)) at the argument
-``\\kappa L`` (`κL`). A new large-scale form is a subtype of [`LargeScaleFactor`](@ref) that adds a
+``\\kappa L`` (`κL`). A new large-scale form is a subtype of `LargeScaleFactor` that adds a
 method here.
 """
 function large_scale_factor end
@@ -92,7 +92,7 @@ function large_scale_factor end
 
 Evaluate the dimensionless dissipation-range roll-off `f` (a [`DissipationFactor`](@ref)) at the
 argument ``\\kappa\\eta`` (`κη`). A new dissipation-range form is a subtype of
-[`DissipationFactor`](@ref) that adds a method here.
+`DissipationFactor` that adds a method here.
 """
 function dissipation_factor end
 
@@ -302,7 +302,7 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\
 values Pope obtains from the energy and dissipation normalizations, with the shape exponents `p₀ = 2`
 and `β = 5.2`. Override any coefficient to re-fit. Evaluate with [`spectrum`](@ref)`(Pope2000(), κ, fp)`.
 
-`Pope2000` is the [`ModelSpectrum`](@ref) carrying Pope's two roll-off factors, so
+`Pope2000` is the `ModelSpectrum` carrying Pope's two roll-off factors, so
 `spec isa Pope2000` holds for a value this constructor returns, exactly as for the presets that are
 plain structs.
 """
@@ -329,7 +329,7 @@ the classic interpolation between the ``\\kappa^{4}`` energy-containing range an
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters). `C_K`
 is the Kolmogorov constant; `c_L` fixes the peak scale.
 
-`VonKarman1948` is the [`ModelSpectrum`](@ref) carrying von Kármán's large-scale factor and no
+`VonKarman1948` is the `ModelSpectrum` carrying von Kármán's large-scale factor and no
 dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constructor returns.
 """
 const VonKarman1948 = ModelSpectrum{VonKarmanLarge, UnitDissipation}
@@ -356,7 +356,7 @@ constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carri
 (unlike [`Pope2000`](@ref)). It has no energy-containing range; use `Pope2000` or
 [`VonKarman1948`](@ref) when the large scales matter.
 
-`Pao1965` is the [`ModelSpectrum`](@ref) carrying Pao's dissipation factor and no large-scale
+`Pao1965` is the `ModelSpectrum` carrying Pao's dissipation factor and no large-scale
 roll-off, so `spec isa Pao1965` holds for a value this constructor returns.
 """
 const Pao1965 = ModelSpectrum{UnitLargeScale, PaoDissipation}

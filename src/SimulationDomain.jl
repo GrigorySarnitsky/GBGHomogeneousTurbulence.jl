@@ -45,8 +45,8 @@ with one; it fixes the `domain.dealias` kernel and, through
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
-default is the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door's
-business, not the catalogue's.
+default is decided by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation), the
+convenience constructor that builds every component, not by this catalogue.
 """
 abstract type DealiasingStrategy end
 
@@ -364,10 +364,10 @@ scalar field in spectral representation. Returns `field`.
 !!! note "Truncating the band is not always the whole of dealiasing"
     The name says what this call does — restrict the field to the retained band — and deliberately
     does not claim to complete the dealiasing, because for one strategy it does not.
-    [`PhaseShift`](@ref) removes its aliases by *averaging two displaced evaluations* of the
+    `PhaseShift` removes its aliases by *averaging two displaced evaluations* of the
     quadratic product, and the spherical truncation is only the second half of that; the generator
-    performs the first half where it assembles the product. For [`TwoThirds`](@ref) the truncation
-    alone is exact, and for [`HouLi`](@ref) the taper damps rather than removes.
+    performs the first half where it assembles the product. For `TwoThirds` the truncation
+    alone is exact, and for `HouLi` the taper damps rather than removes.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 

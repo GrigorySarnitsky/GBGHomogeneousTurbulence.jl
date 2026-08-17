@@ -40,7 +40,7 @@ the caller's own analysis, for which the two sibling packages supply the tools â
 and [`GBGStreamingStatistics`](https://github.com/GrigorySarnitsky/GBGStreamingStatistics.jl) the
 online estimators.
 
-Built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl).
+Built on `GBGPeriodicFields`.
 
 The `GBG` part in the name comes from the city of GÃ¶teborg (Gothenburg, Sweden), where the primary
 development took place.

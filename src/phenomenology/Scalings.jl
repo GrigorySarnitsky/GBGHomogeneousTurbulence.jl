@@ -12,7 +12,7 @@ Dimensionless turbulence constants and their Reynolds-number trends, evaluated b
 - [`stationary_dissipation`](@ref) — the dissipation a stationary run sustains, predicted from its
   energy and box side.
 - [`Li2008`](@ref) — the box-normalized dissipation group ``G``, the constant
-  [`stationary_dissipation`](@ref) inverts.
+  `stationary_dissipation` inverts.
 """
 module Scalings
 
