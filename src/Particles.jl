@@ -24,9 +24,9 @@ Lagrangian tracer tracking:
   trajectory velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
   deposit leaves them).
-- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
 - [`record_trajectory_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
+- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
 - [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate its `out` buffers.
 """

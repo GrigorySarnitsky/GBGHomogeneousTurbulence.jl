@@ -389,7 +389,7 @@ Observe and advance `sim` until the observation stops it, and return it. After e
 and once at the seeded initial state, before any advance —
 the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
-to stop (any other return throws — the decision may not be left implicit). Only then does the next
+to stop (any other return throws an `ArgumentError` — the decision may not be left implicit). Only then does the next
 iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the closing
 deposits. The schedule never varies with how the run is driven, so the closing deposit's maximum-speed
 reduction and its host readback happen every iteration even under a fixed `dt` that never reads them. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
@@ -408,7 +408,7 @@ run!(sim) do s
     current_time(s) < 5.0                        # a span of simulation time
 end
 
-history = Float64[]                              # record k at every observation; stop at 200 steps
+history = Float64[]                              # record k every iteration; stop at 200 steps
 run!(sim) do s
     push!(history, kinetic_energy(s.state.velocity_spectral))
     current_step(s) < 200
@@ -530,7 +530,7 @@ spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement 
 seeded run; write your own callback instead when the transient length is known (a fixed budget is a
 three-line callback — see `run!`).
 
-At each observation it measures the dissipation ``\\varepsilon`` — the small scales
+At each iteration it measures the dissipation ``\\varepsilon`` — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
 clamps ``k`` flat and a fixed-injection forcing makes it ring, which is why ``k`` is kept out of the
 **gate** — and the kinetic energy ``k``, which normalizes the eddy-turnover clock

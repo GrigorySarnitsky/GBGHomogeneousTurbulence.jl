@@ -473,8 +473,9 @@ configuration holds, the same set every iteration — into `cache` (an
 and record each slot at the current epoch (the cache's freshness counter). The
 deposits are the next iteration's first-stage work moved to the iteration's end — the velocity, vorticity, and
 (when the run carries one) scalar recoveries in physical representation, then the maximum-speed
-reduction over the just-deposited velocity — so an iteration's transform and pass counts are
-unchanged by caching; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
+reduction over the just-deposited velocity — so an iteration's transform counts are unchanged by
+caching, and its pass counts are unchanged but for one: the maximum-speed reduction runs every
+iteration, including under a hand-fixed ``\\Delta t`` that never reads it; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
 spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
 
 Every iteration ends with this call: the run layer's

@@ -1468,7 +1468,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     widens from the step to the **iteration** (step + closing deposit), which surfaces the once-per-iteration
     maximum-speed readback in the pass and synchronization ledgers (+1 physical-vector pass in every
     cell; a hand-fixed-``\Delta t`` iteration still pays it — held by the new `UNIFORM DEPOSIT
-    SCHEDULE` design holder, the price of a schedule that never varies with how the run is driven);
+    SCHEDULE` design holder, the price of a schedule that never varies with how the run is driven).
+    Read that against decision 35's synchronization floor — one readback per step under an adaptive
+    CFL, none under a fixed step — and note the two are speaking about different things: 35 states
+    the **floor**, this states what is **achieved**, and on the fixed-step axis they deliberately
+    differ. That gap is exactly what a named holder is for;
     transforms froze **identical** in every cell. Public-surface consequences: the accessors are the
     noun-first checked reads `velocity_physical` / `vorticity_physical` / `scalar_physical` and the
     cached `max_speed` (one generic with the `Observables` reduction), `physical_velocity` /

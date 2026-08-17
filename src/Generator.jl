@@ -146,16 +146,22 @@ _overrides_rate_hook(forcing) =
 """
     ResolvedGenerator(domain, conditions; scalar = false)
 
-The right-hand side of the resolved dynamics made one object (reified) — the flow's generator as a
-value a scheme can hold: the
+The flow's generator as one value a scheme can hold. It carries the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
-through (the quadratic-product fields, the displaced-evaluation buffers when the domain dealiases by
-[`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) , and the per-mode
-forcing-rate arrays). A time-marching scheme consumes it through the
-generator protocol — [`prepare!`](@ref) once per step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref)
-at each stage state, [`velocity_integrating_factor`](@ref) / [`scalar_integrating_factor`](@ref) for the exact linear
-subflows, [`finalize!`](@ref) after the completed step — and itself does only stage arithmetic, so a
-scheme can never assemble the right-hand side from a mismatched intermediate state.
+through: the quadratic-product fields, the per-mode forcing-rate arrays, and — when the domain
+dealiases by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) — the
+displaced-evaluation buffers.
+
+That scratch is the **generator's own** storage, distinct from the run's observables cache. The two
+do meet at one point: the physical quadratic products are formed *in place over the cache's arrays*,
+the Lamb vector over the vorticity slot and the scalar flux over the velocity slot, so no product
+field in physical representation is allocated anywhere.
+
+A time-marching scheme consumes the generator through a fixed protocol: [`prepare!`](@ref) once per
+step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
+[`velocity_integrating_factor`](@ref) / [`scalar_integrating_factor`](@ref) for the exact linear
+subflows, and [`finalize!`](@ref) after the completed step. The scheme does only stage arithmetic, so
+it can never assemble the right-hand side from a mismatched intermediate state.
 
 !!! note "One optimization crosses two verbs"
     Under `PhaseShift`, [`velocity_rhs!`](@ref) leaves the stage's displaced velocity fresh for the same
@@ -189,6 +195,14 @@ you.
   displaced velocity, left fresh by `velocity_rhs!` for the same stage's
   `scalar_rhs!` to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
   rebuilds the recovery itself).
+
+!!! warning "The constructor rejects a misdeclared forcing"
+    A forcing that implements
+    [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) without also
+    declaring [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate) is given no
+    rate array to fill, so its forcing would silently never be applied. Building a
+    `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
+    the run proceed quietly wrong.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C

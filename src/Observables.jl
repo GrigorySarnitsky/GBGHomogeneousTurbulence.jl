@@ -16,8 +16,8 @@ The measured functions of the flow state:
   developed cascade.
 - [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
-- [`vorticity_physical!`](@ref) — the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}``
-  recovered in physical representation from the spectral state — the field-valued observable
+- [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
+  spectral state, the one field-valued observable
   (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical) ,
   lives in `Cache` ).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
@@ -258,10 +258,13 @@ end
 """
     energy_spectrum(û, domain)
 
-The measured kinetic-energy spectrum ``E(\\kappa)`` of the velocity field `û` (in spectral
-representation) — the turbulent kinetic energy resolved over wavenumber-magnitude shells,
-``k = \\sum_\\kappa E(\\kappa)``. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
-wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (positional destructuring
+The measured kinetic-energy spectrum of the velocity field `û` (in spectral representation) — the
+turbulent kinetic energy resolved over wavenumber-magnitude shells. What is returned is a **per-shell
+energy** ``E_n``, summing to the kinetic energy, ``k = \\sum_n E_n``; a model spectrum ``E(\\kappa)``
+from [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) is instead a **density** per unit
+wavenumber, with ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``, so the two differ by the
+shell width ``\\Delta\\kappa = 2\\pi/L`` and are not interchangeable. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
+wavenumber magnitudes ``\\kappa`` and the energy ``E_n`` in each shell (positional destructuring
 `κ, E = energy_spectrum(û, domain)` also works). Both arrays live on the backend `û` lives on — bring
 them to the host yourself with
 [`adapt`](@extref GBGPeriodicFields Adapt.adapt) when you want them there. It is the `GBGPeriodicFields` radial
@@ -281,7 +284,7 @@ end
     integral_scale(û, domain)
 
 The longitudinal integral length scale of the velocity field `û`, measured from its
-[`energy_spectrum`](@ref) ``E(\\kappa)``,
+[`energy_spectrum`](@ref) ``E_n``,
 
 ```math
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
@@ -289,9 +292,9 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
-small scales do not fix. The integrals above are the idealized continuous definition; they are evaluated
-as sums over the measured `energy_spectrum` shells (whose per-shell energy makes the shell width
-cancel in the ratio). The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+small scales do not fix. The integrals above are the idealized continuous definition written with the spectral density
+``E(\\kappa)``; they are evaluated as sums over the measured per-shell energies ``E_n``, whose common
+shell width cancels in the ratio, so no conversion between the two is needed here. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 For reference, two related scales follow from the same spectrum. The **transverse** integral scale is
 ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full trace**

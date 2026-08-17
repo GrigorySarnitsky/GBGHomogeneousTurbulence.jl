@@ -42,20 +42,24 @@ export FixedDomain,
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
 [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) , the advective-CFL
-ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, the default),
+ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
-truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``).
+truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
+default is the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door's
+business, not the catalogue's.
 """
 abstract type DealiasingStrategy end
 
 """
     TwoThirds()
 
-The sharp isotropic ``2/3``-rule truncation: keep the modes
+The sharp isotropic ``2/3``-rule truncation of Orszag (1971),
+[doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2):
+keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, and the lean, GPU-friendly default. The rule is due to Orszag (1971), [doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2).
+of the quadratic nonlinearity, and the lean, GPU-friendly default.
 """
 struct TwoThirds <: DealiasingStrategy end
 
