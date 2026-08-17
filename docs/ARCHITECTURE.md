@@ -1772,6 +1772,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     preset is a type, and the note is deleted. A preset therefore names a functional *form*; the
     fitted coefficients and the citation remain in the value.
 
+56. **(2026-08, user-directed) The consumed operand is named for it: `ω_consumed`, `u_consumed`.**
+    `velocity_rhs!` reads the vorticity and overwrites it; `scalar_rhs!` reads the velocity and
+    overwrites it. Julia's convention is that a `!` verb mutates its *first* argument, so a caller
+    reading either signature had no way to know a second one was destroyed — the fact lived only in
+    the docstring notes.
+
+    The behaviour stays, and the reason is invariant 4: the Lamb vector is formed in place over the
+    vorticity's array and the scalar flux over the velocity's, which is exactly what keeps a product
+    field in physical representation from existing anywhere. Passing a copy instead would buy
+    signature purity for a resident ``N^{3}`` vector — the trade the footprint rule forbids. So the
+    only available improvement was to move the warning from the prose into the signature, where a
+    caller meets it.
+
+    Which operand is consumed follows the **physics** rather than the argument position (the Lamb
+    vector forms over the vorticity, the scalar flux over the velocity), which is why naming beats
+    any positional convention here: there is no position rule to state, and a reader who looked for
+    one would find a coincidence — both sit fifth — that does not generalize.
+
 ---
 
 ## References

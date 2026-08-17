@@ -272,13 +272,13 @@ end
 
 
 """
-    velocity_rhs!(N̂, generator, û, u, ω, domain)
+    velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)
 
 Assemble the explicit right-hand side of the momentum equation into `N̂` — the dealiased,
 Leray-projected rotational nonlinear term plus any additive forcing source — from the stage velocity
-`û` in spectral representation and its physical velocity `u` and vorticity `ω`, on the
+`û` in spectral representation and its physical velocity `u` and vorticity `ω_consumed`, on the
 [`FixedDomain`](@ref) `domain`, using the [`ResolvedGenerator`](@ref) `generator`'s conditions and
-scratch.
+scratch. The vorticity argument carries `_consumed` in its name because it is: see the note below.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -307,24 +307,29 @@ scratch) — averages the two to cancel the aliasing, then truncates spherically
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
-!!! note
-    The assembly **consumes `ω` as its own register**: the Lamb vector is formed in place over the
-    vorticity's array (the backend's cross product may write into one of its operands), so on return
-    `ω` no longer holds the vorticity — while `u` is only read. Which physical argument a right-hand
-    side consumes is stated in each verb's own note and follows the physics (the Lamb vector forms over
-    the vorticity, the scalar flux over the velocity), not the argument position. Only the spectral
-    product scratch remains on the generator, and the operation allocates nothing.
+!!! note "`ω_consumed` is read and then overwritten"
+    The Lamb vector is formed in place over the vorticity's array — the backend's cross product may
+    write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
+    does on return, while `u` is only read. This is what keeps a product field in physical
+    representation from existing at all; passing a copy instead would cost a resident ``N^{3}``
+    vector, which the footprint invariant forbids.
+
+    Which operand is consumed follows the **physics**, not the argument position: the Lamb vector
+    forms over the vorticity here, and the scalar flux over the velocity in
+    [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
+    to infer it. Only the spectral product scratch remains on the generator, and the operation
+    allocates nothing.
 
 Returns `N̂`.
 """
-velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain) =
-  (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω, domain);
+velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
+  (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
    add_forcing_source!(generator.conditions.velocity_forcing, N̂, domain))
 
 # Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
 # projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
-function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, u, ω, domain::FixedDomain)
-  _velocity_lamb!(nonlinear, u, ω, domain, generator.product_spectral, domain.dealias)
+function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, u, ω_consumed, domain::FixedDomain)
+  _velocity_lamb!(nonlinear, u, ω_consumed, domain, generator.product_spectral, domain.dealias)
   return nonlinear
 end
 
@@ -333,11 +338,11 @@ end
 # into the passes rather than swept separately — the primary carries it inside its projection, and
 # the displaced term picks it up through the composed shift-back∘truncation kernel of the averaging
 # convolve, so no whole-field truncation pass remains.
-function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω, domain::FixedDomain)
+function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω_consumed, domain::FixedDomain)
   phase_shift = generator.phase_shift
   product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
-  _velocity_lamb!(nonlinear, u, ω, domain, product_spectral, domain.dealias)                          # primary, truncated
+  _velocity_lamb!(nonlinear, u, ω_consumed, domain, product_spectral, domain.dealias)   # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
   to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
   vorticity_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
@@ -415,12 +420,13 @@ scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
 
 
 """
-    scalar_rhs!(N̂, generator, û, φ̂, u, φ, domain)
+    scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain)
 
 Assemble the explicit right-hand side of the passive-scalar equation into `N̂` — the dealiased
 advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
-spectral representation and their physical `u`, `φ`, on the [`FixedDomain`](@ref) `domain`, using
-the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch.
+spectral representation and their physical `u_consumed`, `φ`, on the [`FixedDomain`](@ref) `domain`,
+using the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch. The velocity argument
+carries `_consumed` in its name because it is: see the note below.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
 ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form
@@ -433,7 +439,7 @@ It is computed pseudospectrally as
 plus the per-stage additive source of the generator's scalar forcing (its
 [`add_forcing_source!`](@ref GBGIsotropicTurbulence.Forcing.add_forcing_source!) hook).
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
-([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u`, `φ`, leaving `û` and `φ̂` unused;
+([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and `φ̂` unused;
 [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced half a cell —
 using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced velocity the
 same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no preceding
@@ -442,23 +448,24 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
 !!! note
-    The assembly **consumes `u` as its own register**: the flux ``\\boldsymbol{u}\\varphi`` is formed
+    The assembly **consumes `u_consumed`**: the flux ``\\boldsymbol{u}\\varphi`` is formed
     in place over the velocity's array (a pointwise product may write into an operand), so on return
-    `u` no longer holds the velocity; `φ` is only read. As in [`velocity_rhs!`](@ref), the consumed
-    argument is fixed by the physics rather than by its position in the signature. Only the spectral
+    `u_consumed` no longer holds the velocity; `φ` is only read. As in [`velocity_rhs!`](@ref), the
+    consumed argument is fixed by the physics rather than by its position in the signature, and is
+    named for it. Only the spectral
     product scratch remains on
     the generator, and the operation allocates nothing.
 
 Returns `N̂`.
 """
-scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u, φ, domain::FixedDomain) =
-  (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u, φ, domain);
+scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain) =
+  (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, domain))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
 # sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.
-function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, φ̂, u, φ, domain::FixedDomain)
-  _scalar_flux_divergence!(nonlinear, u, φ, domain, generator.product_spectral, domain.dealias, -1)
+function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain)
+  _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, generator.product_spectral, domain.dealias, -1)
   return nonlinear
 end
 
@@ -467,11 +474,11 @@ end
 # both inside its divergence, the displaced term picks the truncation up through the composed
 # shift-back∘truncation kernel and the sign through the averaging α — so no whole-field truncation
 # pass remains.
-function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u, φ, domain::FixedDomain)
+function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain)
   phase_shift = generator.phase_shift
   product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
-  _scalar_flux_divergence!(nonlinear, u, φ, domain, product_spectral, domain.dealias, -1)               # primary −𝔻∇·(uφ)
+  _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, product_spectral, domain.dealias, -1)   # primary −𝔻∇·(uφ)
   # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
   # Lamb consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
   # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
