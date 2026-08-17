@@ -373,7 +373,7 @@ Method (§3).
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
-  damping. The `recommended_cfl` helper gives each scheme its conservative advective-CFL ceiling
+  damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -417,7 +417,7 @@ the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers)` builds its
 registers. Two axes matter: the
-trajectory scheme — today the single second-order `EndpointHeun`, with higher-order pushers the
+trajectory scheme — today the single second-order `EndpointHeun`, with higher-order schemes the
 studied future axis — and the sampling-consistency axis, the interpolation scheme's order relative to the field's
 spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` / `LagrangeSpline` available).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the

@@ -31,7 +31,7 @@ Every **Code** entry naming a package object links to its documentation; the few
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) |
-| ``f_\varphi`` | a body forcing on the passive-scalar equation | `AbstractForcing` (via `scalar_forcing`) |
+| ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | [`particle_positions`](@ref) |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the particle velocities — the velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`particle_velocities`](@ref) |
@@ -70,7 +70,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) |
 | ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.spectrum) |
-| ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
+| ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | [`energy_spectrum`](@ref GBGIsotropicTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) |
 

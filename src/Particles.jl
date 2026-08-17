@@ -156,7 +156,7 @@ value (`EndpointHeun()`), passed to [`advect!`](@ref) and to
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which builds exactly
 the working storage that scheme needs.
 
-Today the family has one member, [`EndpointHeun`](@ref). Higher-order pushers are the studied future
+Today the family has one member, [`EndpointHeun`](@ref). Higher-order schemes are the studied future
 axis; the supertype exists so that adding one changes no other type.
 """
 abstract type AbstractParticleIntegrator end
