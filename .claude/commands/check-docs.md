@@ -245,6 +245,25 @@ julia --project -e 'using GBGIsotropicTurbulence;
   `julia --project=docs docs/make.jl > /tmp/build.log 2>&1; echo $?` and require `0`. Then revert the
   transient dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list
   `docs/Manifest.toml`.
+- **Re-run the lanes after the fix pass — this phase is not optional.** The deterministic scans are
+  self-verifying (re-run the scan that found it and read the count), but the JUDGMENT findings are
+  not: applying a fix by hand and asserting it is exactly the accounting failure `/check-consistency`
+  gained `verify.js` to prevent, and this battery had the same hole. Re-run
+  `.claude/commands/check-docs/lanes.js` and close each finding **by number**, as *fixed* or
+  *dismissed with its reason*.
+
+  Measured on the first run of this rule (2026-08-17): 18 findings, 17 applied and **one silently
+  skipped** — and the re-run then surfaced eight more, of which two were the fix pass's own damage.
+  The sharpest: a manual fix unlinked two argument names, and `xlink.jl`, run minutes later in the
+  same commit, **re-linked them** — one instrument of this battery undoing another's work, invisible
+  to the build and to the suite. `xlink.jl` now excludes a docstring's own signature arguments; the
+  general lesson is that a class sweep must be re-measured after every later sweep, not once.
+
+  A lane's finding may be a false positive: an agent reading `inspiration/`'s clone rather than the
+  published inventory reported a live `@extref` as dead. **The build is the oracle for link
+  resolution** — Documenter's `external_cross_references` check fails on a genuinely dead one, so a
+  clean exit code refutes the finding.
+
 - Commit + push on `main` (no `[skip ci]`; the docs site must redeploy).
 
 ## Report

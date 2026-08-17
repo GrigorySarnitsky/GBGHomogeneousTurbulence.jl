@@ -41,7 +41,8 @@ export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spect
 
 The record of the evolving fields a run advances, in spectral representation — the single source of
 truth. The velocity, vorticity, and scalar in physical representation are recoveries of it, not part
-of it: the iteration recovers them at its end into the
+of it: each **iteration** — one advance of the run, a step plus the deposit that closes it — recovers
+them at its end into the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), so the state itself cannot
 go stale.
 
@@ -67,7 +68,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
-``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals the requested [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy). The Leray–Helmholtz
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals the requested `kinetic_energy`. The Leray–Helmholtz
 projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
@@ -136,7 +137,7 @@ end
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-the requested [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) . The
+the requested `scalar_variance`. The
 mean vanishes by
 construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean

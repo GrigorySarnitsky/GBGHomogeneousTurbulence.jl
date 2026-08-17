@@ -16,7 +16,7 @@ scalar_variance
 
 ## Dissipation rates
 
-The kinetic-energy dissipation ε and the scalar-variance dissipation ε_φ.
+The kinetic-energy dissipation ``\varepsilon`` and the scalar-variance dissipation ``\varepsilon_\varphi``.
 
 ```@docs
 dissipation

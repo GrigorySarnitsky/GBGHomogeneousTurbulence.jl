@@ -304,9 +304,12 @@ correction, any direct write to the tracer storage) — the particle counterpart
 [`fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
 trajectory-bound observable is stale and reads throw until the next deposit. Returns `cache`.
 
-The sanctioned mutator calls it for you: the run layer's tracer push announces its own advance, and
+The sanctioned mutator calls it for you: the run layer announces its own tracer advance
+([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) ,
+both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) ), and
 the closing deposit then re-records the sample at the new epoch. A hand-run loop that repositions tracers itself must
-call this, then re-record the trajectory sample before advancing.
+call this, then re-record the particle velocities before advancing.
 """
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 

@@ -212,7 +212,7 @@ end
 """
     record_trajectory_velocity!(tracers, u) -> tracers
 
-Store the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X})`` — the flow velocity seen by
+Store the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` — the flow velocity seen by
 each tracer where it currently sits — by interpolating the velocity field `u` (physical
 representation) onto the positions of the tracer set `tracers`, with the set's interpolation scheme.
 

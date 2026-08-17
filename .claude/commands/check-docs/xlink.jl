@@ -33,7 +33,18 @@ function sites(apply::Bool)
       sighead = join(lines[1:se-1], "\n")
       prose_start = base + (isempty(sighead) ? 0 : ncodeunits(sighead) + 1)
       prose = join(lines[se:end], "\n")
+      # The docstring's own binding names AND its own signature arguments are both off limits: the
+      # cross-reference rule bars linking either, and a keyword that happens to share a name with an
+      # observable elsewhere (`kinetic_energy`, `scalar_variance`) would otherwise be linked to that
+      # observable — which reads as a self-link to a different object. Learned the hard way: this
+      # sweep silently re-linked two arguments a manual fix had just unlinked, in the same commit.
       own = Set(String.(x.captures[1] for x in eachmatch(r"([A-Za-z_][A-Za-z0-9_!]*)\(", sighead)))
+      for argmatch in eachmatch(r"\(([^)]*)\)", sighead)
+        for raw in split(argmatch.captures[1], ",")
+          a = strip(split(split(split(raw, "::")[1], "=")[1], ";")[end])
+          isempty(a) || push!(own, a)
+        end
+      end
       linked = Set(String.(x.captures[1] for x in eachmatch(r"\[`([^`]+)`\]\(@", prose)))
       seen = Set{String}()
       for x in eachmatch(r"`([A-Za-z_][A-Za-z0-9_!]*)`", prose)

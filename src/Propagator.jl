@@ -463,8 +463,8 @@ _recovery_scratch(sb::ScalarBuffers) =
     deposit!(cache, state, domain, buffers)
     deposit!(sim)
 
-Close an iteration: deposit every observable the cache's fixed schedule carries — every slot its
-configuration holds, the same set every iteration — into `cache` (an
+Close an iteration: deposit the field observables the cache's fixed schedule carries — the velocity,
+vorticity and scalar recoveries and the maximum speed, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
 [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) the step has just produced,
 and record each slot at the current epoch (the cache's freshness counter). The
@@ -474,6 +474,10 @@ reduction over the just-deposited velocity — so an iteration's transform count
 caching, and its pass counts are unchanged but for one: the maximum-speed reduction runs every
 iteration, including under a hand-fixed ``\\Delta t`` that never reads it; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
 spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
+
+The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
+the state, so it is re-recorded where the positions move — by `advance!` after the tracer advance,
+and by the `deposit!(sim)` form above, which does it for you when the run carries tracers.
 
 Every iteration ends with this call: the run layer's
 [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!` , a
