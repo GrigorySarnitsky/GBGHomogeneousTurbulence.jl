@@ -92,14 +92,11 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
-  diagnostics of the flow and the scalar (`kinetic_energy`, `dissipation`, …), the spectrum-derived
-  scales (`energy_spectrum`, `integral_scale`), the `max_speed` that sets the advective
-  Courant–Friedrichs–Lewy (CFL) timestep limit, and the field-valued vorticity recovery.
-- [`Cache`](api/Cache.md): the `ObservablesCache` — the storage each **iteration** (one
-  advance of the run: a step plus the deposit that closes it) fills at its
-  end with the observables of the state it just produced; the checked accessors
-  (`velocity_physical`, `max_speed`, …) serve the deposited value or throw, and nothing is
-  recomputed on a read.
+  diagnostics of the flow and the scalar, the developed-turbulence markers, the spectrum-derived
+  scales, and the one field-valued observable, the vorticity recovery.
+- [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the run:
+  a step plus the deposit that closes it) leaves the observables it produced, read through checked
+  accessors that serve the deposited value or throw. Nothing is ever recomputed on a read.
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
@@ -110,11 +107,10 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a selectable interpolation scheme.
-- [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — assembles a `Simulation` and
-  runs it with `advance!` / `run!` / `warmup!` (the CFL-adaptive loop with automatic warm-up to
-  stationarity) and reports the measured flow state as a `Phenomenology` `FlowParameters`
-  (`flow_parameters`). A `Simulation` is a container rather than a reading surface: the state is read
-  through `sim.state`, the deposited observables through `sim.cache`.
+- [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
+  CFL-adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. A `Simulation` is a container,
+  not a reading surface: the state is read through `sim.state`, the deposited observables through
+  `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
   the umbrella), designed to be extractable into a standalone package.

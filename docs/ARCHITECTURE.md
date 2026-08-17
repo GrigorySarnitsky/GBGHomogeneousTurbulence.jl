@@ -18,7 +18,7 @@ reference for turbulence notation (§References).
 > `GBGIsotropicTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS) of
 > homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol{u}`` and one passive
 > scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable integrating-factor
-> time-stepping, with Lagrangian particle probes and Eulerian + Lagrangian statistics. It is a **library
+> time-stepping, with Lagrangian particle probes and field sampling along their trajectories. It is a **library
 > of composable pieces with a thin ergonomic run layer on top**, built as a *consumer* of
 > [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) (the field and spectral
 > machinery) and
@@ -274,7 +274,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   irreversible diffusion and, when the drive is linear, the source. The seam is a decomposition of the
   right-hand side, not of ``\mathcal{E}``.
 
-The passive scalar rides the same generator: the preserving `to_physical!` arity recovers the
+The passive scalar rides the same generator: the source-preserving four-argument `to_physical!` recovers the
 physical ``\varphi`` from ``\hat\varphi`` at each stage, and `scalar_rhs!` assembles the advection in conservative form
 ``-\nabla\cdot(\boldsymbol{u}\varphi)`` (equal to ``-\boldsymbol{u}\cdot\nabla\varphi`` since
 ``\nabla\cdot\boldsymbol{u} = 0``); the conservative form conserves the scalar mean exactly under the
@@ -934,7 +934,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
     validate them.
-    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at `kinetic_energy`,
+    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at the value
+    given by the `kinetic_energy` keyword,
     default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. It does **not**
     breach the extraction boundary — `Li2008` stays a pure scalar law with no `GBGPeriodicFields` /
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both

@@ -49,8 +49,9 @@ export kinetic_energy, dissipation, max_speed, vorticity_physical!,
 """
     kinetic_energy(u)
 
-The turbulent kinetic energy ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
-velocity field `u`. Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
+The turbulent kinetic energy
+``\\texttt{kinetic\\_energy} \\equiv k = \\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle``
+of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
 the normalized inner product, so by Parseval's theorem it accepts `u` in either
 representation. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
 `scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is

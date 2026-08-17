@@ -45,8 +45,6 @@ choice you needed to make. The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
 `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
 
-An operator-free keyword constructor (`BandRescaling(; …)`, `Linear(; …)`, `ConstantPower(; …)`) returns
-a [`DeferredForcing`](@ref) that a `Simulation` materializes once the domain exists.
 """
 module Forcing
 
@@ -332,7 +330,8 @@ hold, chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
-[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). Note what kind of quantity that is: here the held observable
+[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) ). Note what kind
+of quantity that is: here the held observable
 is a **rate**, where `BandRescaling` holds an **amplitude**. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """

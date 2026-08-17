@@ -86,10 +86,11 @@ with [`flow_parameters`](@ref), and track its progress with [`current_time`](@re
 # Setting the Reynolds number
 
 By default the run is **forced and stationary** — a
-[`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) holds the total (whole-field)
-energy
-at [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) (i.e. `over = :total`
-) — and the viscosity is chosen from the grid rather than supplied:
+[`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) holds the whole-field kinetic
+energy at the value given by the
+[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword (`over = :total`)
+— and the viscosity is
+chosen from the grid rather than supplied:
 
 !!! note "The default holds ``k`` fixed, so ``k`` is not a measurable of the default run"
     `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
@@ -141,7 +142,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `velocity_forcing` , `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
-  (whole-field) energy at `kinetic_energy` (`over = :total`), `scalar_forcing` to `NoForcing()`. The
+  (whole-field) energy at the value given by the `kinetic_energy` keyword (`over = :total`), and
+  `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.

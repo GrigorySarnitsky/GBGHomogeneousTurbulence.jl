@@ -142,8 +142,10 @@ iteration.
 **A slot's epoch says what it holds**, and takes three values: the observable at a
 named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code the named time is
 an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
-every step or announced mutation, the particles' with every push; a slot's epoch is current when it equals
-its factor's epoch.) A read is served only in the
+every step or announced mutation, the particles' with every push, and a slot's epoch is current when
+it equals its factor's epoch. An epoch is therefore **not** an iteration number: it counts changes to
+the state rather than advances of the run, so after two steps and one announced mutation the clock
+reads step 2 while the fields epoch reads 4.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.

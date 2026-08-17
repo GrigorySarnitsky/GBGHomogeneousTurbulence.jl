@@ -21,7 +21,8 @@ positions. A slot is readable exactly when its own epoch equals the counter it d
 !!! note "An epoch is not an iteration number"
     An epoch counts *changes to the state*, not advances of the run. A completed
     [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does
-    any announced out-of-band mutation — so a run at step 2 may stand at fields epoch 4. The epoch
+    any announced out-of-band mutation, so the two counts diverge: after two steps and one announced
+    mutation the clock reads step 2 and the fields epoch reads 4. The epoch
     answers "is this value still the right one?"; the clock's
     [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has
     the run gone?".
@@ -105,7 +106,10 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' epochs against **both**
   counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
-  [`fields_modified!`](@ref). A field-derived slot is readable exactly when its epoch equals this.
+  [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run and
+  will run ahead of
+  [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A field-derived slot is
+  readable exactly when its epoch equals this.
 - `particles_epoch` — the tracer positions' counter, advanced by the tracer push.
 """
 mutable struct ObservablesCache{PV, PS, TS}
