@@ -8,7 +8,7 @@ Order   = [:module]
 ## The state
 
 The evolving fields a run advances, in spectral representation — the single source of truth. The
-physical representations are recovered from it with the source-preserving scratch arity of
+physical representations are recovered from it with the source-preserving four-argument form of
 [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!), and the vorticity
 with [`vorticity_physical!`](@ref) — see [Observables](Observables.md).
 

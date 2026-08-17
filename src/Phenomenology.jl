@@ -74,7 +74,7 @@ The flow-state bundle a law is evaluated against — the analogue of `FlowCondit
 isotropic state (``\\nu``, ``\\varepsilon``, ``u'``, ``L_{11}``); the small scales and the dimensionless
 Taylor-scale Reynolds number are [derived](@ref taylor_reynolds) from them, not stored.
 
-# Fields
+# Arguments
 All keyword; a homogeneous-isotropic state fixes the rest:
 
   * `viscosity` — the kinematic viscosity ``\\nu``.
@@ -86,13 +86,30 @@ All keyword; a homogeneous-isotropic state fixes the rest:
   * `schmidt` — the Schmidt number ``\\mathrm{Sc}`` (the scalar diffusivity is
     ``\\varkappa = \\nu/\\mathrm{Sc}``); default `1.0`.
   * `scalar_dissipation` — the scalar dissipation rate ``\\varepsilon_\\varphi`` (only scalar laws read
-    it); default `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle a
-    plain, type-stable set of `Float64`s that a law can evaluate without a branch — the cost being that
-    a scalar law applied to a scalar-free state returns `NaN` rather than raising, so check the field
-    (or the run's `scalar`) before reading a scalar law's answer.
+    it); default `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle
+    a plain, type-stable set of `Float64`s. It is a **sentinel, not a value that propagates**: every
+    law that reads the field checks it first and throws an `ArgumentError` naming the law and the
+    missing rate, so a scalar law applied to a scalar-free state fails loudly rather than returning
+    `NaN`. A caller needs no guard of its own.
+
+# Examples
+
+Built from a run's measured state — which is what `flow_parameters(sim)` returns — or by hand to
+evaluate a law at a state you specify:
+
+```julia
+fp = FlowParameters(; viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
+                      integral_scale = 0.5)                 # velocity-only: no scalar law applies
+
+fps = FlowParameters(; viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
+                       integral_scale = 0.5, schmidt = 0.7, scalar_dissipation = 0.05)
+```
+
+# Fields
 
 The plain constructor `FlowParameters(viscosity, dissipation, rms_velocity, integral_scale, schmidt,
-scalar_dissipation)` takes the six fields directly, in this order.
+scalar_dissipation)` takes the six fields directly, in this order; each holds the value documented for
+the keyword of the same name above.
 """
 struct FlowParameters
   viscosity::Float64

@@ -126,8 +126,11 @@ relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``,
 rate ``\\varepsilon`` — nearly Reynolds-number-independent from the Johns Hopkins Turbulence Database
 (JHTDB) forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``) and consistent with
 higher-Reynolds-number periodic-box DNS. It is a distinct group from the classical
-dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` (Taylor 1935; Sreenivasan 1998; Kaneda
-et al. 2003 for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is
+dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3``
+(Taylor 1935, *Proc. R. Soc. A* **151**, 421–444,
+[doi:10.1098/rspa.1935.0158](https://doi.org/10.1098/rspa.1935.0158); Sreenivasan 1998,
+[doi:10.1063/1.869575](https://doi.org/10.1063/1.869575); Kaneda et al. 2003,
+[doi:10.1063/1.1539855](https://doi.org/10.1063/1.1539855), for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is
 normalized on the **integral** scale ``L_{11}``, not the box side ``L``. Formed on a common length the two
 are exactly related by ``G = \\tfrac{3}{2} C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
 ``G \\approx 0.9`` (box side) and ``C_\\varepsilon \\approx 0.5`` (integral scale) sit at *different*

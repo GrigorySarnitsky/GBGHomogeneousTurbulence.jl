@@ -106,6 +106,7 @@ coefficient `c_L` is set by the requirement that the spectrum integrate to the k
 fixes the low-wavenumber slope (Pope 2000).
 
 # Fields
+The plain constructor `PopeLargeScale(c_L, p₀)` takes the two fields directly:
 - `c_L` — the large-scale coefficient, set by the energy normalization.
 - `p₀` — the low-wavenumber slope exponent.
 """
@@ -127,6 +128,7 @@ set by the requirement that the spectrum yield the dissipation rate; `β` fixes 
 cutoff (Pope 2000).
 
 # Fields
+The plain constructor `PopeDissipation(c_η, β)` takes the two fields directly:
 - `c_η` — the dissipation-range coefficient, set by the dissipation normalization.
 - `β` — the cutoff-sharpness exponent.
 """
@@ -147,6 +149,7 @@ in the inertial range and produces the classic ``\\kappa^{4}`` energy-containing
 (``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^{4}``); `c_L` fixes the peak scale (von Kármán 1948).
 
 # Fields
+The plain constructor `VonKarmanLarge(c_L)` takes the field directly:
 - `c_L` — the coefficient fixing the peak scale.
 """
 struct VonKarmanLarge <: LargeScaleFactor
@@ -187,6 +190,7 @@ hypothesis that the spectral energy flux stays constant through the dissipation 
 Kolmogorov constant ``C_K`` (Pao 1965).
 
 # Fields
+The plain constructor `PaoDissipation(α)` takes the field directly:
 - `α` — the Kolmogorov constant the flux hypothesis reuses.
 """
 struct PaoDissipation <: DissipationFactor
@@ -211,6 +215,7 @@ near-dissipation range is instead a stretched exponential (exponent ``\\approx 2
 2005), a different form this factor does not model.
 
 # Fields
+The plain constructor `ExponentialDissipation(β)` takes the field directly:
 - `β` — the exponential decay rate.
 """
 struct ExponentialDissipation <: DissipationFactor
@@ -259,6 +264,8 @@ spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelo
 [`VonKarmanLarge`](@ref)).
 
 # Fields
+The plain constructor `ModelSpectrum(C_K, large_scale, dissipation, ref)` takes the four fields
+directly, in this order:
 - `C_K` — the Kolmogorov constant of the inertial-range core.
 - `large_scale` — the `LargeScaleFactor` giving ``f_L``.
 - `dissipation` — the `DissipationFactor` giving ``f_\\eta``.
@@ -392,6 +399,7 @@ the scalar dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which
 kinetic-energy dissipation ``\\varepsilon`` from `fp`.
 
 # Fields
+The plain constructor `ObukhovCorrsin1949(C_OC)` takes the field directly:
 - `C_OC` — the Obukhov–Corrsin constant.
 """
 struct ObukhovCorrsin1949 <: ScalarSpectrum

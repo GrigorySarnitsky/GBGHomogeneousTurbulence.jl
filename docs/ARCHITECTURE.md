@@ -1759,7 +1759,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     supertype keeps the name `AbstractIntegrator`, which is accurate for the *family*. One
     consequence had to be settled first: `Tracers` used `scheme` for its *interpolation* scheme, so
     two constructors would have taken one keyword for two concepts; it is now
-    `interpolation_scheme`, which is the more precise name regardless. `pusher` becomes `scheme` too,
+    `interpolation_scheme`, which is the more precise name regardless. The parameter `pusher` becomes `scheme` too,
     so one word names the same role on both sides of the run.
 
     **The presets.** `Pope2000`, `VonKarman1948` and `Pao1965` were PascalCase *functions* returning
