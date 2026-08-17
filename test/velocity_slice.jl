@@ -19,7 +19,7 @@ using Test
   buffers = allocate_buffers(IFRK2(), domain; scalar = true)
   conditions = FlowConditions(viscosity = ν,
                     velocity_forcing = BandRescaling(domain; target = 0.6, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
-  integrator = IFRK2()
+  scheme = IFRK2()
   generator = ResolvedGenerator(domain, conditions; scalar = true)
 
   û = new_vector_field_spectral(domain)
@@ -38,7 +38,7 @@ using Test
     u = velocity_physical(cache)
     dt = cfl * Δx / max(max_speed(cache), 1e-6)
     push!(energies, kinetic_energy(u))
-    step!(integrator, state, generator, domain, buffers, cache, dt)
+    step!(scheme, state, generator, domain, buffers, cache, dt)
     deposit!(cache, state, domain, buffers)
   end
 
@@ -56,9 +56,9 @@ using Test
   @test scalar_variance(φ̂) < 1e-20                  # the passive scalar stayed exactly zero
 
   dt = cfl * Δx / max(max_speed(cache), 1e-6)
-  step!(integrator, state, generator, domain, buffers, cache, dt)                            # warm up
+  step!(scheme, state, generator, domain, buffers, cache, dt)                            # warm up
   deposit!(cache, state, domain, buffers)
-  step_bytes = @allocated step!(integrator, state, generator, domain, buffers, cache, dt)
+  step_bytes = @allocated step!(scheme, state, generator, domain, buffers, cache, dt)
   deposit_bytes = @allocated deposit!(cache, state, domain, buffers)
   field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
   @test step_bytes + deposit_bytes < field_bytes

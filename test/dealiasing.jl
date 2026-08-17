@@ -127,8 +127,8 @@ using Test
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
 
-    function integrate(integrator, dt, nsteps)
-      b = allocate_buffers(integrator, domain; scalar = true)
+    function integrate(scheme, dt, nsteps)
+      b = allocate_buffers(scheme, domain; scalar = true)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       cache = ObservablesCache(domain; scalar = true)
       û = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
@@ -138,17 +138,17 @@ using Test
       state = ResolvedFields(û, φ̂)
       deposit!(cache, state, domain, b)
       for _ in 1:nsteps
-        step!(integrator, state, generator, domain, b, cache, dt)
+        step!(scheme, state, generator, domain, b, cache, dt)
         deposit!(cache, state, domain, b)
       end
       return û, φ̂
     end
     diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
-    function ratios(integrator)
+    function ratios(scheme)
       Tfinal = 0.4; n = 8
-      u1, p1 = integrate(integrator, Tfinal / n, n)
-      u2, p2 = integrate(integrator, Tfinal / 2n, 2n)
-      u4, p4 = integrate(integrator, Tfinal / 4n, 4n)
+      u1, p1 = integrate(scheme, Tfinal / n, n)
+      u2, p2 = integrate(scheme, Tfinal / 2n, 2n)
+      u4, p4 = integrate(scheme, Tfinal / 4n, 4n)
       return diffnorm(u1, u2) / diffnorm(u2, u4), diffnorm(p1, p2) / diffnorm(p2, p4)
     end
 

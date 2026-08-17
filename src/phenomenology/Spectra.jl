@@ -20,10 +20,11 @@ dissipation-range roll-off, each swappable.
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
 
-The velocity-spectrum presets `Pope2000` / `VonKarman1948` / `Pao1965` are factory *functions* that
-assemble and return a composed `ModelSpectrum`, whereas the scalar preset `ObukhovCorrsin1949` — like the
-structure-function and scaling laws — is a concrete *type* with a keyword constructor; both are invoked
-identically as `Name(; …)`.
+Every preset is a type with a keyword constructor, invoked as `Name(; …)`. The velocity-spectrum
+presets `Pope2000` / `VonKarman1948` / `Pao1965` name the [`ModelSpectrum`](@ref) specialization
+carrying their large-scale and dissipation factors, so a preset is the composition rather than a
+wrapper around one; the scalar preset `ObukhovCorrsin1949`, like the structure-function and scaling
+laws, is a plain struct.
 """
 module Spectra
 
@@ -293,7 +294,13 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\
 `C_K` is the Kolmogorov constant; the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number
 values Pope obtains from the energy and dissipation normalizations, with the shape exponents `p₀ = 2`
 and `β = 5.2`. Override any coefficient to re-fit. Evaluate with [`spectrum`](@ref)`(Pope2000(), κ, fp)`.
+
+`Pope2000` is the [`ModelSpectrum`](@ref) carrying Pope's two roll-off factors, so
+`spec isa Pope2000` holds for a value this constructor returns, exactly as for the presets that are
+plain structs.
 """
+const Pope2000 = ModelSpectrum{PopeLargeScale, PopeDissipation}
+
 Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2) =
   ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β), _POPE2000)
 
@@ -314,7 +321,12 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
 the classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters). `C_K`
 is the Kolmogorov constant; `c_L` fixes the peak scale.
+
+`VonKarman1948` is the [`ModelSpectrum`](@ref) carrying von Kármán's large-scale factor and no
+dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constructor returns.
 """
+const VonKarman1948 = ModelSpectrum{VonKarmanLarge, UnitDissipation}
+
 VonKarman1948(; C_K = 1.5, c_L = 1.0) =
   ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN1948)
 
@@ -336,7 +348,12 @@ covering the inertial and dissipation ranges from a constant-spectral-flux hypot
 constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
 (unlike [`Pope2000`](@ref)). It has no energy-containing range; use `Pope2000` or
 [`VonKarman1948`](@ref) when the large scales matter.
+
+`Pao1965` is the [`ModelSpectrum`](@ref) carrying Pao's dissipation factor and no large-scale
+roll-off, so `spec isa Pao1965` holds for a value this constructor returns.
 """
+const Pao1965 = ModelSpectrum{UnitLargeScale, PaoDissipation}
+
 Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K), _PAO1965)
 
 

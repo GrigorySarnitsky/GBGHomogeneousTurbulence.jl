@@ -37,7 +37,7 @@ particle_positions
 number_of_particles
 ```
 
-## The trajectory integrator
+## The trajectory scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes, with
 the same separation between the evolving state and the scheme's per-step registers. `EndpointHeun`

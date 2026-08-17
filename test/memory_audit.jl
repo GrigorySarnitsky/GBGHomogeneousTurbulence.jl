@@ -9,7 +9,7 @@
 #     plus a per-forcing DELTA table and a tracer DELTA, and an exhaustive sweep over the whole
 #     product (~360 combinations) asserts measured = base + deltas, cell by cell. Adding or removing
 #     a buffer anywhere fails the suite: a footprint change must be a conscious, recorded decision,
-#     never a drive-by. (The particle-integrator axis has one point today — the Heun pusher — so it
+#     never a drive-by. (The particle-scheme axis has one point today — the Heun scheme — so it
 #     enters as on/off; precision, backend, and the interpolation scheme change bytes, never counts.)
 #
 #  2. THE FRAME LEDGER — the same walk over what a run does NOT evolve: the read-only `FixedDomain`
@@ -61,7 +61,7 @@ function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, 
   owners = Any[state, ObservablesCache(domain; scalar), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
-    push!(owners, Tracers(domain; number_of_particles = 4, scheme = CatmullRom, rng = MersenneTwister(1)))
+    push!(owners, Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom, rng = MersenneTwister(1)))
   end
   return _counts(owners, N_AUDIT)
 end
@@ -293,13 +293,13 @@ const EPISODE_UNITS = [
 
   @testset "no field-scale storage escapes both ledgers" begin
     # The closure that keeps the frame hole shut. Walk a whole live `Simulation` — frame, state,
-    # observation cache, generator, integrator registers, tracers — and require the total to equal
+    # observation cache, generator, scheme registers, tracers — and require the total to equal
     # frame + working set, cell by cell. A future buffer that neither table names fails here
     # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
     for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
-                       velocity_forcing = NoForcing(), integrator = _scheme(scheme),
+                       velocity_forcing = NoForcing(), scheme = _scheme(scheme),
                        number_of_particles = tracers, rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
             _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
@@ -317,8 +317,8 @@ const EPISODE_UNITS = [
     # Four (M, 3) arrays in total, but they are owned by two different values, and WHICH owns which
     # is the invariant (decision 50). The tracer set holds trajectory STATE only — the positions and
     # the recorded Lagrangian velocity; the predictor pair belongs to the scheme's registers, so a
-    # different pusher changes the second count and never the first.
-    tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, scheme = CatmullRom, rng = MersenneTwister(1))
+    # different scheme changes the second count and never the first.
+    tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, interpolation_scheme = CatmullRom, rng = MersenneTwister(1))
     buffers = allocate_buffers(EndpointHeun(), tracers)
     _m_arrays(owner) = (acc = AbstractArray[];
                         collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
@@ -461,7 +461,7 @@ const EPISODE_UNITS = [
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFRK2()),
         scalar in (false, true)
       sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
-                       integrator = scheme, rng = MersenneTwister(1))
+                       scheme = scheme, rng = MersenneTwister(1))
       advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
       @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * unit
     end

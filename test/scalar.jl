@@ -12,7 +12,7 @@ using Random
 using Test
 
 
-function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
+function integrate_coupled(scheme, domain, buffers, û0, φ̂0, conditions, dt, nsteps)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
   cache = ObservablesCache(domain; scalar = true)
   û = new_vector_field_spectral(domain)
@@ -22,7 +22,7 @@ function integrate_coupled(integrator, domain, buffers, û0, φ̂0, conditions, 
   state = ResolvedFields(û, φ̂)
   deposit!(cache, state, domain, buffers)
   for _ in 1:nsteps
-    step!(integrator, state, generator, domain, buffers, cache, dt)
+    step!(scheme, state, generator, domain, buffers, cache, dt)
     deposit!(cache, state, domain, buffers)
   end
   return û, φ̂

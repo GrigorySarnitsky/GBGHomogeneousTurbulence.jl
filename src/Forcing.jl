@@ -3,7 +3,7 @@
 #
 #   * `set_forcing_rate!` — for forcings LINEAR in the field (`f = A·field`): fill a per-mode rate A(k)
 #     that is folded into the integrating factor, so the linear operator becomes A(k) - D|k|². This
-#     is exact for the linear forcing and preserves the integrator's order (no operator splitting).
+#     is exact for the linear forcing and preserves the scheme's order (no operator splitting).
 #     `Linear` (fixed A) and `ConstantPower` (A set each step so the injection rate is ε_target) use it.
 #   * `apply_forcing!` — a post-step projection/rescale. `BandRescaling` (hold band or total energy fixed) uses it.
 #
@@ -126,7 +126,7 @@ end
 
 For a strategy `forcing` linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
-(the forcing ``f = A \\texttt{field}``) and return `rate`; the integrator folds it into the diffusive
+(the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
 integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Only a forcing declaring [`uses_linear_rate`](@ref) is ever handed

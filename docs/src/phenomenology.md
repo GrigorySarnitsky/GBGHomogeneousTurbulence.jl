@@ -8,11 +8,10 @@ fits sit beside the literature on equal footing.
 
 **One pattern.** Each law family is an abstract type; each parametrization is a named preset
 carrying its fitted coefficients and its provenance, evaluated against a
-[`FlowParameters`](@ref) bundle. Usually the preset is itself a concrete subtype; the composite
-model spectra are the exception — `Pope2000`, `VonKarman1948`, and `Pao1965` are factory
-*functions* returning a ready-assembled `ModelSpectrum` (the subtype), so test `spec isa
-EnergySpectrum` on the value they return, not on the preset name. Choosing a law is choosing the
-preset — the published fit is the default, and any coefficient can be overridden to re-fit:
+[`FlowParameters`](@ref) bundle. Every preset is a type, so `spec isa Pope2000` and
+`spec isa EnergySpectrum` both hold — the composite model spectra name the `ModelSpectrum`
+specialization carrying their roll-off factors, rather than a separate wrapper. Choosing a law is
+choosing the preset — the published fit is the default, and any coefficient can be overridden to re-fit:
 
 ```julia
 using GBGIsotropicTurbulence.Phenomenology         # FlowParameters, spectrum, …

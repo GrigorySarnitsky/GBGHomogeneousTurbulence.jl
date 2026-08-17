@@ -18,7 +18,7 @@ IFRK2
 
 ## Step scratch
 
-The preallocated per-step working set the integrator writes into — built per concrete scheme, sized so
+The preallocated per-step working set the scheme writes into — built per concrete scheme, sized so
 a step allocates no field-sized memory.
 
 ```@docs

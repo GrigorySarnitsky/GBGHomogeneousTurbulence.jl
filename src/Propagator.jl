@@ -21,11 +21,11 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `integrator` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) . All
+the `scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) . All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
-- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integrator` is chosen from.
+- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `scheme` is chosen from.
 - [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
   cheaper two-stage alternative, imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
@@ -55,7 +55,7 @@ export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_b
     AbstractIntegrator
 
 Supertype of the time-marching schemes. A scheme implements
-[`step!`](@ref)`(integrator, state, generator, domain, buffers, cache, dt)`, advancing the `state`'s
+[`step!`](@ref)`(scheme, state, generator, domain, buffers, cache, dt)`, advancing the `state`'s
 velocity ``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one
 timestep in place, and may specialize
 [`recommended_cfl`](@ref).
@@ -76,8 +76,8 @@ end
 """
     IntegratorBuffers
 
-The preallocated per-step scratch the integrator writes into, sized so a step allocates no field-sized
-memory. Built per scheme by [`allocate_buffers`](@ref)`(integrator, domain; scalar)`, which allocates
+The preallocated per-step scratch the scheme writes into, sized so a step allocates no field-sized
+memory. Built per scheme by [`allocate_buffers`](@ref)`(scheme, domain; scalar)`, which allocates
 **exactly** that scheme's working set: an array another scheme would use is left `nothing`, never
 allocated.
 
@@ -141,15 +141,15 @@ function _exponential_rotate!(field, domain::FixedDomain, ℰ)
 end
 
 """
-    allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
-    allocate_buffers(pusher, tracers) -> ParticleIntegratorBuffers
+    allocate_buffers(scheme, domain; scalar = false) -> IntegratorBuffers
+    allocate_buffers(scheme, tracers) -> ParticleIntegratorBuffers
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
 here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
 a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
 
-The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `integrator`
+The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `scheme`
 needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
 backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`;
 [`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_star_spectral`. Passing `scalar = true`
@@ -157,7 +157,7 @@ adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
 The second serves the trajectory schemes: it builds the
 [`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) the
-`pusher` (an
+`scheme` (an
 [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
 needs, sized to the tracer set `tracers`. One generic covers both because it is one concept, and
 because both sides keep the same separation: the evolving state holds no scheme's scratch.
@@ -166,10 +166,10 @@ function allocate_buffers end
 
 
 """
-    step!(integrator, state, generator, domain, buffers, cache, dt)
+    step!(scheme, state, generator, domain, buffers, cache, dt)
 
 Advance the `state` (a [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
-``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `integrator`, the
+``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `scheme`, the
 `generator` (a
 [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
 the equations of motion, their conditions, and their assembly scratch), the `domain` (a
@@ -177,7 +177,7 @@ the equations of motion, their conditions, and their assembly scratch), the `dom
 observables cache `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) ). Dispatches on the
 concrete
-`integrator` type (see `IFRK2`, `IFLowStorageRK3`).
+`scheme` type (see `IFRK2`, `IFLowStorageRK3`).
 
 A scheme does only stage arithmetic: it opens the step with the generator's
 [`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!) , evaluates the
@@ -504,10 +504,10 @@ end
 
 
 """
-    recommended_cfl(integrator, domain)
+    recommended_cfl(scheme, domain)
 
 A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C_{\\mathrm{CFL}}`` for the scheme
-`integrator` on the [`FixedDomain`](@ref) `domain`, for a timestep
+`scheme` on the [`FixedDomain`](@ref) `domain`, for a timestep
 ``\\Delta t = C_{\\mathrm{CFL}} \\Delta x / \\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}\\rvert``,
 with ``\\Delta x = L/N`` the grid spacing.
 
@@ -540,8 +540,8 @@ _base_cfl(::IFLowStorageRK3) = 0.5
 
 # Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
 # (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
-recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
-  _base_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
+recommended_cfl(scheme::AbstractIntegrator, domain::FixedDomain) =
+  _base_cfl(scheme) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
 
 
 end # module Propagator

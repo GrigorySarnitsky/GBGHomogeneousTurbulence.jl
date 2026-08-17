@@ -3,7 +3,7 @@
 # held in the state) and the random initial conditions that seed a run. The physical representations
 # are recovered where they are consumed — through the source-preserving four-argument form of PF's `to_physical!`
 # (the state is never consumed; PF decision 64) and, for the vorticity, `Observables.vorticity_physical!`
-# — and land in `Cache` (`ObservablesCache`); the per-step scratch lives with the integrator
+# — and land in `Cache` (`ObservablesCache`); the per-step scratch lives with the scheme
 # (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
 
 """

@@ -48,7 +48,7 @@ therefore a thin run layer that assembles the machinery with sensible defaults a
 using GBGIsotropicTurbulence
 
 # Assemble a forced case. Everything the run needs — the domain, buffers, physics,
-# integrator, state, and initial condition — is built with defaults from a few numbers.
+# scheme, state, and initial condition — is built with defaults from a few numbers.
 sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
                  velocity_forcing = ConstantPower(target = 0.1),
                  scalar = true, schmidt = 1.0)
@@ -216,7 +216,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   before the run advances again. The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The
-  per-step scratch is **not** state: the scheme's registers live with the integrator (`IntegratorBuffers`
+  per-step scratch is **not** state: the scheme's registers live with the scheme (`IntegratorBuffers`
   in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
   preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
   to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
@@ -345,7 +345,7 @@ The four hooks form one per-step lifecycle with a fixed order — `prepare_forci
 `set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `apply_forcing!` after the
 completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
-hooks need; none receives the integrator's buffers (§11 decision 32).
+hooks need; none receives the scheme's buffers (§11 decision 32).
 
 `NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed — a deterministic
 clamp, fit for spin-up and amplitude-holding but not a faithful stationary sampler; its docstring
@@ -391,7 +391,7 @@ Particles are **instruments** — probes of the turbulence — not a second phys
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
-with the trajectory integrator's registers held apart in a `ParticleIntegratorBuffers` allocated per
+with the trajectory scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
@@ -415,15 +415,15 @@ differs from the next sample only at ``O(\Delta t^2)``, so reusing it as the nex
 the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
-same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(pusher, tracers)` builds its
+same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers)` builds its
 registers. Two axes matter: the
-trajectory integrator — today the single second-order `EndpointHeun`, with higher-order pushers the
+trajectory scheme — today the single second-order `EndpointHeun`, with higher-order pushers the
 studied future axis — and the sampling-consistency axis, the interpolation scheme's order relative to the field's
 spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` / `LagrangeSpline` available).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same
 linear-exact move), while **orientation dynamics on the rotation group is a distinct geometric
-integrator** — the reversible generator of §8 again — so the split does not naively unify all of it.
+scheme** — the reversible generator of §8 again — so the split does not naively unify all of it.
 
 ### 4.7 `SimulationRun` — the front door
 
@@ -592,7 +592,7 @@ numerical counterpart of the charter that the tool investigates the physics rath
   precision, order, or footprint suffices for a regime is a measured finding.
 - **The fitness arbiter is the comparison machine of §3** — the same one that adjudicates
   method-independence and DNS-versus-LES statistical commutation. One machine ranges over model
-  fidelity, integrator, precision, footprint, and closure; the *sufficiency frontier* (the cheapest
+  fidelity, scheme, precision, footprint, and closure; the *sufficiency frontier* (the cheapest
   realization that still passes) is a deliverable of the tool.
 
 This is why the `GBGPeriodicFields` element-type genericity and GPU-first, allocation-free discipline are
@@ -614,7 +614,7 @@ generalization is built for them until a second concrete case forces the abstrac
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
-  integrating-factor split; orientation needs a geometric integrator (§4.6, §8).
+  integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
 - **The sheared frame (Rogallo), a `ShearedDomain`.** A uniform mean velocity gradient makes the
   wavenumbers time-dependent (``\mathrm{d}\boldsymbol{\kappa}/\mathrm{d}t = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)
   and non-separable — the `SimulationDomain` counterpart to `FixedDomain` (§4.1). This is
@@ -659,10 +659,10 @@ generalization is built for them until a second concrete case forces the abstrac
   the GPU-primary production target (invariant 4), where the plan is effectively fixed. It is wired when a
   long CPU campaign makes the search worth the added front-door surface — named for the planning-effort
   choice a user makes, not the raw backend flag.
-- **The ``\nu = 0`` truncated-Euler experiment — an integrator and dealiasing oracle.** At zero
+- **The ``\nu = 0`` truncated-Euler experiment — an scheme and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
-  continuous time — so measured energy drift isolates the time integrator alone: a per-scheme
+  continuous time — so measured energy drift isolates the time scheme alone: a per-scheme
   conservation and order-of-accuracy test (the drift must scale with the scheme's order), a second
   witness that the sharp strategies are exactly Galerkin (an alias residue breaks the detailed
   conservation of the retained triads), and a direct measurement of the Hou–Li filter's effective
@@ -756,7 +756,7 @@ one usually encodes a decision.
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
    that lets the state grow (a scalar today, a coarser Model's extra fields tomorrow) to more slots at no
    runtime cost. **Each scheme allocates exactly its working set:** `allocate_buffers` dispatches on the
-   concrete integrator and builds only the registers that scheme writes — there is no over-allocating
+   concrete scheme and builds only the registers that scheme writes — there is no over-allocating
    `::AbstractIntegrator` fallback, so a scheme with no method is a hard error, never a silent superset
    (an `IFLowStorageRK3` run does not carry `IFRK2`'s two predictor registers).
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU scope
@@ -799,7 +799,7 @@ one usually encodes a decision.
   own package docs (the `DocumenterInterLinks` setup).
 - **Verification is by numerical oracle, not a formalization ledger.** Because the package introduces no
   novel mathematical *objects* (they are `GBGPeriodicFields`' and `GBGStreamingStatistics`'), its
-  nontrivial claims are *dynamical* — the exactness of ``\mathcal{E}``, the order of the integrator,
+  nontrivial claims are *dynamical* — the exactness of ``\mathcal{E}``, the order of the scheme,
   imaginary-axis stability, mean conservation — and are pinned by numerical oracle tests (a Taylor–Green
   order study, unforced energy decay, exact diffusion). This is why the package follows the
   `GBGCloudPhysics` consumer pattern with **no `FORMALIZATION.md`**; a typed-statement ledger is a
@@ -845,7 +845,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 4. **(2026-06) One passive scalar ``\varphi``, coupled in-stage.** Velocity and scalar advance through
    the same RK stages to keep the passive coupling time-accurate.
 5. **(2026-06) Lagrangian tracers by Heun-in-time; interpolation scheme is the accuracy axis.** The
-   pusher uses the start- and end-of-step velocities the solver already produces.
+   scheme uses the start- and end-of-step velocities the solver already produces.
 6. **(2026-07) Statistics extracted to `GBGStreamingStatistics`.** The conditional/transition-density
    machinery is domain-neutral and shared across turbulence, cloud microphysics, and molecular
    dynamics; it is consumed, not owned (§5).
@@ -859,7 +859,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 9. **(2026-07) Precision and footprint are studied axes.** Both precisions supported equally, the
    working point chosen by fitness test; the sufficiency frontier is a deliverable (§6).
 10. **(2026-07) Particles are instruments with first-class numerics.** The role is a probe; the
-    trajectory integrator and sampling-consistency are fitness-tested Method work (§4.6).
+    trajectory scheme and sampling-consistency are fitness-tested Method work (§4.6).
 11. **(2026-07) The run + warm-up layer is a first-class, present concern.** Ease of setup and running
     is the primary quality metric, so the ergonomic front door is built now, not deferred (§2, §4.7).
 12. **(2026-07) Single `ARCHITECTURE.md` (consumer archetype) + `docs/src/notation.md`; no
@@ -1036,7 +1036,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\hat{\boldsymbol{u}}``/``\hat\varphi``, `dissipation` curls into scratch and reduces, and the run layer
     prepares what each needs — the mirror of the generator, both now thin externals over bare fields.
     Consequently the monolithic `FieldBuffers` is dissolved: the generator's operators take their
-    **individual scratch fields** (naming no bundle), so the scratch is free to live with the integrator
+    **individual scratch fields** (naming no bundle), so the scratch is free to live with the scheme
     that owns it as **`IntegratorBuffers`** (module `Propagator`), built by `allocate_buffers` dispatching
     on the concrete scheme; `ScalarBuffers` stays a nested optional sub-bundle. The name `ResolvedFields`
     (over `ResolvedState` / `DNSState` / `FieldState`) follows the `FixedDomain` axis-lesson taken to the
@@ -1078,7 +1078,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     - **Observables are functions of the state, not the `Simulation`.** No `f(sim)` form: an observable
       taking a `Simulation` reached across `state` / `buffers` / `conditions`, smearing the single source of
       truth (decision 26); the run layer supplies the explicit state variables.
-    - **`allocate_buffers` is per-scheme and exact** (invariant 4): each integrator allocates only the
+    - **`allocate_buffers` is per-scheme and exact** (invariant 4): each scheme allocates only the
       registers it uses; over-allocation is a hard error. The friction of the now-explicit `FlowConditions`
       is the standing argument for a reified `Generator` operator (§7). *(Realized: decision 31.)*
 29. **(2026-07) The RK3 stage ordering: both right-hand sides before either update; the
@@ -1138,7 +1138,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `scalar_rhs!` (each field's explicit right-hand side at a stage state: the dealiased nonlinear
     term plus the additive forcing source), `velocity_integrating_factor!` / `scalar_integrating_factor!` (each field's exact
     linear subflow — the generator is the semilinear split ``\partial_t \hat q = A\hat q + N(\hat q)``
-    with a *diagonal, exact* linear operator, the exponential-integrator family's special case), and
+    with a *diagonal, exact* linear operator, the exponential-scheme family's special case), and
     `finalize!` (close the step — the post-step forcing projections). The rhs/factor pairs are the
     required core; `prepare!`/`finalize!` default to no-ops (a two-tier required/optional protocol).
     **`finalize!` on the generator is a recorded deviation** from the solver-library precedent (the
@@ -1147,7 +1147,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     observation: the observables, the diagnostics, and the tracer push must see the forced end-of-step
     state, and molecular-dynamics practice places exactly this operation inside the step (a
     constraint's velocity-projection stage, a thermostat's end-of-step rescale, the trailing factor of
-    a symmetric splitting). The signature becomes `step!(integrator, state, generator, domain,
+    a symmetric splitting). The signature becomes `step!(scheme, state, generator, domain,
     buffers, derived, dt)`: both schemes now contain no physics — no viscosity, no forcing calls, no
     conditions — and `Propagator` drops its `Forcing` dependency. The old public assembly trio
     (`velocity_nonlinear!`, `scalar_nonlinear!`, `integrating_factor!`) demotes to internals behind
@@ -1159,14 +1159,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     **bit-identical** on fixed-seed trajectories (all three dealiasing strategies and the
     `StochasticOU`-forced case) against the pre-migration code.
 32. **(2026-07) Forcing hooks own their scratch; the lifecycle order is contract.** The four-hook
-    interface no longer receives the integrator's buffer bundle ("for interface uniformity" — the
+    interface no longer receives the scheme's buffer bundle ("for interface uniformity" — the
     smell decision 26's discipline predicted): `set_forcing_rate!`, `apply_forcing!`,
     `prepare_forcing!`, and `add_forcing_source!` take only what they act on, and `StochasticOU` owns
     its noise scratch (one field in physical and one in spectral representation, allocated on first
     use like its ``\hat{\boldsymbol{f}}`` state) instead of reaching into `buffers.product_*` by
     field name — at the recorded price of two resident fields for a velocity-forcing instance,
     accepted to sever the one cross-component reach-in (the extended-system discipline: a thermostat
-    never touches the integrator's registers; the OU re-add stays gated on a GPU-tuned generator
+    never touches the scheme's registers; the OU re-add stays gated on a GPU-tuned generator
     either way). The hook lifecycle — prepare and rate before the stages, source at every stage,
     projection after the completed step — is documented as part of the `AbstractForcing` contract,
     with the rate and the source recorded as two channels of *one* forcing term (the exactly linear
@@ -1180,7 +1180,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     suite.** "Minimal footprint" becomes a checked property instead of an aspiration
     (`test/memory_audit.jl`, run by `Pkg.test()`). Two instruments. (a) **The ledger**: a reflective
     walk over every resident field-sized buffer a run owns (state, observation cache, generator,
-    integrator registers, forcing-owned state and kernels, the tracer buffers), counted per shape
+    scheme registers, forcing-owned state and kernels, the tracer buffers), counted per shape
     class over the full **five-axis** combination space — scheme × dealiasing × scalar ×
     (velocity forcing × scalar forcing) × tracers. The frozen spec is **compositional**: twelve
     unforced, tracer-free base cells plus a per-forcing delta table and a tracer delta, and an
@@ -1191,7 +1191,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the physics — the rotational generator's declared working set requires both charts — and becomes
     a live run axis when per-component chart declarations or further charts land. Adding or removing
     a buffer anywhere fails the suite, so a footprint change must be a conscious, recorded decision.
-    The particle-integrator axis has one point today (the Heun pusher), entering as on/off with the
+    The particle-scheme axis has one point today (the Heun scheme), entering as on/off with the
     per-tracer ``(M, 3)`` arrays audited in their own units; precision, backend, and the
     interpolation scheme change bytes, never counts, so they are outside a count ledger. Two scope
     boundaries are deliberate: the ledger audits the **resident** working set — construction-time
@@ -1330,7 +1330,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 36. **(2026-07) The frame is ledgered too, and the two ledgers must jointly account for every
     field-scale array.** Decision 33's ledger walked what a run **evolves** — the state, the
-    observation cache, the generator's assembly scratch, the integrator registers, the tracers. It
+    observation cache, the generator's assembly scratch, the scheme registers, the tracers. It
     never walked the `FixedDomain`, the read-only **frame** the run lives on, so that storage was
     outside every instrument: the audit claimed to bound residency while measuring only part of it.
     The frame is not small. It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}``
@@ -1666,11 +1666,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     docstring conceded in calling `predictor_velocity` "a stage register of the push". The field
     side had held the state/scratch line from the start (`ResolvedFields` versus `IntegratorBuffers`,
     built by `allocate_buffers` dispatching per scheme); the Lagrangian side did not follow it, so
-    changing the pusher meant editing the state type. Now `AbstractParticleIntegrator` is the scheme
-    family, `EndpointHeun` its one member, and `allocate_buffers(pusher, tracers)` builds a
+    changing the scheme meant editing the state type. Now `AbstractParticleIntegrator` is the scheme
+    family, `EndpointHeun` its one member, and `allocate_buffers(scheme, tracers)` builds a
     `ParticleIntegratorBuffers` — one generic across both sides, because it is one concept. The axis
     is recorded as planned in §7, and the scratch genuinely varies along it: a higher-order
-    Runge–Kutta pusher wants several stage velocities, a multistep scheme wants a velocity *history*
+    Runge–Kutta scheme wants several stage velocities, a multistep scheme wants a velocity *history*
     and no predictor at all, and an inertial particle wants ``\boldsymbol{v}`` as **state** rather
     than scratch. The split also disentangles `trajectory_velocity`'s two roles — the measured
     Lagrangian observable, and "the first half of the next push" — so a history-based scheme would
@@ -1745,6 +1745,32 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
     Recorded alongside: `:total` zeroes the band when the out-of-band energy alone exceeds `target`,
     a step with no forcing at all, which the docstring now states.
+
+55. **(2026-08, user-directed) `integrator` → `scheme` on the binding; the composite spectrum presets
+    are types, not factory functions.** Two naming defects the panel found, both of the same kind: a
+    name that reads as a promise the code does not keep.
+
+    **The SciML false cognate.** In `DifferentialEquations.jl` an `integrator` is a *stateful* object
+    — you hold it, step it, read `integrator.u`. Here `IFLowStorageRK3()` is a zero-field dispatch
+    tag: the state lives in `ResolvedFields`, the scratch in `IntegratorBuffers`, and nothing is
+    readable off the value. The internal evidence was decisive: `Propagator`'s own prose said
+    *scheme* thirty times while the code said `integrator` at eighty-three sites. The binding is now
+    `scheme` everywhere — the argument, the `Simulation` field, the front-door keyword — while the
+    supertype keeps the name `AbstractIntegrator`, which is accurate for the *family*. One
+    consequence had to be settled first: `Tracers` used `scheme` for its *interpolation* scheme, so
+    two constructors would have taken one keyword for two concepts; it is now
+    `interpolation_scheme`, which is the more precise name regardless. `pusher` becomes `scheme` too,
+    so one word names the same role on both sides of the run.
+
+    **The presets.** `Pope2000`, `VonKarman1948` and `Pao1965` were PascalCase *functions* returning
+    a `ModelSpectrum`, so `spec isa Pope2000` failed and the phenomenology page carried a standing
+    workaround telling readers to test the returned value instead. A workaround in user docs is
+    interest paid on a naming decision. They are now type aliases —
+    `const Pope2000 = ModelSpectrum{PopeLargeScale, PopeDissipation}` — which required no wrapper and
+    no forwarding, because `ModelSpectrum` was already parameterized on exactly the two factors that
+    distinguish a preset. `spec isa Pope2000` and `spec isa EnergySpectrum` now both hold, every
+    preset is a type, and the note is deleted. A preset therefore names a functional *form*; the
+    fitted coefficients and the citation remain in the value.
 
 ---
 

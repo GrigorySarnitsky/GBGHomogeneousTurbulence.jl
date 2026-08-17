@@ -9,7 +9,7 @@
 # `EndpointHeun` is the one scheme today — second-order, on the velocity at the start and end of the
 # step (tₙ and tₙ₊₁), unlike advecting on the frozen start-of-step velocity (effectively first
 # order). Its two velocity fields are exactly what the field solver already produces each step, so
-# the tracer push stays decoupled from the field Runge–Kutta internals. A higher-order pusher would
+# the tracer push stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
 # want different registers (RK4 several stage velocities; a multistep scheme a velocity HISTORY and
 # no predictor at all) — which is precisely why they are not in `Tracers`.
 
@@ -17,7 +17,7 @@
     Particles
 
 Lagrangian tracer tracking:
-- [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
+- [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`).
 - [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
@@ -35,8 +35,8 @@ module Particles
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, _reference, _real_type
-# One generic builds the per-scheme registers on both sides of the run — the field integrator's and
-# the trajectory integrator's — because it is one concept: allocate exactly what this scheme needs.
+# One generic builds the per-scheme registers on both sides of the run — the field scheme's and
+# the trajectory scheme's — because it is one concept: allocate exactly what this scheme needs.
 import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, EndpointHeun, ParticleIntegratorBuffers,
@@ -45,14 +45,14 @@ export Tracers, AbstractParticleIntegrator, EndpointHeun, ParticleIntegratorBuff
 
 
 """
-    Tracers(domain; number_of_particles, scheme, rng = default_rng())
-    Tracers(domain; positions, scheme)
+    Tracers(domain; number_of_particles, interpolation_scheme, rng = default_rng())
+    Tracers(domain; positions, interpolation_scheme)
 
 A set of Lagrangian tracers, built on `domain`'s backend and element type. Give **exactly one** of
 `number_of_particles`, which seeds that many tracers uniformly at random in the periodic box of
 `domain`, or `positions`, an `(M, 3)` array of `M` tracer positions to wrap (the three columns are
 the ``x, y, z`` components), converted to `domain`'s backend and element type. Supplying both, or
-neither, is an `ArgumentError`. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
+neither, is an `ArgumentError`. The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to
 evaluate the velocity (and any sampled field) at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
 (the default `tracer_scheme` of the
@@ -88,7 +88,7 @@ Building a set directly — to place tracers deliberately rather than at random,
 by hand — takes the `positions` form, and then the scheme's per-step storage is yours to allocate:
 
 ```julia
-tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], scheme = CatmullRom())
+tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], interpolation_scheme = CatmullRom())
 buffers = allocate_buffers(EndpointHeun(), tracers)
 
 record_trajectory_velocity!(tracers, u)     # u(tₙ) at the current positions — do this first
@@ -109,23 +109,23 @@ closing deposit leaves them.
 - `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
   instant they occupy them: the genuine Lagrangian sample, and the observables cache's
   particle-velocities slot.
-- `scheme` — the velocity-interpolation scheme.
+- `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
 
-The trajectory integrator's own working storage is **not** here: it is allocated per scheme into a
+The trajectory scheme's own working storage is **not** here: it is allocated per scheme into a
 [`ParticleIntegratorBuffers`](@ref), so changing the scheme changes no part of this type.
 """
 struct Tracers{P, PSX, VV, S}
   positions::P              # (M, 3)
   position_points::PSX      # PointSet wrapping `positions`
   trajectory_velocity::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
-  scheme::S
+  interpolation_scheme::S
 end
 
 
 # The two forms are ONE method, not two: they are distinguished by which keyword is supplied, and
 # Julia dispatches on positional arguments only. Hence the explicit either/or check, which also gives
 # a better error than a missing-keyword one would.
-function Tracers(domain::FixedDomain; scheme, positions = nothing,
+function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
                  number_of_particles = nothing, rng = Random.default_rng())
   count(!isnothing, (positions, number_of_particles)) == 1 ||
     throw(ArgumentError("give exactly one of `positions` (an (M, 3) array to wrap) or " *
@@ -142,7 +142,7 @@ function Tracers(domain::FixedDomain; scheme, positions = nothing,
     pos = similar(_reference(domain), T, size(positions))   # the domain's backend + element type
     copyto!(pos, positions)
   end
-  return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), scheme)
+  return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme)
 end
 
 
@@ -166,7 +166,7 @@ abstract type AbstractParticleIntegrator end
     EndpointHeun()
 
 Second-order Heun-in-time on the velocity at the two **ends** of the step — the trajectory
-integrator a run uses by default. It advances the positions with the start-of-step Lagrangian
+scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
 velocity that [`record_trajectory_velocity!`](@ref) stored and the end-of-step velocity field
 the solver has just produced, so it needs nothing from inside the field scheme's stages.
 
@@ -179,12 +179,12 @@ struct EndpointHeun <: AbstractParticleIntegrator end
 """
     ParticleIntegratorBuffers
 
-The per-step storage a trajectory integrator computes in, sized to a tracer set and allocated once,
+The per-step storage a trajectory scheme computes in, sized to a tracer set and allocated once,
 so advancing the tracers allocates nothing. Build it with
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(pusher, tracers)`,
-which allocates exactly what `pusher` needs and nothing more; a run builds it for you.
+[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme, tracers)`,
+which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
 
-This storage belongs to the scheme, not to the trajectory: a different integrator wants a different
+This storage belongs to the scheme, not to the trajectory: a different scheme wants a different
 set — a multistep scheme wants a velocity history and no predicted positions at all — which is why it
 lives here rather than in [`Tracers`](@ref).
 
@@ -228,16 +228,16 @@ an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing 
 ``N^{3} \\times 3``.
 """
 function record_trajectory_velocity!(tracers::Tracers, u)
-  interpolate!(tracers.trajectory_velocity, u, tracers.position_points, tracers.scheme)
+  interpolate!(tracers.trajectory_velocity, u, tracers.position_points, tracers.interpolation_scheme)
   return tracers
 end
 
 
 """
-    advect!(pusher, tracers, buffers, velocity_end, domain, dt) -> tracers
+    advect!(scheme, tracers, buffers, velocity_end, domain, dt) -> tracers
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
-below), in place, under the trajectory integrator `pusher` (an
+below), in place, under the trajectory scheme `scheme` (an
 [`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (a
 [`ParticleIntegratorBuffers`](@ref) built for that scheme). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
@@ -281,7 +281,7 @@ function advect!(::EndpointHeun, tracers::Tracers, buffers::ParticleIntegratorBu
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
   # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
   # the thing you measure).
-  interpolate!(buffers.predictor_velocity, velocity_end, buffers.predictor_points, tracers.scheme)
+  interpolate!(buffers.predictor_velocity, velocity_end, buffers.predictor_points, tracers.interpolation_scheme)
   v2 = point_values(buffers.predictor_velocity)
   X .= mod.(X .+ (Δt / 2) .* (v1 .+ v2), L)
   return tracers
@@ -299,7 +299,7 @@ a field is gathered along the trajectories; what is then accumulated over those 
 caller's own analysis.
 """
 function interpolate_at_particles!(out, field, tracers::Tracers)
-  interpolate!(out, field, tracers.position_points, tracers.scheme)
+  interpolate!(out, field, tracers.position_points, tracers.interpolation_scheme)
   return out
 end
 

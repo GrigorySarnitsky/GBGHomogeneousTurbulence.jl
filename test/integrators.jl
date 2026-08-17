@@ -11,8 +11,8 @@ using Test
 
 
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
-function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
-  buffers = allocate_buffers(integrator, domain; scalar = true)
+function integrate_fixed(scheme, domain, û0, conditions, dt, nsteps)
+  buffers = allocate_buffers(scheme, domain; scalar = true)
   generator = ResolvedGenerator(domain, conditions; scalar = true)
   cache = ObservablesCache(domain; scalar = true)
   û = new_vector_field_spectral(domain)
@@ -20,7 +20,7 @@ function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
   state = ResolvedFields(û, new_scalar_field_spectral(domain))
   deposit!(cache, state, domain, buffers)                 # the seeding deposit
   for _ in 1:nsteps
-    step!(integrator, state, generator, domain, buffers, cache, dt)
+    step!(scheme, state, generator, domain, buffers, cache, dt)
     deposit!(cache, state, domain, buffers)               # the closing deposit ends the iteration
   end
   return û
@@ -66,7 +66,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
     conditions = FlowConditions(viscosity = ν,
                       velocity_forcing = BandRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
-    integrator = IFLowStorageRK3()
+    scheme = IFLowStorageRK3()
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)
     û = new_vector_field_spectral(domain)
@@ -74,13 +74,13 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
     deposit!(cache, state, domain, buffers)
     Δx = L / N
-    cfl = recommended_cfl(integrator, domain)
+    cfl = recommended_cfl(scheme, domain)
     energies = T[]
     for _ in 1:200
       u = velocity_physical(cache)
       dt = cfl * Δx / max(max_speed(cache), 1e-6)
       push!(energies, kinetic_energy(u))
-      step!(integrator, state, generator, domain, buffers, cache, dt)
+      step!(scheme, state, generator, domain, buffers, cache, dt)
       deposit!(cache, state, domain, buffers)
     end
     @test all(isfinite, energies)
@@ -89,9 +89,9 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     @test rel_div < 1e-8
 
     dt = cfl * Δx / max(max_speed(cache), 1e-6)
-    step!(integrator, state, generator, domain, buffers, cache, dt)                       # warm up
+    step!(scheme, state, generator, domain, buffers, cache, dt)                       # warm up
     deposit!(cache, state, domain, buffers)
-    bytes = @allocated step!(integrator, state, generator, domain, buffers, cache, dt)
+    bytes = @allocated step!(scheme, state, generator, domain, buffers, cache, dt)
     deposit_bytes = @allocated deposit!(cache, state, domain, buffers)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
     @test bytes + deposit_bytes < field_bytes
