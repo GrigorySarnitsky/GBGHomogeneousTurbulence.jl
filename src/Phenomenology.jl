@@ -200,8 +200,8 @@ function spectrum end
 """
     scaling_exponent(law; order) -> Float64
 
-The inertial-range scaling exponent ``\\zeta_p`` of the order-``p`` longitudinal velocity structure
-function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, of the `order` ``p`` requested, predicted by a
+The inertial-range scaling exponent ``\\zeta_p`` of the longitudinal velocity structure function of
+order ``p`` (the `order` argument), ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, predicted by a
 `law` (a `StructureFunction`) — the
 self-similar ``\\zeta_p = p/3`` of K41, or the anomalous exponent of an intermittency model. Its home is
 [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).

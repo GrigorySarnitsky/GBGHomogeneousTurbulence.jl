@@ -67,7 +67,7 @@ kinetic_energy(u) = 0.5 * inner(u, u)
     dissipation(û, domain, viscosity)
 
 The mean kinetic-energy dissipation rate of a homogeneous flow — a single number, not a field — at
-the kinematic `viscosity` ``\\nu``:
+the kinematic viscosity ``\\nu`` (the `viscosity` argument):
 
 ```math
 \\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle
@@ -182,7 +182,7 @@ scalar_variance(φ) = inner(φ, φ)
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
 in spectral representation `φ̂` ``\\hat\\varphi``, the [`FixedDomain`](@ref) bundle `domain`, and the
-scalar `diffusivity` ``\\varkappa = \\nu/\\mathrm{Sc}``.
+scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` (the `diffusivity` argument).
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
 scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals
 ``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``: a
@@ -223,7 +223,8 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 ``\\operatorname{tr}\\boldsymbol{S}^{3} = 3\\det\\boldsymbol{S}``. By isotropy this equals the classical
 longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
-and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle`` (Betchov 1956). So the
+and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
+(Betchov 1956, [doi:10.1017/S0022112056000317](https://doi.org/10.1017/S0022112056000317)). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 

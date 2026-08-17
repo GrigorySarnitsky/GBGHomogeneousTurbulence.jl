@@ -55,14 +55,14 @@ The sharp isotropic ``2/3``-rule truncation: keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, and the lean, GPU-friendly default. The rule is due to Orszag (1971).
+of the quadratic nonlinearity, and the lean, GPU-friendly default. The rule is due to Orszag (1971), [doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2).
 """
 struct TwoThirds <: DealiasingStrategy end
 
 """
     HouLi(; order = 36, strength = nothing)
 
-The smooth spectral filter of Hou & Li (2007), transfer function
+The smooth spectral filter of Hou & Li (2007), [doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014) — transfer function
 ``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
@@ -92,8 +92,9 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift dealiasing (Patterson & Orszag 1971; combined with spherical truncation by Rogallo
-1981): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
+Phase-shift dealiasing (Patterson & Orszag 1971,
+[doi:10.1063/1.1693365](https://doi.org/10.1063/1.1693365); combined with spherical truncation by
+Rogallo 1981, NASA TM-81315): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell

@@ -214,7 +214,7 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, 2N-storage). With the diffusive
+Integrating-factor third-order low-storage Runge–Kutta (Williamson 1980, [doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9); 2N-storage). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
 [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
 [`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over

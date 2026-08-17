@@ -78,8 +78,10 @@ dealiased by the default ``2/3`` rule (other strategies are available).
     [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `BandRescaling`, `Linear`, and
     `ConstantPower`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
-    provide usable model spectra, structure-function laws, and scaling constants; the Eulerian and
-    Lagrangian statistics are being added.
+    provide usable model spectra, structure-function laws, and scaling constants. Accumulating
+    statistics over the fields and the sampled trajectories is the caller's own analysis:
+    `GBGPeriodicFields` supplies the field reductions and `GBGStreamingStatistics` the online
+    estimators.
 
 ## Components
 

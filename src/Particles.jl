@@ -1,7 +1,7 @@
 # Particles — Lagrangian tracer tracking. Tracers are advected by the velocity through the package's
 # grid→point interpolation (a selectable `GBGPeriodicFields` spline scheme; `CatmullRom` by default,
 # `LalescuSpline`/`LagrangeSpline` for higher order), and any physical field can be sampled along the
-# trajectories for the Lagrangian statistics.
+# trajectories; accumulating statistics over them is the caller's analysis, not this package's.
 #
 # Trajectory time integration is pluggable, exactly as the field side is: the scheme is an
 # `AbstractParticleIntegrator` and its per-step registers are allocated per scheme by
@@ -192,7 +192,7 @@ cache's particle-velocities slot; storing them here is therefore what makes
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Call it at
 the end of each iteration, on the just-deposited velocity at the just-advanced positions.
 
-The stored values serve twice: they are the quantity the Lagrangian statistics accumulate, and they
+The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
 are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
 an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
 ``M \\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
@@ -265,8 +265,9 @@ end
 Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
-for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. Used to gather a field along the trajectories for the forthcoming Lagrangian
-statistics.
+for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. This is how
+a field is gathered along the trajectories; what is then accumulated over those values is the
+caller's own analysis.
 """
 function interpolate_at_particles!(out, field, tracers::Tracers)
   interpolate!(out, field, tracers.position_points, tracers.scheme)

@@ -305,13 +305,13 @@ reification (§11 decisions 29, 31).
 `Observables` realizes the Mori–Zwanzig observables: the functions of the state that are measured. Each
 states the physical quantity first, then the reduction that computes it:
 
-- `kinetic_energy` ``k = \tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` and `dissipation`
-  ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle``;
-- `scalar_variance` ``\langle\varphi^2\rangle`` and `scalar_dissipation`
-  ``\varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
+- ``\texttt{kinetic\_energy} \equiv k = \tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle``
+  and ``\texttt{dissipation} \equiv \varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle``;
+- ``\texttt{scalar\_variance} \equiv \langle\varphi^2\rangle`` and
+  ``\texttt{scalar\_dissipation} \equiv \varepsilon_\varphi = 2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle``;
 - `max_speed`, which sets the advective-CFL (one generic shared with `Cache`, where the cached read
   lives — the reduction is homed here, decision 46);
-- `vorticity_physical!` ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}``, the field-valued
+- ``\texttt{vorticity\_physical!} \equiv \boldsymbol{\omega} = \nabla\times\boldsymbol{u}``, the field-valued
   observable — the vorticity recovered in physical representation, whose cached read is
   `Cache.vorticity_physical` (decision 47);
 - `derivative_skewness`, the classical marker ``S \approx -0.5`` of developed turbulence (an
@@ -321,7 +321,7 @@ states the physical quantity first, then the reduction that computes it:
   ``3C_S\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
-- `energy_spectrum` ``E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
+- ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum, and `integral_scale`
   derived from it.
 
 These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
@@ -1419,8 +1419,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 39. **(2026-08) The integrating factor is never materialized: the factor verbs supply parameters, and
     the stage update is one fused exponential pass.** The protocol's factor half changed shape:
     `velocity_integrating_factor` / `scalar_integrating_factor` (the `!` is gone — nothing is mutated) return the exponential's
-    parameters — `coefficient` ``= -D\tau``, `offset_scale` ``= \tau``, `offset` ``= \hat A`` or
-    `nothing` — and the schemes apply ``\mathcal{E}`` through `GBGPeriodicFields`'
+    parameters — ``\texttt{coefficient} = -D\tau``, ``\texttt{offset\_scale} = \tau``,
+    ``\texttt{offset} = \hat A`` or `nothing` — and the schemes apply ``\mathcal{E}`` through `GBGPeriodicFields`'
     `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
     mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
     (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
@@ -1712,51 +1712,56 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 ## References
 
-Cited author–year above; full entries here (DOIs are omitted rather than filled from memory, per the
-no-guessed-citation rule). The extraction-bound
-`Phenomenology` leaf (§4.8) is exempt: each reference law carries its own self-contained citation in a
-`Reference` value, so this list need not duplicate the ~two dozen it cites.
+Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,
+and the reason is stated with the entry rather than left to the reader to wonder about: a 1941
+*Doklady* note, a NASA technical memorandum, and a CTR research brief predate or sit outside the DOI
+system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
+is worse than none, since it silently sends the reader somewhere else.
+
+The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law carries its own
+self-contained citation in a `Reference` value, so this list need not duplicate the ~two dozen it
+cites.
 
 - Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
-  large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
+  large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305. *(No DOI: the 1941 Doklady notes predate the system.)*
 - Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
-  *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy relations behind the strain-skewness constant, §4.3.)*
+  *J. Fluid Mech.* **1**(5), 497–504. <https://doi.org/10.1017/S0022112056000317> *(The isotropy
+  relations behind the strain-skewness constant, §4.3.)*
 - Patterson, G. S. & Orszag, S. A. (1971). Spectral calculations of isotropic turbulence: efficient
-  removal of aliasing interactions. *Phys. Fluids* **14**, 2538–2541. *(Phase-shift dealiasing; the
+  removal of aliasing interactions. *Phys. Fluids* **14**, 2538–2541. <https://doi.org/10.1063/1.1693365> *(Phase-shift dealiasing; the
   `PhaseShift` strategy, §7, decision 27.)*
 - Orszag, S. A. (1971). On the elimination of aliasing in finite-difference schemes by filtering
-  high-wavenumber components. *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
+  high-wavenumber components. *J. Atmos. Sci.* **28**, 1074. <https://doi.org/10.1175/1520-0469(1971)028%3C1074:OTEOAI%3E2.0.CO;2> *(The ``2/3`` truncation rule.)*
 - Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
-  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
-- Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(The
-  sheared-frame scheme, §7; the spherical-truncation dealiasing of the `PhaseShift` strategy,
-  decision 27.)*
+  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. <https://doi.org/10.1103/PhysRevLett.28.76> *(The pseudospectral method.)*
+- Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(No DOI;
+  a NASA technical memorandum. The sheared-frame scheme, §7; the spherical-truncation dealiasing of
+  the `PhaseShift` strategy, decision 27.)*
 - Hou, T. Y. & Li, R. (2007). Computing nearly singular solutions using pseudo-spectral methods.
-  *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
+  *J. Comput. Phys.* **226**, 379–397. <https://doi.org/10.1016/j.jcp.2007.04.014> *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
 - Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). Effective dissipation and turbulence
-  in spectrally truncated Euler flows. *Phys. Rev. Lett.* **95**, 264502. *(Thermalization of the
+  in spectrally truncated Euler flows. *Phys. Rev. Lett.* **95**, 264502. <https://doi.org/10.1103/PhysRevLett.95.264502> *(Thermalization of the
   Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
 - Chollet, J.-P. & Lesieur, M. (1981). Parameterization of small scales of three-dimensional isotropic
-  turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
+  turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. <https://doi.org/10.1175/1520-0469(1981)038%3C2747:POSSOT%3E2.0.CO;2> *(The spectral eddy
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
-  turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
-- Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473.
+  turbulence. *Computers & Fluids* **16**, 257–278. <https://doi.org/10.1016/0045-7930(88)90013-8> *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.
-  *J. Chem. Phys.* **126**, 014101. *(Stochastic velocity rescaling; its deterministic limit is the
+  *J. Chem. Phys.* **126**, 014101. <https://doi.org/10.1063/1.2408420> *(Stochastic velocity rescaling; its deterministic limit is the
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
   the caveat `BandRescaling` carries.)*
-- Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. *(The
+- Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. <https://doi.org/10.1016/0021-9991(80)90033-9> *(The
   2N low-storage family; the package's third-order coefficients are Williamson's Eq. (11), his recommended
   case 7 — the set later adopted for spectral DNS and popularly named "RKW3".)*
-- Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. *(Notation; the
+- Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. <https://doi.org/10.1017/CBO9780511840531> *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
 - Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,
-  423–455. *(The projection formalism, the foundation of §3 and §8.)*
-- Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**, 215–220.
-  *(The projection formalism, with Mori 1965.)*
+  423–455. <https://doi.org/10.1143/PTP.33.423> *(The projection formalism, the foundation of §3 and §8.)*
+- Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**, 215–220. <https://doi.org/10.1007/BF01008729> *(The projection formalism, with Mori 1965.)*
 - Morrison, P. J. (1986). A paradigm for joined Hamiltonian and dissipative systems. *Physica D* **18**,
-  410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
-- Öttinger, H. C. (2005). *Beyond Equilibrium Thermodynamics.* Wiley. *(GENERIC; the
+  410–419. <https://doi.org/10.1016/0167-2789(86)90209-5> *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
+- Öttinger, H. C. (2005). *Beyond Equilibrium Thermodynamics.* Wiley. <https://doi.org/10.1002/0471727903> *(GENERIC; the
   reversible/irreversible split, §8.)*
