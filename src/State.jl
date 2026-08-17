@@ -40,11 +40,11 @@ export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spect
     ResolvedFields(domain; scalar = false)
 
 The record of the evolving fields a run advances, in spectral representation — the single source of
-truth. The velocity, vorticity, and scalar in
-physical representation are recoveries of it, not part of it. The iteration recovers them at its
-end into the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), never on a
-read: each cached slot records which epoch its value belongs to, and a read serves that value or
-throws. The state itself therefore cannot go stale.
+truth. The velocity, vorticity, and scalar in physical representation are recoveries of it, not part
+of it: the iteration recovers them at its end into the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), so the state itself cannot
+go stale.
+
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
@@ -91,8 +91,8 @@ stream (defaults to `Random.default_rng()`).
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
     fields epoch so cached reads throw rather than serve stale values, then restore the cache with
-    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. Nothing is
-    recomputed on a read, so the interval between the two calls is yours to close.
+    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
+    interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      kinetic_energy::Real, peak_wavenumber::Real,
@@ -160,8 +160,8 @@ stream (defaults to `Random.default_rng()`).
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
     fields epoch so cached reads throw rather than serve stale values, then restore the cache with
-    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. Nothing is
-    recomputed on a read, so the interval between the two calls is yours to close.
+    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
+    interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain;
                         scalar_variance::Real, peak_wavenumber::Real,

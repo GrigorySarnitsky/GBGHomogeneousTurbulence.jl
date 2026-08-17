@@ -333,8 +333,9 @@ The number of steps `sim` has taken — how far the run has gone.
 
 Distinct from the observables cache's **epoch**, which counts *changes to the state* rather than
 advances of the run: a completed step advances the epoch, but so does any announced out-of-band
-mutation, so a run at step 2 may stand at fields epoch 4. Use this to ask how far the run has gone,
-and the epoch to ask whether a cached value is still the right one.
+mutation, so the two counts diverge: after two steps and one announced mutation the clock reads
+step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, and the epoch to ask
+whether a cached value is still the right one.
 """
 current_step(sim::Simulation) = sim.clock.step
 

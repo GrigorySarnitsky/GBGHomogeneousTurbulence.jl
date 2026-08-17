@@ -1613,7 +1613,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     same two lines — copy the coefficients to scratch, transform — differing only in which of the
     domain's plan sets it bound, and once that composition deserved a *name*, invariant 2 sent it to
     the backend rather than keeping a physics-suffixed local copy. The general operation now lives
-    in `GBGPeriodicFields` as the scratch arity `to_physical!(physical, spectral, plans,
+    in `GBGPeriodicFields` as the four-argument form `to_physical!(physical, spectral, plans,
     spectral_scratch)` (PF decision 64, raised as IT's round-3 request), and the call sites bind the
     plans themselves — `to_physical!(u, û, domain.velocity_plans, scratch)` at the closing deposit, the
     substage recoveries, and the displaced (`PhaseShift`) evaluations, where the preservation is
@@ -1626,11 +1626,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     is `Cache.vorticity_physical` (the f/`f!` pair decision 46's pattern implies; the `!` form is
     the home). Two consequences delimit the change: the two recovery regimes are now explicit —
     a consumable source calls the three-argument (destructive) form, as the strain diagnostic always
-    has; a source of truth calls the scratch arity — and no `to_spectral!` twin exists or is wanted,
+    has; a source of truth calls the four-argument form — and no `to_spectral!` twin exists or is wanted,
     because every forward transform in the package reads a consumable source by design (IC and
     forcing noise, quadratic products formed in place over registers the closing deposit refreshes). The umbrella
     re-exports no `GBGPeriodicFields` name, this operation included — the recovery is reached
-    through the backend, as every other field operation is. Bit-identical: the arity performs
+    through the backend, as every other field operation is. Bit-identical: that form performs
     exactly the copy-then-transform the deleted wrappers performed, so the transform and pass
     ledgers and the memory audit are unchanged.
 48. **(2026-08, user-directed) The iteration vocabulary: "closing deposit", not "tail"; no
@@ -1720,14 +1720,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
     The merge creates one hazard, so the `Cache` docstring now states it outright: **an epoch counts
     changes to the state, not advances of the run.** A completed `step!` advances the fields epoch,
-    but so does any announced out-of-band mutation, so a run at step 2 may stand at epoch 4 — measured,
-    not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
+    but so does any announced out-of-band mutation, so the two counts diverge: after two steps and one
+    announced mutation the clock reads step 2 and the fields epoch reads 4 — measured, not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
     far has the run gone?". As with decision 48, the sweep covered the decision log too, so the log
     reads in the current vocabulary; this entry records that the older entries originally said
     "stamp".
 
 54. **(2026-08, user-directed) `BandRescaling`'s `over` is required, and the front door's `:total` is
-    a calibration constraint rather than a preference.** Decision 15 called `over` "a modeling choice
+    a calibration constraint rather than a preference.** *(The read-through pile recorded this as
+    "not decided" and listed three options; the owner settled it in the review that followed, asking
+    for the required form with the front door passing `:total`. The entry is written from that
+    decision, not from the pile's open question.)* Decision 15 called `over` "a modeling choice
     with two defensible answers, so it is a selectable option rather than a fixed default" — and then
     defaulted it to `:band`, contradicting itself inside one sentence. It is now required, which the
     package's own defaults test (decision 28: method-canonical defaults, run-specific is required)
