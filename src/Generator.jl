@@ -65,6 +65,9 @@ All keyword, all required:
   an `AbstractForcing` (pass `NoForcing()` to leave a field undriven).
 
 # Fields
+The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
+four fields directly, in this order.
+
 - `viscosity`, `schmidt` — the kinematic viscosity ``\\nu`` and the Schmidt number ``\\mathrm{Sc}`` (both `Float64`).
 - `velocity_forcing`, `scalar_forcing` — the velocity and scalar forcing strategies, each an `AbstractForcing`.
 """

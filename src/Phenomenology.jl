@@ -90,6 +90,9 @@ All keyword; a homogeneous-isotropic state fixes the rest:
     plain, type-stable set of `Float64`s that a law can evaluate without a branch — the cost being that
     a scalar law applied to a scalar-free state returns `NaN` rather than raising, so check the field
     (or the run's `scalar`) before reading a scalar law's answer.
+
+The plain constructor `FlowParameters(viscosity, dissipation, rms_velocity, integral_scale, schmidt,
+scalar_dissipation)` takes the six fields directly, in this order.
 """
 struct FlowParameters
   viscosity::Float64

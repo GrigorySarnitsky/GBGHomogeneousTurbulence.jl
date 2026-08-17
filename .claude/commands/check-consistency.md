@@ -30,7 +30,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (12 hats)
+## The panel (15 hats)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -48,8 +48,22 @@ self-containedness and structure without the design docs as a crutch.
 | 8 | `dimensional` | dimensional consistency + every normalization factor correct *and* identical across pages | FULL |
 | 9 | `citations-integrity` | consistent author-year, inline↔References matching, no inaccessible source, no overclaim | FULL |
 | 10 | `style-editor` | internal uniformity (majority style) **+** the raw built HTML for silent-render failures | FULL + raw HTML |
-| 11 | `cold-reader` | a first-year grad student's top-to-bottom cold read — undefined symbols/terms (a *boundary*, a *deposit*, a *stamp*, an *epoch*), self-containedness | SITEONLY |
+| 11 | `cold-reader` | a first-year grad student's top-to-bottom cold read — undefined symbols/terms (a *boundary*, a *deposit*, an *epoch*), **ordinary English words carrying package meanings** (a *register*, a *push*, something *armed*), self-containedness | SITEONLY |
+| 12 | `plain-sense` | does this sentence MEAN anything, and does it EARN its place? paraphrase, non-vacuity, unprovoked defence, the delete test | FULL |
+| 13 | `naming-policy` | the public surface against the **written** naming rules — the rulebook outranks the corpus | FULL + source + CLAUDE.md |
+| 14 | `doc-policy` | each docstring against the **written** documentation policy (map / home / constructor-first, physical-meaning-first, one home per f/f! pair) | FULL + source + CLAUDE.md |
+| 15 | `invariants-and-decisions` | the code and docs against the **recorded** invariants and §11 decision log, both directions | FULL + source + CLAUDE.md + §11 |
 | 12 | `plain-sense` | does each clause **mean** anything and **earn its place** — paraphrase, non-vacuity, unprovoked defence, the delete test, buried subject | FULL |
+
+**Why three hats hold the rulebook.** Hats 1–12 are deliberately blind to `CLAUDE.md`, and that
+blindness is what makes them fresh-eyed — but it leaves one class structurally invisible: a
+convention violated **uniformly**. Two of them (`style-editor`, `structure-consistency`) are told
+outright to derive norms from the corpus's majority style, so a rule the corpus breaks everywhere
+reads to them as the norm. Hats 13–15 carry the written rules instead, and for them **the rulebook
+outranks the corpus**. The gap was demonstrated, not theorized: in one user read-through, an
+allocator named for the single field its caller happened to sample, a verb colliding with a noun the
+package uses for something else, and three nouns for one concept in a single export line were all
+found by the reader and by none of the twelve.
 
 The hats live in `.claude/commands/check-consistency/panel.js` (their personas are the source of truth;
 this table is the map). The **`plain-sense` hat exists because every other rubric presumes the sentence belongs**: the others ask
@@ -143,6 +157,44 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    **rank** by severity × corroboration, and record which batteries came back **clean** and which are
    confirmed **false positives**.
 
+   **The summary MUST NOT contain an unenumerated bucket.** A tier tail written as prose
+   ("Tier 3 — ≈67 remaining, structure and style nits") is how a ranking silently becomes a *scoping
+   decision*: the 2026-08-06 round shipped exactly that, and afterwards nobody — including the fixer —
+   could say which of the 67 had been closed. Every banked finding appears in the summary by hat and
+   number, in a **per-hat closure table**, so an unclosed finding is a visible blank rather than an
+   absent sentence.
+
+6. **Run the closure audit — this phase is not optional.** After any fix pass, run `verify.js` over
+   the banked hat files:
+   ```
+   Workflow({ scriptPath: ".claude/commands/check-consistency/verify.js",
+              args: { pile: "$REPO/.claude/doc-review", repo: "$REPO", strength: "economy" } })
+   ```
+   One verifier per hat, **blind to the fix pass** — each sees the banked finding and the current
+   corpus, never the diff, the commit, or the summary, because a verifier handed the fixer's report
+   grades the homework against its own answer key (decision 37's lesson, applied to process).
+   Verdicts are `PRESENT` / `PARTIAL` / `REGRESSED` / `ABSENT` / `NOT-A-DEFECT`, and **the default is
+   `PRESENT`**: `ABSENT` is admissible only with the enumerated search behind it, so a lazy
+   cheap-lane agent fails toward "still broken" — which costs a re-check — rather than toward a false
+   all-clear, which has no downstream verifier. That inversion is what licenses the economy lane
+   here. Results land in `.claude/doc-review/closure/`, consolidated into `00-CLOSURE.md`.
+
+   `PARTIAL` is the verdict that earns the instrument: *fixed at the quoted line, class alive
+   elsewhere* — the recorded failure mode of this project. Its first run returned 12 of them out of
+   85, every one that shape, plus one `REGRESSED`: a module map made false by a previous fix pass.
+   A sub-pattern worth knowing: among the cold-read findings the gloss had landed **at the definition
+   site and not at the site the reader reaches first**. A cold read is ordered, so a fix that ignores
+   the order closes nothing.
+
+7. **Audit the fixes themselves** with `verify-fixes.js` when the findings came from a *human* read
+   (a doc-reading pile), where the reader's verbatim words are the specification. This one is the
+   deliberate inverse of `verify.js`: it **sees the diff**, because it audits an **act** rather than a
+   **state** — fidelity (did the ask land, everywhere?), strategy (fix-by-insertion? line-not-class? a
+   docstring patch over a code defect?), implementation (is the new text correct?), and scope (unasked
+   changes; a flagged term carried through a rewrite). Verdicts: `HONORED` / `ADJACENT` / `INSERTED` /
+   `LINE-ONLY` / `NEW-DEFECT` / `SCOPE-CREEP` / `UNDONE` / `LAUNDERED`, with `HONORED` the only one
+   that must cite its evidence.
+
 ## Discipline (the hard-won rules — follow them)
 
 - **Collect-only.** The panel proposes; the user disposes. Do not touch `src/` or `docs/` during a panel
@@ -172,7 +224,8 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
   confidence** relayed by the summary as "soft", which was false.) **A severity in the summary never
   overrides the hat's own** — re-read the hat before downgrading anything. Report closure **per hat and
   per finding number** ("06: 20/20 closed"), so the count is auditable against the banked files rather
-  than against the summary's clusters.
+  than against the summary's clusters — and **cite those numbers in the fix commit message**, so the
+  record outlives the session that produced it.
 - **Bounded output per hat.** Each hat is capped at its ~25 most significant findings with tight quotes
   (the preamble enforces it): the banked file and the returned object mirror each other, so an unbounded
   dump doubles on output and can overrun the output-token cap (it killed two PF hats once). A hat that

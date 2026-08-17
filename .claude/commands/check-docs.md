@@ -173,6 +173,36 @@ for file in filter(f->endswith(f,".jl"), readdir("src"; join=true))
 end'
 ```
 
+Three scans added 2026-08-17, each from a defect class a read-through found and this battery did not.
+They live in `.claude/commands/check-docs/` rather than inline, because each carries a real subtlety
+that a one-line grep gets wrong:
+
+```bash
+python3 .claude/commands/check-docs/abutting_spans.py    # (a) `code` next to ``math``
+julia --project --startup-file=no .claude/commands/check-docs/xlink.jl   # (b) unlinked cross-module names
+python3 .claude/commands/check-docs/doi_crosscheck.py    # (c) docstring DOIs vs §References
+```
+
+**(a) A code span abutting a math span.** The house rule is that a binding is ONE LaTeX span
+(``\texttt{dissipation} \equiv \varepsilon``); a `` `code` `` span next to a ``` ``math`` ``` span renders
+as two disjoint runs. The build cannot see it. TRIAGE: an argument name followed by the symbol it
+denotes, or a formula split across the boundary, is the true hit; plain adjacency of two unrelated
+things (a grid size next to a strategy name) is not.
+
+**(b) A cross-module first mention, unlinked.** An `@ref` to another module does not resolve
+unqualified, so the author downgrades the link rather than qualifying it — and a broken link never
+reaches the build, it silently becomes a MISSING one. This is why the class is invisible: nothing
+fails. Measured at 56 sites on first run. `APPLY=1` rewrites; the default is a dry run. Note the
+scope: it flags a name whose DEFINING module differs from the docstring's, at its FIRST mention,
+never linked anywhere in that docstring — not every backticked identifier, since the policy caps a
+target at one link per docstring.
+
+**(c) The DOI cross-check, format-aware.** `ARCHITECTURE.md` uses autolinks `<…>`, which cannot
+contain `>`; a docstring uses `[text](…)`, which cannot contain unescaped parens. An AMS DOI contains
+all three, so the same identifier is percent-encoded DIFFERENTLY on the two surfaces and the sides
+must be compared DECODED. The earlier inline regex truncated at the first paren and would report
+false mismatches in both directions.
+
 ```bash
 # ---- SURFACE 4: the built API pages. Run AFTER `julia --project=docs docs/make.jl`. ----
 # Buckets every rendered docstring by page and reports the two mechanical questions; the third

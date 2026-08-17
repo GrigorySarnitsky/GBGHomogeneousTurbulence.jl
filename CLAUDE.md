@@ -140,7 +140,12 @@ docstring is a map**; a **function or type docstring is a home**.
   user's terms; (2) the constructor and its arguments — how the user builds and uses the type (the
   primary read); (3) an example where the construction is non-obvious; (4) a demoted `# Fields` section —
   the plain positional constructor and the field explanations. The struct's fields are reference detail,
-  not the opening; lead with the constructor the user calls.
+  not the opening; lead with the constructor the user calls. **Name the plain positional constructor
+  only where a reader might reasonably call it** — a small parameter record (`HouLi`, `FlowConditions`,
+  `Reference`, a `Phenomenology` law). Omit it for a type whose positional form takes preallocated
+  internals (`Simulation`, `ObservablesCache`, `IntegratorBuffers`, `ResolvedGenerator`): advertising
+  that form invites a caller to assemble machinery by hand, which the derived constructor exists to
+  prevent. The presence or absence is thus a *claim about who builds the value*, not a template slot.
 
 **Physical meaning first — even for spectral-representation operations.** A field is a real physical
 object; spectral is only a *representation*. A docstring for an operation *computed* in spectral
