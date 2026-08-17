@@ -16,17 +16,17 @@ sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
 warmup!(sim)
 advance!(sim)
 
-particle_positions(sim)             # (M, 3) positions at the current instant
-particle_velocities(sim)            # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked cache read
-out = new_vector_point_values(sim.tracers)  # allocate once, then reuse
-interpolate_at_particles!(out, velocity_physical(sim), sim.tracers)
+particle_positions(sim.tracers)              # (M, 3) positions at the current instant
+particle_velocities(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
+out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
+interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```
 
 ## The tracer set
 
-Tracer positions plus a selectable interpolation scheme, preallocated for allocation-free advection,
-with the accessors that read a tracer set's state — its positions, most-recent trajectory velocities,
-and count.
+Tracer positions plus a selectable interpolation scheme, with the accessors that read a tracer set's
+state — its positions and its count. The set holds trajectory *state* only; the trajectory scheme's
+own registers live apart, so changing the scheme changes nothing here.
 
 ```@docs
 Tracers
@@ -37,14 +37,30 @@ particle_positions
 number_of_particles
 ```
 
+## The trajectory integrator
+
+How the positions are advanced over one step — the Lagrangian counterpart of the field schemes, with
+the same separation between the evolving state and the scheme's per-step registers. `EndpointHeun`
+is the one scheme today; its registers are allocated for it by
+[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
+you.
+
+```@docs
+AbstractParticleIntegrator
+EndpointHeun
+```
+
+```@docs
+ParticleIntegratorBuffers
+```
+
 ## The tracking loop
 
-The steps of Lagrangian tracking: advance the tracers with second-order Heun-in-time advection once
-the fields have moved, put the velocity at the new positions on record along the trajectories, then
-read a physical field along those trajectories — all feeding the Lagrangian statistics. The push is
-two verbs because Heun needs the velocity at both ends of the step: the run records the sample at
-the iteration's end, off the just-deposited velocity, and the next iteration's `advect!` reads it
-back as the first half of its pair.
+The steps of Lagrangian tracking: record the flow velocity where each tracer currently sits, advance
+the tracers once the fields have moved, then read any physical field along the trajectories for the
+Lagrangian statistics. Recording and pushing are two verbs because `EndpointHeun` needs the velocity
+at both ends of the step: the run records the sample at the iteration's end, off the just-deposited
+velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 
 ```@docs
 record_trajectory_velocity!

@@ -140,16 +140,25 @@ end
 
 """
     allocate_buffers(integrator, domain; scalar = false) -> IntegratorBuffers
+    allocate_buffers(pusher, tracers) -> ParticleIntegratorBuffers
 
-Allocate the [`IntegratorBuffers`](@ref) `integrator` needs, sized to the `domain` (a
-[`FixedDomain`](@ref), which fixes the grid, precision, and storage backend of every register),
-dispatching on the concrete scheme so it
-allocates **exactly** its working set — never a register another scheme would use.
-[`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`; [`IFRK2`](@ref) allocates `stage1`,
-`stage2`, and `velocity_star_spectral`. Passing `scalar = true` adds the nested `ScalarBuffers`,
-likewise sized to the scheme.
-A scheme with no method here is a hard error — there is no over-allocating fallback. The run layer calls
-this when assembling a `Simulation`.
+Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
+**exactly** its working set — never a register another scheme would use. A scheme with no method
+here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
+a `Simulation`.
+
+The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `integrator`
+needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
+backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`;
+[`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_star_spectral`. Passing `scalar = true`
+adds the nested `ScalarBuffers`, likewise sized to the scheme.
+
+The second serves the trajectory schemes: it builds the
+[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) the
+`pusher` (an
+[`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
+needs, sized to the tracer set `tracers`. One generic covers both because it is one concept, and
+because both sides keep the same separation: the evolving state holds no scheme's scratch.
 """
 function allocate_buffers end
 

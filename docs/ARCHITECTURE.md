@@ -387,14 +387,17 @@ Method (§3).
 Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
-probes (§7). `Tracers` holds positions and a chosen interpolation scheme; the push is Heun-in-time on
+probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
+with the trajectory integrator's registers held apart in a `ParticleIntegratorBuffers` allocated per
+scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
+(decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous closing deposit deposited — the genuine
 Lagrangian velocity, held in `Tracers.trajectory_velocity` and stamped in the observables cache
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`Tracers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
+`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
 not readable. After the push, `record_trajectory_velocity!` records the new sample at the new
 positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
@@ -408,9 +411,11 @@ differs from the next sample only at ``O(\Delta t^2)``, so reusing it as the nex
 ``\boldsymbol{v}_1`` looks like a free interpolation saved — but it corrupts the recorded observable
 the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
-Their **numerics are first-class**, on the same footing as the field schemes. Two axes matter: the
-trajectory integrator — today a single second-order Heun push, with higher-order pushers the studied
-future axis — and the sampling-consistency axis, the interpolation scheme's order relative to the field's
+Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
+same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(pusher, tracers)` builds its
+registers. Two axes matter: the
+trajectory integrator — today the single second-order `EndpointHeun`, with higher-order pushers the
+studied future axis — and the sampling-consistency axis, the interpolation scheme's order relative to the field's
 spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` / `LagrangeSpline` available).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same

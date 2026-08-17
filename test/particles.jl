@@ -22,13 +22,14 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "uniform field advects exactly" begin
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0; 2.0 3.0 4.0]
-    tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
+    tracers = Tracers(domain; positions = copy(X0), scheme = CatmullRom)
+    buffers = allocate_buffers(EndpointHeun(), tracers)
     c = 0.5
     set_uniform_x!(uniform, c)
     nsteps, dt = 20, 0.005
     for _ in 1:nsteps
       record_trajectory_velocity!(tracers, uniform)
-      advect!(tracers, uniform, domain, dt)
+      advect!(EndpointHeun(), tracers, buffers, uniform, domain, dt)
     end
     X = particle_positions(tracers)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
@@ -43,7 +44,8 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     exact_x = X0[1, 1] + sin(ω * Tfinal) / ω                  # ∫₀ᵀ cos(ωt) dt
 
     final_x(nsteps) = begin
-      tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
+      tracers = Tracers(domain; positions = copy(X0), scheme = CatmullRom)
+      buffers = allocate_buffers(EndpointHeun(), tracers)
       u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       dt = Tfinal / nsteps
@@ -51,7 +53,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         set_uniform_x!(u_start, cos(ω * n * dt))
         set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
         record_trajectory_velocity!(tracers, u_start)
-        advect!(tracers, u_end, domain, dt)
+        advect!(EndpointHeun(), tracers, buffers, u_end, domain, dt)
       end
       particle_positions(tracers)[1, 1]
     end
@@ -63,11 +65,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "positions wrap into [0, L)" begin
     X0 = T[6.2 6.2 6.2]                                        # near the upper boundary (L = 2π ≈ 6.283)
-    tracers = Tracers(domain, copy(X0); scheme = CatmullRom)
+    tracers = Tracers(domain; positions = copy(X0), scheme = CatmullRom)
+    buffers = allocate_buffers(EndpointHeun(), tracers)
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
       record_trajectory_velocity!(tracers, uniform)
-      advect!(tracers, uniform, domain, 0.02)
+      advect!(EndpointHeun(), tracers, buffers, uniform, domain, 0.02)
     end
     X = particle_positions(tracers)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
@@ -76,10 +79,11 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "pluggable scheme" begin
     set_uniform_x!(uniform, 0.3)
     for scheme in (CatmullRom, LagrangeSpline(2))
-      tracers = Tracers(domain, 50; scheme = scheme, rng = MersenneTwister(1))
+      tracers = Tracers(domain; number_of_particles = 50, scheme = scheme, rng = MersenneTwister(1))
+      buffers = allocate_buffers(EndpointHeun(), tracers)
       for _ in 1:10
         record_trajectory_velocity!(tracers, uniform)
-        advect!(tracers, uniform, domain, 0.01)
+        advect!(EndpointHeun(), tracers, buffers, uniform, domain, 0.01)
       end
       X = particle_positions(tracers)
       @test all(isfinite, X) && all(0 .<= X .< L)
@@ -87,7 +91,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   end
 
   @testset "interpolate_at_particles! reads a field along trajectories" begin
-    tracers = Tracers(domain, 40; scheme = CatmullRom, rng = MersenneTwister(2))
+    tracers = Tracers(domain; number_of_particles = 40, scheme = CatmullRom, rng = MersenneTwister(2))
     constant = ScalarFieldPhysical((x, y, z) -> 2.5, domain.grid)
     samples = new_scalar_point_values(tracers)
     interpolate_at_particles!(samples, constant, tracers)
@@ -105,7 +109,9 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)
     deposit!(cache, state, domain, buffers)
-    tracers = Tracers(domain, 200; scheme = CatmullRom, rng = MersenneTwister(5))
+    tracers = Tracers(domain; number_of_particles = 200, scheme = CatmullRom, rng = MersenneTwister(5))
+    push_buffers = allocate_buffers(EndpointHeun(), tracers)   # the trajectory scheme's registers,
+                                                               # distinct from the field scheme's
 
     Δx = L / N
     for _ in 1:50
@@ -114,14 +120,15 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       record_trajectory_velocity!(tracers, u)                           # u(tₙ), onto the tracers
       step!(IFLowStorageRK3(), state, generator, domain, buffers, cache, dt)
       deposit!(cache, state, domain, buffers)
-      advect!(tracers, velocity_physical(cache), domain, dt)          # u(tₙ₊₁), the closing deposit
+      advect!(EndpointHeun(), tracers, push_buffers, velocity_physical(cache), domain, dt)   # u(tₙ₊₁), the closing deposit
     end
     @test all(isfinite, particle_positions(tracers)) && all(0 .<= particle_positions(tracers) .< L)
     @test all(isfinite, point_values(tracers.trajectory_velocity))
 
     # allocation-free advection step — both verbs of the push
     u = velocity_physical(cache)
-    bytes = @allocated (record_trajectory_velocity!(tracers, u); advect!(tracers, u, domain, 0.001))
+    bytes = @allocated (record_trajectory_velocity!(tracers, u);
+                        advect!(EndpointHeun(), tracers, push_buffers, u, domain, 0.001))
     @test bytes < 4096
   end
 end

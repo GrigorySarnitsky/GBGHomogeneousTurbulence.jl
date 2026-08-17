@@ -46,7 +46,7 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, record_trajectory_velocity!, advect!
+using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_trajectory_velocity!, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
@@ -154,6 +154,9 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian [`Tracers`](@ref) and
   their interpolation scheme, forwarded to the `Tracers` constructor.
+- `particle_integrator = EndpointHeun()` — the trajectory time-integration scheme
+  ([`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
+  its registers are allocated for you.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 
@@ -178,17 +181,21 @@ sim = Simulation(domain; viscosity = 5e-3)
   the chosen scheme.
 - `state` — the [`ResolvedFields`](@ref) (the evolving `û`, `φ̂`).
 - `cache` — the [`ObservablesCache`](@ref): the observables the iteration deposits and stamps at its end.
-- `tracers` — the [`Tracers`](@ref) being advected along with the fields, or `nothing`.
+- `tracers`, `particle_integrator`, `particle_buffers` — the [`Tracers`](@ref) being advected along
+  with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
+  when the run carries no tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
-struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR}
+struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   integrator::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
-  cache::DF              # ObservablesCache: the stamped observation cache over the state
-  tracers::TR              # Tracers, or nothing
+  cache::DF                # ObservablesCache: the observation cache over the state
+  tracers::TR              # Tracers, or nothing — trajectory STATE only
+  particle_integrator::PI  # AbstractParticleIntegrator, or nothing
+  particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
   cfl::Float64
   clock::Clock
 end
@@ -211,6 +218,7 @@ function Simulation(domain::FixedDomain;
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, tracer_scheme = CatmullRom,
+                    particle_integrator::AbstractParticleIntegrator = EndpointHeun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
@@ -241,7 +249,9 @@ function Simulation(domain::FixedDomain;
   random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
   scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, peak_wavenumber, rng)
 
-  tracers = number_of_particles > 0 ? Tracers(domain, number_of_particles; scheme = tracer_scheme, rng) : nothing
+  tracers = number_of_particles > 0 ?
+    Tracers(domain; number_of_particles, scheme = tracer_scheme, rng) : nothing
+  particle_buffers = tracers === nothing ? nothing : allocate_buffers(particle_integrator, tracers)
 
   cache = ObservablesCache(domain; scalar,
                              particle_velocities = tracers === nothing ? nothing : tracers.trajectory_velocity)
@@ -249,7 +259,8 @@ function Simulation(domain::FixedDomain;
   tracers === nothing ||
     (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integrator, state, cache,
-                    tracers, Float64(cfl), Clock(0.0, 0))
+                    tracers, tracers === nothing ? nothing : particle_integrator, particle_buffers,
+                    Float64(cfl), Clock(0.0, 0))
 end
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
@@ -351,7 +362,8 @@ function advance!(sim::Simulation; dt = nothing)
   # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
-    advect!(sim.tracers, velocity_physical(sim.cache), sim.domain, Δt)
+    advect!(sim.particle_integrator, sim.tracers, sim.particle_buffers,
+            velocity_physical(sim.cache), sim.domain, Δt)
     particles_modified!(sim.cache)
     record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)

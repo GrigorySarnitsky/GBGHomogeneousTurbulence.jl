@@ -61,7 +61,7 @@ function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, 
   owners = Any[state, ObservablesCache(domain; scalar), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
-    push!(owners, Tracers(domain, 4; scheme = CatmullRom, rng = MersenneTwister(1)))
+    push!(owners, Tracers(domain; number_of_particles = 4, scheme = CatmullRom, rng = MersenneTwister(1)))
   end
   return _counts(owners, N_AUDIT)
 end
@@ -313,14 +313,22 @@ const EPISODE_UNITS = [
           _add(FRAME, _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:band, :velocity)))
   end
 
-  @testset "tracer storage scales with M, not N" begin
-    # The Tracers value carries exactly four (M, 3) arrays (positions, predictor, and the two
-    # point-value registers) — per-tracer memory, audited in its own units.
-    tracers = Tracers(domains[:TwoThirds], 4; scheme = CatmullRom, rng = MersenneTwister(1))
-    acc = AbstractArray[]
-    collect_field_arrays!(acc, tracers, Set{UInt}(), 2)   # threshold 4 elements: catch the M-arrays
-    m_arrays = [a for a in acc if size(a) == (4, 3)]
-    @test length(m_arrays) == 4
+  @testset "tracer storage scales with M, not N — and splits state from scheme" begin
+    # Four (M, 3) arrays in total, but they are owned by two different values, and WHICH owns which
+    # is the invariant (decision 50). The tracer set holds trajectory STATE only — the positions and
+    # the recorded Lagrangian velocity; the predictor pair belongs to the scheme's registers, so a
+    # different pusher changes the second count and never the first.
+    tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, scheme = CatmullRom, rng = MersenneTwister(1))
+    buffers = allocate_buffers(EndpointHeun(), tracers)
+    _m_arrays(owner) = (acc = AbstractArray[];
+                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
+                        [a for a in acc if size(a) == (4, 3)])
+    @test length(_m_arrays(tracers)) == 2                  # positions, trajectory_velocity
+    @test length(_m_arrays(buffers)) == 2                  # predictor, predictor_velocity
+    # The split moved storage; it did not add any. The total is what the ledger prices.
+    @test length(_m_arrays(tracers)) + length(_m_arrays(buffers)) == 4
+    # And no scheme register hides in the state.
+    @test isempty(intersect((:predictor, :predictor_points, :predictor_velocity), fieldnames(Tracers)))
   end
 
   @testset "op lists name real registers" begin

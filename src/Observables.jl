@@ -1,6 +1,6 @@
 # Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
-# velocity-derivative skewness, the scalar variance and its dissipation, the maximum component
-# speed (which feeds the CFL), and the field-valued vorticity recovery. In the Mori–Zwanzig reading
+# velocity-derivative skewness, the scalar variance and its dissipation, the maximum flow speed
+# (which feeds the CFL), and the field-valued vorticity recovery. In the Mori–Zwanzig reading
 # (ARCHITECTURE §8) these are the observables of the `Generator`: their plateaus gate warm-up and
 # their statistics are to be tracked by GBGStreamingStatistics. Most reduce a field to a scalar — a
 # GBGPeriodicFields inner product or moment.
@@ -14,7 +14,7 @@ The measured functions of the flow state:
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
   developed cascade.
-- [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step (one
+- [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`vorticity_physical!`](@ref) — the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}``
   recovered in physical representation from the spectral state — the field-valued observable
@@ -22,9 +22,10 @@ The measured functions of the flow state:
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
-Their plateaus gate warm-up (`warmup!`). Each is a function of the state: most reduce a field to a
-scalar (the energy spectrum, to a distribution over wavenumber; the vorticity recovery alone
-produces a field). None dealiases first — the quadratic reductions are exactly
+Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
+distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate
+the automatic warm-up (`warmup!`), which advances until the dissipation and the kinetic energy hold
+steady and the derivative skewness has reached its plateau. None dealiases first — the quadratic reductions are exactly
 alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition; `HouLi` meets
 it only to machine precision), and the cubic skewness carries the slight residual its own docstring
 prices.
@@ -118,11 +119,17 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
     max_speed(u)
     max_speed(cache)
 
-The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
-in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
-is within a factor ``\\sqrt{3}`` of the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``, a gap absorbed by the
-conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling (whose
-eigenvalue bound over-estimates the true spectral radius).
+The fastest flow speed on the grid, ``\\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}(\\boldsymbol{x})\\rvert``,
+of the velocity field `u` in physical representation — the speed that sets the advective-CFL
+timestep. The magnitude is formed per grid point in registers and consumed by the maximum
+immediately, so no magnitude field is materialized.
+
+!!! note "A grid maximum, not a continuum supremum"
+    The reduction runs over grid points, so between them the flow can be faster than any sampled
+    value. The gap is absorbed by the conservative
+    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling, whose
+    eigenvalue bound over-estimates the true spectral radius. A CFL condition bounds the *stability*
+    of the explicit advective term; it is not by itself a guarantee of accuracy.
 
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
@@ -131,7 +138,7 @@ device readback); it throws when no deposit is current, like every cached read.
 """
 function max_speed end
 
-max_speed(u) = maximum(abs, field_data(u))
+max_speed(u) = maximum(norm, u)
 
 
 """
@@ -249,8 +256,10 @@ end
 The measured kinetic-energy spectrum ``E(\\kappa)`` of the velocity field `û` (in spectral
 representation) — the turbulent kinetic energy resolved over wavenumber-magnitude shells,
 ``k = \\sum_\\kappa E(\\kappa)``. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
-wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (brought to the host, an
-occasional diagnostic; positional destructuring `κ, E = energy_spectrum(û, domain)` also works). It is the `GBGPeriodicFields` radial
+wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (positional destructuring
+`κ, E = energy_spectrum(û, domain)` also works). Both arrays live on the backend `û` lives on — bring
+them to the host yourself with
+[`adapt`](@extref GBGPeriodicFields Adapt.adapt) when you want them there. It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
@@ -258,7 +267,7 @@ spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
-  return (; wavenumbers = Array(shells), energy = Array(0.5 .* spec))
+  return (; wavenumbers = shells, energy = 0.5 .* spec)
 end
 
 
@@ -293,12 +302,11 @@ the isotropic average of the one longitudinal and two transverse contributions.
 """
 function integral_scale(û, domain::FixedDomain)
   κ, E = energy_spectrum(û, domain)
-  weighted = zero(eltype(E))
-  total = zero(eltype(E))
-  for i in eachindex(κ, E)
-    total += E[i]
-    κ[i] > 0 && (weighted += E[i] / κ[i])
-  end
+  # Both sums run where the spectrum lives — no host transfer and no scalar indexing, so the
+  # diagnostic works unchanged on a device backend. The κ = 0 shell is excluded from the numerator
+  # by the branch rather than by skipping an index, which a fused broadcast cannot do.
+  total = sum(E)
+  weighted = sum(broadcast((k, e) -> k > 0 ? e / k : zero(e), κ, E))
   return (3 * π / 4) * weighted / total
 end
 
