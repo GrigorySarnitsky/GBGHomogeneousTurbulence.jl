@@ -113,7 +113,8 @@ chosen from the grid rather than supplied:
     exactly dealiased. The `kinetic_energy` and `side_length` fix
     the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
-  * **Explicit mode**: pass `viscosity` and it is used directly (`κ_max_η` is ignored) — for a decaying
+  * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
+    passing both raises an `ArgumentError` rather than dropping one — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
     forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
@@ -128,8 +129,9 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
   argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
-- `κ_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
-  keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
+- `κ_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
+  ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. Mutually exclusive with
+  `viscosity`.
 - `viscosity` — the kinematic viscosity ``\\nu``, which is how the Reynolds number is set (it is
   ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
@@ -173,7 +175,7 @@ sim = Simulation(grid_points_per_axis = 128)
 
 # Explicit mode — set ν directly, carry a passive scalar, force at constant power:
 sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
-                 scalar = true, velocity_forcing = ConstantPower(target = 0.1))
+                 scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-first — build the frame yourself, then hand it to the second form:
 domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
@@ -182,11 +184,15 @@ sim = Simulation(domain; viscosity = 5e-3)
 ```
 
 # Fields
+Two of these are what a user reads — `state` and `cache`. The rest are the machinery the step runs
+on: they hold partial values while a step is in flight, so read them only between steps, and treat
+their contents as the scheme's business rather than the run's state.
+
+- `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
+- `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
 - `domain`, `buffers`, `generator`, `scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
-- `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
 - `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along
   with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
   when the run carries no tracers.
@@ -209,13 +215,13 @@ end
 
 # A forcing may be given ready-built (an `AbstractForcing`) or as a factory `domain -> AbstractForcing`
 # — the latter lets a banded forcing be named before the domain exists (`domain -> ConstantPower(domain;
-# target)`), since a forcing precomputes its band from `domain`.
+# injection_rate)`), since a forcing precomputes its band from `domain`.
 _materialize_forcing(f::AbstractForcing, ::FixedDomain) = f
 _materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
 function Simulation(domain::FixedDomain;
-                    kinetic_energy::Real = 1.5, κ_max_η::Real = 2, viscosity = nothing,
+                    kinetic_energy::Real = 1.5, κ_max_η = nothing, viscosity = nothing,
                     schmidt::Real = 1.0,
                     velocity_forcing = BandRescaling(domain; target = kinetic_energy, over = :total),
                     scalar_forcing = NoForcing(),
@@ -230,10 +236,16 @@ function Simulation(domain::FixedDomain;
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
   side_length = domain.grid.domain_size[1]
   ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
+  # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
+  if !isnothing(viscosity) && !isnothing(κ_max_η)
+    throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
+directly, `κ_max_η` derives it from the grid. Pass one, not both."))
+  end
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
-    ν = ε^(1//3) * (κ_max_η / max_wavenumber(domain))^(4//3)
+    resolution = isnothing(κ_max_η) ? 2 : κ_max_η
+    ν = ε^(1//3) * (resolution / max_wavenumber(domain))^(4//3)
     reλ = (2 * kinetic_energy / 3) * sqrt(15 / (ε * ν))
-    @info "Simulation: grid-resolved at κ_max·η = $(κ_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
+    @info "Simulation: grid-resolved at κ_max·η = $(resolution)" viscosity=ν dissipation=ε Re_λ=reλ
   else
     ν = Float64(viscosity)
   end

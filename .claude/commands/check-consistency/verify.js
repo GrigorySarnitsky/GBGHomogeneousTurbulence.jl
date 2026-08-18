@@ -33,12 +33,26 @@ const PILE = A.pile
 const REPO = A.repo
 
 // The hat files, in the panel's own order. A verifier is spawned per file.
-const HATS = [
+//
+// KEEP THIS LIST IN STEP WITH panel.js. The script cannot read the pile directory (no filesystem in
+// a workflow script), so a hat added to the panel and NOT added here is banked, fixed, and never
+// verified — silently, because the run still reports success over the hats it does know. That is
+// exactly the accounting failure this instrument exists to catch: on 2026-08-18 the list still held
+// the original 11 while the panel banked 15, leaving four hats' findings unaudited.
+const ALL_HATS = [
   '01-consistency-matrix', '02-software-architect', '03-turbulence-theoretician',
   '04-dns-practitioner', '05-structure-consistency', '06-latex-typesetter',
   '07-api-user', '08-dimensional', '09-citations-integrity', '10-style-editor',
-  '11-cold-reader',
+  '11-cold-reader', '12-plain-sense', '13-naming-policy', '14-doc-policy',
+  '15-invariants-and-decisions',
 ]
+
+// `hats` runs a SUBSET (by name or by numeric prefix). Its purpose is re-running the hats that died
+// — the whole panel once came back rate-limited, 11 agents launched at once — so a retry need not
+// re-pay for the verdicts already banked. Omit it to verify everything.
+const HATS = Array.isArray(A.hats) && A.hats.length
+  ? ALL_HATS.filter(h => A.hats.some(x => h === String(x) || h.startsWith(String(x) + '-')))
+  : ALL_HATS
 
 const SCHEMA = {
   type: 'object', additionalProperties: false,

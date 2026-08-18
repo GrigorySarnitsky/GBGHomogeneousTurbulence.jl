@@ -87,7 +87,7 @@ spectra, which the run layer can wire in for you.
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
 
-Returns the filled field.
+Returns `û`.
 
 !!! note "Seeding a running case invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
@@ -160,7 +160,7 @@ e.g. an Obukhov–Corrsin form from [`Phenomenology`](@ref GBGIsotropicTurbulenc
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
 
-Returns the filled field.
+Returns `φ̂`.
 
 !!! note "Seeding a running case invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached

@@ -72,7 +72,7 @@ end
   let k = 1.5, L = 2π, ε = stationary_dissipation(Li2008(), k, L)
     @test k / (L * ε)^(2 / 3) ≈ 0.9                              # stationary_dissipation inverts k/(Lε)^{2/3}=G
   end
-  @test stationary_dissipation(Li2008(constant = 1.0), 1.0, 1.0) == 1.0   # ε = (k/G)^{3/2}/L
+  @test stationary_dissipation(Li2008(dissipation_group = 1.0), 1.0, 1.0) == 1.0   # ε = (k/G)^{3/2}/L
 end
 
 

@@ -44,8 +44,10 @@ run!(sim) do s                                # records what it wants, and decid
     current_time(s) < t_end
 end
 
-# One ITERATION is one advance: a step, then the deposit that closes it. The state is always
-# current; the cache holds what the last deposit left, so its reads are valid between iterations.
+# One ITERATION is one advance: a step, then the DEPOSIT that closes it — the write in which the
+# iteration hands the cache the observables it has just computed, each tagged with the iteration it
+# belongs to. The state is always current; the cache holds what the last deposit left, so its reads
+# are valid between iterations.
 kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
 velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
 flow_parameters(sim)                          # the run's measured flow state
@@ -108,7 +110,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
   sampling along trajectories, with a selectable interpolation scheme.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
-  CFL-adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. A `Simulation` is a container,
+  Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. A `Simulation` is a container,
   not a reading surface: the state is read through `sim.state`, the deposited observables through
   `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function

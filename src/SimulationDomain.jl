@@ -45,8 +45,8 @@ with one; it fixes the `domain.dealias` kernel and, through
 ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
-default is decided by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation), the
-convenience constructor that builds every component, not by this catalogue.
+default is decided by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
+front door, not by this catalogue.
 """
 abstract type DealiasingStrategy end
 
@@ -106,9 +106,9 @@ Rogallo (1981), *Numerical experiments in homogeneous turbulence*, NASA TM-81315
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
-average cancels the aliasing images — the spurious spectral replicas that the under-resolved
-quadratic product folds back into the resolved band — that wrap in an odd number of axes; the
-spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
+average cancels the aliasing images that wrap in an odd number of axes — the aliasing images being the
+spurious spectral replicas that the under-resolved quadratic product folds back into the resolved
+band — while the spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt{2}``
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
 modes in the retained sphere).
@@ -119,7 +119,7 @@ buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
 ``2/3`` rule — handled automatically by [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
-!!! note
+!!! note "A half-cell shift attenuates the Nyquist mode"
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
     cutoff at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
@@ -363,9 +363,9 @@ scalar field in spectral representation. Returns `field`.
 
 !!! note "Truncating the band is not always the whole of dealiasing"
     For `TwoThirds` this call is the whole of it, and for `HouLi` the taper damps the aliases rather
-    than removing them. `PhaseShift` is the case to watch: it cancels its aliases by *averaging two
-    displaced evaluations* of the quadratic product, which the generator does where it assembles
-    that product — the truncation here is only the second half.
+    than removing them. Under `PhaseShift` it is only the second half, so calling it on a product
+    assembled without the displaced-evaluation average leaves that product aliased — the generator
+    pairs the two, and a hand-built assembly must do the same.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 

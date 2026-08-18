@@ -191,9 +191,15 @@ it carries one load-bearing claim a reader should be able to scan for, and stays
 when it is a general aside — and its title is **plain text**, since Documenter renders neither code
 spans nor math there. A **caveat admonition is the last substantive block** of a docstring, before
 `# Fields`. A type gets a bulleted **`# Arguments`** section when its keywords are independent
-settings, and folds them into prose when they describe one coherent object. An **`# Examples`**
+settings, and folds them into prose when they must be read together — when one keyword conditions
+what another *means* (`BandRescaling`'s `target` is a value whose observable `over` selects) or
+several jointly name one object (a `lowest_shell` / `highest_shell` band). Independence is the
+discriminator, not count: two unrelated switches earn the bullets, four interlocking ones do not. An **`# Examples`**
 section appears where construction is non-obvious, not on every type. A **`Returns x.` sentence** is
-required of any in-place mutator whose signature carries no `-> ` arrow. A **module map is
+required of any in-place mutator whose signature carries no `-> ` arrow. A signature carries a
+**`-> Type` arrow** only where the return type is fixed by the signature (`Phenomenology`'s law
+evaluators, whose bundle is `Float64` throughout); a reduction that returns *the field's own* element
+type says so in prose instead, since an arrow there would name a type the call need not produce. A **module map is
 identity → contents list → optional trailing remark**, in that order, with no essay before the list.
 
 **API pages are logically grouped.** Group public objects under hand-written `## Header` sections via

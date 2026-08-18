@@ -58,7 +58,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 
   @testset "ConstantPower sets injection rate = power" begin
     power = 0.3
-    forcing = ConstantPower(domain; target = power, lowest_shell = 1, highest_shell = 2)
+    forcing = ConstantPower(domain; injection_rate = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
     rate = new_scalar_field_spectral(domain)
     set_forcing_rate!(forcing, rate, û0, domain)
@@ -77,7 +77,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 
   @testset "ConstantPower bounded and solenoidal" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = ConstantPower(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
+                      velocity_forcing = ConstantPower(domain; injection_rate = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = run_velocity(conditions, 100)
     @test isfinite(kinetic_energy(û)) && kinetic_energy(û) > 0
     rel_div = l2norm(divergence(û, domain.multipliers)) / (l2norm(û) + 1e-30)
@@ -152,7 +152,7 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     # The storage tracks the physics: only a forcing that drives its field through a linear per-mode
     # rate gets an A(κ) array. A post-step projection (BandRescaling — the run layer's default), a
     # stochastic source, and no forcing at all carry none.
-    rate_driven = (Linear(domain; rate = 0.5), ConstantPower(domain; target = 0.1))
+    rate_driven = (Linear(domain; rate = 0.5), ConstantPower(domain; injection_rate = 0.1))
     other = (NoForcing(), BandRescaling(domain; target = 0.5, over = :band),
              StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
     generator(f) = ResolvedGenerator(domain, FlowConditions(; viscosity = ν, schmidt = 1.0,

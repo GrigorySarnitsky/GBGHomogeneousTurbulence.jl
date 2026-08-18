@@ -50,7 +50,7 @@ using GBGIsotropicTurbulence
 # Assemble a forced case. Everything the run needs — the domain, buffers, physics,
 # scheme, state, and initial condition — is built with defaults from a few numbers.
 sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
-                 velocity_forcing = ConstantPower(target = 0.1),
+                 velocity_forcing = ConstantPower(injection_rate = 0.1),
                  scalar = true, schmidt = 1.0)
 
 # Spin past the transient: advance until the running dissipation ε(t) stops drifting
@@ -83,7 +83,7 @@ interleave a bespoke measurement drops straight to §4. The run layer is a conve
 never a wall in front of it.
 
 > **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example
-> above runs as written — a forcing can be named operator-free (`ConstantPower(target = 0.1)`, a
+> above runs as written — a forcing can be named operator-free (`ConstantPower(injection_rate = 0.1)`, a
 > `DeferredForcing`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
 > the package's primary quality target, but it is no longer a sketch.
 
@@ -185,8 +185,9 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default; every
   strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
-  from here**: `element_type` fixes the real element type (`Float32` or `Float64`)
-  and `array_type` the storage (`Array`, `CuArray`, `ROCArray`), and every buffer is allocated `similar`
+  from here**: `element_type` fixes the real element type
+  ([`Float32`](@extref Julia Core.Float32) or [`Float64`](@extref Julia Core.Float64))
+  and `array_type` the storage ([`Array`](@extref Julia Core.Array), `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
   record of the evolving fields in spectral representation — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
@@ -257,7 +258,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\big)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\bigr)``
   — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep
   ``d_i\Delta t``, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
@@ -359,7 +360,7 @@ field) and the scalar (a scalar field), because these four methods are written t
 operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
 velocity, and none of the built strategies needs it — each preserves a divergence-free velocity by
 construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form
-(`ConstantPower(target = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
+(`ConstantPower(injection_rate = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
 ### 4.5 `Propagator` — the map that advances the state in time
@@ -412,7 +413,7 @@ onto the tracers stores ``M\times3`` values where retaining the endpoint field w
 ``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
 recorded as **forbidden**: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
-differs from the next sample only at ``O(\Delta t^2)``, so reusing it as the next
+differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so reusing it as the next
 ``\boldsymbol{v}_1`` looks like a free interpolation saved — but it corrupts the recorded observable
 the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
@@ -582,8 +583,10 @@ Two standing rules follow:
 Precision and the memory-footprint/accuracy trade-off are **objects of study**, not fixed defaults — the
 numerical counterpart of the charter that the tool investigates the physics rather than assuming it (§8).
 
-- **Both precisions are supported equally, with no privileged default.** `Float32` is the
-  development and desktop precision; `Float64` is the production precision. The element type
+- **Both precisions are supported equally, with no privileged default.** `Float32` buys twice the
+  grid per byte and roughly twice the throughput on a consumer GPU; `Float64` buys the accuracy
+  margin a long integration or a sensitive diagnostic may need. Which one a run wants is a fitness
+  question, settled by test rather than by a house default. The element type
   ``T`` flows from the frame (§4.1): no kernel silently fixes the arithmetic. (The `FlowConditions` scalar
   parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
   commitment.) The **one computational exception** is statistics: reductions and online moments aggregate in
@@ -871,12 +874,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     velocity-derivative skewness, not the kinetic energy.** ``\varepsilon(t)`` (the small scales, which
     settle last) must stop drifting over a trailing window; ``k(t)`` is avoided because a constant-energy
     forcing clamps it and a fixed-injection forcing makes it ring. The skewness ``S(t)``
-    (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the strict
-    "real turbulence yet" gate (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
+    (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the
+    "real turbulence yet" gate, whose default floor is a permissive one to be raised toward the
+    developed ``\lvert S\rvert \approx 0.5`` when the run must be strict (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
     forced, ``\langle\varphi^2\rangle`` must flatten too — the scalar reaches stationarity after the
     velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the warm-up
     literature.)*
-14. **(2026-07) Operator-free forcing construction.** `ConstantPower(target = 0.1)` (and the other banded
+14. **(2026-07) Operator-free forcing construction.** `ConstantPower(injection_rate = 0.1)` (and the other banded
     forcings) return a `DeferredForcing` capturing the parameters, materialized into the concrete
     `AbstractForcing` once `Simulation` builds the domain — so a case names its forcing before the grid
     exists. The operator-taking constructor is unchanged. *(Originally the keyword was `power` and the
@@ -1090,7 +1094,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\hat{\boldsymbol{u}}`` *before* assembling the scalar's advection. A mask strategy never reads
     ``\hat{\boldsymbol{u}}`` there, but `PhaseShift`'s displaced evaluation does (decision 27) — so the
     displaced flux paired the *next* stage's velocity with *this* stage's scalar, breaking the odd-axis
-    alias cancellation at ``O(\Delta t)`` and degrading the scalar from third to **first** order
+    alias cancellation at ``\mathcal{O}(\Delta t)`` and degrading the scalar from third to **first** order
     (measured self-convergence ratios 2.02 against 7.97 for the velocity; `IFRK2`'s call sites were
     consistent, and the term-level padding oracle cannot see a call-site mismatch — it checks the
     assembly with matched inputs). The comment that had licensed the old order ("`u` and `φ̂` are
@@ -1535,7 +1539,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     user-settled accessor prefix). The register `predictor_velocity` is deliberately **not** readable — an
     off-trajectory value must not be servable as a plausible-looking Lagrangian velocity — and the
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
-    would approximate the measured observable at ``O(\Delta t^2)``; never approximate the thing you
+    would approximate the measured observable at ``\mathcal{O}(\Delta t^{2})``; never approximate the thing you
     measure).
 
 43. **(2026-08) The loop is observation-first, and stopping is the caller's decision on
@@ -1756,8 +1760,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     against carries no such constraint, and `:band` is then the gentler clamp. The right answer
     genuinely differs by context — the strongest argument that no single default was right.
 
-    Recorded alongside: `:total` zeroes the band when the out-of-band energy alone exceeds `target`,
-    a step with no forcing at all, which the docstring now states.
+    Recorded alongside: `:total` zeroes the band when the out-of-band energy alone exceeds `target`.
+    The docstring states what that is — the most violent intervention the strategy can make, not the
+    absence of one.
 
 55. **(2026-08, user-directed) `integrator` → `scheme` on the binding; the composite spectrum presets
     are types, not factory functions.** Two naming defects the panel found, both of the same kind: a
@@ -1786,8 +1791,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     fitted coefficients and the citation remain in the value.
 
 56. **(2026-08, user-directed) The consumed operand is named for it: `ω_consumed`, `u_consumed`.**
-    `velocity_rhs!` reads the vorticity and overwrites it; `scalar_rhs!` reads the velocity and
-    overwrites it. Julia's convention is that a `!` verb mutates its *first* argument, so a caller
+    The `velocity_rhs!` assembly reads the vorticity and overwrites it; `scalar_rhs!` reads the
+    velocity and overwrites it. Julia's convention is that a `!` verb mutates its *first* argument, so a caller
     reading either signature had no way to know a second one was destroyed — the fact lived only in
     the docstring notes.
 

@@ -196,7 +196,7 @@ object leads — the scheme here, the cache there — and the common arguments f
 `state`, `domain`, `buffers`, so the chained pair transposes nothing. This signature interleaves two
 more: `generator` directly after `state`, and `cache` then `dt` at the end.
 
-!!! note
+!!! note "A step alone leaves the cache mid-iteration"
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
     the iteration with `deposit!`, which re-fills every slot, at the new epoch, from the advanced
     state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does both.
@@ -239,8 +239,10 @@ lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step 
 the third stage.
 Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose ``N`` counts
 evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
-per field: the state's own array plus one accumulator (`stage1`; the raw-assembly register
-`nonlinear` is the dealiasing seam's addition, not the scheme's). The general-purpose workhorse:
+per field: the state's own array plus one accumulator (`stage1`). The
+[`IntegratorBuffers`](@ref) a run allocates holds more than that count — `nonlinear` is the
+dealiasing seam's assembly register and `velocity_star_spectral` the projection's — because the
+count measures the scheme, not the solver it is embedded in. The general-purpose workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
@@ -344,7 +346,7 @@ with ``\\widehat{\\boldsymbol{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\boldsym
 ``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa``
 respectively, then the forcings are applied. Two nonlinear evaluations per step.
 
-!!! note
+!!! note "Unstable on the imaginary axis without viscous damping"
     Every second-order two-stage explicit Runge–Kutta has stability function
     ``R(z) = 1 + z + z^{2}/2``, for which ``\\lvert R(\\mathrm{i}y)\\rvert^{2} = 1 + y^{4}/4 > 1``: the
     scheme is unstable on the imaginary axis, so it is stable only where the viscous damping of the
@@ -467,7 +469,8 @@ Close an iteration: deposit the field observables the cache's fixed schedule car
 vorticity and scalar recoveries and the maximum speed, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
 [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) the step has just produced,
-and record each slot at the current epoch (the cache's freshness counter). The
+and record each slot at the current epoch (the cache's freshness counter).
+
 The deposits are the next iteration's first-stage work moved to the iteration's end: the velocity,
 vorticity and — when the run carries one — scalar recoveries in physical representation, then the
 maximum-speed reduction over the just-deposited velocity. The recoveries run on the

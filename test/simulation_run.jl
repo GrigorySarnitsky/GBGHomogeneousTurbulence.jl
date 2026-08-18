@@ -17,7 +17,7 @@ using Test
 
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
-                     velocity_forcing = domain -> ConstantPower(domain; target = 0.1),
+                     velocity_forcing = domain -> ConstantPower(domain; injection_rate = 0.1),
                      scalar = true, number_of_particles = 50, rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
@@ -71,7 +71,9 @@ using Test
     @test ν > 0
 
     @test Simulation(grid_points_per_axis = 32, κ_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
-    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, κ_max_η = 5).generator.conditions.viscosity == 0.01
+    # The two set ν by different routes, so supplying both is an error rather than a silent drop.
+    @test_throws ArgumentError Simulation(grid_points_per_axis = 32, viscosity = 0.01, κ_max_η = 5)
+    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01).generator.conditions.viscosity == 0.01
   end
 
   @testset "initial condition from a spectrum" begin
@@ -122,13 +124,13 @@ using Test
   end
 
   @testset "domain-free forcing spec" begin
-    for spec in (ConstantPower(target = 0.1), Linear(rate = 0.5),
+    for spec in (ConstantPower(injection_rate = 0.1), Linear(rate = 0.5),
                  BandRescaling(target = 0.5, over = :band), StochasticOU(variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
                      rng = MersenneTwister(20))
     run!(s -> current_step(s) < 5, sim)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -163,7 +165,7 @@ using Test
 
   @testset "warmup! detects stationarity" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
                      rng = MersenneTwister(21))
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -178,7 +180,7 @@ using Test
   @testset "warmup! gates on the scalar" begin
     D = GBGIsotropicTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                        velocity_forcing = ConstantPower(target = 0.1),
+                        velocity_forcing = ConstantPower(injection_rate = 0.1),
                         scalar_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3),
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
@@ -201,7 +203,7 @@ using Test
     # develop turbulence, then the coordinate-free skewness ⇒ the negative K41 value S ≈ −0.5
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
     cache = ObservablesCache(domain; scalar = true)
-    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; target = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
+    conditions = FlowConditions(viscosity = 0.02, velocity_forcing = ConstantPower(domain; injection_rate = 0.15), schmidt = 1.0, scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     deposit!(cache, state, domain, buffers)
     for _ in 1:80
@@ -214,7 +216,7 @@ using Test
 
   @testset "warmup! skewness gate runs" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(target = 0.15), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.15), scalar = false,
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0

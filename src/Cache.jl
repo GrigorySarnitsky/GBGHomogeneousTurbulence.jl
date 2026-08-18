@@ -21,15 +21,16 @@ than served stale. The cache's operations:
   next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
-- [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached maximum velocity
-  component, the number the timestep choice reads (one
+- [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed
+  ``\\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}\\rvert``, the number the timestep choice reads (one
   generic with the field reduction in `Observables`, whose docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the particle velocities
   ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
 
-The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
-— homed in `Propagator`, with the iteration it closes — which fills every slot at the iteration's
-end and sets its epoch. A caller reads through the accessors and never deposits.
+The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
+which fills every slot at the iteration's end and sets its epoch. A caller reads through the
+accessors and never deposits. It is homed in `Propagator` rather than here because it needs the
+scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
@@ -70,17 +71,19 @@ representation when the run carries one, the fastest flow speed on the grid (the
 the next timestep choice reads), and — when the run advects tracers — the particle velocities
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
 configuration, never declared: the cache holds exactly what the iteration computes, materializes,
-and leaves alive at the iteration's end, and nothing may be added on any cost axis.
+and leaves alive at the iteration's end, and nothing may be added on any cost axis. The cache
+allocates and owns every slot but one: the particle velocities are the tracer set's own storage,
+which the cache borrows and records epochs for rather than filling itself.
 
-Build it on a [`FixedDomain`](@ref) `domain`; pass `scalar = true` when the run evolves a passive
-scalar (it adds the scalar's slot), and `particle_velocities` — the tracer set's own point-value
-storage — when the run advects tracers. Pass `tracers.particle_velocities`: the slot **is** that
-array, so the tracer advance writes the values and the cache only records which epochs they belong
-to. The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door wires it for
-you; a hand-assembled run passes it here. The
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door —
-the convenience constructor that builds every component — builds,
-wires, and seeds one for you.
+Build it on a [`FixedDomain`](@ref) `domain`. The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds, wires,
+and seeds one for you; a hand-assembled run constructs it here.
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the run lives on; it sizes every slot.
+- `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
+- `particle_velocities = nothing` — the tracer set's own point-value storage, passed when the run
+  advects tracers. Pass `tracers.particle_velocities`: the slot **is** that array, so the tracer
+  advance writes the values and the cache only records which epochs they belong to.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
@@ -88,7 +91,7 @@ Nothing in the cache is ever recomputed: a read that finds a stale, taken, or ne
 reports a scheduling error — it throws an `ErrorException` whose message names the slot and which
 of the three states it is in — and the only repair is to fix the schedule that failed to deposit.
 
-!!! note
+!!! note "A cached array is the next iteration's scratch"
     A slot is also the array its producer computes in: between deposits the step writes its own
     stage values there, so a cached field is meaningful only between iterations. Treat every
     returned array as read-only — it is the storage the next iteration will work in.

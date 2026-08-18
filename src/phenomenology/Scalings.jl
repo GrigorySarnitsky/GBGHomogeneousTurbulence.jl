@@ -38,8 +38,8 @@ abstract type ScalingLaw <: TurbulenceLaw end
     stationary_dissipation(law, kinetic_energy, side_length)
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
-dissipation `law` from the turbulent `kinetic_energy` ``k`` and the periodic-box side length
-`side_length` (``L``) — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
+dissipation `law` from the turbulent kinetic energy ``\\texttt{kinetic\\_energy} \\equiv k`` and the
+periodic-box side length ``\\texttt{side\\_length} \\equiv L`` — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
 [`Li2008`](@ref) gives the ``(k/G)^{3/2}/L`` form). This is the seam by which a run's
 viscosity can be set from its grid and target energy, rather than the reverse.
 """
@@ -114,7 +114,7 @@ const _LI2008 = Reference("Li et al. (2008), *J. Turbulence* **9**, N31 (JHTDB).
                           valid_Reλ = (100.0, Inf))
 
 """
-    Li2008(; constant = 0.9)
+    Li2008(; dissipation_group = 0.9)
 
 The box-normalized dissipation group
 
@@ -138,25 +138,25 @@ lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that ide
 being fits to different datasets, they are not expected to close exactly: carrying
 ``C_\\varepsilon \\approx 0.5`` across at that ratio gives ``G \\approx 0.81`` against the quoted ``0.9``.
 
-The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
+The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
 inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the dissipation a
 stationary run of energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the
 run layer uses to set the viscosity from the grid and target energy.
 
 # Fields
-The plain constructor `Li2008(constant)` takes the field directly:
-- `constant` — the group value ``G``.
+The plain constructor `Li2008(dissipation_group)` takes the field directly:
+- `dissipation_group` — the group value ``G``.
 """
 struct Li2008 <: ScalingLaw
-  constant::Float64
+  dissipation_group::Float64
 end
 
-Li2008(; constant = 0.9) = Li2008(constant)
+Li2008(; dissipation_group = 0.9) = Li2008(dissipation_group)
 
-scaling(m::Li2008, ::FlowParameters) = m.constant
+scaling(m::Li2008, ::FlowParameters) = m.dissipation_group
 
 stationary_dissipation(m::Li2008, kinetic_energy::Real, side_length::Real) =
-  (kinetic_energy / m.constant)^(3//2) / side_length
+  (kinetic_energy / m.dissipation_group)^(3//2) / side_length
 
 provenance(::Li2008) = _LI2008
 

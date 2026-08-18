@@ -15,7 +15,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 - [Generator](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of verbs.
 - [Propagator](api/Propagator.md): the integrating-factor time-stepping schemes under `AbstractIntegrator` — `IFRK2` (Heun) and the low-storage `IFLowStorageRK3`.
 - [Particles](api/Particles.md): Lagrangian tracer tracking — `Tracers`, second-order `advect!` (Heun-in-time), and `interpolate_at_particles!` for the Lagrangian statistics.
-- [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the CFL-adaptive loop (`advance!`, `run!`, `warmup!`) that drives it. A `Simulation` is a container, not a reading surface: the state is read through `sim.state`, the deposited observables through `sim.cache`.
+- [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!`, `run!`, `warmup!`) that drives it. A `Simulation` is a container, not a reading surface: the state is read through `sim.state`, the deposited observables through `sim.cache`.
 - [Phenomenology](phenomenology.md): the reference turbulence laws — model spectra, structure-function laws, and scaling constants — to validate a run against. A separate, opt-in group: not re-exported by the umbrella, and designed to be extractable into a standalone package.
 
 ```@contents

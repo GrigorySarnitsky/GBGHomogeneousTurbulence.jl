@@ -18,18 +18,17 @@ layer reads to compare a run against, never a comparer itself and never assumed 
 A law family is an abstract subtype of [`TurbulenceLaw`](@ref) (the root of every reference law
 here); each parametrization is a named preset — usually a concrete subtype
 carrying its fitted coefficients and its provenance, or (for the composed velocity spectra like
-`Spectra.Pope2000`) a factory function that assembles one. Choosing a law is choosing the preset (the
+`Spectra.Pope2000`) an alias for one specialization of a composed type, with a keyword constructor
+that fills in the published fit — so `spec isa Spectra.Pope2000` holds either way. Choosing a law is choosing the preset (the
 published fit is the default); a name is disambiguated by its **submodule** (the quantity), its
 **author-year** (the paper), and a trailing letter (a same-year collision).
 
-**The flow state a law reads:**
+The module's contents:
 - [`FlowParameters`](@ref) — the flow-state bundle a law evaluates against, with the
   derived scales [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
   [`taylor_reynolds`](@ref), and [`scalar_diffusivity`](@ref) as helpers.
 - [`provenance`](@ref) — a law's citation and validity range (a [`Reference`](@ref)); [`fit`](@ref)
   is the (future) seam for fitting a parametrization to measured data.
-
-**The law families, one submodule per representation:**
 - [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra) — model velocity and scalar
   spectra, functions of
   wavenumber, evaluated by [`spectrum`](@ref).
@@ -90,7 +89,8 @@ All keyword; a homogeneous-isotropic state fixes the rest:
     a plain, type-stable set of `Float64`s. It is a **sentinel, not a value that propagates**: every
     law that reads the field checks it first and throws an `ArgumentError` naming the law and the
     missing rate, so a scalar law applied to a scalar-free state fails loudly rather than returning
-    `NaN`. A caller needs no guard of its own.
+    `NaN`. That check is what makes the sentinel safe, so it covers the laws here and not arithmetic
+    a caller does on the field itself, which propagates `NaN` as `NaN` always does.
 
 # Examples
 

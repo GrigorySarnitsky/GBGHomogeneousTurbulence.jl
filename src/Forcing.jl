@@ -94,7 +94,7 @@ abstract type AbstractForcing end
 A deferred forcing. The operator-free keyword constructors
 
     Linear(; rate, lowest_shell = 1, highest_shell = 2)
-    ConstantPower(; target, lowest_shell = 1, highest_shell = 2)
+    ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
     BandRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
@@ -104,6 +104,17 @@ exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun
 forcing argument
 therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
 `DeferredForcing`.
+
+# Examples
+```julia
+# Name the forcing before any grid exists — the front door supplies the domain:
+sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
+                 velocity_forcing = ConstantPower(injection_rate = 0.1))
+
+# Or build it directly, once the domain is in hand:
+domain = FixedDomain(grid_points_per_axis = 64)
+forcing = ConstantPower(domain; injection_rate = 0.1)
+```
 
 # Fields
 - `build` — the captured constructor closure: calling the `DeferredForcing` on a `FixedDomain`
@@ -151,13 +162,17 @@ uses_linear_rate(::AbstractForcing) = false
 
 
 """
-    apply_forcing!(forcing, field, domain) -> field
+    apply_forcing!(forcing, advanced_field, domain) -> advanced_field
 
-Apply the strategy `forcing`'s post-step projection to `field` (a velocity or scalar ``\\varphi`` field in spectral
-representation) in place, on the [`FixedDomain`](@ref) `domain`. The default does nothing; see
-`BandRescaling`.
+Apply the strategy `forcing`'s post-step projection to `advanced_field` (a velocity or scalar
+``\\varphi`` field in spectral representation) in place, on the [`FixedDomain`](@ref) `domain`. The
+default does nothing; see `BandRescaling`.
+
+Unlike the two hooks that read the start-of-step field, this one is handed the field the step has
+already advanced — the argument is named for that instant, since a strategy that rescales toward a
+target must measure the state it is correcting, not the one it started from.
 """
-apply_forcing!(::AbstractForcing, field, domain::FixedDomain) = field
+apply_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advanced_field
 
 
 """
@@ -242,11 +257,12 @@ run may no longer measure, and there is no answer that is right for every run.
 
 Rescaling preserves the divergence-free constraint either way.
 
-!!! note
+!!! note "A deterministic clamp, not a stationary sampler"
     This is a deterministic clamp, not a faithful stationary sampler.
     Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of
-    stochastic velocity rescaling — the molecular-dynamics thermostat whose deterministic limit this
-    is: it has no conserved quantity, is not associated with a well-defined
+    stochastic velocity rescaling: the molecular-dynamics thermostat that multiplies every velocity
+    by one factor each step, chosen to drag the instantaneous temperature toward its target, which is
+    what this forcing does to the band's amplitude. Such a scheme has no conserved quantity, is not associated with a well-defined
     ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
     holds (Bussi, Donadio & Parrinello 2007 — *Canonical sampling through velocity rescaling*,
     *J. Chem. Phys.* **126**, 014101,
@@ -322,41 +338,41 @@ end
 
 
 """
-    ConstantPower(domain; target, lowest_shell = 1, highest_shell = 2)
+    ConstantPower(domain; injection_rate, lowest_shell = 1, highest_shell = 2)
 
 Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a banded linear
 forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
-whose rate ``A`` is set each step so the field's injection rate holds the `target`. A linear rate
-injects at ``2 A E_{\\mathrm{band}}``, with ``E_{\\mathrm{band}}`` the band's own observable, so the
-rate that holds the target is
+whose rate ``A`` is set each step so the field's injection rate holds the `injection_rate`. A
+linear rate injects at ``2 A E_{\\mathrm{band}}``, with ``E_{\\mathrm{band}}`` the band's own
+observable, so the rate that holds it is
 
 ```math
-A = \\frac{\\texttt{target}}{2 E_{\\mathrm{band}}}.
+A = \\frac{\\texttt{injection\\_rate}}{2 E_{\\mathrm{band}}}.
 ```
- In stationarity
-the injection balances dissipation, so `target` is a number: the **value** of the dissipation rate to
-hold, chosen to agree with the diagnostics —
+
+In stationarity the injection balances dissipation, so `injection_rate` is a number: the **value** of
+the dissipation rate to hold, chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
-[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). Note what kind
-of quantity that is: here the held observable
-is a **rate**, where `BandRescaling` holds an **amplitude**. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
+[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword is
+named for the kind of quantity it is: a **rate**, where `BandRescaling`'s `target` is an
+**amplitude** — which is why the two strategies do not share one keyword name. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.
 """
 struct ConstantPower{K, I, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
   indicator::I         # the band indicator as a real array — the rate fill's factor
-  target::T            # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
+  injection_rate::T    # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
 end
 
-function ConstantPower(domain::FixedDomain; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
+function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
   band = _shell_band(domain, lowest_shell, highest_shell)
   # The kernel is lazy and carries no coefficients to read, so the rate fill's indicator is
   # materialized once here as a real array (half the complex field the stored band once was).
   indicator = real.(field_data(materialize_kernel(band).field))
-  return ConstantPower(band, indicator, float(target))
+  return ConstantPower(band, indicator, float(injection_rate))
 end
 
 uses_linear_rate(::ConstantPower) = true
@@ -364,7 +380,7 @@ uses_linear_rate(::ConstantPower) = true
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
-  amplitude = band_observable > 1e-12 ? forcing.target / (2 * band_observable) : 0.0
+  amplitude = band_observable > 1e-12 ? forcing.injection_rate / (2 * band_observable) : 0.0
   rate .= T(amplitude) .* forcing.indicator
   return rate
 end
@@ -401,7 +417,7 @@ given (a vector or scalar state, projected only for the velocity). The forcing o
 noise scratch — one field in physical and one in spectral representation, allocated on first use, so a
 velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
 
-!!! note
+!!! note "The random increment is generated host-side"
     The random increment is generated host-side each step; on the GPU this is a portability-first
     choice, not yet a performance-tuned one.
 """
@@ -445,10 +461,10 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real
 
   # exact Ornstein–Uhlenbeck update. The unit-variance rescale of ξ is not a pass of its own: the
   # only consumer of ξ is the combination below, so 1/√⟨ξ,ξ⟩ rides in as part of its coefficient.
-  θ = exp(-T(dt) / T(ou.correlation_time))
-  s = sqrt(T(ou.variance) * (one(T) - θ^2))
+  α = exp(-T(dt) / T(ou.correlation_time))
+  s = sqrt(T(ou.variance) * (one(T) - α^2))
   β = noise_variance > 0 ? s / sqrt(T(noise_variance)) : zero(T)
-  combine!(ou.state, θ, ou.state, β, noise_spectral)                        # f̂ ← θ f̂ + √(σ²(1-θ²)) ξ̂
+  combine!(ou.state, α, ou.state, β, noise_spectral)                        # f̂ ← α f̂ + √(σ²(1-α²)) ξ̂
   return nothing
 end
 
@@ -458,12 +474,12 @@ add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain) =
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
 # domain exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
-# `ConstantPower(target = 0.1)` — with `Simulation` supplying the domain.
+# `ConstantPower(injection_rate = 0.1)` — with `Simulation` supplying the domain.
 Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> Linear(domain; rate, lowest_shell, highest_shell))
 
-ConstantPower(; target::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  DeferredForcing(domain -> ConstantPower(domain; target, lowest_shell, highest_shell))
+ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> ConstantPower(domain; injection_rate, lowest_shell, highest_shell))
 
 BandRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> BandRescaling(domain; target, over, lowest_shell, highest_shell))

@@ -48,12 +48,15 @@ export kinetic_energy, dissipation, max_speed, vorticity_physical!,
 
 """
     kinetic_energy(u)
+    kinetic_energy(û)
 
 The turbulent kinetic energy
 ``\\texttt{kinetic\\_energy} \\equiv k = \\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle``
 of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
-the normalized inner product, so by Parseval's theorem it accepts `u` in either
-representation. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
+the normalized inner product, so by Parseval's theorem it accepts the velocity in either
+representation — the physical field ``\\boldsymbol{u}`` or its spectral coefficients
+``\\hat{\\boldsymbol{u}}``, to the same value. It returns the field's own real element type, not
+always a `Float64`. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
 `scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
 exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
 zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —
@@ -103,7 +106,7 @@ the mean-square vorticity of a divergence-free velocity is its **Dirichlet energ
 of its gradient, ``H^1`` in the Sobolev naming —
 ``\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = \\langle\\hat{\\boldsymbol{u}},\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat{\\boldsymbol{u}}\\rangle``.
 
-!!! warning
+!!! warning "The velocity route holds only for a divergence-free field"
     The `û` route drops the ``\\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2}``
     term, so it holds only for a divergence-free velocity — exact for a state advanced by the
     Leray-projected dynamics, wrong for an arbitrary vector field. The vorticity route carries no
@@ -129,10 +132,12 @@ immediately, so no magnitude field is materialized.
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
-    value. The gap is absorbed by the conservative
-    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling, whose
-    eigenvalue bound over-estimates the true spectral radius. A CFL condition bounds the *stability*
-    of the explicit advective term; it is not by itself a guarantee of accuracy.
+    value, which makes the sampled maximum an under-estimate. The conservative
+    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling pulls the
+    other way, its eigenvalue bound over-estimating the true spectral radius — but the two are
+    independent, so the second is not guaranteed to cover the first, which is why that ceiling
+    carries a margin of its own. A CFL condition bounds the *stability* of the explicit advective
+    term; it is not by itself a guarantee of accuracy.
 
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
@@ -144,8 +149,10 @@ device readback); it throws an `ErrorException` when no deposit is current, like
     contents are derived from the schedule, never declared. The maximum speed qualifies because the
     run itself needs it: the next timestep is chosen from it, so the reduction happens whether or not
     anyone reads the value. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
-    because no part of the iteration computes them; caching either would mean adding a reduction the
-    run does not otherwise perform, which is the one thing the cache may not do.
+    because no part of the iteration leaves one alive at its end; caching either would mean adding a
+    reduction the run does not otherwise perform, which is the one thing the cache may not do. (A
+    constant-energy forcing does form ``k`` mid-step to size its rescale, but that is the pre-rescale
+    value, discarded before the deposit.)
 """
 function max_speed end
 

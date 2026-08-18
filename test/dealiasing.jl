@@ -43,7 +43,7 @@ using Test
   @testset "a HouLi simulation runs and stays finite" begin
     domain = FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = HouLi(), element_type = Float64, array_type = Array)
     sim = Simulation(domain; viscosity = 0.03,
-                     velocity_forcing = ConstantPower(target = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
                      rng = MersenneTwister(7))
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)    # the domain-aware CFL flowed in
     run!(s -> current_step(s) < 10, sim)
@@ -162,7 +162,7 @@ using Test
 
   @testset "a PhaseShift simulation runs and stays finite" begin
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing = PhaseShift(), scalar = true,
-                     velocity_forcing = ConstantPower(target = 0.1), rng = MersenneTwister(9))
+                     velocity_forcing = ConstantPower(injection_rate = 0.1), rng = MersenneTwister(9))
     @test sim.domain.dealiasing isa PhaseShift
     @test sim.generator.phase_shift !== nothing                      # the displaced-evaluation scratch was built
     @test sim.cfl ≈ recommended_cfl(IFLowStorageRK3(), sim.domain)

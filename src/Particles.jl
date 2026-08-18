@@ -120,8 +120,8 @@ closing deposit leaves them.
   particle-velocities slot.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
 
-The trajectory scheme's own working storage is **not** here: it is allocated per scheme into a
-[`ParticleIntegratorBuffers`](@ref), so changing the scheme changes no part of this type.
+The trajectory scheme's own working storage is **not** here: it lives in a
+[`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 """
 struct Tracers{P, PSX, VV, S}
   positions::P              # (M, 3)
@@ -270,7 +270,7 @@ representation:
 with positions wrapped into ``[0, L)``. This is second-order accurate in time — advecting on the
 frozen start-of-step velocity alone would be first order.
 
-!!! note
+!!! note "The start-of-step velocity is read, never recomputed"
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
     ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by `record_trajectory_velocity!`
     at the previous iteration's end. In a run the observables cache records that sample at its epoch

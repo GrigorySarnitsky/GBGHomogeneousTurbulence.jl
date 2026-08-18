@@ -179,13 +179,15 @@ buffer.
 
 **The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
 any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
-which does scalar arithmetic on it and measures nothing. It is the only number the
-iteration produces, so it is the only number the cache holds; ``\varepsilon``, ``k``, or a variance
-is each one reduction away from the cached fields, performed by the observation that wants it (§2.4).
+which does scalar arithmetic on it and measures nothing. It is the only number the iteration
+produces *and still holds at its end*, so it is the only number the cache holds; ``\varepsilon``,
+``k``, or a variance is each one reduction away from the cached fields, performed by the observation
+that wants it (§2.4). A constant-energy forcing does form ``k`` mid-step, but discards it before the
+end — the qualification §1.2 draws.
 
 ### 1.4 What caching costs
 
-It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. That is bookkeeping, not a slogan: every slot is a
+It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. Each clause of that is an accounting statement: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
 read computes. The cache is a naming-and-dating layer over storage the run already owns: removing
@@ -229,7 +231,7 @@ passive scalar and tracer particles. The convective term is written through
 
 ```math
 (\boldsymbol{u}\cdot\nabla)\boldsymbol{u}
-  = \nabla\big(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\big) - \boldsymbol{u}\times\boldsymbol{\omega}
+  = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) - \boldsymbol{u}\times\boldsymbol{\omega}
 ```
 
 and the Leray–Helmholtz projection ``\mathbb{P}`` onto divergence-free fields absorbs both the pressure
@@ -260,7 +262,7 @@ transforms below.
   ``-\nabla\cdot(\boldsymbol{u}\varphi)``: evaluated as fields.
 - **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\big((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\big)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a field-proportional forcing's
   rate, and ``\tau`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A field-proportional one folds its rate into that
@@ -287,6 +289,9 @@ Under a mask rule one **evaluation** of the velocity term proceeds as follows: r
 ``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the Lamb vector forming in place over the
 vorticity's own array, as below — and transform it back (3 forward); apply ``\mathbb{P}`` and the
 mask, both per-wavenumber multiplications.
+
+Counts are per step of a three-stage scheme (`IFLowStorageRK3`); a scheme with a different stage
+count scales them by its own.
 
 | dealiasing rule | velocity only | with the scalar |
 |:---|:---|:---|
@@ -333,7 +338,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
-| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
+| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
 | ``E_n``, the per-shell energy | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
@@ -365,7 +370,7 @@ either form precisely because they agree in the mean.
 **Only one tracer sample reflects the flow.** The particle velocities
 ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` give the velocity at each particle's own position and
 moment, and are what a Lagrangian statistic accumulates. The second, at a predicted position differing
-from the endpoint by ``\mathcal O(\Delta t^{2})``, exists only to give the position update its
+from the endpoint by ``\mathcal{O}(\Delta t^{2})``, exists only to give the position update its
 second-order accuracy; it belongs to no instant along the trajectory and is not exposed.
 
 ---
@@ -378,7 +383,7 @@ second-order accuracy; it belongs to no instant along the trajectory and is not 
 
 ### 3.1 The calls
 
-[`run!`](@ref) is the observation-first loop: after every iteration (and once at the seeded state) the callback reads the run and its
+The [`run!`](@ref) driver is the observation-first loop: after every iteration (and once at the seeded state) the callback reads the run and its
 return decides continuation. The accessors [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 and [`scalar_physical`](@ref) return the
 deposited field, and [`max_speed`](@ref) the deposited number — each a checked read that throws when

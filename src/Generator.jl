@@ -74,10 +74,8 @@ All keyword, all required:
 
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
-four fields directly, in this order.
-
-- `viscosity`, `schmidt` — the kinematic viscosity ``\\nu`` and the Schmidt number ``\\mathrm{Sc}`` (both `Float64`).
-- `velocity_forcing`, `scalar_forcing` — the velocity and scalar forcing strategies, each an `AbstractForcing`.
+four fields directly, in this order; each holds the value documented for the keyword of the same name
+above, with the two numbers stored as `Float64`.
 """
 struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   viscosity::Float64
@@ -186,6 +184,25 @@ step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
 subflows, and [`finalize!`](@ref) after the completed step. The scheme does only stage arithmetic, so
 it can never assemble the right-hand side from a mismatched intermediate state.
 
+Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
+carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
+run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds one for
+you.
+
+!!! warning "The constructor rejects a misdeclared forcing"
+    A forcing that implements
+    [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) without also
+    declaring `uses_linear_rate` is given no
+    rate array to fill, so its forcing would silently never be applied. Building a
+    `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
+    the run proceed quietly wrong.
+
+!!! note "One optimization crosses two verbs"
+    Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
+    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
+    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
+    rebuilds the displaced velocity itself, value-identically.
+
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
 - `product_spectral` — the quadratic products' spectral image (the transformed Lamb vector
@@ -206,26 +223,6 @@ it can never assemble the right-hand side from a mismatched intermediate state.
   displaced velocity, left fresh by `velocity_rhs!` for the same stage's
   `scalar_rhs!` to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
   rebuilds the recovery itself).
-
-!!! warning "The constructor rejects a misdeclared forcing"
-    A forcing that implements
-    [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) without also
-    declaring `uses_linear_rate` is given no
-    rate array to fill, so its forcing would silently never be applied. Building a
-    `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
-    the run proceed quietly wrong.
-
-!!! note "One optimization crosses two verbs"
-    Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
-    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
-    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
-    rebuilds the displaced velocity itself, value-identically.
-Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
-carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
-run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door — the
-convenience constructor that builds every component — builds one for
-you.
-
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
@@ -467,7 +464,7 @@ velocity evaluation rebuilds it from `û` instead) — before the spherical trun
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
-!!! note
+!!! note "The assembly consumes the velocity argument"
     The assembly **consumes `u_consumed`**: the flux ``\\boldsymbol{u}\\varphi`` is formed
     in place over the velocity's array (a pointwise product may write into an operand), so on return
     `u_consumed` no longer holds the velocity; `φ` is only read. As in `velocity_rhs!`, the

@@ -140,7 +140,7 @@ _build_forcing(tag, domain) =
   tag === :none  ? NoForcing() :
   tag === :band  ? BandRescaling(domain; target = 0.5, over = :band) :
   tag === :linear ? Linear(domain; rate = 0.1) :
-  tag === :power ? ConstantPower(domain; target = 0.1) :
+  tag === :power ? ConstantPower(domain; injection_rate = 0.1) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFRK2()

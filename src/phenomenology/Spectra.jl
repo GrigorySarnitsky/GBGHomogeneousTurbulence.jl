@@ -65,7 +65,7 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
 ``f_\\eta \\to 1`` as ``\\kappa\\eta \\to 0``. Evaluated by [`dissipation_factor`](@ref);
 [`PopeDissipation`](@ref) is Pope's form.
 
-!!! note
+!!! note "Bottleneck models are deliberately deferred"
     These factors are inertial-normalized cutoffs; bottleneck models are deliberately deferred.
     Models of the near-dissipation *bottleneck* — a bump
     before the cutoff (Qian 1984, [doi:10.1063/1.864902](https://doi.org/10.1063/1.864902);
@@ -233,9 +233,10 @@ A Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa
 parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman
 (1963, appendix, [doi:10.1017/S0022112063000987](https://doi.org/10.1017/S0022112063000987); roughly half the
 cutoff coefficient of the earlier Townsend 1951 form,
-[doi:10.1098/rspa.1951.0179](https://doi.org/10.1098/rspa.1951.0179)), whose coefficient is skewness-dependent
-(about 2.6 to 3.3) and is simplified downward to `2` here for a parameter-free, deliberately soft cutoff
-(retaining a little more near-cutoff energy than the physical range would).
+[doi:10.1098/rspa.1951.0179](https://doi.org/10.1098/rspa.1951.0179)), whose coefficient varies with the
+derivative skewness ``S`` — about ``2.6`` to ``3.3`` across the range of ``S`` that paper considers — and
+is simplified downward to ``2`` here for a parameter-free, deliberately soft cutoff, which retains more
+near-cutoff energy than a measured spectrum shows.
 """
 struct SaffmanDissipation <: DissipationFactor end
 
