@@ -195,17 +195,21 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
-  carrier so the arrows stay primary (§11 decision 26). The **chart map** — the recovery of the
-  physical representations — is not a package verb: the velocity and scalar are recovered by the
-  source-preserving four-argument form of `GBGPeriodicFields`' `to_physical!` (the extra argument is
-  a scratch field the transform consumes in the state's place) at the sites that consume
-  them, and the derived vorticity by `Observables.vorticity_physical!` (decision 47). The values
-  land in the **`ObservablesCache`** (its own
-  module, `Cache`, after `Observables`): the storage each iteration
-  fills at its end with its observables — the physical velocity, vorticity, and scalar, the
-  maximum speed, and, when tracers ride the run, the particle velocities
-  ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — under the no-recompute rule (`docs/src/observables_cache.md` is the design page;
-  §11 decision 40). A slot IS its producer's register: the step takes the chart arrays as its
+  carrier so the arrows stay primary (§11 decision 26).
+
+  The **chart map** — the recovery of the physical representations — is not a package verb. The
+  velocity and scalar are recovered by the source-preserving four-argument form of
+  `GBGPeriodicFields`' `to_physical!`, whose extra argument is a scratch field the transform consumes
+  in the state's place, at the sites that consume them; the derived vorticity comes from
+  `Observables.vorticity_physical!` (decision 47).
+
+  The recovered values land in the **`ObservablesCache`** — its own module, `Cache`, included after
+  `Observables`. That is the storage each iteration fills at its end with its observables: the
+  physical velocity, vorticity and scalar, the maximum speed, and, when tracers ride the run, the
+  particle velocities ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``. It fills them under the
+  no-recompute rule (`docs/src/observables_cache.md` is the design page; §11 decision 40).
+
+  A slot IS its producer's register: the step takes the chart arrays as its
   substage recovery registers mid-iteration (their epochs go to *scratch*, so a mid-iteration read
   throws instead of serving a stage intermediate), and the closing `deposit!` re-fills them at the new epoch
   from the state the step just produced. An accessor (`velocity_physical`, `vorticity_physical`,

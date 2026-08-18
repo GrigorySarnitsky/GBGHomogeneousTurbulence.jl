@@ -55,3 +55,7 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
 - **Both a `-> Type` arrow and a trailing `Returns x.` sentence.** Two sanctioned shapes, not a
   drift: the arrow states a return type fixed by the signature, the sentence covers an in-place
   mutator whose signature carries none. `CLAUDE.md` records the discriminator.
+- **A named-method citation opening the docstring, ahead of the formula.** Not an inversion of the
+  physical-meaning-first rule but the corpus-wide convention `CLAUDE.md` states: an inline citation
+  *may* open the identity sentence when it names the method ("the smooth spectral filter of Hou & Li
+  (2007) …"). The formula still lives in the docstring, below the identity.
