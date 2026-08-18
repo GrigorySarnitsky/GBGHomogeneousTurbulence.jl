@@ -398,6 +398,12 @@ particle positions.
 ```julia
 domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration — nothing is declared
+
+# With tracers, the particle-velocities slot is the tracer set's own storage, passed in.
+# The interpolation scheme comes from the field library, not from this package:
+using GBGPeriodicFields: CatmullRom
+tracers = Tracers(domain; number_of_particles = 1024, interpolation_scheme = CatmullRom)
+cache   = ObservablesCache(domain; scalar = true, particle_velocities = tracers.particle_velocities)
 ```
 
 ### 3.2 What is not built

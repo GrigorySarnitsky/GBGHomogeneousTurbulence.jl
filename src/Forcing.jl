@@ -309,12 +309,15 @@ Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber 
 [`ConstantPower`](@ref) the member whose rate is re-solved each step (a band-limited
 variant of Lundgren 2003 — *CTR Annual Research Briefs*, which carries no DOI — whose linear
 forcing acts at every wavenumber), built on the
-[`FixedDomain`](@ref) `domain`,
-with the fixed rate ``A = \\texttt{rate}`` on the integer shells `lowest_shell` to
-`highest_shell`, in units of the box's fundamental ``2\\pi/L``. The rate is
+[`FixedDomain`](@ref) `domain`. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
-rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity). A positive `rate`
-amplifies the field.
+rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `rate` — the fixed linear rate ``A``. A positive value amplifies the field.
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
+  fundamental ``2\\pi/L``.
 """
 struct Linear{M, T} <: AbstractForcing
   mask::M              # real array: the band indicator (1 in band, 0 outside)
@@ -358,8 +361,14 @@ the rate ``\\varepsilon`` for the velocity (measured by
 ``\\varepsilon_\\varphi`` for the scalar (by
 [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword is
 named for the kind of quantity it is: a **rate**, where `BandRescaling`'s `target` is an
-**amplitude** — which is why the two strategies do not share one keyword name. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
-velocity.
+**amplitude** — which is why the two strategies do not share one keyword name. The rate is folded
+into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `injection_rate` — the value of the dissipation rate to hold.
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
+  fundamental ``2\\pi/L``.
 """
 struct ConstantPower{K, I, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
@@ -416,6 +425,14 @@ The same type forces either the velocity or the scalar ``\\varphi``: it adapts t
 given (a vector or scalar state, projected only for the velocity). The forcing owns its state and its
 noise scratch — one field in physical and one in spectral representation, allocated on first use, so a
 velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the band and the noise scratch are built on.
+- `variance` — the stationary forcing variance ``\\sigma^{2}``.
+- `correlation_time` — the correlation time ``T_L`` of each mode's process.
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
+  fundamental ``2\\pi/L``.
+- `seed = 0` — fixes the random stream, so a forced run is reproducible.
 
 !!! note "The random increment is generated host-side"
     The random increment is generated host-side each step; on the GPU this is a portability-first

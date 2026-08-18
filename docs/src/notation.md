@@ -44,7 +44,7 @@ Every **Code** entry naming a package object links to its documentation; the few
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `conditions.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `conditions.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is ``\mathrm{Re}_\lambda``) | `1 / ν` |
+| ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is ``\mathrm{Re}_\lambda``) | `1 / ν` (in units where ``u' = L = 1``) |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
