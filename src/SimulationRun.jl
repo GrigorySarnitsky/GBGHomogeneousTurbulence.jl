@@ -91,7 +91,7 @@ energy at the value given by the
 — and the viscosity is
 chosen from the grid rather than supplied:
 
-!!! note "The default holds ``k`` fixed, so ``k`` is not a measurable of the default run"
+!!! note "The default holds the kinetic energy fixed, so it is not a measurable of the default run"
     `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
     energy at the target **value**, which pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and
     suppresses the physical fluctuation of the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
@@ -139,7 +139,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
-- `velocity_forcing` , `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
+- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
   (whole-field) energy at the value given by the `kinetic_energy` keyword (`over = :total`), and

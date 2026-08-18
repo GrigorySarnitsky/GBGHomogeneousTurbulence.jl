@@ -55,8 +55,8 @@ with the box in units where ``u' = L = 1`` this is ``\\mathrm{Re} = 1/\\nu``; on
 defaults (``u' = 1``, ``L = 2\\pi``) the box-scale value is ``2\\pi/\\nu``, and the integral-scale one
 smaller again), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
-(`velocity_forcing`, `scalar_forcing` , both
-[`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) ). Consumed by the time
+(`velocity_forcing`, `scalar_forcing`, both
+[`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing)). Consumed by the time
 step ([`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)).
 
 # Arguments
@@ -244,10 +244,10 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
 
 Open a step of the generator: advance each forcing's internal state once (its per-step
 [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
-per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing` )
+per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing`)
 (its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook,
 written into the generator's rate arrays) from the start-of-step `state` (a
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) over the
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) over the
 timestep `dt`, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once before its Runge–Kutta
 stages; the stage evaluations and the integrating factors then consume what it prepared. Returns
 `generator`.
@@ -272,8 +272,8 @@ end
 
 Close a step of the [`ResolvedGenerator`](@ref) `generator`: apply each of its forcings' post-step
 projections (the [`apply_forcing!`](@ref GBGIsotropicTurbulence.Forcing.apply_forcing!) hook —
-e.g. the energy rescale of a [`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) )
-to the advanced `state` , velocity first, then the scalar
+e.g. the energy rescale of a [`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling))
+to the advanced `state`, velocity first, then the scalar
 when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
 the step — the diagnostics, the derived observables, the tracer push — sees the forced end-of-step fields.
 Returns `state`.
@@ -321,7 +321,7 @@ scratch) — averages the two to cancel the aliasing, then truncates spherically
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
-!!! note "`ω_consumed` is read and then overwritten"
+!!! note "The vorticity argument is read and then overwritten"
     The Lamb vector is formed in place over the vorticity's array — the backend's cross product may
     write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
     does on return, while `u` is only read. This is what keeps a product field in physical

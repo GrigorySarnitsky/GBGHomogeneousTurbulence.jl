@@ -305,8 +305,8 @@ trajectory-bound observable is stale and reads throw until the next deposit. Ret
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) ,
-both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) ), and
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!),
+both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
 the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
 this, then
 [`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) —

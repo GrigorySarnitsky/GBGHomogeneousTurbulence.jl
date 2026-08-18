@@ -100,7 +100,7 @@ A deferred forcing. The operator-free keyword constructors
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is materialized into the concrete
 `AbstractForcing` once the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain)
-exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) ). A
+exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)). A
 forcing argument
 therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
 `DeferredForcing`.
@@ -232,7 +232,7 @@ run may no longer measure, and there is no answer that is right for every run.
     ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards. Here ``k`` is the artifact and
     the band is free.
 
-!!! note "Which one a run wants depends on what else reads ``k``"
+!!! note "Which one a run wants depends on what else reads the kinetic energy"
     The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door passes
     `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the *assumed* kinetic
     energy, through the box-normalized dissipation law, so the resolution criterion
@@ -339,7 +339,7 @@ hold, chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
-[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) ). Note what kind
+[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). Note what kind
 of quantity that is: here the held observable
 is a **rate**, where `BandRescaling` holds an **amplitude**. The rate is folded into the integrating factor; like `Linear`, it preserves a solenoidal
 velocity.

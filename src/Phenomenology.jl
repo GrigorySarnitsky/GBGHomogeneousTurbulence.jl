@@ -233,8 +233,7 @@ function scaling_exponent end
     structure_function(law, r, fp; order) -> Float64
 
 The reference structure function of the given `order` predicted by a `law` (a
-[`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)
-) at
+[`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)) at
 separation `r` for the state `fp` (a [`FlowParameters`](@ref)). Most laws give the longitudinal
 **velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the `order`-th moment ``p``) of the
 velocity increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives

@@ -175,7 +175,7 @@ Advance the `state` (a [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.Reso
 the equations of motion, their conditions, and their assembly scratch), the `domain` (a
 [`FixedDomain`](@ref)), the scheme's `buffers` (an [`IntegratorBuffers`](@ref)), and the run's
 observables cache `cache` (an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) ). Dispatches on the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)). Dispatches on the
 concrete
 `scheme` type (see `IFRK2`, `IFLowStorageRK3`).
 
@@ -466,7 +466,7 @@ _recovery_scratch(sb::ScalarBuffers) =
 Close an iteration: deposit the field observables the cache's fixed schedule carries — the velocity,
 vorticity and scalar recoveries and the maximum speed, the same set every iteration — into `cache` (an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) the step has just produced,
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) the step has just produced,
 and record each slot at the current epoch (the cache's freshness counter). The
 The deposits are the next iteration's first-stage work moved to the iteration's end: the velocity,
 vorticity and — when the run carries one — scalar recoveries in physical representation, then the
@@ -483,7 +483,7 @@ the state, so it is filled by
 wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
 
 Every iteration ends with this call: the run layer's
-[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!` , a
+[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!`, a
 hand-run loop calls it itself, and the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor makes the seeding
 deposit so the

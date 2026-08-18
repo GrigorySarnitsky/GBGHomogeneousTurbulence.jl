@@ -19,7 +19,7 @@ The measured functions of the flow state:
 - [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
   spectral state, the one field-valued observable
   (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical),
-  lives in `Cache` ).
+  lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
