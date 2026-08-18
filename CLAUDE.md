@@ -185,6 +185,17 @@ number (`§4.5`), a decision-log entry, or a repo path (`src/…`, `inspiration/
 adds depth one hop away; it never carries a fact the reader needs. (Design rationale and section
 citations stay in `#` comments and `ARCHITECTURE.md`.)
 
+**Template conventions, stated so the split is checkable.** Several shapes vary across the corpus for
+reasons that were real but unwritten; they are rules now. An **admonition takes a custom title** when
+it carries one load-bearing claim a reader should be able to scan for, and stays a bare `!!! note`
+when it is a general aside — and its title is **plain text**, since Documenter renders neither code
+spans nor math there. A **caveat admonition is the last substantive block** of a docstring, before
+`# Fields`. A type gets a bulleted **`# Arguments`** section when its keywords are independent
+settings, and folds them into prose when they describe one coherent object. An **`# Examples`**
+section appears where construction is non-obvious, not on every type. A **`Returns x.` sentence** is
+required of any in-place mutator whose signature carries no `-> ` arrow. A **module map is
+identity → contents list → optional trailing remark**, in that order, with no essay before the list.
+
 **API pages are logically grouped.** Group public objects under hand-written `## Header` sections via
 explicit `@docs` blocks (never `@autodocs`, which cannot express a semantic group); each object appears
 **once**; keep an `f` / `f!` pair together with the `!` home first; a `@docs` block stays homogeneous

@@ -13,21 +13,8 @@
 The observables cache — where the iteration leaves the observables it produces, for the run's own
 components and any observation to read.
 
-Each slot carries the value **and** the moment that value belongs to, so a read can be refused
-rather than served stale. That moment is the slot's **epoch**, and the cache keeps two epoch
-counters saying what the current moment is: one for the resolved fields, one for the tracer
-positions. A slot is readable exactly when its own epoch equals the counter it depends on.
-
-!!! note "An epoch is not an iteration number"
-    An epoch counts *changes to the state*, not advances of the run. A completed
-    [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does
-    any announced out-of-band mutation, so the two counts diverge: after two steps and one announced
-    mutation the clock reads step 2 and the fields epoch reads 4. The epoch
-    answers "is this value still the right one?"; the clock's
-    [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has
-    the run gone?".
-
-The cache's operations:
+Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
+than served stale. The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
   mutation made outside the iteration, so the affected slots go stale and reads throw until the
@@ -43,6 +30,17 @@ The cache's operations:
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
 — homed in `Propagator`, with the iteration it closes — which fills every slot at the iteration's
 end and sets its epoch. A caller reads through the accessors and never deposits.
+
+The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
+and a slot is readable exactly when its own epoch equals the counter it depends on.
+
+!!! note "An epoch is not an iteration number"
+    An epoch counts *changes to the state*, not advances of the run. A completed
+    [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does
+    any announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value
+    still the right one?"; the clock's
+    [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has
+    the run gone?".
 """
 module Cache
 

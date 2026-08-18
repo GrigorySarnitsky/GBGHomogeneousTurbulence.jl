@@ -66,8 +66,14 @@ constructor);
 [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
 smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
 acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and smoothness parameters.
-The `rng` is the random stream seeding the uniformly-random tracer positions (used with
-`number_of_particles`, ignored with `positions`); it defaults to `Random.default_rng()`.
+# Arguments
+
+- `domain` — the [`FixedDomain`](@ref) whose backend, element type and box the set is built on.
+- `number_of_particles` — seed this many tracers uniformly at random in the box.
+- `positions` — or wrap this `(M, 3)` array instead; give exactly one of the two.
+- `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
+- `rng` — the random stream seeding the positions (used with `number_of_particles`, ignored with
+  `positions`); defaults to `Random.default_rng()`.
 
 # Examples
 

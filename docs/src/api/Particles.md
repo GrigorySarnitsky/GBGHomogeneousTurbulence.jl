@@ -5,22 +5,6 @@ Modules = [GBGIsotropicTurbulence.Particles]
 Order   = [:module]
 ```
 
-## Wiring tracers into a run
-
-Pass `number_of_particles` to the front door and the run carries a tracer set: `advance!` pushes it
-every iteration and records the Lagrangian sample, so the reads below are always current between
-iterations.
-
-```julia
-sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
-warmup!(sim)
-advance!(sim)
-
-particle_positions(sim.tracers)              # (M, 3) positions at the current instant
-particle_velocities(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
-out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
-interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
-```
 
 ## The tracer set
 
@@ -77,4 +61,21 @@ for the scalar.
 ```@docs
 new_vector_point_values
 new_scalar_point_values
+```
+
+## Wiring tracers into a run
+
+Pass `number_of_particles` to the front door and the run carries a tracer set: `advance!` pushes it
+every iteration and records the Lagrangian sample, so the reads below are always current between
+iterations.
+
+```julia
+sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
+warmup!(sim)
+advance!(sim)
+
+particle_positions(sim.tracers)              # (M, 3) positions at the current instant
+particle_velocities(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
+out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
+interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```

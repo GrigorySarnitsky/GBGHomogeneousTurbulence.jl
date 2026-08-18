@@ -186,18 +186,6 @@ step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
 subflows, and [`finalize!`](@ref) after the completed step. The scheme does only stage arithmetic, so
 it can never assemble the right-hand side from a mismatched intermediate state.
 
-!!! note "One optimization crosses two verbs"
-    Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
-    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
-    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
-    rebuilds the displaced velocity itself, value-identically.
-
-Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
-carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
-run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door — the
-convenience constructor that builds every component — builds one for
-you.
-
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
 - `product_spectral` — the quadratic products' spectral image (the transformed Lamb vector
@@ -226,6 +214,18 @@ you.
     rate array to fill, so its forcing would silently never be applied. Building a
     `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
     the run proceed quietly wrong.
+
+!!! note "One optimization crosses two verbs"
+    Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
+    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
+    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
+    rebuilds the displaced velocity itself, value-identically.
+Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
+carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
+run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door — the
+convenience constructor that builds every component — builds one for
+you.
+
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
