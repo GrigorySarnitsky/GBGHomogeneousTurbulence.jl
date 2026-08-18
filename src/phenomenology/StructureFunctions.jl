@@ -182,6 +182,14 @@ D_{LLL}(r) = -\\Bigl(\\tfrac{4}{5} - \\tfrac{8.45}{\\mathrm{Re}_\\lambda^{2/3}}\
 which relaxes to the exact ``-\\tfrac{4}{5}\\varepsilon r`` of [`Kolmogorov1941`](@ref) as
 ``\\mathrm{Re}_\\lambda \\to \\infty`` — turbulence at a finite Reynolds number never quite reaches the
 asymptotic 4/5 slope (the coefficient as tabulated by Sagaut & Cambon 2018, Table 4.5).
+
+!!! warning "The correction has a floor, and it is not cosmetic"
+    The bracket vanishes at ``\\mathrm{Re}_\\lambda = (8.45/0.8)^{3/2} \\approx 34`` and turns
+    **positive** below it — a third-order longitudinal structure function of the wrong sign, which
+    would read as an inverse flux. Even at ``\\mathrm{Re}_\\lambda = 100`` the correction still
+    removes about half the coefficient. This is why the law's [`provenance`](@ref) records a validity
+    floor of ``\\mathrm{Re}_\\lambda = 50``; a comparison that honours `valid_Reλ` never evaluates it
+    in the region where the sign flips.
 Evaluating [`structure_function`](@ref)`(law, r, fp; order = 3)` returns it, reading
 ``\\mathrm{Re}_\\lambda`` from `fp` via [`taylor_reynolds`](@ref); any other `order` throws an
 `ArgumentError`.

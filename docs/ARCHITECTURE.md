@@ -479,8 +479,9 @@ comparison machine of §3 sets them side by side. Two properties follow, both in
 
 **The abstraction is the strategy pattern** already used for `AbstractForcing` / `AbstractIntegrator` /
 `DealiasingStrategy`: **a law family is an abstract type, each parametrization a named preset** — usually a
-concrete subtype carrying its fitted coefficients and provenance, or (for the composed velocity spectra) a
-factory function that assembles a `ModelSpectrum` — implementing one small interface: evaluate the law at its
+concrete subtype carrying its fitted coefficients and provenance, or (for the composed velocity spectra)
+an alias naming the `ModelSpectrum` specialization that carries its two roll-off factors, so `isa`
+holds on the preset name either way (decision 55) — implementing one small interface: evaluate the law at its
 argument (``\kappa``, ``r``, ``\mathrm{Re}_\lambda``) given a `FlowParameters` bundle; report its
 `provenance` (the citation and validity range); and eventually `fit` itself to data. Choosing a law is
 choosing the preset (`Pope2000` versus `VonKarman1948`) and optionally overriding its coefficients

@@ -131,7 +131,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
 - `κ_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
   keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
-- `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
+- `viscosity` — the kinematic viscosity ``\\nu``, which is how the Reynolds number is set (it is
+  ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
   an r.m.s. velocity ``u' = \\sqrt{2k/3} = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
@@ -561,6 +562,10 @@ All keyword:
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tol`.
 - `skew_floor` — the minimum ``\\lvert S\\rvert`` for a plateau to count as developed turbulence.
+  The default `0.1` is a **floor against a random-phase field**, which starts at ``S \\approx 0``; it
+  is a fifth of the ``\\lvert S\\rvert \\approx 0.5`` of a developed cascade, so clearing it means
+  "no longer Gaussian", not "fully developed". Raise it toward `0.4` when the run's statistics
+  depend on the cascade being mature.
 - `max_turnovers` — the give-up cap: reaching it stops the run with a warning rather than spinning
   forever.
 

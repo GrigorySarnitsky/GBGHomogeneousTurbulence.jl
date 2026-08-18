@@ -51,7 +51,9 @@ export FlowConditions, ResolvedGenerator,
     FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
 
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
-the Reynolds number is ``\\mathrm{Re} = 1/\\nu``), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
+with the box in units where ``u' = L = 1`` this is ``\\mathrm{Re} = 1/\\nu``; on the shipped
+defaults (``u' = 1``, ``L = 2\\pi``) the box-scale value is ``2\\pi/\\nu``, and the integral-scale one
+smaller again), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing` , both
 [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) ). Consumed by the time

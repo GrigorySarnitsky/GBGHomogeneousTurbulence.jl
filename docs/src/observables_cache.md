@@ -81,8 +81,14 @@ position is one the probe never occupies, so as a quantity along the trajectory 
 fills the cache as it produces the values, and an observable no component computes
 could enter only by making the iteration compute it, which the choice forbids. This test is where
 ``\varepsilon`` and ``k`` fall out: each is one reduction away from the cached fields, but no
-component of the iteration performs that reduction, so the cache cannot hold them — whoever wants one
-computes it at an observation (§2.4).
+component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
+wants one computes it at an observation (§2.4).
+
+One case looks like a counterexample and is worth stating. Under the default
+`BandRescaling(over = :total)` the forcing *does* form the whole-field ``k`` every step, to size its
+own rescale. That value is the **pre-rescale** energy, taken mid-step and discarded — not the
+observable at the iteration's end, which is what a slot must hold — so it fails the surviving test
+below rather than this one.
 
 **Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.

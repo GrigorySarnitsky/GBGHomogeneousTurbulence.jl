@@ -232,7 +232,10 @@ run may no longer measure, and there is no answer that is right for every run.
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
     If the out-of-band value alone exceeds `target`, the band is zeroed — the closest reachable
-    state, and a step with no forcing at all. Here ``k`` is the artifact and the band is free.
+    state — and the most violent intervention the rescale can make, not the absence of one: it
+    empties the energy-containing range in a single step, so ``L_{11}``, ``u'`` and
+    ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards. Here ``k`` is the artifact and
+    the band is free.
 
 !!! note "Which one a run wants depends on what else reads ``k``"
     The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door passes

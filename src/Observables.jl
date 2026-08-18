@@ -304,7 +304,12 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
 small scales do not fix. The integrals above are the idealized continuous definition written with the spectral density
 ``E(\\kappa)``; they are evaluated as sums over the measured per-shell energies ``E_n``, whose common
-shell width cancels in the ratio, so no conversion between the two is needed here. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+shell width cancels in the ratio, so no conversion between the two is needed here. The cancellation
+is exact; what is approximate is the *shell* itself — ``E_n`` is the exact sum over a shell's lattice
+modes, and identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint quadrature whose error is
+largest at the low shells, where the mode count departs most from the continuum ``4\\pi\\kappa^2``.
+Those are also the shells this ratio weights most, so read ``L_{11}`` as resolution-limited at coarse
+grids. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 For reference, two related scales follow from the same spectrum. The **transverse** integral scale is
 ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full trace**
