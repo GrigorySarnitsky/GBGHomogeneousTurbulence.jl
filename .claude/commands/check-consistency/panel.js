@@ -158,13 +158,31 @@ The invariants: (1) THIN PHYSICS, RICH NUMERICS — this package owns the equati
 Then check the decision log against the code and docs BOTH WAYS: a decision the current state contradicts, and a current-state claim no decision supports. Flag in particular a documented cost with no lower bound held against it, a justification that argues from the existing arrangement rather than from first principles, and any place a scalar readback, a host transfer, or an N^3 allocation serves a need that is not N^3. Quote the invariant or decision number, and the line that breaks it.` },
 ]
 
+// `hats` re-runs a SUBSET — the retry path for a hat killed mid-panel (a 529, a token-out), which
+// the discipline calls for and which had to be improvised the first time it happened. The banked
+// filename is derived from the hat's index in the FULL panel, never in the filtered list: numbering
+// by position within a subset would file a re-run `dimensional` as `01-dimensional.md` and orphan
+// the `08-` slot the pile and the closure verifier both expect.
+const SELECT = Array.isArray(A.hats) && A.hats.length ? A.hats.map(String) : null
+if (SELECT) {
+  const unmatched = SELECT.filter(x => !hats.some((h, i) =>
+    h.key === x || String(i + 1).padStart(2, '0') === x.padStart(2, '0')))
+  if (unmatched.length) {
+    throw new Error(`hats selector(s) ${JSON.stringify(unmatched)} matched no hat. Known: ${hats.map(h => h.key).join(', ')}`)
+  }
+}
+const selected = hats
+  .map((h, i) => ({ h, nn: String(i + 1).padStart(2, '0') }))
+  .filter(({ h, nn }) => !SELECT || SELECT.some(x => h.key === x || nn === x.padStart(2, '0')))
+if (SELECT) log(`subset run: ${selected.map(s => `${s.nn}-${s.h.key}`).join(', ')}`)
+
 phase('Panel')
 const results = []
 const dead = []
 const empty = []
-for (let i = 0; i < hats.length; i++) {
-  const h = hats[i]
-  const nn = String(i + 1).padStart(2, '0')
+for (let i = 0; i < selected.length; i++) {
+  const h = selected[i].h
+  const nn = selected[i].nn
   const prompt = `${PREAMBLE}
 
 YOUR HAT:
@@ -183,13 +201,13 @@ When your review is complete, FIRST use the Write tool to save your findings as 
   // stopping rule depends on telling those apart, and `0 findings` looks identical to both.
   if (!r) {
     dead.push(h.key)
-    log(`[${nn}/${hats.length}] ${h.key}: DEAD — no result (re-run this hat standalone to fill ${nn}-${h.key}.md)`)
+    log(`[${i + 1}/${selected.length}] ${h.key}: DEAD — no result (re-run this hat standalone to fill ${nn}-${h.key}.md)`)
     continue
   }
   if (!r.findings || !r.findings.length) empty.push(h.key)
   results.push(r)
-  log(`[${nn}/${hats.length}] ${h.key}${economized ? ' (economy)' : ' (anchor/full)'}: ${r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
+  log(`[${i + 1}/${selected.length}] ${h.key}${economized ? ' (economy)' : ' (anchor/full)'}: ${r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
 }
 if (dead.length) log(`!! ${dead.length} HAT(S) DEAD — the panel is INCOMPLETE: ${dead.join(', ')}`)
 if (empty.length) log(`!! ${empty.length} hat(s) returned zero findings — verify each wrote its file before reading this as clean: ${empty.join(', ')}`)
-return { results, dead, empty, complete: dead.length === 0, hats_run: hats.map(h => h.key) }
+return { results, dead, empty, complete: dead.length === 0, hats_run: selected.map(s => `${s.nn}-${s.h.key}`) }

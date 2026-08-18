@@ -1,122 +1,75 @@
-# Doc-review panel — hat: physicist-programmer API user
+# Doc-review panel — Hat: physicist-programmer / API user
 
-Reviewed the full rendered manuscript (Home, api overview, architecture, notation,
-observables_cache, phenomenology landing, and every `api/*` + `api/phenomenology/*` module page)
-as a user trying to assemble a `Simulation`, run it with `run!`/`warmup!`, read `sim.cache`, and
-sample tracers. Findings below, most-severe first.
+Reviewing the rendered manuscript as a user who would assemble a `Simulation`, warm it up,
+observe it with `run!`, read the cache, and sample along tracers — from the docs alone.
 
 ---
 
-## 1. `advance!`'s own docstring never mentions the closing deposit it performs
-
-- **Type:** api-gap
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - PAGE `api / SimulationRun`, `advance!`: *"Advance `sim` by one timestep in place and return it. … Advects the tracers, if any, … and updates the clock."*
-  - PAGE `api / Propagator`, `step!`: *"the caller closes the iteration with `deposit!` … the run layer's `advance!` does both."*
-  - PAGE `api / Propagator`, `deposit!`: *"the run layer's `advance!` performs it after `step!`"*
-- **Description:** `advance!` is the function nearly every example calls directly (including the Particles page's own usage example, which calls `advance!(sim)` and then reads `sim.cache` right after). Yet its own docstring — the "home" for that operation per the package's own doc policy — says nothing about the closing `deposit!` that is precisely what makes `sim.cache` readable afterward. A cold read of `advance!` alone gives no idea the cache becomes valid as a side effect; that fact must be pieced together from two *other* pages' docstrings (`step!`, `deposit!`).
-
----
-
-## 2. `ObservablesCache`'s `particle_velocities` keyword: type and required wiring undocumented
-
-- **Type:** api-gap
-- **Severity:** major
-- **Confidence:** medium
-- **Locations:**
-  - PAGE `api / Cache`, `ObservablesCache`: *"pass … `particle_velocities` — the tracer set's own point-value storage — when the run advects tracers: the slot IS that storage"*
-  - PAGE `api / Particles`, `record_trajectory_velocity!`: *"which is also the observables cache's particle-velocities slot"*
-- **Description:** Neither docstring says what value to actually pass (e.g. `tracers.trajectory_velocity`) or shows a worked hand-assembly example — the `observables_cache` design page's own build example (`ObservablesCache(domain; scalar = true)`) omits tracers entirely, and the Particles page's hand-run-loop example bypasses `ObservablesCache` altogether. Architecture.md explicitly invites a user to "drop straight to §4" and assemble pieces by hand, but nothing shows how to wire the cache's slot to the tracer set's storage. `record_trajectory_velocity!`'s docstring then states the aliasing as an unconditional fact rather than a consequence of that (undocumented) wiring.
-
----
-
-## 3. `Tracers`'s two-line signature block visually implies dispatch the architecture says is impossible
+## Finding 1 — `Simulation`'s own docstring contradicts the architecture doc on whether `sim.tracers` is a reading surface
 
 - **Type:** contradiction
-- **Severity:** minor
-- **Confidence:** medium
-- **Locations:**
-  - PAGE `api / Particles`, `Tracers`: `Tracers(domain; number_of_particles, interpolation_scheme, rng = default_rng())` / `Tracers(domain; positions, interpolation_scheme)`
-  - PAGE `architecture`, decision log (2026-08): *"keyword arguments do not participate in dispatch … `Tracers` is therefore a single method … a merge forced by the language"*
-- **Contradicts:** whether `Tracers` is two genuinely dispatched constructors or one method with a runtime check — the API page's two-signature-block formatting (the same convention used for real multi-dispatch elsewhere, e.g. `dissipation`, `max_speed`) versus the architecture's explicit statement that two all-keyword forms "cannot be two methods."
-- **Description:** The `Tracers` docstring's own prose does clarify the runtime `ArgumentError` behavior, so a careful reader isn't actually misled — but the signature-block convention itself doesn't distinguish "two real methods" from "one method, two valid call shapes," and `Tracers` is the one place in the whole surface where that convention is applied to the latter.
-
----
-
-## 4. "What does this return?" is documented three incompatible ways across modules
-
-- **Type:** format
-- **Severity:** minor
+- **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - PAGE `api / Generator`, `prepare!`: *"Returns `generator`."*
-  - PAGE `api / Propagator`, `deposit!`: *"Returns `cache` (or `sim`)."*
-  - PAGE `api / Forcing`, `set_forcing_rate!`: `set_forcing_rate!(forcing, rate, field, domain) -> rate`
-  - PAGE `api / Particles`, `record_trajectory_velocity!`: `record_trajectory_velocity!(tracers, u) -> tracers`
-- **Description:** For functionally identical "this mutator hands back its mutated argument" cases, `Generator`/`Propagator`/`Observables` use a trailing "Returns X." sentence while `Forcing`/`Particles`/`Phenomenology` put `-> X` in the signature block itself. No page states a rule for which style applies where, so a reader can't tell from the signature alone whether an omitted arrow means "returns nothing interesting" or "this module just doesn't use arrows."
+  - `PAGE: api / SimulationRun`, `Simulation` Fields: *"Two of these are what a user reads — `state` and `cache`. The rest are the machinery the step runs on: … treat their contents as the scheme's business rather than the run's state."* — `tracers` is listed among "the rest."
+  - `PAGE: architecture`, §4.7: *"The state is read through `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it — `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`, `particle_positions(sim.tracers)`."*
+  - `PAGE: api / Particles`, "Wiring tracers into a run" and the `Tracers` example both show `particle_positions(sim.tracers)` as the ordinary way to read tracer state.
+- **Contradicts:** the SimulationRun API page says exactly two fields (`state`, `cache`) are user-facing and `tracers` is scheme-internal machinery "read only between steps"; the architecture doc and the Particles page treat `sim.tracers` as a third, parallel, first-class accessor-owned reading route exactly like `sim.state`/`sim.cache`.
+- **Description:** A user reading only the `Simulation` API page would conclude that reaching into `sim.tracers` is unsupported/internal, then find every worked example in the corpus doing exactly that. One of the two claims needs to be reconciled — either `Simulation`'s Fields section should list `state`, `cache`, *and* `tracers` (with `trajectory_scheme`/`particle_buffers`/`buffers`/`generator`/`scheme` as the true "read only between steps" machinery), or the examples are wrong.
+- **Resolution hint:** Fold `tracers` into the "what a user reads" sentence; keep `domain`, `buffers`, `generator`, `scheme`, `trajectory_scheme`, `particle_buffers` as the internal-machinery group.
 
 ---
 
-## 5. `Observables`' plain scalar reductions never show a return-type arrow, unlike `Phenomenology`'s equivalents
+## Finding 2 — `deposit_sample!`, required by the documented hand-run particle-repositioning recipe, is never documented or indexed anywhere
+
+- **Type:** api-gap
+- **Severity:** major
+- **Confidence:** high
+- **Locations:**
+  - `PAGE: api / Cache`, `particles_modified!`: *"A hand-run loop that repositions tracers itself must call this, then `record_trajectory_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs."*
+  - `PAGE: api / Particles`, `record_trajectory_velocity!`: *"the slot becomes readable when the cache is then told the values are current, which is a second call the cache owns"* — the "second call" is never named here either.
+  - `PAGE: api / GBGIsotropicTurbulence` Index (the complete export list, lines ~1045–1125): no `deposit_sample!` anywhere.
+- **Description:** The Cache page's own checked-read contract tells a user following the documented out-of-band tracer-repositioning recipe to call `deposit_sample!` as the final, required step. That name occurs exactly once in the whole corpus and is absent from the package's complete public index, from the Particles page's own function list, and from the Propagator page's `deposit!` docstring (which explicitly says the particle-velocities slot is *not* among what `deposit!` fills). A user cannot find this function's signature, confirm it is public, or complete the documented procedure.
+- **Resolution hint:** Either export and document `deposit_sample!` where the other Particles/Cache verbs live, or replace the two vague references with the actual call a user should make.
+
+---
+
+## Finding 3 — `BandRescaling` is the one forcing constructor missing a per-argument `Arguments` list
 
 - **Type:** format
 - **Severity:** minor
 - **Confidence:** medium
 - **Locations:**
-  - PAGE `api / Observables`, `kinetic_energy`: `kinetic_energy(u)` — no return annotation anywhere in the block.
-  - PAGE `api / phenomenology / Phenomenology`, `kolmogorov_length`: `kolmogorov_length(fp) -> Float64`
-- **Description:** Both are pure scalar-returning query functions over a state bundle, yet every `Observables` reduction (`kinetic_energy`, `dissipation`, `scalar_variance`, `derivative_skewness`, `max_speed`) omits a return-type arrow while every structurally identical `Phenomenology` accessor includes one — an inconsistent signature-block convention for the same kind of operation, one module apart.
+  - `PAGE: api / Forcing`, `Linear` and `ConstantPower` each carry an explicit bulleted `Arguments` section naming `domain`, the rate/target keyword, and `lowest_shell`/`highest_shell` individually.
+  - `PAGE: api / Forcing`, `BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)` has no such section — `domain`, `lowest_shell`, and `highest_shell` are only mentioned in running prose ("the integer shells `lowest_shell` to `highest_shell`… built on the `FixedDomain` `domain`").
+- **Description:** All three constructors take the same shape of arguments (`domain`, a required target/rate keyword, a shell band), and two of the three enumerate every argument in a dedicated list per the corpus's own self-containedness rule ("every signature argument documented — enumerated from the signature, each its own entry"). `BandRescaling`'s prose covers `target` and `over` at length but leaves `domain`/`lowest_shell`/`highest_shell` unenumerated, breaking the sibling family's formatting parity.
+- **Resolution hint:** Add the same `Arguments` bullet block `BandRescaling` is missing, reusing `Linear`'s wording for `domain`/`lowest_shell`/`highest_shell`.
 
 ---
 
-## 6. Bare, physical-convention symbol names (`u`, `ω`, `φ`) are documented to accept — and an example passes — spectral data
-
-- **Type:** clarity
-- **Severity:** minor
-- **Confidence:** medium
-- **Locations:**
-  - PAGE `api / Observables`, `kinetic_energy`: `kinetic_energy(u)` … *"it accepts `u` in either representation"*
-  - PAGE `Home`: *"kinetic_energy(sim.state.velocity_spectral)"*
-- **Description:** The house convention (CLAUDE.md, notation.md) reserves the bare symbol for the physical representation and the hatted symbol (`û`) for spectral. `kinetic_energy`/`scalar_variance`/`dissipation`'s field arguments keep the bare, physical-looking name yet are documented — and the flagship Home-page quick-start actually demonstrates — passing the *spectral* field into it, cutting against the very field-vs-representation discipline the docs elsewhere insist is a category-error class to guard against.
-
----
-
-## 7. `advect!`'s argument order diverges from `step!`'s despite the docs advertising a shared convention
+## Finding 4 — The `ArgumentError` a user hits inside `FlowConditions(...)` is documented only on a different page
 
 - **Type:** api-gap
 - **Severity:** minor
 - **Confidence:** medium
 - **Locations:**
-  - PAGE `api / Propagator`, `step!`: `step!(scheme, state, generator, domain, buffers, cache, dt)`
-  - PAGE `api / Particles`, `advect!`: `advect!(scheme, tracers, buffers, velocity_end, domain, dt)`
-- **Description:** `buffers` precedes `domain` in `advect!` but follows it in `step!`. The docs elsewhere take explicit pride in a shared positional convention across the field and particle sides (`allocate_buffers` is "one generic … because both sides keep the same separation") and in `step!`/`deposit!`'s shared order specifically ("the chained pair transposes nothing"), which makes the one mismatched pair stand out as unexplained.
+  - `PAGE: api / Forcing`, `AbstractForcing`: *"A strategy holding per-field scratch or a random stream must not drive both fields from one instance… `FlowConditions` throws an `ArgumentError` rather than let that happen."*
+  - `PAGE: api / Generator`, `FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)`: no mention of this throw condition anywhere in its own docstring.
+- **Description:** The error actually fires inside `FlowConditions`'s constructor, which is where a user would hit it (passing the same stateful forcing instance for both `velocity_forcing` and `scalar_forcing`), but the explanation of *why* and *when* lives only in `AbstractForcing`'s docstring on a different page. Per the corpus's own rule ("the checked-read contract documented where a user will hit it"), this belongs on (or is at least cross-referenced from) `FlowConditions`.
+- **Resolution hint:** Add a one-line note to `FlowConditions` pointing at the shared-instance restriction, or `@ref` it from there.
 
 ---
 
-## 8. `tracer_scheme` (front door) vs `interpolation_scheme` (`Tracers`) is a renamed forward with no stated reason
+## Finding 5 — The stated `viscosity`/`κ_max_η` mutual-exclusivity contract is hard to reconcile with `κ_max_η`'s always-present default
 
 - **Type:** clarity
-- **Severity:** nit
-- **Confidence:** medium
+- **Severity:** minor
+- **Confidence:** low
 - **Locations:**
-  - PAGE `api / SimulationRun`, `Simulation`: *"`tracer_scheme = CatmullRom` … forwarded to the `Tracers` constructor as its `interpolation_scheme`"*
-  - PAGE `api / SimulationRun`, `Simulation`: *"`particle_scheme = EndpointHeun()` … a different axis from `tracer_scheme` despite the neighbouring names"*
-- **Description:** The front door renames the keyword it forwards (`interpolation_scheme` → `tracer_scheme`) for no stated reason, landing the new name one letter-shuffle from the unrelated `particle_scheme` keyword. The risk is self-acknowledged in the same docstring ("despite the neighbouring names") but not resolved — simply keeping the name `interpolation_scheme` at the front door, matching `Tracers`, would have removed the collision the note has to warn about.
+  - `PAGE: api / SimulationRun`, `Simulation`: signature shows `κ_max_η = 2` as an ordinary default (always present), while the prose says *"Explicit mode: pass `viscosity` and it is used directly; the two are alternatives, and passing both raises an `ArgumentError` rather than dropping one."*
+- **Description:** Since `κ_max_η` is shown with an ordinary Julia default of `2` (not a `nothing` sentinel), nothing in the documented signature lets a reader tell "the user explicitly wrote `κ_max_η = 2`" apart from "the user omitted it and the default applied" — yet the docs describe an error path that depends on exactly that distinction ("passing both"). As written, a reader cannot tell whether providing `viscosity` alone is safe (most likely, and probably what happens) or whether it is expected to collide with the ever-present default. This is a documentation clarity gap rather than a demonstrated code bug.
+- **Resolution hint:** State explicitly that the check is really "is `viscosity` given," with `κ_max_η` simply unused/ignored in that case, if that is the real behavior — rather than describing it as a symmetric "passing both" case.
 
 ---
 
-## Positive cross-checks (not findings, recorded to show the ground covered)
-
-- Every export listed in the `api / GBGIsotropicTurbulence` Index has a matching documented
-  entry on its module's page, for every core-DNS module (`SimulationDomain`, `State`,
-  `Observables`, `Cache`, `Forcing`, `Generator`, `Propagator`, `Particles`, `SimulationRun`) — no
-  exported-but-undocumented or documented-but-not-exported items found.
-- All constructors checked against the "source object positional, settings keyword" decision
-  (`FixedDomain`, `ObservablesCache`, `ResolvedGenerator`, `Tracers`, `BandRescaling`,
-  `FlowConditions`, `ResolvedFields`, `Simulation`) comply with it.
-- `squared_wavenumber_kernel` (notation.md, `Observables.dissipation`/`scalar_dissipation`) is
-  consistently documented as the lazy `RadialKernel` field on `FixedDomain` across every page that
-  names it — an apparent staleness risk against the "the stored real |κ|² array is gone" decision
-  that turned out not to be one.
+*Not flagged (already adjudicated as non-defects): `kinetic_energy` default of 1.5, Saffman attribution, decision-log entries naming superseded APIs, absence of the deferred capabilities, `vorticity_spectral(sim)` non-existence, `Lundgren2002` citation, `deposit_velocity!`/`take_velocity!` existing as undocumented internals, the host-device-sync floor-vs-achieved pair, `integrator`→`scheme`, PascalCase composed presets, `No DOI`/`no DOI` capitalization, bare `CatmullRom`, the arrow-vs-`Returns` dual convention, and a citation opening a docstring ahead of its formula.*

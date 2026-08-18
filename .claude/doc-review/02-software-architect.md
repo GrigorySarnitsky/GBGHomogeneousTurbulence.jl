@@ -1,145 +1,107 @@
-# Software Architect review — GBGIsotropicTurbulence rendered docs
+# Software-architect review — GBGIsotropicTurbulence rendered docs
 
-Hat: senior Julia programmer / software architect, judging the documented API and design as written.
-
----
-
-## 1. `tracer_scheme` (Simulation front door) renames `interpolation_scheme` (Tracers) across one forwarding hop, and sits beside a same-shaped sibling keyword for an unrelated axis
-
-**Type:** design | **Severity:** major | **Confidence:** high
-
-**Locations:**
-- PAGE: api / SimulationRun — `Simulation`: "`number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian `Tracers` and the spatial scheme that evaluates a field at their positions, forwarded to the `Tracers` constructor as its `interpolation_scheme`."
-- PAGE: api / SimulationRun — `Simulation`: "`particle_scheme = EndpointHeun()` — the temporal scheme that advances the trajectories, a different axis from `tracer_scheme` despite the neighbouring names."
-- PAGE: architecture — decision log, "`integrator` → `scheme` on the binding": "`Tracers` used `scheme` for its interpolation scheme, so two constructors would have taken one keyword for two concepts; it is now `interpolation_scheme`, which is the more precise name regardless."
-
-**Description:** The decision log records a deliberate rename of `Tracers`' own keyword to `interpolation_scheme` specifically for precision. Yet the `Simulation` front door does not reuse that name for the pass-through — it introduces a third name, `tracer_scheme`, for the identical concept, then places `particle_scheme` (a wholly different, temporal-integration axis) one keyword away, defended only by a docstring caveat ("despite the neighbouring names"). A user now must hold three names for two concepts (`interpolation_scheme` / `tracer_scheme` for one; `particle_scheme` for the other) where the project's own naming discipline (six-lens panels, `ω_consumed`/`u_consumed`, `*_epoch`) argues for reusing the precise name at every hop.
-
-**Resolution hint:** Rename the front-door keyword to `interpolation_scheme` (matching `Tracers`), removing the need for the disclaimer prose.
+Hat: senior Julia programmer / software architect, judging the documented API and module design as written (no source read).
 
 ---
 
-## 2. `advect!`'s argument order breaks the shared `state, domain, buffers` order that `step!`/`deposit!` are explicitly designed to share
+## Finding 1 — `StationarityCriterion`'s documented positional constructor exposes an internal object and admits it
 
-**Type:** design | **Severity:** major | **Confidence:** high
+**Type:** contradiction · **Severity:** major · **Confidence:** high
 
 **Locations:**
-- PAGE: api / Propagator — `step!`: "The argument order is shared with `deposit!` ... the common arguments follow in the fixed order `state`, `domain`, `buffers` ... so the chained pair transposes nothing."
-- PAGE: api / Propagator — `step!(scheme, state, generator, domain, buffers, cache, dt)`; `deposit!(cache, state, domain, buffers)`.
-- PAGE: api / Particles — `advect!(scheme, tracers, buffers, velocity_end, domain, dt)`.
+- PAGE: api / SimulationRun — "The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn, last_time, started)` is internal. Note the keyword arguments above do not map one-to-one onto these fields: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and `skew_floor` are all stored inside `monitor`, which holds the sampled series together with the thresholds that judge them."
 
-**Description:** `step!`/`deposit!` place `domain` before `buffers`, a design choice the docs call out by name as intentional ("transposes nothing"). `advect!` — introduced as "the Lagrangian counterpart of the field schemes," built on the identically-named `allocate_buffers` and an explicitly parallel `AbstractParticleIntegrator`/`ParticleIntegratorBuffers` pair — places `buffers` before `domain`, the opposite order. The one place the docs advertise cross-signature order discipline is exactly the place a parallel signature violates it.
+**Description:** The rendered API page documents the type's plain positional constructor in full — a labelled, code-fenced signature, exactly like every other type's constructor on the site — and then immediately states that this same form "is internal" and that its parameters do not correspond one-to-one with the keyword constructor a caller actually wants. Publishing a constructor signature on the public docs page while telling the reader not to use it is self-contradictory documentation: a reader skimming the signature block (as the "Fields" convention used throughout the rest of the corpus trains them to do) has no cue, short of the trailing prose, that calling it would require hand-assembling an opaque `monitor` object. Every comparable "assembled-from-preallocated-internals" type elsewhere in the corpus (`Simulation`, `ObservablesCache`, `IntegratorBuffers`, `ResolvedGenerator`) instead omits the positional form entirely; `StationarityCriterion` is the one place the corpus's own pattern is broken.
 
-**Resolution hint:** Reorder `advect!` to `(scheme, tracers, velocity_end, domain, buffers, dt)` or state why the particle side is exempt from the shared-order rule.
+**Resolution hint:** Either drop the positional-constructor line from the rendered page (matching `Simulation`/`ObservablesCache`/`IntegratorBuffers`/`ResolvedGenerator`) or replace it with a `# Fields` list that documents `monitor`'s role without presenting a callable signature.
 
 ---
 
-## 3. `Simulation`'s fields expose internal per-step scratch (`buffers`, `generator`) at the same access level as the sanctioned reading surfaces
+## Finding 2 — The opportunistic `displaced_velocity_fresh` flag reopens the class of hazard the generator reification was built to close
 
-**Type:** design | **Severity:** major | **Confidence:** medium
+**Type:** contradiction · **Severity:** major · **Confidence:** medium
 
 **Locations:**
-- PAGE: architecture — decision log: "A `Simulation` is a container, not a reading surface... The state is read through `sim.state` and the deposited observables through `sim.cache`... each read by the accessor that owns it."
-- PAGE: api / SimulationRun — `Simulation` Fields: "`domain`, `buffers`, `generator`, `scheme`... `state`... `cache`... `tracers`, `particle_scheme`, `particle_buffers`..."
-- PAGE: api / Propagator — `IntegratorBuffers`: "Each such array is a register: storage a scheme computes one stage into and overwrites at the next, holding nothing a caller should read between steps."
+- PAGE: architecture, §4.2 / decision log — "A scheme consumes the physics only through this protocol, so it can never assemble the right-hand side from a mismatched intermediate — the class of the stage-ordering bug that motivated the reification (§11 decisions 29, 31)."
+- PAGE: api / Generator, `ResolvedGenerator` — "One optimization crosses two verbs. Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through either signature."
 
-**Description:** The "container, not a reading surface" decision deliberately rejects forwarding accessors in favor of direct field access as the package's whole read API. But `sim.buffers` and `sim.generator` are listed as ordinary fields alongside `sim.state`/`sim.cache`/`sim.tracers`, with no distinction in the type itself between a safe read (`state`, `cache`, `tracers`) and a stage register explicitly documented elsewhere as unsafe to read between steps. Julia field access carries no visibility distinction, so a user tab-completing `sim.` meets `buffers` and `generator` on equal footing with the reads the design intends to sanction.
+**Description:** The generator's six-verb protocol was reified specifically so a scheme could never observe a stale or mismatched intermediate across two verb calls (the RK3 stage-ordering bug the decision log names as the motivating incident). The `displaced_velocity_fresh` flag reintroduces exactly this shape: `scalar_rhs!`'s cost and correctness path now depend on whether `velocity_rhs!` was called immediately before it in the same stage, tracked by mutable state hidden on the `ResolvedGenerator` rather than by either function's signature. The self-healing fallback ("a `scalar_rhs!` that finds the flag clear rebuilds the displaced velocity itself, value-identically") keeps it correctness-safe, but it is still an undocumented-in-the-signature, call-order-sensitive side channel between two protocol verbs — the very pattern the protocol's own charter says it makes "unrepresentable."
 
-**Resolution hint:** Either note directly on `Simulation`'s docstring which fields are unsafe to read mid-run, or keep them out of the field list a user is pointed at.
+**Resolution hint:** Either surface the freshness dependency in `scalar_rhs!`'s signature (an optional argument or a documented calling contract), or note explicitly, next to decision 31's "never a mismatched intermediate" claim, that this one opportunistic exception exists.
 
 ---
 
-## 4. "One forcing instance per forced field" is enforced only by a documentation warning, unlike the package's demonstrated throw-on-misuse pattern
+## Finding 3 — `deposit!`, the cache's only writer, is undocumented in `Cache`'s own operation list and lives in a different module
 
-**Type:** design | **Severity:** major | **Confidence:** medium
+**Type:** organization · **Severity:** minor · **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Forcing — `AbstractForcing`: "WarningConstruct one strategy instance per forced field. An instance owns per-field scratch and internal state, so passing the same instance as both `velocity_forcing` and `scalar_forcing` would silently conflate the two fields' bookkeeping."
-- PAGE: api / Generator — `ResolvedGenerator`: "The constructor rejects a misdeclared forcing... Building a `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than let the run proceed quietly wrong."
+- PAGE: api / Cache — "The cache's operations: `ObservablesCache` …; `fields_modified!`, `particles_modified!` …; `velocity_physical`, `vorticity_physical`, `scalar_physical` …; `max_speed` …" (four bullets, all reads or an announce-mutation pair — no `deposit!`).
+- PAGE: api / Cache — "The solver's side of the contract is `deposit!`, which fills every slot at the iteration's end and sets its epoch. … It is homed in `Propagator` rather than here because it needs the scheme's own scratch to recover the fields, and that is the module owning the iteration it closes."
 
-**Description:** The package elsewhere validates forcing configuration aggressively at construction (a forcing declaring `set_forcing_rate!` without `uses_linear_rate` throws, "rather than let the run proceed quietly wrong"). The reused-instance hazard is at least as easy to trigger by accident (`Simulation(...; velocity_forcing = f, scalar_forcing = f)`) and is documented as producing silent, wrong bookkeeping — yet nothing in the constructors checks for it. The one invariant most likely to be violated by a naive call site is the one left to prose.
+**Description:** `Cache`'s module docstring is a map ("the cache's operations") that lists every read accessor and both "announce a mutation" verbs, but omits the one function that actually fills the type it defines. A reader who wants to know "how does something get into this cache" is not served by `Cache`'s own bullet list at all — the answer surfaces only in prose several paragraphs later, pointing to a different module three steps downstream in the include order. The write half of `ObservablesCache`'s API is consequently split across two module pages with no forward pointer from `Cache`'s bullet list to `Propagator.deposit!`.
 
-**Resolution hint:** Have `ResolvedGenerator`'s constructor (or `FlowConditions`) reject `velocity_forcing === scalar_forcing` (identity check) with the same `ArgumentError` discipline used for the rate-declaration mismatch.
+**Resolution hint:** Add `deposit!` (with an `@ref`-style pointer to its home) to `Cache`'s own bullet list, even though the implementation stays in `Propagator`.
 
 ---
 
-## 5. `FlowParameters.scalar_dissipation` uses a `NaN` sentinel, diverging from the `nothing`-sentinel convention used everywhere else for "this run lacks X"
+## Finding 4 — `velocity_rhs!`/`scalar_rhs!`'s "consumed" arguments are, at real call sites, the cache's live deposited slots — protected only by a naming convention
 
-**Type:** design | **Severity:** minor | **Confidence:** medium
+**Type:** api-gap · **Severity:** minor · **Confidence:** medium
 
 **Locations:**
-- PAGE: api / phenomenology / Phenomenology — `FlowParameters`: "`scalar_dissipation`... default `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle a plain, type-stable set of `Float64`s. It is a sentinel, not a value that propagates: every law that reads the field checks it first and throws an `ArgumentError`..."
-- PAGE: api / Cache — `ObservablesCache` Fields: "`scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run."
-- PAGE: api / Propagator — `IntegratorBuffers` Fields: registers left `nothing` when a scheme or config doesn't use them.
+- PAGE: api / Generator — "`velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)` … The vorticity argument is read and then overwritten. The Lamb vector is formed in place over the vorticity's array — the backend's cross product may write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer does on return."
+- PAGE: api / Propagator, `step!` — "The first stage reads the deposited velocity, vorticity, and scalar in physical representation from `cache` … and the later stages compute their recoveries into those same slots."
 
-**Description:** Every other "absent because this run/config doesn't carry the capability" slot in the documented API — cache slots, integrator/particle buffers, `Tracers`/`particle_scheme` on a tracer-free `Simulation` — uses `nothing`. `FlowParameters` alone substitutes `NaN`, and its own docstring's guarantee ("not a value that propagates") holds only for the bundled `Phenomenology` law implementations, which check first; it does not hold for a caller doing ordinary arithmetic on `fp.scalar_dissipation` directly, where a `NaN` propagates silently exactly as the docstring says it does not. The type-stability argument is real, but it is applied at the one site with the least performance pressure (a per-run diagnostic bundle) while the actual hot-loop structs (`IntegratorBuffers`, `ResolvedGenerator`) use `Union{Nothing,T}` freely.
+**Description:** `velocity_rhs!` and `scalar_rhs!` are public, exported functions (`GBGIsotropicTurbulence.Generator.velocity_rhs!`/`scalar_rhs!` in the Index). Inside `step!` their `ω_consumed`/`u_consumed` arguments are literally `cache.vorticity_physical`/`cache.velocity_physical` — the same array a concurrent call to `vorticity_physical(cache)`/`velocity_physical(cache)` would otherwise serve as a checked, currently-valid deposited observable. A caller who invokes the generator protocol directly (the docs advertise "the composable pieces stay fully exposed" for exactly this kind of hand-rolled use) and passes the array returned by `vorticity_physical(cache)` — reasonably assuming a read-only "give me the vorticity" call — will silently destroy the cache's current deposit as a side effect. Nothing in the type system distinguishes a "safe to pass" array from a "will be destroyed" one; the `_consumed` suffix is the only guard, and it protects only a reader who already reads the docstring.
 
-**Resolution hint:** Either scope the "does not propagate" claim explicitly to the `Phenomenology` evaluators, or use a small dedicated sentinel/`missing` with the same check-first contract stated package-wide.
+**Resolution hint:** Consider a distinguishing wrapper type (or at minimum a bold caveat on `vorticity_physical`/`velocity_physical` themselves cross-referencing the destructive consumers) so the hazard is visible at the read site, not only at the write site.
 
 ---
 
-## 6. The `Cache` module's central epoch invariant is written exclusively by `deposit!`, which is homed in `Propagator`, not `Cache`
+## Finding 5 — `max_speed(u)` / `max_speed(cache)`: one generic spans an O(N³) reduction and an O(1) cached read, and the pattern is declared the template for future observables
 
-**Type:** design | **Severity:** minor | **Confidence:** medium
+**Type:** design · **Severity:** minor · **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Cache — module docstring: "The solver's side of the contract is `deposit!` — homed in `Propagator`, with the iteration it closes — which fills every slot at the iteration's end and sets its epoch; internal per-slot deposit and take verbs move the individual epochs."
+- PAGE: api / Observables, `max_speed` — "`max_speed(u)` / `max_speed(cache)` … The second form reads the number back from an `ObservablesCache`, where the closing deposit left it — the same quantity, measured once per iteration and served without a reduction (or a device readback)."
+- PAGE: architecture, decision log (2026-08, "`Observables` precedes `Cache`") — "an observable with both a measurement and a cached value is one generic with two method families … the pattern is the rule for any future cached observable."
 
-**Description:** `Cache` is presented as the module owning the deposit-driven design (three-valued epochs, slot=register merge, throw-on-stale). But the one function that actually advances a slot's epoch to "deposited" — the write side of the whole invariant — lives in a different module. The type that owns the storage and its read contract does not own its writer; a reader auditing `Cache` alone cannot see what makes a read valid. This is presumably forced by the include order (`Cache` precedes `Propagator`, and `deposit!` needs a scheme-agnostic notion of "the state the step just produced"), but the docs do not say so — they simply note the split.
+**Description:** Calling `max_speed` on a field sweeps the whole grid (an O(N³) reduction); calling it on a cache performs an O(1) array lookup that can throw if the deposit is stale. Both share one name and are selected only by argument type, so a call site's cost class is invisible from the call itself — a reader must know which argument they hold. This is workable for one observable, but the decision log states this dispatch shape is now the house pattern for *every future* observable that gains a cached form, meaning the corpus is set to accumulate more same-name, differently-costed, differently-failure-mode method pairs over time rather than fewer.
 
-**Resolution hint:** State the include-order reason for the split on `Cache`'s module docstring, or move the completeness/epoch-advance logic into a `Cache`-owned verb that `Propagator.deposit!` calls.
+**Resolution hint:** None required to fix `max_speed` itself (already shipped and reasoned about), but worth flagging before the pattern is applied a second and third time — a distinguishing verb (`max_speed!`/`cached_max_speed`) would make the cost class visible at the call site.
 
 ---
 
-## 7. `ObservablesCache.particle_velocities` is externally-owned aliased storage, unlike every other slot the type allocates itself
+## Finding 6 — `Tracers`'s two constructor forms are merged into one method, disambiguated only by a runtime `ArgumentError`
 
-**Type:** design | **Severity:** minor | **Confidence:** medium
+**Type:** design · **Severity:** minor · **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Cache — `ObservablesCache`: "pass ... `particle_velocities` — the tracer set's own point-value storage — when the run advects tracers: the slot IS that storage, so the tracers' push writes the values and the cache only records which epochs they belong to."
+- PAGE: api / Particles, `Tracers` — "(One method, shown as the two ways it is called — keywords do not dispatch.) … Give exactly one of `number_of_particles` … or `positions` … Supplying both, or neither, is an `ArgumentError`."
+- PAGE: architecture, decision log (2026-08-18, "Constructor arguments") — "keyword arguments do not participate in dispatch, so two all-keyword forms cannot be two methods. `Tracers` is therefore a single method requiring exactly one of `positions` or `number_of_particles`, with an `ArgumentError` naming the choice — a better error than a missing-keyword one, but a merge forced by the language rather than preferred."
 
-**Description:** `velocity_physical`, `vorticity_physical`, and `scalar_physical` are arrays the `ObservablesCache` constructor allocates and owns outright. The `particle_velocities` slot is instead a handed-in reference into `Tracers.trajectory_velocity` — the cache never allocates it and cannot itself guarantee it stays valid; correctness depends on `Particles`' own mutator (`record_trajectory_velocity!`) writing through the same array a well-behaved caller passed in. Within one type, most slots are self-contained value storage and one is a live alias into another module's object — an ownership split that is real (and reused deliberately for the "slot IS the register" design elsewhere) but is easy to miss when reasoning about what "the cache" actually holds.
-
-**Resolution hint:** No code change implied; consider naming the asymmetry explicitly in the type's opening paragraph rather than only in the constructor's keyword description.
+**Description:** Two conceptually distinct construction paths — "seed `M` random tracers" versus "wrap these positions" — are collapsed into a single method whose branch is chosen by which keyword happens to be non-`nothing`, checked at run time. The docs candidly call this "a merge forced by the language rather than preferred," which is honest, but the result is still weaker than ordinary Julia dispatch: a caller who typos `position` instead of `positions` gets "neither supplied" rather than a `MethodError`/`UndefKeywordError` pointing at the typo, and there is no compile-time signal distinguishing the two call shapes. A small dispatchable seed-selector value (e.g. two argument types instead of two keywords) would restore ordinary multiple-dispatch behavior at the cost of one more exported name.
 
 ---
 
-## 8. `k_max_η` mixes an ASCII-folded κ with a literal Unicode η, contradicting its own "spelled in ASCII" claim
+## Finding 7 — `FlowConditions` and `FlowParameters`: near-identical names sharing two field names, flagged as confusable in the docs and left as-is
 
-**Type:** clarity | **Severity:** nit | **Confidence:** medium
+**Type:** clarity · **Severity:** nit · **Confidence:** low
 
 **Locations:**
-- PAGE: api / SimulationRun — `Simulation`: "`k_max_η = 2` — the resolution criterion $\kappa_{\max}\eta$ used to set $\nu$ in grid mode (the keyword spells $\kappa_{\max}$ in ASCII)".
+- PAGE: api / Generator, `FlowConditions` — "Not to be confused with `Phenomenology`'s `FlowParameters`, which shares two field names: this type holds what a run is configured with, that one holds what a run has been measured to have."
 
-**Description:** The parenthetical explains why κ became `k` (ASCII-friendliness for a REPL keyword), but the same keyword keeps `η` as a literal Unicode codepoint, requiring the same `\eta<tab>` REPL input the ASCII substitution was presumably meant to avoid. The identifier is neither fully ASCII nor fully symbolic — a half-transliteration the docstring's own justification doesn't quite cover.
-
-**Resolution hint:** Either fold η too (`k_max_eta`) or drop the "spelled in ASCII" framing in favor of "κ is spelled `k`; η is kept as-is."
+**Description:** Two types eight letters apart in name (`FlowConditions` vs `FlowParameters`), living in different modules, sharing the field names `viscosity` and `schmidt`, are distinguished only by a parenthetical disclaimer inside one of the two docstrings — a reader who meets `FlowParameters` first has no matching cross-reference back. Given how much naming care the rest of the corpus invests in disambiguating near-neighbors (`particle` vs `tracer`, `epoch` vs `stamp`, `scheme` vs `integrator`), this pair reads as a residual case the same discipline has not yet reached.
 
 ---
 
-## 9. `Simulation`'s explicit mode silently ignores `k_max_η` when `viscosity` is also given
+## Finding 8 — The cached-vs-measured duality has two different, module-crossing resolutions depending on whether the observable is scalar- or field-valued
 
-**Type:** design | **Severity:** minor | **Confidence:** medium
-
-**Locations:**
-- PAGE: architecture — decision log, "Resolution-based `viscosity`": grid mode vs explicit mode described, with `viscosity` opting "back into direct control."
-- PAGE: api / SimulationRun — `Simulation`: "Explicit mode: pass `viscosity` and it is used directly (`k_max_η` is ignored)".
-
-**Description:** Passing both `viscosity` and a non-default `k_max_η` produces no error and no effect on the ignored keyword — it is simply dropped. This is the opposite of the package's demonstrated stance elsewhere (a misdeclared forcing rate throws `ArgumentError` "rather than let the run proceed quietly wrong"; `BandRescaling`'s `over` was made required specifically because a silent default "made that choice for a user who might be measuring exactly the clamped quantity"). A user who sweeps `k_max_η` in an experiment while also fixing `viscosity` for reproducibility gets silently ignored input.
-
-**Resolution hint:** Warn (or throw) when both `viscosity` and a non-default `k_max_η` are supplied together.
-
----
-
-## 10. The four `AbstractForcing` hooks reuse the parameter name `field` for three physically distinct instants
-
-**Type:** clarity | **Severity:** minor | **Confidence:** medium
+**Type:** design · **Severity:** nit · **Confidence:** low
 
 **Locations:**
-- PAGE: api / Forcing — `prepare_forcing!(forcing, field, domain, dt)`: "from the start-of-step `field` (in spectral representation)".
-- PAGE: api / Forcing — `set_forcing_rate!(forcing, rate, field, domain)`: "The `field` is the start-of-step field in spectral representation".
-- PAGE: api / Forcing — `apply_forcing!(forcing, field, domain)`: "Apply the strategy `forcing`'s post-step projection to `field`... in place".
+- PAGE: api / Observables — "`max_speed` — the fastest flow speed on the grid … (one generic shared with `Cache`, where the cached read lives …)" versus "`vorticity_physical!` — the vorticity recovered in physical representation … (its cached read, `vorticity_physical`, lives in `Cache`)."
+- PAGE: architecture, decision log (2026-08, "The chart recoveries are not package verbs") — "an f/`f!` pair, not decision 46's single dispatched generic, and the difference is structural rather than a drift."
 
-**Description:** `prepare_forcing!` and `set_forcing_rate!` both name their argument `field` and mean the start-of-step value; `apply_forcing!` names its argument `field` too but means the just-advanced, post-step value — a different array at a different point in the lifecycle. The four-hook interface is pitched as one uniform per-step lifecycle ("the four hooks form one per-step lifecycle with a fixed order"), and the reused name invites a reader implementing a new strategy to assume all `field` arguments are interchangeable in timing, when only two of three actually are.
-
-**Resolution hint:** Distinguish the post-step argument, e.g. `apply_forcing!(forcing, advanced_field, domain)`.
+**Description:** A scalar observable with both a live and a cached form (`max_speed`) is one generic dispatching on argument type; a field-valued observable with both forms (`vorticity_physical!`/`vorticity_physical`) is instead an `f`/`f!` pair, with the two halves living in two different modules (`Observables` and `Cache`). The docs explicitly defend the split as principled rather than accidental, which the panel takes at face value — but the practical result is that a future contributor adding a new cached observable must first classify it as scalar or field-valued before knowing which of two unrelated naming/module patterns to follow, a piece of tacit knowledge not stated as a rule anywhere a newcomer would find it before hitting the two examples.

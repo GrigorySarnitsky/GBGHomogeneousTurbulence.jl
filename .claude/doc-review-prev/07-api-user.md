@@ -1,207 +1,122 @@
-# Doc-review panel — hat: physicist-programmer / API user
+# Doc-review panel — hat: physicist-programmer API user
 
-Reviewed the full rendered manuscript (Home, architecture, notation, observables_cache, phenomenology
-index, and every `api/*` page) as a user who wants to assemble a `Simulation`, warm it up, observe it
-with `run!`, read the cache, and sample tracers — from the docs alone. Overall the surface is unusually
-consistent (constructor/keyword coverage, representation labeling, and cross-page formula agreement all
-checked out almost everywhere); the findings below are the genuine gaps and drift that survived that
-sweep.
+Reviewed the full rendered manuscript (Home, api overview, architecture, notation,
+observables_cache, phenomenology landing, and every `api/*` + `api/phenomenology/*` module page)
+as a user trying to assemble a `Simulation`, run it with `run!`/`warmup!`, read `sim.cache`, and
+sample tracers. Findings below, most-severe first.
 
 ---
 
-## Finding 1 — Several in-place protocol verbs never document their return value, while their siblings do
+## 1. `advance!`'s own docstring never mentions the closing deposit it performs
 
-**Type:** api-gap
-**Severity:** major
-**Confidence:** high
-
-**Locations:**
-- PAGE `api / Generator`, `velocity_rhs!(N̂, generator, û, u, ω, domain)` — full docstring body never
-  states what is returned (no `-> …` in the signature, no "Returns …" sentence).
-- PAGE `api / Generator`, `scalar_rhs!(N̂, generator, û, φ̂, u, φ, domain)` — same omission.
-- PAGE `api / Propagator`, `step!(integrator, state, generator, domain, buffers, cache, dt)` — same
-  omission.
-- PAGE `api / Propagator`, `deposit!(cache, state, domain, buffers)` — same omission.
-- PAGE `api / SimulationDomain`, `dealias!(field, domain)` — same omission.
-
-**Contradicts:** the sibling verbs in the very same protocols document their return explicitly — PAGE
-`api / Generator`: "`prepare!` … Returns `generator`." and "`finalize!` … Returns `state`."; PAGE
-`api / Observables`: "`vorticity_physical!` … Returns `ω`."; PAGE `api / Cache`:
-"`resolved_fields_modified!` … Returns `cache` (or `sim`)."; PAGE `api / Forcing`: `set_forcing_rate!(...)
--> rate`, `add_forcing_source!(...) -> nonlinear`, `apply_forcing!(...) -> field` all carry an explicit
-arrow.
-
-**Description:** A user hand-assembling a step (the docs explicitly invite this — "a hand-run loop is
-`step!` then `deposit!`") cannot tell from `velocity_rhs!`/`scalar_rhs!`/`step!`/`deposit!`/`dealias!`'s
-own docstrings whether the mutated argument is returned for chaining or `nothing` is returned. Every
-comparable in-place verb elsewhere in the package states this explicitly, so the omission reads as
-missed rather than deliberate.
+- **Type:** api-gap
+- **Severity:** major
+- **Confidence:** high
+- **Locations:**
+  - PAGE `api / SimulationRun`, `advance!`: *"Advance `sim` by one timestep in place and return it. … Advects the tracers, if any, … and updates the clock."*
+  - PAGE `api / Propagator`, `step!`: *"the caller closes the iteration with `deposit!` … the run layer's `advance!` does both."*
+  - PAGE `api / Propagator`, `deposit!`: *"the run layer's `advance!` performs it after `step!`"*
+- **Description:** `advance!` is the function nearly every example calls directly (including the Particles page's own usage example, which calls `advance!(sim)` and then reads `sim.cache` right after). Yet its own docstring — the "home" for that operation per the package's own doc policy — says nothing about the closing `deposit!` that is precisely what makes `sim.cache` readable afterward. A cold read of `advance!` alone gives no idea the cache becomes valid as a side effect; that fact must be pieced together from two *other* pages' docstrings (`step!`, `deposit!`).
 
 ---
 
-## Finding 2 — `uses_linear_rate`'s validation contract ("the constructor rejects it") is not documented where the rejecting constructor lives
+## 2. `ObservablesCache`'s `particle_velocities` keyword: type and required wiring undocumented
 
-**Type:** api-gap
-**Severity:** major
-**Confidence:** medium-high
-
-**Locations:**
-- PAGE `api / Forcing`, `uses_linear_rate`: "a forcing that fills a rate without declaring one is never
-  given an array to fill, and **the constructor rejects it** rather than let the forcing go silently
-  unapplied."
-- PAGE `api / Generator`, `ResolvedGenerator(domain, conditions; scalar = false)` — the only plausible
-  "constructor" the previous sentence can mean — documents `product_spectral`, `phase_shift`,
-  `velocity_rate`/`scalar_rate`, and `displaced_velocity_fresh`, but says nothing about validating or
-  rejecting a misdeclared forcing.
-
-**Description:** `AbstractForcing` is called out as "the one deliberately designed-in extension point"
-(architecture §4.4), so a user is expected to write a custom forcing. If they implement
-`set_forcing_rate!` but forget `uses_linear_rate`, the failure surfaces at whatever *actually* rejects
-it — but that rejection is described only from the Forcing side, never from the constructor's own
-docstring, and it isn't even named unambiguously ("the constructor" — of `ResolvedGenerator`? of
-`Simulation`? of `FlowConditions`?). A user debugging the rejection has nowhere on the Generator page to
-look it up.
+- **Type:** api-gap
+- **Severity:** major
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / Cache`, `ObservablesCache`: *"pass … `particle_velocities` — the tracer set's own point-value storage — when the run advects tracers: the slot IS that storage"*
+  - PAGE `api / Particles`, `record_trajectory_velocity!`: *"which is also the observables cache's particle-velocities slot"*
+- **Description:** Neither docstring says what value to actually pass (e.g. `tracers.trajectory_velocity`) or shows a worked hand-assembly example — the `observables_cache` design page's own build example (`ObservablesCache(domain; scalar = true)`) omits tracers entirely, and the Particles page's hand-run-loop example bypasses `ObservablesCache` altogether. Architecture.md explicitly invites a user to "drop straight to §4" and assemble pieces by hand, but nothing shows how to wire the cache's slot to the tracer set's storage. `record_trajectory_velocity!`'s docstring then states the aliasing as an unconditional fact rather than a consequence of that (undocumented) wiring.
 
 ---
 
-## Finding 3 — The checked-read exception type is stated once, off to the side, not on the accessors or callback contract that actually throw it
+## 3. `Tracers`'s two-line signature block visually implies dispatch the architecture says is impossible
 
-**Type:** api-gap
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE `api / Cache`, `ObservablesCache` (type docstring): "it throws an `ErrorException` whose message
-  names the slot and which of the three states it is in."
-- PAGE `api / Cache`, `velocity_physical(cache)`: "Returns the deposited field … and throws otherwise …"
-  — no exception type named.
-- PAGE `api / Cache`, `vorticity_physical`, `scalar_physical`, `particle_velocities`: same pattern —
-  each documents an `ArgumentError` for a *missing* scalar/tracers, but none names the exception for the
-  stale/scratch/never-deposited case.
-- PAGE `api / SimulationRun`, `run!`: "any other return throws (the decision may not be left implicit)"
-  — exception type never named anywhere on the page.
-
-**Description:** The "home" docstring for each checked read (the one a user actually calls and would
-`catch` around) documents *that* it throws but not *what* it throws; the type is stated only once, on a
-different page section (`ObservablesCache`'s own type docstring), which a user calling `velocity_physical`
-directly has no particular reason to have read. A `try`/`catch ErrorException` written from
-`velocity_physical`'s own docstring alone is a guess, not a documented contract.
+- **Type:** contradiction
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / Particles`, `Tracers`: `Tracers(domain; number_of_particles, interpolation_scheme, rng = default_rng())` / `Tracers(domain; positions, interpolation_scheme)`
+  - PAGE `architecture`, decision log (2026-08): *"keyword arguments do not participate in dispatch … `Tracers` is therefore a single method … a merge forced by the language"*
+- **Contradicts:** whether `Tracers` is two genuinely dispatched constructors or one method with a runtime check — the API page's two-signature-block formatting (the same convention used for real multi-dispatch elsewhere, e.g. `dissipation`, `max_speed`) versus the architecture's explicit statement that two all-keyword forms "cannot be two methods."
+- **Description:** The `Tracers` docstring's own prose does clarify the runtime `ArgumentError` behavior, so a careful reader isn't actually misled — but the signature-block convention itself doesn't distinguish "two real methods" from "one method, two valid call shapes," and `Tracers` is the one place in the whole surface where that convention is applied to the latter.
 
 ---
 
-## Finding 4 — No worked example wires `Simulation` tracers together with `particle_velocities` / `sample!`
+## 4. "What does this return?" is documented three incompatible ways across modules
 
-**Type:** api-gap
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE `api / SimulationRun`, `Simulation`: three examples (grid mode, explicit mode, domain-first), none
-  passing `number_of_tracers`.
-- PAGE Home, PAGE `architecture` §2: both quick-start examples omit tracers entirely.
-- PAGE `api / Particles`: every entry is a bare signature block with prose, no runnable snippet showing
-  `Tracers` built through a `Simulation`, then read via `particle_positions` / `particle_velocities` /
-  `sample!`.
-
-**Description:** Every individual piece (the `number_of_tracers` keyword, `particle_positions`,
-`particle_velocities`, `sample!`, `velocity_buffer`) is documented on its own, but nothing in the
-manuscript shows them wired together end to end — the exact "sample along tracers" workflow this hat was
-asked to assemble purely from the docs. A first-time user has to infer the wiring (does `sim.tracers`
-exist automatically once `number_of_tracers > 0`? is `particle_velocities(sim)` populated from the first
-observation, i.e. at $t_0$, or only after the first `advance!`?) rather than read it off an example.
+- **Type:** format
+- **Severity:** minor
+- **Confidence:** high
+- **Locations:**
+  - PAGE `api / Generator`, `prepare!`: *"Returns `generator`."*
+  - PAGE `api / Propagator`, `deposit!`: *"Returns `cache` (or `sim`)."*
+  - PAGE `api / Forcing`, `set_forcing_rate!`: `set_forcing_rate!(forcing, rate, field, domain) -> rate`
+  - PAGE `api / Particles`, `record_trajectory_velocity!`: `record_trajectory_velocity!(tracers, u) -> tracers`
+- **Description:** For functionally identical "this mutator hands back its mutated argument" cases, `Generator`/`Propagator`/`Observables` use a trailing "Returns X." sentence while `Forcing`/`Particles`/`Phenomenology` put `-> X` in the signature block itself. No page states a rule for which style applies where, so a reader can't tell from the signature alone whether an omitted arrow means "returns nothing interesting" or "this module just doesn't use arrows."
 
 ---
 
-## Finding 5 — Grid-mode viscosity selection (`Li2008`, calibrated for a forced-stationary run) is never cautioned against for a decaying (`NoForcing`) case
+## 5. `Observables`' plain scalar reductions never show a return-type arrow, unlike `Phenomenology`'s equivalents
 
-**Type:** api-gap
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE `api / SimulationRun`, `Simulation`, "Setting the Reynolds number": grid mode "reads the
-  dissipation the box sustains from the box-normalized dissipation law `Li2008`" — a law explicitly
-  calibrated on *stationary* forced DNS (per PAGE `api / phenomenology / Scalings`, `Li2008`:
-  "$G = k/(L\varepsilon)^{2/3}$ … nearly Reynolds-number-independent" for the JHTDB *forced-isotropic*
-  dataset).
-- Same docstring, Keywords: "`viscosity` — … omit for grid mode." and separately "Explicit mode: pass
-  `viscosity` … for a decaying run (`velocity_forcing = NoForcing()`) or manual control" — phrased as an
-  example of when to use explicit mode, not as a restriction on grid mode.
-
-**Description:** Nothing states that combining the default grid-mode $\nu$ selection with
-`velocity_forcing = NoForcing()` is inapplicable or produces a viscosity calibrated for an energy balance
-the run will never sustain (since `Li2008` presumes the box holds `kinetic_energy` in stationary forced
-balance). A user reading only the `Simulation` docstring could plausibly build
-`Simulation(grid_points_per_axis = 64, velocity_forcing = NoForcing())`, expecting the automatic
-resolution-criterion viscosity to remain meaningful through decay, with no warning that it will not.
+- **Type:** format
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / Observables`, `kinetic_energy`: `kinetic_energy(u)` — no return annotation anywhere in the block.
+  - PAGE `api / phenomenology / Phenomenology`, `kolmogorov_length`: `kolmogorov_length(fp) -> Float64`
+- **Description:** Both are pure scalar-returning query functions over a state bundle, yet every `Observables` reduction (`kinetic_energy`, `dissipation`, `scalar_variance`, `derivative_skewness`, `max_speed`) omits a return-type arrow while every structurally identical `Phenomenology` accessor includes one — an inconsistent signature-block convention for the same kind of operation, one module apart.
 
 ---
 
-## Finding 6 — `StructureFunctions` laws' "any other order throws" never names the exception type
+## 6. Bare, physical-convention symbol names (`u`, `ω`, `φ`) are documented to accept — and an example passes — spectral data
 
-**Type:** api-gap
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE `api / phenomenology / StructureFunctions`, `Kolmogorov1941`: "any other `order` throws (K41
-  fixes only these two longitudinal moments universally)."
-- Same page, `Yaglom1949`: "any other `order` throws."
-- Same page, `Lundgren2002`: "any other `order` throws."
-
-**Description:** Same pattern as Finding 3 in a different module: three separate law docstrings promise a
-throw on an invalid `order` keyword but never state whether it is an `ArgumentError`, a `MethodError`, or
-something else, so a caller cannot write a targeted catch from the documented contract alone.
+- **Type:** clarity
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / Observables`, `kinetic_energy`: `kinetic_energy(u)` … *"it accepts `u` in either representation"*
+  - PAGE `Home`: *"kinetic_energy(sim.state.velocity_spectral)"*
+- **Description:** The house convention (CLAUDE.md, notation.md) reserves the bare symbol for the physical representation and the hatted symbol (`û`) for spectral. `kinetic_energy`/`scalar_variance`/`dissipation`'s field arguments keep the bare, physical-looking name yet are documented — and the flagship Home-page quick-start actually demonstrates — passing the *spectral* field into it, cutting against the very field-vs-representation discipline the docs elsewhere insist is a category-error class to guard against.
 
 ---
 
-## Finding 7 — `Simulation`'s "Keywords" section lists a positional argument under its own heading
+## 7. `advect!`'s argument order diverges from `step!`'s despite the docs advertising a shared convention
 
-**Type:** format
-**Severity:** nit
-**Confidence:** medium
-
-**Locations:**
-- PAGE `api / SimulationRun`, `Simulation`, under the heading "Keywords": "`domain` — a pre-built
-  `FixedDomain`, **the positional argument of the second form** (the front door builds one from
-  `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`)."
-
-**Description:** The bullet is self-explanatory once read, so no reader is actually misled, but a section
-titled "Keywords" containing an entry that its own text calls "the positional argument" is an internal
-label/content mismatch — a skimming reader scanning bullet names for a keyword called `domain` would be
-surprised that passing it as `Simulation(; domain = …)` does not work (it must be positional:
-`Simulation(domain; …)`).
+- **Type:** api-gap
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / Propagator`, `step!`: `step!(scheme, state, generator, domain, buffers, cache, dt)`
+  - PAGE `api / Particles`, `advect!`: `advect!(scheme, tracers, buffers, velocity_end, domain, dt)`
+- **Description:** `buffers` precedes `domain` in `advect!` but follows it in `step!`. The docs elsewhere take explicit pride in a shared positional convention across the field and particle sides (`allocate_buffers` is "one generic … because both sides keep the same separation") and in `step!`/`deposit!`'s shared order specifically ("the chained pair transposes nothing"), which makes the one mismatched pair stand out as unexplained.
 
 ---
 
-## Finding 8 — `dissipation`'s two call forms and `scalar_dissipation`'s single form are asymmetric with no note on why
+## 8. `tracer_scheme` (front door) vs `interpolation_scheme` (`Tracers`) is a renamed forward with no stated reason
 
-**Type:** clarity
-**Severity:** nit
-**Confidence:** low
-
-**Locations:**
-- PAGE `api / Observables`, `dissipation`: two forms, `dissipation(ω, viscosity)` and
-  `dissipation(û, domain, viscosity)`.
-- Same page, `scalar_dissipation(φ̂, domain, diffusivity)`: one form only.
-
-**Description:** The velocity route gets a field-argument overload (from an already-recovered `ω`) and a
-state-argument overload (straight from `û`); the scalar analogue only gets the state-argument form. This
-is defensible (there is no cached, first-class $\nabla\varphi$ recovery the way there is a cached
-`vorticity_physical`), but the docstring never says so, so a reader who has just read the velocity route's
-two-form pattern may look for (and fail to find any explanation of the absence of) a
-`scalar_dissipation(∇φ, diffusivity)` twin.
+- **Type:** clarity
+- **Severity:** nit
+- **Confidence:** medium
+- **Locations:**
+  - PAGE `api / SimulationRun`, `Simulation`: *"`tracer_scheme = CatmullRom` … forwarded to the `Tracers` constructor as its `interpolation_scheme`"*
+  - PAGE `api / SimulationRun`, `Simulation`: *"`particle_scheme = EndpointHeun()` … a different axis from `tracer_scheme` despite the neighbouring names"*
+- **Description:** The front door renames the keyword it forwards (`interpolation_scheme` → `tracer_scheme`) for no stated reason, landing the new name one letter-shuffle from the unrelated `particle_scheme` keyword. The risk is self-acknowledged in the same docstring ("despite the neighbouring names") but not resolved — simply keeping the name `interpolation_scheme` at the front door, matching `Tracers`, would have removed the collision the note has to warn about.
 
 ---
 
-## Summary
+## Positive cross-checks (not findings, recorded to show the ground covered)
 
-The public surface is tightly disciplined overall: every exported name in the umbrella's Index is
-documented, every documented type's own constructor and keywords are enumerated, physical-vs-spectral
-representation is stated on essentially every field-taking function, and the formula cross-checks
-(`Li2008` ↔ `stationary_dissipation` ↔ `Simulation`'s Reynolds-number section; `scalar_dissipation` ↔
-`Yaglom1949` ↔ `ObukhovCorrsin1949`; the module dependency order across Home / api / architecture) all
-agree exactly. The residual gaps are concentrated in two places a physicist-programmer would actually
-hit: **return-value documentation on in-place protocol verbs** (Finding 1) and **exception-type
-documentation on checked reads and validation contracts** (Findings 2, 3, 6) — plus one missing
-end-to-end tracer example (Finding 4).
+- Every export listed in the `api / GBGIsotropicTurbulence` Index has a matching documented
+  entry on its module's page, for every core-DNS module (`SimulationDomain`, `State`,
+  `Observables`, `Cache`, `Forcing`, `Generator`, `Propagator`, `Particles`, `SimulationRun`) — no
+  exported-but-undocumented or documented-but-not-exported items found.
+- All constructors checked against the "source object positional, settings keyword" decision
+  (`FixedDomain`, `ObservablesCache`, `ResolvedGenerator`, `Tracers`, `BandRescaling`,
+  `FlowConditions`, `ResolvedFields`, `Simulation`) comply with it.
+- `squared_wavenumber_kernel` (notation.md, `Observables.dissipation`/`scalar_dissipation`) is
+  consistently documented as the lazy `RadialKernel` field on `FixedDomain` across every page that
+  names it — an apparent staleness risk against the "the stored real |κ|² array is gone" decision
+  that turned out not to be one.

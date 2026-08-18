@@ -22,7 +22,8 @@ reference for turbulence notation (§References).
 > of composable pieces with a thin ergonomic run layer on top**, built as a *consumer* of
 > [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) (the field and spectral
 > machinery) and
-> [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl) (the statistics).
+> [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl) (the
+> statistics — the division is settled and the bridge to it is deferred, §4.9).
 >
 > It **is not** a general PDE or CFD framework, and not multi-physics: the physics is a **thin, fixed
 > core** — Navier–Stokes plus one passive scalar, no chemistry, phases, or processes. It is **not
@@ -882,8 +883,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     settle last) must stop drifting over a trailing window; ``k(t)`` is avoided because a constant-energy
     forcing clamps it and a fixed-injection forcing makes it ring. The skewness ``S(t)``
     (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the
-    "real turbulence yet" gate, whose default floor is a permissive one to be raised toward the
-    developed ``\lvert S\rvert \approx 0.5`` when the run must be strict (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
+    "real turbulence yet" gate, whose default floor is a permissive one: raise it to ``0.4`` when the
+    run must be strict, against the ``\lvert S\rvert \approx 0.5`` of a developed cascade (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is
     forced, ``\langle\varphi^2\rangle`` must flatten too — the scalar reaches stationarity after the
     velocity. A fixed turnover/time/step budget is the explicit alternative. *(Follows the warm-up
     literature.)*

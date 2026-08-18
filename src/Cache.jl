@@ -51,7 +51,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_fie
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       particle_velocities, fields_modified!, particles_modified!
+       particle_velocities, fields_modified!, particles_modified!, deposit_sample!
 
 
 # Epoch sentinels. A slot's epoch is the fields epoch it was deposited at; the sentinels mark the
@@ -255,6 +255,23 @@ deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = cache.fie
 deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_epoch; cache.scalar_physical)
 deposit_max_speed!(cache::ObservablesCache, value::Real) =
   (cache.max_speed = Float64(value); cache.max_speed_epoch = cache.fields_epoch; value)
+"""
+    deposit_sample!(cache) -> particle velocities
+
+Record the particle velocities already written into `cache` (an [`ObservablesCache`](@ref)) as
+current, so [`particle_velocities`](@ref) will serve them instead of throwing.
+
+Use it after writing new values along the trajectories —
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!)
+writes, this call records. The two are separate because the slot is the tracer set's own storage: the
+cache never fills it, and cannot know when its contents became current. A run does both for you at
+the end of each iteration; a hand-run loop that advances tracers itself must call both, in that
+order, since the write alone leaves the slot stale.
+
+This slot is the one checked against **two** epochs — the fields epoch of the velocity that was
+interpolated, and the particles epoch of the positions it was interpolated at — so this call stamps
+both from the cache's current counters. Returns the slot's array.
+"""
 deposit_sample!(cache::ObservablesCache) =
   (cache.sample_fields_epoch = cache.fields_epoch;
    cache.sample_particles_epoch = cache.particles_epoch; cache.particle_velocities)

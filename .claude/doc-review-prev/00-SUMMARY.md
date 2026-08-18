@@ -1,184 +1,184 @@
-# Panel round — 2026-08-14/15 (Enteropia) — 85 findings across 11 hats
+# Panel round 3 — 15 hats, 2026-08-18
 
-Run: `/check-consistency`, economy mode (9 Sonnet lanes + 2 full-strength physics anchors), against the
-docs built at commit `ebfde77` — i.e. **after** decisions 46–48 (the Observables/Cache reorder, the
-recovery move to PF's arity, the closing-deposit vocabulary sweep) and after the `/check-docs` battery.
-Sequential, collect-only, 11/11 hats returned, 0 errors, ~104 min.
+Fresh-eyed run over the rendered site after ~45 commits of change (ten rename classes, five
+signature changes, the `Tracers` split, decisions 49–56). **114 findings.** First outing for
+hats 13–15 (the rulebook hats) and for the cold reader's widened brief.
 
-**STATUS: CLOSED — 85/85 dispositioned. 75 fixed, 10 adjudicated as not defects.**
-Commits `0baddf3` (Tier 1 + Tier 2), `e8fba92` (Tier 3: citations, argument sections, K41),
-`c1d2fcc` (the remainder). Dashboard: https://claude.ai/code/artifact/e3216b09-781a-4b79-8d68-eeeed43a0fcc
-Suite green, docs build exit 0, both lints clean, surface 4 re-audited after every batch.
+| # | hat | findings | blocker | major | minor | nit |
+|---|---|---:|---:|---:|---:|---:|
+| 01 | `consistency-matrix` | 4 |  | 1 | 2 | 1 |
+| 02 | `software-architect` | 10 |  | 4 | 5 | 1 |
+| 03 | `turbulence-theoretician` | 9 |  | 3 | 4 | 2 |
+| 04 | `dns-practitioner` | 3 |  |  | 2 | 1 |
+| 05 | `structure-consistency` | 10 |  | 4 | 5 | 1 |
+| 06 | `latex-typesetter` | 6 |  | 1 | 3 | 2 |
+| 07 | `api-user` | 8 |  | 2 | 5 | 1 |
+| 08 | `dimensional` | 6 | 1 | 1 | 3 | 1 |
+| 09 | `citations-integrity` | 4 |  | 1 | 1 | 2 |
+| 10 | `style-editor` | 6 |  | 2 | 3 | 1 |
+| 11 | `cold-reader` | 11 |  | 3 | 5 | 3 |
+| 12 | `plain-sense` | 22 |  | 6 | 14 | 2 |
+| 13 | `naming-policy` | 9 |  | 4 | 5 |  |
+| 14 | `doc-policy` | 3 |  | 1 | 2 |  |
+| 15 | `invariants-and-decisions` | 3 |  | 3 |  |  |
+| | **TOTAL** | **114** | **1** | **36** | **59** | **18** |
 
-> The per-hat `NN-*.md` files are the work list. This summary is a **lossy** reading aid — a fix pass
-> must enumerate every finding in every hat by number and close it there, never from this file. A
-> severity here never overrides the hat's own.
+## Verified before reporting
 
-Counts per hat: 01:2 · 02:7 · 03:10 · 04:5 · 05:12 · 06:6 · 07:8 · 08:9 · 09:4 · 10:7 · 11:15 = **85**
+The discipline requires the crux of every Tier-1/2 finding checked against `src/` and the built
+HTML before it is relayed. Six were checked; the results split three ways.
 
----
+### CONFIRMED — the blocker, narrowed
 
-## Tier 1 — verified at source, unambiguous defects (5)
+**`max_speed`: two answers across four surfaces** (`dimensional`). Ground truth is
+`max_speed(u) = maximum(norm, u)` — the whole-vector magnitude — so three of the four surfaces are
+correct. The fourth is false: `docs/src/observables_cache.md:335` still says *"the `max_speed`
+reduction takes the largest component magnitude directly"*, and the same row claims no component
+forms the speed "even pointwise", which the fused `maximum(norm, u)` now does. **A stale sentence I
+left behind when I changed the behaviour this session**, on the divisor of the adaptive timestep.
+Real, but one site rather than a genuine ambiguity.
 
-Each was confirmed against current `src/` or the built HTML in the main thread before being listed here.
+### CONFIRMED — and also mine, from this session
 
-**T1-1. The rendered module Index still carries the pre-decision-46 order.** (hat 01#1)
-Five prose surfaces state `… State → Observables → Cache → Forcing → Generator …`; the rendered Index
-groups `State, Cache, Generator, Observables, Forcing`. **Verified cause:** `docs/make.jl:121–129`'s
-`modules = [...]` list — which drives the Index grouping — was never updated. My decision-46 commit
-fixed the pages and the sidebar and missed this one. *(One-line fix; also explains why hat 01 ranked it
-major — five statements against the machine-generated truth.)*
+**The two CFL loosenesses do not "pull the same way"** (`dimensional`, major). `recommended_cfl`
+says they do. They do not: a grid maximum *under*estimates the continuum supremum, making the step
+too large (unsafe), while the eigenvalue bound *over*estimates the spectral radius, making the
+ceiling too small (conservative). They pull in opposite directions, and the sentence is the stated
+justification for the conservative factor.
 
-**T1-2. The bare `C` in the skewness formula — found by FOUR hats.** (03#6, 06#2, 08#4, 10#2)
-`ARCHITECTURE.md:318` and `:886` write `3C\langle\det S\rangle/…` and then name the constant `C_S` in
-the same sentence; `notation.md` explicitly reserves bare `C` for the CFL ceiling, and the
-`derivative_skewness` docstring uses `C_S` throughout. **Verified:** both sites present. The strongest
-corroboration signal in the round.
+### REFUTED — all three findings of one new hat
 
-**T1-3. The Particles "tracking loop" intro describes the retired pre-cache mechanism.** (hat 10#1)
-`docs/src/api/Particles.md:25–29`: *"put the start-of-step velocity on record … the start-of-step values
-are taken off it **before the state advances**."* **Verified false:** `SimulationRun.jl:414–418` calls
-`deposit!`, then `advect!`, then `record_trajectory_velocity!` — at the iteration's **end**, on the
-just-deposited velocity. The function's own docstring and `advect!`'s Note both state the current order;
-only this section intro is stale (decision 42 moved it).
+`invariants-and-decisions` returned exactly three findings, all major, all asserting that
+`CLAUDE.md` still holds retired names — "stamped", `resolved_fields_modified!`, `velocity_factor`,
+`cache.vorticity`, `state.velocity`. **All five terms are absent**, from both the working tree and
+`HEAD`; the sweep that removed them held. A hat's first run scoring 0/3 is a fact about the
+instrument, not the corpus, and it belongs in the record next to the hat that earned its keep.
 
-**T1-4. "Spectral fields" / "the spectral velocity" — the package's own banned category error.** (03#4)
-`notation.md` states the rule ("a field is one physical object; physical and spectral are two
-representations"), §10 names the class. **Verified 6 sites:** `ARCHITECTURE.md:192, 365, 420, 1007, 1592`
-and — the one that matters most — `src/Cache.jl:272`, a **rendered docstring**
-(`resolved_fields_modified!`). Same class as the "spectral differential operators" fix in `01fdeb4`.
+## Ranked findings
 
-**T1-5. "Every diagnostic is dimensionless" is false.** (03#5)
-`ARCHITECTURE.md:734` (invariant list). ε, k, u′, L₁₁, η, τ_η, λ all carry dimensions in box units; what
-is dimensionless is the *control* (Re, Sc) and the reference *constants*. Collides with `FlowParameters`,
-documented as carrying "the independent **dimensional** quantities".
+### BLOCKER (1)
 
----
+- **max_speed: whole-vector magnitude or largest single component? Four surfaces, two answers** — `dimensional`, high confidence.
 
-## Tier 2 — real, needing a judgment call or a decision (13)
+### MAJOR (36)
 
-**T2-1. `E(κ)` is one glyph for two dimensionally distinct objects.** (08#7, adjacent 03)
-Measured = energy per shell (L²T⁻²); model = spectral density (L³T⁻²). `notation.md` binds both to `E(κ)`
-and annotates the difference in prose. This is precisely the "per-κ density vs an energy" category error
-the doc policy names. **Decision needed:** distinguish the measured one glyph-wise, or accept the
-annotation as sufficient.
+- **Decision-log entries disagree about what "decision 46's pattern" is** — `consistency-matrix`, high confidence.
+- **tracer_scheme (front door) renames interpolation_scheme (Tracers), beside a confusable sibling keyword** — `software-architect`, high confidence.
+- **advect! argument order breaks the step!/deposit! shared-order contract** — `software-architect`, high confidence.
+- **Simulation's fields expose internal per-step scratch (buffers, generator) at the same level as the sanctioned reading surfaces** — `software-architect`, medium confidence.
+- **"One forcing instance per field" is enforced only by a doc warning, unlike the package's throw-on-misuse pattern elsewhere** — `software-architect`, medium confidence.
+- **`max_speed` defined two incompatible ways: vector magnitude vs largest velocity component** — `turbulence-theoretician`, high confidence.
+- **"No component of the iteration computes k" is false under the default forcing the page assumes** — `turbulence-theoretician`, high confidence.
+- **Emptying the forced band is described as "a step with no forcing at all"** — `turbulence-theoretician`, high confidence.
+- **Admonition titling is not uniform: bare Note/Warning vs. custom titles** — `structure-consistency`, high confidence.
+- **Formula placement (display block vs. inline) inconsistent within one module** — `structure-consistency`, high confidence.
+- **Bulleted Arguments header used for some multi-keyword types, folded into prose for siblings with equal keyword count** — `structure-consistency`, medium confidence.
+- **Cache's module docstring interposes a conceptual aside before its contents list; every sibling module docstring lists first** — `structure-consistency`, medium confidence.
+- **C_{OC} renders as bare italic letter-product, not upright label** — `latex-typesetter`, high confidence.
+- **advance!'s docstring omits the closing deposit it performs** — `api-user`, high confidence.
+- **ObservablesCache's particle_velocities keyword: type/wiring undocumented** — `api-user`, medium confidence.
+- **CFL margin: two "loosenesses" said to pull the same way actually pull opposite ways** — `dimensional`, high confidence.
+- **Phenomenology pages' "not duplicated in ARCHITECTURE.md" claim is false for 3 works** — `citations-integrity`, high confidence.
+- **Admonition titles render literal backticks instead of code formatting** — `style-editor`, high confidence.
+- **Phenomenology References-list DOIs render as dead text, unlike identical DOIs elsewhere** — `style-editor`, high confidence.
+- **"deposit" is jargon used inside its own would-be definition** — `cold-reader`, high confidence.
+- **No glossary exists for the package's own operational vocabulary** — `cold-reader`, high confidence.
+- **FlowConditions and FlowParameters: near-identical names, overlapping fields, different jobs** — `cold-reader`, medium confidence.
+- **`step!`'s argument-order paragraph states an order that is false on its natural reading** — `plain-sense`, high confidence.
+- **`deposit!`'s second sentence: ~95 words, five clauses, cost accounting where the reader wants the arguments** — `plain-sense`, high confidence.
+- **`Simulation`'s `initial_spectrum` entry nests parentheses two deep and buries its subject** — `plain-sense`, high confidence.
+- **"not a filtered subset of the scales" — a fossil that plants the reading it denies** — `plain-sense`, high confidence.
+- **Architecture §4.1's State bullet is one ~600-word paragraph containing an 85-word sentence** — `plain-sense`, medium confidence.
+- **Grid mode: a dangling "which" leaves the reader guessing what credits what** — `plain-sense`, medium confidence.
+- **tracer_scheme / particle_scheme swap the axis decision 51 assigns them** — `naming-policy`, high confidence.
+- **Linear claims sole ownership of an identity ConstantPower shares** — `naming-policy`, high confidence.
+- **peak_wavenumber promises a spectrum peak the code does not deliver** — `naming-policy`, high confidence.
+- **k_max_η spells the wavenumber magnitude with the letter reserved for kinetic energy** — `naming-policy`, high confidence.
+- **Spectra module docstring embeds a formula, violating "map, no formulas"** — `doc-policy`, high confidence.
+- **CLAUDE.md's Cache bullet uses two terms decision 53/30 retired: "stamped" and resolved_fields_modified!** — `invariants-and-decisions`, high confidence.
+- **CLAUDE.md's Generator bullet names nonexistent verbs velocity_factor / scalar_factor** — `invariants-and-decisions`, high confidence.
+- **CLAUDE.md's naming-convention examples cite stale field names cache.vorticity and state.velocity** — `invariants-and-decisions`, high confidence.
 
-**T2-2. The default run is driven by the forcing the docs call unfit for measurement.** (03#1)
-`Simulation` says "forced and stationary"; `BandRescaling` says "a deterministic clamp, not a faithful
-stationary sampler … when the held quantity is itself measured, prefer `ConstantPower`". The clamped
-quantity is `kinetic_energy` — what a validation run measures. **Escalation:** a caveat at the front
-door, or reconsider the default. Not a wording fix.
+### MINOR (59)
 
-**T2-3. "Caching costs nothing on any axis" vs the recorded +1 pass/iteration.** (08#3, 04#2, 01#2 — three hats)
-The cache page and `deposit!` claim unchanged pass counts; the decision log records a once-per-iteration
-max-speed pass and host readback in **every** cell, held by `UNIFORM DEPOSIT SCHEDULE`, paid even under a
-fixed Δt. Also a live GPU cost invisible on the two pages a performance-minded caller reads (`advance!`,
-`deposit!`).
+- **tracer_scheme default shown without parens, unlike sibling defaults** — `consistency-matrix`, high confidence.
+- **Three docstrings credit three different actors with making particle_velocities readable** — `consistency-matrix`, low confidence.
+- **FlowParameters.scalar_dissipation uses a NaN sentinel, diverging from the package-wide nothing-sentinel convention** — `software-architect`, medium confidence.
+- **Cache's central epoch invariant is written from Propagator, not from Cache itself** — `software-architect`, medium confidence.
+- **ObservablesCache.particle_velocities is externally-owned aliased storage, unlike every other self-allocated slot** — `software-architect`, medium confidence.
+- **Simulation's explicit mode silently ignores k_max_η when viscosity is also given** — `software-architect`, medium confidence.
+- **The four AbstractForcing hooks reuse the parameter name field for three physically distinct instants** — `software-architect`, medium confidence.
+- **`Sreenivasan1995` preset defaults to a Kolmogorov constant that paper does not give** — `turbulence-theoretician`, medium confidence.
+- **`Lundgren2002` changes sign below Re_λ ≈ 34 and states no validity floor** — `turbulence-theoretician`, medium confidence.
+- **Warm-up skewness gate's default floor is a fifth of the marker it claims to enforce** — `turbulence-theoretician`, medium confidence.
+- **Two current-state surfaces still call the composed spectrum presets factory functions** — `turbulence-theoretician`, high confidence.
+- **"Float64 is the production precision" sits oddly against the package's own "no privileged default / fitness-tested" precision policy on a GPU-primary, consumer-GPU-targeted code** — `dns-practitioner`, medium confidence.
+- **The §2.3 transform-count table's "three-stage scheme" scope is stated once, two paragraphs before the table, and not repeated at the table itself** — `dns-practitioner`, medium confidence.
+- **State's two random-seeding functions omit the 'Returns x' sentence their template class otherwise always includes** — `structure-consistency`, medium confidence.
+- **FlowConditions's Fields section duplicates full prose (plus Julia types); FlowParameters's equivalent is a one-line back-reference** — `structure-consistency`, medium confidence.
+- **ResolvedGenerator's admonition sits mid-docstring, not near the end like its siblings** — `structure-consistency`, medium confidence.
+- **Phenomenology's module docstring carries two separate contents lists where every sibling has exactly one** — `structure-consistency`, medium confidence.
+- **Particles is the only API page opening with a usage-example section before its reference material** — `structure-consistency`, medium confidence.
+- **Big-O order symbol styled two ways for the same concept** — `latex-typesetter`, high confidence.
+- **Word-subscript labels mix \text{} and \mathrm{}, even on one page** — `latex-typesetter`, medium confidence.
+- **Same constant typeset as stacked fraction and as bare slash fraction within one file** — `latex-typesetter`, high confidence.
+- **Tracers' two-signature block implies dispatch the architecture says is impossible** — `api-user`, medium confidence.
+- **Return-value documentation style split across modules (prose vs signature arrow)** — `api-user`, high confidence.
+- **Observables' scalar reductions never show a return-type arrow, unlike Phenomenology's** — `api-user`, medium confidence.
+- **Bare physical-convention symbol names document accepting spectral input** — `api-user`, medium confidence.
+- **advect!'s argument order diverges from step!'s shared convention** — `api-user`, medium confidence.
+- **det S — materialized by the warm-up skewness gate, or never materialized?** — `dimensional`, high confidence.
+- **Scalar Dirichlet form written with φ where its velocity twin writes û** — `dimensional`, high confidence.
+- **Composed spectrum presets called "factory functions" in two maps, "types" in three current-state places** — `dimensional`, high confidence.
+- **Williamson (1980) "his recommended case 7" attribution is unverifiable/possibly wrong** — `citations-integrity`, low confidence.
+- **Stray space renders before closing punctuation after a code/link span** — `style-editor`, high confidence.
+- **Two prose sentences open with a lowercase code identifier** — `style-editor`, medium confidence.
+- **The @extref exception for backend/element types is applied in notation.md but not in ARCHITECTURE.md's own prose** — `style-editor`, low confidence.
+- **"register" used in two unrelated senses before the package sense is defined** — `cold-reader`, medium confidence.
+- **"CFL" used unexpanded at its first two appearances** — `cold-reader`, medium confidence.
+- **"the developed-turbulence markers" (plural) but only one marker is ever documented** — `cold-reader`, medium confidence.
+- **"Berendsen-thermostat limit" borrowed from molecular dynamics, never explained mechanically** — `cold-reader`, medium confidence.
+- **"EDQNM, DIA, LRA" acronyms never expanded anywhere on the site** — `cold-reader`, low confidence.
+- **`step!`: "the step allocates and resides nothing"** — `plain-sense`, high confidence.
+- **`AbstractForcing` states the return-value contract twice** — `plain-sense`, high confidence.
+- **The Particles page says "changing the scheme changes nothing here" three times** — `plain-sense`, high confidence.
+- **`truncate_to_band!`'s admonition argues about its own name and repeats the blurb above it** — `plain-sense`, high confidence.
+- **The `Cache` module map points at verbs a reader cannot look up** — `plain-sense`, high confidence.
+- **Architecture §4.7 explains an API that no longer exists** — `plain-sense`, high confidence.
+- **"A fifth name is not a hook" — a denial with nothing to deny** — `plain-sense`, medium confidence.
+- **`Simulation` glosses the docs' own house word inside its own docstring** — `plain-sense`, high confidence.
+- **`run!` leaks the audit ledger into the front-door loop verb** — `plain-sense`, medium confidence.
+- **"a solver with no cache serving only its own dynamics" — a dangling modifier** — `plain-sense`, medium confidence.
+- **`SaffmanDissipation`: "about half the earlier Townsend 1951 spectrum"** — `plain-sense`, medium confidence.
+- **`PhaseShift`: a relative clause torn from its noun by a 14-word gloss** — `plain-sense`, high confidence.
+- **`particle_scheme` apologises for a name instead of stating what it does** — `plain-sense`, medium confidence.
+- **The epoch-vs-step worked example is printed four times, verbatim** — `plain-sense`, medium confidence.
+- **target names two different physical kinds of quantity across sibling forcings** — `naming-policy`, high confidence.
+- **Tracers.trajectory_velocity (singular) stores what particle_velocities (plural) reads** — `naming-policy`, medium confidence.
+- **Li2008's constant field uses the least specific name in its own family** — `naming-policy`, medium confidence.
+- **stationary_dissipation's energy argument breaks the package-wide kinetic_energy name** — `naming-policy`, medium confidence.
+- **finalize! borrows a software-engineering term where a physics verb is available** — `naming-policy`, medium confidence.
+- **Pope2000 duplicates ModelSpectrum's generic formula verbatim** — `doc-policy`, medium confidence.
+- **Named-method citations open the identity sentence, ahead of the formula** — `doc-policy`, low confidence.
 
-**T2-4. `Li2008`'s three numbers don't satisfy its own identity.** (08#1 — corroborates my own check-docs flag)
-`G = (3/2)C_ε^{-2/3}(L₁₁/L)^{2/3}` with the quoted `C_ε = 0.5`, `L/L₁₁ ≈ 5` gives `G = 0.814`, not the
-quoted `0.9`; consistency needs `L/L₁₁ ≈ 4.3`. The passage exists to let a reader close the two groups.
+### NIT (18)
 
-**T2-5. In-place protocol verbs never document their return value.** (07#1)
-`velocity_rhs!`, `scalar_rhs!`, `step!`, `deposit!`, `dealias!` — while `prepare!`, `finalize!`,
-`vorticity_physical!`, `resolved_fields_modified!` and all four Forcing hooks state theirs explicitly.
-The docs invite hand-run loops, so this is a real gap.
+- **"the developed-turbulence markers" (plural) names only one built marker** — `consistency-matrix`, low confidence.
+- **k_max_η mixes ASCII-folded κ with literal Unicode η, contradicting its own "spelled in ASCII" claim** — `software-architect`, medium confidence.
+- **Re = 1/ν asserted absolutely while the default box side is 2π** — `turbulence-theoretician`, medium confidence.
+- **E_n ↔ E(κ) presented as an exact conversion by the shell width** — `turbulence-theoretician`, medium confidence.
+- **IFLowStorageRK3's "two field registers per field" headline sits next to a three-array IntegratorBuffers field list** — `dns-practitioner`, low confidence.
+- **Examples sections appear on a minority of types with no stated selection rule** — `structure-consistency`, low confidence.
+- **theta reused in archived StochasticOU docstring against the house glyph rule** — `latex-typesetter`, medium confidence.
+- **\exp\!\big(...\big) uses non-directional \big throughout vs directional \bigl/\bigr elsewhere** — `latex-typesetter`, low confidence.
+- **tracer_scheme (front door) vs interpolation_scheme (Tracers) renamed forward** — `api-user`, medium confidence.
+- **"Of order 10² flops per grid point" per scalar transform against the package's own 5/2·N³log₂N³** — `dimensional`, medium confidence.
+- **"Kaneda 1993" cited with no bibliographic detail, unlike its paragraph neighbors** — `citations-integrity`, low confidence.
+- **"the leanest of the three on a GPU" (TwoThirds) is an unsubstantiated superlative** — `citations-integrity`, low confidence.
+- **"No DOI" capitalization is inconsistent between ARCHITECTURE.md and the Phenomenology reference lists** — `style-editor`, high confidence.
+- **"arm"/"armed" used before its own gloss, on the same page** — `cold-reader`, low confidence.
+- **PointSet / VectorPointValues / ScalarPointValues named but never characterized** — `cold-reader`, low confidence.
+- **"resolved" used for two different concepts** — `cold-reader`, low confidence.
+- **The notation page states the ϰ-distinctness convention twice** — `plain-sense`, high confidence.
+- **"That is bookkeeping, not a slogan"** — `plain-sense`, medium confidence.
 
-**T2-6. `velocity_rhs!`/`scalar_rhs!` clobber different, unpredictable argument positions.** (02#1, 07 adjacent)
-`velocity_rhs!` destroys the last physical arg (`ω`, keeps `u`); `scalar_rhs!` destroys a non-last one
-(`u`, keeps `φ`). Two halves of one protocol disagreeing. **Escalation** — an API-shape question, not a
-doc fix.
-
-**T2-7. `max_wavenumber`: "the modes above it are zeroed each step" is false for `HouLi`.** (08#6)
-`SimulationDomain.jl:257`. HouLi has `f = 1`, so corner modes out to √3·κ_Ny are *damped*, not zeroed.
-`HouLi`'s and `dealias!`'s own docstrings state the correct weaker claim.
-
-**T2-8. HouLi's `f = 1` "resolves a finer η" credit assumes clean bandwidth its own page disclaims.** (04#1)
-The grid-mode viscosity formula credits a wider retained band with a finer η at equal `k_max_η`, treating
-HouLi's band as trustworthy resolved signal where HouLi documents it as only damped.
-
-**T2-9. No `particles_modified!` counterpart to `resolved_fields_modified!`.** (02#2)
-The cache is explicitly two-axis (`fields_epoch`, `particles_epoch`) and the architecture generalizes
-"writing stays on the dot path", but only the fields axis has an announce verb.
-
-**T2-10. `FlowParameters.scalar_dissipation` uses `NaN` as the unset sentinel.** (02#3)
-Against the package's own throw-don't-degrade discipline; `NaN` propagates silently where `nothing`
-would fail loudly at the point of misuse.
-
-**T2-11. Cold-read: four load-bearing terms unglossed where they first appear.** (11#1–#4)
-"front door" (Home, first sentence of Quick start; re-glossed three times later, defined on a fourth
-page); "iteration"/"deposit"/"stamp" (Home, before the Cache page defines them); "scratch arity" (used
-verbatim twice, defined nowhere); "2N-storage" (reuses `N`, which `notation.md` fixes as grid points).
-
-**T2-12. Exception types are never named on the surfaces that throw.** (07#3, 07#6)
-The checked reads document *that* they throw; only `ObservablesCache`'s type docstring names
-`ErrorException`. Same for the `StructureFunctions` "any other order throws".
-
-**T2-13. `IFRK2`'s CFL 0.25 is presented inside a derivation it isn't derived from.** (04#3)
-`y_s = 0` makes the stated formula vanish; 0.25 is substituted with no derivation and no ν-dependence,
-beside a stability argument that is explicitly ν-dependent.
-
----
-
-## Tier 3 — nits, style, and structure (≈67 remaining)
-
-- **Structure (hat 05, 12 findings)** — four different shapes for "enumerate the constructor arguments"
-  (`Arguments:` / `Keywords:` / unheaded bullets / prose-only); citation placement front-loaded in ~10
-  types, deferred in 3; two module maps whose bullet order doesn't track their page's sections (Cache,
-  Particles); two documented operations missing from their module's map (`DeferredForcing`,
-  `stationary_dissipation`); the "plain constructor" preamble on 8 types and absent on 14.
-- **Typesetting (hat 06)** — `\frac{\partial u}{\partial t}` on the cache page vs `\partial_t u` in seven
-  other restatements of the same equation; mixed `\tfrac`/`\frac` inside one `Lundgren2002` display;
-  `\mathrm d` vs `\mathrm{d}`; `\kappa^4` unbraced 4×/braced 1× in one file; the Home scalar equation
-  spelling `ν/Sc` where ϰ is the reserved glyph.
-- **Citations (hat 09)** — `Kolmogorov1941` carries both the 2/3 law (Dokl. **30**) and the exact 4/5 law
-  (historically Dokl. **32**) under one Reference; `TwoThirds` alone of the three strategies carries no
-  inline citation (Orszag 1971 exists in §References); eight inline-only Spectra citations unresolvable
-  while the one named exemplar gets full detail; a 301 vs 301–305 page-range split.
-- **`StationarityCriterion`** (11#7, 05#6, 10#7 — three hats) — 7 keywords vs a 6-entry Fields list; five
-  keywords vanish into an opaque `monitor`, and only `gate_scalar` of the two sibling gates gets a bullet.
-- **Vocabulary** (11#5, 10#3 — two hats) — Home says "the instant between **steps**"; decision 48 settled
-  on "between iterations", and step ⊂ iteration is a distinction the corpus otherwise keeps.
-- Plus: `2.51` should be `2.52 GiB` (08#9); the 10-flops/24-bytes pair describing two different kernels
-  (08#8, 04#4); `peak_wavenumber` is √2 off the peak it names and doubles as `1/L₁₁` (08#5); the CFL √3
-  gap not actually absorbed by 0.83→0.5 (08#2); `Phenomenology` a peer bullet on Home, a subordinate
-  clause on api.md (05#8); PascalCase factory functions (02#7); `integrator` as a SciML false cognate
-  (02#6); a decision-log sentence opening with a lowercase identifier (10#6); `Simulation`'s "Keywords"
-  section listing a positional argument (07#7); no end-to-end tracer example (07#4).
-
----
-
-## Self-inflicted, found in verification (not a hat finding)
-
-The decision-48 vocabulary sweep left two `#`-comment artifacts: `SimulationRun.jl:10`
-("recovers **the deposited** observables") and `:410` ("deposit **the deposited** observables"), both
-from the mechanical `boundary observables → deposited observables` substitution. Not rendered, but
-wrong. Fix with the pass.
-
-## Verified clean (batteries the panel ran and closed)
-
-- **All physics.** Both anchors re-derived, independently: `C_S = (4/7)√(15/2)` against **both** stated
-  isotropy relations and Betchov's identities; the ε Dirichlet route; `ε_φ = 2ϰ⟨|∇φ|²⟩`; Yaglom's
-  −(2/3)ε_φ r from the KHM balance; `L₁₁`/`L_E`/`L₂₂` from `R_ii(r)`; the RK3 coefficients (Σd = 1) and
-  IFRK2's `|R(iy)|² = 1 + y⁴/4`; the phase-shift `2√2/3 κ_Ny` and ×2.8 modes in all six places;
-  `κ_max η = fπη/Δx`, `Re_λ ~ N^{2/3}`; the alias condition `2κ_max < N`; every memory figure and every
-  transform-ledger cell (18/9, 21/18, 36/18, 42/36; 51→42, 34→28); She–Lévêque, K62, Pope/von Kármán/
-  Pao/Obukhov–Corrsin.
-- **Citations** — no fabricated or unverifiable reference across ~28 checked; no citation to the
-  gitignored `inspiration/`; no unsubstantiated "exact"/"allocation-free"/"optimal" claim.
-- **Typesetting** — no `\left`/`\right` anywhere; no unbraced `\boldsymbol u`/`\tfrac12`; every code
-  identifier inside a math span `\texttt{}`-wrapped; `\mathrm{i}` everywhere; operators upright.
-- **Raw HTML** — the pipe-tables and glued admonition titles in the manuscript are extraction artifacts;
-  they render as real `<table>`s and Documenter admonitions. `Fields` renders uniformly on all 10 pages.
-- **The decision-48 rename** — hat 10 swept for `trajectory_sample`, `tracer_positions`, "tail deposit",
-  "boundary velocity/observables" and found none outside the decision-log entries recording the old
-  names (exempt).
-
-## False positives / adjudicated
-
-- Manuscript-extraction artifacts (tables, admonition titles) — confirmed clean in the built HTML by
-  hat 10 itself; already in `doc-review-adjudicated.md` from the prior round.
-- `Lundgren2002` "missing" from StructureFunctions' References — re-checked present, correctly
-  **not** re-flagged (the adjudication file did its job).
-- 11#8 (`PointSet`/`*PointValues` undefined) — self-flagged low confidence; these are `@extref`-linked
-  backend types the text extraction can't show. Not a defect.

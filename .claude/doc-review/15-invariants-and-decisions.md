@@ -1,117 +1,50 @@
-# Hat: invariants-and-decisions
+# Panel hat: invariants-and-decisions
 
-Audits whether the package's own recorded invariants (CLAUDE.md's "Core invariants") and its
-append-only decision log (`ARCHITECTURE.md` §11) are honoured by the current documentation surface —
-including `CLAUDE.md` itself, which the panel's brief lists as one of the two authoritative "law"
-documents to read.
+Scope: `CLAUDE.md`'s Core invariants, `docs/ARCHITECTURE.md` §11's decision log, the rendered
+manuscript, and `src/*.jl`, cross-checked for whether the package still honours its own recorded
+invariants and decisions. Method: read the full decision log (56 entries) and CLAUDE.md's
+invariants, then cross-referenced every current-state claim in the rendered pages against them,
+verifying a large sample of the load-bearing claims (naming, signatures, module contents, memory
+figures, forcing archival status, extraction-boundary purity) directly against `src/*.jl`.
 
-All three findings below are of one class: `CLAUDE.md`'s own current-state prose (not the decision
-log, which is append-only history and exempt per the adjudicated notes) uses names that later
-decisions in `ARCHITECTURE.md` §11 explicitly retired, and that no longer exist in the rendered docs
-or the source. Each is corroborated directly against `src/*.jl`.
+Overall verdict: this corpus is unusually self-consistent — CLAUDE.md, the ARCHITECTURE.md
+decision log, the rendered pages, and the source all agreed on every substantive check performed
+(the six-verb protocol, the `ω_consumed`/`u_consumed` naming of decision 56, `StochasticOU`'s
+un-exported archival status, the extraction-bound `Phenomenology` leaf's zero PF/SS dependency,
+the 384 MiB-per-vector arithmetic behind decisions 37/41, the `advect!`/`particle_positions`/
+`number_of_particles` renames of decisions 50–51, and more). Only one genuine class of defect
+surfaced.
 
----
+## Finding 1: The umbrella module's own "Module layout" comment states the wrong include order — reversing the very dependency decision 23(a) added
 
-## Finding 1 — `CLAUDE.md`'s `Cache` bullet uses two retired terms: "stamped" and `resolved_fields_modified!`
-
-- **Type:** other (naming/decision-log drift)
-- **Severity:** major
+- **Type:** contradiction
+- **Severity:** minor
 - **Confidence:** high
 - **Locations:**
-  - `CLAUDE.md`, "Modules and wiring": *"`Cache` — the observables cache (`ObservablesCache`): the
-    **stamped storage** the iteration deposits its observables into at its end (… `resolved_fields_modified!`
-    announces an out-of-band state mutation)."*
-- **Contradicts:**
-  - `ARCHITECTURE.md` §11 decision 53: *"'Stamp' is retired; a slot carries an **epoch**… The `*_stamp`
-    fields become `*_epoch`… rather than 'stamping' it."*
-  - `ARCHITECTURE.md` §11 decision 30 (as corrected): *"The verb was named `resolved_fields_modified!`
-    when the decision was taken; decision 24 shortened it, and the sweep updated the log to the current
-    name."* The current verb is `fields_modified!`, used consistently across the rendered `Cache` API
-    page, the `observables_cache.md` design page, and decision 49.
-  - `src/Cache.jl`: the exported, defined verb is `fields_modified!` (line 296:
-    `fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)`); no
-    `resolved_fields_modified!` exists anywhere in the source.
-- **Description:** `CLAUDE.md` is one of the two documents this panel treats as authoritative "law",
-  and its own description of the `Cache` module contradicts two separate later decisions (24/30 and 53)
-  that are otherwise followed everywhere else in the codebase and its docs — the rendered site never
-  uses "stamped" or `resolved_fields_modified!` outside the decision log's historical record (where the
-  terms are correctly quoted as *what used to be said*). Decision 48/53 explicitly retire this
-  vocabulary "from every surface, prose and code alike"; `CLAUDE.md` is a surface that was missed. A
-  reader following `CLAUDE.md` verbatim would call a function that does not exist.
-- **Resolution hint:** replace "the stamped storage" → "the epoch-dated storage", and
-  `resolved_fields_modified!` → `fields_modified!`.
-
----
-
-## Finding 2 — `CLAUDE.md`'s `Generator` bullet names nonexistent verbs `velocity_factor` / `scalar_factor`
-
-- **Type:** other (naming/decision-log drift)
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `CLAUDE.md`, "Modules and wiring": *"`Generator` — … reified as `ResolvedGenerator` … behind the
-    protocol `prepare!` / `velocity_rhs!` / `scalar_rhs!` / **`velocity_factor` / `scalar_factor`** /
-    `finalize!`."*
-- **Contradicts:**
-  - `ARCHITECTURE.md` §11 decisions 31 and 39, and the rendered `api/Generator` page, all of which name
-    the pair `velocity_integrating_factor` / `scalar_integrating_factor` (decision 39: *"the `!` is gone
-    — nothing is mutated"*, i.e. even the pre-decision-39 name carried `_integrating_factor`, never a
-    bare `_factor`).
-  - `src/Generator.jl`: exports and defines exactly `velocity_integrating_factor` /
-    `scalar_integrating_factor` (lines 27, 47, 376–416); no `velocity_factor` or `scalar_factor` exists
-    anywhere in the source or the rendered docs.
-- **Description:** The backtick-quoted verb names in this bullet are not, and have never been, the
-  package's actual identifiers — house style (the doc policy's silent-rendering rule (e), which governs
-  `CLAUDE.md`'s own authored surface) reserves a backtick span for "only well-formed Julia — a name,
-  type, call, or expression", so this reads as a claim about real code that is false. A reader forming a
-  mental API map from `CLAUDE.md` (its stated purpose) would look for a function that has never existed.
-- **Resolution hint:** `velocity_factor` / `scalar_factor` → `velocity_integrating_factor` /
-  `scalar_integrating_factor`.
-
----
-
-## Finding 3 — `CLAUDE.md`'s naming-convention example list gives two stale storage-field names: `cache.vorticity`, `state.velocity`
-
-- **Type:** other (naming/decision-log drift)
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `CLAUDE.md`, "Style" → "Naming — flow-field math variables…": *"Storage slots keep descriptive
-    names — `cache.vorticity`, `generator.product_spectral`, `state.velocity`,
-    `Tracers.trajectory_velocity`…"*
-- **Contradicts:**
-  - Rendered `api/Cache` page, `ObservablesCache` Fields: *"`velocity_physical`, `vorticity_physical` —
-    the cached velocity and vorticity in physical representation"* — the field is `vorticity_physical`,
-    not `vorticity`.
-  - Rendered `api/State` page, `ResolvedFields` Fields: *"`velocity_spectral` — the velocity in spectral
-    representation, ``\hat{\boldsymbol{u}}``"* — the field is `velocity_spectral`, not `velocity`
-    (decision 26 named the field this way when `ResolvedFields` was reified, precisely to distinguish it
-    from a physical-representation slot).
-  - `src/Cache.jl` line 117: `const vorticity_physical::PV` (no field named plain `vorticity`).
-    `src/State.jl` line 57: `velocity_spectral::UH` (no field named plain `velocity`).
-- **Description:** This is the worked example for the very rule it illustrates ("storage slots keep
-  descriptive names") — the rule that is supposed to prevent exactly this kind of ambiguity (is it the
-  physical or spectral representation? the source or the cached copy?) is demonstrated with two field
-  names that do not exist on the objects named. `generator.product_spectral` and
-  `Tracers.trajectory_velocity` in the same list are correct, which makes the two wrong entries read as
-  drift (pre-dating decisions 26/30/40) rather than a deliberate abbreviation.
-- **Resolution hint:** `cache.vorticity` → `cache.vorticity_physical`; `state.velocity` →
-  `state.velocity_spectral`.
-
----
-
-## Scope note
-
-Beyond `CLAUDE.md` itself, the rendered site (`Home`, `api`, `architecture`, `observables_cache`,
-`phenomenology`, and every `api/*` module page) was cross-checked against every decision-log entry
-32–56 (the post-cache-redesign era most likely to have left stale prose) for: include-order claims,
-the `step!`/`deposit!` signatures, the `IntegratorBuffers`/`ParticleIntegratorBuffers` field lists, the
-`Forcing` hook lifecycle, the `BandRescaling`/`Li2008`/grid-mode viscosity construction, the
-`StationarityCriterion`/`run!` stopping vocabulary, the `Tracers`/`EndpointHeun`
-trajectory/predictor-register naming, and the memory-footprint arithmetic in
-`observables_cache.md` §1.4 (independently re-derived: 6 vector-shaped fields × 384 MiB = 2.25 GiB ≈
-"about 2.3 GiB" at 256³/`Float64`, and 10 → 6 matches the four retired registers decisions 40–41 name).
-None of that surface showed a violation of invariant 1–5, decision 18's extraction boundary, or
-invariant 4's footprint/allocation discipline — the rendered docs track the current decision-log state
-closely. The three findings above are all in `CLAUDE.md`'s own prose, which the panel brief names as
-authoritative but which was not swept when decisions 24, 26, 30, 39, and 53 landed.
+  - `src/GBGIsotropicTurbulence.jl`, lines 12–25 (the "Module layout" comment): lists
+    `"Cache … Generator … Forcing … Propagator"` — i.e. **Generator before Forcing**.
+  - `src/GBGIsotropicTurbulence.jl`, lines 58–66 (the actual `include(...)` calls, ~30 lines
+    below the comment): `include("Cache.jl")`, then `include("Forcing.jl")`, then
+    `include("Generator.jl")` — i.e. **Forcing before Generator**.
+  - `CLAUDE.md`, "Modules and wiring": `"Include order: SimulationDomain → State → Observables →
+    Cache → Forcing → Generator → Propagator → Particles → SimulationRun"`.
+  - `docs/ARCHITECTURE.md` §4.9 / rendered `architecture` page: `"SimulationDomain → State →
+    Observables → Cache → Forcing → Generator → Propagator → Particles → SimulationRun."`
+  - `src/Generator.jl` line 43: `using ..Forcing: AbstractForcing, NoForcing, …` — Generator
+    *consumes* Forcing, confirming Forcing must be included first.
+  - A secondary, weaker echo of the same drift: `src/SimulationRun.jl` line 5's prose comment
+    ("it wires the pieces of SimulationDomain/State/**Generator**/Observables/**Forcing**/
+    Propagator/Particles") also places Generator before Forcing and omits Cache entirely.
+- **Contradicts:** the umbrella file's own `include()` statements 30 lines below the comment, and
+  both authoritative documents' explicit "Include order" statement (CLAUDE.md and ARCHITECTURE
+  §4.9 both say Forcing precedes Generator) — the axis of disagreement is the ordering of two
+  named modules in a five-way described sequence.
+- **Description:** Decision 23(a) explicitly earned the `Generator → Forcing` *dependency* edge
+  ("this adds the honest Generator → Forcing dependency (the RHS includes the forcing source)"),
+  which is why Forcing must be textually included first — and the real `include()` list, and both
+  CLAUDE.md and ARCHITECTURE.md, get this right. But the umbrella module's own top-of-file "Module
+  layout" comment — whose opening line says "it sets the include order" — states the modules in
+  the opposite order for exactly this pair, an internal inconsistency a maintainer reading the file
+  top-to-bottom would trip on immediately (the comment's claim is falsified by the code 30 lines
+  below it). This is a source-level, not user-facing, defect, but it is squarely a decision/
+  invariant currency lapse: the file never got the memo its own dependency decision required.

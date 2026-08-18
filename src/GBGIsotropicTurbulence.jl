@@ -93,7 +93,8 @@ using .Cache:
   scalar_physical,
   particle_velocities,
   fields_modified!,
-  particles_modified!
+  particles_modified!,
+  deposit_sample!
 
 using .Generator:
   FlowConditions,
@@ -172,6 +173,7 @@ export FixedDomain,
        particle_velocities,
        fields_modified!,
        particles_modified!,
+       deposit_sample!,
        new_vector_field_spectral,
        new_vector_field_physical,
        new_scalar_field_spectral,

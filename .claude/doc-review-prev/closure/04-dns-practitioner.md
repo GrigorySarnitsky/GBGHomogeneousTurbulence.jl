@@ -1,56 +1,43 @@
-# Closure audit — 04-dns-practitioner
+# Closure — Hat 04: DNS practitioner / GPU performance
 
-## Finding 1 — HouLi f=1 "resolves a finer η" claim leans on inexact spectral content
+## Finding 1 — "Float64 is the production precision" framing tension
 **VERDICT: ABSENT**
 
-Evidence: `src/SimulationRun.jl:111-113` — "a wider-band strategy (larger `f`) resolves a finer
-dissipation scale `η` on the same grid at the same `k_max_η` — which credits the whole retained band
-as clean signal, exact for `TwoThirds` and `PhaseShift`, approximate for `HouLi`, whose top of band
-is damped rather than exactly dealiased." The exact caveat the finding's resolution hint asked for is
-now present at the site of the formula. Cross-checked `HouLi`'s own docstring
-(`src/SimulationDomain.jl:81`, "only damps aliasing rather than removing it exactly — a
-stabilization") — unchanged, still consistent with the new caveat, no regression introduced.
+Evidence: `docs/ARCHITECTURE.md` §6 (lines 586–612) no longer contains the phrase "production
+precision" or "development and desktop precision" anywhere (`rg -ni "production precision"` and
+`rg -ni "desktop precision"` across the corpus, excluding `.claude/`, both return zero hits). The
+section now reads neutrally: "`Float32` buys twice the grid per byte and roughly twice the
+throughput on a consumer GPU; `Float64` buys the accuracy margin a long integration or a sensitive
+diagnostic may need. Which one a run wants is a fitness question, settled by test rather than by a
+house default." (line 591–594) — no normative label pre-judging the fitness-test outcome. The
+`Simulation` front-door default `element_type = Float64` (`src/SimulationRun.jl:66,182,285`) is
+unchanged, but the finding's specific complaint — the doc handing out a normative "production"
+label in the same breath as disclaiming one — is gone.
 
 ---
 
-## Finding 2 — `max_speed` reduction/readback unconditional under fixed `dt`, undocumented
+## Finding 2 — §2.3 transform-count table's scheme scope stated only once, far from the table
 **VERDICT: ABSENT**
 
-Evidence: `src/Propagator.jl:473-475`, `deposit!` docstring — "its pass counts are unchanged but for
-one: the maximum-speed reduction runs every iteration, including under a hand-fixed `Δt` that never
-reads it." This is one of the two pages the finding named (`deposit!`), stating exactly the cost and
-condition the finding asked to surface. `advance!` (`src/SimulationRun.jl:355-361`) itself still
-doesn't repeat the note, but the resolution hint asked for it on "`advance!` **or** `deposit!`" and
-`deposit!` now carries it.
+Evidence: `docs/src/observables_cache.md` line 293–294, immediately above the table (line
+296–299), now reads: "Counts are per step of a three-stage scheme (`IFLowStorageRK3`); a scheme
+with a different stage count scales them by its own." This is the exact resolution hint the
+finding proposed (repeat the scheme qualifier at the table). The §2 opening mention (line 222,
+"a three-stage scheme") still exists as well, but the table is no longer scheme-scope-silent: the
+scoping sentence sits in the paragraph directly preceding it.
 
 ---
 
-## Finding 3 — `IFRK2`'s CFL ceiling (0.25) presented without derivation or ν-dependence caveat
+## Finding 3 — "two field registers per field" headline vs. three-array `IntegratorBuffers`
 **VERDICT: ABSENT**
 
-Evidence: `src/Propagator.jl:526-528`, `recommended_cfl` docstring — "`IFRK2` is imaginary-axis
-unstable (`y_s = 0`, relying on viscous damping), which makes the formula degenerate — its `0.25` is
-an empirical margin, not a computed limit, and the damping it leans on weakens as `ν` falls." Matches
-the finding's resolution hint (state it's an empirical margin, not a stability-limit computation)
-essentially verbatim, including the explicit ν-dependence caveat.
-
----
-
-## Finding 4 — "24 bytes moved" traffic estimate silently Float64-only
-**VERDICT: ABSENT**
-
-Evidence: `docs/src/observables_cache.md:43` — "...against twenty-four bytes moved in double
-precision (twelve in single)." Matches the finding's exact resolution hint wording. (Note: the
-adjacent flop count changed from "ten" to "one" arithmetic operations per point — an unrelated edit,
-not part of this finding's scope, not evaluated here.)
-
----
-
-## Finding 5 — "five operations" lead-in doesn't match the four clauses that follow
-**VERDICT: ABSENT**
-
-Evidence: `docs/src/observables_cache.md:279-284` — the "five operations" lead-in phrase is gone
-entirely; the passage now reads "one **evaluation** of the velocity term proceeds as follows: recover
-`u` (3 inverse transforms); form `ω̂` and recover `ω` (3 inverse); multiply pointwise ... and
-transform it back (3 forward); apply `P` and the mask..." with no operation count claimed up front —
-matches the finding's resolution hint ("drop the 'five operations' lead-in").
+Evidence: `src/Propagator.jl` lines 240–245 (the `IFLowStorageRK3` docstring) now reads: "Three
+nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose `N` counts evolved
+field registers, not the grid points `N` of the rest of the documentation — two field registers
+per field: the state's own array plus one accumulator (`stage1`). The `IntegratorBuffers` a run
+allocates can hold more than that count — for this scheme it adds `nonlinear`, the dealiasing
+seam's assembly register — because the count measures the scheme, not the solver it is embedded
+in." This is a materially expanded, explicit sentence (not the easy-to-skim parenthetical the
+finding quoted) that directly states the "2N" count is a classical-accounting convention distinct
+from `IntegratorBuffers`' actual allocation, addressing the finding's own concession that this was
+"very likely not a defect" at low confidence.

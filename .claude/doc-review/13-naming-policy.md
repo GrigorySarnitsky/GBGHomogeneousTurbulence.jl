@@ -1,129 +1,112 @@
 # Naming-policy hat — findings
 
-Audits the public surface against CLAUDE.md's Naming rules: (a) named for what it means to the
-physicist-user, never the backend/mechanism; (b) unambiguous and precise; (c) math variables
-symbolic, storage/functions descriptive; (d) one concept, one name, across the whole surface.
+Reviewed against `CLAUDE.md`'s Naming rules: (a) name for what it means to the user, never the
+backend mechanism; (b) unambiguous and precise; (c) field math variables are Unicode symbols,
+storage/functions descriptive; (d) one concept, one name. Corpus read: `CLAUDE.md`, the rendered
+manuscript (Home, architecture, notation, observables_cache, phenomenology, and every `api/*` page),
+and `src/*.jl` for cross-checking the rendered names against the actual bindings.
 
 ---
 
-## 1. `tracer_scheme` / `particle_scheme` swap the very axis decision 51 assigns them
+## Finding 1 — `record_trajectory_velocity!` keeps the one root word the particle/tracer rename swept away everywhere else
 
-- **Type:** other (naming-convention violation)
+- **Type:** clarity
 - **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - ARCHITECTURE.md decision log (2026-08, "Particle is the category, tracer the kind"): "Anything true of the whole deferred ladder of §7 takes particle — ... interpolation at positions; only what is specific to the massless ... kind takes tracer — the `Tracers` type and its construction... `advect!` stays generic ... its `EndpointHeun` method carrying the tracer-specific assumption."
-  - `api / SimulationRun`: "`number_of_particles = 0`, `tracer_scheme = CatmullRom` — ... forwarded to the `Tracers` constructor as its `interpolation_scheme`." and "`particle_scheme = EndpointHeun()` — the temporal scheme ... a different axis from `tracer_scheme` despite the neighbouring names".
-- **Contradicts:** Decision 51 makes "particle" the word for what generalizes across the whole probe ladder (explicitly interpolation — hence `interpolate_at_particles!`) and "tracer" the word for what is specific to the massless tracer kind (explicitly the temporal push, whose `EndpointHeun` carries "the tracer-specific assumption that the particle velocity is the fluid velocity"). The front-door keywords invert this: the ladder-general interpolation axis is named `tracer_scheme`, and the kind-specific temporal-integration axis is named `particle_scheme` — backwards relative to the rule the package itself states.
-- **Description:** This is not a cosmetic near-collision — the docstring's own hedge ("despite the neighbouring names") shows the tension is known but unresolved. Per decision 51's own test, the interpolation-scheme keyword should read `particle_scheme` (it is `interpolate_at_particles!`, true of the whole ladder) and the temporal-integrator keyword should carry the tracer-specific flavor. Today it is exactly reversed.
-- **Resolution hint:** Rename the front-door keywords to track decision 51: e.g. `particle_scheme` for interpolation (or keep `interpolation_scheme` verbatim, avoiding both loaded words) and a tracer-flavored name (`tracer_integrator`?) for the temporal scheme.
+  - PAGE `api / Particles` (module docstring): "`record_trajectory_velocity!` — store the flow velocity at the tracers' current positions" sits in the same export list as `particle_positions`, `number_of_particles`, `particle_velocities`, `interpolate_at_particles!`.
+  - Same page: "the trajectory velocities are read from the run's observables cache through `particle_velocities`" — both roots used for the identical quantity in one sentence.
+  - PAGE `architecture` §11 decision (2026-08, user-directed, "Particle is the category, tracer the kind"): "Hence `number_of_tracers` becomes `number_of_particles`... and `sample!` becomes `interpolate_at_particles!`."
+- **Contradicts:** the decision-log rename explicitly states the rule "name by what the operation is true of" and enumerates only two vocabulary roots, *particle* (whole ladder) and *tracer* (massless kind); `record_trajectory_velocity!` uses a third root, "trajectory," that the decision never mentions and never sweeps.
+- **Description:** The single Lagrangian quantity $\boldsymbol u(t_n,\boldsymbol X(t_n))$ is named `particle_velocities` everywhere it is stored or read (the `Tracers` field, the `Cache` slot, the accessor) but is *written* by a verb rooted in a different word, `record_trajectory_velocity!`. The decision-51 sweep renamed every sibling in the same export list (`number_of_tracers`→`number_of_particles`, `sample!`→`interpolate_at_particles!`) but missed this one verb, so the module's own contents list juxtaposes both roots for one concept. Per the decision's own taxonomy the operation is arguably tracer-specific (an inertial particle's velocity is state, not an interpolated sample), so neither existing root cleanly covers it — but "trajectory" is a third, unexamined choice.
+- **Resolution hint:** rename to `record_particle_velocity!` (matching the noun everywhere else) or, if the tracer-specificity argument is intended, to `record_tracer_velocity!` — either beats the unswept third root.
 
 ---
 
-## 2. `Linear` claims an identity `ConstantPower` shares — the sibling literally calls itself "a linear forcing" too
+## Finding 2 — `max_wavenumber` reads as the grid Nyquist and isn't; the docstring has to say so
 
-- **Type:** other (imprecise / non-exclusive name)
+- **Type:** clarity
 - **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - `api / Forcing`, `Linear` docstring: "Linear (negative-damping) forcing `f = A·field`..."
-  - `api / Forcing`, `ConstantPower` docstring: "Constant-injection-rate forcing... **a banded linear forcing** `f = A·field`... like `Linear`, it preserves a solenoidal velocity."
-  - ARCHITECTURE §4.4: "`Linear` (fixed-rate negative damping...) and `ConstantPower` (its rate reset each step...) — **the two linear forcings folded into 𝓔**".
-- **Contradicts:** `ConstantPower`'s own docstring names itself "a banded linear forcing," and ARCHITECTURE calls both `Linear` and `ConstantPower` "the two linear forcings." Yet only one type is bare-named `Linear` in the export list, alongside `NoForcing`, `BandRescaling`, `ConstantPower` — the other three all read as forcing-specific from the name alone.
-- **Description:** A reader scanning the exported `AbstractForcing` family sees `Linear` and reasonably reads it as *the* linear forcing (also the bare word collides with "linear" used pervasively elsewhere for the general concept — a linear rate, "linear in the field"). It is really the fixed-rate member of a two-member linear-forcing family the docs name explicitly; `ConstantPower` is the other, dynamically-rate-adjusted member, but its name gives no hint it belongs to the same family.
-- **Resolution hint:** A name distinguishing the two by what's fixed — e.g. `FixedRate` / `ConstantPower`, or `LinearDamping` — would be precise without claiming sole ownership of "linear."
+  - PAGE `api / SimulationDomain`: `max_wavenumber(domain)` — "The highest wavenumber magnitude that `domain`... actually evolves"
+  - Same docstring: "It is the cutoff the dealiasing sets — not the grid Nyquist $\tfrac{N}{2}\tfrac{2\pi}{L}$ itself."
+- **Description:** "Maximum wavenumber" is the plain-English name for the grid's Nyquist wavenumber $\kappa_{\mathrm{Ny}} = \tfrac{N}{2}\tfrac{2\pi}{L}$ — the literal largest wavenumber the grid can represent. The function instead returns the smaller, strategy-dependent dealiasing cutoff $\kappa_{\max} = f\kappa_{\mathrm{Ny}}$, and its own docstring must explicitly warn against the more natural reading. This is exactly the category-error risk the project's own doc-policy guards against elsewhere (a rate vs. its field, a density vs. an energy) — here applied to the name itself rather than a formula.
+- **Resolution hint:** `dealiased_max_wavenumber` or `resolved_max_wavenumber` would state the qualifier the docstring currently has to supply after the fact.
 
 ---
 
-## 3. `peak_wavenumber` promises a spectrum peak the code does not deliver
+## Finding 3 — `FlowConditions` and `FlowParameters` are near-identical names for an input bundle and a measured bundle, sharing field names
 
-- **Type:** other (name promises an outcome the call cannot deliver)
+- **Type:** clarity
 - **Severity:** major
-- **Confidence:** high
+- **Confidence:** medium
 - **Locations:**
-  - `api / State`, `random_solenoidal_velocity_spectral!`: "the shell-summed energy spectrum ∝ κ²exp(−2κ²/κp²) **peaks at κp/√2, not at κp itself**."
-  - `api / SimulationRun`, `Simulation`: "`peak_wavenumber = 2.0` — the large-scale envelope wavenumber κ_p of the initial condition ... (each shell-summed spectrum **peaks at κ_p/√2**)."
-- **Contradicts:** The keyword's own name asserts it is where the spectrum peaks; three separate docstrings (velocity IC, scalar IC, and the front-door keyword) must each independently caveat that the actual measured (shell-summed) peak sits at a different wavenumber, κ_p/√2 ≈ 0.71 κ_p.
-- **Description:** This is the textbook "name promises an outcome one call cannot deliver" pattern the hat is built to catch. The value genuinely fixes the Gaussian *envelope's* characteristic wavenumber (which the docs elsewhere correctly call "the large-scale envelope wavenumber") — that is the precise, deliverable meaning; "peak" is the imprecise one, and needing to correct it in every docstring that mentions it is the tell.
-- **Resolution hint:** `envelope_wavenumber` (already used in prose) states exactly what the code delivers.
+  - PAGE `api / Generator`: `FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)` — "Not to be confused with `Phenomenology`'s `FlowParameters`, which shares two field names: this type holds what a run is configured with, that one holds what a run has been measured to have."
+  - PAGE `api / phenomenology / Phenomenology`: `FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale, schmidt = 1.0, ...)`.
+- **Description:** Two types differing only by "Conditions" vs. "Parameters" — both prefixed `Flow`, both carrying `viscosity` and `schmidt` — represent categorically different things: a configuration input and a measured output. The docstring's own disclaimer ("not to be confused with") is itself evidence the names sit too close together for rule (b)'s "one reading." A reader skimming a signature or an error message with `FlowConditions`/`FlowParameters` in scope has no lexical cue for which one is which without opening the docs.
+- **Resolution hint:** a name that encodes the input/measured axis directly (e.g. `MeasuredFlowState` for the latter) would remove the need for the disclaimer.
 
 ---
 
-## 4. `k_max_η` spells the wavenumber magnitude with the letter the package reserves for kinetic energy
+## Finding 4 — "spectrum" names two dimensionally different objects: a per-shell sum and a spectral density
 
-- **Type:** other (notation/naming collision)
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `notation` page, "Wavenumber clash": "italic scalar $k$ is **the turbulent kinetic energy**... kept distinct" from $\boldsymbol\kappa$/$\kappa$.
-  - `api / SimulationRun`: "`k_max_η = 2` — the resolution criterion $\kappa_{\max}\eta$ ... (**the keyword spells $\kappa_{\max}$ in ASCII**)."
-- **Contradicts:** The notation page's own house rule keeps $k$ (kinetic energy) and $\kappa$ (wavenumber) deliberately distinct glyphs — "kept distinct" is the literal wording — yet the keyword `k_max_η` uses ASCII `k` to stand for $\kappa_{\max}$, the exact collision the glyph table exists to prevent, in an identifier that sits right beside `kinetic_energy` in the same constructor's keyword list.
-- **Description:** The docstring's own aside ("spells κ_max in ASCII") shows the author noticed the transliteration is not self-evident, but the chosen ASCII stand-in reuses the one letter the package's own notation table says never to reuse for wavenumber.
-- **Resolution hint:** `kappa_max_eta` (or `resolution_criterion`) avoids the collision the current spelling walks into.
-
----
-
-## 5. `target` names two different physical *kinds* of quantity across sibling forcings
-
-- **Type:** other (ambiguous shared keyword)
-- **Severity:** minor
-- **Confidence:** high
-- **Locations:**
-  - `api / Forcing`, `BandRescaling`: "The `target` is a number: **the value the held observable is to keep**" (an amplitude — kinetic energy or scalar variance).
-  - `api / Forcing`, `ConstantPower`: "`target` is a number: the value of the **dissipation rate** to hold... **Note what kind of quantity that is: here the held observable is a rate, where `BandRescaling` holds an amplitude.**"
-- **Contradicts:** Same keyword name, same `AbstractForcing` family, two different physical kinds (an amplitude vs. a rate) — the second docstring's explicit warning is itself evidence the ambiguity is real and known, not resolved by a naming distinction.
-- **Description:** Rule (b) asks for precision, not merely internal consistency of use; `target` alone does not tell a reader which kind of quantity is meant without opening the specific type's docstring.
-- **Resolution hint:** e.g. `target_amplitude` / `target_rate`, or leave `target` but only where a rate is meant and rename `BandRescaling`'s to `target_value`/`target_amplitude`.
-
----
-
-## 6. `Tracers.trajectory_velocity` (singular) stores what `particle_velocities` (plural) reads
-
-- **Type:** other (grammatical-number drift across an f/accessor pair)
+- **Type:** clarity
 - **Severity:** minor
 - **Confidence:** medium
 - **Locations:**
-  - `api / Particles`, `Tracers` Fields: "`trajectory_velocity` — the interpolated velocity at the positions the tracers occupy... the observables cache's particle-velocities slot."
-  - `api / Cache`: "`particle_velocities` — the checked read of the ... particle-velocities slot."
-- **Contradicts:** One underlying `(M, 3)` array of per-tracer velocity samples is named with the singular "velocity" as the `Tracers` struct field but with the plural "velocities" as the cache accessor and slot name that reads the identical storage (decision 42 explicitly wires the slot IS the register).
-- **Description:** Minor, but it is exactly the kind of one-concept-two-names drift rule (d) flags — a reader moving from `Tracers` internals to the cache accessor meets a different grammatical number for the same array.
-- **Resolution hint:** Either `trajectory_velocities` on `Tracers`, or accept the asymmetry is deliberate (field = "the trajectory's velocity value," slot = "the particles' velocities") and say so once in a docstring note.
+  - PAGE `api / Observables`: `energy_spectrum(û, domain)` — "a model spectrum $E(\kappa)$ from `Phenomenology` is instead a density per unit wavenumber... and are not interchangeable."
+  - PAGE `api / phenomenology / Phenomenology`: `spectrum(law, κ, fp) -> Float64` — "the velocity energy spectrum $E(\kappa)$."
+  - PAGE `notation`: $E_n$ (dimensions $L^2T^{-2}$) vs. $E(\kappa)$ (dimensions $L^3T^{-2}$).
+- **Description:** `Observables.energy_spectrum` returns the measured per-shell energy $E_n$; `Phenomenology.spectrum` returns the model density $E(\kappa)$. Both are called "spectrum" in their identifiers, and the two are explicitly non-interchangeable by a factor of the shell width. The name alone gives no hint which of the two dimensionally distinct quantities a caller gets — the disambiguation lives entirely in prose the project elsewhere insists on carrying in the identifier itself (e.g. `energy_spectrum` vs. a hypothetical `spectral_density`).
+- **Resolution hint:** none required if the corpus's convention is "Observables measures, Phenomenology predicts, and the shape difference is inherent" — but a `energy_per_shell` or `shell_energy` name would remove the ambiguity outright.
 
 ---
 
-## 7. `Li2008(; constant = 0.9)` names its one parameter with the least specific word available
+## Finding 5 — `integral_scale` returns specifically $L_{11}$, one of (at least) three named integral scales its own docstring discusses
 
-- **Type:** other (approximate cover word instead of the precise name)
+- **Type:** clarity
 - **Severity:** minor
 - **Confidence:** medium
 - **Locations:**
-  - `api / phenomenology / Scalings`, `Li2008`: "The `constant` is the group value $G$ (default `0.9`)".
-  - Compare sibling laws in the same module: `Sreenivasan1995(; C_K = 1.5)`, `Sreenivasan1998(; asymptote, correction)`.
-- **Description:** Every scaling law in the module is a "constant" in the loose sense — that's the module's whole subject — so naming one law's single field literally `constant` fails the precision test relative to its siblings, which each name their coefficient for what it specifically is ($C_K$, the plateau, the correction). A reader skimming a `Reference`/provenance table sees `constant` and has to open the docstring to learn it means $G$.
-- **Resolution hint:** `G` (matching the rendered symbol used throughout the same docstring) or `box_normalized_constant`.
+  - PAGE `api / Observables`: `integral_scale(û, domain)` — "$L_{11}$ is the large-eddy scale"; same docstring: "the transverse integral scale is $L_{22} = L_{11}/2$"; "$L_E = \tfrac{2}{3}L_{11}$."
+- **Description:** The function name is generic ("the" integral scale) while the docstring immediately distinguishes three specifically-named scales ($L_{11}$, $L_{22}$, $L_E$) and returns only the first. A reader who has not opened the docstring has no way to know which of the three is meant — a violation of rule (b)'s "the exact thing, not an approximate cover word," especially notable given the project's care distinguishing $E_n$ from $E(\kappa)$ elsewhere.
+- **Resolution hint:** `longitudinal_integral_scale` (matching the $L_{11}$ subscript convention already used in the notation table).
 
 ---
 
-## 8. `stationary_dissipation`'s `energy` argument breaks with the package-wide `kinetic_energy` name for the same quantity
+## Finding 6 — the Heun/RK2 "predictor" concept is named `*_star_spectral` on the field side and `predictor*` on the particle side
 
-- **Type:** other (one concept, two names)
+- **Type:** design
 - **Severity:** minor
-- **Confidence:** medium
+- **Confidence:** low-medium
 - **Locations:**
-  - `api / phenomenology / Scalings`: "`stationary_dissipation(law, energy, side_length)` ... from the turbulent kinetic energy `energy` ($k$)".
-  - Everywhere else on the public surface the identical quantity is named `kinetic_energy` — the `Observables.kinetic_energy` function, and the `Simulation(; kinetic_energy = 1.5, ...)` keyword.
-- **Description:** `energy` alone is imprecise (potential vs. kinetic, total vs. per-mass) exactly where the rest of the package is careful to say `kinetic_energy`; this is a small but clean instance of rule (d)'s "one concept, one name" not holding across a module boundary (DNS surface vs. `Phenomenology`).
-- **Resolution hint:** Rename the argument `kinetic_energy` to match its only other spelling in the package.
+  - PAGE `api / Propagator`: `IntegratorBuffers` — "`stage2`, `velocity_star_spectral` — the second stage register and the substage velocity **predictor** $\hat{\boldsymbol{u}}^{*}$ in spectral representation."
+  - PAGE `api / Particles`: `ParticleIntegratorBuffers` — "`predictor` — the $(M,3)$ predicted positions... `predictor_velocity` — the velocity interpolated at the predicted positions."
+- **Contradicts:** the architecture text draws the two buffer types as one deliberate parallel ("exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side," decision 50), yet the shared role — a scheme's provisional/predictor value — is stored under two different name roots ("star" vs. "predictor").
+- **Description:** Both buffers hold the same structural role for their respective Heun-family scheme: a provisional midpoint value used only to compute the second-stage right-hand side. The field-side struct field spells it `velocity_star_spectral` (naming the math notation $\hat u^*$) while its own docstring prose calls it "the substage velocity predictor" — and the particle-side struct field takes that prose word literally as its field name (`predictor`, `predictor_velocity`). One concept, two storage-name conventions, in two types the docs explicitly present as parallel.
+- **Resolution hint:** low stakes given each is confined to its own scheme's internals, but `velocity_predictor_spectral` would align the field-side name with both its own docstring prose and the particle side.
 
 ---
 
-## 9. `finalize!` borrows a software-engineering term where the physics is a specific, nameable action
+## Finding 7 — `BandRescaling`'s `over` keyword is a bare preposition standing in for "which quantity this rescale holds fixed"
 
-- **Type:** other (software-engineering term where a physics/mathematics word is exact)
-- **Severity:** minor
-- **Confidence:** medium
+- **Type:** clarity
+- **Severity:** nit
+- **Confidence:** low
 - **Locations:**
-  - `api / Generator`: "`finalize!` — close a step: apply the post-step forcing projections to the advanced state."
-  - ARCHITECTURE decision log: "`finalize!` on the generator is a recorded deviation from the solver-library precedent (the SciML/PETSc/SUNDIALS right-hand-side objects are pure evaluators, with post-step action in callback layers)".
-- **Description:** "Finalize" is standard OOP/RAII vocabulary (a finalizer/destructor releasing a resource), not a physics term, and the decision log itself flags that this verb's meaning here — apply a forcing's post-step projection or rescale — deviates from what a reader coming from the solver-library tradition (which the log cites by name) would expect from "finalize." The prepare!/finalize! bracketing metaphor is intuitive, but the specific action (a forcing projection) has a more exact physics-facing name available.
-- **Resolution hint:** Something in the family of `apply_forcing_projections!` (mirroring `finalize!`'s own summary sentence) would read correctly to a physicist without the SWE overtone; if `prepare!`/`finalize!` symmetry is judged more valuable, at least the docstring already carries the needed caveat, so this is a low-cost, low-urgency rename.
+  - PAGE `api / Forcing`: `BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)` — "The `over` keyword selects where the target applies. It is required."
+- **Description:** `over` alone, read cold, does not say what it ranges *over* — a value's scope, a time window, or (as it actually is) which of two energy budgets (`:band` vs. `:total`) the rescale pins. The keyword is thoroughly justified and its required-ness carefully decided (architecture §11), but the word itself is a short function word rather than a term naming the choice it makes.
+- **Resolution hint:** something like `hold` or `pin_scope` would name the choice rather than its grammatical role.
+
+---
+
+## Finding 8 — `κ_max_η` is a raw symbol used as a settings keyword, breaking the descriptive-parameter convention every sibling setting follows
+
+- **Type:** design
+- **Severity:** nit
+- **Confidence:** low
+- **Locations:**
+  - PAGE `api / SimulationRun`: `Simulation(; grid_points_per_axis, κ_max_η = 2, kinetic_energy = 1.5, ...)` — "`κ_max_η = 2` — the resolution criterion $\kappa_{\max}\eta$ used to set $\nu$ in grid mode."
+- **Description:** Every other scalar setting in the same constructor is an English descriptive word (`viscosity`, `side_length`, `injection_rate`, `envelope_wavenumber`), consistent with CLAUDE.md's rule that a field math variable takes a symbol while a storage slot or setting is descriptive. `κ_max_η` is not a field math variable (it is a resolution-criterion threshold, a setting) yet is spelled as a bare compound symbol — the one keyword in the front door's argument list that departs from the descriptive-name convention its neighbors all follow.
+- **Resolution hint:** `resolution_criterion` (with the symbol given once in the docstring) would match its neighbors; low priority since the symbol is precise and the docstring explains it immediately.

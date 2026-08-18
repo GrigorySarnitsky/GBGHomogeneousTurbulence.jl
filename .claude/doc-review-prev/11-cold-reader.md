@@ -1,187 +1,139 @@
-# Cold-reader hat — first-year turbulence grad student, new to the package
+# Hat: First-year turbulence grad student (cold reader)
 
-Findings from a top-to-bottom read of the rendered site, treating every term as unknown until the
-document itself defines it. Ranked most-severe first.
+Read top-to-bottom in manuscript page order: Home → api → notation → phenomenology →
+api/Cache → api/Forcing → api/GBGIsotropicTurbulence(index) → api/Generator →
+api/Observables → api/Particles → api/Propagator → api/SimulationDomain →
+api/SimulationRun → api/State → api/phenomenology/{Phenomenology,Scalings,Spectra,StructureFunctions}.
+Findings are ordered most-severe first; each names the page where I *first* met the term.
 
 ---
 
-## 1. "front door" used with zero gloss on the very first page it appears
+## Finding 1 — "deposit" is jargon used inside its own would-be definition
 
 **Type:** clarity **Severity:** major **Confidence:** high
 
 **Locations:**
-- PAGE: Home, Quick start: "Build a case at the front door, spin it up to statistical stationarity, and advance it:" — no explanation at all of what "front door" means.
-- PAGE: api / Cache, `ObservablesCache`: "The `Simulation` front door — the build-everything convenience constructor — builds, wires, and seeds one for you." (first real gloss, many pages later)
-- PAGE: api / Generator, `ResolvedGenerator`: "The `Simulation` front door — the build-everything convenience constructor — builds one for you." (a second, separate gloss)
-- PAGE: api / SimulationRun, `Simulation`: "('front door' names exactly this convenience form throughout — the constructor that builds every component for you)" (the closest thing to a canonical definition)
+- Home, Quick start (code comment): *"One ITERATION is one advance: a step, then the deposit that closes it."*
+- Home, Quick start (code comment): *"the cache holds what the last deposit left"*
+- (True definition, four pages later) api/Cache, "The observables cache": *"`deposit!` — homed in `Propagator`... which fills every slot at the iteration's end and sets its epoch"*
 
-**Description:** A first-time reader meets "front door" as an unglossed idiom in the first sentence of the Quick start, with no forward pointer. The term is then independently re-glossed three separate times on three different pages before the reader ever reaches the page that actually defines it canonically. A one-clause parenthetical on first use (Home) would fix this.
+**Description:** The very first thing the manuscript tells me about the run loop is what an "iteration" is — and it defines that word using another undefined word, "the deposit." I have no idea yet what gets deposited, where, or why the word "deposit" (with its financial connotation) was chosen over "write" or "record." I don't find out until page 5 (api/Cache). Sharpening 2 applies exactly here: the definition site (Cache) does not rescue the four pages of bare use that precede it.
 
 ---
 
-## 2. Core cache vocabulary ("iteration", "deposit", "stamp") used on the Home page before any of it is defined
+## Finding 2 — No glossary exists for the package's own operational vocabulary
 
-**Type:** clarity **Severity:** major **Confidence:** high
+**Type:** organization **Severity:** major **Confidence:** high
 
 **Locations:**
-- PAGE: Home, Quick start: "`velocity_physical(sim)` # a cached observable at the iteration's end (the instant between steps)" — "iteration" used with no definition.
-- PAGE: Home, Components: "`Cache`: the `ObservablesCache` — the stamped storage each iteration fills at its end with the observables of the state it just produced; the checked accessors ... serve the deposited value or throw" — "stamped", "iteration", "deposited" all used together, unglossed.
-- PAGE: api / Cache, module docstring (first actual definition, many pages later): "An iteration is one advance of the run — one `step!` and the `deposit!` that closes it..."
+- notation page, entire "## Conventions" through "## Forcing" tables (math symbols only)
+- Contrast: epoch, deposit, slot, iteration, register are each defined exactly once, in passing, wherever the relevant API page happens to introduce them (Cache, Propagator)
 
-**Description:** The Home page is the reader's very first exposure to the package, yet its Quick start and Components section lean on "iteration" / "deposit" / "stamp" as if already known. None of these is a common-English word doing double duty — each is later given a precise, load-bearing technical meaning (Cache page) that the reader cannot yet have. Cold-read fails here: parsing the Home page alone, a reader cannot tell an "iteration" apart from a "step" or know what "stamped" means.
-
----
-
-## 3. "scratch arity" is used twice and never defined anywhere in the document
-
-**Type:** clarity **Severity:** major **Confidence:** high
-
-**Locations:**
-- PAGE: api / Generator, module docstring: "recovered by the source-preserving `to_physical!` scratch arity of `GBGPeriodicFields`"
-- PAGE: api / State, module docstring: "The physical representations are recovered from the state with the scratch (source-preserving) arity of `to_physical!`"
-
-**Description:** "Scratch arity" is presented as a fixed term of art (used identically, verbatim, in two places) but is never explained anywhere on the site — not what "arity" refers to here (an overload with an extra output-buffer argument?), not why it matters beyond "source-preserving." A reader has to reverse-engineer the phrase from the surrounding sentence each time; it is never introduced with a plain-language gloss on first use.
+**Description:** The Notation page bills itself as *"the single reference — a docstring introduces a symbol on first use and need not repeat the convention."* It delivers on that promise for math symbols (i, κ, k, ε, …) but has zero entries for the package's operational nouns — epoch, deposit, slot, iteration, register, front door — even though these are used just as load-bearingly and just as repeatedly as the math symbols. A cold reader has no single page to consult for "what is a slot" the way they can consult Notation for "what is κ."
 
 ---
 
-## 4. "2N-storage" silently reuses the symbol N for a different quantity than the notation page's canonical N
+## Finding 3 — `FlowConditions` and `FlowParameters`: near-identical names, overlapping fields, different jobs
 
 **Type:** clarity **Severity:** major **Confidence:** medium
 
 **Locations:**
-- PAGE: notation, Numerics table: "$N$ | grid points per side | `grid_points_per_axis`"
-- PAGE: api / Propagator, `IFLowStorageRK3`: "Three nonlinear evaluations per step, and — in Williamson's 2N-storage count — two field registers per field..."
+- api/Generator, "Flow conditions": `FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)` — *"The physical conditions the generator is built from"*
+- api/phenomenology/Phenomenology, "The flow-state bundle" (met many pages later): `FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale, schmidt = 1.0, scalar_dissipation = NaN)` — *"the analogue of `FlowConditions` and `FixedDomain` on the phenomenology side"*
 
-**Description:** The notation page fixes $N$ as *grid points per axis* and calls the wavenumber/kinetic-energy clash ($\boldsymbol\kappa$/$\kappa$/$k$) out explicitly as a "kept distinct" set of glyphs — signaling the document cares about symbol collisions. But "2N-storage" (classical Williamson low-storage RK terminology, where N counts *evolved field registers*, not grid points) reuses the same letter for an unrelated quantity with no disambiguating note. A reader who just internalized $N$ = grid resolution from the notation page will misread "2N-storage" as "twice the grid points."
-
----
-
-## 5. "instant between steps" (Home) vs. "instant between iterations" (elsewhere) — inconsistent phrasing for the same concept
-
-**Type:** contradiction **Severity:** minor **Confidence:** medium
-
-**Locations:**
-- PAGE: Home, Quick start: "a cached observable at the iteration's end (**the instant between steps**)"
-- PAGE: api / Cache, module docstring: "between iterations the run stands at one $t_n$ ... — **an instant of the run's clock**"
-- PAGE: api / Propagator, `step!`: "the values of **the instant between iterations**, where the cache's deposits are current"
-
-**Description:** Once "iteration" and "step" are established as distinct technical terms (an iteration = one `step!` + one `deposit!`), calling the cached instant "the instant between steps" on Home — while every later page consistently says "between iterations" — reads as a terminology slip on the axis of *step vs. iteration*, exactly the distinction the rest of the document is careful to preserve.
+**Description:** By the time I meet `FlowConditions` (Generator page) I have no warning that a second, differently-scoped bundle called `FlowParameters` exists later, sharing two of its four-to-six field names (`viscosity`, `schmidt`) and an almost-identical descriptive phrase ("physical conditions" vs "flow-state bundle"). Only the later type's docstring acknowledges the relationship — the earlier one gives no forward pointer, so on first meeting `FlowConditions` I have every reason to assume it is the one and only "conditions" object in the package.
 
 ---
 
-## 6. $y_{\mathrm s}$ (the imaginary-axis stability limit) is used and defined inline but missing from the "single reference" notation page
-
-**Type:** organization **Severity:** minor **Confidence:** medium
-
-**Locations:**
-- PAGE: notation: "This page is the single reference — a docstring introduces a symbol on first use and need not repeat the convention." Numerics table lists $N, L, \Delta t, C, \kappa_{\max}, A_i/B_i/d_i, T$ — no $y_{\mathrm s}$.
-- PAGE: api / Propagator, `recommended_cfl`: "stability needs this times $C$ to stay within the scheme's imaginary-axis stability limit $y_{\mathrm{s}}$ ... for `IFLowStorageRK3` $y_{\mathrm{s}} = \sqrt{3}$ ... `IFRK2` is imaginary-axis unstable ($y_{\mathrm{s}} = 0$...)"
-
-**Description:** The notation page explicitly bills itself as the single reference for every symbol used throughout the docstrings, yet a load-bearing symbol used twice in one docstring ($y_{\mathrm s}$) never makes it into that glossary. Minor because it is re-explained locally, but it breaks the "single reference" promise.
-
----
-
-## 7. `StationarityCriterion`'s documented "Fields" list accounts for only 6 of the 7 keyword-constructor parameters
+## Finding 4 — "register" is used in two unrelated senses before the package sense is ever defined
 
 **Type:** clarity **Severity:** minor **Confidence:** medium
 
 **Locations:**
-- PAGE: api / SimulationRun, `StationarityCriterion`: keyword constructor takes `gate_scalar, gate_skewness, min_turnovers, window_turnovers, tol, skew_floor, max_turnovers` (7 keywords).
-- Same page, Fields: "The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn, last_time, started)` is internal" — lists only `monitor, max_turnovers, gate_scalar, elapsed_turn, last_time, started` (6 fields), with `gate_skewness, min_turnovers, window_turnovers, tol, skew_floor` unaccounted for except by the vague gloss "`monitor` — the sampled signals and gates."
+- api/Observables, "Timestep control" (`max_speed`), first use: *"The magnitude is formed per grid point in registers and consumed by the maximum immediately"* (ordinary CPU/GPU hardware registers)
+- api/Propagator, "Step scratch" (`IntegratorBuffers`), two pages later: *"Each such array is a register: storage a scheme computes one stage into and overwrites at the next"* (a specific package concept)
 
-**Description:** A cold reader trying to map the 7 documented keywords onto the type's actual storage cannot: 5 of them seemingly vanish into an opaque `monitor` field whose own structure is never described. Whether they are truly inside `monitor` or dropped is not stated.
-
----
-
-## 8. `PointSet` / `VectorPointValues` / `ScalarPointValues` used with no on-site definition of their shape or purpose
-
-**Type:** clarity **Severity:** minor **Confidence:** low
-
-**Locations:**
-- PAGE: api / Particles, `Tracers` Fields: "`position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation."
-- PAGE: api / Particles, `sample!`: "into the point-value buffer `out` (a `VectorPointValues` for the velocity, a `ScalarPointValues` for the scalar $\varphi$)"
-
-**Description:** These three type names are used as if already familiar; nothing on the site says what a `PointSet` or a `*PointValues` object actually is (an array wrapper? a struct with fields?) beyond "wraps positions" / "the point-value buffer." Likely a backend (`GBGPeriodicFields`) cross-link exists in the live HTML that this text extraction can't show — flagged at low confidence for that reason — but as written, a cold reader has no way to know these types' shape.
+**Description:** "Registers" first appears as an offhand remark about how a reduction is computed on hardware. Two pages later the identical word is promoted to a formal package term — a named, reusable per-stage scratch slot, deliberately contrasted with the cache's slots. Nothing flags that the second use is a distinct, technical redefinition of a word I already filed away as "just CPU/GPU internals, not my concern."
 
 ---
 
-## 9. "observation" is overloaded between "the act of observing" and "the callback object itself"
+## Finding 5 — "CFL" used unexpanded at its very first two appearances
 
 **Type:** clarity **Severity:** minor **Confidence:** medium
 
 **Locations:**
-- PAGE: api / SimulationRun, module docstring: "advance one iteration; observe and advance until the callback stops the run (**the callback is the observation**, and its return decides continuation)"
-- PAGE: api / SimulationRun, `StationarityCriterion`: "**The packaged spin-up observation** for `run!`: a callback that watches the run settle..."
+- Home, Components: *"the CFL-adaptive loop (`advance!` / `run!` / `warmup!`)"*
+- api overview, Components (repeated verbatim)
+- (expansion, three pages later) notation, Numerics table: *"$C_{\mathrm{CFL}}$ | advective-CFL (Courant–Friedrichs–Lewy) ceiling"*
 
-**Description:** "Observation" first reads naturally as the *act* (observing the run each iteration), but is then used as a noun standing in for the callback *object* itself ("the callback is the observation," "the packaged ... observation"). A cold reader has to hold both readings simultaneously without either being flagged as the intended usage.
+**Description:** "CFL" is dropped bare on page 1 and again on page 2 before the Notation page spells out Courant–Friedrichs–Lewy on page 3. A minor point (the acronym is common in the field) but a genuine ordering gap by the doc's own stated self-containedness standard.
 
 ---
 
-## 10. "reified" / "reification" used repeatedly with no plain-language gloss
+## Finding 6 — "the developed-turbulence markers" (plural) but only one marker is ever documented
 
-**Type:** clarity **Severity:** nit **Confidence:** medium
+**Type:** clarity **Severity:** minor **Confidence:** medium
 
 **Locations:**
-- PAGE: Home, Components: "reified as the `ResolvedGenerator` a scheme consumes through the generator protocol"
-- PAGE: api / Generator, `ResolvedGenerator`: "The reified right-hand side of the resolved dynamics — the flow's generator as one object"
+- Home, Components / api overview (identical wording both places): *"Observables: ... the developed-turbulence markers, the spectrum-derived scales, ..."*
+- api/Observables module docstring and its own section: *"`derivative_skewness` — the velocity-derivative skewness, the **classical marker** of a developed cascade"* (singular; the only entry of this kind in the module's bullet list)
 
-**Description:** "Reified" is a CS term of art (turning an abstract concept into a concrete object) that a physics-first audience (per the project's own stated documentation policy — "the user is a physicist... not a software engineer fluent in startup idiom") may not know. It is used several times with no gloss beyond the surrounding sentence's own paraphrase, which does help, but the word itself is never explained.
+**Description:** The Components lists (met on page 1 and page 2) promise plural "markers," priming me to expect more than one diagnostic of this kind. When I reach the Observables page itself, exactly one such quantity exists, and its own section calls it "the marker" (singular). Either the plural is stale or a second marker is missing from the module's own summary.
 
 ---
 
-## 11. "armed" (forcing rate) used metaphorically with no explicit definition of the mechanism
+## Finding 7 — "Berendsen-thermostat limit" borrowed from molecular dynamics, never explained mechanically
+
+**Type:** clarity **Severity:** minor **Confidence:** medium
+
+**Locations:**
+- api/Forcing, `BandRescaling` note: *"Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of stochastic velocity rescaling"* (citing Bussi, Donadio & Parrinello 2007, *J. Chem. Phys.*)
+
+**Description:** As a turbulence student I have no particular reason to already know what a Berendsen thermostat is (it's an MD concept for holding kinetic temperature fixed). The sentence explains the *consequence* (no conserved quantity, fluctuations suppressed) but never actually states what a Berendsen thermostat mechanically does, so the name itself functions as an unexplained label rather than an aid to understanding.
+
+---
+
+## Finding 8 — "EDQNM, DIA, LRA" acronyms never expanded anywhere on the site
+
+**Type:** clarity **Severity:** minor **Confidence:** low-medium
+
+**Locations:**
+- api/phenomenology/Spectra, `ExponentialDissipation`: *"the form the triadic spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018)"*
+
+**Description:** Eddy-Damped Quasi-Normal Markovian, Direct-Interaction Approximation, and Lagrangian Renormalized Approximation are considerably less universally known than CFL or DNS to a first-year reader; they appear exactly once, unexpanded, with no gloss beyond a citation.
+
+---
+
+## Finding 9 — "arm"/"armed" used before its own gloss, on the same page
+
+**Type:** clarity **Severity:** nit **Confidence:** low-medium
+
+**Locations:**
+- api/Generator module docstring (top of page): *"`prepare!` — open a step: advance the forcings' internal state and **arm the linear rates**."*
+- api/Generator, `prepare!` docstring (further down the same page): *"arm the per-mode linear forcing rates **(fill them**, so the factor verbs return them instead of `nothing`)"*
+
+**Description:** Reading top-to-bottom, I meet "arm the linear rates" in the module's summary bullet list first, with no gloss; only when I reach the `prepare!` docstring itself, further down the same page, does a parenthetical equate "arm" with "fill." A small in-page ordering gap, but the module summary is exactly the place a skimming reader stops.
+
+---
+
+## Finding 10 — `PointSet` / `VectorPointValues` / `ScalarPointValues` named but never characterized
 
 **Type:** clarity **Severity:** nit **Confidence:** low
 
 **Locations:**
-- PAGE: api / Generator, `ResolvedGenerator` Fields: "a non-`nothing` rate is **the armed offset** the factor verbs return"
-- PAGE: api / Generator, `prepare!`: "**arm** the per-mode linear forcing rates"
+- api/Particles, `Tracers` Fields: *"`position_points` — a `PointSet` wrapping `positions`: the form the interpolation reads them in."*
+- api/Particles, `interpolate_at_particles!`: *"into the point-value buffer `out` (a `VectorPointValues` for the velocity, a `ScalarPointValues` for the scalar φ)"*
 
-**Description:** "Arm"/"armed" is used as if self-explanatory; the reader can infer it means "populated by `set_forcing_rate!` and therefore non-`nothing`," but this is never stated plainly — only implied across two separate docstrings.
-
----
-
-## 12. Notation-page symbol $T$ (element type) is never used in any formula elsewhere in the document
-
-**Type:** organization **Severity:** nit **Confidence:** low
-
-**Locations:**
-- PAGE: notation, Numerics table: "$T$ | the real element type (Float32 / Float64) | `element_type`"
-
-**Description:** Every other notation-table entry recurs in at least one formula or docstring elsewhere on the site; $T$ does not appear again anywhere (element type is always referred to in prose as "`Float32`/`Float64`" or "the real element type," never by the glyph $T$). A minor glossary/usage mismatch — not misleading, just dead weight for a reader cross-referencing the table against the docstrings.
+**Description:** These three types (presumably from the sibling `GBGPeriodicFields` package) are named several times but never described beyond their bare role as "the form the interpolation reads them in" — I cannot tell from the site alone what a `PointSet` actually contains or why it differs from the plain `(M, 3)` array `positions` it wraps.
 
 ---
 
-## 13. "wavenumber-magnitude shell" used pervasively without ever plainly stating what a shell is
-
-**Type:** clarity **Severity:** minor **Confidence:** low
-
-**Locations:**
-- PAGE: notation, Diagnostics: "$E(\kappa)$ | the energy spectrum, in two readings related by the shell width $\Delta\kappa = 2\pi/L$: as measured, **the energy in each wavenumber-magnitude shell**"
-- PAGE: api / Observables, `energy_spectrum`: "the turbulent kinetic energy resolved over wavenumber-magnitude shells"
-
-**Description:** The shell *width* is given ($\Delta\kappa = 2\pi/L$), but "shell" itself — the set of Fourier modes whose $|\boldsymbol\kappa|$ falls in one such width-$\Delta\kappa$ bin — is never spelled out plainly. A reader who does not already know pseudospectral radial-binning conventions has to infer the concept purely from the word "shell" plus the width formula.
-
----
-
-## 14. "CFL" acronym never expanded on first use
+## Finding 11 — "resolved" used for two different concepts
 
 **Type:** clarity **Severity:** nit **Confidence:** low
 
 **Locations:**
-- PAGE: Home, Components: "the advective-CFL `max_speed`"
-- PAGE: api / Propagator, `recommended_cfl`: used throughout as "advective-CFL ceiling"
+- api overview, SimulationDomain bullet: *"the **resolved-wavenumber ceiling** `max_wavenumber`"* (met first — "resolved" = the wavenumbers actually retained by dealiasing)
+- api/Generator: *"`ResolvedGenerator` — the generator as one value"* (a type-name prefix meaning "gathered into one concrete value")
 
-**Description:** "CFL" (Courant–Friedrichs–Lewy) is used dozens of times across the site as an established acronym but is never expanded or cited anywhere. Likely known to the target audience (a numerical-methods-literate turbulence physicist), hence nit-level, but strictly a term used before (in fact, without ever) being defined.
-
----
-
-## 15. "Dirichlet ($H^1$) energy" used twice with only the formula, no gloss of the Sobolev-norm terminology
-
-**Type:** clarity **Severity:** nit **Confidence:** low
-
-**Locations:**
-- PAGE: api / Observables, `dissipation`: "the enstrophy of a divergence-free velocity is its Dirichlet ($H^{1}$) energy, $\langle\lvert\boldsymbol{\omega}\rvert^{2}\rangle = \langle\hat{\boldsymbol{u}},\lvert\boldsymbol{\kappa}\rvert^{2}\hat{\boldsymbol{u}}\rangle$."
-- PAGE: api / Observables, `scalar_dissipation`: "The gradient energy ... is the Dirichlet ($H^{1}$) energy $\langle\varphi,\lvert\boldsymbol{\kappa}\rvert^{2}\varphi\rangle$"
-
-**Description:** "Dirichlet energy" / "$H^1$" is functional-analysis terminology that a first-year turbulence student may not have met; the formula that follows does make the *quantity* clear, but the name itself is asserted rather than glossed even briefly (e.g., "the mean-square-gradient norm").
+**Description:** The word "resolved" is introduced first (api overview) with a specific numerical-methods meaning tied to the dealiasing cutoff. It then reappears, unremarked, as a type-naming convention (`ResolvedFields`, `ResolvedGenerator`) with a different sense — "materialized as one object" rather than "kept below the dealiasing cutoff." The two uses are never distinguished or cross-referenced.
