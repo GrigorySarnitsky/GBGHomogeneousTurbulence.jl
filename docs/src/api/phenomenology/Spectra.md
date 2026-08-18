@@ -31,10 +31,12 @@ ExponentialDissipation
 SaffmanDissipation
 ```
 
-The factor evaluators, extended by each roll-off form.
+The factor evaluators, extended by each roll-off form, and the length a large-scale form is
+evaluated against.
 
 ```@docs
 large_scale_factor
+large_scale_length
 dissipation_factor
 ```
 

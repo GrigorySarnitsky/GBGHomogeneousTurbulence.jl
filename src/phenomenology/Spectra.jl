@@ -33,7 +33,7 @@ import ..Phenomenology: spectrum, provenance
 
 export EnergySpectrum, ScalarSpectrum, LargeScaleFactor, DissipationFactor, PopeLargeScale,
        PopeDissipation, VonKarmanLarge, UnitLargeScale, UnitDissipation, PaoDissipation,
-       ExponentialDissipation, SaffmanDissipation, ModelSpectrum, large_scale_factor,
+       ExponentialDissipation, SaffmanDissipation, ModelSpectrum, large_scale_factor, large_scale_length,
        dissipation_factor, Pope2000, VonKarman1948, Pao1965, ObukhovCorrsin1949, spectrum
 
 
@@ -81,10 +81,30 @@ abstract type DissipationFactor end
     large_scale_factor(f, κL) -> Float64
 
 Evaluate the dimensionless large-scale roll-off `f` (a [`LargeScaleFactor`](@ref)) at the argument
-``\\kappa L`` (`κL`). A new large-scale form is a subtype of `LargeScaleFactor` that adds a
-method here.
+``\\kappa L`` (`κL`), where ``L`` is the length that form's own coefficient was fitted against —
+[`large_scale_length`](@ref) supplies it. A new large-scale form is a subtype of `LargeScaleFactor`
+that adds a method here, and a method there when its length is not ``L_{11}``.
 """
 function large_scale_factor end
+
+
+"""
+    large_scale_length(f, fp) -> Float64
+
+The length scale the large-scale roll-off `f` is evaluated against, read from the flow state `fp`
+(a [`FlowParameters`](@ref)).
+
+This exists because a fitted coefficient belongs to a particular length, and the two published forms
+here do not use the same one. The default is the longitudinal integral scale ``L_{11}``, which
+[`VonKarmanLarge`](@ref) uses. [`PopeLargeScale`](@ref) overrides it with
+``L_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
+``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
+same coefficient ``L_{11}`` instead — smaller by a factor of order three — leaves the model spectrum
+holding well under half the kinetic energy it is normalized to.
+"""
+function large_scale_length end
+
+large_scale_length(::LargeScaleFactor, fp::FlowParameters) = fp.integral_scale
 
 
 """
@@ -116,6 +136,10 @@ struct PopeLargeScale <: LargeScaleFactor
 end
 
 large_scale_factor(f::PopeLargeScale, κL) = (κL / sqrt(κL^2 + f.c_L))^(5//3 + f.p₀)
+
+# Pope normalizes against L₀ = k^{3/2}/ε, not L₁₁ (Turbulent Flows §6.5); k = (3/2)u'² here.
+large_scale_length(::PopeLargeScale, fp::FlowParameters) =
+  (3 * fp.rms_velocity^2 / 2)^(3//2) / fp.dissipation
 
 
 """
@@ -249,14 +273,15 @@ dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 The composed model energy spectrum
 
 ```math
-E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\\kappa\\eta),
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L) f_\\eta(\\kappa\\eta),
 ```
 
 an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-off `large_scale` (a
 [`LargeScaleFactor`](@ref), giving ``f_L``) and a dissipation-range roll-off `dissipation` (a
 [`DissipationFactor`](@ref), giving ``f_\\eta``); `ref` is its [`Reference`](@ref). Build one directly to
 mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
-[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the integral scale ``L_{11}`` from
+[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the roll-off's own length ``L``
+(see [`large_scale_length`](@ref) — ``L_{11}`` for most forms, ``k^{3/2}/\\varepsilon`` for Pope's) from
 `fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).
 
 This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000; Meyers &
@@ -282,7 +307,7 @@ end
 
 spectrum(m::ModelSpectrum, κ, fp::FlowParameters) =
   m.C_K * fp.dissipation^(2//3) * κ^(-5//3) *
-  large_scale_factor(m.large_scale, κ * fp.integral_scale) *
+  large_scale_factor(m.large_scale, κ * large_scale_length(m.large_scale, fp)) *
   dissipation_factor(m.dissipation, κ * kolmogorov_length(fp))
 
 provenance(m::ModelSpectrum) = m.ref

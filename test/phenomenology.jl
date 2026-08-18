@@ -187,3 +187,25 @@ end
   @test isdefined(GBGIsotropicTurbulence, :Phenomenology)
   @test GBGIsotropicTurbulence.Phenomenology.Spectra.Pope2000 === Pope2000
 end
+
+# The Pope model spectrum is normalized: c_L = 6.78 is exactly the coefficient making ∫E dκ = k, and
+# it is calibrated against L₀ = k^{3/2}/ε — NOT the longitudinal L₁₁ the composition used to pass it.
+# Feeding L₁₁ left the spectrum holding 0.42 k while its docstring claimed the normalization, so this
+# pins the property the constant exists to provide rather than the constant itself.
+@testset "Pope2000 integrates to the kinetic energy" begin
+  function integrate_spectrum(model, fp; lo = -14.0, hi = 14.0, n = 200_000)
+    total = 0.0                                    # ∫E dκ = ∫ E(κ)·κ d(ln κ), on a log grid
+    t = range(lo, hi; length = n); h = step(t)
+    for i in 1:n-1
+      κ₁, κ₂ = exp(t[i]), exp(t[i+1])
+      total += 0.5 * h * (spectrum(model, κ₁, fp) * κ₁ + spectrum(model, κ₂, fp) * κ₂)
+    end
+    return total
+  end
+  for (u′, L₁₁) in ((1.0, 0.5), (2.0, 0.3), (1.0, 1.0))
+    ε = 0.5 * u′^3 / L₁₁                           # C_ε ≈ 0.5, the plateau Sreenivasan1998 gives
+    k = 1.5 * u′^2
+    fp = FlowParameters(; viscosity = 1e-6, dissipation = ε, rms_velocity = u′, integral_scale = L₁₁)
+    @test integrate_spectrum(Pope2000(), fp) ≈ k rtol = 0.01
+  end
+end

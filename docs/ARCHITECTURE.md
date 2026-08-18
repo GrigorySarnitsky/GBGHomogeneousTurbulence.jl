@@ -509,7 +509,7 @@ handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by c
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
   **composed**: an inertial core ``C_K \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
-  factor ``f_L(\kappa L_{11})`` and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
+  factor ``f_L(\kappa L)`` — each form evaluated at the length its own coefficient was fitted against — and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
   published triple.
 - **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
   representation, any two-point correlation law when one is added).
