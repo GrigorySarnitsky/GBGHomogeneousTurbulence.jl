@@ -230,8 +230,8 @@ dissipation_factor(f::ExponentialDissipation, κη) = exp(-f.β * κη)
 
 A Gaussian dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-2(\\kappa\\eta)^2)`` — a simple,
 parameter-free cutoff that tends to `1` in the inertial range. The Gaussian form follows Saffman
-(1963, appendix, [doi:10.1017/S0022112063000987](https://doi.org/10.1017/S0022112063000987); about
-half the earlier Townsend 1951 spectrum,
+(1963, appendix, [doi:10.1017/S0022112063000987](https://doi.org/10.1017/S0022112063000987); roughly half the
+cutoff coefficient of the earlier Townsend 1951 form,
 [doi:10.1098/rspa.1951.0179](https://doi.org/10.1098/rspa.1951.0179)), whose coefficient is skewness-dependent
 (about 2.6 to 3.3) and is simplified downward to `2` here for a parameter-free, deliberately soft cutoff
 (retaining a little more near-cutoff energy than the physical range would).

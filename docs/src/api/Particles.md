@@ -25,8 +25,8 @@ interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ## The tracer set
 
 Tracer positions plus a selectable interpolation scheme, with the accessors that read a tracer set's
-state — its positions and its count. The set holds trajectory *state* only; the working storage a
-trajectory scheme computes in lives apart, so changing the scheme changes nothing here.
+state — its positions and its count. The set holds trajectory *state* only; a scheme's working
+storage lives apart.
 
 ```@docs
 Tracers
@@ -40,8 +40,7 @@ number_of_particles
 ## The trajectory scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes, with
-the same separation between the evolving state and the scheme's per-step storage. `EndpointHeun`
-is the one scheme today; that storage is allocated for it by
+`EndpointHeun` is the one scheme today; its storage is allocated by
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
 you.
 

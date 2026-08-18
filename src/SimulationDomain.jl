@@ -362,12 +362,10 @@ the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spheri
 scalar field in spectral representation. Returns `field`.
 
 !!! note "Truncating the band is not always the whole of dealiasing"
-    The name says what this call does — restrict the field to the retained band — and deliberately
-    does not claim to complete the dealiasing, because for one strategy it does not.
-    `PhaseShift` removes its aliases by *averaging two displaced evaluations* of the
-    quadratic product, and the spherical truncation is only the second half of that; the generator
-    performs the first half where it assembles the product. For `TwoThirds` the truncation
-    alone is exact, and for `HouLi` the taper damps rather than removes.
+    For `TwoThirds` this call is the whole of it, and for `HouLi` the taper damps the aliases rather
+    than removing them. `PhaseShift` is the case to watch: it cancels its aliases by *averaging two
+    displaced evaluations* of the quadratic product, which the generator does where it assembles
+    that product — the truncation here is only the second half.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 

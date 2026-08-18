@@ -141,7 +141,7 @@ reaches is observed exactly once: the first because a deposit seeding the initia
 the cache is built, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
 closing deposit has no following iteration to fold into — it serves the final observation instead — so, relative
-to a solver with no cache serving only its own dynamics, the run pays one extra closing deposit: the state-only
+to a cacheless solver serving only its own dynamics, the run pays one extra closing deposit: the state-only
 share of one first-stage evaluation, one reduction, and one interpolation, per run rather than per
 iteration.
 
@@ -150,8 +150,7 @@ named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code
 an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
 every step or announced mutation, the particles' with every push, and a slot's epoch is current when
 it equals its factor's epoch. An epoch is therefore **not** an iteration number: it counts changes to
-the state rather than advances of the run, so after two steps and one announced mutation the clock
-reads step 2 while the fields epoch reads 4.) A read is served only in the
+the state rather than advances of the run.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.
@@ -386,7 +385,7 @@ deposited field, and [`max_speed`](@ref) the deposited number — each a checked
 no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run layer's `advance!` calls it
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
-fields* being the two integrated fields, not a filtered subset of the scales — after which reads
+fields* being the two integrated fields — after which reads
 throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the particle velocities —
 a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
 particle positions.

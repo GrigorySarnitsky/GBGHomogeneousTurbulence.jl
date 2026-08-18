@@ -208,12 +208,13 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   substage recovery registers mid-iteration (their epochs go to *scratch*, so a mid-iteration read
   throws instead of serving a stage intermediate), and the closing `deposit!` re-fills them at the new epoch
   from the state the step just produced. An accessor (`velocity_physical`, `vorticity_physical`,
-  `scalar_physical`, the cached `max_speed`) serves the deposited value or throws — there is no path
-  by which reading causes a computation — and the cache keeps one epoch counter per dynamical factor
-  of the run (fields, particles); `step!` advances the fields epoch as it completes, and an
-  out-of-band mutation of the spectral state is declared through `fields_modified!` — the
-  one freshness event the cache cannot detect itself (§11 decision 30) — followed by a `deposit!`
-  before the run advances again. The `State` module's initial conditions seed the state:
+  `scalar_physical`, the cached `max_speed`) serves the deposited value or throws; no read ever
+  causes a computation.
+
+  Freshness is tracked by one epoch counter per dynamical factor of the run — fields, particles.
+  `step!` advances the fields epoch as it completes. An out-of-band mutation of the spectral state is
+  the one freshness event the cache cannot detect itself, so it is declared through
+  `fields_modified!` and followed by a `deposit!` before the run advances again (§11 decision 30). The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The
   per-step scratch is **not** state: the scheme's registers live with the scheme (`IntegratorBuffers`
@@ -454,9 +455,7 @@ Over it:
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
-  `particle_positions(sim.tracers)`. The run layer once carried forwarding methods that hid this
-  split; they bought a shorter call at the price of a second docstring per quantity, and of teaching
-  a surface rather than the two objects the package is built from.
+  `particle_positions(sim.tracers)`. 
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) the
   current-state diagnostics, for a callback to read.

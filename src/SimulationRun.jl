@@ -74,8 +74,7 @@ the assembly scratch), the chosen scheme, the [`ResolvedFields`](@ref) state (th
 [`ObservablesCache`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
-`Simulation` at ``t = 0`` ("front door" names exactly this convenience form throughout — the
-constructor that builds every component for you); the second takes a `FixedDomain` you built
+`Simulation` at ``t = 0``; the second takes a `FixedDomain` you built
 yourself. Advance it with
 [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref); read its measured state by applying the
 observables to its `state` fields (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or through the
@@ -109,7 +108,7 @@ chosen from the grid rather than supplied:
     **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
     retained-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
-    same grid at the same `κ_max_η` — which credits the whole retained band as clean signal, exact for
+    same grid at the same `κ_max_η`. That criterion treats the whole retained band as clean signal — exact for
     `TwoThirds` and [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped rather than
     exactly dealiased. The `kinetic_energy` and `side_length` fix
     the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
@@ -151,21 +150,18 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale `initial_spectrum` is evaluated at.
-- `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
-  `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
-  initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
-  run's state (its integral scale set to `1/envelope_wavenumber` (which is the Gaussian envelope's characteristic
-  wavenumber ``\\kappa_p``, not the shell-spectrum peak — that sits at ``\\kappa_p/\\sqrt{2}``; see
-  [`random_solenoidal_velocity_spectral!`](@ref))) and normalized to `kinetic_energy`.
+- `initial_spectrum = nothing` — draw the initial velocity from a
+  [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
+  `VonKarman1948()`) instead of the default large-scale Gaussian. The model is evaluated at the run's
+  state, with its integral scale taken as `1/envelope_wavenumber`, and the result normalized to
+  `kinetic_energy`.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
   the **spatial** scheme that evaluates a field at their positions, forwarded to the `Tracers`
   constructor as its `interpolation_scheme`.
-- `trajectory_scheme = EndpointHeun()` — the **temporal** scheme that advances the trajectories, a
-  different axis from `interpolation_scheme` despite the neighbouring names
-  ([`AbstractParticleIntegrator`](@ref
-  GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
+- `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
+  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
   its registers are allocated for you.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
@@ -402,8 +398,7 @@ the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
 to stop (any other return throws an `ArgumentError` — the decision may not be left implicit). Only then does the next
 iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the closing
-deposits. The schedule never varies with how the run is driven, so the closing deposit's maximum-speed
-reduction and its host readback happen every iteration even under a fixed `dt` that never reads them. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
+deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
 step, the last after the final one, with statistics recorded before the stop.
 
 Stopping is the observation's decision on observables, never a run option: a budget is a callback

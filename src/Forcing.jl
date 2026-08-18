@@ -28,10 +28,9 @@ the order the step calls them:
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`apply_forcing!`](@ref) — project or rescale the field after the step.
 
-A fifth name is not a hook: [`DeferredForcing`](@ref) is the operator-free keyword form of a
-strategy, materialized once the
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain. It exists
-at construction time and the step never calls it.
+[`DeferredForcing`](@ref) is the operator-free keyword form of a strategy, materialized once the
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain — a
+construction-time object, not a lifecycle hook.
 
 The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref) and
 [`ConstantPower`](@ref), one implementation serving both the velocity and the scalar through
@@ -67,10 +66,6 @@ declare [`uses_linear_rate`](@ref), or it is never given a rate array to fill),
 [`add_forcing_source!`](@ref) (an additive per-stage source), and [`apply_forcing!`](@ref) (a
 post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
 need.
-
-Three of the four hooks mutate and return their second argument; `prepare_forcing!` is the exception —
-its `field` is read-only and what it advances is the forcing's own internal state, so it returns
-`nothing`.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
 `set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook

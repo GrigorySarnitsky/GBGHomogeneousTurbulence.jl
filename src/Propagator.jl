@@ -187,14 +187,14 @@ assembles the physics itself. The first stage reads the
 deposited velocity, vorticity, and scalar in physical representation from `cache` — the values of
 the instant between iterations, where the cache's deposits are current, deposited there
 by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
-stages compute their recoveries into those same slots, so the step allocates and resides nothing
-beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
+stages compute their recoveries into those same slots, so the step allocates nothing and occupies
+no storage beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
 deposit is recorded at — is advanced when the step completes.
 
-The argument order is shared with `deposit!`, the call that closes the iteration: the
-dispatch object leads (the scheme here, the cache there), the common arguments follow in the fixed
-order `state`, `domain`, `buffers` (with `generator` after `state` and `cache`, `dt` closing this
-signature), so the chained pair transposes nothing.
+The argument order is shared with `deposit!`, the call that closes the iteration: the dispatch
+object leads — the scheme here, the cache there — and the common arguments follow in the fixed order
+`state`, `domain`, `buffers`, so the chained pair transposes nothing. This signature interleaves two
+more: `generator` directly after `state`, and `cache` then `dt` at the end.
 
 !!! note
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
@@ -468,12 +468,14 @@ vorticity and scalar recoveries and the maximum speed, the same set every iterat
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
 [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) ) the step has just produced,
 and record each slot at the current epoch (the cache's freshness counter). The
-deposits are the next iteration's first-stage work moved to the iteration's end — the velocity, vorticity, and
-(when the run carries one) scalar recoveries in physical representation, then the maximum-speed
-reduction over the just-deposited velocity — so an iteration's transform counts are unchanged by
-caching, and its pass counts are unchanged but for one: the maximum-speed reduction runs every
-iteration, including under a hand-fixed ``\\Delta t`` that never reads it; the recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a
-spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
+The deposits are the next iteration's first-stage work moved to the iteration's end: the velocity,
+vorticity and — when the run carries one — scalar recoveries in physical representation, then the
+maximum-speed reduction over the just-deposited velocity. The recoveries run on the
+[`FixedDomain`](@ref) `domain`'s plans, through a spectral stage register of `buffers` (an
+[`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
+
+Caching therefore costs an iteration no transforms. It costs one pass: the maximum-speed reduction
+runs every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
 
 The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
 the state, so it is filled by

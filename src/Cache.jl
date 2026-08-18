@@ -42,8 +42,7 @@ The cache's operations:
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
 — homed in `Propagator`, with the iteration it closes — which fills every slot at the iteration's
-end and sets its epoch; internal per-slot deposit and take verbs move the individual epochs. A
-caller reads through the accessors and never deposits.
+end and sets its epoch. A caller reads through the accessors and never deposits.
 """
 module Cache
 
