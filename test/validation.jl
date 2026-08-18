@@ -1,6 +1,6 @@
 using Test
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: curl!, field_data, adapt
+using GBGPeriodicFields: curl!, field_data
 using GBGIsotropicTurbulence.Phenomenology
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 
@@ -63,12 +63,10 @@ end
 # the default L = 2π where Δκ = 1.
 function compare_to_model(sim, model)
   fp = flow_parameters(sim)
-  spectrum_on_device = energy_spectrum(sim.state.velocity_spectral, sim.domain)
-  # `energy_spectrum` leaves its results where the field lives (decision: the host transfer is the
-  # caller's to ask for). This comparison walks the shells one at a time, so it must be on the host —
-  # scalar-indexing a device array is what invariant 4 forbids. `adapt` is the verb that moves it.
-  κ = adapt(Array, spectrum_on_device.wavenumbers)
-  measured = adapt(Array, spectrum_on_device.energy)
+  # `energy_spectrum` returns host `Vector`s whatever backend the field lives on — the shell
+  # accumulators are O(N) and the reduction brings them back — so this comparison, which walks the
+  # shells one at a time, needs no transfer of its own and never scalar-indexes a device array.
+  κ, measured = energy_spectrum(sim.state.velocity_spectral, sim.domain)
   Δκ = 2π / sim.domain.grid.domain_size[1]
   predicted = similar(measured)
   num = zero(eltype(measured))

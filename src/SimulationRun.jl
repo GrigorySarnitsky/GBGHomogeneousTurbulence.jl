@@ -71,7 +71,8 @@ A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@re
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and
 the assembly scratch), the chosen scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the
-[`ObservablesCache`](@ref) observation cache, any [`Tracers`](@ref), and a clock. The first form is the
+[`ObservablesCache`](@ref) holding the observables the last iteration deposited, any
+[`Tracers`](@ref), and a clock. The first form is the
 **front door**: from `grid_points_per_axis` and `side_length` it builds every piece with sensible defaults, seeds a
 divergence-free velocity (and, with `scalar = true`, a mean-zero scalar ``\\varphi``), and returns a
 `Simulation` at ``t = 0``; the second takes a `FixedDomain` you built

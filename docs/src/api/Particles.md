@@ -23,7 +23,7 @@ number_of_particles
 
 ## The trajectory scheme
 
-How the positions are advanced over one step — the Lagrangian counterpart of the field schemes, with
+How the positions are advanced over one step — the Lagrangian counterpart of the field schemes.
 `EndpointHeun` is the one scheme today; its storage is allocated by
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
 you.

@@ -111,8 +111,14 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
   # rejects it (PF's radial-kernel contract).
   zero_value = zero(T)
   envelope = if isnothing(spectrum)
+    # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
+    # its spatial mean, so killing that mode leaves ⟨u⟩ = 0 with no physical-space pass. Without the
+    # guard the Gaussian is exp(0) = 1 there and the seed carries a uniform mean flow — measured at
+    # 13.5% of the seeded energy — which is not homogeneous isotropic turbulence, inflates u' and the
+    # CFL speed, and sweeps every tracer. The `spectrum` branch below and the scalar twin both guard.
     inverse_peak_squared = one(T) / T(envelope_wavenumber)^2
-    radial_kernel(k2 -> exp(-inverse_peak_squared * k2), û, domain.multipliers)
+    radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
+                  û, domain.multipliers)
   else
     # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
     # spectrum ∝ κ²·(√E/κ)² = E(κ) (the κ² is the shell's mode count); the DC mode stays at 0.

@@ -150,38 +150,12 @@ for f in glob.glob('src/*.jl'):
             print('DOI in a docstring but not in ARCHITECTURE §References:', f, d)
 PY
 
-# Argument coverage — from each docstring SIGNATURE, every positional + keyword parameter must be
-# mentioned as a backticked `arg` in the body (an arg named only inside a formula reads as
-# bound-by-use). Triage the hits: a thin wrapper that @ref-links its home may name a math variable
-# in a ``…`` span; internal `_helpers` are looser.
-julia --startup-file=no -e '
-for file in filter(f->endswith(f,".jl"), readdir("src"; join=true))
-  s = read(file, String)
-  for m in eachmatch(r"\"\"\"\n(.*?)\n\"\"\""s, s)
-    body = m.captures[1]; sig = strip(first(split(body, "\n")))
-    (occursin("(", sig) && occursin(")", sig)) || continue
-    o = findfirst("(", sig).start; c = findlast(")", sig).start
-    inside = sig[nextind(sig, o):prevind(sig, c)]   # prevind, NOT c-1: û/φ̂/ω are multibyte, and a
-                                                    # StringIndexError aborts the sweep at the FIRST
-                                                    # file while the run still looks complete
-    for raw in split(inside, ",")
-      p = strip(split(split(raw, "::")[1], "=")[1]); p = strip(split(p, ";")[end])
-      occursin(r"^[A-Za-zα-ωΑ-Ω][A-Za-z0-9_!α-ωΑ-Ω̂]*$", p) || continue
-      # A mention counts in either form: `name` alone, or `name = value` (four docstrings document a
-      # keyword as "pass `scalar = true` to …", which names the argument and its effect perfectly
-      # well). Requiring the bare span would push prose around to satisfy the regex.
-      mentioned = occursin(Regex("`\\Q"*p*"\\E`"), body) ||
-                  occursin(Regex("`\\Q"*p*"\\E\\s*="), body)
-      mentioned || println(file, ": ", sig, "  UNDOCUMENTED `", p, "`")
-    end
-  end
-end'
-```
-
-Three scans added 2026-08-17, each from a defect class a read-through found and this battery did not.
-They live in `.claude/commands/check-docs/` rather than inline, because each carries a real subtlety
-that a one-line grep gets wrong:
-
+# Argument coverage — every positional + keyword parameter in a docstring SIGNATURE must be
+# documented in that docstring's body. Lives in a file, not inline: it accepts BOTH house shapes
+# (`scalar` and `scalar = false`), and an inline version that matched only the bare form reported six
+# false positives on every run — a scan that always cries wolf is one whose real hit gets waved
+# through. Exits non-zero on any gap.
+julia --startup-file=no .claude/commands/check-docs/argcov.jl
 ```bash
 python3 .claude/commands/check-docs/abutting_spans.py    # (a) `code` next to ``math``
 julia --project --startup-file=no .claude/commands/check-docs/xlink.jl   # (b) unlinked cross-module names

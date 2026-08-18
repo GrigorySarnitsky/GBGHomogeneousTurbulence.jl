@@ -6,7 +6,7 @@ spectrum ``E_\\varphi(\\kappa)``, evaluated by [`spectrum`](@ref). A velocity mo
 an inertial-range core times a large-scale roll-off and a dissipation-range roll-off, each
 swappable — and [`ModelSpectrum`](@ref) owns the formula.
 
-- [`ModelSpectrum`](@ref) — the composed velocity spectrum: a Kolmogorov constant, a
+- `ModelSpectrum` — the composed velocity spectrum: a Kolmogorov constant, a
   [`LargeScaleFactor`](@ref), and a [`DissipationFactor`](@ref).
 - `LargeScaleFactor` / `DissipationFactor` — the swappable roll-off pieces, evaluated by
   [`large_scale_factor`](@ref) / [`dissipation_factor`](@ref): [`PopeLargeScale`](@ref) /

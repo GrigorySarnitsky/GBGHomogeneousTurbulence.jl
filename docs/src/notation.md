@@ -22,7 +22,7 @@ a direct dependency.
 ## Physical variables
 
 
-Every **Code** entry naming a package object links to its documentation; the few that stay bare are constructor keywords, which have no object of their own to link to.
+Every **Code** entry naming a package object links to its documentation. The few that stay bare name no single object to link to: a constructor keyword, or a quantity carried as a field of the state rather than by a function of its own.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|

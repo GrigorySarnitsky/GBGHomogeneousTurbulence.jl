@@ -65,7 +65,7 @@ band. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) keeps the fu
 are Nyquist modes its taper has already damped to machine precision — alias-free in practice, not
 exactly.
 """
-kinetic_energy(u) = 0.5 * inner(u, u)
+kinetic_energy(u) = inner(u, u) / 2
 
 
 """
@@ -268,7 +268,8 @@ function derivative_skewness(û, domain::FixedDomain)
   # ⟨det S⟩ as the fused mapped reduction: the determinant is formed per grid point in registers and
   # consumed by the mean immediately, so no determinant field is materialized.
   mean_det = mean(det, strain_physical)
-  return 3 * _SKEWNESS_ISOTROPY_CONSTANT * mean_det / ss^1.5         # C · 3⟨det S⟩/⟨S:S⟩^{3/2}
+  # `oftype` keeps a Float32 run measuring in Float32: a bare Float64 constant would promote it.
+  return 3 * oftype(mean_det, _SKEWNESS_ISOTROPY_CONSTANT) * mean_det / ss^oftype(ss, 1.5)  # C · 3⟨det S⟩/⟨S:S⟩^{3/2}
 end
 
 
@@ -282,9 +283,9 @@ from [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) is instead a *
 wavenumber, with ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``, so the two differ by the
 shell width ``\\Delta\\kappa = 2\\pi/L`` and are not interchangeable. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
 wavenumber magnitudes ``\\kappa`` and the energy ``E_n`` in each shell (positional destructuring
-`κ, E = energy_spectrum(û, domain)` also works). Both arrays live on the backend `û` lives on — bring
-them to the host yourself with
-[`adapt`](@extref GBGPeriodicFields Adapt.adapt) when you want them there. It is the `GBGPeriodicFields` radial
+`κ, E = energy_spectrum(û, domain)` also works). Both come back as host `Vector`s whatever backend
+`û` lives on: the shell accumulators are ``O(N)`` and the reduction brings them back, so a plotting
+or fitting caller needs no transfer of its own. It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
 multipliers. This is the measured counterpart of a

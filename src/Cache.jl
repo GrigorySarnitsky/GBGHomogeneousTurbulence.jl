@@ -11,7 +11,8 @@
     Cache
 
 The observables cache — where the iteration leaves the observables it produces, for the run's own
-components and any observation to read.
+components and for any **observation** to read: a measurement the caller makes between iterations,
+from the values the run has already computed.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.

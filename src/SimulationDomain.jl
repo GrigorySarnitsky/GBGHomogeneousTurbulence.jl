@@ -46,7 +46,8 @@ ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
 [`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
 default is decided by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
-front door, not by this catalogue.
+constructor that builds a whole run from a few keywords — the **front door** — and not by this
+catalogue.
 """
 abstract type DealiasingStrategy end
 
@@ -273,7 +274,8 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 """
     max_wavenumber(domain)
 
-The highest wavenumber magnitude that `domain` actually evolves — the dealiasing cutoff
+The highest wavenumber magnitude that `domain` (a [`FixedDomain`](@ref)) actually evolves — the
+dealiasing cutoff
 
 ```math
 \\kappa_{\\max} = f \\frac{N}{2} \\frac{2\\pi}{L},
