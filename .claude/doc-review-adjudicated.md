@@ -34,7 +34,24 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   caches; here it is a stateless dispatch tag. Deliberate: the package's arrows-external style keeps the
   state, cache, generator, and buffers as explicit arguments, and `AbstractIntegrator`/`IFRK2`/
   `IFLowStorageRK3` name schemes consistently throughout.
-- **PascalCase spectrum factories** (`Pope2000`, `VonKarman1948`, `Pao1965` are functions returning a
-  composed `ModelSpectrum`). Deliberate: the author-year handle is the naming scheme for every reference
-  law, concrete subtype or composition alike, and the docs already direct users to test `spec isa
-  EnergySpectrum` rather than the preset name.
+- **PascalCase composed spectrum presets** (`Pope2000`, `VonKarman1948`, `Pao1965`). Deliberate: the
+  author-year handle is the naming scheme for every reference law, concrete subtype or composition
+  alike. (Corrected 2026-08-18: each is a `const` **type alias** for one `ModelSpectrum`
+  specialization with a keyword constructor — *not* a factory function, so `spec isa Pope2000` holds.
+  The earlier wording here was wrong and was itself propagating into the docs.)
+
+
+## Round 2026-08-18 (closure verifier) — settled as NOT defects (do not re-flag)
+
+- **`No DOI` vs `no DOI` capitalization.** Not an inconsistency: `ARCHITECTURE.md`'s §References
+  instances open an italic parenthetical *sentence* (`*(No DOI: the 1941 Doklady notes predate the
+  system.)*`), while the `Phenomenology` `Reference` strings are mid-sentence parentheticals
+  (`**13**, 58 (no DOI)`). Both follow ordinary sentence capitalization; harmonizing them would break
+  one of the two.
+- **`CatmullRom` passed bare, without parentheses.** Correct as written: in `GBGPeriodicFields` it is
+  `const CatmullRom = LalescuSpline(1, 1)` — a ready-made *value*, not a type — so the parenthesised
+  form its neighbours use would be a call on a value. A panel round asked for the opposite change; the
+  docstring now states why it is bare.
+- **Both a `-> Type` arrow and a trailing `Returns x.` sentence.** Two sanctioned shapes, not a
+  drift: the arrow states a return type fixed by the signature, the sentence covers an in-place
+  mutator whose signature carries none. `CLAUDE.md` records the discriminator.

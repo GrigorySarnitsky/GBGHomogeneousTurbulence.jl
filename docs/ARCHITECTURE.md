@@ -186,7 +186,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `element_type` fixes the real element type
-  ([`Float32`](@extref Julia Core.Float32) or [`Float64`](@extref Julia Core.Float64))
+  ([`Float32`](@extref Julia Core.Float32) or `Float64`)
   and `array_type` the storage ([`Array`](@extref Julia Core.Array), `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
@@ -213,7 +213,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   causes a computation.
 
   Freshness is tracked by one epoch counter per dynamical factor of the run — fields, particles.
-  `step!` advances the fields epoch as it completes. An out-of-band mutation of the spectral state is
+  A completed `step!` advances the fields epoch. An out-of-band mutation of the spectral state is
   the one freshness event the cache cannot detect itself, so it is declared through
   `fields_modified!` and followed by a `deposit!` before the run advances again (§11 decision 30). The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
@@ -1651,7 +1651,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     instant between iterations is named plainly — *between iterations*, *the iteration's end*,
     *the instant* ``t_n`` — and the cache values carry the adjective **deposited** (the deposited
     velocity, the deposited observables) where "boundary velocity/observables" stood.
-    `check_boundary` is renamed **`check_deposits`** (the deposit-completeness check), and the op
+    The `check_boundary` verb is renamed **`check_deposits`** (the deposit-completeness check), and the op
     model's `_tail_deposit`/`tail` become `_closing_deposit`/`closing`. Untouched, being different
     senses of the same words: the spatial box boundary, an ownership or kernel-granularity
     boundary, a spectrum's ``\kappa^{2}`` tail, and the phase-shift chain's final convolve
@@ -1670,7 +1670,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     objects the package is actually built from. The clock accessors `current_time` / `current_step`
     stay: the clock is the run layer's own state, not a forwarded read. The bundle `flow_parameters(sim)` stays
     for the same reason — it assembles a bundle from several owners rather than forwarding to one.
-    `validate_spectrum` leaves the package altogether, to `test/validation.jl` as `compare_to_model`:
+    The `validate_spectrum` helper leaves the package altogether, to `test/validation.jl` as `compare_to_model`:
     comparing a run against a model spectrum answers "does this reproduce the literature", which is
     what a validation suite asks and a solver never does.
 

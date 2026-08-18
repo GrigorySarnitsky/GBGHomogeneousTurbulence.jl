@@ -127,8 +127,8 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 
 The fastest flow speed on the grid, ``\\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}(\\boldsymbol{x})\\rvert``,
 of the velocity field `u` in physical representation — the speed that sets the advective-CFL
-timestep. The magnitude is formed per grid point in registers and consumed by the maximum
-immediately, so no magnitude field is materialized.
+timestep. The magnitude is formed one grid point at a time and consumed by the maximum immediately,
+so no magnitude field is materialized.
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
