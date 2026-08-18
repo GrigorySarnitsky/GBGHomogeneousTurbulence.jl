@@ -355,7 +355,9 @@ end
     advance!(sim; dt = nothing)
 
 Advance `sim` by one timestep in place and return it. With `dt = nothing` the step size is the
-advective-CFL value for the current velocity; pass `dt` to force a fixed step. Advects the tracers,
+advective-CFL value for the current velocity; pass `dt` to force a fixed step. Closes the iteration
+with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
+returns. Advects the tracers,
 if any, by Heun-in-time on the start- and end-of-step velocities, and updates the clock.
 """
 function advance!(sim::Simulation; dt = nothing)

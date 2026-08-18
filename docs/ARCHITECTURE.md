@@ -1854,8 +1854,9 @@ cites.
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
   the caveat `BandRescaling` carries.)*
 - Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. <https://doi.org/10.1016/0021-9991(80)90033-9> *(The
-  2N low-storage family; the package's third-order coefficients are Williamson's Eq. (11), his recommended
-  case 7 — the set later adopted for spectral DNS and popularly named "RKW3".)*
+  2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
+  popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
+  cites the family rather than a numbered case.)*
 - Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. <https://doi.org/10.1017/CBO9780511840531> *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
 - Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,

@@ -193,7 +193,7 @@ in spectral representation ``\\hat\\varphi`` (the `φ̂` argument), the [`FixedD
 scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` (the `diffusivity` argument).
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
 scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals
-``\\langle\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\varphi\\rangle``: a
+``\\langle\\hat\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat\\varphi\\rangle``: a
 ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral inner product against the
 `domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
 physical gradient ``\\nabla\\varphi`` materialized. It is the scalar twin of

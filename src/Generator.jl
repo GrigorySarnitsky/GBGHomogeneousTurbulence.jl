@@ -20,7 +20,8 @@ Its contents (each formula lives in the operation's own docstring):
   the Schmidt number, the forcings).
 - [`ResolvedGenerator`](@ref) — the generator as one value: the conditions bundled with the assembly
   scratch its evaluations write through, consumed by a scheme through the protocol below.
-- [`prepare!`](@ref) — open a step: advance the forcings' internal state and arm the linear rates.
+- [`prepare!`](@ref) — open a step: advance the forcings' internal state and fill the linear rate
+  arrays the integrating factor will consume.
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (the
   dealiased, Leray-projected momentum term and the scalar advection, each plus its additive forcing
   source) at a stage state.
@@ -56,7 +57,12 @@ defaults (``u' = 1``, ``L = 2\\pi``) the box-scale value is ``2\\pi/\\nu``, and 
 smaller again), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both
-[`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing)). Consumed by the time
+[`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing)).
+
+Not to be confused with `Phenomenology`'s `FlowParameters`, which shares two field names: this type
+holds what a run is **configured with**, that one holds what a run has been **measured to have**.
+
+Consumed by the time
 step ([`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)).
 
 # Arguments

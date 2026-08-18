@@ -60,7 +60,7 @@ Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, and the leanest of the three on a GPU.
+of the quadratic nonlinearity, with the narrowest retained band of the three and no taper to evaluate.
 """
 struct TwoThirds <: DealiasingStrategy end
 

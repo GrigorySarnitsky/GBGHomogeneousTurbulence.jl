@@ -48,6 +48,8 @@ export Tracers, AbstractParticleIntegrator, EndpointHeun, ParticleIntegratorBuff
     Tracers(domain; number_of_particles, interpolation_scheme, rng = default_rng())
     Tracers(domain; positions, interpolation_scheme)
 
+(One method, shown as the two ways it is called — keywords do not dispatch.)
+
 A set of Lagrangian tracers, built on `domain`'s backend and element type. Give **exactly one** of
 `number_of_particles`, which seeds that many tracers uniformly at random in the periodic box of
 `domain`, or `positions`, an `(M, 3)` array of `M` tracer positions to wrap (the three columns are
@@ -106,7 +108,7 @@ closing deposit leaves them.
 - `positions` — the `(M, 3)` tracer positions (read with `particle_positions`).
 - `position_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `positions`: the
-  form the interpolation reads them in.
+  same coordinates in the form `GBGPeriodicFields`' interpolation takes, which is why both exist.
 - `particle_velocities` — the interpolated velocity at the positions the tracers occupy, at the
   instant they occupy them: the genuine Lagrangian sample, and the observables cache's
   particle-velocities slot.

@@ -76,8 +76,10 @@ and leaves alive at the iteration's end, and nothing may be added on any cost ax
 
 Build it on a [`FixedDomain`](@ref) `domain`; pass `scalar = true` when the run evolves a passive
 scalar (it adds the scalar's slot), and `particle_velocities` — the tracer set's own point-value
-storage — when the run advects tracers: the slot IS that storage, so the tracers' push writes the
-values and the cache only records which epochs they belong to. The
+storage — when the run advects tracers. Pass `tracers.particle_velocities`: the slot **is** that
+array, so the tracer advance writes the values and the cache only records which epochs they belong
+to. The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door wires it for
+you; a hand-assembled run passes it here. The
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door —
 the convenience constructor that builds every component — builds,
 wires, and seeds one for you.

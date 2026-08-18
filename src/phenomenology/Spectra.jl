@@ -205,7 +205,8 @@ dissipation_factor(f::PaoDissipation, κη) = exp(-1.5 * f.α * κη^(4//3))
 
 The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta \\kappa\\eta)``
 — the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
-spectral closures (EDQNM, DIA, LRA) consistently predict (Kaneda 1993; Sagaut & Cambon 2018). It is the
+spectral closures — eddy-damped quasi-normal Markovian, direct-interaction approximation, Lagrangian
+renormalized approximation — consistently predict (Kaneda 1993; Sagaut & Cambon 2018). It is the
 *far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
 ``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018,
 [doi:10.1103/PhysRevFluids.3.082601](https://doi.org/10.1103/PhysRevFluids.3.082601); consistent with

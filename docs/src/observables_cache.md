@@ -295,7 +295,7 @@ mask, both per-wavenumber multiplications.
 
 **No count depends on what the cache holds.** The deposit replaces the next iteration's first-stage
 work rather than adding to it, so an iteration recovers a field once whether or not it is cached.
-These transforms carry essentially all of the arithmetic: a scalar transform costs of order ``10^{2}``
+These transforms carry essentially all of the arithmetic: a scalar transform costs of order ``10^{1}``–``10^{2}``
 floating-point operations per grid point, a pointwise multiplication of order one.
 
 The pointwise product writes into one of its own operands: the backend's cross product reads each
@@ -336,7 +336,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not computed: no component of the iteration forms them; each is one reduction at an observation |
 | ``E_n``, the per-shell energy | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
-| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
+| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
 | the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | — | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | — | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |

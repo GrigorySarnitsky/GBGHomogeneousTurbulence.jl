@@ -106,3 +106,20 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 |:---|:---|:---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
 | ``\varepsilon_{\mathrm{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |
+
+## Vocabulary
+
+The page above fixes one symbol per physical concept. This section does the same for the package's
+**operational** words — the ones that name how a run is organized rather than what it computes. Each
+is used throughout the docstrings, and each means exactly this and nothing looser.
+
+| Term | Meaning |
+|:---|:---|
+| **iteration** | one advance of the run: a [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) followed by the [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) that closes it. Wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
+| **deposit** | to write an observable into the cache and mark the moment it belongs to. The closing deposit is the one that ends an iteration; nothing is ever written to the cache on a read. |
+| **slot** | one storage place in the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) — an array or a number, together with the epoch its value belongs to. |
+| **epoch** | a counter of *changes to the state*, one per dynamical factor (the fields, the tracer positions). A slot is readable exactly when its own epoch equals the counter it depends on. Not an iteration number: an announced out-of-band mutation advances an epoch without advancing the clock. |
+| **register** | storage a component computes one value into and overwrites at the next, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
+| **front door** | the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor that builds every component from a few keywords, as against assembling the pieces yourself. |
+| **observation** | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue. |
+| **resolved** | in `ResolvedFields` and `ResolvedGenerator`, *made concrete as one value* — not the numerical sense of "resolved by the grid", which this package writes out in full wherever it is meant. |
