@@ -78,8 +78,20 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   scalar_forcing::SF
 end
 
-FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
-  FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
+function FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
+  # One instance driving both fields conflates their bookkeeping — but only for a strategy that HAS
+  # per-field state to conflate. An immutable forcing (`BandRescaling`, `Linear`, `ConstantPower`)
+  # carries only its band and its target, so sharing one is harmless; `===` would not even
+  # distinguish two separately-built copies of it, since Julia compares immutables by value. The
+  # hazard is exactly the mutable strategies, whose scratch and random stream are per-field. Caught
+  # here rather than left to a docstring warning, matching how the sibling misconfiguration (a
+  # forcing that fills a rate without declaring it) is handled.
+  ismutable(velocity_forcing) && velocity_forcing === scalar_forcing &&
+    throw(ArgumentError("the same $(nameof(typeof(velocity_forcing))) instance was given as both " *
+                        "`velocity_forcing` and `scalar_forcing`; that strategy carries per-field " *
+                        "state, so construct one instance per forced field"))
+  return FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
+end
 
 
 # Phase-shift dealiasing scratch + the two translation kernels (present only when `dealiasing isa

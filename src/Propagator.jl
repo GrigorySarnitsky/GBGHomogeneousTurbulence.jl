@@ -476,8 +476,9 @@ iteration, including under a hand-fixed ``\\Delta t`` that never reads it; the r
 spectral stage register of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
 
 The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
-the state, so it is re-recorded where the positions move — by `advance!` after the tracer advance,
-and by the `deposit!(sim)` form above, which does it for you when the run carries tracers.
+the state, so it is filled by
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!)
+wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
 
 Every iteration ends with this call: the run layer's
 [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!` , a

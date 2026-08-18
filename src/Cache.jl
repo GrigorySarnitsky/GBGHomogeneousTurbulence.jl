@@ -308,8 +308,10 @@ The sanctioned mutator calls it for you: the run layer announces its own tracer 
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
 [`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) ,
 both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) ), and
-the closing deposit then re-records the sample at the new epoch. A hand-run loop that repositions tracers itself must
-call this, then re-record the particle velocities before advancing.
+the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
+this, then
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) —
+the slot's only producer, and what sets both of its epochs — before advancing.
 """
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 

@@ -1625,8 +1625,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the state and its seeders. What remains a package verb is the one recovery that is *not* a chart:
     **`vorticity_physical!`** — curl in scratch, then transform; no preservation copy, since the curl
     only reads its source — homed in `Observables` as the field-valued observable whose cached read
-    is `Cache.vorticity_physical` (the f/`f!` pair decision 46's pattern implies; the `!` form is
-    the home). Two consequences delimit the change: the two recovery regimes are now explicit —
+    is `Cache.vorticity_physical` — an f/`f!` **pair**, not decision 46's single dispatched generic, and
+    the difference is structural rather than a drift: `max_speed` is a pure reduction, so one name can
+    dispatch on whether it is handed a field or the cache, while a recovery *writes a field* and a
+    checked read *returns one*, which no single name can carry. Decision 46's one-generic rule
+    therefore governs reductions; a field-valued observable takes the pair, with the `!` form the home. Two consequences delimit the change: the two recovery regimes are now explicit —
     a consumable source calls the three-argument (destructive) form, as the strain diagnostic always
     has; a source of truth calls the four-argument form — and no `to_spectral!` twin exists or is wanted,
     because every forward transform in the package reads a consumable source by design (IC and

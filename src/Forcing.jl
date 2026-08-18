@@ -83,10 +83,12 @@ Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
 `add_forcing_source!` the right-hand side, `apply_forcing!` the field); `prepare_forcing!` returns
 `nothing`.
 
-!!! warning
-    Construct one strategy instance per forced field. An instance owns per-field scratch and
-    internal state, so passing the same instance as both `velocity_forcing` and `scalar_forcing`
-    would silently conflate the two fields' bookkeeping.
+!!! warning "One instance per forced field, for a strategy that carries state"
+    A strategy holding per-field scratch or a random stream must not drive both fields from one
+    instance, or their bookkeeping is conflated;
+    [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) throws an
+    `ArgumentError` rather than let that happen. A stateless strategy — one whose whole content is
+    its band and its target — has nothing to conflate and may be shared.
 """
 abstract type AbstractForcing end
 

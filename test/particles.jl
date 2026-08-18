@@ -29,7 +29,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     nsteps, dt = 20, 0.005
     for _ in 1:nsteps
       record_trajectory_velocity!(tracers, uniform)
-      advect!(EndpointHeun(), tracers, buffers, uniform, domain, dt)
+      advect!(EndpointHeun(), tracers, uniform, domain, buffers, dt)
     end
     X = particle_positions(tracers)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
@@ -53,7 +53,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         set_uniform_x!(u_start, cos(ω * n * dt))
         set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
         record_trajectory_velocity!(tracers, u_start)
-        advect!(EndpointHeun(), tracers, buffers, u_end, domain, dt)
+        advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
       end
       particle_positions(tracers)[1, 1]
     end
@@ -70,7 +70,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
       record_trajectory_velocity!(tracers, uniform)
-      advect!(EndpointHeun(), tracers, buffers, uniform, domain, 0.02)
+      advect!(EndpointHeun(), tracers, uniform, domain, buffers, 0.02)
     end
     X = particle_positions(tracers)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
@@ -83,7 +83,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       buffers = allocate_buffers(EndpointHeun(), tracers)
       for _ in 1:10
         record_trajectory_velocity!(tracers, uniform)
-        advect!(EndpointHeun(), tracers, buffers, uniform, domain, 0.01)
+        advect!(EndpointHeun(), tracers, uniform, domain, buffers, 0.01)
       end
       X = particle_positions(tracers)
       @test all(isfinite, X) && all(0 .<= X .< L)
@@ -120,7 +120,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       record_trajectory_velocity!(tracers, u)                           # u(tₙ), onto the tracers
       step!(IFLowStorageRK3(), state, generator, domain, buffers, cache, dt)
       deposit!(cache, state, domain, buffers)
-      advect!(EndpointHeun(), tracers, push_buffers, velocity_physical(cache), domain, dt)   # u(tₙ₊₁), the closing deposit
+      advect!(EndpointHeun(), tracers, velocity_physical(cache), domain, push_buffers, dt)   # u(tₙ₊₁), the closing deposit
     end
     @test all(isfinite, particle_positions(tracers)) && all(0 .<= particle_positions(tracers) .< L)
     @test all(isfinite, point_values(tracers.particle_velocities))
@@ -128,7 +128,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     # allocation-free advection step — both verbs of the push
     u = velocity_physical(cache)
     bytes = @allocated (record_trajectory_velocity!(tracers, u);
-                        advect!(EndpointHeun(), tracers, push_buffers, u, domain, 0.001))
+                        advect!(EndpointHeun(), tracers, u, domain, push_buffers, 0.001))
     @test bytes < 4096
   end
 end

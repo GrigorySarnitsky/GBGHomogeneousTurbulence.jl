@@ -54,7 +54,8 @@ A set of Lagrangian tracers, built on `domain`'s backend and element type. Give 
 the ``x, y, z`` components), converted to `domain`'s backend and element type. Supplying both, or
 neither, is an `ArgumentError`. The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to
 evaluate the velocity (and any sampled field) at the tracer positions.
-[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
+[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) — a ready-made
+value rather than a type, so it is passed bare — is the ``C^1`` choice
 (the default `interpolation_scheme` of the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door, the
 build-everything convenience
@@ -88,11 +89,11 @@ Building a set directly — to place tracers deliberately rather than at random,
 by hand — takes the `positions` form, and then the scheme's per-step storage is yours to allocate:
 
 ```julia
-tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], interpolation_scheme = CatmullRom())
+tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], interpolation_scheme = CatmullRom)
 buffers = allocate_buffers(EndpointHeun(), tracers)
 
 record_trajectory_velocity!(tracers, u)     # u(tₙ) at the current positions — do this first
-advect!(EndpointHeun(), tracers, buffers, u_end, domain, dt)
+advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 ```
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
@@ -217,8 +218,10 @@ each tracer where it currently sits — by interpolating the velocity field `u` 
 representation) onto the positions of the tracer set `tracers`, with the set's interpolation scheme.
 
 The values go into the tracer set's own `particle_velocities` storage, which is also the observables
-cache's particle-velocities slot; storing them here is therefore what makes
-[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Call it at
+cache's particle-velocities slot. **This call is that slot's only producer**: it sets both of the
+epochs the slot is checked against — the fields epoch and the particles epoch — which is what makes
+[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Every other
+mention of the slot going fresh names some caller of this function. Call it at
 the end of each iteration, on the just-deposited velocity at the just-advanced positions.
 
 The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
@@ -234,7 +237,7 @@ end
 
 
 """
-    advect!(scheme, tracers, buffers, velocity_end, domain, dt) -> tracers
+    advect!(scheme, tracers, velocity_end, domain, buffers, dt) -> tracers
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
 below), in place, under the trajectory scheme `scheme` (an
@@ -268,8 +271,8 @@ frozen start-of-step velocity alone would be first order.
 """
 function advect! end
 
-function advect!(::EndpointHeun, tracers::Tracers, buffers::ParticleIntegratorBuffers,
-                 velocity_end, domain::FixedDomain, dt::Real)
+function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDomain,
+                 buffers::ParticleIntegratorBuffers, dt::Real)
   L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
   Δt = real(eltype(tracers.positions))(dt)
   X = tracers.positions

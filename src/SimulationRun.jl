@@ -377,8 +377,8 @@ function advance!(sim::Simulation; dt = nothing)
   # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
-    advect!(sim.trajectory_scheme, sim.tracers, sim.particle_buffers,
-            velocity_physical(sim.cache), sim.domain, Δt)
+    advect!(sim.trajectory_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
+            sim.particle_buffers, Δt)
     particles_modified!(sim.cache)
     record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)
