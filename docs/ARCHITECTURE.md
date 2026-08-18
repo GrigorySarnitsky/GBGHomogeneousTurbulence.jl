@@ -397,7 +397,7 @@ scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on th
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous closing deposit deposited — the genuine
-Lagrangian velocity, held in `Tracers.trajectory_velocity` and recorded in the observables cache
+Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the observables cache
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
@@ -437,7 +437,7 @@ Over it:
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
   builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
   scheme. The viscosity is set from the grid by default — the highest Reynolds number consistent with the
-  chosen resolution criterion `k_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
+  chosen resolution criterion `κ_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -932,7 +932,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
     (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2} C_\varepsilon^{-2/3}`` — calibrated to
-    JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `k_max_η`
+    JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `κ_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
     validate them.
@@ -1521,7 +1521,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     wearing sequence numbers: the first is the **trajectory sample**
     ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable between iterations —
     the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
-    register, substage on the position argument alone. They are renamed `trajectory_velocity` /
+    register, substage on the position argument alone. They are renamed `particle_velocities` /
     `predictor_velocity`, and the sample becomes the observables cache's first trajectory-bound
     slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
     storage (the slot IS the register, as everywhere else) and dated against **both** epochs,
@@ -1679,14 +1679,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     is recorded as planned in §7, and the scratch genuinely varies along it: a higher-order
     Runge–Kutta scheme wants several stage velocities, a multistep scheme wants a velocity *history*
     and no predictor at all, and an inertial particle wants ``\boldsymbol{v}`` as **state** rather
-    than scratch. The split also disentangles `trajectory_velocity`'s two roles — the measured
+    than scratch. The split also disentangles `particle_velocities`'s two roles — the measured
     Lagrangian observable, and "the first half of the next push" — so a history-based scheme would
     not disturb the observable. Storage is unchanged, only reassigned: the memory audit now pins two
     ``(M, 3)`` arrays on each side rather than four on one.
 
 51. **(2026-08, user-directed) *Particle* is the category, *tracer* the kind.** The public surface
     used three nouns for one set of objects — `particle_positions` beside `number_of_tracers` in a
-    single export line, plus `trajectory_velocity` — with no convention stated anywhere. The rule is
+    single export line, plus `particle_velocities` — with no convention stated anywhere. The rule is
     now: **name by what the operation is true of.** Anything true of the whole deferred ladder of §7
     takes *particle* — the positions, the count, the cache slot, interpolation at positions;
     only what is specific to the massless, internal-degree-of-freedom-free kind takes *tracer* — the

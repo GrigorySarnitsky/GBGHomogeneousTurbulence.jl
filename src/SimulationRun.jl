@@ -62,10 +62,10 @@ end
 
 
 """
-    Simulation(; grid_points_per_axis, k_max_η = 2, kinetic_energy = 1.5,
+    Simulation(; grid_points_per_axis, κ_max_η = 2, kinetic_energy = 1.5,
                  side_length = 2π, element_type = Float64, array_type = Array,
                  dealiasing = TwoThirds(), kwargs...)
-    Simulation(domain; k_max_η = 2, kinetic_energy = 1.5, kwargs...)
+    Simulation(domain; κ_max_η = 2, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and
@@ -99,22 +99,22 @@ chosen from the grid rather than supplied:
     ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
 
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with the
-    chosen resolution criterion `k_max_η`.
+    chosen resolution criterion `κ_max_η`.
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
     ``k``, `side_length` the side ``L``, and ``G`` a dimensionless constant calibrated on
     box-confined DNS (``\\approx 0.9``; Li et al. 2008),
-    then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `k_max_η` — the
+    then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
     **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
-    retained-Nyquist fraction, `k_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
+    retained-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
     (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
-    same grid at the same `k_max_η` — which credits the whole retained band as clean signal, exact for
+    same grid at the same `κ_max_η` — which credits the whole retained band as clean signal, exact for
     `TwoThirds` and [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped rather than
     exactly dealiased. The `kinetic_energy` and `side_length` fix
-    the units; the grid and `k_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
+    the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
-  * **Explicit mode**: pass `viscosity` and it is used directly (`k_max_η` is ignored) — for a decaying
+  * **Explicit mode**: pass `viscosity` and it is used directly (`κ_max_η` is ignored) — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
     forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
@@ -129,7 +129,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
   argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
-- `k_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
+- `κ_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode (the
   keyword spells ``\\kappa_{\\max}`` in ASCII); ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin.
 - `viscosity` — the kinematic viscosity ``\\nu`` (sets ``\\mathrm{Re} = 1/\\nu``); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
@@ -147,22 +147,22 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
-- `peak_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
+- `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale `initial_spectrum` is evaluated at.
 - `initial_spectrum = nothing` — a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology)
   `EnergySpectrum` (e.g. `VonKarman1948()`) to draw the
   initial velocity from, in place of the default large-scale Gaussian; its shape is evaluated at the
-  run's state (its integral scale set to `1/peak_wavenumber` (which is the Gaussian envelope's characteristic
+  run's state (its integral scale set to `1/envelope_wavenumber` (which is the Gaussian envelope's characteristic
   wavenumber ``\\kappa_p``, not the shell-spectrum peak — that sits at ``\\kappa_p/\\sqrt{2}``; see
   [`random_solenoidal_velocity_spectral!`](@ref))) and normalized to `kinetic_energy`.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
-- `number_of_particles = 0`, `tracer_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
+- `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
   the **spatial** scheme that evaluates a field at their positions, forwarded to the `Tracers`
   constructor as its `interpolation_scheme`.
-- `particle_scheme = EndpointHeun()` — the **temporal** scheme that advances the trajectories, a
-  different axis from `tracer_scheme` despite the neighbouring names
+- `trajectory_scheme = EndpointHeun()` — the **temporal** scheme that advances the trajectories, a
+  different axis from `interpolation_scheme` despite the neighbouring names
   ([`AbstractParticleIntegrator`](@ref
   GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator));
   its registers are allocated for you.
@@ -190,7 +190,7 @@ sim = Simulation(domain; viscosity = 5e-3)
   the chosen scheme.
 - `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
 - `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
-- `tracers`, `particle_scheme`, `particle_buffers` — the `Tracers` being advected along
+- `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along
   with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
   when the run carries no tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
@@ -203,7 +203,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   cache::DF                # ObservablesCache: the observation cache over the state
   tracers::TR              # Tracers, or nothing — trajectory STATE only
-  particle_scheme::PI  # AbstractParticleIntegrator, or nothing
+  trajectory_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
   cfl::Float64
   clock::Clock
@@ -218,25 +218,25 @@ _materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
 function Simulation(domain::FixedDomain;
-                    kinetic_energy::Real = 1.5, k_max_η::Real = 2, viscosity = nothing,
+                    kinetic_energy::Real = 1.5, κ_max_η::Real = 2, viscosity = nothing,
                     schmidt::Real = 1.0,
                     velocity_forcing = BandRescaling(domain; target = kinetic_energy, over = :total),
                     scalar_forcing = NoForcing(),
                     scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(scheme, domain),
                     scalar::Bool = false, scalar_variance::Real = 1.0,
-                    peak_wavenumber::Real = 2.0, initial_spectrum = nothing,
-                    number_of_particles::Integer = 0, tracer_scheme = CatmullRom,
-                    particle_scheme::AbstractParticleIntegrator = EndpointHeun(),
+                    envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
+                    number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
+                    trajectory_scheme::AbstractParticleIntegrator = EndpointHeun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
   side_length = domain.grid.domain_size[1]
   ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
-    ν = ε^(1//3) * (k_max_η / max_wavenumber(domain))^(4//3)
+    ν = ε^(1//3) * (κ_max_η / max_wavenumber(domain))^(4//3)
     reλ = (2 * kinetic_energy / 3) * sqrt(15 / (ε * ν))
-    @info "Simulation: grid-resolved at κ_max·η = $(k_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
+    @info "Simulation: grid-resolved at κ_max·η = $(κ_max_η)" viscosity=ν dissipation=ε Re_λ=reλ
   else
     ν = Float64(viscosity)
   end
@@ -250,25 +250,25 @@ function Simulation(domain::FixedDomain;
   ic_spectrum = nothing
   if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
     fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * kinetic_energy / 3),
-                        integral_scale = inv(peak_wavenumber), schmidt)
+                        integral_scale = inv(envelope_wavenumber), schmidt)
     ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
   elseif !isnothing(initial_spectrum)
     ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
   end
-  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, peak_wavenumber, spectrum = ic_spectrum, rng)
-  scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, peak_wavenumber, rng)
+  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, envelope_wavenumber, spectrum = ic_spectrum, rng)
+  scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
 
   tracers = number_of_particles > 0 ?
-    Tracers(domain; number_of_particles, interpolation_scheme = tracer_scheme, rng) : nothing
-  particle_buffers = tracers === nothing ? nothing : allocate_buffers(particle_scheme, tracers)
+    Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, rng) : nothing
+  particle_buffers = tracers === nothing ? nothing : allocate_buffers(trajectory_scheme, tracers)
 
   cache = ObservablesCache(domain; scalar,
-                             particle_velocities = tracers === nothing ? nothing : tracers.trajectory_velocity)
+                             particle_velocities = tracers === nothing ? nothing : tracers.particle_velocities)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), scheme, state, cache,
-                    tracers, tracers === nothing ? nothing : particle_scheme, particle_buffers,
+                    tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
                     Float64(cfl), Clock(0.0, 0))
 end
 
@@ -377,7 +377,7 @@ function advance!(sim::Simulation; dt = nothing)
   # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
-    advect!(sim.particle_scheme, sim.tracers, sim.particle_buffers,
+    advect!(sim.trajectory_scheme, sim.tracers, sim.particle_buffers,
             velocity_physical(sim.cache), sim.domain, Δt)
     particles_modified!(sim.cache)
     record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))

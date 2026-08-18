@@ -35,10 +35,10 @@ abstract type ScalingLaw <: TurbulenceLaw end
 
 
 """
-    stationary_dissipation(law, energy, side_length)
+    stationary_dissipation(law, kinetic_energy, side_length)
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
-dissipation `law` from the turbulent kinetic energy `energy` (``k``) and the periodic-box side length
+dissipation `law` from the turbulent `kinetic_energy` ``k`` and the periodic-box side length
 `side_length` (``L``) — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
 [`Li2008`](@ref) gives the ``(k/G)^{3/2}/L`` form). This is the seam by which a run's
 viscosity can be set from its grid and target energy, rather than the reverse.
@@ -139,7 +139,7 @@ being fits to different datasets, they are not expected to close exactly: carryi
 ``C_\\varepsilon \\approx 0.5`` across at that ratio gives ``G \\approx 0.81`` against the quoted ``0.9``.
 
 The `constant` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
-inverted, [`stationary_dissipation`](@ref)`(law, energy, side_length)` predicts the dissipation a
+inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the dissipation a
 stationary run of energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the
 run layer uses to set the viscosity from the grid and target energy.
 
@@ -155,7 +155,8 @@ Li2008(; constant = 0.9) = Li2008(constant)
 
 scaling(m::Li2008, ::FlowParameters) = m.constant
 
-stationary_dissipation(m::Li2008, energy::Real, side_length::Real) = (energy / m.constant)^(3//2) / side_length
+stationary_dissipation(m::Li2008, kinetic_energy::Real, side_length::Real) =
+  (kinetic_energy / m.constant)^(3//2) / side_length
 
 provenance(::Li2008) = _LI2008
 

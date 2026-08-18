@@ -61,7 +61,7 @@ using Test
   end
 
   @testset "grid-resolved viscosity (grid mode)" begin
-    # No `viscosity`: ν is chosen so the grid resolves κ_max·η = k_max_η, forced-and-stationary.
+    # No `viscosity`: ν is chosen so the grid resolves κ_max·η = κ_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
     ν = sim.generator.conditions.viscosity
     ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
@@ -70,8 +70,8 @@ using Test
     @test sim.generator.conditions.velocity_forcing isa BandRescaling        # forced by default
     @test ν > 0
 
-    @test Simulation(grid_points_per_axis = 32, k_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
-    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, k_max_η = 5).generator.conditions.viscosity == 0.01
+    @test Simulation(grid_points_per_axis = 32, κ_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
+    @test Simulation(grid_points_per_axis = 32, viscosity = 0.01, κ_max_η = 5).generator.conditions.viscosity == 0.01
   end
 
   @testset "initial condition from a spectrum" begin
@@ -193,7 +193,7 @@ using Test
     domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(30))
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(30))
     truncate_to_band!(û, domain)
     S0 = derivative_skewness(û, domain)
     @test isfinite(S0) && abs(S0) < 0.15          # random-phase (Gaussian) field ⇒ S ≈ 0

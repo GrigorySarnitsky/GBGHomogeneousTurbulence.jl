@@ -63,7 +63,7 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 
 """
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, peak_wavenumber,
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,
                                 spectrum = nothing, rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
@@ -74,7 +74,7 @@ projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes (zeroed
 at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so the mean mode stays empty), whose
-characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
+characteristic wavenumber is ``\\kappa_p`` (`envelope_wavenumber`). Because the envelope multiplies the
 amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
@@ -97,7 +97,7 @@ stream (defaults to `Random.default_rng()`).
     interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
-                                     kinetic_energy::Real, peak_wavenumber::Real,
+                                     kinetic_energy::Real, envelope_wavenumber::Real,
                                      spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = new_vector_field_physical(domain)
@@ -109,7 +109,7 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
   # rejects it (PF's radial-kernel contract).
   zero_value = zero(T)
   envelope = if isnothing(spectrum)
-    inverse_peak_squared = one(T) / T(peak_wavenumber)^2
+    inverse_peak_squared = one(T) / T(envelope_wavenumber)^2
     radial_kernel(k2 -> exp(-inverse_peak_squared * k2), û, domain.multipliers)
   else
     # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
@@ -132,7 +132,7 @@ end
 
 
 """
-    random_scalar_spectral!(φ̂, domain; scalar_variance, peak_wavenumber,
+    random_scalar_spectral!(φ̂, domain; scalar_variance, envelope_wavenumber,
                    spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
@@ -146,7 +146,7 @@ construction: the envelope is zeroed at
 By default (`spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
 ``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes — zeroed,
 as above, at the origin — whose
-characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
+characteristic wavenumber is ``\\kappa_p`` (`envelope_wavenumber`). Because the envelope multiplies the
 amplitudes, the shell-summed scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Pass `spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
@@ -168,7 +168,7 @@ stream (defaults to `Random.default_rng()`).
     interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain;
-                        scalar_variance::Real, peak_wavenumber::Real,
+                        scalar_variance::Real, envelope_wavenumber::Real,
                         spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   noise = new_scalar_field_physical(domain)
@@ -181,7 +181,7 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
     # The envelope vanishes at κ = 0, which IS the mean removal: the κ = 0 coefficient of a field is
     # its spatial mean, so killing that mode leaves ⟨φ⟩ = 0 without a physical-space pass or the
     # reduction one would need to measure the mean. The `spectrum` branch below vanishes there too.
-    inverse_peak_squared = one(T) / T(peak_wavenumber)^2
+    inverse_peak_squared = one(T) / T(envelope_wavenumber)^2
     radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
                   φ̂, domain.multipliers)
   else

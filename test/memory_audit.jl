@@ -323,7 +323,7 @@ const EPISODE_UNITS = [
     _m_arrays(owner) = (acc = AbstractArray[];
                         collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
                         [a for a in acc if size(a) == (4, 3)])
-    @test length(_m_arrays(tracers)) == 2                  # positions, trajectory_velocity
+    @test length(_m_arrays(tracers)) == 2                  # positions, particle_velocities
     @test length(_m_arrays(buffers)) == 2                  # predictor, predictor_velocity
     # The split moved storage; it did not add any. The total is what the ledger prices.
     @test length(_m_arrays(tracers)) + length(_m_arrays(buffers)) == 4
@@ -416,15 +416,15 @@ const EPISODE_UNITS = [
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     unit = 8 * N^3
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(1))
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(1))
     φ̂ = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, peak_wavenumber = 2.0, rng = MersenneTwister(2))
+    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = MersenneTwister(2))
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
     episodes = Dict(
       "seed velocity" => () -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
-                                                           peak_wavenumber = 2.0, rng = MersenneTwister(1)),
+                                                           envelope_wavenumber = 2.0, rng = MersenneTwister(1)),
       "seed scalar" => () -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
-                                            peak_wavenumber = 2.0, rng = MersenneTwister(2)),
+                                            envelope_wavenumber = 2.0, rng = MersenneTwister(2)),
       "derivative_skewness" => () -> derivative_skewness(û, domain),
       "energy_spectrum" => () -> energy_spectrum(û, domain),
       "integral_scale" => () -> integral_scale(û, domain),

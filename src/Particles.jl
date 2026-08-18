@@ -55,7 +55,7 @@ the ``x, y, z`` components), converted to `domain`'s backend and element type. S
 neither, is an `ArgumentError`. The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to
 evaluate the velocity (and any sampled field) at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
-(the default `tracer_scheme` of the
+(the default `interpolation_scheme` of the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door, the
 build-everything convenience
 constructor);
@@ -106,7 +106,7 @@ closing deposit leaves them.
 - `position_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `positions`: the
   form the interpolation reads them in.
-- `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
+- `particle_velocities` — the interpolated velocity at the positions the tracers occupy, at the
   instant they occupy them: the genuine Lagrangian sample, and the observables cache's
   particle-velocities slot.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
@@ -117,7 +117,7 @@ The trajectory scheme's own working storage is **not** here: it is allocated per
 struct Tracers{P, PSX, VV, S}
   positions::P              # (M, 3)
   position_points::PSX      # PointSet wrapping `positions`
-  trajectory_velocity::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
+  particle_velocities::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
   interpolation_scheme::S
 end
 
@@ -216,7 +216,7 @@ Store the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` —
 each tracer where it currently sits — by interpolating the velocity field `u` (physical
 representation) onto the positions of the tracer set `tracers`, with the set's interpolation scheme.
 
-The values go into the tracer set's own `trajectory_velocity` storage, which is also the observables
+The values go into the tracer set's own `particle_velocities` storage, which is also the observables
 cache's particle-velocities slot; storing them here is therefore what makes
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Call it at
 the end of each iteration, on the just-deposited velocity at the just-advanced positions.
@@ -228,7 +228,7 @@ an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing 
 ``N^{3} \\times 3``.
 """
 function record_trajectory_velocity!(tracers::Tracers, u)
-  interpolate!(tracers.trajectory_velocity, u, tracers.position_points, tracers.interpolation_scheme)
+  interpolate!(tracers.particle_velocities, u, tracers.position_points, tracers.interpolation_scheme)
   return tracers
 end
 
@@ -275,7 +275,7 @@ function advect!(::EndpointHeun, tracers::Tracers, buffers::ParticleIntegratorBu
   X = tracers.positions
   Xstar = buffers.predictor
 
-  v1 = point_values(tracers.trajectory_velocity)
+  v1 = point_values(tracers.particle_velocities)
   Xstar .= mod.(X .+ Δt .* v1, L)
   # v₂ is evaluated at the PREDICTOR positions and is a stage register, never deposited particle velocities —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse

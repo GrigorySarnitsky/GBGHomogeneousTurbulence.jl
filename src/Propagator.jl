@@ -520,11 +520,13 @@ with ``\\Delta x = L/N`` the grid spacing.
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times
 ``C_{\\mathrm{CFL}}`` to stay within the scheme's imaginary-axis stability limit
-``y_{\\mathrm{s}}``. Two loosenesses justify the conservative factor below, and they pull the same
-way. The speed in the denominator is
+``y_{\\mathrm{s}}``. Two loosenesses sit in that estimate, and they pull in **opposite** directions.
+The speed in the denominator is
 [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid points, so the
-continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger; and the eigenvalue
-bound over-estimates the true spectral radius, since not every mode carries the peak speed. The base
+continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger — which makes the computed
+step too long. Against it, the eigenvalue bound over-estimates the true spectral radius, since not
+every mode carries the peak speed — which makes the ceiling too small. The conservative factor below
+exists because the second is not guaranteed to cover the first. The base
 ceiling is calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
 [`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C_{\\mathrm{CFL}} \\lesssim 0.83``,
 taken conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,

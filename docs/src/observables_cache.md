@@ -332,7 +332,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``E_n``, the per-shell energy | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes and discards both, at its own cadence |
-| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed: no component forms it, even pointwise — the [`max_speed`](@ref) reduction takes the largest component magnitude directly — and whole, it would cost a pass the iteration does not perform (§1.2) |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | — | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | — | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
 | a rescaling forcing's equivalent field | — | never | — | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |

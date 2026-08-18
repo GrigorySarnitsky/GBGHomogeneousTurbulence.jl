@@ -287,7 +287,9 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
+Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band — the
+**fixed-rate** member of the two linear forcings, with
+[`ConstantPower`](@ref) the member whose rate is re-solved each step (a band-limited
 variant of Lundgren 2003 — *CTR Annual Research Briefs*, which carries no DOI — whose linear
 forcing acts at every wavenumber), built on the
 [`FixedDomain`](@ref) `domain`,

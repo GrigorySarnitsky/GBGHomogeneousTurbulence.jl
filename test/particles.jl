@@ -103,7 +103,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     conditions = FlowConditions(viscosity = 0.05,
                       velocity_forcing = BandRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(4))
+    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(4))
     truncate_to_band!(û, domain)
     state = ResolvedFields(û, new_scalar_field_spectral(domain))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
@@ -123,7 +123,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       advect!(EndpointHeun(), tracers, push_buffers, velocity_physical(cache), domain, dt)   # u(tₙ₊₁), the closing deposit
     end
     @test all(isfinite, particle_positions(tracers)) && all(0 .<= particle_positions(tracers) .< L)
-    @test all(isfinite, point_values(tracers.trajectory_velocity))
+    @test all(isfinite, point_values(tracers.particle_velocities))
 
     # allocation-free advection step — both verbs of the push
     u = velocity_physical(cache)

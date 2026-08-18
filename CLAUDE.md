@@ -99,7 +99,7 @@ inverse. Operators and extended Base functions are imported before being extende
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
 `cache.vorticity_physical`, `generator.product_spectral`, `state.velocity_spectral`,
-`Tracers.trajectory_velocity` — as do
+`Tracers.particle_velocities` — as do
 function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
@@ -137,7 +137,8 @@ docstring is a map**; a **function or type docstring is a home**.
   when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
   (4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
   load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
-  **named / published** method (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
+  **named / published** method — which may open the identity sentence when the citation *names* the
+  method ("the smooth spectral filter of Hou & Li (2007) …"), the corpus-wide convention; (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
   has a §References entry and every entry a citing docstring; the extraction-bound `Phenomenology` leaf is
   exempt, carrying its own self-contained `Reference` values), none for a classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
   (→ `ARCHITECTURE.md`).

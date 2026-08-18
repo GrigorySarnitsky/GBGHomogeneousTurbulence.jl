@@ -2,9 +2,9 @@
     Phenomenology.Spectra
 
 Model spectra — parametrizations of the reference velocity spectrum ``E(\\kappa)`` and the scalar
-spectrum ``E_\\varphi(\\kappa)``, evaluated by [`spectrum`](@ref). A velocity model is **composed**: an
-inertial-range core ``C_K\\varepsilon^{2/3}\\kappa^{-5/3}`` times a large-scale roll-off and a
-dissipation-range roll-off, each swappable.
+spectrum ``E_\\varphi(\\kappa)``, evaluated by [`spectrum`](@ref). A velocity model is **composed** —
+an inertial-range core times a large-scale roll-off and a dissipation-range roll-off, each
+swappable — and [`ModelSpectrum`](@ref) owns the formula.
 
 - [`ModelSpectrum`](@ref) — the composed velocity spectrum: a Kolmogorov constant, a
   [`LargeScaleFactor`](@ref), and a [`DissipationFactor`](@ref).
@@ -291,12 +291,9 @@ const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* (Cambridge Universit
 """
     Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2)
 
-The Pope (2000) model spectrum — a preset [`ModelSpectrum`](@ref) with [`PopeLargeScale`](@ref) and
-[`PopeDissipation`](@ref) roll-offs:
-
-```math
-E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L_{11}) f_\\eta(\\kappa\\eta).
-```
+The Pope (2000) model spectrum — the [`ModelSpectrum`](@ref) composition (whose docstring carries the
+formula) with [`PopeLargeScale`](@ref) supplying ``f_L`` and [`PopeDissipation`](@ref) supplying
+``f_\\eta``.
 
 `C_K` is the Kolmogorov constant; the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number
 values Pope obtains from the energy and dissipation normalizations, with the shape exponents `p₀ = 2`

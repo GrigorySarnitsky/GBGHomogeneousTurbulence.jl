@@ -38,7 +38,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
+  random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(7))
   truncate_to_band!(û0, domain)
 
   Tfinal = 0.5
