@@ -54,10 +54,17 @@ const HATS = Array.isArray(A.hats) && A.hats.length
   ? ALL_HATS.filter(h => A.hats.some(x => h === String(x) || h.startsWith(String(x) + '-')))
   : ALL_HATS
 
+// A filter that matches nothing would run zero agents and report a clean empty tally — the same
+// silent-success shape as the stale hat list this argument was added to work around. Fail loudly.
+if (!HATS.length) {
+  throw new Error(`hats filter ${JSON.stringify(A.hats)} matched none of: ${ALL_HATS.join(', ')}`)
+}
+
 const SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
     hat: { type: 'string' },
+    findings_in_file: { type: 'integer', description: 'how many findings the banked hat file contains, counted by enumerating it — NOT how many you adjudicated' },
     verdicts: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       properties: {
@@ -70,7 +77,7 @@ const SCHEMA = {
       required: ['finding', 'title', 'verdict', 'evidence'],
     } },
   },
-  required: ['hat', 'verdicts'],
+  required: ['hat', 'findings_in_file', 'verdicts'],
 }
 
 const PREAMBLE = `You are an ADVERSARIAL CLOSURE AUDITOR for GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (velocity field and passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers).
@@ -92,6 +99,7 @@ If you cannot establish a verdict with evidence in reasonable effort, return PRE
 
 HOW TO WORK:
 - Read your banked hat file FIRST, in full. Enumerate EVERY finding in it by number. You must return a verdict for EVERY ONE — no skipping, no merging, no "the rest look fine".
+- Return \`findings_in_file\` = how many findings that file CONTAINS (the count you enumerated), independently of how many you managed to adjudicate. The two are cross-checked: reporting a count that matches your verdict list when it does not match the file defeats the check and is the one thing you must not do. If you genuinely cannot adjudicate one, return PRESENT for it with the reason as evidence — that is the safe verdict — rather than dropping it.
 - The findings quote the RENDERED text. Ground truth is the SOURCE: the docstrings in ${REPO}/src/*.jl, the pages in ${REPO}/docs/src/, and ${REPO}/docs/ARCHITECTURE.md. The rendered build is at ${REPO}/docs/build (read it when the finding is about rendering — a dead link, a formula rendering as literal text, a table falling back to pipes).
 - ${REPO}/CLAUDE.md is the house rulebook. Consult it when a finding turns on house style, naming, or documentation policy — it tells you what the corpus is SUPPOSED to look like.
 - Note that names may have CHANGED since the finding was written. A finding about \`velocity_factor\` may now concern a renamed binding. Follow the concept, not the string: a defect that moved to a new name is PRESENT, not ABSENT.
@@ -116,13 +124,48 @@ When you are done, FIRST use the Write tool to save your verdicts as readable ma
       ...(STRENGTH === 'economy' ? { model: 'sonnet' } : {}) })
 )
 
-const all = results.filter(Boolean)
+// ANOMALY DETECTION. A tally is only trustworthy if every hat actually ran and actually adjudicated
+// its whole file, and until 2026-08-18 neither was checked — the script accepted whatever came back.
+// The rule "a per-hat count of zero means a DEAD AGENT, not a clean hat" is implemented here rather
+// than left to whoever reads the output, because a reader applying it by eye gets it wrong in BOTH
+// directions: on 2026-08-18 an all-ABSENT hat was misread as a dead agent (the reader's own filter
+// hid the verdicts), and the rate-limited run before it had eleven genuinely dead agents whose only
+// signal was an empty tally. Neither judgement should be a human's to make from the output alone.
+const anomalies = []
+const all = []
+for (let i = 0; i < HATS.length; i++) {
+  const hat = HATS[i]
+  const r = results[i]
+  if (!r) { anomalies.push({ hat, kind: 'DEAD', detail: 'agent returned nothing (died, or was skipped)' }); continue }
+  const n = (r.verdicts || []).length
+  const expected = r.findings_in_file
+  if (n === 0) anomalies.push({ hat, kind: 'EMPTY', detail: 'returned zero verdicts — a dead agent, not a clean hat' })
+  else if (typeof expected === 'number' && n < expected) {
+    anomalies.push({ hat, kind: 'INCOMPLETE', detail: `adjudicated ${n} of ${expected} banked findings` })
+  }
+  all.push(r)
+}
+
 const tally = {}
 for (const r of all) for (const v of (r.verdicts || [])) tally[v.verdict] = (tally[v.verdict] || 0) + 1
 for (const r of all) {
   const c = {}
   for (const v of (r.verdicts || [])) c[v.verdict] = (c[v.verdict] || 0) + 1
-  log(`${r.hat}: ${(r.verdicts || []).length} adjudicated — ${JSON.stringify(c)}`)
+  const cov = typeof r.findings_in_file === 'number' ? `${(r.verdicts || []).length}/${r.findings_in_file}` : `${(r.verdicts || []).length}/?`
+  log(`${r.hat}: ${cov} adjudicated — ${JSON.stringify(c)}`)
 }
 log(`TOTAL: ${JSON.stringify(tally)}`)
-return { tally, results: all }
+
+// The headline the caller must not be able to miss. A run with anomalies has NOT verified what its
+// tally appears to claim, and the tally must not be read as a closure rate until they are resolved.
+if (anomalies.length) {
+  log(`!! ${anomalies.length} ANOMALY(S) — THE TALLY IS INCOMPLETE, DO NOT READ IT AS A CLOSURE RATE:`)
+  for (const a of anomalies) log(`   !! ${a.hat}: ${a.kind} — ${a.detail}`)
+} else {
+  log(`every hat ran and adjudicated its whole banked file (${HATS.length} hats)`)
+}
+
+// `hats_run` lets the caller check the closure/ directory against what was actually attempted:
+// the agents are told to Write their verdict files, and nothing inside a workflow script can see
+// the filesystem to confirm they did.
+return { tally, anomalies, hats_run: HATS, complete: anomalies.length === 0, results: all }
