@@ -105,4 +105,4 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
-| ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |
+| ``\varepsilon_{\mathrm{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |

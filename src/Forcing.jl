@@ -382,8 +382,8 @@ box's fundamental ``2\\pi/L`` — carries an
 independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
 
 ```math
-\\hat f \\leftarrow \\theta \\hat f + \\sqrt{\\sigma^{2}(1-\\theta^{2})} \\xi,
-\\qquad \\theta = \\exp(-\\Delta t / T_L),
+\\hat f \\leftarrow \\alpha \\hat f + \\sqrt{\\sigma^{2}(1-\\alpha^{2})} \\xi,
+\\qquad \\alpha = \\exp(-\\Delta t / T_L),
 ```
 
 with correlation time ``T_L = \\texttt{correlation\\_time}``, stationary forcing variance

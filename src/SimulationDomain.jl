@@ -70,7 +70,7 @@ struct TwoThirds <: DealiasingStrategy end
 The smooth spectral filter of Hou & Li (2007) — *Computing nearly singular solutions using
 pseudo-spectral methods*, *J. Comput. Phys.* **226**, 379–397,
 [doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014). Transfer function
-``\\exp\\!\\big(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\big)``,
+``\\exp\\!\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
 with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
 sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
 damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
@@ -122,7 +122,7 @@ buffer per phase-shifted term). Because it retains energy out to
 !!! note
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
-    cutoff at ``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
+    cutoff at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
 """
 struct PhaseShift <: DealiasingStrategy end
@@ -280,7 +280,7 @@ The highest wavenumber magnitude that `domain` actually evolves — the dealiasi
 ```
 
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
-[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``2\\sqrt{2}/3`` for `PhaseShift`).
+[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`).
 It is the cutoff the
 dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself. The modes above it are
 zeroed each step by the two sharp strategies; [`HouLi`](@ref), whose band runs to the Nyquist wavenumber,
@@ -358,7 +358,7 @@ Apply the run's dealias low-pass kernel `domain.dealias` — `domain` a [`FixedD
 controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
 [`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
 the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
-``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
+``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation. Returns `field`.
 
 !!! note "Truncating the band is not always the whole of dealiasing"

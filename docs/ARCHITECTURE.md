@@ -705,7 +705,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   **Markovian surrogate** kept on the system's own side, a *modeled* degree of freedom; so it homes, when
   built, as a modeled slot on the one `State`, never a separate "environment state".
 - **The commuting square — the modeling ideal.** With ``\Pi`` a coarse-graining and ``S`` a flow map, one
-  would like ``\Pi\circ S_{\text{fine}} = S_{\text{coarse}}\circ\Pi``. It cannot hold pathwise: the coarse
+  would like ``\Pi\circ S_{\mathrm{fine}} = S_{\mathrm{coarse}}\circ\Pi``. It cannot hold pathwise: the coarse
   state does not determine its own tendency (that is the memory and noise made concrete), and turbulence is
   chaotic. The achievable ideal — the design target of any Model — is **statistical** commutation,
   agreement of the distributions and fluxes on the attractor, exactly what the DNS-versus-LES comparison of
@@ -1453,7 +1453,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     priced no longer exists), `MATERIALIZED_SYMBOLS` (both its residency and traffic claims delivered —
     the pass ledger's fused bound now *equals* the physical floor, asserted as an equality), and the
     `COINCIDENT INTEGRATING FACTORS` residual (nothing is built for the ``\mathrm{Sc} = 1`` coincidence
-    to save; its guard lesson — key any dedup on the full ``(D, \tau, \text{rate})`` tuple, never
+    to save; its guard lesson — key any dedup on the full ``(D, \tau, \mathrm{rate})`` tuple, never
     ``\mathrm{Sc}`` alone — survives as the armed-rate pin in the factor-verb test). The
     `derivative_skewness` diagnostic also stopped materializing its determinant field
     (``\langle\det\boldsymbol{S}\rangle`` is the fused mapped mean), and transforms are untouched

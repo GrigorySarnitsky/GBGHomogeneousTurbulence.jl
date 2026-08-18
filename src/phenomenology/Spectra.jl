@@ -122,7 +122,7 @@ large_scale_factor(f::PopeLargeScale, κL) = (κL / sqrt(κL^2 + f.c_L))^(5//3 +
     PopeDissipation(c_η, β)
 
 Pope's dissipation-range roll-off
-``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\beta\\{[(\\kappa\\eta)^4 + c_\\eta^4]^{1/4} - c_\\eta\\}\\big)``,
+``f_\\eta(\\kappa\\eta) = \\exp\\!\\bigl(-\\beta\\{[(\\kappa\\eta)^4 + c_\\eta^4]^{1/4} - c_\\eta\\}\\bigr)``,
 which tends to `1` in the inertial range and cuts the spectrum off near the Kolmogorov scale. `c_η` is
 set by the requirement that the spectrum yield the dissipation rate; `β` fixes the sharpness of the
 cutoff (Pope 2000).
@@ -185,7 +185,7 @@ large_scale_factor(::UnitLargeScale, κL) = one(κL)
     PaoDissipation(α)
 
 Pao's dissipation-range roll-off
-``f_\\eta(\\kappa\\eta) = \\exp\\!\\big(-\\tfrac{3}{2} \\alpha (\\kappa\\eta)^{4/3}\\big)``, from the
+``f_\\eta(\\kappa\\eta) = \\exp\\!\\bigl(-\\tfrac{3}{2} \\alpha (\\kappa\\eta)^{4/3}\\bigr)``, from the
 hypothesis that the spectral energy flux stays constant through the dissipation range; `α` is the
 Kolmogorov constant ``C_K`` (Pao 1965).
 
@@ -345,7 +345,7 @@ The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no ener
 
 ```math
 E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} 
-             \\exp\\!\\big(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\big),
+             \\exp\\!\\bigl(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\bigr),
 ```
 
 covering the inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
@@ -380,7 +380,7 @@ const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. G
 The Obukhov–Corrsin inertial-convective scalar spectrum
 
 ```math
-E_\\varphi(\\kappa) = C_{OC} \\varepsilon_\\varphi \\varepsilon^{-1/3} \\kappa^{-5/3},
+E_\\varphi(\\kappa) = C_{\\mathrm{OC}} \\varepsilon_\\varphi \\varepsilon^{-1/3} \\kappa^{-5/3},
 ```
 
 the Obukhov–Corrsin scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's

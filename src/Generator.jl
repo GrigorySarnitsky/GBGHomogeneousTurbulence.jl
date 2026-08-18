@@ -297,7 +297,7 @@ scratch. The vorticity argument carries `_consumed` in its name because it is: s
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
 ```math
-(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\big(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\big) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
+(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\bigr) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
 ```
 
 so that, with the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbing the
@@ -396,7 +396,7 @@ diffusion ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus 
 representation by the per-mode multiplier
 
 ```math
-\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\big((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\big),
+\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\bigr),
 ```
 
 with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\mathcal{E}`` advances its
@@ -449,7 +449,7 @@ component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by de
 untouched.
 
 It is computed pseudospectrally as
-``- \\operatorname{dealias}\\big(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\big)``,
+``- \\operatorname{dealias}\\bigl(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\bigr)``,
 plus the per-stage additive source of the generator's scalar forcing (its
 [`add_forcing_source!`](@ref GBGIsotropicTurbulence.Forcing.add_forcing_source!) hook).
 The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
