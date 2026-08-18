@@ -23,7 +23,8 @@ The measured functions of the flow state:
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
-Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
+Each returns the field's own real element type rather than a fixed `Float64`, so a `Float32` run
+measures in `Float32`. Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
 distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate the automatic warm-up
 ([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
@@ -55,8 +56,7 @@ The turbulent kinetic energy
 of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
 the normalized inner product, so by Parseval's theorem it accepts the velocity in either
 representation — the physical field ``\\boldsymbol{u}`` or its spectral coefficients
-``\\hat{\\boldsymbol{u}}``, to the same value. It returns the field's own real element type, not
-always a `Float64`. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
+``\\hat{\\boldsymbol{u}}``, to the same value. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
 `scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
 exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
 zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —

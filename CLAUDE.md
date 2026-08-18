@@ -195,7 +195,12 @@ settings, and folds them into prose when they must be read together — when one
 what another *means* (`BandRescaling`'s `target` is a value whose observable `over` selects) or
 several jointly name one object (a `lowest_shell` / `highest_shell` band). Independence is the
 discriminator, not count: two unrelated switches earn the bullets, four interlocking ones do not. An **`# Examples`**
-section appears where construction is non-obvious, not on every type. A **`Returns x.` sentence** is
+section appears where construction is non-obvious, not on every type — which is why the types a run
+builds for the user (`ObservablesCache`, `ResolvedGenerator`, a forcing reached through
+`DeferredForcing`'s two forms) carry none, while `FixedDomain`, `Simulation`, `Tracers` and
+`FlowParameters` do. A **formula gets a display block** when it is the thing the docstring defines
+(a law's own law, an operation's own identity) and stays inline when it is a fragment cited in
+passing (a roll-off factor inside a composed spectrum, a limit quoted in an aside). A **`Returns x.` sentence** is
 required of any in-place mutator whose signature carries no `-> ` arrow. A signature carries a
 **`-> Type` arrow** only where the return type is fixed by the signature (`Phenomenology`'s law
 evaluators, whose bundle is `Float64` throughout); a reduction that returns *the field's own* element

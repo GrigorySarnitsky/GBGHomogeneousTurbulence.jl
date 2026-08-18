@@ -90,7 +90,12 @@ const _SREENIVASAN1995 = Reference("Sreenivasan (1995), *Phys. Fluids* **7**, 27
     Sreenivasan1995(; C_K = 1.5)
 
 The three-dimensional Kolmogorov constant ``C_K`` of the inertial-range energy spectrum
-``E(\\kappa) = C_K \\varepsilon^{2/3}\\kappa^{-5/3}`` — the amplitude a `Spectra` model uses. Reviewing
+
+```math
+E(\\kappa) = C_K \\varepsilon^{2/3}\\kappa^{-5/3},
+```
+
+the amplitude a `Spectra` model uses. Reviewing
 the experimental and numerical record, Sreenivasan (1995) found it close to universal, a reliable
 estimate being ``C_K = 1.5 \\pm 0.1`` (the default; Sagaut & Cambon 2018), with no significant
 Reynolds-number trend; [`scaling`](@ref)`(law, fp)` returns it, independent of `fp`.

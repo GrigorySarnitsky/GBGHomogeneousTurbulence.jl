@@ -13,8 +13,7 @@
 The observables cache — where the iteration leaves the observables it produces, for the run's own
 components and any observation to read.
 
-Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
-than served stale. The cache's operations:
+The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
   mutation made outside the iteration, so the affected slots go stale and reads throw until the
@@ -27,7 +26,8 @@ than served stale. The cache's operations:
 - [`particle_velocities`](@ref) — the checked read of the particle velocities
   ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
 
-The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
+Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
+than served stale. The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
 which fills every slot at the iteration's end and sets its epoch. A caller reads through the
 accessors and never deposits. It is homed in `Propagator` rather than here because it needs the
 scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.
@@ -312,8 +312,9 @@ The sanctioned mutator calls it for you: the run layer announces its own tracer 
 both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
 the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
 this, then
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) —
-the slot's only producer, and what sets both of its epochs — before advancing.
+[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) to
+write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
+alone leaves the slot stale, and a read of it throws.
 """
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 

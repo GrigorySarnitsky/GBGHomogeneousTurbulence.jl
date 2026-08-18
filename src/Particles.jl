@@ -226,11 +226,12 @@ each tracer where it currently sits — by interpolating the velocity field `u` 
 representation) onto the positions of the tracer set `tracers`, with the set's interpolation scheme.
 
 The values go into the tracer set's own `particle_velocities` storage, which is also the observables
-cache's particle-velocities slot. **This call is that slot's only producer**: it sets both of the
-epochs the slot is checked against — the fields epoch and the particles epoch — which is what makes
-[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) readable. Every other
-mention of the slot going fresh names some caller of this function. Call it at
-the end of each iteration, on the just-deposited velocity at the just-advanced positions.
+cache's particle-velocities slot. **This call is that slot's only producer of values**, but it writes
+values only: the slot becomes readable when the cache is then told the values are current, which is a
+second call the cache owns. Write, then record — a run does both at the end of each iteration, on the
+just-deposited velocity at the just-advanced positions, and reading
+[`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) after only the first
+throws.
 
 The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
 are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why

@@ -240,9 +240,9 @@ the third stage.
 Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose ``N`` counts
 evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
 per field: the state's own array plus one accumulator (`stage1`). The
-[`IntegratorBuffers`](@ref) a run allocates holds more than that count — `nonlinear` is the
-dealiasing seam's assembly register and `velocity_star_spectral` the projection's — because the
-count measures the scheme, not the solver it is embedded in. The general-purpose workhorse:
+[`IntegratorBuffers`](@ref) a run allocates can hold more than that count — for this scheme it adds
+`nonlinear`, the dealiasing seam's assembly register — because the count measures the scheme, not
+the solver it is embedded in. The general-purpose workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
