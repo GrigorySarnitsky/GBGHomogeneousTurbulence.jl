@@ -43,6 +43,13 @@ for path in sorted(glob.glob(os.path.join(pile, '[0-9][0-9]-*.md'))):
     else:
         rows.append((hat, banked, got, 'ok'))
 
+# Pointed at a directory holding no hat files at all, an earlier version of THIS script printed
+# "0 hats | 0 findings | COMPLETE" and exited 0 — the same silent-success shape it exists to catch,
+# in the tool written to catch it. A pile with no hats is a bad argument, not a clean result.
+if not rows:
+    print(f'no hat files (NN-*.md) under {pile!r} — wrong pile directory?')
+    sys.exit(2)
+
 w = max((len(r[0]) for r in rows), default=10)
 for hat, banked, got, note in rows:
     print(f'{hat:<{w}}  banked {banked:>3}  verdicts {"--" if got is None else got:>3}  {note}')

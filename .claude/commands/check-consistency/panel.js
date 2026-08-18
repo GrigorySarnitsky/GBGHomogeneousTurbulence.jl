@@ -1,6 +1,6 @@
-// /check-consistency panel — a fresh-eyed 11-expert audit of the RENDERED docs, sequential & collect-only.
+// /check-consistency panel — a fresh-eyed 15-expert audit of the RENDERED docs, sequential & collect-only.
 // Args (absolute paths): { full, siteonly, rawhtml, pile, adjudicated, strength }
-//   strength — 'economy' (DEFAULT: nine hats on the cheap scan model; the two physics hats and
+//   strength — 'economy' (DEFAULT: twelve hats on the cheap scan model; the two physics hats and
 //              plain-sense anchored at the session model) | 'full' (every hat at the session model, on explicit request
 //              only). The main-thread verification/consolidation that follows the panel is never
 //              economized — same policy as /check-docs (ported from PF, 2026-08-06).
@@ -16,7 +16,7 @@
 // token-out loses at most the current hat, so hats are in PRIORITY order.
 export const meta = {
   name: 'check-consistency-panel',
-  description: 'Fresh-eyed 11-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure & design (sequential, collect-only)',
+  description: 'Fresh-eyed 15-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure & design (sequential, collect-only)',
   phases: [ { title: 'Panel' } ],
 }
 
@@ -160,6 +160,8 @@ Then check the decision log against the code and docs BOTH WAYS: a decision the 
 
 phase('Panel')
 const results = []
+const dead = []
+const empty = []
 for (let i = 0; i < hats.length; i++) {
   const h = hats[i]
   const nn = String(i + 1).padStart(2, '0')
@@ -177,7 +179,17 @@ When your review is complete, FIRST use the Write tool to save your findings as 
   const economized = STRENGTH === 'economy' && !h.anchor
   const r = await agent(prompt, { label: h.key, phase: 'Panel', schema: SCHEMA, agentType: 'general-purpose',
                                   ...(economized ? { model: 'sonnet' } : {}) })
+  // A hat that dies, or comes back with nothing, must not read as a clean hat — the panel's own
+  // stopping rule depends on telling those apart, and `0 findings` looks identical to both.
+  if (!r) {
+    dead.push(h.key)
+    log(`[${nn}/${hats.length}] ${h.key}: DEAD — no result (re-run this hat standalone to fill ${nn}-${h.key}.md)`)
+    continue
+  }
+  if (!r.findings || !r.findings.length) empty.push(h.key)
   results.push(r)
-  log(`[${nn}/${hats.length}] ${h.key}${economized ? ' (economy)' : ' (anchor/full)'}: ${r && r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
+  log(`[${nn}/${hats.length}] ${h.key}${economized ? ' (economy)' : ' (anchor/full)'}: ${r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
 }
-return { results }
+if (dead.length) log(`!! ${dead.length} HAT(S) DEAD — the panel is INCOMPLETE: ${dead.join(', ')}`)
+if (empty.length) log(`!! ${empty.length} hat(s) returned zero findings — verify each wrote its file before reading this as clean: ${empty.join(', ')}`)
+return { results, dead, empty, complete: dead.length === 0, hats_run: hats.map(h => h.key) }

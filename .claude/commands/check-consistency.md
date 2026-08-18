@@ -8,9 +8,12 @@ reader would** and hunts what a grep cannot — a quantity defined two ways acro
 category error, a normalization that disagrees between two formulas, a structure/design smell, an
 unreachable citation, a cold-read gap.
 
-Each hat is a **fresh agent** that reads ONLY the reader-text manuscript (no `src/`, no `CLAUDE.md`, no
-memory — it judges the docs as written, from its own expertise) and banks its findings to a file. **One
-exception:** the `latex-typesetter` hat also reads the authored **source** (`src/`, `docs/`) and the
+Most hats are **fresh agents** that read ONLY the reader-text manuscript (no `src/`, no `CLAUDE.md`, no
+memory — judging the docs as written, from their own expertise) and bank their findings to a file.
+**Four hats are deliberately not blind**, and the difference is the point: `naming-policy`,
+`doc-policy` and `invariants-and-decisions` carry the written rulebook *because* a convention the
+corpus breaks everywhere is invisible to a hat that infers norms from the corpus; and the
+`latex-typesetter` hat reads the authored **source** (`src/`, `docs/`) and the
 **`CLAUDE.md`** house rulebook — typesetting idiom lives in the source markup, not the rendered output,
 and the house style it enforces is defined there. The panel is **collect-only**: it never edits `src/`
 or `docs/`; you act only when the user says fix. It runs **sequentially**, so a token-out loses at most
@@ -80,12 +83,12 @@ left behind when the term it defended was retired, which now introduces the read
 The physics pair sits adjacent by design — `turbulence-theoretician` (the
 physical laws and the category/type errors) with `dimensional` (the factors) — the first catching the
 structurally-false-but-plausible sentence, the second the concrete normalization slip. Scale the panel
-to the ask: the full 11-hat run is the "thorough audit" (tens of minutes; cost per the modes below);
+to the ask: the full 15-hat run is the "thorough audit" (tens of minutes; cost per the modes below);
 for a quick check, run a subset.
 
 ## Cost modes (mirrors `/check-docs` — ported from PF 2026-08-06)
 
-**Economy is the DEFAULT.** Nine of the twelve hats run on the cheap scan model (Sonnet); three are
+**Economy is the DEFAULT.** Twelve of the fifteen hats run on the cheap scan model (Sonnet); three are
 **anchors** that always run at the session's full-strength model — the two physics hats,
 `turbulence-theoretician` and `dimensional`, and **`plain-sense`**. The asymmetry is deliberate: a cheap hat's *false positive* is caught
 downstream (the discipline already verifies every Tier-1/2 finding against `src/` and the built HTML in
@@ -167,8 +170,31 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    the banked hat files:
    ```
    Workflow({ scriptPath: ".claude/commands/check-consistency/verify.js",
-              args: { pile: "$REPO/.claude/doc-review", repo: "$REPO", strength: "economy" } })
+              args: { pile: "$REPO/.claude/doc-review", repo: "$REPO", strength: "economy",
+                      hats: ["01", "02"] } })     // optional: re-run a subset (dead hats, a retry)
    ```
+   `hats` accepts the banked name, the bare key, or the number (padded or not); a selector matching
+   no hat throws, because a filter that silently selects nothing runs zero agents and returns a clean
+   empty tally. `ALL_HATS` inside the script is a hand-maintained mirror of `panel.js` — **keep the
+   two in step**: on 2026-08-18 it still named the original 11 while the panel banked 15, so four
+   hats were banked, fixed, and never verified while the run reported success.
+
+   **Then run the coverage gate — the tally is not a closure rate until it passes:**
+   ```bash
+   python3 .claude/commands/check-consistency/coverage.py .claude/doc-review    # exit 1 = incomplete
+   ```
+   It compares, per hat, the findings banked against the verdicts written. No workflow script can do
+   this — none can see the filesystem — so an agent told to write its verdict file and returning
+   without writing it is invisible from inside. The script also flags DEAD / EMPTY / INCOMPLETE hats
+   in its own output and returns `complete: false`; read that line before reading any total.
+
+   **Archive the previous round's verdicts OUTSIDE the pile, or accept that blindness leaks.** The
+   pile lives inside the repository and the verifier is told to grep aggressively, so a repo-wide
+   search sweeps a `closure-r1/` sitting beside the hat files straight into the agent's results — the
+   answer key, unasked. Measured on 2026-08-18: three agents across rounds 2 and 3 had a prior round's
+   verdicts surface this way. The preamble now forbids `.claude/` outright except the agent's own hat
+   file and tells it to scope searches with `rg --glob '!.claude/**'`, but the safest archive location
+   is one the corpus search cannot reach at all.
    One verifier per hat, **blind to the fix pass** — each sees the banked finding and the current
    corpus, never the diff, the commit, or the summary, because a verifier handed the fixer's report
    grades the homework against its own answer key (decision 37's lesson, applied to process).
@@ -203,7 +229,16 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
      the per-hat counts against the previous run before reading any total.
 
 7. **Audit the fixes themselves** with `verify-fixes.js` when the findings came from a *human* read
-   (a doc-reading pile), where the reader's verbatim words are the specification. This one is the
+   (a doc-reading pile), where the reader's verbatim words are the specification.
+   ```
+   Workflow({ scriptPath: ".claude/commands/check-consistency/verify-fixes.js",
+              args: { pile: "$REPO/.claude/doc-reading-pile-<date>.md", repo: "$REPO",
+                      range: "<sha>..HEAD",                 // REQUIRED — the fix pass it audits
+                      batches: [[1,7],[8,14],[15,21]] } })  // REQUIRED — must cover EVERY finding
+   ```
+   Count the pile first (`grep -cE '^#{2,3} +(Finding )?[0-9]+' <pile>`) and make the batches cover
+   it. `batches` used to default to a six-range list ending at 42; pointed at a larger pile that
+   default audited findings 1–42, reported a healthy tally, and never mentioned the rest. This one is the
    deliberate inverse of `verify.js`: it **sees the diff**, because it audits an **act** rather than a
    **state** — fidelity (did the ask land, everywhere?), strategy (fix-by-insertion? line-not-class? a
    docstring patch over a code defect?), implementation (is the new text correct?), and scope (unasked

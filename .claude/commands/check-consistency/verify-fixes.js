@@ -37,8 +37,19 @@ const PILE = A.pile
 const REPO = A.repo
 const RANGE = A.range
 // Findings are adjudicated in batches so each auditor holds a workable slice; batches are ranges of
-// finding numbers in the pile. Passed in, or defaulted to the round-2 read's 42.
-const BATCHES = A.batches || [[1, 7], [8, 14], [15, 21], [22, 28], [29, 35], [36, 42]]
+// finding numbers in the pile.
+//
+// `batches` is REQUIRED, and used to default to the round-2 read's [[1,7]…[36,42]]. That default was
+// a silent truncation waiting to happen: pointed at a 114-finding pile it would audit findings 1-42,
+// report a healthy tally over six batches, and never mention the 72 it skipped. A caller who knows
+// the pile size must state it, so the coverage is a decision rather than a leftover.
+const BATCHES = A.batches
+if (!Array.isArray(BATCHES) || !BATCHES.length) {
+  throw new Error('`batches` is required: pass e.g. [[1,7],[8,14],…] covering EVERY finding in the pile. ' +
+                  'Count them first (`grep -cE "^#{2,3} +(Finding )?[0-9]+" <pile>`) — an unstated range silently drops the tail.')
+}
+const covered = BATCHES.reduce((n, b) => n + (b[1] - b[0] + 1), 0)
+log(`auditing findings ${BATCHES[0][0]}-${BATCHES[BATCHES.length - 1][1]} in ${BATCHES.length} batches (${covered} findings)`)
 
 const SCHEMA = {
   type: 'object', additionalProperties: false,
@@ -126,9 +137,27 @@ When you are done, FIRST use the Write tool to save your audit as readable markd
       ...(STRENGTH === 'economy' ? { model: 'sonnet' } : {}) })
 )
 
-const all = results.filter(Boolean)
+// A dead batch must not vanish: log against the range this loop ASSIGNED, never the agent's own
+// self-reported `batch` string, and count the shortfall against what the range asked for.
+const all = []
+const anomalies = []
+for (let i = 0; i < BATCHES.length; i++) {
+  const b = BATCHES[i]
+  const want = b[1] - b[0] + 1
+  const r = results[i]
+  if (!r) { anomalies.push(`${b[0]}-${b[1]}: DEAD — no result`); log(`batch ${b[0]}-${b[1]}: DEAD`); continue }
+  const got = (r.audits || []).length
+  if (got === 0) anomalies.push(`${b[0]}-${b[1]}: EMPTY — zero audits returned`)
+  else if (got < want) anomalies.push(`${b[0]}-${b[1]}: SHORT — ${got} of ${want}`)
+  log(`batch ${b[0]}-${b[1]}: ${got}/${want} audited`)
+  all.push(r)
+}
+
 const tally = {}
 for (const r of all) for (const a of (r.audits || [])) tally[a.verdict] = (tally[a.verdict] || 0) + 1
-for (const r of all) log(`batch ${r.batch}: ${(r.audits || []).length} audited`)
 log(`TOTAL: ${JSON.stringify(tally)}`)
-return { tally, results: all }
+if (anomalies.length) {
+  log(`!! ${anomalies.length} ANOMALY(S) — THE TALLY IS INCOMPLETE, DO NOT READ IT AS A FIX-QUALITY RATE:`)
+  for (const a of anomalies) log(`   !! ${a}`)
+}
+return { tally, anomalies, batches: BATCHES, complete: anomalies.length === 0, results: all }

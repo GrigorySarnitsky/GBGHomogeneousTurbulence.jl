@@ -50,15 +50,26 @@ const ALL_HATS = [
 // `hats` runs a SUBSET (by name or by numeric prefix). Its purpose is re-running the hats that died
 // — the whole panel once came back rate-limited, 11 agents launched at once — so a retry need not
 // re-pay for the verdicts already banked. Omit it to verify everything.
+// Accept every spelling a caller actually uses: the banked name ('06-latex-typesetter'), the bare
+// key the panel logs and a person says ('latex-typesetter'), and the number padded or not (6, '06').
+const matches = (hat, sel) => {
+  const x = String(sel)
+  return hat === x || hat.endsWith('-' + x) || hat.startsWith(x.padStart(2, '0') + '-')
+}
 const HATS = Array.isArray(A.hats) && A.hats.length
-  ? ALL_HATS.filter(h => A.hats.some(x => h === String(x) || h.startsWith(String(x) + '-')))
+  ? ALL_HATS.filter(h => A.hats.some(x => matches(h, x)))
   : ALL_HATS
 
-// A filter that matches nothing would run zero agents and report a clean empty tally — the same
-// silent-success shape as the stale hat list this argument was added to work around. Fail loudly.
-if (!HATS.length) {
-  throw new Error(`hats filter ${JSON.stringify(A.hats)} matched none of: ${ALL_HATS.join(', ')}`)
+// A selector that matches nothing would run zero agents and report a clean empty tally — the same
+// silent-success shape as the stale hat list this argument was added to work around. Every selector
+// must hit, not just one of them: `hats: ['12', 'cold-readr']` should fail, not quietly run one hat.
+if (Array.isArray(A.hats) && A.hats.length) {
+  const unmatched = A.hats.filter(x => !ALL_HATS.some(h => matches(h, x)))
+  if (unmatched.length) {
+    throw new Error(`hats selector(s) ${JSON.stringify(unmatched)} matched no hat. Known: ${ALL_HATS.join(', ')}`)
+  }
 }
+if (!HATS.length) throw new Error('no hats selected')
 
 const SCHEMA = {
   type: 'object', additionalProperties: false,
@@ -82,7 +93,11 @@ const SCHEMA = {
 
 const PREAMBLE = `You are an ADVERSARIAL CLOSURE AUDITOR for GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (velocity field and passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers).
 
-Some time ago an expert panel audited this package's documentation and banked its findings. A fix pass then ran. YOUR JOB IS NOT TO REVIEW THE FIX PASS — you are deliberately not shown it, and you must not go looking for it (do NOT read git log, git diff, commit messages, 00-SUMMARY.md, or any other hat's file). Your job is to answer ONE question per banked finding, from the CURRENT corpus alone:
+Some time ago an expert panel audited this package's documentation and banked its findings. A fix pass then ran. YOUR JOB IS NOT TO REVIEW THE FIX PASS — you are deliberately not shown it, and you must not go looking for it.
+
+BLINDNESS — THE ONE RULE THAT MAKES THIS AUDIT WORTH RUNNING. Read exactly ONE file under \`.claude/\`: your own banked hat file, named below. Everything else under \`.claude/\` is FORBIDDEN — every other hat's file, 00-SUMMARY.md, the fix-audit and doc-reading piles, and above all ANY \`closure\` directory (\`closure/\`, \`closure-r1/\`, \`closure-r2/\`, …), which hold PREVIOUS ROUNDS' VERDICTS ON THE FINDINGS YOU ARE ADJUDICATING RIGHT NOW. They are the answer key. Reading one — or letting one surface in a search result and using it — converts this audit into a copy of the last one, which is precisely the failure it exists to prevent. Also forbidden: git log, git diff, and commit messages.
+
+THIS BITES THROUGH SEARCHES, NOT JUST READS. The findings pile lives INSIDE the repository, so a repo-wide grep sweeps the answer key into your results without your asking. Scope every search to the corpus under audit — \`src/\`, \`docs/src/\`, \`docs/ARCHITECTURE.md\`, \`docs/build/\`, \`CLAUDE.md\` — and never search \`.claude/\` (with ripgrep: \`rg --glob '!.claude/**'\`). If a forbidden file appears in output anyway, disregard its content and say so in your evidence rather than relying on it. Your job is to answer ONE question per banked finding, from the CURRENT corpus alone:
 
     ** DOES THE DEFECT THIS FINDING DESCRIBES EXIST IN THE CORPUS RIGHT NOW? **
 
@@ -148,11 +163,13 @@ for (let i = 0; i < HATS.length; i++) {
 
 const tally = {}
 for (const r of all) for (const v of (r.verdicts || [])) tally[v.verdict] = (tally[v.verdict] || 0) + 1
-for (const r of all) {
+for (let i = 0; i < HATS.length; i++) {
+  const r = results[i]
+  if (!r) { log(`[${i + 1}/${HATS.length}] ${HATS[i]}: DEAD — no result returned`); continue }
   const c = {}
   for (const v of (r.verdicts || [])) c[v.verdict] = (c[v.verdict] || 0) + 1
   const cov = typeof r.findings_in_file === 'number' ? `${(r.verdicts || []).length}/${r.findings_in_file}` : `${(r.verdicts || []).length}/?`
-  log(`${r.hat}: ${cov} adjudicated — ${JSON.stringify(c)}`)
+  log(`[${i + 1}/${HATS.length}] ${HATS[i]}: ${cov} adjudicated — ${JSON.stringify(c)}`)
 }
 log(`TOTAL: ${JSON.stringify(tally)}`)
 
