@@ -192,6 +192,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   `Random.default_rng()`).
 
 # Examples
+The two ways in, and the two ways to set the Reynolds number:
+
 ```julia
 # Grid mode — a 128³ forced-stationary run, ν set from the resolution criterion:
 sim = Simulation(grid_points_per_axis = 128)

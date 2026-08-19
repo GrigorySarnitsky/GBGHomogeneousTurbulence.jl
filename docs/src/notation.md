@@ -83,7 +83,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGIsotropicTurbulence.SimulationRun.flow_parameters) |
-| ``\\ell`` | the length a large-scale roll-off is evaluated against (``\\ell_{11}``, or Pope's ``\\ell_0 = k^{3/2}/\\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.large_scale_length) |
+| ``\ell`` | the length a large-scale roll-off is evaluated against (``\ell_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.large_scale_length) |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |

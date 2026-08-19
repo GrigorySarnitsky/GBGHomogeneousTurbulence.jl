@@ -27,7 +27,7 @@ HouLi
 PhaseShift
 ```
 
-The dealiasing cutoff it sets — the dealiasing cutoff — the highest wavenumber the run treats as resolved signal, and the resolution
+The dealiasing cutoff it sets — the highest wavenumber the run treats as resolved signal, and the resolution
 criterion ``\kappa_{\max}\eta`` a run is built to meet.
 
 ```@docs

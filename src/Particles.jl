@@ -20,7 +20,8 @@ Lagrangian tracer tracking:
 - [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`).
 - [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
-  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) — the same quantity
+  the docs also call the Lagrangian velocity or the trajectory velocity — where the closing
   deposit leaves them).
 - [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
   schemes, and [`ParticleIntegratorBuffers`](@ref) the per-step storage each one needs.

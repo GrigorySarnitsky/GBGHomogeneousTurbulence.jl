@@ -53,7 +53,7 @@ abstract type EnergySpectrum <: TurbulenceLaw end
 Supertype of the dimensionless **large-scale roll-off** factors ``f_L(\\kappa \\ell)`` — with
 ``\\ell`` the length that form's own coefficient was fitted against, *not* the box side ``L`` — of a composed
 [`ModelSpectrum`](@ref) — the shape that bends the inertial ``\\kappa^{-5/3}`` law over into the
-energy-containing range, with ``f_L \\to 1`` as ``\\kappa L \\to \\infty``. Evaluated by
+energy-containing range, with ``f_L \\to 1`` as ``\\kappa \\ell \\to \\infty``. Evaluated by
 [`large_scale_factor`](@ref); [`PopeLargeScale`](@ref) is Pope's form.
 """
 abstract type LargeScaleFactor end
@@ -73,7 +73,8 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
     before the cutoff (Qian 1984, [doi:10.1063/1.864902](https://doi.org/10.1063/1.864902);
     Ishihara et al. 2005, [doi:10.1143/JPSJ.74.1464](https://doi.org/10.1143/JPSJ.74.1464);
     Kraichnan 1959, [doi:10.1017/S0022112059000362](https://doi.org/10.1017/S0022112059000362) — all of the form
-    ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma < 0``) — do not satisfy
+    ``A(\\kappa\\eta)^\\gamma\\exp(-\\beta\\kappa\\eta)`` with ``\\gamma > 0``, the prefactor that lifts the
+    spectrum into the bump before the exponential cuts it down) — do not satisfy
     ``f_\\eta\\to 1`` and need a richer spectrum structure; they are deliberately deferred.
 """
 abstract type DissipationFactor end
@@ -83,7 +84,7 @@ abstract type DissipationFactor end
     large_scale_factor(f, κL) -> Float64
 
 Evaluate the dimensionless large-scale roll-off `f` (a [`LargeScaleFactor`](@ref)) at the argument
-``\\kappa L`` (`κL`), where ``L`` is the length that form's own coefficient was fitted against —
+``\\kappa \\ell`` (`κL`), where ``\\ell`` is the length that form's own coefficient was fitted against —
 [`large_scale_length`](@ref) supplies it. A new large-scale form is a subtype of `LargeScaleFactor`
 that adds a method here, and a method there when its length is not ``L_{11}``.
 """
@@ -356,7 +357,7 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 [`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
 
 [`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is von Kármán's
-``\\bigl((\\kappa \\ell)^{2}/((\\kappa \\ell)^{2} + c_L)\\bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
+``\\Bigl(\\frac{(\\kappa \\ell)^2}{(\\kappa \\ell)^2 + c_L}\\Bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
 classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters).
 `C_K` is the Kolmogorov constant; `c_L` fixes where the spectrum peaks and is a shape parameter of

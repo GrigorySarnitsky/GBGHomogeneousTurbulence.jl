@@ -36,7 +36,7 @@ you — spin it up to stationarity, and advance it:
 using GBGIsotropicTurbulence
 
 sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
-                                              # ν is set so the grid resolves the dissipation scale
+                                              # ν is set so the grid captures the dissipation scale
 warmup!(sim)                                  # spin up to statistical stationarity
                                               # (the default forcing is a deterministic clamp on k —
                                               #  see BandRescaling before measuring k itself)

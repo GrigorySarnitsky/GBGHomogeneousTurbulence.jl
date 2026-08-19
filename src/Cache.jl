@@ -88,7 +88,7 @@ and seeds one for you; a hand-assembled run constructs it here.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
-Nothing in the cache is ever recomputed: a read that finds a stale, taken, or never-deposited slot
+Nothing in the cache is ever recomputed: a read that finds a slot stale, **taken** (in use as the step's own scratch mid-iteration), or never deposited
 reports a scheduling error — it throws an `ErrorException` whose message names the slot and which
 of the three states it is in — and the only repair is to fix the schedule that failed to deposit.
 
@@ -97,12 +97,12 @@ of the three states it is in — and the only repair is to fix the schedule that
     stage values there, so a cached field is meaningful only between iterations. Treat every
     returned array as read-only — it is the storage the next iteration will work in.
 
-The word *epoch* names two things here, and the fields below are of both kinds. The two **counters**
-tick as the state changes; every other `*_epoch` field records the counter's value at the moment its
-slot was filled. A slot is readable exactly while the epoch it records still equals the counter it
+# Fields
+The word *epoch* names two things here, and these fields are of both kinds. The two **counters** tick
+as the state changes; every other `*_epoch` field records the counter's value at the moment its slot
+was filled. A slot is readable exactly while the epoch it records still equals the counter it
 depends on.
 
-# Fields
 - `velocity_physical`, `vorticity_physical` — the cached velocity and vorticity in physical
   representation. Mid-iteration the step also computes its stage recoveries *into these same
   arrays*, which is why they are not readable then.

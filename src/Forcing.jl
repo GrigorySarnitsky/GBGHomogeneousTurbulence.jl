@@ -250,7 +250,7 @@ run may no longer measure, and there is no answer that is right for every run.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
-    If the out-of-band value alone exceeds `target`, the band is zeroed — the closest reachable
+    If the value outside the forced shells alone exceeds `target`, the band is zeroed — the closest reachable
     state: it
     empties the energy-containing range in a single step, so ``L_{11}``, ``u'`` and
     ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards — the most violent intervention
