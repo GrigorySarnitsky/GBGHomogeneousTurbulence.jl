@@ -15,6 +15,7 @@ a direct dependency.
 |:---|:---|:---|
 | Imaginary unit | ``\mathrm{i}`` | Upright, always — never bare italic ``i``, never ``\imath``. Writing it upright frees ``i`` for use as an index. |
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
+| Normalized inner product | ``\langle f, g \rangle`` | ``\frac{1}{\lvert\Omega\rvert}\int_\Omega f\cdot g\,\mathrm{d}\boldsymbol{x}``, the box average of the pointwise product. Parseval holds for it in this normalization, which is why the quadratic reductions (``k``, ``\varepsilon``, the variances) take a field in either representation and return the same number. |
 | Spatial average | ``\langle \cdot \rangle`` | The box average ``\frac{1}{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm{d}\boldsymbol{x}`` over the periodic domain ``\Omega`` — the single-realization estimate of the homogeneous ensemble average (exact only in the ergodic, infinite-box limit; at a finite box it retains the large-scale statistical fluctuation). |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral). A field is one physical object; physical and spectral are two representations of it. |
 | Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*.  |
@@ -44,7 +45,7 @@ The **Code** column gives the name each symbol carries in the package.
 | ``\nu`` | kinematic viscosity (sets the Reynolds number) | `conditions.viscosity` |
 | ``\mathrm{Sc}`` | Schmidt number | `conditions.schmidt` |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
-| ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is ``\mathrm{Re}_\lambda``) | `1 / ν` (in units where ``u' = L = 1``) |
+| ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is ``\mathrm{Re}_\lambda``) | `1 / ν` (in units where ``u' = L = 1``; on the shipped defaults, where ``L = 2\pi``, the box-scale value is ``2\pi/\nu``) |
 
 *(The scalar diffusivity ``\varkappa`` is a deliberately distinct glyph from the wavenumber
 magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*

@@ -236,7 +236,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 
 `Generator` realizes the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
 inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} = 1/\nu`` in units where
-``u' = L = 1``), the Schmidt number
+``u' = L = 1``; ``2\pi/\nu`` on the shipped defaults, where ``L = 2\pi``), the Schmidt number
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
@@ -938,7 +938,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `Simulation` to a `Phenomenology` `FlowParameters` (``\nu``, ``\varepsilon``, ``u'``, ``L_{11}`` from the
     measured state), and `validate_spectrum(sim, model)` compares the measured spectrum against a model
     spectrum evaluated at that state, returning a named tuple of the measured and predicted spectra and
-    their relative ``L^2`` discrepancy. This realizes the
+    their relative ``L^2`` discrepancy. The two sides are not the same kind of object and the
+    comparison must convert: `energy_spectrum` returns the per-shell energy ``E_n``, a model returns
+    the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n)\,\Delta\kappa`` with
+    ``\Delta\kappa = 2\pi/L``. The factor is invisible on the default ``L = 2\pi`` box, where it is
+    ``1``, and silently wrong on any other. This realizes the
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
     no `GBGStreamingStatistics` bridge is needed for it. The structure-function and scaling-constant
     paths (via `radial_correlation` and the scalar diagnostics) share the shape and are deferred.

@@ -82,6 +82,22 @@ function compare_to_model(sim, model)
 end
 
 
+# The Δκ conversion is invisible on the default L = 2π box, where Δκ = 1, so it is pinned on a box
+# where it is not: a wrong (or missing) shell-width factor changes the prediction there and nowhere
+# else, which is exactly how such a factor survives a test suite.
+@testset "the model comparison carries the shell width on a non-2π box" begin
+  sim = Simulation(grid_points_per_axis = 32, side_length = 4π, viscosity = 0.02,
+                   velocity_forcing = ConstantPower(injection_rate = 0.1))
+  advance!(sim)
+  v = compare_to_model(sim, Pope2000())
+  fp = flow_parameters(sim)
+  Δκ = 2π / sim.domain.grid.domain_size[1]
+  @test Δκ ≈ 0.5                                        # not 1: the factor is live here
+  i = findfirst(>(0), v.wavenumbers)
+  @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp) * Δκ
+end
+
+
 @testset "the measured spectrum against a model spectrum" begin
   v = compare_to_model(SIM, Pope2000())
   @test length(v.wavenumbers) == length(v.measured) == length(v.predicted)

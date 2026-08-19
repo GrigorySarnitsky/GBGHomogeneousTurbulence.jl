@@ -103,7 +103,8 @@ dealiased by the default ``2/3`` rule (other strategies are available).
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes
   right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered
-  into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of verbs
+  into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of **verbs** —
+  the protocol's functions, `prepare!`, `velocity_rhs!` and the rest —
   rather than assembling the physics itself.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.

@@ -235,7 +235,11 @@ renormalized approximation — consistently predict (Kaneda 1993; Sagaut & Cambo
 ``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018,
 [doi:10.1103/PhysRevFluids.3.082601](https://doi.org/10.1103/PhysRevFluids.3.082601); consistent with
 Chen et al. 1993, [doi:10.1103/PhysRevLett.70.3051](https://doi.org/10.1103/PhysRevLett.70.3051),
-``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``). The
+``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``).
+[`PopeDissipation`](@ref) is asymptotically ``\\exp(-\\beta\\kappa\\eta)`` too, and carries
+``\\beta = 5.2`` — a lower rate, because Pope fits his ``\\beta`` across the whole dissipation range
+including the near-dissipation bend, while the values here are fitted to the far range alone. The two
+are the same symbol for the same decay, calibrated on different intervals. The
 near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara et al.
 2005), a different form this factor does not model.
 
