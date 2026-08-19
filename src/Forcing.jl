@@ -256,8 +256,6 @@ run may no longer measure, and there is no answer that is right for every run.
     exactly what `:total` guarantees. A hand-built forcing that nothing downstream calibrates
     against has no such constraint, and `:band` is then the gentler clamp.
 
-Rescaling preserves the divergence-free constraint either way.
-
 # Arguments
 - `domain` — the [`FixedDomain`](@ref) the band is built on.
 - `target` — the value of the held observable (the kinetic energy for a velocity, the scalar variance
@@ -266,6 +264,8 @@ Rescaling preserves the divergence-free constraint either way.
   paragraphs above give the consequences of each.
 - `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
   box's fundamental ``2\\pi/L``.
+
+Rescaling preserves the divergence-free constraint either way.
 
 !!! note "A deterministic clamp, not a stationary sampler"
     This is a deterministic clamp, not a faithful stationary sampler.
@@ -364,8 +364,8 @@ observable, so the rate that holds it is
 A = \\frac{\\texttt{injection\\_rate}}{2 E_{\\mathrm{band}}}.
 ```
 
-In stationarity the injection balances dissipation, so `injection_rate` is a number: the **value** of
-the dissipation rate to hold, chosen to agree with the diagnostics —
+In stationarity the injection balances dissipation, so `injection_rate` is the value ``\\varepsilon``
+relaxes to in the stationary mean — chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by

@@ -144,9 +144,10 @@ reaches is observed exactly once: the first because a deposit seeding the initia
 the cache is built, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
 closing deposit has no following iteration to fold into — it serves the final observation instead — so, relative
-to a cacheless solver serving only its own dynamics, the run pays one extra closing deposit: the state-only
-share of one first-stage evaluation, one reduction, and one interpolation, per run rather than per
-iteration.
+to a cacheless solver serving only its own dynamics, the run pays **one** extra closing deposit — the
+state-only share of one first-stage evaluation, one reduction, and one interpolation — once per run.
+That is the cache's *added* cost. The reduction inside every other closing deposit recurs per
+iteration, and is work the following first stage would have done anyway (§1.4).
 
 **A slot's epoch says what it holds**, and takes three values: the observable at a
 named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code the named time is

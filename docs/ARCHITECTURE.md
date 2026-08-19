@@ -50,7 +50,7 @@ using GBGIsotropicTurbulence
 
 # Assemble a forced case. Everything the run needs — the domain, buffers, physics,
 # scheme, state, and initial condition — is built with defaults from a few numbers.
-sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
+sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  velocity_forcing = ConstantPower(injection_rate = 0.1),
                  scalar = true, schmidt = 1.0)
 
@@ -412,8 +412,8 @@ Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the o
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
-not readable. After the push, `record_particle_velocity!` records the new sample at the new
+`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of
+the flow, and nothing offers it as one. After the push, `record_particle_velocity!` records the new sample at the new
 positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 

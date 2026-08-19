@@ -8,7 +8,7 @@ Order   = [:module]
 ## Integrator schemes
 
 The integrating-factor scheme supertype and its concretes — the third-order low-storage RK3,
-then the cheaper, imaginary-axis-unstable second-order Heun.
+then the second-order Heun, imaginary-axis unstable and cheaper in transforms but dearer in memory.
 
 ```@docs
 AbstractIntegrator

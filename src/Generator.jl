@@ -186,9 +186,14 @@ step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
 subflows, and [`finalize!`](@ref) after the completed step. The scheme does only stage arithmetic, so
 it can never assemble the right-hand side from a mismatched intermediate state.
 
-Build it on the [`FixedDomain`](@ref) `domain` from the `conditions`; pass `scalar = true` when the run
-carries a passive scalar (it allocates the scalar's forcing-rate array, required for a scalar-forced
-run). The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds one for
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the assembly scratch is sized on.
+- `conditions` — the [`FlowConditions`](@ref) the generator resolves: the viscosity, the Schmidt
+  number, and the two forcing strategies.
+- `scalar = false` — pass `true` when the run carries a passive scalar; it allocates the scalar's
+  forcing-rate array, required for a scalar-forced run.
+
+The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds one for
 you.
 
 !!! warning "The constructor rejects a misdeclared forcing"

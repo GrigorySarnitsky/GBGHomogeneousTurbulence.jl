@@ -11,7 +11,8 @@
 # diffusive one E_κ (κ = ν/Sc), both reaching the same lab time each substep. Advancing velocity
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
-# IFLowStorageRK3 (Williamson 2N) is the general-purpose workhorse; IFRK2 (Heun) is a cheaper option that is
+# IFLowStorageRK3 (Williamson 2N) is the general-purpose workhorse; IFRK2 (Heun) trades a register
+# for a transform (cheaper in transforms, dearer in memory) and is an option that is
 # imaginary-axis unstable for advection (see its docstring). Each `step!` reads the deposited velocity
 # and vorticity from the `ObservablesCache` (deposited by the previous iteration's closing `deposit!`,
 # nothing recomputed), takes the same slots as its stage recovery registers from stage 2 on, and
@@ -27,7 +28,8 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `scheme` is chosen from.
 - [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
-  cheaper two-stage alternative, imaginary-axis unstable).
+  two-stage alternative — cheaper in transforms, dearer by one register per field, and
+  imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
 - [`deposit!`](@ref) — close the iteration: recover the observables into the cache at the new epoch.

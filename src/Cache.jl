@@ -25,11 +25,12 @@ The cache's operations:
   the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
   docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the velocity sampled along each trajectory.
+- [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), [`deposit_sample!`](@ref) — the
+  writers: the first fills every field slot at the iteration's end, the second records the particle
+  velocities the tracer advance wrote.
 
 Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
-than served stale. - [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
-  [`deposit_sample!`](@ref) — the writers: the first fills every field slot at the iteration's end,
-  the second records the particle velocities the tracer advance wrote.
+than served stale.
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
 which fills every slot at the iteration's end and sets its epoch. A caller reads through the
@@ -308,13 +309,15 @@ Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\va
 representation —
 were changed outside the iteration (a re-seeded velocity, any direct write to the state's storage).
 Advances the fields epoch of `cache`, so every cached observable is stale and reads throw until
-the next deposit; that interval belongs to whoever made the change. Returns `cache`.
+the next deposit; that interval belongs to whoever made the change.
 
 The sanctioned mutators call this for you: [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
 advances the epoch itself when it completes, and
 the iteration's closing deposit then restores the cache. After a hand-made mutation, re-deposit with the
 run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
+
+Returns `cache`.
 """
 fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
@@ -325,7 +328,7 @@ fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
 correction, any direct write to the tracer storage) — the particle counterpart of
 [`fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
-trajectory-bound observable is stale and reads throw until the next deposit. Returns `cache`.
+trajectory-bound observable is stale and reads throw until the next deposit.
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
@@ -336,6 +339,8 @@ this, then
 [`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!) to
 write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
 alone leaves the slot stale, and a read of it throws.
+
+Returns `cache`.
 """
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
