@@ -46,7 +46,7 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_trajectory_velocity!, advect!
+using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocity!, advect!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
@@ -280,7 +280,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                              particle_velocities = tracers === nothing ? nothing : tracers.particle_velocities)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
-    (record_trajectory_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
+    (record_particle_velocity!(tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), scheme, state, cache,
                     tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
                     Float64(cfl), Clock(0.0, 0))
@@ -305,7 +305,7 @@ function deposit!(sim::Simulation)
   # The particle velocities ride the same re-deposit: the positions are unchanged, so re-recording
   # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
-    (record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache));
+    (record_particle_velocity!(sim.tracers, velocity_physical(sim.cache));
      deposit_sample!(sim.cache))
   return sim
 end
@@ -396,7 +396,7 @@ function advance!(sim::Simulation; dt = nothing)
     advect!(sim.trajectory_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
             sim.particle_buffers, Δt)
     particles_modified!(sim.cache)
-    record_trajectory_velocity!(sim.tracers, velocity_physical(sim.cache))
+    record_particle_velocity!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)
   end
   check_deposits(sim.cache)

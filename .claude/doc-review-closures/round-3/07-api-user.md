@@ -17,7 +17,7 @@ tracer set's own point-value storage, passed when the run advects tracers. Pass
 `tracers.particle_velocities`: the slot **is** that array…" — the core "what value do I pass" gap
 is closed. Surviving class: no worked hand-assembly example wires the two together anywhere in the
 corpus — `docs/src/observables_cache.md:400` still builds `ObservablesCache(domain; scalar = true)`
-with tracers omitted, and `src/Particles.jl`'s hand-run-loop example (`record_trajectory_velocity!`
+with tracers omitted, and `src/Particles.jl`'s hand-run-loop example (`record_particle_velocity!`
 / `advect!`) never constructs an `ObservablesCache` at all.
 
 ---

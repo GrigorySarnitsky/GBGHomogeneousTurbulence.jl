@@ -24,7 +24,7 @@ Lagrangian tracer tracking:
   deposit leaves them).
 - [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
   schemes, and [`ParticleIntegratorBuffers`](@ref) the per-step storage each one needs.
-- [`record_trajectory_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
+- [`record_particle_velocity!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
 - [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
@@ -40,7 +40,7 @@ using ..SimulationDomain: FixedDomain, _reference, _real_type
 import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, EndpointHeun, ParticleIntegratorBuffers,
-       record_trajectory_velocity!, advect!, interpolate_at_particles!,
+       record_particle_velocity!, advect!, interpolate_at_particles!,
        particle_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
@@ -100,7 +100,7 @@ by hand — takes the `positions` form, and then the scheme's per-step storage i
 tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], interpolation_scheme = CatmullRom)
 buffers = allocate_buffers(EndpointHeun(), tracers)
 
-record_trajectory_velocity!(tracers, u)     # u(tₙ) at the current positions — do this first
+record_particle_velocity!(tracers, u)     # u(tₙ) at the current positions — do this first
 advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 ```
 
@@ -176,7 +176,7 @@ abstract type AbstractParticleIntegrator end
 
 Second-order Heun-in-time on the velocity at the two **ends** of the step — the trajectory
 scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
-velocity that [`record_trajectory_velocity!`](@ref) stored and the end-of-step velocity field
+velocity that [`record_particle_velocity!`](@ref) stored and the end-of-step velocity field
 the solver has just produced, so it needs nothing from inside the field scheme's stages.
 
 It needs one set of predicted positions and the velocity interpolated there
@@ -219,7 +219,7 @@ end
 
 
 """
-    record_trajectory_velocity!(tracers, u) -> tracers
+    record_particle_velocity!(tracers, u) -> tracers
 
 Store the Lagrangian velocity ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` — the flow velocity seen by
 each tracer where it currently sits — by interpolating the velocity field `u` (physical
@@ -240,7 +240,7 @@ an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing 
 ``M \\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
 ``N^{3} \\times 3``.
 """
-function record_trajectory_velocity!(tracers::Tracers, u)
+function record_particle_velocity!(tracers::Tracers, u)
   interpolate!(tracers.particle_velocities, u, tracers.position_points, tracers.interpolation_scheme)
   return tracers
 end
@@ -256,7 +256,7 @@ below), in place, under the trajectory scheme `scheme` (an
 supplies the box side the positions are wrapped into.
 
 Under [`EndpointHeun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
-step — the start-of-step values that [`record_trajectory_velocity!`](@ref) stored, and
+step — the start-of-step values that [`record_particle_velocity!`](@ref) stored, and
 `velocity_end`, the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical
 representation:
 
@@ -274,10 +274,10 @@ frozen start-of-step velocity alone would be first order.
 
 !!! note "The start-of-step velocity is read, never recomputed"
     ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
-    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by `record_trajectory_velocity!`
+    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by `record_particle_velocity!`
     at the previous iteration's end. In a run the observables cache records that sample at its epoch
     and the run layer reads it checked before each advance; a hand-run loop must call
-    `record_trajectory_velocity!` itself between advances.
+    `record_particle_velocity!` itself between advances.
 """
 function advect! end
 

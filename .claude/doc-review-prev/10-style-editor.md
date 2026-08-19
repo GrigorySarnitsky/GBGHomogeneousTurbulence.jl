@@ -64,7 +64,7 @@ docs, cross-checked against the raw built HTML under `docs/build`. Ranked most-s
 - **Severity:** minor
 - **Confidence:** high
 - **Locations:**
-  - `docs/build/api/Cache/index.html` — "…by `record_trajectory_velocity!` **,** both inside
+  - `docs/build/api/Cache/index.html` — "…by `record_particle_velocity!` **,** both inside
     `advance!`…"
   - `docs/build/api/Forcing/index.html` — "…measured by `dissipation`) and $\varepsilon_\varphi$ for
     the scalar (by `scalar_dissipation` **)**." and "`velocity_forcing` **,** `scalar_forcing`"

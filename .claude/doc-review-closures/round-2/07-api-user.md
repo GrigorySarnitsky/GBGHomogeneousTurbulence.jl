@@ -43,7 +43,7 @@ this one site, which is the only offending one named).
 All four quoted instances are byte-for-byte unchanged: `src/Generator.jl:255` "Returns
 `generator`." (no arrow in signature at line 246); `src/Propagator.jl:498` "Returns `cache` (or
 `sim`)."; `src/Forcing.jl:131` `set_forcing_rate!(...) -> rate`; `src/Particles.jl:222`
-`record_trajectory_velocity!(tracers, u) -> tracers`. CLAUDE.md now states a house rule ("a
+`record_particle_velocity!(tracers, u) -> tracers`. CLAUDE.md now states a house rule ("a
 `Returns x.` sentence is required... whose signature carries no `->` arrow") but this is
 repo-internal, never surfaced on any rendered page (`grep -rn "arrow" docs/src/*.md` — no
 explanation found); a reader of the manuscript still cannot tell the two styles apart from the page.

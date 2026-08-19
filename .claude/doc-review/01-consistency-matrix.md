@@ -31,8 +31,8 @@ report lists only the genuine divergences found, not the (much larger) set of ch
 - **Severity:** major
 - **Confidence:** medium
 - **Locations:**
-  - PAGE: api / Cache, `particles_modified!` docstring — *"A hand-run loop that repositions tracers itself must call this, then `record_trajectory_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*
-  - PAGE: api / Particles, `record_trajectory_velocity!` docstring — describes the very same second step only as *"a second call the cache owns"* — never naming it.
+  - PAGE: api / Cache, `particles_modified!` docstring — *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*
+  - PAGE: api / Particles, `record_particle_velocity!` docstring — describes the very same second step only as *"a second call the cache owns"* — never naming it.
   - PAGE: api / GBGIsotropicTurbulence, the full `## Index` (lines listing every `Cache.*` and `Particles.*` export) — contains no `deposit_sample!` entry anywhere.
 - **Contradicts:** One docstring names the operation a hand-run-loop author must call (`deposit_sample!`); its sibling docstring, describing the exact same operation, declines to name it at all; and the function does not appear in the package's own public index. A reader who tries to follow the `particles_modified!` docstring's explicit instructions has no way to locate `deposit_sample!` from the API pages.
 - **Description:** Either `deposit_sample!` is a real, callable verb that should be indexed (and its sibling docstring should name it too), or it is a stale/renamed reference left over from an earlier vocabulary sweep (cf. the `check_boundary` → `check_deposits`, `tail` → `closing` renames recorded in the decision log) and the docstring text was not updated. As written, a reader cannot resolve the reference either way.

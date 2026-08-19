@@ -68,7 +68,7 @@ abstract type AbstractIntegrator end
 struct ScalarBuffers{SS, ST2, SST, NL}
   stage1::SS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
-  star_spectral::SST             # IFRK2 only
+  predictor_spectral::SST             # IFRK2 only
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
 end
 
@@ -90,12 +90,12 @@ field is meaningful only between iterations.
 - `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
   [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
 - `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
-- `stage2`, `velocity_star_spectral` — the second stage register and the substage velocity predictor
+- `stage2`, `velocity_predictor_spectral` — the second stage register and the substage velocity predictor
   ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFRK2` only, else `nothing`.
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
   fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
-  `stage2` and `star_spectral` (`IFRK2`'s corrector register and predictor state ``\\hat\\varphi^*``),
+  `stage2` and `predictor_spectral` (`IFRK2`'s corrector register and predictor state ``\\hat\\varphi^*``),
   and `nonlinear` (`IFLowStorageRK3` only).
 
 There are deliberately **no physical-representation registers** here: the substage velocity,
@@ -115,7 +115,7 @@ only the scheme's own spectral stage registers.
 struct IntegratorBuffers{VS, ST2, VSS, NL, SB}
   stage1::VS
   stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
-  velocity_star_spectral::VSS    # IFRK2 only
+  velocity_predictor_spectral::VSS    # IFRK2 only
   nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
   scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
 end
@@ -152,7 +152,7 @@ a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
 The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `scheme`
 needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
 backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`;
-[`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_star_spectral`. Passing `scalar = true`
+[`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
 adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
 The second serves the trajectory schemes: it builds the
@@ -386,12 +386,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # after stage 2 (neither is read by the stage-2 assembly, which works off the predictor). The
   # factor is never materialized — the fused exponential evaluates it per mode from its parameters.
   ℰ = velocity_integrating_factor(generator, dt)                                                             # E_ν parameters
-  _exponential_update!(buffers.velocity_star_spectral, one(T), û, dt_T, buffers.stage1, domain, ℰ)  # û* ← E_ν(ûₙ + Δt N̂_u,1)
+  _exponential_update!(buffers.velocity_predictor_spectral, one(T), û, dt_T, buffers.stage1, domain, ℰ)  # û* ← E_ν(ûₙ + Δt N̂_u,1)
   _exponential_rotate!(buffers.stage1, domain, ℰ)                                                # E_ν N̂_u,1
   _exponential_rotate!(û, domain, ℰ)                                                             # E_ν ûₙ
   if has_scalar
     ℰφ = scalar_integrating_factor(generator, dt)                                                            # E_κ parameters
-    _exponential_update!(sb.star_spectral, one(T), φ̂, dt_T, sb.stage1, domain, ℰφ)               # φ̂* ← E_κ(φ̂ₙ + Δt N̂_φ,1)
+    _exponential_update!(sb.predictor_spectral, one(T), φ̂, dt_T, sb.stage1, domain, ℰφ)               # φ̂* ← E_κ(φ̂ₙ + Δt N̂_φ,1)
     _exponential_rotate!(sb.stage1, domain, ℰφ)                                                  # E_κ N̂_φ,1
     _exponential_rotate!(φ̂, domain, ℰφ)                                                          # E_κ φ̂ₙ
   end
@@ -399,13 +399,13 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   # stage 2 — right-hand sides at the predictor state. The cache slots are taken as the recovery
   # registers (epochs to scratch); `stage2` is the spectral scratch, written by the assembly just after.
   u_star, ω_star = take_velocity!(cache), take_vorticity!(cache)
-  to_physical!(u_star, buffers.velocity_star_spectral, domain.velocity_plans, buffers.stage2)
-  vorticity_physical!(ω_star, buffers.velocity_star_spectral, domain, buffers.stage2)
-  velocity_rhs!(buffers.stage2, generator, buffers.velocity_star_spectral, u_star, ω_star, domain)  # N̂_u,2
+  to_physical!(u_star, buffers.velocity_predictor_spectral, domain.velocity_plans, buffers.stage2)
+  vorticity_physical!(ω_star, buffers.velocity_predictor_spectral, domain, buffers.stage2)
+  velocity_rhs!(buffers.stage2, generator, buffers.velocity_predictor_spectral, u_star, ω_star, domain)  # N̂_u,2
   if has_scalar
     φ_star = take_scalar!(cache)
-    to_physical!(φ_star, sb.star_spectral, domain.scalar_plans, sb.stage2)
-    scalar_rhs!(sb.stage2, generator, buffers.velocity_star_spectral, sb.star_spectral, u_star, φ_star, domain)  # N̂_φ,2
+    to_physical!(φ_star, sb.predictor_spectral, domain.scalar_plans, sb.stage2)
+    scalar_rhs!(sb.stage2, generator, buffers.velocity_predictor_spectral, sb.predictor_spectral, u_star, φ_star, domain)  # N̂_φ,2
   end
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2) — both rotated halves already banked
@@ -426,19 +426,19 @@ end
 
 # Per-scheme scratch — each scheme allocates exactly its working set; there is no `::AbstractIntegrator`
 # fallback, so a scheme with no method here is a hard error (never a silent over-allocation).
-# IFLowStorageRK3 uses stage1 + nonlinear; IFRK2 uses stage1 + stage2 + velocity_star_spectral; each
+# IFLowStorageRK3 uses stage1 + nonlinear; IFRK2 uses stage1 + stage2 + velocity_predictor_spectral; each
 # leaves the other scheme's registers `nothing`.
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
-  new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, star_spectral, nonlinear
+  new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
 )
 ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
-  new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), nothing,   # stage1, stage2, star_spectral, nonlinear
+  new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), nothing,   # stage1, stage2, predictor_spectral, nonlinear
 )
 
 allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   new_vector_field_spectral(domain),                                # stage1
   nothing,                                                # stage2 (IFRK2 only)
-  nothing,                                                # velocity_star_spectral (IFRK2 only)
+  nothing,                                                # velocity_predictor_spectral (IFRK2 only)
   new_vector_field_spectral(domain),                                # nonlinear
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
 )
@@ -446,7 +446,7 @@ allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) =
 allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   new_vector_field_spectral(domain),                                # stage1
   new_vector_field_spectral(domain),                                # stage2
-  new_vector_field_spectral(domain),                                # velocity_star_spectral
+  new_vector_field_spectral(domain),                                # velocity_predictor_spectral
   nothing,                                                # nonlinear (IFLowStorageRK3 only)
   scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
 )
@@ -482,7 +482,7 @@ runs every iteration, including under a hand-fixed ``\\Delta t`` that never read
 
 The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
 the state, so it is filled by
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!)
+[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!)
 wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
 
 Every iteration ends with this call: the run layer's

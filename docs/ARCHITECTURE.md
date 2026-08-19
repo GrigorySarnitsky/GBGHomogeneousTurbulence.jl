@@ -413,7 +413,7 @@ Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the o
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is
-not readable. After the push, `record_trajectory_velocity!` records the new sample at the new
+not readable. After the push, `record_particle_velocity!` records the new sample at the new
 positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 
@@ -1453,7 +1453,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `exponential_convolve!`, which evaluates ``\exp(c\lvert\boldsymbol{\kappa}\rvert^2 + s\hat A)`` per
     mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
     (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
-    the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal{E}(\hat{\boldsymbol{u}} + B_i h)`` is
+    the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal{E}(\hat{\boldsymbol{u}} + B_i \boldsymbol{h})`` is
     the backend's **two-operand** exponential form, one pass where combine-build-rotate were three, and
     a velocity-only working set now holds *nothing scalar-shaped at all*; (2) an armed linear forcing
     rate became a scalar field in spectral representation holding real values (the fused exponential's

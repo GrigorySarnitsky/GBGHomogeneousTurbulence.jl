@@ -39,14 +39,14 @@ the default. No remaining site pairs the bare default with a parenthesized worke
 **Evidence:** The mechanism is now named consistently across all three docstrings via a single
 extra verb, `deposit_sample!` (`src/Cache.jl:257-259`), which sets both
 `sample_fields_epoch`/`sample_particles_epoch`. `src/Cache.jl:301-317` (`particles_modified!`)
-spells the full sequence: `advect!` → `particles_modified!` → `record_trajectory_velocity!` (write)
+spells the full sequence: `advect!` → `particles_modified!` → `record_particle_velocity!` (write)
 → `deposit_sample!` (mark current) — "the write alone leaves the slot stale, and a read of it
-throws." `src/Particles.jl:221-234` (`record_trajectory_velocity!`) now states explicitly: "This
+throws." `src/Particles.jl:221-234` (`record_particle_velocity!`) now states explicitly: "This
 call is that slot's only producer of values, but it writes values only: the slot becomes readable
 when the cache is then told the values are current, which is a second call the cache owns."
-`src/Propagator.jl:483-486` (`deposit!`) says the slot "is filled by `record_trajectory_velocity!`
+`src/Propagator.jl:483-486` (`deposit!`) says the slot "is filled by `record_particle_velocity!`
 ... which `advance!` and the `deposit!(sim)` form ... both do," consistent with (not contradicting)
-the other two, since it doesn't claim `record_trajectory_velocity!` alone makes it readable. The
+the other two, since it doesn't claim `record_particle_velocity!` alone makes it readable. The
 actual call sites (`src/SimulationRun.jl:277-278`, `:302-304`, `:393-395`) confirm the same
 write-then-mark pair everywhere. No site claims a different call sequence.
 

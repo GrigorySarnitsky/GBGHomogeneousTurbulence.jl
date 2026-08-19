@@ -72,7 +72,7 @@ Evidence: `src/Particles.jl:118,129,228,242,289` — the `Tracers` struct field 
 `particle_velocities::VV` (plural), matching `Cache.particle_velocities` exactly
 (`src/Cache.jl:27,52,63,76-77,102,118,130,133,212,224-232`). The grammatical-number drift the
 finding flagged is gone: both sides of the pair now share the identical plural name. (The verb
-`record_trajectory_velocity!` still carries "trajectory" singular, but that is a different
+`record_particle_velocity!` still carries "trajectory" singular, but that is a different
 identifier — a function name, not the storage field the finding is about.)
 
 ---

@@ -32,8 +32,8 @@ arrow vs `Returns` sentence, citation-opens-identity) are excluded.
 - **Type:** api-gap / self-containedness
 - **Severity:** major
 - **Confidence:** high
-- **Locations:** `api/Cache/index.html` (`Cache.particles_modified!` docstring): *"A hand-run loop that repositions tracers itself must call this, then `record_trajectory_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*.
-- **Contradicts:** No other occurrence of `deposit_sample!` exists anywhere in the manuscript — not as its own docstring entry, not in the master `GBGIsotropicTurbulence` API index (which lists every other public verb, including the sibling `record_trajectory_velocity!`), and not on the Cache or Particles pages' section lists.
+- **Locations:** `api/Cache/index.html` (`Cache.particles_modified!` docstring): *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*.
+- **Contradicts:** No other occurrence of `deposit_sample!` exists anywhere in the manuscript — not as its own docstring entry, not in the master `GBGIsotropicTurbulence` API index (which lists every other public verb, including the sibling `record_particle_velocity!`), and not on the Cache or Particles pages' section lists.
 - **Description:** The docstring tells a reader following a hand-run loop that they "must" call `deposit_sample!`, but a cold reader has no way to find its signature, its module, or confirm it is even public API — it fails the doc policy's own cold-read test ("every signature argument documented... a term of art... is explained or `@ref`-linked"). Either the function needs a docstring and an index entry, or the instruction is stale and should name whatever verb actually serves this role today.
 - **Resolution hint:** Add `deposit_sample!` to the Cache (or Particles) API page with its own docstring, or replace the reference with the currently-correct verb name.
 

@@ -26,8 +26,8 @@ observe it with `run!`, read the cache, and sample along tracers — from the do
 - **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - `PAGE: api / Cache`, `particles_modified!`: *"A hand-run loop that repositions tracers itself must call this, then `record_trajectory_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs."*
-  - `PAGE: api / Particles`, `record_trajectory_velocity!`: *"the slot becomes readable when the cache is then told the values are current, which is a second call the cache owns"* — the "second call" is never named here either.
+  - `PAGE: api / Cache`, `particles_modified!`: *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs."*
+  - `PAGE: api / Particles`, `record_particle_velocity!`: *"the slot becomes readable when the cache is then told the values are current, which is a second call the cache owns"* — the "second call" is never named here either.
   - `PAGE: api / GBGIsotropicTurbulence` Index (the complete export list, lines ~1045–1125): no `deposit_sample!` anywhere.
 - **Description:** The Cache page's own checked-read contract tells a user following the documented out-of-band tracer-repositioning recipe to call `deposit_sample!` as the final, required step. That name occurs exactly once in the whole corpus and is absent from the package's complete public index, from the Particles page's own function list, and from the Propagator page's `deposit!` docstring (which explicitly says the particle-velocities slot is *not* among what `deposit!` fills). A user cannot find this function's signature, confirm it is public, or complete the documented procedure.
 - **Resolution hint:** Either export and document `deposit_sample!` where the other Particles/Cache verbs live, or replace the two vague references with the actual call a user should make.

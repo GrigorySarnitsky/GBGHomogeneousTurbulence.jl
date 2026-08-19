@@ -34,13 +34,13 @@ binding; the docs now say so directly.
 **VERDICT: ABSENT**
 
 **Evidence:** All three docstrings now converge on one producer. `src/Particles.jl:227-230`
-(`record_trajectory_velocity!`): "**This call is that slot's only producer**: it sets both of the
+(`record_particle_velocity!`): "**This call is that slot's only producer**: it sets both of the
 epochs the slot is checked against... Every other mention of the slot going fresh names some
 caller of this function." `src/Cache.jl:311-314` (`particles_modified!`): "...then
-`record_trajectory_velocity!`... — the slot's only producer, and what sets both of its epochs —
+`record_particle_velocity!`... — the slot's only producer, and what sets both of its epochs —
 before advancing." `src/Propagator.jl:478-480` (`deposit!`): "The particle-velocities slot is
-**not** among them... it is filled by `record_trajectory_velocity!`... which `advance!` and the
-`deposit!(sim)` form above both do for you." One home (`record_trajectory_velocity!`), two
+**not** among them... it is filled by `record_particle_velocity!`... which `advance!` and the
+`deposit!(sim)` form above both do for you." One home (`record_particle_velocity!`), two
 consistent pointers.
 
 ---

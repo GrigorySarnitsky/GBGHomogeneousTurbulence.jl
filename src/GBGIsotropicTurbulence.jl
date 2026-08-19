@@ -18,10 +18,12 @@
 #                      the field-valued vorticity recovery
 #   Cache            — the ObservablesCache: the storage the iteration deposits its
 #                      observables into at its end (no-recompute; slots double as the step's registers)
+#   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source. Included BEFORE
+#                      Generator: decision 23(a) earned the Generator → Forcing edge, so Forcing's
+#                      types must exist first.
 #   Generator        — the Navier–Stokes RHS (rotational form) + scalar advection + integrating factor,
 #                      gathered into ResolvedGenerator (FlowConditions + assembly scratch + the protocol
 #                      prepare!/velocity_rhs!/scalar_rhs!/velocity_integrating_factor/scalar_integrating_factor/finalize!)
-#   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source
 #   Propagator       — integrating-factor schemes (AbstractIntegrator) — the time map
 #   Particles        — Lagrangian tracer tracking (instruments)
 #   SimulationRun    — the ergonomic run layer (Simulation + run!/warmup!/advance!)
@@ -145,7 +147,7 @@ using .Particles:
   AbstractParticleIntegrator,
   EndpointHeun,
   ParticleIntegratorBuffers,
-  record_trajectory_velocity!,
+  record_particle_velocity!,
   advect!,
   interpolate_at_particles!,
   particle_positions,
@@ -228,7 +230,7 @@ export FixedDomain,
        AbstractParticleIntegrator,
        EndpointHeun,
        ParticleIntegratorBuffers,
-       record_trajectory_velocity!,
+       record_particle_velocity!,
        advect!,
        interpolate_at_particles!,
        particle_positions,

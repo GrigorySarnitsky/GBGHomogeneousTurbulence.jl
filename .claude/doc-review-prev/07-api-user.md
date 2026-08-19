@@ -27,8 +27,8 @@ sample tracers. Findings below, most-severe first.
 - **Confidence:** medium
 - **Locations:**
   - PAGE `api / Cache`, `ObservablesCache`: *"pass … `particle_velocities` — the tracer set's own point-value storage — when the run advects tracers: the slot IS that storage"*
-  - PAGE `api / Particles`, `record_trajectory_velocity!`: *"which is also the observables cache's particle-velocities slot"*
-- **Description:** Neither docstring says what value to actually pass (e.g. `tracers.trajectory_velocity`) or shows a worked hand-assembly example — the `observables_cache` design page's own build example (`ObservablesCache(domain; scalar = true)`) omits tracers entirely, and the Particles page's hand-run-loop example bypasses `ObservablesCache` altogether. Architecture.md explicitly invites a user to "drop straight to §4" and assemble pieces by hand, but nothing shows how to wire the cache's slot to the tracer set's storage. `record_trajectory_velocity!`'s docstring then states the aliasing as an unconditional fact rather than a consequence of that (undocumented) wiring.
+  - PAGE `api / Particles`, `record_particle_velocity!`: *"which is also the observables cache's particle-velocities slot"*
+- **Description:** Neither docstring says what value to actually pass (e.g. `tracers.trajectory_velocity`) or shows a worked hand-assembly example — the `observables_cache` design page's own build example (`ObservablesCache(domain; scalar = true)`) omits tracers entirely, and the Particles page's hand-run-loop example bypasses `ObservablesCache` altogether. Architecture.md explicitly invites a user to "drop straight to §4" and assemble pieces by hand, but nothing shows how to wire the cache's slot to the tracer set's storage. `record_particle_velocity!`'s docstring then states the aliasing as an unconditional fact rather than a consequence of that (undocumented) wiring.
 
 ---
 
@@ -54,7 +54,7 @@ sample tracers. Findings below, most-severe first.
   - PAGE `api / Generator`, `prepare!`: *"Returns `generator`."*
   - PAGE `api / Propagator`, `deposit!`: *"Returns `cache` (or `sim`)."*
   - PAGE `api / Forcing`, `set_forcing_rate!`: `set_forcing_rate!(forcing, rate, field, domain) -> rate`
-  - PAGE `api / Particles`, `record_trajectory_velocity!`: `record_trajectory_velocity!(tracers, u) -> tracers`
+  - PAGE `api / Particles`, `record_particle_velocity!`: `record_particle_velocity!(tracers, u) -> tracers`
 - **Description:** For functionally identical "this mutator hands back its mutated argument" cases, `Generator`/`Propagator`/`Observables` use a trailing "Returns X." sentence while `Forcing`/`Particles`/`Phenomenology` put `-> X` in the signature block itself. No page states a rule for which style applies where, so a reader can't tell from the signature alone whether an omitted arrow means "returns nothing interesting" or "this module just doesn't use arrows."
 
 ---

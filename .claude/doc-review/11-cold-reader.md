@@ -59,13 +59,13 @@ of first use.
 - **Confidence:** high
 - **Locations:**
   - PAGE: api / Cache, `particles_modified!` — "A hand-run loop that repositions tracers itself must
-    call this, then `record_trajectory_velocity!` to write the new values, and finally
+    call this, then `record_particle_velocity!` to write the new values, and finally
     `deposit_sample!` to record them at the current epochs — the write alone leaves the slot stale, and
     a read of it throws."
   - Absent from the `GBGIsotropicTurbulence` Index (PAGE: api / GBGIsotropicTurbulence) — neither
     `Cache.deposit_sample!` nor any `deposit_sample!` appears among the listed exports.
 - **Description:** The text tells a reader building a hand-run loop that they must call
-  `deposit_sample!` as the third step after `particles_modified!` and `record_trajectory_velocity!` — a
+  `deposit_sample!` as the third step after `particles_modified!` and `record_particle_velocity!` — a
   step the docs say is necessary or "a read of it throws." But `deposit_sample!` has no docstring, no
   signature, and no Index entry anywhere on the site. A reader following the documented recipe hits a
   dead end: the one function the recipe depends on is undocumented and unlisted. (Distinct from the

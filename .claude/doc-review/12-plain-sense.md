@@ -62,7 +62,7 @@ the glossary literally will conclude the tracer push sits outside the iteration.
 - **type**: clarity · **severity**: major · **confidence**: high · **fix**: REWRITE
 
 **Locations**
-- PAGE: api / Particles, `record_trajectory_velocity!`: "Write, then record — a run does both at the end of each iteration"
+- PAGE: api / Particles, `record_particle_velocity!`: "Write, then record — a run does both at the end of each iteration"
 - same docstring: "which is a second call the cache owns"
 
 The verb is *record*, and this paragraph assigns "record" to the **other**, unnamed call, making the

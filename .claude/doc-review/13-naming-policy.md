@@ -8,17 +8,17 @@ and `src/*.jl` for cross-checking the rendered names against the actual bindings
 
 ---
 
-## Finding 1 — `record_trajectory_velocity!` keeps the one root word the particle/tracer rename swept away everywhere else
+## Finding 1 — `record_particle_velocity!` keeps the one root word the particle/tracer rename swept away everywhere else
 
 - **Type:** clarity
 - **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - PAGE `api / Particles` (module docstring): "`record_trajectory_velocity!` — store the flow velocity at the tracers' current positions" sits in the same export list as `particle_positions`, `number_of_particles`, `particle_velocities`, `interpolate_at_particles!`.
+  - PAGE `api / Particles` (module docstring): "`record_particle_velocity!` — store the flow velocity at the tracers' current positions" sits in the same export list as `particle_positions`, `number_of_particles`, `particle_velocities`, `interpolate_at_particles!`.
   - Same page: "the trajectory velocities are read from the run's observables cache through `particle_velocities`" — both roots used for the identical quantity in one sentence.
   - PAGE `architecture` §11 decision (2026-08, user-directed, "Particle is the category, tracer the kind"): "Hence `number_of_tracers` becomes `number_of_particles`... and `sample!` becomes `interpolate_at_particles!`."
-- **Contradicts:** the decision-log rename explicitly states the rule "name by what the operation is true of" and enumerates only two vocabulary roots, *particle* (whole ladder) and *tracer* (massless kind); `record_trajectory_velocity!` uses a third root, "trajectory," that the decision never mentions and never sweeps.
-- **Description:** The single Lagrangian quantity $\boldsymbol u(t_n,\boldsymbol X(t_n))$ is named `particle_velocities` everywhere it is stored or read (the `Tracers` field, the `Cache` slot, the accessor) but is *written* by a verb rooted in a different word, `record_trajectory_velocity!`. The decision-51 sweep renamed every sibling in the same export list (`number_of_tracers`→`number_of_particles`, `sample!`→`interpolate_at_particles!`) but missed this one verb, so the module's own contents list juxtaposes both roots for one concept. Per the decision's own taxonomy the operation is arguably tracer-specific (an inertial particle's velocity is state, not an interpolated sample), so neither existing root cleanly covers it — but "trajectory" is a third, unexamined choice.
+- **Contradicts:** the decision-log rename explicitly states the rule "name by what the operation is true of" and enumerates only two vocabulary roots, *particle* (whole ladder) and *tracer* (massless kind); `record_particle_velocity!` uses a third root, "trajectory," that the decision never mentions and never sweeps.
+- **Description:** The single Lagrangian quantity $\boldsymbol u(t_n,\boldsymbol X(t_n))$ is named `particle_velocities` everywhere it is stored or read (the `Tracers` field, the `Cache` slot, the accessor) but is *written* by a verb rooted in a different word, `record_particle_velocity!`. The decision-51 sweep renamed every sibling in the same export list (`number_of_tracers`→`number_of_particles`, `sample!`→`interpolate_at_particles!`) but missed this one verb, so the module's own contents list juxtaposes both roots for one concept. Per the decision's own taxonomy the operation is arguably tracer-specific (an inertial particle's velocity is state, not an interpolated sample), so neither existing root cleanly covers it — but "trajectory" is a third, unexamined choice.
 - **Resolution hint:** rename to `record_particle_velocity!` (matching the noun everywhere else) or, if the tracer-specificity argument is intended, to `record_tracer_velocity!` — either beats the unswept third root.
 
 ---

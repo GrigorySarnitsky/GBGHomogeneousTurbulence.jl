@@ -40,7 +40,7 @@ Evidence: `grep -rlo '</code></a> [,.);]' docs/build/` and the broader
 `grep -rlo '</code> [,.);]' docs/build/` both return zero matches anywhere in the rebuilt
 docs, not just on the five originally-flagged pages
 (`Cache`, `Forcing`, `Generator`, `Propagator`, `phenomenology/Phenomenology`). Source check
-of `src/Cache.jl:311` (`record_trajectory_velocity!`) shows the comma hugging the closing
+of `src/Cache.jl:311` (`record_particle_velocity!`) shows the comma hugging the closing
 `)` with no space.
 
 ---

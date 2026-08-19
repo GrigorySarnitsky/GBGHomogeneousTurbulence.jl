@@ -266,7 +266,7 @@ Record the particle velocities already written into `cache` (an [`ObservablesCac
 current, so [`particle_velocities`](@ref) will serve them instead of throwing.
 
 Use it after writing new values along the trajectories —
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!)
+[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!)
 writes, this call records. The two are separate because the slot is the tracer set's own storage: the
 cache never fills it, and cannot know when its contents became current. A run does both for you at
 the end of each iteration; a hand-run loop that advances tracers itself must call both, in that
@@ -330,11 +330,11 @@ trajectory-bound observable is stale and reads throw until the next deposit. Ret
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!),
+[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!),
 both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
 the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
 this, then
-[`record_trajectory_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_trajectory_velocity!) to
+[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!) to
 write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
 alone leaves the slot stale, and a read of it throws.
 """

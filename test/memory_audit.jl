@@ -343,12 +343,12 @@ const EPISODE_UNITS = [
     @test !(:product_physical in fieldnames(ResolvedGenerator))
     IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
     SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers
-    @test all(f -> f in fieldnames(IB), (:stage1, :stage2, :velocity_star_spectral, :nonlinear))
+    @test all(f -> f in fieldnames(IB), (:stage1, :stage2, :velocity_predictor_spectral, :nonlinear))
     # The integrating factor has NO register (decision 39), and the physical-representation
     # registers moved onto the cache slots (decision 40) — a step recovers INTO the charts it takes.
     @test !(:integrating_factor in fieldnames(IB))
     @test isempty(intersect((:velocity_star, :vorticity_physical), fieldnames(IB)))
-    @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :star_spectral, :nonlinear))
+    @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :predictor_spectral, :nonlinear))
     @test isempty(intersect((:copy, :field), fieldnames(SB)))
     @test all(f -> f in fieldnames(StochasticOU), (:state, :noise_physical, :noise_spectral))
   end

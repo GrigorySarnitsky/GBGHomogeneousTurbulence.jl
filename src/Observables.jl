@@ -76,8 +76,10 @@ The mean kinetic-energy dissipation rate of a homogeneous flow — a single numb
 the kinematic viscosity ``\\nu`` (the `viscosity` argument):
 
 ```math
-\\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle
-            = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
+\\begin{aligned}
+\\varepsilon &= \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle \\\\
+              &= 2\\nu\\langle S_{ij}S_{ij}\\rangle,
+\\end{aligned}
 ```
 
 the two forms equal for a homogeneous, divergence-free flow (periodicity alone removes the
@@ -97,9 +99,11 @@ The second route trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}
 inner product against the `domain.squared_wavenumber_kernel` multiplier: from
 
 ```math
+\\begin{aligned}
 \\lvert\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}\\rvert^{2}
-  = \\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}
-  - \\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2},
+  &= \\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}
+   - \\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2},
+\\end{aligned}
 ```
 
 the mean-square vorticity of a divergence-free velocity is its **Dirichlet energy** — the mean square

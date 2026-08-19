@@ -89,24 +89,24 @@ with the one working code example that actually constructs the value.
 **Confidence:** low
 
 **Locations:**
-- PAGE: api / Particles, `record_trajectory_velocity!`: *"storing them here is therefore what makes
+- PAGE: api / Particles, `record_particle_velocity!`: *"storing them here is therefore what makes
   `particle_velocities` readable."*
 - PAGE: api / Cache, `particles_modified!`: *"the run layer announces its own tracer advance
-  (`advect!` followed by `record_trajectory_velocity!`, both inside `advance!`), and **the closing
+  (`advect!` followed by `record_particle_velocity!`, both inside `advance!`), and **the closing
   deposit then re-records the sample at the new epoch**."*
 - PAGE: api / Propagator, `deposit!`: *"it is re-recorded where the positions move — **by
   `advance!` after the tracer advance, and by the `deposit!(sim)` form**... which does it for you
   when the run carries tracers."*
 
 **Contradicts:** Each passage credits a different call with making the particle-velocities slot
-current — `record_trajectory_velocity!` itself, "the closing deposit," and `advance!`/`deposit!(sim)`
+current — `record_particle_velocity!` itself, "the closing deposit," and `advance!`/`deposit!(sim)`
 — without stating whether these are three names for the same event or three distinct writes to the
 same epoch pair.
 
 **Description:** Given the slot's epoch is checked against *two* counters
 (`sample_fields_epoch`/`sample_particles_epoch`, per the `ObservablesCache` field list), a reader
 piecing together the exact call sequence that makes `particle_velocities` current from these three
-docstrings alone cannot tell whether `record_trajectory_velocity!` sets both epoch fields itself, or
+docstrings alone cannot tell whether `record_particle_velocity!` sets both epoch fields itself, or
 whether a separate "closing deposit" step is required afterward as `particles_modified!`'s text
 implies ("then re-records"). This is a plausible design-consistency gap rather than a demonstrated
 bug — flagged at low confidence because the docs may simply be using "re-record"/"the closing

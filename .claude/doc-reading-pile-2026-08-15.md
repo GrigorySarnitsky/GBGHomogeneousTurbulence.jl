@@ -1604,7 +1604,7 @@ and `max_speed` should say which of the two gaps each carries, and the CFL discu
 leave the reader with the impression that satisfying it certifies accuracy.
 
 
-### 35. `record_trajectory_velocity!` — "put on record", "push" (`src/Particles.jl`)
+### 35. `record_particle_velocity!` — "put on record", "push" (`src/Particles.jl`)
 User: "put on record, what is that record?! And what is that push? Completely unclear without broader
 context. Some hat should have flagged both." — Two **ordinary words carrying package-specific
 meanings**: the *record* is the `trajectory_velocity` slot (which is also the cache's
@@ -1640,7 +1640,7 @@ Don't we have a convention on tracer vs particle distinction?" — **We do not**
 contradicts itself:
 
 ```julia
-export Tracers, record_trajectory_velocity!, advect!, sample!,
+export Tracers, record_particle_velocity!, advect!, sample!,
        particle_positions, number_of_tracers, velocity_buffer, scalar_buffer
 ```
 
