@@ -133,7 +133,7 @@ call, this phrasing in a different page undoes the clarity that decision bought.
 **Confidence:** medium
 
 **Locations:**
-- **Particles API**, `record_particle_velocity!`: *"Storing them costs $M \times 3$ values for
+- **Particles API**, `record_particle_velocities!`: *"Storing them costs $M \times 3$ values for
   $M$ tracers"* (spaced)
 - **ARCHITECTURE.md** §4.6, §9(memory audit), and **observables_cache page** §1.2/§2.3 (three
   separate occurrences): *"$M\times3$ arrays"* / *"an $M\times3\times$..."* (unspaced)

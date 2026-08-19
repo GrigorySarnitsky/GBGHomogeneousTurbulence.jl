@@ -195,11 +195,9 @@ end — the qualification §1.2 draws.
 It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. Each clause of that is an accounting statement: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
-read computes. Those are two different costs and it is worth keeping them apart: the maximum-speed
-reduction above recurs **every iteration**, while the only work the cache *adds* over a cacheless
-solver is §1.3's final closing deposit — the one whose deposits no iteration consumes, kept because it
-serves the final observation, and paid **once per run**. The cache is otherwise a naming-and-dating
-layer over storage the run already owns: removing it would free no array.
+read computes. The cache is otherwise a naming-and-dating layer over storage the run already owns:
+removing it would free no array, and the only work it *adds* over a cacheless solver is §1.3's final
+closing deposit, paid once per run.
 
 What the design pays instead is control over the contents. Since nothing may be added, what the cache
 holds is decided by the solver's minimal-memory schedule, and it changes when the solver's storage

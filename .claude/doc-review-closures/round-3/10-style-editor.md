@@ -10,7 +10,7 @@ Evidence: `src/phenomenology/Scalings.jl:49,87,118` and `src/phenomenology/Spect
 
 ## 3. Stray space before closing punctuation after a linked/coded term
 **VERDICT: ABSENT**
-Evidence: checked all four cited locations directly in rendered HTML — `record_particle_velocity!</code></a>, both inside` (Cache), `scalar_dissipation</code></a>). The keyword` (Forcing), `ResolvedFields</code></a>) the step has just` (Propagator), `StructureFunction</code></a>) at separation` (Phenomenology) — punctuation now hugs the code span with no gap. Corpus-wide regex `find docs/build -name "*.html" | xargs grep -oE '</code></a>[[:space:]]+[,.);:]'` and the plain `</code>` variant both return zero matches across all built pages.
+Evidence: checked all four cited locations directly in rendered HTML — `record_particle_velocities!</code></a>, both inside` (Cache), `scalar_dissipation</code></a>). The keyword` (Forcing), `ResolvedFields</code></a>) the step has just` (Propagator), `StructureFunction</code></a>) at separation` (Phenomenology) — punctuation now hugs the code span with no gap. Corpus-wide regex `find docs/build -name "*.html" | xargs grep -oE '</code></a>[[:space:]]+[,.);:]'` and the plain `</code>` variant both return zero matches across all built pages.
 
 ## 4. Prose sentences open with a lowercase code identifier
 **VERDICT: ABSENT**

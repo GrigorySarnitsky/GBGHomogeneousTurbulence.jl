@@ -487,7 +487,7 @@ every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
 
 The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
 the state, so it is filled by
-[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!)
+[`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!)
 wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
 
 Every iteration ends with this call: the run layer's

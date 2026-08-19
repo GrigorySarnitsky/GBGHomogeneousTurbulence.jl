@@ -45,23 +45,23 @@ why and is internally consistent.
 
 **Evidence:** The three docstrings were rewritten to give one definitive story, but that story is
 now factually **false** against the code. `src/Particles.jl:227-229` claims of
-`record_particle_velocity!`: "**This call is that slot's only producer**: it sets both of the
+`record_particle_velocities!`: "**This call is that slot's only producer**: it sets both of the
 epochs the slot is checked against — the fields epoch and the particles epoch." But
-`record_particle_velocity!(tracers::Tracers, u)` (`src/Particles.jl:241-244`) takes no `cache`
+`record_particle_velocities!(tracers::Tracers, u)` (`src/Particles.jl:241-244`) takes no `cache`
 argument and only calls `interpolate!`; it cannot touch `cache.sample_fields_epoch` /
 `cache.sample_particles_epoch`. Those are set exclusively by `deposit_sample!` (`src/Cache.jl:257-259`),
-called as a **separate** statement immediately after `record_particle_velocity!` at every one of
+called as a **separate** statement immediately after `record_particle_velocities!` at every one of
 its three call sites (`src/SimulationRun.jl:277-278`, `303-304`, `394-395`). `src/Cache.jl:314-317`
 (`particles_modified!`) compounds this: it instructs a hand-run loop to call `particles_modified!`
-then `record_particle_velocity!` "before advancing" — omitting `deposit_sample!` entirely — a
+then `record_particle_velocities!` "before advancing" — omitting `deposit_sample!` entirely — a
 recipe that, followed literally, leaves `sample_fields_epoch`/`sample_particles_epoch` stale and
 `particle_velocities(cache)` throwing (`src/Cache.jl:229-234`).
 
 **Surviving class:** the conflation of "writes the array" with "advances the epoch" recurs at two
-sites: `src/Particles.jl:227-229` (`record_particle_velocity!`'s own docstring) and
+sites: `src/Particles.jl:227-229` (`record_particle_velocities!`'s own docstring) and
 `src/Cache.jl:314-317` (`particles_modified!`'s docstring, whose stated hand-run recipe is
 incomplete/broken without `deposit_sample!`). `src/Propagator.jl:479-482` (`deposit!`) is the one
-passage that stays accurate — it says the slot "is filled by `record_particle_velocity!`" without
+passage that stays accurate — it says the slot "is filled by `record_particle_velocities!`" without
 claiming it sets epochs.
 
 ---

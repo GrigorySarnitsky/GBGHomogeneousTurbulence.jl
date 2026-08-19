@@ -18,10 +18,7 @@ The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
-- [`deposit_sample!`](@ref) — the one writer this module owns: it records the particle velocities the
-  tracer advance wrote. The field slots are filled by
-  [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which `Propagator` owns because it
-  needs the scheme's scratch to recover the fields.
+- [`deposit_sample!`](@ref) — records the particle velocities the tracer advance wrote.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
@@ -29,8 +26,10 @@ The cache's operations:
   docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the velocity sampled along each trajectory.
 
-Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
-than served stale.
+The field slots are filled by [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which
+`Propagator` owns rather than this module because it needs the scheme's scratch to recover the
+fields. Each slot carries the value **and** the epoch that value belongs to, so a read can be refused
+rather than served stale.
 
 The solver's side of the contract is that `deposit!` fills every slot at the iteration's end and sets
 its epoch. A caller reads through the accessors and never deposits.
@@ -269,7 +268,7 @@ Record the particle velocities already written into `cache` (an [`ObservablesCac
 current, so [`particle_velocities`](@ref) will serve them instead of throwing.
 
 Use it after writing new values along the trajectories —
-[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!)
+[`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!)
 writes, this call records. The two are separate because the slot is the tracer set's own storage: the
 cache never fills it, and cannot know when its contents became current. A run does both for you at
 the end of each iteration; a hand-run loop that advances tracers itself must call both, in that
@@ -337,11 +336,11 @@ trajectory-bound observable is stale and reads throw until the next deposit.
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
-[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!),
+[`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!),
 both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
 the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
 this, then
-`record_particle_velocity!` to
+`record_particle_velocities!` to
 write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
 alone leaves the slot stale, and a read of it throws.
 

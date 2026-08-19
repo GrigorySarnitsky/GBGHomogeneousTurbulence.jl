@@ -1325,7 +1325,7 @@ sentence resting on an undefined noun.
   adjacent. Add the one-clause gloss here, at the coinage point.
 - `src/Cache.jl` — the `# Fields` entry (screenshot) and the module docstring's "a slot IS its
   producer's register".
-- `src/Particles.jl:68, 77, 160` — "a stage register of the push" for `predictor_velocity`, which is
+- `src/Particles.jl:68, 77, 160` — "a stage register of the push" for `velocity_predictor`, which is
   ``M\times3`` point values, not a field at all. The furthest stretch of the word.
 - `docs/src/observables_cache.md` — ~10 uses; §1.2's whole "surviving" argument is phrased in registers.
 - `docs/ARCHITECTURE.md` — design-doc uses, lower priority.
@@ -1394,7 +1394,7 @@ Three reasons, all confirmed:
    oriented probes use the exponential-drag integrator, which has no corrector stage; a cache
    accessor's docstring should not carry a fact owned by one tracer scheme.
 3. **Duplicate of its home** — `Tracers`' field list already states it better and where it belongs
-   (`Particles.jl:67–68`): *"`predictor_velocity` — the interpolated velocity at the Heun predictor
+   (`Particles.jl:67–68`): *"`velocity_predictor` — the interpolated velocity at the Heun predictor
    positions, which no tracer ever occupies: a stage register of the push, never a sample of the flow,
    and never exposed."* One concept, one home; decision 42's forbidden ``v_2``-as-``v_1`` reuse is
    stated at the thing it constrains.
@@ -1604,7 +1604,7 @@ and `max_speed` should say which of the two gaps each carries, and the CFL discu
 leave the reader with the impression that satisfying it certifies accuracy.
 
 
-### 35. `record_particle_velocity!` — "put on record", "push" (`src/Particles.jl`)
+### 35. `record_particle_velocities!` — "put on record", "push" (`src/Particles.jl`)
 User: "put on record, what is that record?! And what is that push? Completely unclear without broader
 context. Some hat should have flagged both." — Two **ordinary words carrying package-specific
 meanings**: the *record* is the `trajectory_velocity` slot (which is also the cache's
@@ -1640,7 +1640,7 @@ Don't we have a convention on tracer vs particle distinction?" — **We do not**
 contradicts itself:
 
 ```julia
-export Tracers, record_particle_velocity!, advect!, sample!,
+export Tracers, record_particle_velocities!, advect!, sample!,
        particle_positions, number_of_tracers, velocity_buffer, scalar_buffer
 ```
 
@@ -1735,14 +1735,14 @@ enumerate the **class** rather than a list of names I noticed.
 
 User: "Here we mix the state of the tracers with the integrator, no? What if we change the integrator?"
 
-Three of the seven fields are Heun-specific, and the docstring says so itself — `predictor_velocity` is
+Three of the seven fields are Heun-specific, and the docstring says so itself — `velocity_predictor` is
 "a **stage register of the push**, never a sample of the flow, and never exposed":
 
 | field | kind |
 |---|---|
 | `positions`, `position_points` | state — the trajectory |
 | `trajectory_velocity` | the recorded observable (the cache's particle-velocities slot) |
-| `predictor`, `predictor_points`, `predictor_velocity` | **Heun stage scratch** |
+| `predictor`, `predictor_points`, `velocity_predictor` | **Heun stage scratch** |
 | `scheme` | the interpolation method |
 
 **The package already established the correct split and the Lagrangian side does not follow it:**

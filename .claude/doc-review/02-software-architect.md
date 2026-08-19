@@ -77,7 +77,7 @@ Hat: software architect / senior Julia programmer, judging the *documented* API 
 - PAGE: api / Cache, `deposit_sample!` synopsis: `` deposit_sample!(cache) -> particle velocities ``
 - Same docstring, final sentence: "Returns the slot's array."
 
-**Contradicts:** every other arrow-bearing verb in the corpus (`advect!`, `record_particle_velocity!`, `allocate_buffers`, `interpolate_at_particles!`) states its return only once, via the arrow, with no trailing "Returns ..." sentence — the shape the panel's own prior round confirmed is the corpus convention (arrow *or* sentence, chosen by whether the signature carries one).
+**Contradicts:** every other arrow-bearing verb in the corpus (`advect!`, `record_particle_velocities!`, `allocate_buffers`, `interpolate_at_particles!`) states its return only once, via the arrow, with no trailing "Returns ..." sentence — the shape the panel's own prior round confirmed is the corpus convention (arrow *or* sentence, chosen by whether the signature carries one).
 
 **Description:** `deposit_sample!` carries both, and the two descriptions use different vocabulary for the same value ("particle velocities" vs. "the slot's array") — a small but genuine notation drift on a single function's own return contract.
 

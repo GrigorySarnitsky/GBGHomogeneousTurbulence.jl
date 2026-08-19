@@ -26,7 +26,7 @@ markup):**
 - `src/Cache.jl`, the `Cache` **module** docstring: `` [`deposit!`](@ref …Propagator.deposit!) ``
   in the operations bullet list, then again in the next paragraph: "The solver's side of the
   contract is `[`deposit!`](@ref …Propagator.deposit!)`."
-- `src/Cache.jl`, `particles_modified!`: `` [`record_particle_velocity!`](@ref …) `` linked once
+- `src/Cache.jl`, `particles_modified!`: `` [`record_particle_velocities!`](@ref …) `` linked once
   describing the run-layer path, then again describing the hand-run-loop path.
 - `src/Propagator.jl`, `recommended_cfl`: `` [`IFLowStorageRK3`](@ref) `` linked in the base-ceiling
   paragraph and again in the trailing `!!! warning`; `` [`IFRK2`](@ref) `` likewise linked twice.

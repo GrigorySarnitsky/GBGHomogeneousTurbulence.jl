@@ -144,12 +144,12 @@ information the doc's cold-read currently supplies only by exclusion.
 
 ---
 
-## 7. `predictor_velocity` and `velocity_predictor_spectral` invert word order for the same role
+## 7. `velocity_predictor` and `velocity_predictor_spectral` invert word order for the same role
 
 **Type:** clarity · **Severity:** nit · **Confidence:** medium
 
 **Locations:**
-- PAGE `api / Particles`, `ParticleIntegratorBuffers` Fields: *"`predictor_velocity` — the velocity
+- PAGE `api / Particles`, `ParticleIntegratorBuffers` Fields: *"`velocity_predictor` — the velocity
   interpolated at the predicted positions."*
 - PAGE `api / Propagator`, `IntegratorBuffers` Fields: *"`stage2`, `velocity_predictor_spectral` —
   the second stage register and the substage velocity predictor $\hat{\boldsymbol u}^{*}$ in spectral
@@ -157,26 +157,26 @@ information the doc's cold-read currently supplies only by exclusion.
 
 **Description:** Both are the same shape of object — a scheme-owned stage register holding a
 predicted/predictor velocity, explicitly disclaimed in both docstrings as "not a sample of the flow
-at any instant" — yet the noun order flips: `predictor_velocity` (particle side) vs
+at any instant" — yet the noun order flips: `velocity_predictor` (particle side) vs
 `velocity_predictor_spectral` (field side). A single order across the two sibling buffer types would
 make the shared concept legible at a glance rather than requiring the reader to notice the two are
 analogous despite reading differently.
 
 ---
 
-## 8. `record_particle_velocity!` (singular) writes into `particle_velocities` (plural)
+## 8. `record_particle_velocities!` (singular) writes into `particle_velocities` (plural)
 
 **Type:** clarity · **Severity:** nit · **Confidence:** low-medium
 
 **Locations:**
-- PAGE `api / Particles`, `record_particle_velocity!(tracers, u) -> tracers`: *"Store the Lagrangian
+- PAGE `api / Particles`, `record_particle_velocities!(tracers, u) -> tracers`: *"Store the Lagrangian
   velocity … by interpolating the velocity field `u` … onto the positions of the tracer set
   `tracers`…"*
 - Same page, `Tracers` Fields: *"`particle_velocities` — the interpolated velocity at the positions
   the tracers occupy…"* and `Cache.particle_velocities(cache)`.
 
 **Description:** The mutator that fills the $M \times 3$ `particle_velocities` slot for every
-tracer in the set is named in the singular (`record_particle_velocity!`), while the slot, its
+tracer in the set is named in the singular (`record_particle_velocities!`), while the slot, its
 accessor, and its notation.md binding are all plural. The verb reads as "record one particle's
 velocity" when it in fact records all $M$ at once — a small but real drift against "one concept, one
 name" for the noun it operates on.

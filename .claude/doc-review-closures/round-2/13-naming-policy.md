@@ -42,7 +42,7 @@ No shared ambiguous name remains.
 **Verdict:** ABSENT
 **Evidence:** The `Tracers` struct field is now `particle_velocities` (`src/Particles.jl:118,129,243,290`),
 matching the cache accessor/slot name `particle_velocities` (`src/Cache.jl:26,105,121,215,227`) exactly —
-same plural spelling on both sides of the pair. (A verb `record_particle_velocity!` still exists but
+same plural spelling on both sides of the pair. (A verb `record_particle_velocities!` still exists but
 names an action, not the storage the finding compared.)
 
 ## 7. `Li2008(; constant = 0.9)` names its one parameter with the least specific word available

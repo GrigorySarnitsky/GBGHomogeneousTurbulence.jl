@@ -41,12 +41,12 @@ now states this explicitly: "a ready-made value rather than a type, so it is pas
 **Verdict:** ABSENT
 
 **Evidence:** All three homes now describe one consistent two-step mechanism explicitly.
-`src/Particles.jl:227-229` (`record_particle_velocity!`): "This call is that slot's only producer
+`src/Particles.jl:227-229` (`record_particle_velocities!`): "This call is that slot's only producer
 of values, but it writes values only: the slot becomes readable when the cache is then told the
 values are current, which is a second call the cache owns." `src/Cache.jl:307-317`
 (`particles_modified!`): spells the full hand-run sequence — `particles_modified!` →
-`record_particle_velocity!` → `deposit_sample!` ("finally `deposit_sample!` to record them at the
-current epochs"). `src/Propagator.jl:483-485` (`deposit!`): "filled by `record_particle_velocity!`
+`record_particle_velocities!` → `deposit_sample!` ("finally `deposit_sample!` to record them at the
+current epochs"). `src/Propagator.jl:483-485` (`deposit!`): "filled by `record_particle_velocities!`
 ... which `advance!` and the `deposit!(sim)` form above both do for you" — no longer conflicting
 attributions; `deposit_sample!` (`src/Cache.jl:257`) is the concrete function all three now name.
 

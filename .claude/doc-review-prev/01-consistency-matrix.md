@@ -31,8 +31,8 @@ report lists only the genuine divergences found, not the (much larger) set of ch
 - **Severity:** major
 - **Confidence:** medium
 - **Locations:**
-  - PAGE: api / Cache, `particles_modified!` docstring — *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*
-  - PAGE: api / Particles, `record_particle_velocity!` docstring — describes the very same second step only as *"a second call the cache owns"* — never naming it.
+  - PAGE: api / Cache, `particles_modified!` docstring — *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocities!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*
+  - PAGE: api / Particles, `record_particle_velocities!` docstring — describes the very same second step only as *"a second call the cache owns"* — never naming it.
   - PAGE: api / GBGIsotropicTurbulence, the full `## Index` (lines listing every `Cache.*` and `Particles.*` export) — contains no `deposit_sample!` entry anywhere.
 - **Contradicts:** One docstring names the operation a hand-run-loop author must call (`deposit_sample!`); its sibling docstring, describing the exact same operation, declines to name it at all; and the function does not appear in the package's own public index. A reader who tries to follow the `particles_modified!` docstring's explicit instructions has no way to locate `deposit_sample!` from the API pages.
 - **Description:** Either `deposit_sample!` is a real, callable verb that should be indexed (and its sibling docstring should name it too), or it is a stale/renamed reference left over from an earlier vocabulary sweep (cf. the `check_boundary` → `check_deposits`, `tail` → `closing` renames recorded in the decision log) and the docstring text was not updated. As written, a reader cannot resolve the reference either way.
@@ -65,13 +65,13 @@ report lists only the genuine divergences found, not the (much larger) set of ch
 
 ---
 
-## Finding 5 — `ParticleIntegratorBuffers.predictor_velocity` is called "not readable" / "never exposed," yet is documented as an ordinary public struct field
+## Finding 5 — `ParticleIntegratorBuffers.velocity_predictor` is called "not readable" / "never exposed," yet is documented as an ordinary public struct field
 
 - **Type:** contradiction
 - **Severity:** nit
 - **Confidence:** low
 - **Locations:**
-  - PAGE: architecture, §4.6 — *"`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is not readable."*
-  - PAGE: api / Particles, `ParticleIntegratorBuffers` Fields section — *"`predictor_velocity` — the velocity interpolated at the predicted positions: an intermediate value the scheme works with, never a sample of the flow, and never exposed as one."*
-- **Contradicts:** Both passages assert the value is inaccessible/"not readable"/"never exposed," yet the second passage is itself a `# Fields` entry documenting `predictor_velocity` as a plain, dot-accessible field of a public type (`buffers.predictor_velocity` works in Julia like any other field). Nothing marks it `#`-internal or otherwise structurally hidden.
+  - PAGE: architecture, §4.6 — *"`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme, never a sample of the flow, and is not readable."*
+  - PAGE: api / Particles, `ParticleIntegratorBuffers` Fields section — *"`velocity_predictor` — the velocity interpolated at the predicted positions: an intermediate value the scheme works with, never a sample of the flow, and never exposed as one."*
+- **Contradicts:** Both passages assert the value is inaccessible/"not readable"/"never exposed," yet the second passage is itself a `# Fields` entry documenting `velocity_predictor` as a plain, dot-accessible field of a public type (`buffers.velocity_predictor` works in Julia like any other field). Nothing marks it `#`-internal or otherwise structurally hidden.
 - **Description:** Low confidence because this may simply be the package's established convention (per its own doc policy, a demoted `# Fields` section documents internals as reference detail even when a checked accessor is the sanctioned read path elsewhere, e.g. `ObservablesCache`'s "treat every returned array as read-only" caveat for a technically-public field). Flagged because the specific wording ("not readable," "never exposed") reads as a stronger claim than "discouraged" and is worth a second look against the actual export list.

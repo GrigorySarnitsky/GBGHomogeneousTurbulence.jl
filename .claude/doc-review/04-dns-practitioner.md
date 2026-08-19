@@ -106,16 +106,16 @@ and nothing on the page says so.
 **Locations:**
 - PAGE: api / Cache, `deposit_sample!`: "the write alone leaves the slot stale, and a read of it
   throws" — and `particles_modified!`: "A hand-run loop that repositions tracers itself must call
-  this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!`."
-- PAGE: api / Particles, `record_particle_velocity!`: describes writing the slot but does not mention
+  this, then `record_particle_velocities!` to write the new values, and finally `deposit_sample!`."
+- PAGE: api / Particles, `record_particle_velocities!`: describes writing the slot but does not mention
   that a caller driving the loop by hand must additionally call `deposit_sample!` before
   `particle_velocities` becomes readable — that three-call sequence is stated only on the Cache page.
 
 **Description:** A hand-run particle loop that follows only the Particles page's own worked examples
 (which never call `deposit_sample!` directly, since `advance!` does it internally) would plausibly
-call `record_particle_velocity!` and then read `particle_velocities` and hit a throw, with the fix
+call `record_particle_velocities!` and then read `particle_velocities` and hit a throw, with the fix
 documented on a different page than the one describing the write. Not a factual error, just a
-one-hop-away caveat that would help where it is used, on `record_particle_velocity!` itself.
+one-hop-away caveat that would help where it is used, on `record_particle_velocities!` itself.
 
 ---
 

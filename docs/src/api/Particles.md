@@ -46,7 +46,7 @@ at both ends of the step: the run records the sample at the iteration's end, off
 velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 
 ```@docs
-record_particle_velocity!
+record_particle_velocities!
 advect!
 interpolate_at_particles!
 ```

@@ -413,8 +413,8 @@ Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the o
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of
-the flow, and nothing offers it as one. After the push, `record_particle_velocity!` records the new sample at the new
+`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme, never a sample of
+the flow, and nothing offers it as one. After the push, `record_particle_velocities!` records the new sample at the new
 positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 
@@ -1543,7 +1543,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable between iterations —
     the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
     register, substage on the position argument alone. They are renamed `particle_velocities` /
-    `predictor_velocity`, and the sample becomes the observables cache's first trajectory-bound
+    `velocity_predictor`, and the sample becomes the observables cache's first trajectory-bound
     slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
     storage (the slot IS the register, as everywhere else) and dated against **both** epochs,
     since the sample is a function of the state and the positions together. The push's schedule
@@ -1553,7 +1553,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
     favor of the slot epoch, and the sample is read through the checked `particle_velocities`
     (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
-    user-settled accessor prefix). The register `predictor_velocity` is deliberately **not served** as an
+    user-settled accessor prefix). The register `velocity_predictor` is deliberately **not served** as an
     observable — an off-trajectory value must not be offered as a plausible-looking Lagrangian
     velocity, though it remains an ordinary reachable field of its buffers type — and the
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
@@ -1694,8 +1694,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 50. **(2026-08, user-directed) `Tracers` holds trajectory state; the trajectory scheme's registers
     are allocated per scheme, as on the field side.** Three of `Tracers`' seven fields —
-    `predictor`, `predictor_points`, `predictor_velocity` — were one scheme's scratch, as its own
-    docstring conceded in calling `predictor_velocity` "a stage register of the push". The field
+    `predictor`, `predictor_points`, `velocity_predictor` — were one scheme's scratch, as its own
+    docstring conceded in calling `velocity_predictor` "a stage register of the push". The field
     side had held the state/scratch line from the start (`ResolvedFields` versus `IntegratorBuffers`,
     built by `allocate_buffers` dispatching per scheme); the Lagrangian side did not follow it, so
     changing the scheme meant editing the state type. Now `AbstractParticleIntegrator` is the scheme

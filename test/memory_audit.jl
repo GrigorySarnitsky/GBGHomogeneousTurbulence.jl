@@ -324,11 +324,11 @@ const EPISODE_UNITS = [
                         collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
                         [a for a in acc if size(a) == (4, 3)])
     @test length(_m_arrays(tracers)) == 2                  # positions, particle_velocities
-    @test length(_m_arrays(buffers)) == 2                  # predictor, predictor_velocity
+    @test length(_m_arrays(buffers)) == 2                  # predictor, velocity_predictor
     # The split moved storage; it did not add any. The total is what the ledger prices.
     @test length(_m_arrays(tracers)) + length(_m_arrays(buffers)) == 4
     # And no scheme register hides in the state.
-    @test isempty(intersect((:predictor, :predictor_points, :predictor_velocity), fieldnames(Tracers)))
+    @test isempty(intersect((:predictor, :predictor_points, :velocity_predictor), fieldnames(Tracers)))
   end
 
   @testset "op lists name real registers" begin

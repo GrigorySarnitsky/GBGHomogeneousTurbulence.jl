@@ -267,7 +267,7 @@ stationary state — use a fixed budget".
 
 **Locations**
 
-- PAGE `api / Cache`, `particles_modified!`: "must call this, then `record_particle_velocity!` ...
+- PAGE `api / Cache`, `particles_modified!`: "must call this, then `record_particle_velocities!` ...
   and finally `deposit_sample!` to record them at the current epochs"
 - PAGE `api / GBGIsotropicTurbulence`, Index: no `deposit_sample!` entry.
 

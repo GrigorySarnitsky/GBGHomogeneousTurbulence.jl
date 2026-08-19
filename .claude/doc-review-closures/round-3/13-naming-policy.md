@@ -22,7 +22,7 @@ Evidence: `BandRescaling` still uses `target` (an amplitude, `src/Forcing.jl:98,
 
 ## Finding 6 — `Tracers.trajectory_velocity` (singular) vs `particle_velocities` (plural)
 **VERDICT: ABSENT**
-Evidence: `src/Particles.jl:118,129,228,233,290` — the `Tracers` struct field is now `particle_velocities` (plural), matching `Cache.jl`'s `particle_velocities` slot/accessor exactly (decision 42's slot-is-register wiring). `grep -n "trajectory_velocity" src/Particles.jl` only matches the verb `record_particle_velocity!`, not a stored field.
+Evidence: `src/Particles.jl:118,129,228,233,290` — the `Tracers` struct field is now `particle_velocities` (plural), matching `Cache.jl`'s `particle_velocities` slot/accessor exactly (decision 42's slot-is-register wiring). `grep -n "trajectory_velocity" src/Particles.jl` only matches the verb `record_particle_velocities!`, not a stored field.
 
 ## Finding 7 — `Li2008(; constant = 0.9)` names its parameter imprecisely
 **VERDICT: ABSENT**

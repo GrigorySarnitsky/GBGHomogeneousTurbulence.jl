@@ -15,7 +15,7 @@ agree.
 Evidence: `rg "deposit_sample"` shows it is now exported (`src/Cache.jl:57`,
 `src/GBGIsotropicTurbulence.jl:99,178`), has its own docstring (`src/Cache.jl:263-279`),
 appears in `docs/src/api/Cache.md:17`, and is explicitly named with an `@ref` link in
-`src/Particles.jl:234` (`record_particle_velocity!`'s docstring: "...
+`src/Particles.jl:234` (`record_particle_velocities!`'s docstring: "...
 [`deposit_sample!`](@ref GBGIsotropicTurbulence.Cache.deposit_sample!) records them as
 current"). Both sibling docstrings now name it and it is indexed.
 
@@ -41,19 +41,19 @@ out the copy/paste-leak concern the finding raised.
 
 ---
 
-## Finding 5 — `predictor_velocity` called "not readable"/"never exposed" yet is a plain public struct field
+## Finding 5 — `velocity_predictor` called "not readable"/"never exposed" yet is a plain public struct field
 **Verdict: PARTIAL**
 Evidence: The two locations the finding originally cited now agree and use softened language:
-`docs/ARCHITECTURE.md` §4.6 (line 415) — "`ParticleIntegratorBuffers.predictor_velocity` is a
+`docs/ARCHITECTURE.md` §4.6 (line 415) — "`ParticleIntegratorBuffers.velocity_predictor` is a
 stage register of the scheme, never a sample of the flow, **and nothing offers it as one**"
 (dropped "not readable"); `src/Particles.jl` lines 202-206 (`ParticleIntegratorBuffers` Fields
 section) — "**It is reachable like any field of this type**, but it is a scheme intermediate
 rather than a sample of the flow at any instant, so nothing in the package offers it as one."
 These two now match and concede the field is plainly dot-accessible.
 **Surviving class:** `docs/ARCHITECTURE.md` §11 decision 42 (line 1553) still asserts the
-stronger, now-contradicted claim: "The register `predictor_velocity` is deliberately **not**
+stronger, now-contradicted claim: "The register `velocity_predictor` is deliberately **not**
 readable — an off-trajectory value must not be servable as a plausible-looking Lagrangian
 velocity." This decision-log sentence was not updated to match the softened §4.6/Fields
 wording and still contradicts the field's confirmed plain accessibility
-(`struct ParticleIntegratorBuffers{P, PS, VV} ... predictor_velocity::VV`, `src/Particles.jl:213`,
+(`struct ParticleIntegratorBuffers{P, PS, VV} ... velocity_predictor::VV`, `src/Particles.jl:213`,
 no access control).
