@@ -327,6 +327,8 @@ scratch) — averages the two to cancel the aliasing, then truncates spherically
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
+Returns `N̂`.
+
 !!! note "The vorticity argument is read and then overwritten"
     The Lamb vector is formed in place over the vorticity's array — the backend's cross product may
     write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
@@ -339,8 +341,6 @@ forcing are advanced exactly by the integrating factor ([`velocity_integrating_f
     [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
     to infer it. Only the spectral product scratch remains on the generator, and the operation
     allocates nothing.
-
-Returns `N̂`.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
@@ -468,6 +468,8 @@ velocity evaluation rebuilds it from `û` instead) — before the spherical trun
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
+Returns `N̂`.
+
 !!! note "The assembly consumes the velocity argument"
     The assembly **consumes `u_consumed`**: the flux ``\\boldsymbol{u}\\varphi`` is formed
     in place over the velocity's array (a pointwise product may write into an operand), so on return
@@ -476,8 +478,6 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
     named for it. Only the spectral
     product scratch remains on
     the generator, and the operation allocates nothing.
-
-Returns `N̂`.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain) =
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain);

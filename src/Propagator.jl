@@ -197,12 +197,12 @@ the dispatch object first, then `state`, `domain`, `buffers`. Only the extras di
 sits directly after `state` here, and `cache` and `dt` come last — so the two calls of a hand-run
 loop read as a pair.
 
+Returns `state`.
+
 !!! note "A step alone leaves the cache mid-iteration"
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
     the iteration with `deposit!`, which re-fills every slot, at the new epoch, from the advanced
     state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does both.
-
-Returns `state`.
 """
 function step! end
 

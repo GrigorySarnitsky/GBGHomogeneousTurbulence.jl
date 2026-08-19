@@ -347,14 +347,11 @@ const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* 
 The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) with the
 [`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
 
-```math
-E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3}
-             \\Bigl(\\frac{(\\kappa L_{11})^2}{(\\kappa L_{11})^2 + c_L}\\Bigr)^{17/6},
-```
-
-the classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
-inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters). `C_K`
-is the Kolmogorov constant; `c_L` fixes the peak scale.
+[`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is von Kármán's
+``\\bigl((\\kappa L)^{2}/((\\kappa L)^{2} + c_L)\\bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
+classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
+inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters).
+`C_K` is the Kolmogorov constant; `c_L` fixes the peak scale.
 
 `VonKarman1948` is the `ModelSpectrum` carrying von Kármán's large-scale factor and no
 dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constructor returns.
@@ -373,12 +370,9 @@ const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063. [doi:10.1063
 The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no energy-containing roll-off
 ([`UnitLargeScale`](@ref)) and the [`PaoDissipation`](@ref) cutoff:
 
-```math
-E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} 
-             \\exp\\!\\bigl(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\bigr),
-```
-
-covering the inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
+[`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is unity and
+``f_\\eta`` is Pao's ``\\exp\\!\\bigl(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\bigr)``. It covers the
+inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
 constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
 (unlike [`Pope2000`](@ref)). It has no energy-containing range; use `Pope2000` or
 [`VonKarman1948`](@ref) when the large scales matter.

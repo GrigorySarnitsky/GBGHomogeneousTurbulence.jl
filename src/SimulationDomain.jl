@@ -78,7 +78,9 @@ damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{str
 (`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
 epsilon — ``\\approx 36`` for [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
 [`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps
-to that precision's machine epsilon; pass an explicit `strength` to override. It keeps more modes
+to that precision's machine epsilon; pass an explicit `strength` to override. (That `Float64` value
+lands on ``36``, which the default `order` also is: Hou & Li's own filter takes both as ``36``, and
+the coincidence is theirs rather than a transcription slip.) It keeps more modes
 than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization.
 Applied isotropically in ``\\kappa``. Because it retains energy out to
 the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled

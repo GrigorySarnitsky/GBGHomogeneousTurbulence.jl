@@ -59,3 +59,18 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   physical-meaning-first rule but the corpus-wide convention `CLAUDE.md` states: an inline citation
   *may* open the identity sentence when it names the method ("the smooth spectral filter of Hou & Li
   (2007) …"). The formula still lives in the docstring, below the identity.
+
+## Round 2026-08-19 (panel) — settled as NOT defects (do not re-flag)
+
+- **Two DOI link formats.** A `§References` entry ends in a bare autolink `<https://doi.org/…>`
+  (bibliography style); an inline docstring cite uses the labelled `[doi:10.…](https://doi.org/…)`.
+  One form per surface, recorded in `CLAUDE.md`; `doi_crosscheck.py` compares the two decoded because
+  the same identifier percent-encodes differently in each.
+- **`HouLi(; order = 36)` sharing the value 36 with the `Float64` auto-`strength`.** Not a
+  copy/paste leak: Hou & Li's own filter takes both as 36. Stated in the docstring now.
+- **The `max_speed` cost split (`O(N³)` field form vs `O(1)` cache form under one name).** Deliberate
+  — one generic, one docstring, the field method measuring and the cache method serving the deposit
+  (decision 46). A distinguishing verb was considered and rejected when the decision was recorded.
+- **`Tracers`' two construction paths in one method.** `number_of_particles` and `positions` are
+  mutually exclusive keywords, and keywords do not dispatch in Julia; the runtime `ArgumentError` is
+  the language's behaviour, not a design choice, and the docstring says so.

@@ -138,7 +138,7 @@ docstring is a map**; a **function or type docstring is a home**.
   (4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
   load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
   **named / published** method — which may open the identity sentence when the citation *names* the
-  method ("the smooth spectral filter of Hou & Li (2007) …"), the corpus-wide convention; (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
+  method ("the smooth spectral filter of Hou & Li (2007) …"), the corpus-wide convention. **Two link forms, one per surface:** a `§References` entry ends in a bare autolink `<https://doi.org/…>` (bibliography style), an inline docstring cite uses the labelled `[doi:10.…](https://doi.org/…)`; the same identifier percent-encodes differently in the two, which is why `doi_crosscheck.py` compares them decoded. (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
   has a §References entry and every entry a citing docstring; the extraction-bound `Phenomenology` leaf is
   exempt, carrying its own self-contained `Reference` values), none for a classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
   (→ `ARCHITECTURE.md`).
@@ -201,7 +201,11 @@ builds for the user (`ObservablesCache`, `ResolvedGenerator`, a forcing reached 
 `FlowParameters` do. A **formula gets a display block** when it is the thing the docstring defines
 (a law's own law, an operation's own identity) and stays inline when it is a fragment cited in
 passing (a roll-off factor inside a composed spectrum, a limit quoted in an aside). A **`Returns x.` sentence** is
-required of any in-place mutator whose signature carries no `-> ` arrow. A signature carries a
+required of any in-place mutator whose signature carries no `-> ` arrow, and it sits **before** any
+caveat admonition — the admonition is the last substantive block in a function docstring exactly as
+it is in a type's. A *pure* function needs no such sentence and its siblings give none; the one
+exception is a return whose **shape** is not evident from the name (a named tuple), where the shape
+is stated and the sentence earns its place. A signature carries a
 **`-> Type` arrow** only where the return type is fixed by the signature (`Phenomenology`'s law
 evaluators, whose bundle is `Float64` throughout); a reduction that returns *the field's own* element
 type says so in prose instead, since an arrow there would name a type the call need not produce. A **module map is

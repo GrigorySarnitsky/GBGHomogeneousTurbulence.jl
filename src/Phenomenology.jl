@@ -86,8 +86,9 @@ All keyword; a homogeneous-isotropic state fixes the rest:
     ``\\varkappa = \\nu/\\mathrm{Sc}``); default `1.0`.
   * `scalar_dissipation` — the scalar dissipation rate
     ``\\varepsilon_\\varphi = 2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, the
-    **full**-variance convention (not the half-variance ``\\chi``, which is half of it — a law fed the
-    wrong one is off by a factor of 2 with no error); only scalar laws read it, and the default is
+    **full**-variance convention — a law fed the half-variance form
+    ``\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` instead is off by a factor of two
+    with no error; only scalar laws read it, and the default is
     `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle
     a plain, type-stable set of `Float64`s. It is a **sentinel, not a value that propagates**: every
     law that reads the field checks it first and throws an `ArgumentError` naming the law and the

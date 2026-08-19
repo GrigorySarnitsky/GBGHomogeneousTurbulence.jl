@@ -201,8 +201,11 @@ lives here rather than in [`Tracers`](@ref).
 - `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
-- `predictor_velocity` — the velocity interpolated at the predicted positions: an intermediate value
-  the scheme works with, never a sample of the flow, and never exposed as one.
+- `predictor_velocity` — the velocity interpolated at the predicted positions. It is reachable like
+  any field of this type, but it is a scheme intermediate rather than a sample of the flow at any
+  instant, so nothing in the package offers it as one: read
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) for the Lagrangian
+  sample.
 """
 struct ParticleIntegratorBuffers{P, PS, VV}
   predictor::P
