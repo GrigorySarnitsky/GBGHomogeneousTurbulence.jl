@@ -9,7 +9,7 @@
 # The observables cache is deposit-driven (no recompute anywhere): `advance!` runs `step!`, then the
 # closing `deposit!` recovers the iteration's observables into the cache at the new epoch, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
-# arithmetic, no grid pass. The tracer push is Heun on the two endpoint velocities: v₁ is the
+# arithmetic, no grid pass. The tracer advance is Heun on the two endpoint velocities: v₁ is the
 # particle velocities the PREVIOUS closing deposit left (read checked), v₂ interpolates the just-deposited
 # u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
 # same field, completing the iteration's deposits; only M-sized point values are held, never a second field copy.
@@ -416,7 +416,7 @@ and once at the seeded initial state, before any advance —
 the `callback` **observes** the run as `callback(sim)`: it reads the
 state and the cached observables, records what it wants, and returns `true` to continue or `false`
 to stop (any other return throws an `ArgumentError` — the decision may not be left implicit). Only then does the next
-iteration run: the timestep from the cached maximum speed, the step, the tracer push, and the closing
+iteration run: the timestep from the cached maximum speed, the step, the tracer advance, and the closing
 deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
 step, the last after the final one, with statistics recorded before the stop.
 

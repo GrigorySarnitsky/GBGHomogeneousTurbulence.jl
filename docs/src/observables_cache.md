@@ -336,7 +336,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
 |:---|:---|:---|:---|:---|
-| ``\boldsymbol{u}`` | physical, grid | yes | yes | the closing recovery; read by the timestep choice, the tracer push, the Lamb assembly, and observations |
+| ``\boldsymbol{u}`` | physical, grid | yes | yes | the closing recovery; read by the timestep choice, the tracer advance, the Lamb assembly, and observations |
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the closing recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the particle velocities | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |

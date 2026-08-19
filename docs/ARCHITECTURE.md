@@ -394,7 +394,7 @@ Method (§3).
   decision 40) — built by `allocate_buffers` dispatching on the
   concrete scheme, so each allocates exactly its working set. The right-hand-side *assembly* scratch
   lives with the generator on the `ResolvedGenerator` (§4.2), and the start-of-step physical fields are
-  the observation cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
+  the observables cache's charts (§4.1): a `step!` is stage arithmetic over the generator protocol and
   the scheme's registers, nothing more. None of this scratch is state (§11 decisions 26, 30, 31).
 
 ### 4.6 `Particles` — Lagrangian instruments
@@ -441,7 +441,7 @@ scheme** — the reversible generator of §8 again — so the split does not nai
 
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
-observation cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
+observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling, and a clock.
 Over it:
 
@@ -452,7 +452,7 @@ Over it:
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
-  the tracer push on the sample and the deposited endpoint field, the new sample, and the deposit-
+  the tracer advance on the sample and the deposited endpoint field, the new sample, and the deposit-
   completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
   observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
@@ -746,7 +746,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   triangle — and it gives every state slot a litmus: **the restart record holds exactly what the flow
   map needs** (``\hat{\boldsymbol{u}}``, ``\hat\varphi``; the tracer positions; a stochastic
   forcing's internal state — the extended-phase-space discipline of molecular dynamics' thermostats);
-  the observation cache holds spent compute, reconstructable from the record (delete it and the
+  the observables cache holds spent compute, reconstructable from the record (delete it and the
   trajectory is unchanged); and the clock and output cursors are the experimenter's logbook. The
   `ObservablesCache` charts are the tower's *algebraic* variables — solved, never integrated — and their
   per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
@@ -1169,7 +1169,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     **`finalize!` on the generator is a recorded deviation** from the solver-library precedent (the
     SciML/PETSc/SUNDIALS right-hand-side objects are pure evaluators, with post-step action in
     callback layers), adopted because the projection is part of the *step's* contract, not of
-    observation: the observables, the diagnostics, and the tracer push must see the forced end-of-step
+    observation: the observables, the diagnostics, and the tracer advance must see the forced end-of-step
     state, and molecular-dynamics practice places exactly this operation inside the step (a
     constraint's velocity-projection stage, a thermostat's end-of-step rescale, the trailing factor of
     a symmetric splitting). The signature becomes `step!(scheme, state, generator, domain,
@@ -1204,14 +1204,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 33. **(2026-07) The memory audit: a frozen buffer ledger and a liveness lower bound, in the standard
     suite.** "Minimal footprint" becomes a checked property instead of an aspiration
     (`test/memory_audit.jl`, run by `Pkg.test()`). Two instruments. (a) **The ledger**: a reflective
-    walk over every resident field-sized buffer a run owns (state, observation cache, generator,
+    walk over every resident field-sized buffer a run owns (state, observables cache, generator,
     scheme registers, forcing-owned state and kernels, the tracer buffers), counted per shape
     class over the full **five-axis** combination space — scheme × dealiasing × scalar ×
     (velocity forcing × scalar forcing) × tracers. The frozen spec is **compositional**: twelve
     unforced, tracer-free base cells plus a per-forcing delta table and a tracer delta, and an
     exhaustive sweep over the whole product (~360 combinations) asserts measured = base + deltas,
     cell by cell — a cross-term (a buffer whose existence depends on two axes at once) fails the
-    sweep and must be recorded. The observation cache's **charts axis** (resident charts are
+    sweep and must be recorded. The observables cache's **charts axis** (resident charts are
     opt-in) is audited at the API level with its own delta; for any *stepping* run it is pinned by
     the physics — the rotational generator's declared working set requires both charts — and becomes
     a live run axis when per-component chart declarations or further charts land. Adding or removing
@@ -1315,7 +1315,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
     Two structural consequences beyond the ledgers. The op model must extend **past `step!`** to
     every surface a run touches — the initial-condition seeders, the observables, the run-loop
-    accounting, the tracer push, the forcing hooks — since a cost outside the stepped region is
+    accounting, the tracer advance, the forcing hooks — since a cost outside the stepped region is
     invisible, not absent. And an **eighth axis** joins the seven: **host–device synchronization**.
     On GPU-primary code every reduction that returns a Julia scalar is a blocking device-to-host
     transfer that drains the pipeline, and no footprint or traffic count can see a barrier; the
@@ -1355,7 +1355,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 36. **(2026-07) The frame is ledgered too, and the two ledgers must jointly account for every
     field-scale array.** Decision 33's ledger walked what a run **evolves** — the state, the
-    observation cache, the generator's assembly scratch, the scheme registers, the tracers. It
+    observables cache, the generator's assembly scratch, the scheme registers, the tracers. It
     never walked the `FixedDomain`, the read-only **frame** the run lives on, so that storage was
     outside every instrument: the audit claimed to bound residency while measuring only part of it.
     The frame is not small. It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}``
@@ -1826,10 +1826,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 ## References
 
-Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,
-and the reason is stated with the entry rather than left to the reader to wonder about: a 1941
-*Doklady* note, a NASA technical memorandum, and a CTR research brief predate or sit outside the DOI
-system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
+Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
+and the reason is stated with the entry rather than left to the reader to wonder about: a NASA
+technical memorandum and a CTR research brief sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
 is worse than none, since it silently sends the reader somewhere else.
 
 The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law carries its own

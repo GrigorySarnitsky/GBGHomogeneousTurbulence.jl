@@ -9,7 +9,7 @@
 # `EndpointHeun` is the one scheme today — second-order, on the velocity at the start and end of the
 # step (tₙ and tₙ₊₁), unlike advecting on the frozen start-of-step velocity (effectively first
 # order). Its two velocity fields are exactly what the field solver already produces each step, so
-# the tracer push stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
+# the tracer advance stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
 # want different registers (RK4 several stage velocities; a multistep scheme a velocity HISTORY and
 # no predictor at all) — which is precisely why they are not in `Tracers`.
 

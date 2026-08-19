@@ -285,7 +285,7 @@ projections (the [`apply_forcing!`](@ref GBGIsotropicTurbulence.Forcing.apply_fo
 e.g. the energy rescale of a [`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling))
 to the advanced `state`, velocity first, then the scalar
 when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
-the step — the diagnostics, the derived observables, the tracer push — sees the forced end-of-step fields.
+the step — the diagnostics, the derived observables, the tracer advance — sees the forced end-of-step fields.
 Returns `state`.
 """
 function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)
