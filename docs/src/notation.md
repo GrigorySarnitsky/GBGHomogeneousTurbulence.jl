@@ -57,7 +57,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers) |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
 | ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^{2}`` acts as multiplication by it | `domain.squared_wavenumber_kernel` |
-| ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
+| ``\mathcal{F}``, ``\mathcal{F}^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
 | ``\mathbb{P}`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
 | ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) |
@@ -70,6 +70,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) |
+| ``E_\varphi(\kappa)`` | the scalar-variance spectrum, summing to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | — |
 | ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.spectrum) |
 | ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | [`energy_spectrum`](@ref GBGIsotropicTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
@@ -97,6 +98,8 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
 | ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |
+| ``\kappa_{\mathrm{Ny}}`` | the grid Nyquist wavenumber ``\tfrac{N}{2}\tfrac{2\pi}{L}`` — the highest a grid can represent, before dealiasing | — |
+| ``\kappa_p`` | the envelope wavenumber of the default random initial condition (the shell-summed spectrum peaks at ``\kappa_p/\sqrt{2}``) | `envelope_wavenumber` |
 | ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | [`DealiasingStrategy`](@ref GBGIsotropicTurbulence.SimulationDomain.DealiasingStrategy) |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGIsotropicTurbulence.Propagator.IFLowStorageRK3) |
 | ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3`; ``0`` for the imaginary-axis-unstable `IFRK2`) | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |

@@ -25,7 +25,7 @@ The measured functions of the flow state:
 
 Each returns the field's own real element type rather than a fixed `Float64`, so a `Float32` run
 measures in `Float32`. Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
-distribution over wavenumber, and the vorticity recovery alone produces a field. Three of them gate the automatic warm-up
+per-shell energy over wavenumber, and the vorticity recovery alone produces a field. Three of them gate the automatic warm-up
 ([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
 the scalar is forced — the scalar variance settles too. The kinetic energy is deliberately **not**
