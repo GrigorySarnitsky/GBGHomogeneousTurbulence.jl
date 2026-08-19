@@ -223,10 +223,7 @@ their contents as the scheme's business rather than the run's state.
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
 - `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along with the
-  fields, the scheme advancing them along their trajectories, and that scheme's registers. The two
-  roots are not interchangeable: *trajectory* names the path through time the scheme integrates,
-  *particle* the objects whose storage the buffers hold. All `nothing` when the run carries no
-  tracers.
+  fields, the scheme advancing them along their trajectories, and that scheme's registers. All `nothing` when the run carries no tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
 struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
@@ -375,8 +372,8 @@ The number of steps `sim` has taken — how far the run has gone.
 
 Distinct from the observables cache's **epoch**, which counts *changes to the state* rather than
 advances of the run: a completed step advances the epoch, but so does any announced out-of-band
-mutation, so the two counts diverge. The constructor's seeding deposit already leaves the fields
-epoch at 1, so after two steps and one announced mutation the clock reads
+mutation. The constructor's seeding deposit already leaves the fields epoch at 1, so after two steps
+and one announced mutation the clock reads
 step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, and the epoch to ask
 whether a cached value is still the right one.
 """

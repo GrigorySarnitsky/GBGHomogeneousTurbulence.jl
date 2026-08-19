@@ -15,14 +15,6 @@ that theory and experiment have established, each an author-year parametrization
 family. This is the *predicted* counterpart to the measured `Observables`: a provider the validation
 layer reads to compare a run against, never a comparer itself and never assumed by the dynamics.
 
-A law family is an abstract subtype of [`TurbulenceLaw`](@ref) (the root of every reference law
-here); each parametrization is a named preset — usually a concrete subtype
-carrying its fitted coefficients and its provenance, or (for the composed velocity spectra like
-`Spectra.Pope2000`) an alias for one specialization of a composed type, with a keyword constructor
-that fills in the published fit — so `spec isa Spectra.Pope2000` holds either way. Choosing a law is choosing the preset (the
-published fit is the default); a name is disambiguated by its **submodule** (the quantity), its
-**author-year** (the paper), and a trailing letter (a same-year collision).
-
 The module's contents:
 - [`FlowParameters`](@ref) — the flow-state bundle a law evaluates against, with the
   derived scales [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
@@ -38,6 +30,14 @@ The module's contents:
 - [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) — the dimensionless constants and
   their Reynolds-number
   trends, evaluated by [`scaling`](@ref).
+
+A law family is an abstract subtype of [`TurbulenceLaw`](@ref); each parametrization is a named
+preset — usually a concrete subtype carrying its fitted coefficients and its provenance, or (for the
+composed velocity spectra like `Spectra.Pope2000`) an alias for one specialization of a composed
+type, with a keyword constructor that fills in the published fit, so `spec isa Spectra.Pope2000`
+holds either way. Choosing a law is choosing the preset; a name is disambiguated by its
+**submodule** (the quantity), its **author-year** (the paper), and a trailing letter (a same-year
+collision).
 
 !!! note "Extraction-bound"
     Built inside `GBGIsotropicTurbulence` but designed to be cut into a standalone

@@ -42,7 +42,7 @@ export FixedDomain,
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
 [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl), the advective-CFL
-ceiling. They come in two families, and the rest of the corpus uses these names: a **mask** strategy
+ceiling. They come in two families: a **mask** strategy
 acts on the assembled product alone, while a **shift** strategy also changes how that product is
 evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
@@ -368,10 +368,10 @@ the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spheri
 scalar field in spectral representation. Returns `field`.
 
 !!! note "This verb truncates; under PhaseShift that is half the dealiasing"
-    For `TwoThirds` this call is the whole of it, and for `HouLi` the taper damps the aliases rather
-    than removing them. Under `PhaseShift` it is only the second half, so calling it on a product
-    assembled without the displaced-evaluation average leaves that product aliased — the generator
-    pairs the two, and a hand-built assembly must do the same.
+    For `TwoThirds` this call is the whole of it; for `HouLi` the taper damps the aliases rather than
+    removing them. Under `PhaseShift` it is only the second half — a product assembled without the
+    displaced-evaluation average stays aliased, so a hand-built assembly must pair the two as the
+    generator does.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 

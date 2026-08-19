@@ -182,7 +182,7 @@ end
 """
     vorticity_physical(cache)
 
-The vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
+The vorticity in physical representation
 at the current epoch — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
 slot, with exactly [`velocity_physical`](@ref)'s contract (the deposited field or a throw; never a
 recomputation; read-only). The deposited value is produced by
