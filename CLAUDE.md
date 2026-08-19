@@ -186,30 +186,38 @@ adds depth one hop away; it never carries a fact the reader needs. (Design ratio
 citations stay in `#` comments and `ARCHITECTURE.md`.)
 
 **Template conventions, stated so the split is checkable.** Several shapes vary across the corpus for
-reasons that were real but unwritten; they are rules now. An **admonition takes a custom title** when
-it carries one load-bearing claim a reader should be able to scan for, and stays a bare `!!! note`
-when it is a general aside — and its title is **plain text**, since Documenter renders neither code
-spans nor math there. A **caveat admonition is the last substantive block** of a docstring, before
-`# Fields`. A type gets a bulleted **`# Arguments`** section when its keywords are independent
-settings, and folds them into prose when they must be read together — when one keyword conditions
-what another *means* (`BandRescaling`'s `target` is a value whose observable `over` selects) or
-several jointly name one object (a `lowest_shell` / `highest_shell` band). Independence is the
-discriminator, not count: two unrelated switches earn the bullets, four interlocking ones do not. An **`# Examples`**
-section appears where construction is non-obvious, not on every type — which is why the types a run
-builds for the user (`ObservablesCache`, `ResolvedGenerator`, a forcing reached through
-`DeferredForcing`'s two forms) carry none, while `FixedDomain`, `Simulation`, `Tracers` and
-`FlowParameters` do. A **formula gets a display block** when it is the thing the docstring defines
-(a law's own law, an operation's own identity) and stays inline when it is a fragment cited in
-passing (a roll-off factor inside a composed spectrum, a limit quoted in an aside). A **`Returns x.` sentence** is
-required of any in-place mutator whose signature carries no `-> ` arrow, and it sits **before** any
-caveat admonition — the admonition is the last substantive block in a function docstring exactly as
-it is in a type's. A *pure* function needs no such sentence and its siblings give none; the one
-exception is a return whose **shape** is not evident from the name (a named tuple), where the shape
-is stated and the sentence earns its place. A signature carries a
-**`-> Type` arrow** only where the return type is fixed by the signature (`Phenomenology`'s law
-evaluators, whose bundle is `Float64` throughout); a reduction that returns *the field's own* element
-type says so in prose instead, since an arrow there would name a type the call need not produce. A **module map is
-identity → contents list → optional trailing remark**, in that order, with no essay before the list.
+reasons that were real but unwritten; they are rules now, one per line so a later round appends a
+line rather than a clause:
+
+- An **admonition takes a custom title** when it carries one load-bearing claim a reader should be
+  able to scan for, and stays a bare `!!! note` when it is a general aside. The title is **plain
+  text** — Documenter renders neither code spans nor math there.
+- A **caveat admonition is the last substantive block** of a docstring, before `# Fields` — in a
+  function docstring as in a type's.
+- A type gets a bulleted **`# Arguments`** section when its keywords are independent settings, and
+  folds them into prose when they must be read together (one keyword conditioning what another
+  *means*, or several jointly naming one object). Independence is the discriminator, not count.
+- An **`# Examples`** section appears where construction is non-obvious, not on every type — hence
+  none on the types a run builds for the user, and one on `FixedDomain`, `Simulation`, `Tracers`,
+  `FlowParameters`.
+- A **formula gets a display block** when it is the thing the docstring defines, and stays inline
+  when it is a fragment cited in passing.
+- A **`Returns x.` sentence** is required of any in-place mutator whose signature carries no `-> `
+  arrow, and sits **before** any caveat admonition. A *pure* function needs none; the exception is a
+  return whose **shape** is not evident from the name (a named tuple), where the shape is stated.
+- A signature carries a **`-> Type` arrow** only where the return type is fixed by the signature; a
+  reduction returning *the field's own* element type says so in prose instead.
+- A **module map is identity → contents list → optional trailing remark**, in that order, with no
+  essay before the list.
+
+**Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
+docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never
+re-reads the whole. Measured 2026-08-19: `BandRescaling` reached 861 words with four scattered
+admonitions, `# Arguments` mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode
+bullet reached a 120-word run-on with an ungrammatical clause. Every individual edit was correct.
+**When a docstring has taken three or more rounds of patches, rewrite it whole rather than append
+again** — the signature to watch is a long paragraph, an admonition count above two, or a section
+out of the order above.
 
 **API pages are logically grouped.** Group public objects under hand-written `## Header` sections via
 explicit `@docs` blocks (never `@autodocs`, which cannot express a semantic group); each object appears

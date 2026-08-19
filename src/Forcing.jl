@@ -226,89 +226,64 @@ struct NoForcing <: AbstractForcing end
     BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
 Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed, built on the
-[`FixedDomain`](@ref) `domain`. Each step the in-band
-Fourier modes — the integer shells `lowest_shell` to `highest_shell`, in units of the box's
-fundamental ``2\\pi/L`` — are rescaled by a single factor to hold the `target`.
+[`FixedDomain`](@ref) `domain`. Each step the in-band Fourier modes — the integer shells
+`lowest_shell` to `highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a
+single factor to hold `target`. Rescaling preserves the divergence-free constraint.
 
-The `target` is a number: the **value** the held observable is to keep. Which observable that is
-follows from the field, chosen to agree with the diagnostics — the **kinetic energy**
-``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle``
-([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)) for the velocity, the
-**scalar variance** ``\\langle\\varphi^{2}\\rangle``
-([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the
-field's ``L^{2}`` observable — the ``\\tfrac{1}{2}`` belongs to the kinetic energy's own definition,
-not to the field being a vector.
+Which observable is held follows from the field, chosen to agree with the diagnostics: the **kinetic
+energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
+([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)), the **scalar variance**
+``\\langle\\varphi^{2}\\rangle`` for the scalar
+([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) — each the field's
+``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
+to the field being a vector.
 
-The `over` keyword selects where the target applies. It is **required**: a deterministic clamp
-destroys the physical fluctuation of whatever it holds, so this choice decides which quantity your
-run may no longer measure, and there is no answer that is right for every run.
-  * `:band` — hold the band's own value; the whole-field value then floats, oscillating slowly
-    about its mean as the band feeds the cascade. The band's energy is then set by the
-    forcing rather than by the flow. The whole-field ``k`` is then a measurable, though not an
-    untouched one: it still contains the pinned band, so on the default shells 1–2 — the
+`over` selects *where* that target applies, and the two choices differ in which quantity a run may no
+longer measure:
+
+  * `:band` holds the band's own value. The whole-field value then floats, oscillating about its mean
+    as the band feeds the cascade. The band's energy is set by the forcing rather than by the flow;
+    the whole-field ``k`` remains a measurable, though on the default shells 1–2 — the
     energy-containing range — most of it is held rather than free.
-  * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
-    `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
-    ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
-    If the value outside the forced shells alone exceeds `target`, the band is zeroed — the closest reachable
-    state: it
-    empties the energy-containing range in a single step, so ``L_{11}``, ``u'`` and
-    ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards — the most violent intervention
-    the rescale can make. Here it is ``k`` that the forcing sets, and
-    the band is free.
+  * `:total` rescales the band to absorb the whole-field deficit, so the whole-field value equals
+    `target`. For the velocity this pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``
+    (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the forcing
+    sets and the band is free.
+
+# Arguments
+- `domain` — the `FixedDomain` the band is built on.
+- `target` — the value of the held observable, as selected by `over`.
+- `over` — `:band` or `:total`. Required: a deterministic clamp destroys the physical fluctuation of
+  whatever it holds, and no default is right for every run.
+- `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
+  box's fundamental ``2\\pi/L``.
 
 !!! note "Which one a run wants depends on what else reads the kinetic energy"
     The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door passes
     `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the *assumed* kinetic
-    energy, through the box-normalized dissipation law, so the resolution criterion
-    ``\\kappa_{\\max}\\eta`` is only self-consistent if the run really holds ``k`` there — which is
-    exactly what `:total` guarantees. A hand-built forcing that nothing downstream calibrates
-    against has no such constraint, and `:band` is then the gentler clamp.
+    energy, so the resolution criterion ``\\kappa_{\\max}\\eta`` is self-consistent only if the run
+    really holds ``k`` there — which is exactly what `:total` guarantees. A hand-built forcing that
+    nothing downstream calibrates against has no such constraint, and `:band` is the gentler clamp.
 
-# Arguments
-- `domain` — the `FixedDomain` the band is built on.
-- `target` — the value of the held observable (the kinetic energy for a velocity, the scalar variance
-  for a scalar), as selected by `over`.
-- `over` — `:band` to hold the band's own value, `:total` to hold the whole field's. Required; the
-  paragraphs above give the consequences of each.
-- `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
-  box's fundamental ``2\\pi/L``.
-
-Rescaling preserves the divergence-free constraint either way.
+!!! warning "Two extremes worth knowing before you rely on the clamp"
+    Under `:total`, if the value outside the forced shells alone exceeds `target`, the band is
+    **zeroed** — the closest reachable state, and the most violent intervention the rescale can make:
+    it empties the energy-containing range in one step, leaving ``L_{11}``, ``u'`` and
+    ``\\mathrm{Re}_\\lambda`` meaningless for turnovers afterwards. At the other end, a band with
+    nothing in it is **left alone**: below a small floor the rescale returns the field untouched
+    rather than dividing by ~0, so an empty band stays empty instead of being driven to `target` —
+    reachable the step after a zeroing, and it means the clamp can stop applying. Seed content in the
+    band if a run depends on it taking hold.
 
 !!! note "It costs two host readbacks per step on a GPU"
     Sizing the rescale means reducing the field to a number and comparing it to `target`, so each
-    step blocks on a device-to-host transfer — two of them under `over = :total`, which measures the
-    band and the whole field. A run that never needs its energy pinned pays none of this;
-    `ConstantPower` pays one.
+    step blocks on a device-to-host transfer — two under `over = :total`, which measures the band and
+    the whole field. `ConstantPower` pays one; an unforced run pays none.
 
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.
 - `target` — the held value.
 - `over` — `:band` or `:total`.
-
-!!! note "A band with nothing in it is left alone"
-    The rescale needs a nonzero band value to scale by: below a small floor it returns the field
-    untouched rather than dividing by ~0, so a band with no content stays empty instead of being
-    driven to `target`. That state is reachable a step after `over = :total` zeroes the band, and it
-    means the clamp can stop applying rather than keep forcing — seed content in the band if a run
-    depends on it taking hold.
-
-!!! note "A deterministic clamp, not a stationary sampler"
-    This is a deterministic clamp, not a faithful stationary sampler.
-    Holding an amplitude fixed by deterministic rescaling is the limit of the Berendsen thermostat
-    (Berendsen, Postma, van Gunsteren, DiNola & Haak 1984, *Molecular dynamics with coupling to an
-    external bath*, *J. Chem. Phys.* **81**, 3684,
-    [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)) — the limit of
-    stochastic velocity rescaling: the molecular-dynamics thermostat that multiplies every velocity
-    by one factor each step, chosen to drag the instantaneous temperature toward its target, which is
-    what this forcing does to the band's amplitude. Such a scheme has no conserved quantity, is not associated with a well-defined
-    ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
-    holds (Bussi, Donadio & Parrinello 2007, *Canonical sampling through velocity rescaling*,
-    *J. Chem. Phys.* **126**, 014101,
-    [doi:10.1063/1.2408420](https://doi.org/10.1063/1.2408420)). Use it to spin up or to pin an amplitude; when the held
-    quantity is itself measured, prefer a fixed-injection forcing (`ConstantPower`), which leaves the
-    energy free to fluctuate.
 """
 struct BandRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
