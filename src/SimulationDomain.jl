@@ -42,8 +42,10 @@ export FixedDomain,
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
 [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl), the advective-CFL
-ceiling. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule),
-[`HouLi`](@ref) (the smooth Hou–Li filter), and [`PhaseShift`](@ref) (the half-cell shift-average,
+ceiling. They come in two families, and the rest of the corpus uses these names: a **mask** strategy
+acts on the assembled product alone, while a **shift** strategy also changes how that product is
+evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
+[`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
 default is decided by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
 constructor that builds a whole run from a few keywords — the **front door** — and not by this
@@ -303,7 +305,7 @@ end
 """
     new_vector_field_spectral(domain)
 
-Allocate a single zeroed vector field in spectral representation on `domain`'s backend and element type.
+Allocate a single zeroed vector field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_spectral(domain::FixedDomain) =
   VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid, domain.layout)
@@ -312,7 +314,7 @@ new_vector_field_spectral(domain::FixedDomain) =
 """
     new_vector_field_physical(domain)
 
-Allocate a single zeroed vector field in physical representation on `domain`'s backend and element type.
+Allocate a single zeroed vector field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_physical(domain::FixedDomain) =
   VectorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(1))), domain.grid, domain.layout)
@@ -321,7 +323,7 @@ new_vector_field_physical(domain::FixedDomain) =
 """
     new_scalar_field_spectral(domain)
 
-Allocate a single zeroed scalar field in spectral representation on `domain`'s backend and element type.
+Allocate a single zeroed scalar field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_spectral(domain::FixedDomain) =
   ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid, domain.layout)
@@ -330,7 +332,7 @@ new_scalar_field_spectral(domain::FixedDomain) =
 """
     new_scalar_field_physical(domain)
 
-Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type.
+Allocate a single zeroed scalar field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_physical(domain::FixedDomain) =
   ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid, domain.layout)
@@ -339,7 +341,7 @@ new_scalar_field_physical(domain::FixedDomain) =
 """
     new_tensor_field_spectral(domain)
 
-Allocate a single zeroed second-order tensor field in spectral representation on `domain`'s backend and element type.
+Allocate a single zeroed second-order tensor field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_spectral(domain::FixedDomain) =
   TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid, domain.layout)
@@ -348,7 +350,7 @@ new_tensor_field_spectral(domain::FixedDomain) =
 """
     new_tensor_field_physical(domain)
 
-Allocate a single zeroed second-order tensor field in physical representation on `domain`'s backend and element type.
+Allocate a single zeroed second-order tensor field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_physical(domain::FixedDomain) =
   TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid, domain.layout)

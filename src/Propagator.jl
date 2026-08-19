@@ -212,7 +212,8 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta, 2N-storage — Williamson (1980),
+Integrating-factor third-order low-storage Runge–Kutta, 2N-storage — of the Williamson (1980)
+low-storage family,
 *Low-storage Runge–Kutta schemes*, *J. Comput. Phys.* **35**, 48–56,
 [doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9). With the diffusive
 integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
@@ -529,7 +530,7 @@ with ``\\Delta x = L/N`` the grid spacing.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``, a rate; stability needs that rate times the
-step — ``C_{\\mathrm{CFL}}\\,\\kappa_{\\max}\\Delta x``, once ``\\Delta t`` is substituted — to stay
+step — ``C_{\\mathrm{CFL}} \\kappa_{\\max}\\Delta x``, once ``\\Delta t`` is substituted — to stay
 within the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, which is a pure number. Two loosenesses sit in that estimate, and they pull in **opposite** directions.
 The speed in the denominator is
 [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid points, so the

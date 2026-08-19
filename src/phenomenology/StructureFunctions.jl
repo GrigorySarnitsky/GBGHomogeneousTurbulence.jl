@@ -42,7 +42,7 @@ const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301�
     Kolmogorov1941(; C₂ = 2.0)
 
 The Kolmogorov (1941) inertial-range structure-function laws for the longitudinal velocity increment
-``\\delta u_L``. Evaluating [`structure_function`](@ref)`(law, r, fp; order)` returns:
+``\\delta u_L``. Evaluating [`structure_function`](@ref)`(law, r, fp; order = 2)` returns:
 
   * `order = 2` — the **2/3 law** ``D_{LL}(r) = C_2 (\\varepsilon r)^{2/3}``, the second-order
     increment; the constant ``C_2 \\approx 2.0`` is empirical (default `2.0`).

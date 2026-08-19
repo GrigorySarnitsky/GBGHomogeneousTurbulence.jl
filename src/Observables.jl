@@ -119,10 +119,10 @@ of its gradient, ``H^1`` in the Sobolev naming —
 """
 function dissipation end
 
-dissipation(ω, viscosity::Real) = viscosity * inner(ω, ω)
+dissipation(ω, viscosity::Real) = (v = inner(ω, ω); oftype(v, viscosity) * v)
 
 dissipation(û, domain::FixedDomain, viscosity::Real) =
-  viscosity * weighted_inner(û, domain.squared_wavenumber_kernel)
+  (v = weighted_inner(û, domain.squared_wavenumber_kernel); oftype(v, viscosity) * v)
 
 
 """
@@ -148,7 +148,8 @@ device readback); it throws an `ErrorException` when no deposit is current, like
 
 !!! note "Why this observable alone has a cached form"
     The cache holds exactly what the iteration already computes and leaves alive at its end — its
-    contents are derived from the schedule, never declared. The maximum speed qualifies because the
+    contents are derived from the run's fixed computation schedule — what each iteration computes,
+    settled when the cache is built — never declared. The maximum speed qualifies because the
     run itself needs it: on the adaptive-CFL path the next timestep is chosen from it, so the
     reduction happens whether or not anyone reads the value. Under a hand-fixed ``\\Delta t`` nothing
     consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
@@ -212,7 +213,7 @@ cached field a run already holds, while ``\\nabla\\varphi`` is never recovered o
 field-argument twin would have nothing to consume.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
-  2 * diffusivity * weighted_inner(φ̂, domain.squared_wavenumber_kernel)
+  (v = weighted_inner(φ̂, domain.squared_wavenumber_kernel); 2 * oftype(v, diffusivity) * v)
 
 
 # The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal

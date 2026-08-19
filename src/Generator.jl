@@ -252,7 +252,7 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
 """
     prepare!(generator, state, domain, dt)
 
-Open a step of the generator: advance each forcing's internal state once (its per-step
+Open a step of the [`ResolvedGenerator`](@ref) `generator`: advance each forcing's internal state once (its per-step
 [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
 per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing`)
 (its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook,
@@ -419,7 +419,7 @@ exponential convolution
 which evaluates it per mode from the wavenumber arrays: nothing is built,
 stored, or swept for it. Accordingly this verb returns the exponential's parameters as a named tuple —
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = \\hat A`` (the armed rate field, or `nothing` when no
+``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed rate field, or `nothing` when no
 linear forcing is active) — exactly the arguments the fused exponential takes.
 
 The `generator` (a [`ResolvedGenerator`](@ref)) supplies ``\\nu`` and the armed rate; `τ` is the

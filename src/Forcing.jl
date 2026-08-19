@@ -267,6 +267,13 @@ run may no longer measure, and there is no answer that is right for every run.
 
 Rescaling preserves the divergence-free constraint either way.
 
+!!! note "A band with nothing in it is left alone"
+    The rescale needs a nonzero band value to scale by: below a small floor it returns the field
+    untouched rather than dividing by ~0, so a band with no content stays empty instead of being
+    driven to `target`. That state is reachable a step after `over = :total` zeroes the band, and it
+    means the clamp can stop applying rather than keep forcing — seed content in the band if a run
+    depends on it taking hold.
+
 !!! note "A deterministic clamp, not a stationary sampler"
     This is a deterministic clamp, not a faithful stationary sampler.
     Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of

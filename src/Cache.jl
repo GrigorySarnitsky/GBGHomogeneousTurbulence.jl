@@ -34,7 +34,7 @@ than served stale.
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
 which fills every slot at the iteration's end and sets its epoch. A caller reads through the
-accessors and never deposits. `deposit!` lives in `Propagator` rather than here because it needs the
+accessors and never deposits. That verb lives in `Propagator` rather than here because it needs the
 scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
@@ -312,7 +312,7 @@ end
 Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\varphi``, in spectral
 representation —
 were changed outside the iteration (a re-seeded velocity, any direct write to the state's storage).
-Advances the fields epoch of `cache`, so every cached observable is stale and reads throw until
+Advances the fields epoch of `cache` (an [`ObservablesCache`](@ref)), so every cached observable is stale and reads throw until
 the next deposit; that interval belongs to whoever made the change.
 
 The sanctioned mutators call this for you: [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
@@ -331,7 +331,7 @@ fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
 correction, any direct write to the tracer storage) — the particle counterpart of
-[`fields_modified!`](@ref). Advances the particles epoch of `cache`, so every
+[`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
 trajectory-bound observable is stale and reads throw until the next deposit.
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance

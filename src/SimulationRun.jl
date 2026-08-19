@@ -169,7 +169,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   constructor as its `interpolation_scheme`.
 - `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
-  its registers are allocated for you.
+  its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
+  are allocated for you.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 
@@ -593,7 +594,8 @@ The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turno
 `skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
 that judge them. Build one through the keyword constructor above — the positional form takes
 assembled internals and is not part of the interface.
-- `monitor` — the sampled signals (``\\varepsilon``, ``k``, the scalar variance, the skewness) and the
+- `monitor` — the sampled signals (the turnover clock, ``\\varepsilon``, the scalar variance, the
+  skewness — not ``k``, which this criterion deliberately never gates on) and the
   gate settings and tolerances that test them.
 - `max_turnovers` — the give-up cap.
 - `gate_scalar` — the requested scalar gate (applied only when the run's scalar is forced).

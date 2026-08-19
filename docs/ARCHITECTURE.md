@@ -759,8 +759,9 @@ The public surface and these absences are the spec. Do not add a capability "for
 one usually encodes a decision.
 
 1. **No physical units.** Quantities are in box units; control is by ``\mathrm{Re}`` (through ``\nu``)
-   and ``\mathrm{Sc}``, and the reference constants a run is judged against (``C_K``, ``C_\varepsilon``,
-   ``G``) are dimensionless groups.
+   and ``\mathrm{Sc}``, and the reference constants a run is judged against — ``C_K``,
+   ``C_\varepsilon``, and the box-normalized dissipation group ``G = k/(L\varepsilon)^{2/3}`` — are
+   dimensionless groups.
 2. **No field or statistics machinery reimplemented.** Field operations come from `GBGPeriodicFields`,
    estimators from `GBGStreamingStatistics` (§5).
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
@@ -940,7 +941,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     spectrum evaluated at that state, returning a named tuple of the measured and predicted spectra and
     their relative ``L^2`` discrepancy. The two sides are not the same kind of object and the
     comparison must convert: `energy_spectrum` returns the per-shell energy ``E_n``, a model returns
-    the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n)\,\Delta\kappa`` with
+    the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n) \Delta\kappa`` with
     ``\Delta\kappa = 2\pi/L``. The factor is invisible on the default ``L = 2\pi`` box, where it is
     ``1``, and silently wrong on any other. This realizes the
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
