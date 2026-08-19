@@ -21,7 +21,12 @@ pile = sys.argv[1] if len(sys.argv) > 1 else '.claude/doc-review'
 sub = sys.argv[2] if len(sys.argv) > 2 else 'closure'
 closure = os.path.join(pile, sub)
 
-FINDING = re.compile(r'^#{2,3} +(?:Finding +)?(\d+)[.:) ]', re.M)
+# The heading delimiter is optional: hats write "## 3. Title", "## Finding 3 — Title" and bare
+# "## Finding 3". Requiring punctuation after the number made one hat parse to ZERO findings while
+# it had banked eleven — and because a hat with 0 banked needs 0 verdicts, it then passed the gate
+# as "ok". Both holes are closed here: the delimiter may be end-of-line, and a hat that parses to
+# nothing is an error rather than a pass.
+FINDING = re.compile(r'^#{2,3} +(?:Finding +)?(\d+)(?=[.:)\s-]|$)', re.M)
 # Agents render the verdict two ways — "VERDICT: PARTIAL" and a standalone "**PARTIAL**" — and an
 # earlier version of this regex demanded the literal word VERDICT, so it reported a complete 21/21
 # hat as SHORT by 21. A coverage gate that cries wolf is one the operator learns to wave through,
@@ -42,7 +47,10 @@ for path in sorted(glob.glob(os.path.join(pile, '[0-9][0-9]-*.md'))):
         bad += 1
         continue
     got = len(VERDICT.findall(open(vpath, encoding='utf-8').read()))
-    if got < banked:
+    if banked == 0:
+        rows.append((hat, banked, got, 'NO FINDINGS PARSED — heading format not recognized?'))
+        bad += 1
+    elif got < banked:
         rows.append((hat, banked, got, f'SHORT by {banked - got} — findings adjudicated silently'))
         bad += 1
     else:

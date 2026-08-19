@@ -98,6 +98,11 @@ of the three states it is in — and the only repair is to fix the schedule that
     stage values there, so a cached field is meaningful only between iterations. Treat every
     returned array as read-only — it is the storage the next iteration will work in.
 
+The word *epoch* names two things here, and the fields below are of both kinds. The two **counters**
+tick as the state changes; every other `*_epoch` field records the counter's value at the moment its
+slot was filled. A slot is readable exactly while the epoch it records still equals the counter it
+depends on.
+
 # Fields
 - `velocity_physical`, `vorticity_physical` — the cached velocity and vorticity in physical
   representation. Mid-iteration the step also computes its stage recoveries *into these same
@@ -105,11 +110,6 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number).
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
-The word *epoch* names two things here, and the fields below are of both kinds. The two **counters**
-tick as the state changes; every other `*_epoch` field records the counter's value at the moment its
-slot was filled. A slot is readable exactly while the epoch it records still equals the counter it
-depends on.
-
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two epochs, against

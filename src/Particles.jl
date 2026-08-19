@@ -245,7 +245,7 @@ throws.
 The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
 are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
 an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
-``M\\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
+``M\\times3`` values for ``M`` tracers, where keeping the velocity field would cost
 ``N^{3} \\times 3``.
 """
 function record_particle_velocity!(tracers::Tracers, u)

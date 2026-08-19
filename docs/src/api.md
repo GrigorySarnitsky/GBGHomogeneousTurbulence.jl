@@ -10,7 +10,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 
 - [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
 - [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!`, `run!`, `warmup!`) that drives it. Read a run's state through `sim.state` and its deposited observables through `sim.cache`.
-- [SimulationDomain](api/SimulationDomain.md): the discretized periodic box a run lives on — the `FixedDomain` (with its choice of `DealiasingStrategy`), the scratch-field allocators, and `max_wavenumber`, the highest wavenumber magnitude the run evolves.
+- [SimulationDomain](api/SimulationDomain.md): the discretized periodic box a run lives on — the `FixedDomain` (with its choice of `DealiasingStrategy`), the scratch-field allocators, and `max_wavenumber`, the dealiasing cutoff.
 - [State](api/State.md): the evolving state (`ResolvedFields` — the velocity and scalar in spectral representation, the single source of truth) and the random initial conditions that seed it — a divergence-free velocity and a mean-zero scalar.
 - [Observables](api/Observables.md): the measured functions of state — the energy and dissipation diagnostics of the flow and the scalar, the developed-turbulence marker (`derivative_skewness`), the spectrum-derived scales, and the one field-valued observable, the vorticity recovery.
 - [Cache](api/Cache.md): the `ObservablesCache` — where each iteration leaves the observables it produced, read through checked reads that serve the deposited value or throw. Nothing is ever recomputed on a read.

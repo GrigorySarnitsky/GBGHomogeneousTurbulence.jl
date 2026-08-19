@@ -104,10 +104,10 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift dealiasing — Patterson & Orszag (1971), *Spectral calculations of isotropic turbulence:
+Phase-shift dealiasing — Patterson & Orszag (1971) — *Spectral calculations of isotropic turbulence:
 efficient removal of aliasing interactions*, *Phys. Fluids* **14**, 2538–2541,
 [doi:10.1063/1.1693365](https://doi.org/10.1063/1.1693365), combined with the spherical truncation of
-Rogallo (1981), *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
+Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
 by half a cell, average the two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell

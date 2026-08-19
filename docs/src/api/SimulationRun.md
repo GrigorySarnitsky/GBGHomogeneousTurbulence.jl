@@ -19,7 +19,7 @@ Simulation
 ## Advancing the run
 
 Advance one iteration, or observe-and-advance until the callback stops the run; the packaged
-stationarity observation and its sugar spin a fresh run up to measurement readiness.
+stationarity observation and its one-line shorthand spin a fresh run up to measurement readiness.
 
 ```@docs
 advance!

@@ -271,6 +271,11 @@ run may no longer measure, and there is no answer that is right for every run.
 
 Rescaling preserves the divergence-free constraint either way.
 
+# Fields
+- `band` — the band-pass kernel selecting the rescaled shells.
+- `target` — the held value.
+- `over` — `:band` or `:total`.
+
 !!! note "A band with nothing in it is left alone"
     The rescale needs a nonzero band value to scale by: below a small floor it returns the field
     untouched rather than dividing by ~0, so a band with no content stays empty instead of being
@@ -342,6 +347,10 @@ rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusi
 - `rate` — the fixed linear rate ``A``. A positive value amplifies the field.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
+
+# Fields
+- `mask` — the band indicator as a real array.
+- `rate` — the fixed linear rate ``A``.
 """
 struct Linear{M, T} <: AbstractForcing
   mask::M              # real array: the band indicator (1 in band, 0 outside)
@@ -397,10 +406,16 @@ into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
-- `injection_rate` — the energy-injection rate to hold: the value ``\\varepsilon`` relaxes to in the
-  stationary mean, not an instantaneous dissipation the forcing measures or clamps.
+- `injection_rate` — the injection rate to hold: energy for the velocity, scalar variance for the
+  scalar. It is the value the corresponding dissipation relaxes to in the stationary mean, not an
+  instantaneous rate the forcing measures or clamps.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
+
+# Fields
+- `band` — the band-pass kernel weighting the band observable.
+- `indicator` — the band indicator as a real array, the rate fill's factor.
+- `injection_rate` — the held rate.
 """
 struct ConstantPower{K, I, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight

@@ -157,7 +157,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   ``\\varphi``), and its initial variance.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
-  ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale `initial_spectrum` is evaluated at.
+  ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale in the assumed state `initial_spectrum` reads — though a roll-off
+  whose coefficient belongs to a different length forms its own (see `large_scale_length`).
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
@@ -434,7 +435,7 @@ deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — th
 step, the last after the final one, with statistics recorded before the stop.
 
 Stopping is the observation's decision on observables, never a run option: a fixed-length run is a callback
-that accumulates what it budgets. A span of simulation time compares [`current_time`](@ref) against
+that accumulates elapsed turnovers and stops at a chosen total. A span of simulation time compares [`current_time`](@ref) against
 a target; a step budget compares [`current_step`](@ref); an eddy-turnover budget accumulates
 ``\\Delta t \\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
 packaged [`StationarityCriterion`](@ref). Whatever the callback needs beyond the cached observables
@@ -587,7 +588,8 @@ All keyword:
   ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal: a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
   ``S \\approx -0.5``. The skewness costs transforms, so it is measured on the criterion's own
-  sampling interval rather than every iteration.
+  sampling interval — one sample per `window_turnovers / 40` of turnover time, giving about forty
+  samples across the trailing window — rather than every iteration.
 - `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tol`.
@@ -655,7 +657,7 @@ end
 """
     warmup!(sim; kwargs...)
 
-Sugar, and nothing more: `warmup!(sim; kwargs...)` is exactly
+A one-line shorthand, and nothing more: `warmup!(sim; kwargs...)` is exactly
 
 ```julia
 run!(StationarityCriterion(; kwargs...), sim)
