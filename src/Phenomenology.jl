@@ -93,8 +93,8 @@ All keyword; a homogeneous-isotropic state fixes the rest:
     a plain, type-stable set of `Float64`s. It is a **sentinel, not a value that propagates**: every
     law that reads the field checks it first and throws an `ArgumentError` naming the law and the
     missing rate, so a scalar law applied to a scalar-free state fails loudly rather than returning
-    `NaN`. That check is what makes the sentinel safe, so it covers the laws here and not arithmetic
-    a caller does on the field itself, which propagates `NaN` as `NaN` always does.
+    `NaN`. Arithmetic a caller does on the field itself is not covered — there `NaN` propagates as
+    it always does.
 
 # Examples
 
@@ -112,7 +112,7 @@ fps = FlowParameters(; viscosity = 1e-3, dissipation = 1.0, rms_velocity = 1.0,
 # Fields
 
 The plain constructor `FlowParameters(viscosity, dissipation, rms_velocity, integral_scale, schmidt,
-scalar_dissipation)` takes the six fields directly, in this order; each holds the value documented for
+scalar_dissipation)` takes the six fields directly, in the order shown; each holds the value documented for
 the keyword of the same name above.
 """
 struct FlowParameters

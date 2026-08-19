@@ -77,7 +77,8 @@ at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so the mean mode stays empty), w
 characteristic wavenumber is ``\\kappa_p`` (`envelope_wavenumber`). Because the envelope multiplies the
 amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count). The `envelope_wavenumber` setting has no effect in the `spectrum` branch below, which carries its own large scale and will not generally peak there — the two modes do not seed the same large scale at the same nominal setting.
-Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
+Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum (the
+front door forwards its `initial_spectrum` keyword here), to
 seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
 spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
 shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or

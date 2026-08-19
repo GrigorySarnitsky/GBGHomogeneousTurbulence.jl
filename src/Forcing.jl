@@ -230,14 +230,15 @@ follows from the field, chosen to agree with the diagnostics — the **kinetic e
 ([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)) for the velocity, the
 **scalar variance** ``\\langle\\varphi^{2}\\rangle``
 ([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) for the scalar — the
-field's ``L^{2}`` observable, carrying the ``\\tfrac{1}{2}`` only for the vector.
+field's ``L^{2}`` observable — the ``\\tfrac{1}{2}`` belongs to the kinetic energy's own definition,
+not to the field being a vector.
 
 The `over` keyword selects where the target applies. It is **required**: a deterministic clamp
 destroys the physical fluctuation of whatever it holds, so this choice decides which quantity your
 run may no longer measure, and there is no answer that is right for every run.
   * `:band` — hold the band's own value; the whole-field value then floats, oscillating slowly
-    about its mean as the band feeds the cascade. The band's energy is then an artifact of the
-    forcing, while ``k`` remains a measurable of the flow.
+    about its mean as the band feeds the cascade. The band's energy is then set by the
+    forcing rather than by the flow, while ``k`` still measures the flow itself.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
@@ -245,7 +246,7 @@ run may no longer measure, and there is no answer that is right for every run.
     state: it
     empties the energy-containing range in a single step, so ``L_{11}``, ``u'`` and
     ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards — the most violent intervention
-    the rescale can make. Here ``k`` is the artifact and
+    the rescale can make. Here it is ``k`` that the forcing sets, and
     the band is free.
 
 !!! note "Which one a run wants depends on what else reads the kinetic energy"
@@ -385,8 +386,8 @@ named for the kind of quantity it is: a **rate**, where `BandRescaling`'s `targe
 into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
-    The rate ``A`` diverges as the band's own energy goes to zero, which is reachable — a scalar
-    seeded with nothing in the forced shells, or the step after a `BandRescaling(over = :total)`
+    The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
+    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `BandRescaling(over = :total)`
     zeroed the band. Below a small floor on ``E_{\\mathrm{band}}`` the rate is set to zero instead,
     so an empty band stays empty rather than receiving an unbounded kick; seed some content in the
     band if a run needs the forcing to take hold.

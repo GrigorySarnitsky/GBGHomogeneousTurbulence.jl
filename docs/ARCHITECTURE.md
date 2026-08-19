@@ -249,7 +249,7 @@ projection ``\mathbb{P}`` onto divergence-free fields absorb the pressure and th
 the equation becomes
 
 ```math
-\partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f} .
+\partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}.
 ```
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:

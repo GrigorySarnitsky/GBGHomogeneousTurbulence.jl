@@ -186,6 +186,7 @@ end
 
 """
     scalar_variance(φ)
+    scalar_variance(φ̂)
 
 The scalar variance ``\\langle\\varphi^{2}\\rangle`` of the scalar field `φ` (for a mean-zero
 ``\\varphi``). Computed as ``\\langle\\varphi,\\varphi\\rangle`` with the normalized inner product,

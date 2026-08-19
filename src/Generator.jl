@@ -76,7 +76,7 @@ All keyword, all required:
 
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
-four fields directly, in this order; each holds the value documented for the keyword of the same name
+four fields directly, in the order shown; each holds the value documented for the keyword of the same name
 above, with the two numbers stored as `Float64`.
 """
 struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}

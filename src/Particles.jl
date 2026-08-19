@@ -232,7 +232,7 @@ representation) onto the positions of the tracer set `tracers`, with the set's i
 
 The values go into the tracer set's own `particle_velocities` storage, which is also the observables
 cache's particle-velocities slot. **This call is that slot's only producer of values**, but it writes
-values only: the slot becomes readable once
+values only: the slot stays stale, and reads of it throw, until
 [`deposit_sample!`](@ref GBGIsotropicTurbulence.Cache.deposit_sample!) records them as current.
 Interpolate here, then mark current there — a run does both at the end of each iteration, on the just-deposited velocity at
 the just-advanced positions, and reading
@@ -242,7 +242,7 @@ throws.
 The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
 are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
 an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
-``M \\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
+``M\\times 3`` values for ``M`` tracers, where keeping the velocity field would cost
 ``N^{3} \\times 3``.
 """
 function record_particle_velocity!(tracers::Tracers, u)

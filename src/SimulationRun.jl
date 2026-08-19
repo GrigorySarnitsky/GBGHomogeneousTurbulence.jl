@@ -20,7 +20,7 @@
 The run layer:
 - [`Simulation`](@ref) — the assembled state of a case.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
-  callback stops the run (the callback *is* the observation — the thing that reads the run each
+  callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
   iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
   observation, and `warmup!`, the one-line shorthand that runs it.
@@ -165,7 +165,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
   that same energy, ``\\nu`` as resolved above, and the integral scale as `1/envelope_wavenumber`.
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
-  assumed state only positions it.
+  assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
+  the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
+  [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
+  built run and announcing the change.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -564,8 +567,7 @@ statistical stationarity and stops it there — `run!(StationarityCriterion(), s
 spin-up, and [`warmup!`](@ref) is the one-line shorthand for exactly that call. Use it before measurement on any freshly
 seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
 ``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
-decaying run a fixed budget instead, which is a three-line callback (see `run!`). The same argument
-the scalar gate makes for an unforced scalar applies to the velocity.
+decaying run a fixed-length loop instead, which is a three-line callback (see `run!`).
 
 At each iteration it measures the dissipation ``\\varepsilon`` — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing

@@ -66,7 +66,7 @@ composed [`ModelSpectrum`](@ref) — the shape that cuts the spectrum off near t
 [`PopeDissipation`](@ref) is Pope's form.
 
 !!! note "Bottleneck models are deliberately deferred"
-    These factors are inertial-normalized cutoffs; bottleneck models are deliberately deferred.
+    These factors are inertial-normalized cutoffs.
     Models of the near-dissipation *bottleneck* — a bump
     before the cutoff (Qian 1984, [doi:10.1063/1.864902](https://doi.org/10.1063/1.864902);
     Ishihara et al. 2005, [doi:10.1143/JPSJ.74.1464](https://doi.org/10.1143/JPSJ.74.1464);
@@ -149,7 +149,7 @@ large_scale_length(::PopeLargeScale, fp::FlowParameters) =
     PopeDissipation(c_η, β)
 
 Pope's dissipation-range roll-off
-``f_\\eta(\\kappa\\eta) = \\exp\\!\\bigl(-\\beta\\{[(\\kappa\\eta)^4 + c_\\eta^4]^{1/4} - c_\\eta\\}\\bigr)``,
+``f_\\eta(\\kappa\\eta) = \\exp\\!\\Bigl(-\\beta\\bigl\\{\\bigl[(\\kappa\\eta)^4 + c_\\eta^4\\bigr]^{1/4} - c_\\eta\\bigr\\}\\Bigr)``,
 which tends to `1` in the inertial range and cuts the spectrum off near the Kolmogorov scale. `c_η` is
 set by the requirement that the spectrum yield the dissipation rate; `β` fixes the sharpness of the
 cutoff (Pope 2000).
@@ -298,7 +298,7 @@ spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelo
 
 # Fields
 The plain constructor `ModelSpectrum(C_K, large_scale, dissipation, ref)` takes the four fields
-directly, in this order:
+directly, in the order shown:
 - `C_K` — the Kolmogorov constant of the inertial-range core.
 - `large_scale` — the `LargeScaleFactor` giving ``f_L``.
 - `dissipation` — the `DissipationFactor` giving ``f_\\eta``.
