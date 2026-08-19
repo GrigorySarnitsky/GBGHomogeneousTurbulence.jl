@@ -50,7 +50,8 @@ abstract type EnergySpectrum <: TurbulenceLaw end
 """
     LargeScaleFactor
 
-Supertype of the dimensionless **large-scale roll-off** factors ``f_L(\\kappa L)`` of a composed
+Supertype of the dimensionless **large-scale roll-off** factors ``f_L(\\kappa \\ell)`` — with
+``\\ell`` the length that form's own coefficient was fitted against, *not* the box side ``L`` — of a composed
 [`ModelSpectrum`](@ref) — the shape that bends the inertial ``\\kappa^{-5/3}`` law over into the
 energy-containing range, with ``f_L \\to 1`` as ``\\kappa L \\to \\infty``. Evaluated by
 [`large_scale_factor`](@ref); [`PopeLargeScale`](@ref) is Pope's form.
@@ -98,12 +99,12 @@ The length scale the large-scale roll-off `f` is evaluated against, read from th
 This exists because a fitted coefficient belongs to a particular length, and the two published forms
 here do not use the same one. The default is the longitudinal integral scale ``L_{11}``, which
 [`VonKarmanLarge`](@ref) uses. [`PopeLargeScale`](@ref) overrides it with
-``L_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
+``\\ell_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
 ``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
 same coefficient ``L_{11}`` instead breaks that normalization. The two lengths are related by
-``L_{11}/L_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is set by the normalized dissipation
+``\\ell_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is set by the normalized dissipation
 constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is 3.7 times smaller and the spectrum
-integrates to ``0.42k``, and at Pope's high-Reynolds-number ``L_{11} = 0.43 L_{0}`` it is 2.3 times
+integrates to ``0.42k``, and at Pope's high-Reynolds-number ``\\ell_{11} = 0.43\\,\\ell_{0}`` it is 2.3 times
 smaller and integrates to ``0.57k`` (``\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}``).
 """
 function large_scale_length end
@@ -124,7 +125,7 @@ function dissipation_factor end
 """
     PopeLargeScale(c_L, p₀)
 
-Pope's large-scale roll-off ``f_L(\\kappa L) = \\Bigl(\\frac{\\kappa L}{\\sqrt{(\\kappa L)^2 + c_L}}\\Bigr)^{5/3 + p_0}``,
+Pope's large-scale roll-off ``f_L(\\kappa \\ell) = \\Bigl(\\frac{\\kappa \\ell}{\\sqrt{(\\kappa \\ell)^2 + c_L}}\\Bigr)^{5/3 + p_0}``,
 which tends to `1` in the inertial range and rolls the spectrum off below the integral scale. The
 coefficient `c_L` is set by the requirement that the spectrum integrate to the kinetic energy; `p₀`
 fixes the low-wavenumber slope (Pope 2000).
@@ -172,7 +173,7 @@ dissipation_factor(f::PopeDissipation, κη) = exp(-f.β * ((κη^4 + f.c_η^4)^
     VonKarmanLarge(c_L)
 
 The von Kármán large-scale roll-off
-``f_L(\\kappa L) = \\Bigl(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\Bigr)^{17/6}``, which tends to `1`
+``f_L(\\kappa \\ell) = \\Bigl(\\frac{(\\kappa \\ell)^2}{(\\kappa \\ell)^2 + c_L}\\Bigr)^{17/6}``, which tends to `1`
 in the inertial range and produces the classic ``\\kappa^{4}`` energy-containing range at low wavenumber
 (``E \\sim \\kappa^{-5/3}f_L \\sim \\kappa^{4}``); `c_L` fixes the peak scale (von Kármán 1948).
 
@@ -282,7 +283,7 @@ dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 The composed model energy spectrum
 
 ```math
-E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa L) f_\\eta(\\kappa\\eta),
+E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa \\ell) f_\\eta(\\kappa\\eta),
 ```
 
 an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-off `large_scale` (a
@@ -355,7 +356,7 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 [`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
 
 [`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is von Kármán's
-``\\bigl((\\kappa L)^{2}/((\\kappa L)^{2} + c_L)\\bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
+``\\bigl((\\kappa \\ell)^{2}/((\\kappa \\ell)^{2} + c_L)\\bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
 classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters).
 `C_K` is the Kolmogorov constant; `c_L` fixes where the spectrum peaks and is a shape parameter of
