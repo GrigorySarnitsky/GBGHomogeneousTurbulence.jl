@@ -115,7 +115,8 @@ of the three states it is in — and the only repair is to fix the schedule that
   will run ahead of
   [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A field-derived slot is
   readable exactly when its epoch equals this.
-- `particles_epoch` — the tracer positions' counter, advanced by the tracer push.
+- `particles_epoch` — the tracer positions' counter, advanced when
+  [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) moves them.
 """
 mutable struct ObservablesCache{PV, PS, TS}
   const velocity_physical::PV

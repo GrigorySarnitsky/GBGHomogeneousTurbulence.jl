@@ -478,8 +478,9 @@ maximum-speed reduction over the just-deposited velocity. The recoveries run on 
 [`FixedDomain`](@ref) `domain`'s plans, through a spectral stage register of `buffers` (an
 [`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
 
-Caching therefore costs an iteration no transforms. It costs one pass: the maximum-speed reduction
-runs every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
+Every recovery here is work the next iteration's first stage would have done anyway, so closing the
+iteration costs it no extra transforms. It costs one extra pass: the maximum-speed reduction runs
+every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
 
 The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
 the state, so it is filled by

@@ -52,9 +52,10 @@ more — but this package caches only what the iteration produces anyway. What t
 control over the contents: since nothing may be added on any axis, what the cache holds is decided by
 the solver's own schedule, not by the reader — §1.2 derives the contents and §1.4 states that price.
 
-Tracer particles are instruments rather than a second physics: probes of the flow, each carrying a
-state of its own — its position — which its own equation advances. Where this page says *the state*, it
-means the fluid's.
+Where this page says *the state*, it means the fluid's — the resolved fields, the velocity and, when
+the run carries one, the scalar. Tracer particles are instruments rather than a second physics:
+probes of the flow, each carrying a state of its own — its position — which its own equation
+advances.
 
 ### 1.2 What the cache holds
 

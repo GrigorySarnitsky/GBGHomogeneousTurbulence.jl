@@ -94,7 +94,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
-  diagnostics of the flow and the scalar, the developed-turbulence marker, the spectrum-derived
+  diagnostics of the flow and the scalar, the developed-turbulence marker (`derivative_skewness`), the spectrum-derived
   scales, and the one field-valued observable, the vorticity recovery.
 - [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the run:
   a step plus the deposit that closes it) leaves the observables it produced, read through checked
