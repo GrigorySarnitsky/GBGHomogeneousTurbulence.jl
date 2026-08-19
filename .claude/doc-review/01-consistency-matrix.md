@@ -1,117 +1,82 @@
-# Consistency Matrix — fresh-eyed audit
+# Consistency-matrix hat — findings
 
-Hat: **consistency-matrix** (systematic entity-diff across every rendered page)
-
-Methodology: built a matrix of every recurring entity (physical quantities, notation, numerical
-constants, vocabulary terms, docstring structure) and diffed each entity's stated form across every
-page of the manuscript. Extensive cross-page formula/dimension expansion was performed (Reynolds
-number, dissipation-group identities, transform/pass ledger counts, frame-memory byte counts,
-skewness constant, CFL ceilings, PhaseShift band-volume ratio) — all of it checked out internally
-consistent; those are not reported below. What follows are the divergences that survived expansion.
-
----
-
-## Finding 1 — "stamp" is a retired term, but the rendered docs still use it as the primary noun
-
-- **Type:** contradiction
-- **Severity:** major
-- **Confidence:** high
-
-**Locations:**
-- PAGE: architecture, §11 decision log (2026-08, user-directed): *""Stamp" is retired; a slot carries
-  an epoch... The `*_stamp` fields become `*_epoch`... One noun now serves both roles: the counters
-  are epochs..."*
-- PAGE: notation, Vocabulary table, "epoch" row: *"the value of that counter **stamped** on it when
-  it was filled. A slot is readable exactly when the **stamp** it carries still equals the counter it
-  depends on."*
-- PAGE: api / Cache, `ObservablesCache` Fields section: *"each slot carries a **stamp**, the
-  counter's value at the moment that slot was filled. A slot is readable exactly when its **stamp**
-  still equals the counter it depends on."* — then: *"`velocity_epoch`, ... — each slot's **stamp**,
-  or a sentinel"* and *"`sample_fields_epoch`, `sample_particles_epoch` — the particle velocities'
-  two **stamps**"*.
-- PAGE: api / Cache, `deposit_sample!`: *"this call **stamps** both from the cache's current
-  counters."*
-
-**Contradicts:** the architecture page's own decision log explicitly retires "stamp" corpus-wide in
-favor of "epoch," and the design page (`observables_cache`) itself is fully compliant — §1.3 and §3.1
-there consistently say "epoch," never "stamp." The `notation.md` Vocabulary table is supposed to be
-*the* single reference the rest of the corpus points to ("this page is the single reference — a
-docstring introduces a symbol on first use and need not repeat the convention"), yet it is one of the
-two surfaces still carrying the retired word, and the `api/Cache` page — the most-read API surface for
-this exact concept — repeats it four more times.
-
-**Description:** A user reading `notation.md`'s Vocabulary entry or the `Cache` API page for "epoch"
-learns the retired vocabulary as if it were current, directly contradicting the decision log's own
-claim that the rename is complete ("One noun now serves both roles"). This is exactly the kind of
-"fix the instance, not the class" failure the project's own CLAUDE.md self-guards call out — the
-rename evidently swept the field names (`*_stamp` → `*_epoch`) but not the prose nouns describing them.
+Fresh-eyed cross-page consistency audit of the rendered `GBGIsotropicTurbulence` documentation
+(Home, api overview, `architecture`, `notation`, `observables_cache`, every `api/*` module page,
+every `api/phenomenology/*` page). Method: built a matrix of recurring entities (physical
+quantities and their formulas/normalizations, numerical constants, module/API cross-references,
+docstring structure) and diffed each entity's every occurrence. The corpus is unusually
+well-scrubbed — dozens of formulas, memory/transform-count tables, and cross-page numeric claims
+were independently re-derived by hand during this pass and found to check out exactly (Parseval
+factors, the `322.5 MiB` / `384 MiB` / `768 MiB` frame and register sizes, the `TwoThirds` /
+`PhaseShift` transform-count table, the `κ_max·η = fπη/Δx` identity, the `ε = ν⟨|ω|²⟩ =
+2ν⟨S_ijS_ij⟩` periodic/solenoidal identity, the IFLowStorageRK3 stage coefficients, the register
+counts behind "IFRK2 is dearer by one register"). Those are not reported below since they
+survived verification; only the residual, genuine divergences are.
 
 ---
 
-## Finding 2 — the shared `particle_velocities` array carries its read-only/staleness caveat on one documentation surface but not the other
+## Finding 1 — Decision-log entries are cited by number ~50+ times, but no entry in the rendered log carries a visible number
 
-- **Type:** api-gap
-- **Severity:** minor
-- **Confidence:** medium
+**Type:** clarity
+**Severity:** major
+**Confidence:** medium (flagged explicitly as possibly a manuscript-extraction artifact — see below)
 
 **Locations:**
-- PAGE: api / Cache, `ObservablesCache` Fields section: *"A cached array is the next iteration's
-  scratch — ... Treat every returned array as read-only — it is the storage the next iteration will
-  work in."* (repeated verbatim for `velocity_physical`, `vorticity_physical`, `scalar_physical`).
-- PAGE: api / Particles, `Tracers` Fields section: *"`particle_velocities` — the interpolated
-  velocity at the positions the tracers occupy, at the instant they occupy them: the genuine
-  Lagrangian sample, and the observables cache's particle-velocities slot."* — no read-only /
-  mid-iteration-staleness caveat given here.
+- PAGE: api — "`Simulation(...)` — ... the highest Reynolds number consistent with the chosen resolution criterion `κ_max_η` (**decision 20**)"
+- PAGE: architecture, §4.2 — "the class of the stage-ordering bug that motivated the reification (§11 **decisions 29, 31**)"
+- PAGE: architecture, §11 (the decision log itself) — every one of the **56** bulleted entries opens with only `- (2026-06) …` / `- (2026-07) …` / `- (2026-08) …`; none is prefixed with a locatable number, yet later entries refer back to `decision 8`, `decision 12`, `decision 14`, `decision 16`, `decision 17`, `decision 21`, `decision 24`, `decisions 25`, `decision 26`, `decision 27`, `decision 28`, `decisions 30–31`, `decision 33`, `decision 34`, `decision 35`, `decision 36`, `decision 37`, `decision 40`, `decision 41`, `decision 46`, `decision 48`, `decision 52`, `decision 55`, etc.
 
-**Description:** The architecture page and `observables_cache` design page both establish that
-`tracers.particle_velocities` *is* the cache's particle-velocities slot — the identical array, not a
-copy ("the slot IS the register, as everywhere else"). Reading it through `Cache.particle_velocities`
-carries the epoch-checked-throw protection and an explicit read-only admonition; reading the same
-bytes directly off `tracers.particle_velocities` (a public field, per the Particles page's own "Fields"
-listing) bypasses both. The two documentation surfaces describing one shared array give it
-asymmetric safety coverage — a reader who only reads the Particles page has no warning that the field
-they can dot into is mid-iteration scratch part of the time.
+**Description:** The prose (both in `ARCHITECTURE.md`'s own body and on the `api` page) treats "decision *N*" as a stable, locatable anchor — the corpus's primary internal cross-reference mechanism for design rationale — and cites it upward of fifty times. But the rendered decision log that is supposed to hold entry *N* shows no numbering at all: a reader trying to find "decision 20" or "decision 46" has no way to count to it reliably (the log is append-only prose, not a numbered list in the text given here). This is either a broken cross-reference on the built page, or — plausibly — an ordered-list (`<ol>`) that Documenter numbers visually but that the manuscript-extraction step flattened to bullets, stripping the numerals. Given the extraction-artifact caveat this panel operates under, this is reported at medium rather than high confidence, but it is worth a build-side check either way: does the actually-rendered HTML page show "1.", "2.", … beside each entry?
+
+**Resolution hint:** Check the built `docs/` HTML for this page; if the numbers are genuinely absent, add them (or a manual `id`/anchor with the number in the bullet text) so "decision 26"-style citations resolve to something a reader can locate.
 
 ---
 
-## Finding 3 — twin Parseval-polymorphic reductions are documented with an inconsistent signature style
+## Finding 2 — Home page and the api-overview page order the same nine modules two different ways, one of which contradicts the reading habit the other page sets up
 
-- **Type:** format
-- **Severity:** nit
-- **Confidence:** medium
+**Type:** organization
+**Severity:** minor
+**Confidence:** low-medium
 
 **Locations:**
-- PAGE: api / Observables, `kinetic_energy`: signature block shows **two** explicit forms —
-  `` kinetic_energy(u) `` and `` kinetic_energy(û) `` — "so by Parseval's theorem it accepts the
-  velocity in either representation."
-- PAGE: api / Observables, `scalar_variance`: signature block shows **one** form only —
-  `` scalar_variance(φ) `` — yet the prose makes the identical claim: "so by Parseval's theorem it
-  accepts `φ` in either representation."
+- PAGE: Home, "## Components" — bullets in the order `SimulationDomain`, `State`, `Observables`, `Cache`, `Forcing`, `Generator`, `Propagator`, `Particles`, `SimulationRun`, `Phenomenology` (SimulationRun **second-to-last**).
+- PAGE: api — "The pages below are ordered for reading, not by that dependency: **`SimulationRun` comes first** because a run is what a user builds first" — and its own bullet list opens `GBGIsotropicTurbulence`, **`SimulationRun`**, `SimulationDomain`, `State`, …
 
-**Description:** Both functions are the same structural case (a Parseval quadratic reduction generic
-over physical/spectral representation of its one argument), and the module docstring explicitly pairs
-them ("Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_dissipation`),
-it needs no dealiasing of its own"). Yet the two docstrings render the dual-signature capability
-differently — one spells out both call forms in the code block, the other doesn't — which reads as if
-`scalar_variance` supports only one representation until the prose sentence corrects that impression.
+**Description:** Both pages describe the identical nine-module surface, but Home presents it in strict dependency-include order (matching §4.9's chain verbatim) while the api page explicitly promotes `SimulationRun` to the front "because a run is what a user builds first" — the exact same rationale that motivates Home's own Quick Start, which opens with `sim = Simulation(...)` as its very first line of code. Home's Components section then buries the thing its Quick Start used first at position 9 of 10. Neither page cross-references the other's ordering choice, so a reader moving from Home to the api index meets the same catalogue reshuffled with no stated reason tied back to Home.
+
+**Contradicts:** Home's Components-section ordering (dependency order, `SimulationRun` 9th of 10) vs. api overview's explicit statement that reading order puts `SimulationRun` 1st, on grounds that apply equally to Home's own Quick Start.
+
+---
+
+## Finding 3 — `FixedDomain(...)` construction examples inconsistently include the keyword-only `;`
+
+**Type:** format
+**Severity:** nit
+**Confidence:** low
+
+**Locations:**
+- PAGE: observables_cache, §3.1 — `domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)` (no leading `;`).
+- PAGE: api / SimulationDomain — `domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)` (leading `;`), and again in the "wide" example.
+- PAGE: api / SimulationRun — `sim = Simulation(domain; viscosity = 1e-2)` and the `FixedDomain(grid_points_per_axis = 128, ...)` domain-first example (no leading `;` on the `FixedDomain` call itself).
+
+**Description:** Functionally identical in Julia (a keyword-only constructor accepts keywords with or without the leading `;` at the call site), so this is not a code defect — but the corpus is otherwise extremely disciplined about matching the constructor's declared signature verbatim in every example (the signature itself is always written `FixedDomain(; grid_points_per_axis, …)` with the `;`). The observables_cache page is the one place that drops it, which is a small, easily-fixed drift given how carefully every other example mirrors the signature.
 
 ---
 
 ## Notes on what was checked and found consistent (no findings filed)
 
-For the record, since this hat's job is exhaustive cross-page diffing, the following entities were
-independently re-derived from their stated formulas across every page they appear on and found
-internally consistent (not reported as findings): the Reynolds-number/viscosity convention
-($\mathrm{Re}=1/\nu$ at $u'=L=1$; $2\pi/\nu$ on the shipped defaults); the $u'=\sqrt{2k/3}$ /
-$k=\tfrac32u'^2$ round-trip between `notation.md` and `FlowParameters`; the $C_S=\tfrac47\sqrt{15/2}$
-skewness constant and the $\operatorname{tr}\boldsymbol S^3=3\det\boldsymbol S$ traceless identity;
-the $G=\tfrac32C_\varepsilon^{-2/3}$ cross-check between `Li2008`'s box-normalized group and
-`Sreenivasan1998`'s integral-scale constant, including the numeric $G\approx0.81$ vs quoted $0.9$
-reconciliation; the $E(\kappa)$ / $E_n$ dimensional pair ($L^3T^{-2}$ vs $L^2T^{-2}$); the
-`PhaseShift` retained-band volume ratio ($\approx2.8\times$) and its $2\times$-transform-cost claim
-against the observables-cache page's own transform-count table (18/9, 21/18, 36/18, 42/36 all
-expand correctly); the frame-memory ledger's 322.5 MiB figure (verified by reconstructing it as one
-rfft-shaped real array plus two rfft-shaped complex-container arrays); the `recommended_cfl` numeric
-derivation ($C_{\mathrm{CFL}}\lesssim0.83$ from $y_s=\sqrt3$ and $\kappa_{\max}\Delta x=2\pi/3$); and
-the `ConstantPower` injection-rate formula's self-consistency across the vector ($\tfrac12$-carrying)
-and scalar (full-variance) conventions.
+For the record, since this hat's job is exhaustive cross-referencing: the following recurring
+entities were independently checked across every page they appear on and found in agreement —
+`kinetic_energy` ($k=\tfrac12\langle|u|^2\rangle$, default `1.5`⇒`u'=1`), `dissipation`
+($\varepsilon=\nu\langle|\omega|^2\rangle=2\nu\langle S_{ij}S_{ij}\rangle$), `scalar_dissipation`
+(full-variance $2\varkappa\langle|\nabla\varphi|^2\rangle$ convention, consistent through the
+Yaglom 4/3→2/3 conversion and Obukhov–Corrsin's $C_{OC}$), `derivative_skewness`'s
+$C_S=\tfrac47\sqrt{15/2}$, the `TwoThirds`/`HouLi`/`PhaseShift` cutoff fractions and the
+$\sqrt2/3\,N\cdot2\pi/L$ / $2\sqrt2/3\,\kappa_{Ny}$ equivalence, the memory-footprint numbers
+(`384`/`768`/`322.5` MiB at $256^3$/`Float64`), the transform-count table in
+`observables_cache` §2.3 against the compute-audit decision-log's post-fix numbers (`51→42`
+c2r), the `G`↔$C_\varepsilon$ cross-check example, the epoch-vs-step-count worked example
+(step 2 / epoch 4) repeated verbatim in two places, the `Li2008`/`stationary_dissipation`
+formula $\varepsilon=(k/G)^{3/2}/L$, the `BandRescaling` `over` keyword's required-not-defaulted
+status (matches its own decision-log correction), and the eight removed `Simulation`-forwarder
+count. No drift found in any of these.

@@ -1,92 +1,186 @@
-# Style / copy-edit review — hat: style-editor
+# Style / Copy-Editor hat — findings
 
-Scope: `manuscript-full.md` (full rendered site) plus spot-checks of the raw built HTML under
-`docs/build` for silent rendering failures. Findings ranked most-severe first. Items already
-settled in `.claude/doc-review-adjudicated.md` (Saffman attribution, `kinetic_energy` 1.5 vs 0.5,
-decision-log history, deferred capabilities, `vorticity_spectral(sim)`, `Lundgren2002` in
-StructureFunctions refs, `deposit_velocity!`/`take_velocity!` existence, host-device-sync floor
-vs achieved, `integrator` false cognate, PascalCase presets, `No DOI`/`no DOI`, bare `CatmullRom`,
-arrow vs `Returns` sentence, citation-opens-identity) are excluded.
+Reviewed: the full manuscript consolidation (Home, api overview, architecture, notation,
+observables_cache, phenomenology, every `api/*` page, every `api/phenomenology/*` page) plus the
+raw built HTML under `docs/build/` (checked for silent rendering failures: table fallback,
+dead cross-references, unrendered math, admonition breakage). Adjudicated items from
+`.claude/doc-review-adjudicated.md` are excluded throughout.
 
 ---
 
-## Finding 1 — "observation" is used for three different objects
+## Finding 1 — "Stamp" was declared retired corpus-wide, but survives on the Home page, the
+Notation glossary, and the Cache API page
 
-- **Type:** clarity / notation
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `notation.md`, Vocabulary: *"observation | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue."* (defines *observation* = the callback, a single object per run)
-  - `architecture.md` §3/§4.7 and `SimulationRun` module docstring: *"the callback is the observation — the thing that reads the run each iteration — and its return decides continuation"* (same sense: object)
-  - `architecture.md` §2 / `SimulationRun.run!`: *"n iterations, n+1 observations"*, *"A run of n iterations therefore observes n + 1 instants"* (here *observation* is a countable **event**, not an object — there is exactly one callback per run, never n+1 of them)
-  - `observables_cache.md` §1.1: *"between those times... sits the observation: the caller's callback reads the state and the cache"* (event again)
-  - `architecture.md` §8 and `SimulationRun.Simulation` docstring: *"the `ObservablesCache` observation cache"*, *"the observation cache holds spent compute, reconstructable from the record"* — here *observation cache* is used as an informal alias for **the `ObservablesCache` itself**, a third referent distinct from both the callback and the event.
-- **Contradicts:** `notation.md`'s own Vocabulary section states each term "means exactly this and nothing looser," yet *observation* is bound to three distinct kinds of object (the callback, the per-iteration event of it firing, and the cache) across the corpus — precisely the field/representation-style category conflation the house rules ask reviewers to guard against.
-- **Description:** This is a load-bearing term (it names the run's whole driving mechanism) used inconsistently enough that a cold reader cannot form one mental model of what "an observation" is. The event sense ("n+1 observations") and the object sense ("the callback is the observation") cannot both be literal; the "observation cache" sense adds a third name for something that already has a canonical name (`ObservablesCache`/"the cache") everywhere else, including the Cache module's own docstring.
-- **Resolution hint:** Pick one referent for the glossary entry (most usage supports "the discrete act of a callback reading the run"), retire "observation cache" in favor of "the cache"/`ObservablesCache" wherever it appears, and word the callback-defining sentences ("the callback is the observation") to say the callback *performs* the observation rather than *is* it.
+**Type:** contradiction
+**Severity:** major
+**Confidence:** high
 
----
+**Locations:**
+- ARCHITECTURE.md decision log (2026-08, user-directed): *""Stamp" is retired... The `*_stamp`
+  fields become `*_epoch`, and the verb goes with the noun — a deposit fills a slot and sets its
+  epoch rather than "stamping" it."* — and later in the same entry: *"the sweep covered the
+  decision log too, so the log reads in the current vocabulary."*
+- **Home page**, Quick start comment: *"each stamped with the epoch of the state they were
+  computed from"*
+- **Notation page**, Vocabulary table, `epoch` entry: *"the value of that counter stamped on it
+  when it was filled. A slot is readable exactly when the stamp it carries still equals the
+  counter it depends on."*
+- **Cache API page**, `ObservablesCache` docstring: *"each slot carries a stamp, the counter's
+  value at the moment that slot was filled. A slot is readable exactly when its stamp still
+  equals the counter it depends on"*; Fields list: *"each slot's stamp, or a sentinel"*; *"the
+  particle velocities' two stamps"*; `deposit_sample!` docstring: *"this call stamps both from
+  the cache's current counters."*
 
-## Finding 2 — `deposit_sample!` is prescribed to the reader but never documented
+**Contradicts:** the decision-48 claim that the rename swept "every surface, prose and code
+alike" and that the noun "stamp" no longer describes what a slot carries.
 
-- **Type:** api-gap / self-containedness
-- **Severity:** major
-- **Confidence:** high
-- **Locations:** `api/Cache/index.html` (`Cache.particles_modified!` docstring): *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocities!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*.
-- **Contradicts:** No other occurrence of `deposit_sample!` exists anywhere in the manuscript — not as its own docstring entry, not in the master `GBGIsotropicTurbulence` API index (which lists every other public verb, including the sibling `record_particle_velocities!`), and not on the Cache or Particles pages' section lists.
-- **Description:** The docstring tells a reader following a hand-run loop that they "must" call `deposit_sample!`, but a cold reader has no way to find its signature, its module, or confirm it is even public API — it fails the doc policy's own cold-read test ("every signature argument documented... a term of art... is explained or `@ref`-linked"). Either the function needs a docstring and an index entry, or the instruction is stale and should name whatever verb actually serves this role today.
-- **Resolution hint:** Add `deposit_sample!` to the Cache (or Particles) API page with its own docstring, or replace the reference with the currently-correct verb name.
+**Description:** The decision log explicitly retires "stamp"/"stamped" in favor of "epoch" and
+records that the sweep covered even the decision log's own historical prose. Yet the word
+survives, unretired, in the three most user-facing surfaces of the site: the landing-page quick
+start, the canonical glossary's own `epoch` entry, and the primary `ObservablesCache` type
+docstring (used four separate times there, plus once more in `deposit_sample!`). A reader who
+learns the vocabulary from the glossary or the Home page comes away calling the same thing by
+the retired name. This is exactly the "sweep that skips its own surfaces" failure pattern the
+project's own CLAUDE.md names as a live risk.
 
----
-
-## Finding 3 — Two citation/DOI formats coexist across the corpus
-
-- **Type:** citation / format
-- **Severity:** minor
-- **Confidence:** medium-high
-- **Locations:**
-  - `architecture.md` §References: *"Orszag, S. A. (1971)... J. Atmos. Sci. 28, 1074. https://doi.org/10.1175/1520-0469(1971)028%3C1074:OTEOAI%3E2.0.CO;2"* — full `https://doi.org/` URL, percent-encoded `<`/`>`.
-  - `api/SimulationDomain/index.html` (`TwoThirds` docstring), citing the same Orszag (1971) work: *"doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2"* — bare `doi:` prefix, literal (unescaped) `<`/`>`.
-  - Every `Phenomenology` submodule's own `## References` list (`Scalings`, `Spectra`, `StructureFunctions`) uniformly uses the bare `doi:10.xxxx` form with no article title, e.g. *"Sreenivasan (1998), Phys. Fluids 10, 528. doi:10.1063/1.869575"*, versus `architecture.md`'s `LastName, Initial. (Year). Title. Journal Vol, pages. https://doi.org/...` form.
-- **Contradicts:** the same physical citation (Orszag 1971) is rendered two different ways depending on which page cites it; the two DOI conventions are never reconciled or acknowledged as deliberate.
-- **Description:** `CLAUDE.md`'s citation rule ("Citations follow author–year; the full references are §References... never cite an inaccessible source") does not license a second citation-string format. This is a real, checkable, corpus-wide split between a verbose `ARCHITECTURE.md`-style reference and a terse docstring/Phenomenology-style reference, most visible where both cite the identical paper.
-- **Resolution hint:** Standardize on one DOI-string convention (either always the resolvable `https://doi.org/` URL, or always the bare `doi:` prefix) across `ARCHITECTURE.md`, inline docstring citations, and the `Phenomenology` reference lists.
+**Resolution hint:** replace "stamp"/"stamped"/"stamps" with "epoch" (or "recorded at [the]
+epoch") in the four locations above.
 
 ---
 
-## Finding 4 — `to_spectral` is `@extref`-linked on its second mention but bare on its first, same page
+## Finding 2 — Grammar: "an scheme"
 
-- **Type:** typesetting / cross-referencing
-- **Severity:** minor
-- **Confidence:** high
-- **Locations:**
-  - `notation.md`, "## Conventions" table, row for $\hat f$: rendered HTML is `<code>to_spectral(f)</code>` — plain code span, **no link**.
-  - `notation.md`, "## Spectral representation and operators" table, a few rows below on the **same page**: `<a href="https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/dev/api/Fields/#GBGPeriodicFields.Fields.to_spectral"><code>to_spectral</code></a>` — properly `@extref`-linked to `GBGPeriodicFields`.
-- **Contradicts:** `CLAUDE.md`'s cross-referencing rule: "(1) Link a target at most once per docstring — its first genuine mention." The first genuine mention of `to_spectral` on `notation.md` is the unlinked one; the link appears only on the second mention.
-- **Description:** Confirmed directly in the built HTML (not an extraction artifact): identical identifier, same page, inconsistent linking. A reader hitting the first occurrence has no way to jump to the backend's actual documentation for it.
-- **Resolution hint:** Move the `@extref` link to the first occurrence (the Conventions-table row), or drop the link from the second and rely on the first.
+**Type:** language-tone (grammar)
+**Severity:** nit
+**Confidence:** high
 
----
+**Locations:**
+- ARCHITECTURE.md §7: *"The $\nu = 0$ truncated-Euler experiment — an scheme and dealiasing
+  oracle."*
 
-## Finding 5 — No single convention for where a trailing caveat admonition sits relative to the closing "Returns" sentence
-
-- **Type:** format (docstring skeleton)
-- **Severity:** nit
-- **Confidence:** medium
-- **Locations:**
-  - Admonition **before** the final `Returns` sentence (i.e. `Returns` is the true last line): `Generator.velocity_rhs!` (admonition *"The vorticity argument is read and then overwritten..."*, then eventually *"Returns `N̂`."*); `Propagator.step!` (admonition *"A step alone leaves the cache mid-iteration..."* immediately followed by *"Returns `state`."*).
-  - Admonition **after** the `Returns` sentence (i.e. `Returns` is not last): `State.random_solenoidal_velocity_spectral!` (*"Returns `û`."* then the admonition *"Seeding a running case invalidates the observables cache..."*); `State.random_scalar_spectral!` (same pattern with `φ̂`); `SimulationDomain.truncate_to_band!` (*"Returns `field`."* then *"Truncating the band is not always the whole of dealiasing..."*).
-- **Contradicts:** the two groups place the same two elements (a load-bearing caveat, and the closing `Returns` sentence) in opposite relative order, with no discernible rule distinguishing which docstrings get which order.
-- **Description:** `CLAUDE.md` states a caveat admonition is "the last substantive block... before `# Fields`" for **type** docstrings; for **function** docstrings with a `Returns` sentence, the corpus is split roughly evenly (3 vs 3 among the sampled instances) with no stated rule, so this reads as skeleton drift rather than a deliberate two-shape convention.
-- **Resolution hint:** Pick one order for function docstrings that both mutate a field and carry a caveat (recommend: caveat first, `Returns` last, mirroring the type-docstring rule) and apply it uniformly.
+**Description:** "an" before a consonant-initial word ("scheme"); should be "a scheme". Isolated
+typo — the rest of the manuscript's a/an usage is clean (checked systematically).
 
 ---
 
-## Finding 6 — `notation.md`'s reference-conventions table has no header separator sanity issue, but the intro rule about `Code`-column linking doesn't apply to the "Conventions" table (design ambiguity, not a defect)
+## Finding 3 — Citation format: em-dash vs comma splits the three sibling dealiasing-strategy
+docstrings
 
-- **Type:** organization
-- **Severity:** nit
-- **Confidence:** low
-- **Locations:** `notation.md`, "## Conventions" table (`Concept | Symbol | Convention`, no `Code` column) versus every later table on the same page (`Symbol | Meaning | Code`).
-- **Description:** Noted for completeness only: the page states "Every Code entry naming a package object links to its documentation," but the very first table has no `Code` column at all, so `to_spectral(f)` inside its "Convention" cell sits outside that rule's literal scope — which is why Finding 4 has to invoke the general cross-referencing rule rather than this one. Flagging as a low-confidence "smells inconsistent" observation, not a separate defect from Finding 4.
-- **Resolution hint:** none needed beyond Finding 4's fix.
+**Type:** format (citation)
+**Severity:** minor
+**Confidence:** medium
+
+**Locations:**
+- **SimulationDomain API**, `TwoThirds`: *"The sharp isotropic $2/3$-rule truncation of Orszag
+  (1971) — On the elimination of aliasing..."* (em dash after the year)
+- Same page, `HouLi`: *"The smooth spectral filter of Hou & Li (2007) — Computing nearly
+  singular solutions..."* (em dash)
+- Same page, `PhaseShift`: *"Patterson & Orszag (1971), Spectral calculations of isotropic
+  turbulence..."* and *"...of Rogallo (1981), Numerical experiments in homogeneous
+  turbulence..."* (comma, not em dash, for both citations)
+
+**Contradicts:** `TwoThirds` and `HouLi`, its immediate siblings in the same "Dealiasing
+strategies" section, doing the identical job (an inline citation opening/embedded in the
+identity sentence, per CLAUDE.md's named-method convention).
+
+**Description:** All three dealiasing-strategy docstrings inline a full bibliographic citation
+(author-year, title, journal, DOI) in the same rhetorical slot. Two use "Author (Year) — Title…"
+(em dash); `PhaseShift`, citing two works, uses "Author (Year), Title…" (comma) for both. This
+may be a deliberate choice to avoid stacking three em dashes in one already-compound sentence,
+which is why confidence is medium rather than high, but the corpus gives no stated rule for the
+switch, so a reader sees two visually different citation styles within one API section.
+
+---
+
+## Finding 4 — "the default `BandRescaling(over = :total)`" reads as if `over` had a default,
+contradicting the decision that made it required
+
+**Type:** clarity
+**Severity:** minor
+**Confidence:** medium
+
+**Locations:**
+- **observables_cache page**, §1.2: *"Under the default `BandRescaling(over = :total)` the
+  forcing does form the whole-field $k$ every step..."*
+- **Forcing API**, `BandRescaling` signature: `BandRescaling(domain; target, over,
+  lowest_shell = 1, highest_shell = 2)` — no default shown for `over`; its own prose: *"The
+  `over` keyword... **is required**: a deterministic clamp destroys the physical fluctuation..."*
+- ARCHITECTURE.md decision log (2026-08): *"`BandRescaling`'s `over` is **required**... Decision
+  15 called `over` "a modeling choice with two defensible answers"... and then defaulted it to
+  `:band`, **contradicting itself inside one sentence**. It is now required..."*
+
+**Contradicts:** the decision log's own point that `over` must never look like it carries a
+house default, since exactly that ambiguity was the earlier design's flaw and the reason `over`
+became a required, undefaulted keyword.
+
+**Description:** The observables_cache.md phrase "the default `BandRescaling(over = :total)`"
+is defensible as shorthand for "the `Simulation` front door's default forcing, which happens to
+be a `BandRescaling` called with `over = :total`" — but read literally it presents `over = :total`
+as if it were `BandRescaling`'s own default, which the constructor signature and its own
+docstring explicitly deny (`over` has no default and is required precisely so no such reading is
+possible). Given the decision log spends a full paragraph on why a default here was the wrong
+call, this phrasing in a different page undoes the clarity that decision bought.
+
+**Resolution hint:** reword to "Under the `Simulation` front door's default forcing,
+`BandRescaling(over = :total)`, …" or similar.
+
+---
+
+## Finding 5 — Inconsistent spacing around `\times` for the same `M × 3` quantity
+
+**Type:** typesetting
+**Severity:** nit
+**Confidence:** medium
+
+**Locations:**
+- **Particles API**, `record_particle_velocities!`: *"Storing them costs $M \times 3$ values for
+  $M$ tracers"* (spaced)
+- **ARCHITECTURE.md** §4.6, §9(memory audit), and **observables_cache page** §1.2/§2.3 (three
+  separate occurrences): *"$M\times3$ arrays"* / *"an $M\times3\times$..."* (unspaced)
+
+**Description:** The same dimensional quantity, the tracer point-value array shape, is
+typeset with a space around `\times` in one docstring and without a space everywhere else it
+appears (five other occurrences checked). Minor, but a copy-editor-visible inconsistency in a
+symbol used repeatedly across the corpus.
+
+---
+
+## Finding 6 — "checked accessor" vs "checked read" used for the same concept without a
+stated distinction
+
+**Type:** language-tone
+**Severity:** nit
+**Confidence:** low
+
+**Locations:**
+- **Cache API** section header: *"## The checked reads"* and prose *"the checked reads of the
+  cached fields"*
+- **Home page** / module map: *"read through checked accessors that serve the deposited value or
+  throw"*
+
+**Description:** "Checked accessor" and "checked read" name the same mechanism (an accessor that
+serves the deposited value or throws) in different pages. This may be intentional register
+variation (accessor = the function, read = the act of calling it), which is why confidence is
+low, but the corpus's own glossary (`notation.md`'s Vocabulary section) does not carry either
+term, so a reader has no anchor confirming they are synonyms rather than two different things.
+
+---
+
+## Notes on what was checked and found clean
+
+- All Markdown tables in `notation.md` and `observables_cache.md` render as real `<table>`
+  elements in the built HTML (9 and 2 respectively) — no literal-pipe fallback.
+- No `katex-error` class anywhere in the built site; no dead (`href="#"`-only) cross-references
+  found in the pages spot-checked.
+- The retired terms "tail" (for the closing deposit) and "boundary" (for the instant between
+  iterations) do not leak outside the decision-log entry that retires them; every other
+  occurrence is a different, exempted sense (spectral tail, extraction boundary, ownership
+  boundary, consumer boundary, `max_speed`'s "boundary case").
+- Other previously-retired names (`resolved_fields_modified!`, `ForcingSpec`, `scalar_type`,
+  `physical_velocity`/`physical_vorticity`, `tracer_velocities`/`tracer_positions`/
+  `number_of_tracers`, `X_to_physical!`) do not leak outside decision-log history either.
+- "Front door" capitalization, bold-italic vector notation, `\varkappa`/`\kappa`/`k` glyph
+  separation, and the constructor-first / plain-constructor-naming convention (present exactly
+  where CLAUDE.md's own example list says it should be, absent exactly where it says it should
+  be omitted) were all sampled across many type docstrings and found uniform.
+- No stray "knob"/"tweak" register violations found.

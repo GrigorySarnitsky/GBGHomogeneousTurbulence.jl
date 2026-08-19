@@ -1,6 +1,7 @@
 using Test
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: curl!, field_data
+using Random
 using GBGIsotropicTurbulence.Phenomenology
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 
@@ -107,4 +108,31 @@ end
   Δκ = 2π / SIM.domain.grid.domain_size[1]
   i = findfirst(>(0), v.wavenumbers)
   @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp) * Δκ
+end
+
+# The module docstring promises every observable returns the field's own element type. That claim was
+# found false in a new place on three consecutive review rounds — kinetic_energy/derivative_skewness,
+# then dissipation/scalar_dissipation via their Real parameter, then energy_spectrum/integral_scale
+# via untyped literals. Each fix was verified against the functions the finding named. This pins the
+# CLAIM instead, over every exported observable, so the next leak fails a test rather than a review.
+@testset "every observable returns the field's own element type" begin
+  for T in (Float32, Float64)
+    d = FixedDomain(grid_points_per_axis = 16, side_length = T(2π), element_type = T,
+                    array_type = Array, dealiasing = TwoThirds())
+    û = new_vector_field_spectral(d)
+    random_solenoidal_velocity_spectral!(û, d; kinetic_energy = T(0.5), envelope_wavenumber = T(2),
+                                         rng = MersenneTwister(1))
+    φ̂ = new_scalar_field_spectral(d)
+    random_scalar_spectral!(φ̂, d; scalar_variance = T(1), envelope_wavenumber = T(2),
+                            rng = MersenneTwister(2))
+    @test typeof(kinetic_energy(û))            === T
+    @test typeof(dissipation(û, d, 0.001))     === T   # a Float64 parameter must not promote
+    @test typeof(scalar_variance(φ̂))           === T
+    @test typeof(scalar_dissipation(φ̂, d, 0.001)) === T
+    @test typeof(derivative_skewness(û, d))    === T
+    @test typeof(integral_scale(û, d))         === T
+    spec = energy_spectrum(û, d)
+    @test eltype(spec.energy)      === T
+    @test eltype(spec.wavenumbers) === T
+  end
 end

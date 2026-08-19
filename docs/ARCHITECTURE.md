@@ -443,7 +443,8 @@ scheme** — the reversible generator of §8 again — so the split does not nai
 A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
-scheme registers, the chosen `AbstractIntegrator`, any `Tracers`, a stored CFL ceiling, and a clock.
+scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
+`AbstractParticleIntegrator` and `ParticleIntegratorBuffers`, a stored CFL ceiling, and a clock.
 Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
@@ -601,9 +602,11 @@ numerical counterpart of the charter that the tool investigates the physics rath
   question, settled by test rather than by a house default. The element type
   ``T`` flows from the frame (§4.1): no kernel silently fixes the arithmetic. (The `FlowConditions` scalar
   parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
-  commitment.) The **one computational exception** is statistics: reductions and online moments aggregate in
-  `Float64` even for a `Float32` field, since summing many single-precision values loses accuracy —
-  precision flows from the frame where the field is *stored and stepped*, never where it is *accumulated*.
+  commitment.) Field reductions do **not** break this: every observable returns the field's own element
+  type, so a `Float32` run measures in `Float32` — the `Observables` module docstring states it and
+  `test/validation.jl` pins it over every exported observable. Whether the online statistics of a
+  future `GBGStreamingStatistics` bridge should accumulate in `Float64` regardless is a question for
+  that backend, not a property of this one.
 - **The footprint/accuracy trade-off is held at both ends** — low-storage integrators, the dealias
   fraction, truncation — and the working point is chosen by *direct fitness test*, never decreed. Which
   precision, order, or footprint suffices for a regime is a measured finding.

@@ -72,7 +72,7 @@ representation when the run carries one, the fastest flow speed on the grid (the
 the next timestep choice reads), and — when the run advects tracers — the particle velocities
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
 configuration, never declared: the cache holds exactly what the iteration computes, materializes,
-and leaves alive at the iteration's end, and nothing may be added on any cost axis. The cache
+and leaves alive at the iteration's end, and nothing is added that the iteration would not otherwise compute, materialize, or hold. The cache
 allocates and owns every slot but one: the particle velocities are the tracer set's own storage,
 which the cache borrows and records epochs for rather than filling itself.
 

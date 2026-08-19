@@ -406,9 +406,9 @@ into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
-- `injection_rate` — the injection rate to hold: energy for the velocity, scalar variance for the
-  scalar. It is the value the corresponding dissipation relaxes to in the stationary mean, not an
-  instantaneous rate the forcing measures or clamps.
+- `injection_rate` — the rate at which energy (for the velocity) or scalar variance (for the scalar)
+  is injected. In the stationary mean the corresponding dissipation relaxes to it; it is not an
+  instantaneous dissipation the forcing measures or clamps.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
 

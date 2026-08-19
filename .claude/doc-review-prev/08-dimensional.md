@@ -1,196 +1,228 @@
 # Hat 08 — Dimensional analysis & normalization
 
-Fresh-eyed audit of every formula, factor and constant in the rendered site, checked for dimensional
-consistency and for cross-page agreement. Findings are ranked most-severe first.
+Mechanical audit of every formula, factor, and cutoff in the rendered site for dimensional
+consistency and for cross-page agreement of the *same* number.
 
-**Verified clean (no finding raised)** — recorded so the negative results are visible: the ½ in
-`kinetic_energy` (5 surfaces); the 2ϰ in `scalar_dissipation` (4 surfaces); ε = ν⟨|ω|²⟩ = 2ν⟨S:S⟩ and
-the dilatation caveat; the Dirichlet identity ⟨|ω|²⟩ = ⟨û,|κ|²û⟩ and its solenoidal condition;
-κ_max = f(N/2)(2π/L) with f = 2/3, 1, 2√2/3 — the PhaseShift cutoff is the *same* number in all four
-places it appears ((√2/3)N·2π/L = (2√2/3)κ_Ny ≈ 0.94κ_Ny, √2 wider ⇒ 2.83× the modes); the alias-free
-condition 2κ_max < N (2/3 ✓, PhaseShift 0.943N ✓, HouLi at the boundary ✓); the cubic-invariant
-residual for the skewness; C_S = (4/7)√(15/2) ≈ 1.5649, reconstructed from Betchov (−3/4) and Taylor
-(−35/2) — 105/8 is right; ⟨S:S⟩ = (15/2)⟨(∂₁u₁)²⟩; tr S³ = 3 det S; L₁₁ = (3π/4)∫(E/κ)/∫E, L₂₂ = L₁₁/2,
-L_E = (π/2)∫(E/κ)/∫E = (2/3)L₁₁ = (1/3)(L₁₁+2L₂₂) — all three π factors derived and confirmed;
-E(κ) [L³T⁻²] vs E_n [L²T⁻²] and Δκ = 2π/L; the shell-width cancellation in `integral_scale`;
-u' = √(2k/3); η, τ_η, λ, Re_λ; the CFL numbers (κ_maxΔx = 2π/3 ≈ 2.09, y_s = √3 ⇒ C ≲ 0.83);
-the RK3 coefficients (Σd = 1, c = (0,1/3,3/4) from d) and the IFRK2 stability function |R(iy)|² = 1+y⁴/4;
-E = exp((A − D|κ|²)τ) and the returned parameters (coefficient = −ντ, offset_scale = τ);
-ConstantPower's A = injection_rate/(2E_band) — correct for BOTH fields under the "½ only for the
-vector" convention; G = k/(Lε)^{2/3}, ε = (k/G)^{3/2}/L, G = (3/2)C_ε^{−2/3}, and the L/L₁₁ ≈ 5
-carry-across giving 0.81 (recomputed: 0.814); κ_maxη = fπη/Δx and Re_λ ∼ N^{2/3}; the Gaussian
-envelope's peak at κ_p/√2; the transform ledgers (mask (6,3)+(1,3) ⇒ 21/18; PhaseShift exactly 2×
-⇒ 42/36, and 51→42 / 34→28); the byte ledgers (384/192 MiB per vector, 322.5 MiB frame = 64.5+129+129,
-2.52 GiB at 512³, 2.3 GiB for six vector fields); Yaglom −4/3 → −2/3 under the full-variance ε_φ;
-ζ_p of K62 and She–Lévêque (both ζ₃ = 1); Lundgren's zero at Re_λ ≈ 34; C₂ = 2.0 ↔ C_K = 1.5
-(C₂ ≈ 1.31 C_K); C_OC = 0.67 as the 3-D, full-variance constant.
+## What was verified clean (no finding)
+
+Recorded so the negative result is on the record, since these are the factors the hat exists to
+catch:
+
+- `kinetic_energy` ½, `scalar_variance` (no ½), `dissipation` ν⟨|ω|²⟩ = 2ν⟨S:S⟩ (differ by the
+  dilatation — expanded and confirmed), `scalar_dissipation` 2ϰ⟨|∇φ|²⟩ — identical on all four
+  surfaces (ARCHITECTURE §4.3, notation, Observables, `FlowParameters`).
+- **Yaglom**: −(2/3)ε_φ r with the full-variance ε_φ. Re-derived from the scalar KHM
+  (∇_r·⟨δu(δθ)²⟩ = −4ϰ⟨|∇θ|²⟩ ⇒ F = −(4/3)ϰ⟨|∇θ|²⟩r = −(2/3)ε_φ r). **Correct.**
+- **Betchov constant**: C_S = (8/105)(15/2)^{3/2} = (4/7)√(15/2) = 1.5649, and both stated Betchov
+  relations (105/8, 15/2) reproduce it exactly. `tr S³ = 3 det S` for symmetric traceless. Correct.
+- **Phase-shift cutoff**: (√2/3)N·(2π/L) = (2√2/3)κ_Ny = 0.9428κ_Ny — the *same number* at all six
+  sites (ARCH §7, decision 27, notation, `DealiasingStrategy`, `PhaseShift`, `truncate_to_band!`,
+  `max_wavenumber`). The √2 band factor and the 2.8× (=√2³) mode count check out.
+- **CFL**: κ_max Δx = 2π/3 = 2.094; y_s = √3 ⇒ C ≲ 0.827 ("≲0.83"). |R(iy)|² = 1 + y⁴/4 for RK2.
+  RK3 A/B/d coefficients: Σd = 1, cumulative d = c = (0, 1/3, 3/4). All correct.
+- **Integrating factor**: exp((A − D|κ|²)τ), coefficient = −ντ, offset_scale = τ — identical in
+  ARCH §4.2, notation, `observables_cache` §2.2, both factor verbs, decision 52.
+- **Spectrum**: E_n vs E(κ), Δκ = 2π/L, dimensions L²T⁻² vs L³T⁻², the "halved radial spectrum",
+  the cancellation of Δκ in L₁₁ — consistent everywhere. L₁₁ = (3π/4)∫(E/κ)/∫E, L₂₂ = L₁₁/2,
+  L_E = (π/2)R = (2/3)L₁₁ = (1/3)(L₁₁+2L₂₂) — algebraically consistent.
+- **Li2008**: G = k/(Lε)^{2/3} ⇔ ε = (k/G)^{3/2}/L; G = (3/2)C_ε^{−2/3}; carrying C_ε = 0.5 at
+  L/L₁₁ = 5 gives 1.5/2.5^{2/3} = 0.814 ("≈0.81"). κ_max η = fπη/Δx; κ_max_η = 2, f = 2/3 ⇒
+  Δx ≈ η. All correct.
+- **Forcing**: injection = 2A·E_band holds for *both* fields, because the velocity's band observable
+  carries the ½ and the scalar's does not, and ε_φ is the full-variance rate. The factor-2 trap is
+  navigated correctly; the "net rate A − D|κ|²" is the amplitude rate, consistent with 𝓔.
+- **Memory/compute arithmetic**: 384/768 MiB, 3N³ reals, 322.5 MiB frame (64.5+129+129), ×7.97 at
+  512³ = 2.52 GiB, 6 vector fields = 2.26 GiB, 24 B/point for a pointwise multiply, transform
+  tables 18/9, 21/18, 36/18, 42/36 and the RK2 scaling 51→42 / 34→28 — every one reproduces.
+- **Phenomenology**: ζ_p (K62, She–Lévêque) exact at ζ₃ = 1; Lundgren zero at (8.45/0.8)^{3/2} =
+  34.3 and ~half the coefficient at Re_λ = 100; VonKarmanLarge exponent 17/6 ⇒ κ⁴; PopeLargeScale
+  p₀ ⇒ κ^{p₀}; Pao (3/2)C_K(κη)^{4/3}; OC dimensions; L₀/L₁₁ ≈ 3.7 ⇒ energy × 3.7^{−2/3} = 0.42
+  ("well under half"). C₂ = 2.0 and C_K = 1.5 are mutually consistent (C₂ ≈ 4.02·(18/55)C_K).
+
+## Findings
 
 ---
 
-## 1. `Pope2000`'s `c_L = 6.78` is Pope's constant for `L = k^{3/2}/ε`, but the factor is evaluated at `κL₁₁`
+### 1. The seeded model spectrum's large scale: `Simulation` promises `1/envelope_wavenumber`, `large_scale_length` overrides it
 
-- **type**: dimensional  **severity**: major  **confidence**: high
+- **type**: contradiction (dimensional / normalization input)
+- **severity**: major
+- **confidence**: medium
 
 **Locations**
 
-- PAGE: api / phenomenology / Spectra — `ModelSpectrum`:
-  "E(\kappa) = C_K \varepsilon^{2/3} \kappa^{-5/3} f_L(\kappa L_{11}) f_\eta(\kappa\eta)"
-  and "reads $\varepsilon$ and the integral scale $L_{11}$ from `fp`".
-- Same page — `PopeLargeScale`: "The coefficient `c_L` is set by the requirement that the spectrum
-  integrate to the kinetic energy".
-- Same page — `Pope2000`: "the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number values
-  Pope obtains from the energy and dissipation normalizations".
-- PAGE: architecture §4.8 states the same composition: "an inertial core $C_K \varepsilon^{2/3}\kappa^{-5/3}$
-  times a swappable large-scale factor $f_L(\kappa L_{11})$".
+- PAGE: api / SimulationRun, `Simulation` → Arguments, `initial_spectrum`:
+  "The model is evaluated at the run's state, with its integral scale taken as
+  `1/envelope_wavenumber`".
+- PAGE: api / phenomenology / Spectra, `large_scale_length`:
+  "`PopeLargeScale` overrides it with $L_{0} = k^{3/2}/\varepsilon$".
 
-**Description**
+**Contradicts**: the same page states the override changes the length "smaller by a factor of order
+three", i.e. the two lengths differ by ≈3.7 at C_ε = 0.5.
 
-With `PopeLargeScale` (p₀ = 2) the integral evaluates in closed form to
-∫E dκ = 1.5·c_L^{−5/6}·B(3/2,1/3)/2·ε^{2/3}L^{2/3}. Dimensionally the only length that makes a *pure
-number* c_L satisfy ∫E dκ = k is L = k^{3/2}/ε — and at c_L = 6.78 the integral is then exactly k
-(numerically 0.999). L₁₁ is smaller by C_ε/1.837 ≈ 1/2.3…1/3.7, so evaluating f_L at κL₁₁ with
-c_L = 6.78 leaves ∫E dκ ≈ 0.4–0.6 k and moves the spectral peak up by the same factor. The docstring's
-own claim ("c_L is set by the requirement that the spectrum integrate to the kinetic energy") cannot
-hold at the length the code passes. `VonKarman1948`'s `c_L = 1.0` "fixes the peak scale" carries the same
-length question. (c_η = 0.40 is unaffected: the dissipation integral lives where f_L → 1.)
+**Description**: The front-door claim is unconditional, but for every `PopeLargeScale`-based preset
+(`Pope2000`, the flagship example of a model spectrum) the roll-off is evaluated at L₀ = k^{3/2}/ε,
+not at the supplied L₁₁ = 1/`envelope_wavenumber`. The seeded spectrum's energy-containing peak then
+sits at a length ~3.7× the promised one, and the setting the user turned has no effect. Only the
+`VonKarman1948` example named in the docstring actually honours the promise.
 
-**resolution_hint**: either pass L₀ = k^{3/2}/ε (derivable from `rms_velocity` and `dissipation` in
-`FlowParameters`) to `f_L`, or re-derive c_L for L₁₁ (≈ 2.4 at L₁₁/L₀ ≈ 0.27) and say so.
+**resolution_hint** (advisory): qualify the front-door sentence — the supplied scale is the bundle's
+`integral_scale`, which a form using `large_scale_length`'s default reads and Pope's form does not.
 
 ---
 
-## 2. `recommended_cfl`: an eigenvalue multiplied by the dimensionless CFL number, compared to `y_s`
+### 2. `ε_target` is bound to "energy-injection rate" but also carries a scalar-variance rate
 
-- **type**: dimensional  **severity**: minor  **confidence**: high
-
-**Location** — PAGE: api / Propagator, `recommended_cfl`: "The advective eigenvalues … of magnitude up
-to $\kappa_{\max}\sup\lvert\boldsymbol{u}\rvert$; stability needs this times $C_{\mathrm{CFL}}$ to stay
-within the scheme's imaginary-axis stability limit $y_{\mathrm{s}}$."
-
-**Description**
-
-κ_max·sup|u| has dimensions T⁻¹; C_CFL is dimensionless; y_s is dimensionless. The quantity that must
-stay within y_s is λΔt, i.e. C_CFL·κ_max·Δx — which is exactly how the very next sentence computes
-√3/(2π/3) ≈ 0.83. The prose skips the Δt. **resolution_hint**: "…needs this times Δt — that is,
-C_CFL κ_max Δx — to stay within y_s."
-
----
-
-## 3. Two different values for the same far-dissipation decay rate β, in one module
-
-- **type**: physics  **severity**: minor  **confidence**: medium
-
-**Locations** — PAGE: api / phenomenology / Spectra —
-`PopeDissipation`: "$f_\eta(\kappa\eta) = \exp(-\beta\{[(\kappa\eta)^4 + c_\eta^4]^{1/4} - c_\eta\})$",
-with `Pope2000`'s default "`β = 5.2`";
-`ExponentialDissipation`: "$f_\eta(\kappa\eta) = \exp(-\beta \kappa\eta)$ … DNS resolving that range fit
-$\beta \approx 6.7$".
-
-**Description**
-
-Pope's factor is asymptotically exp(−β κη) for κη ≫ c_η, so both `β`s name the same physical quantity —
-the far-dissipation exponential decay rate — yet the page carries 5.2 and 6.7 with no note that they
-disagree by 30 %, and reuses one symbol for both. A reader comparing the two cutoffs has no way to
-tell whether the difference is physical (fit range, Re_λ, the c_η offset) or a transcription slip.
-
----
-
-## 4. Parseval and the "normalized inner product" are asserted, but no transform normalization is stated
-
-- **type**: dimensional  **severity**: minor  **confidence**: medium
+- **type**: dimensional
+- **severity**: minor
+- **confidence**: high
 
 **Locations**
 
-- PAGE: api / Observables, `kinetic_energy`: "Computed as $\tfrac{1}{2}\langle\boldsymbol{u},\boldsymbol{u}\rangle$
-  with the normalized inner product, so by Parseval's theorem it accepts the velocity in either representation".
-- PAGE: notation, Spectral representation: "$\hat f$ | The field $f$ in spectral (Fourier) representation,
-  to_spectral(f)" — no 1/N³ or 1/|Ω| convention.
+- PAGE: notation, § Forcing table: "$\varepsilon_{\mathrm{target}}$ | target energy-injection rate |
+  `ConstantPower(injection_rate=…)`".
+- PAGE: api / Forcing, `ConstantPower`: "the rate $\varepsilon$ for the velocity … and
+  $\varepsilon_\varphi$ for the scalar".
+- PAGE: api / Forcing, module map: "The interchangeable energy-injection strategies".
 
-**Description**
+**Contradicts**: one glossary symbol, two dimensionally distinct quantities — ε is L²T⁻³, ε_φ is
+[φ²]T⁻¹.
 
-Every representation-independence claim (kinetic_energy, scalar_variance, dissipation, the halved radial
-spectrum) rests on a transform normalization the rendered corpus never states, and on a two-argument
-⟨·,·⟩ the glossary does not define (it defines only the one-argument box average ⟨·⟩). A cold reader
-cannot check any of the 1/N factors my hat is asked to verify. **resolution_hint**: one glossary row —
-⟨f,g⟩ = |Ω|⁻¹∫f·g, and the Parseval statement it implies for the backend's convention.
+**Description**: The glossary is the single reference that binds each symbol to one concept, and it
+binds ε_target to an *energy*-injection rate; the same keyword on the scalar side injects scalar
+variance, whose rate has different dimensions and a different symbol (ε_φ) already in the glossary.
+The `Forcing` module map inherits the slip by calling every strategy an "energy-injection" strategy
+while one implementation serves the scalar too.
+
+**resolution_hint**: name the glossary entry for the held quantity's rate ("the target injection rate
+of the forced field's quadratic invariant — ε for the velocity, ε_φ for the scalar").
 
 ---
 
-## 5. `FlowParameters` calls four dependent quantities "independent", and its examples violate the package's own C_ε
+### 3. "Two registers per field" names two different sets on two pages
 
-- **type**: dimensional  **severity**: minor  **confidence**: medium
+- **type**: contradiction (count convention)
+- **severity**: minor
+- **confidence**: medium
 
 **Locations**
 
-- PAGE: api / phenomenology / Phenomenology, `FlowParameters`: "It carries the independent dimensional
-  quantities of a homogeneous isotropic state ($\nu$, $\varepsilon$, $u'$, $L_{11}$)".
-- Same page, example: "FlowParameters(; viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
-  integral_scale = 0.5)".
-- PAGE: api / phenomenology / Scalings, `Sreenivasan1998`: "$C_\varepsilon = \varepsilon L_{11}/u'^3$ …
-  `asymptote = 0.5`".
+- PAGE: architecture, §4.5: "dearer in memory — three spectral registers per field against the
+  low-storage scheme's two".
+- PAGE: api / Propagator, `IFLowStorageRK3`: "two field registers per field: the state's own array
+  plus one accumulator (`stage1`)".
+- PAGE: api / Propagator, `allocate_buffers`: "`IFLowStorageRK3` allocates `stage1` and `nonlinear`;
+  `IFRK2` allocates `stage1`, `stage2`, and `velocity_predictor_spectral`".
 
-**Description**
+**Contradicts**: axis = what the count includes. ARCH's "two" = {stage1, nonlinear} (state excluded);
+the scheme docstring's "two" = {state, stage1} (nonlinear excluded).
 
-Four quantities in two dimensions leave two dimensionless groups, and one of them — C_ε = εL₁₁/u'³ — is
-fixed at ≈ 0.5 by the package's own `Sreenivasan1998`. The documented example states C_ε = 0.05 (the
-PAGE: phenomenology front-page example gives 0.1), i.e. 5–10× off a realizable HIT state, so a reader
-who evaluates a law there is off the manifold every law is fitted on. "Independent" is the wrong word
-for a set the package elsewhere constrains.
-
----
-
-## 6. `Sreenivasan1995`'s C_K = 1.5 ± 0.1 is not the value that paper reports for the 3-D spectrum
-
-- **type**: citation  **severity**: minor  **confidence**: low
-
-**Location** — PAGE: api / phenomenology / Scalings, `Sreenivasan1995`: "Sreenivasan (1995) found it
-close to universal, a reliable estimate being $C_K = 1.5 \pm 0.1$ (the default; Sagaut & Cambon 2018)".
-
-**Description**
-
-Sreenivasan (1995) reports the one-dimensional constant C₁ ≈ 0.53 ± 0.055; the three-dimensional
-constant follows by C_K = (55/18)C₁ ≈ 1.6. The docstring attributes 1.5 ± 0.1 to the finding of the
-named paper while crediting the number to Sagaut & Cambon — precisely the 1-D/3-D normalization
-conversion this hat is asked to police, and the one the sibling `ObukhovCorrsin1949` docstring handles
-explicitly ("≈ 0.67 for the three-dimensional spectrum"). The value itself is internally consistent
-with `Kolmogorov1941`'s C₂ = 2.0 (C₂ ≈ 1.31 C_K), so only the attribution is at issue.
+**Description**: The two "two"s coincide numerically by accident and denote disjoint sets, so ARCH's
+3-against-2 comparison cannot be checked against either page. The `IFLowStorageRK3` docstring
+anticipates the collision ("the `IntegratorBuffers` a run allocates can hold more than that count"),
+but ARCH never says which convention it uses, and the reader who carries Williamson's 2N count across
+gets 4-against-3 for the same comparison.
 
 ---
 
-## 7. `Re = 1/ν` is stated on three surfaces under a units condition the shipped default violates
+### 4. `max_wavenumber` calls κ_max "the highest wavenumber magnitude that `domain` actually evolves" — false for `HouLi`
 
-- **type**: dimensional  **severity**: minor  **confidence**: medium
+- **type**: physics / definition
+- **severity**: minor
+- **confidence**: medium
 
 **Locations**
 
-- PAGE: notation, Parameters: "$\mathrm{Re}$ | Reynolds number … | 1 / ν (in units where $u' = L = 1$)".
-- PAGE: architecture §4.2: "the viscosity $\nu$ ($\mathrm{Re} = 1/\nu$ in units where $u' = L = 1$)".
-- PAGE: api / Generator, `FlowConditions`: "on the shipped defaults ($u' = 1$, $L = 2\pi$) the box-scale
-  value is $2\pi/\nu$" — against PAGE: api / SimulationRun, `Simulation`: "`side_length = 2π`".
+- PAGE: api / SimulationDomain, `max_wavenumber`: "The highest wavenumber magnitude that `domain`
+  (a `FixedDomain`) actually evolves … $f$ … ($1$ for `HouLi`)".
+- Same docstring, two sentences later: "`HouLi`, whose band runs to the Nyquist wavenumber, damps
+  them instead (to machine epsilon at Nyquist)".
 
-**Description**
+**Description**: Under `HouLi` nothing is zeroed, and the grid carries modes out to the cube corner
+(√3 κ_Ny), all still evolved with a taper. κ_Ny is therefore a *convention* for HouLi, not the
+highest evolved magnitude — and this κ_max is what feeds both the CFL scaling and the resolution
+criterion κ_max·η. The docstring already knows this; the opening identity sentence contradicts it.
 
-Every default run has L = 2π, so the condition under which Re = 1/ν holds is never met by a shipped
-case, and the box-scale Reynolds number is 2π/ν — a factor 6.28. Only `FlowConditions` says so; the
-glossary row and the architecture, which are where a reader looks the number up, do not. Not a
-contradiction (both are conditioned), but the correction lives on the one surface least likely to be
-read for it.
+**resolution_hint**: "the highest wavenumber the run treats as resolved signal" covers all three
+strategies without the false claim.
 
 ---
 
-## 8. χ is assigned to the half-variance rate, against the more common convention
+### 5. `Sreenivasan1995`'s default C_K = 1.5 is not Sreenivasan's own value
 
-- **type**: dimensional  **severity**: nit  **confidence**: low
+- **type**: citation / normalization constant
+- **severity**: minor
+- **confidence**: low
 
-**Location** — PAGE: api / phenomenology / Phenomenology, `FlowParameters`: "$\varepsilon_\varphi =
-2\varkappa\langle\lvert\nabla\varphi\rvert^{2}\rangle$, the full-variance convention (not the
-half-variance $\chi$, which is half of it — a law fed the wrong one is off by a factor of 2 with no
-error)".
+**Location**
 
-**Description**
+- PAGE: api / phenomenology / Scalings, `Sreenivasan1995`: "Reviewing the experimental and numerical
+  record, Sreenivasan (1995) found it close to universal, a reliable estimate being $C_K = 1.5 \pm
+  0.1$ (the default; Sagaut & Cambon 2018)".
 
-The arithmetic is right (χ = ϰ⟨|∇φ|²⟩ = ε_φ/2, matching `Yaglom1949`'s −4/3 → −2/3 conversion), but a
-large part of the mixing literature — including Sreenivasan's Obukhov–Corrsin papers, cited two pages
-later for C_OC — writes χ for the *full*-variance rate 2ϰ⟨|∇φ|²⟩. A warning built on the opposite
-reading of χ can send a reader the wrong way on exactly the factor of 2 it exists to prevent.
-**resolution_hint**: name the half-variance rate by its formula rather than by the contested glyph.
+**Description**: Sreenivasan (1995) reports the *one-dimensional* longitudinal constant C₁ = 0.53 ±
+0.055; converted with the isotropy factor 55/18 that is C_K = 1.62 ± 0.17 for the three-dimensional
+spectrum this preset evaluates — outside the stated 1.5 ± 0.1. The parenthetical credits 1.5 to
+Sagaut & Cambon, but the sentence reads as Sreenivasan's finding, so a preset named for the 1995
+review ships a different amplitude. C_K is the spectrum's overall normalization, so the ~8 %
+difference propagates into every `validate_spectrum`-style comparison.
+
+---
+
+### 6. `initial_spectrum` is "evaluated at the run's state" at *t* = 0, where ε and η do not yet exist
+
+- **type**: method / underspecified normalization
+- **severity**: minor
+- **confidence**: low
+
+**Location**
+
+- PAGE: api / SimulationRun, `Simulation`, `initial_spectrum`: "The model is evaluated at the run's
+  state, with its integral scale taken as `1/envelope_wavenumber`, and the result normalized to
+  `kinetic_energy`."
+
+**Description**: Every `ModelSpectrum` needs ε (for the C_K ε^{2/3} core) and η (for f_η), both
+measured quantities that do not exist before the field is seeded. Only L₁₁ and k are said to be
+supplied. Which ε the seeder uses — the `Li2008` prediction of grid mode? a value derived from k and
+the box? — decides the shape of the dissipation roll-off and is not stated anywhere on the page.
+
+---
+
+### 7. "Carrying the ½ only for the vector" attributes an energy-vs-variance convention to tensor rank
+
+- **type**: clarity / normalization statement
+- **severity**: nit
+- **confidence**: medium
+
+**Location**
+
+- PAGE: api / Forcing, `BandRescaling`: "the kinetic energy $\tfrac{1}{2}\langle\lvert\boldsymbol{u}
+  \rvert^{2}\rangle` … the scalar variance $\langle\varphi^{2}\rangle$ … the field's $L^{2}$
+  observable, carrying the $\tfrac{1}{2}$ only for the vector."
+
+**Description**: The ½ is present because the *kinetic energy* is conventionally half the mean square
+and the *variance* is not; it has nothing to do with the field being a vector. As written a reader
+generalizing the rule to a future vector-valued scalar, or to a second scalar diagnostic, would carry
+the ½ to the wrong quantity. The consequence matters: the same ½ decides whether `target` and
+`ConstantPower`'s 2A·E_band relation stay consistent across the two fields.
+
+---
+
+### 8. The notation glossary writes κ_max in two algebraic shapes and omits `HouLi`
+
+- **type**: format / notation consistency
+- **severity**: nit
+- **confidence**: high
+
+**Locations**
+
+- PAGE: notation, § Numerics: "$\kappa_{\max}$ | dealiased maximum wavenumber, $\tfrac{2}{3}\cdot
+  \tfrac{N}{2}\cdot\tfrac{2\pi}{L}$ for the default $2/3$ rule ($\tfrac{\sqrt{2}}{3}N\cdot
+  \tfrac{2\pi}{L}$ for PhaseShift; set by the dealiasing strategy)".
+- PAGE: api / SimulationDomain, `max_wavenumber`: "$\kappa_{\max} = f \frac{N}{2}\frac{2\pi}{L}$ …
+  ($2/3$ for `TwoThirds`, $1$ for `HouLi`, $\tfrac{2\sqrt{2}}{3}$ for `PhaseShift`)".
+
+**Description**: The glossary — the page that is "the single reference" — gives the same quantity in
+two incompatible-looking forms (one with N/2 factored out, one with N), so the reader must do the
+algebra to see that (√2/3)N = (2√2/3)(N/2), and `HouLi`'s f = 1 is absent. The API page's uniform
+f·(N/2)·(2π/L) form makes all three commensurable at a glance.

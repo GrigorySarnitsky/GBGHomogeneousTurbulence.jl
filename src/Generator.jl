@@ -341,7 +341,7 @@ Returns `N̂`.
     write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
     does on return, while `u` is only read. This is what keeps a product field in physical
     representation from existing at all; passing a copy instead would cost a resident ``N^{3}``
-    vector, which the footprint invariant forbids.
+    vector, which the package's preference for the smallest working set forbids.
 
     Which operand is consumed follows the **physics**, not the argument position: the Lamb vector
     forms over the vorticity here, and the scalar flux over the velocity in

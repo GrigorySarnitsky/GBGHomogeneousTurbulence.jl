@@ -1,75 +1,114 @@
-# Doc-review panel — Hat: physicist-programmer / API user
+# Panel review — hat: physicist-programmer / API user
 
-Reviewing the rendered manuscript as a user who would assemble a `Simulation`, warm it up,
-observe it with `run!`, read the cache, and sample along tracers — from the docs alone.
+Scope: assemble a `Simulation`, spin it up, observe with `run!`, read cached observables, sample
+tracers — from the rendered docs alone. Checked: constructor arguments and defaults, argument
+documentation completeness, return-shape clarity, the checked-read (throw) contract, example
+correctness, and exported-vs-documented parity.
 
----
-
-## Finding 1 — `Simulation`'s own docstring contradicts the architecture doc on whether `sim.tracers` is a reading surface
-
-- **Type:** contradiction
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `PAGE: api / SimulationRun`, `Simulation` Fields: *"Two of these are what a user reads — `state` and `cache`. The rest are the machinery the step runs on: … treat their contents as the scheme's business rather than the run's state."* — `tracers` is listed among "the rest."
-  - `PAGE: architecture`, §4.7: *"The state is read through `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it — `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`, `particle_positions(sim.tracers)`."*
-  - `PAGE: api / Particles`, "Wiring tracers into a run" and the `Tracers` example both show `particle_positions(sim.tracers)` as the ordinary way to read tracer state.
-- **Contradicts:** the SimulationRun API page says exactly two fields (`state`, `cache`) are user-facing and `tracers` is scheme-internal machinery "read only between steps"; the architecture doc and the Particles page treat `sim.tracers` as a third, parallel, first-class accessor-owned reading route exactly like `sim.state`/`sim.cache`.
-- **Description:** A user reading only the `Simulation` API page would conclude that reaching into `sim.tracers` is unsupported/internal, then find every worked example in the corpus doing exactly that. One of the two claims needs to be reconciled — either `Simulation`'s Fields section should list `state`, `cache`, *and* `tracers` (with `trajectory_scheme`/`particle_buffers`/`buffers`/`generator`/`scheme` as the true "read only between steps" machinery), or the examples are wrong.
-- **Resolution hint:** Fold `tracers` into the "what a user reads" sentence; keep `domain`, `buffers`, `generator`, `scheme`, `trajectory_scheme`, `particle_buffers` as the internal-machinery group.
+Overall: the exported-surface-vs-documented-surface check came back **clean** — every name in the
+`GBGIsotropicTurbulence` API index has a matching docstring, and every constructor follows one
+stated positional/keyword convention (source object positional, settings keyword) without
+exception across all ~20 constructors inspected. The findings below are the residue: one
+corpus-wide terminology leftover, and several smaller signature/contract asymmetries.
 
 ---
 
-## Finding 2 — `deposit_sample!`, required by the documented hand-run particle-repositioning recipe, is never documented or indexed anywhere
+## Finding 1 — "Stamp" vocabulary survives in live prose after its own retirement
 
-- **Type:** api-gap
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - `PAGE: api / Cache`, `particles_modified!`: *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocities!` to write the new values, and finally `deposit_sample!` to record them at the current epochs."*
-  - `PAGE: api / Particles`, `record_particle_velocities!`: *"the slot becomes readable when the cache is then told the values are current, which is a second call the cache owns"* — the "second call" is never named here either.
-  - `PAGE: api / GBGIsotropicTurbulence` Index (the complete export list, lines ~1045–1125): no `deposit_sample!` anywhere.
-- **Description:** The Cache page's own checked-read contract tells a user following the documented out-of-band tracer-repositioning recipe to call `deposit_sample!` as the final, required step. That name occurs exactly once in the whole corpus and is absent from the package's complete public index, from the Particles page's own function list, and from the Propagator page's `deposit!` docstring (which explicitly says the particle-velocities slot is *not* among what `deposit!` fills). A user cannot find this function's signature, confirm it is public, or complete the documented procedure.
-- **Resolution hint:** Either export and document `deposit_sample!` where the other Particles/Cache verbs live, or replace the two vague references with the actual call a user should make.
+**Type:** contradiction
+**Severity:** major
+**Confidence:** high
 
----
+**Locations:**
+- PAGE: Home, Quick start comment: "each stamped with the epoch of the state they were computed from"
+- PAGE: notation, Vocabulary/`epoch` entry: "the stamp it carries still equals the counter it depends on"
+- PAGE: api / Cache, `ObservablesCache` Fields: "each slot carries a stamp, the counter's value at the moment that slot was filled... its stamp still equals the counter"; "each slot's stamp"; "the particle velocities' two stamps"
+- PAGE: api / Cache, `deposit_sample!`: "this call stamps both from the cache's current counters"
 
-## Finding 3 — `BandRescaling` is the one forcing constructor missing a per-argument `Arguments` list
+**Contradicts:** PAGE: architecture, decision log (2026-08, "'Stamp' is retired"): "The `*_stamp` fields become `*_epoch`, and the verb goes with the noun — a deposit fills a slot and sets its epoch rather than 'stamping' it" — axis: the very vocabulary the decision retired.
 
-- **Type:** format
-- **Severity:** minor
-- **Confidence:** medium
-- **Locations:**
-  - `PAGE: api / Forcing`, `Linear` and `ConstantPower` each carry an explicit bulleted `Arguments` section naming `domain`, the rate/target keyword, and `lowest_shell`/`highest_shell` individually.
-  - `PAGE: api / Forcing`, `BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)` has no such section — `domain`, `lowest_shell`, and `highest_shell` are only mentioned in running prose ("the integer shells `lowest_shell` to `highest_shell`… built on the `FixedDomain` `domain`").
-- **Description:** All three constructors take the same shape of arguments (`domain`, a required target/rate keyword, a shell band), and two of the three enumerate every argument in a dedicated list per the corpus's own self-containedness rule ("every signature argument documented — enumerated from the signature, each its own entry"). `BandRescaling`'s prose covers `target` and `over` at length but leaves `domain`/`lowest_shell`/`highest_shell` unenumerated, breaking the sibling family's formatting parity.
-- **Resolution hint:** Add the same `Arguments` bullet block `BandRescaling` is missing, reusing `Linear`'s wording for `domain`/`lowest_shell`/`highest_shell`.
+**Description:** The decision log records that "stamp" was swept everywhere in favor of "epoch" (the field names are indeed `velocity_epoch`, `fields_epoch`, etc. throughout). Yet the word survives as live, current-state prose on four separate user-facing surfaces, including the very first page a new user reads (Home's quick-start walkthrough) and the glossary entry that is supposed to be the single canonical definition of "epoch." A reader is left holding two words for one concept exactly where the decision log says that confusion was fixed.
 
 ---
 
-## Finding 4 — The `ArgumentError` a user hits inside `FlowConditions(...)` is documented only on a different page
+## Finding 2 — `deposit_sample!`'s return-type arrow names neither a type nor an argument
 
-- **Type:** api-gap
-- **Severity:** minor
-- **Confidence:** medium
-- **Locations:**
-  - `PAGE: api / Forcing`, `AbstractForcing`: *"A strategy holding per-field scratch or a random stream must not drive both fields from one instance… `FlowConditions` throws an `ArgumentError` rather than let that happen."*
-  - `PAGE: api / Generator`, `FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)`: no mention of this throw condition anywhere in its own docstring.
-- **Description:** The error actually fires inside `FlowConditions`'s constructor, which is where a user would hit it (passing the same stateful forcing instance for both `velocity_forcing` and `scalar_forcing`), but the explanation of *why* and *when* lives only in `AbstractForcing`'s docstring on a different page. Per the corpus's own rule ("the checked-read contract documented where a user will hit it"), this belongs on (or is at least cross-referenced from) `FlowConditions`.
-- **Resolution hint:** Add a one-line note to `FlowConditions` pointing at the shared-instance restriction, or `@ref` it from there.
+**Type:** format
+**Severity:** minor
+**Confidence:** high
 
----
+**Locations:**
+- PAGE: api / Cache: `deposit_sample!(cache) -> particle velocities`
+- Contrast, same page/corpus: `advect!(...) -> tracers`, `interpolate_at_particles!(...) -> out`, `allocate_buffers(...) -> IntegratorBuffers`, `kolmogorov_length(fp) -> Float64`
 
-## Finding 5 — The stated `viscosity`/`κ_max_η` mutual-exclusivity contract is hard to reconcile with `κ_max_η`'s always-present default
-
-- **Type:** clarity
-- **Severity:** minor
-- **Confidence:** low
-- **Locations:**
-  - `PAGE: api / SimulationRun`, `Simulation`: signature shows `κ_max_η = 2` as an ordinary default (always present), while the prose says *"Explicit mode: pass `viscosity` and it is used directly; the two are alternatives, and passing both raises an `ArgumentError` rather than dropping one."*
-- **Description:** Since `κ_max_η` is shown with an ordinary Julia default of `2` (not a `nothing` sentinel), nothing in the documented signature lets a reader tell "the user explicitly wrote `κ_max_η = 2`" apart from "the user omitted it and the default applied" — yet the docs describe an error path that depends on exactly that distinction ("passing both"). As written, a reader cannot tell whether providing `viscosity` alone is safe (most likely, and probably what happens) or whether it is expected to collide with the ever-present default. This is a documentation clarity gap rather than a demonstrated code bug.
-- **Resolution hint:** State explicitly that the check is really "is `viscosity` given," with `κ_max_η` simply unused/ignored in that case, if that is the real behavior — rather than describing it as a symmetric "passing both" case.
+**Description:** Every other `-> X` signature in the corpus names either a concrete Julia type (`Float64`, `Bool`, `IntegratorBuffers`) or the literal identifier of the returned/mutated argument (`-> rate`, `-> tracers`, `-> out`). `deposit_sample!(cache) -> particle velocities` does neither: the sole argument is `cache`, and "particle velocities" is a two-word English phrase, not backticked, not a type, not an identifier in scope. The body separately says "Returns the slot's array," so the arrow is redundant as well as off-convention — the one signature line in the corpus that breaks the pattern.
 
 ---
 
-*Not flagged (already adjudicated as non-defects): `kinetic_energy` default of 1.5, Saffman attribution, decision-log entries naming superseded APIs, absence of the deferred capabilities, `vorticity_spectral(sim)` non-existence, `Lundgren2002` citation, `deposit_velocity!`/`take_velocity!` existing as undocumented internals, the host-device-sync floor-vs-achieved pair, `integrator`→`scheme`, PascalCase composed presets, `No DOI`/`no DOI` capitalization, bare `CatmullRom`, the arrow-vs-`Returns` dual convention, and a citation opening a docstring ahead of its formula.*
+## Finding 3 — `velocity_rhs!` / `scalar_rhs!` order the consumed operand inconsistently
+
+**Type:** clarity
+**Severity:** minor
+**Confidence:** medium
+
+**Locations:**
+- PAGE: api / Generator: `velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)` — consumed arg (`ω_consumed`) last before `domain`
+- PAGE: api / Generator: `scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain)` — consumed arg (`u_consumed`) comes *before* the non-consumed physical field (`φ`)
+
+**Description:** The two sibling right-hand-side assemblers place the destructively-consumed physical argument in opposite relative positions with respect to the read-only physical argument: `velocity_rhs!` reads non-consumed-then-consumed, `scalar_rhs!` reads consumed-then-non-consumed. Both docstrings note "the consumed argument is fixed by the physics, not by its position," which explains *which* argument is consumed but not why the pair does not share one positional convention the way `step!`/`deposit!` are explicitly documented to ("Call it with the same arguments in the same order as `deposit!`"). A caller who has memorized one signature has no positional cue for the other.
+
+---
+
+## Finding 4 — `stationary_dissipation` is the one `Scalings` evaluator without a return-type arrow
+
+**Type:** format
+**Severity:** nit
+**Confidence:** medium
+
+**Locations:**
+- PAGE: api / phenomenology / Scalings: `stationary_dissipation(law, kinetic_energy, side_length)` — no `-> Type`
+- Contrast, same page/module family: `scaling(law, fp) -> Float64`, and elsewhere `spectrum(...) -> Float64`, `structure_function(...) -> Float64`, `scaling_exponent(...) -> Float64`, `kolmogorov_length(fp) -> Float64`
+
+**Description:** Every other pure evaluator in the `Phenomenology` submodules — including `Li2008`'s own `scaling` sibling on the very same page — carries a `-> Float64` signature annotation. `stationary_dissipation`, the seam the run layer actually calls to set viscosity, is the lone silent one, with no prose "Returns …" sentence to compensate.
+
+---
+
+## Finding 5 — `particle_velocities` breaks the tracer-accessor naming pattern it sits beside
+
+**Type:** clarity
+**Severity:** minor
+**Confidence:** medium
+
+**Locations:**
+- PAGE: api / Particles: "Read the particle state with `particle_positions` and `number_of_particles`; the trajectory velocities are read from the run's observables cache, through `particle_velocities`"
+- PAGE: api / Particles, `Tracers` Fields: "`particle_velocities` — the interpolated velocity at the positions the tracers occupy... the observables cache's particle-velocities slot"
+
+**Description:** `particle_positions(tracers)` and `number_of_particles(tracers)` both take the tracer set, establishing a "call the accessor on `tracers`" pattern for particle state. `particle_velocities`, despite naming the same conceptual quantity and existing as `tracers.particle_velocities` (a genuine field on the same struct), is exposed as a function only over `particle_velocities(cache)` — the cache, not the tracer set. The docs do call this out in prose, so it is not silently wrong, but the surface itself is the odd one out among three sibling "read the particle state" accessors, and a reader pattern-matching from the first two will reach for `particle_velocities(tracers)`, which does not exist.
+
+---
+
+## Finding 6 — the front door's spectrum-matched IC option covers velocity only, with no documented scalar path or explanation
+
+**Type:** api-gap
+**Severity:** minor
+**Confidence:** medium
+
+**Locations:**
+- PAGE: api / SimulationRun, `Simulation` Arguments: "`initial_spectrum = nothing` — draw the initial velocity from a `Phenomenology` `EnergySpectrum`..."; the scalar-related keywords are only "`scalar = false`, `scalar_variance = 1.0`"
+- PAGE: api / State, `random_scalar_spectral!`: "Pass `spectrum`, a function κ ↦ E_φ(κ)... e.g. an Obukhov–Corrsin form from `Phenomenology`"
+
+**Description:** The underlying primitive `random_scalar_spectral!` already supports spectrum-matched scalar initial conditions (mirroring the velocity seeder, per the docs' own cross-reference). The `Simulation` front door exposes this for the velocity (`initial_spectrum`) but has no equivalent keyword for the scalar, and nothing in the `Simulation` docstring says why, or shows the workaround (build via `Simulation(domain; ...)`, then call `random_scalar_spectral!` plus `fields_modified!`/`deposit!` by hand). This is not one of the recorded §7 deferrals, so a user wanting faster scalar warm-up via an Obukhov–Corrsin IC has no documented route from the front door.
+
+---
+
+## Finding 7 — `scalar_physical`'s "exactly `velocity_physical`'s contract" is immediately contradicted by an extra throw case
+
+**Type:** clarity
+**Severity:** nit
+**Confidence:** low
+
+**Locations:**
+- PAGE: api / Cache: `scalar_physical` — "with exactly `velocity_physical`'s contract (the deposited field or a throw; never a recomputation; read-only). Throws an `ArgumentError` when the run carries no scalar."
+- Same pattern: `particle_velocities` — "it serves the deposited values or throws an `ErrorException`, like every cached read... Throws an `ArgumentError` when the run advects no tracers."
+
+**Description:** "Exactly" oversells the parity: `velocity_physical` has one failure mode (stale/scratch/never-deposited → `ErrorException`), while `scalar_physical` has that mode *plus* a second, structurally different one (no scalar in the run → `ArgumentError`) that `velocity_physical` cannot hit (a velocity slot always exists). The information given is correct and complete: the word "exactly" is simply stronger than the two sentences that follow it support.

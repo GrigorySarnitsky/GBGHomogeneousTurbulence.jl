@@ -298,7 +298,7 @@ spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
-  return (; wavenumbers = shells, energy = 0.5 .* spec)
+  return (; wavenumbers = shells, energy = spec ./ 2)
 end
 
 
@@ -343,7 +343,7 @@ function integral_scale(û, domain::FixedDomain)
   # by the branch rather than by skipping an index, which a fused broadcast cannot do.
   total = sum(E)
   weighted = sum(broadcast((k, e) -> k > 0 ? e / k : zero(e), κ, E))
-  return (3 * π / 4) * weighted / total
+  return oftype(weighted, 3 * π / 4) * weighted / total
 end
 
 

@@ -245,7 +245,7 @@ Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, 
 evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
 per field: the state's own array plus one accumulator (`stage1`). The
 [`IntegratorBuffers`](@ref) a run allocates can hold more than that count — for this scheme it adds
-`nonlinear`, the dealiasing seam's assembly register — because the count measures the scheme, not
+`nonlinear`, the register the right-hand-side assembly and its dealiasing pass write through — because the count measures the scheme, not
 the solver it is embedded in. The general-purpose workhorse:
 third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
 """
@@ -498,7 +498,9 @@ deposit so the
 first iteration finds the initial state's observables. The argument order is shared with `step!` —
 the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
 same fixed order as there. After mutating the state out of band, announce
-it with [`fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
+it with [`fields_modified!`](@ref) and re-deposit with the second form: `sim`, a
+`Simulation`, unpacks its own cache, state,
+domain and buffers and calls the first.
 
 Returns `cache` (or `sim`).
 """

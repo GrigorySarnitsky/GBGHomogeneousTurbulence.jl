@@ -169,7 +169,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
   [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
-  built run and announcing the change.
+  built run and announcing the change with
+  [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -605,7 +606,7 @@ The criterion carries its own observation state (the sampled signals and the tur
 build a fresh one per run.
 
 # Fields
-The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
+The fields are not the keywords: `gate_skew`, `min_turnovers`, `window_turnovers`, `tol` and
 `skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
 that judge them. Build one through the keyword constructor above.
 - `monitor` — the sampled signals (the turnover clock, ``\\varepsilon``, the scalar variance, the
