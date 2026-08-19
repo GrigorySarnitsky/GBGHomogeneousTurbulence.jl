@@ -23,6 +23,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 ```@contents
 Pages = [
   "api/GBGIsotropicTurbulence.md",
+  "api/SimulationRun.md",
   "api/SimulationDomain.md",
   "api/State.md",
   "api/Observables.md",
@@ -31,7 +32,6 @@ Pages = [
   "api/Generator.md",
   "api/Propagator.md",
   "api/Particles.md",
-  "api/SimulationRun.md",
 ]
 Depth = 2
 ```

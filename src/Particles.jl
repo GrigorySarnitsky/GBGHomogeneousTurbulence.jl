@@ -232,7 +232,7 @@ The values go into the tracer set's own `particle_velocities` storage, which is 
 cache's particle-velocities slot. **This call is that slot's only producer of values**, but it writes
 values only: the slot becomes readable once
 [`deposit_sample!`](@ref GBGIsotropicTurbulence.Cache.deposit_sample!) records them as current.
-Write, then record — a run does both at the end of each iteration, on the just-deposited velocity at
+Interpolate here, then mark current there — a run does both at the end of each iteration, on the just-deposited velocity at
 the just-advanced positions, and reading
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) after only the first
 throws.

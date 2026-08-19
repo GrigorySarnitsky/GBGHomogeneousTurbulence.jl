@@ -107,10 +107,14 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number).
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
-- `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
-  value belongs to, or a sentinel (never deposited / in use as scratch).
-- `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' epochs against **both**
-  counters, since that sample is a function of the state and the positions together.
+Two kinds of field share the word: the two **counters** below tick as the state changes, and each
+slot carries a **stamp**, the counter's value at the moment that slot was filled. A slot is readable
+exactly when its stamp still equals the counter it depends on.
+
+- `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — each slot's stamp, or a
+  sentinel (never deposited / in use as scratch).
+- `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two stamps, against
+  **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
   [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run and
   will run ahead of
