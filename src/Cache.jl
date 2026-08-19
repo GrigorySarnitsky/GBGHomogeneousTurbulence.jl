@@ -200,9 +200,9 @@ end
     scalar_physical(cache)
 
 The scalar ``\\varphi`` in physical representation at the current epoch — the checked read of the
-[`ObservablesCache`](@ref) `cache`'s scalar slot, with exactly [`velocity_physical`](@ref)'s
-contract (the deposited field or a throw; never a recomputation; read-only). Throws an
-`ArgumentError` when the run carries no scalar.
+[`ObservablesCache`](@ref) `cache`'s scalar slot, on [`velocity_physical`](@ref)'s terms (the
+deposited field or a throw; never a recomputation; read-only) plus one of its own: it throws an
+`ArgumentError` when the run carries no scalar, so there is no slot to read.
 """
 function scalar_physical(cache::ObservablesCache)
   cache.scalar_physical === nothing &&
@@ -264,7 +264,7 @@ deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_ep
 deposit_max_speed!(cache::ObservablesCache, value::Real) =
   (cache.max_speed = Float64(value); cache.max_speed_epoch = cache.fields_epoch; value)
 """
-    deposit_sample!(cache) -> particle velocities
+    deposit_sample!(cache)
 
 Record the particle velocities already written into `cache` (an [`ObservablesCache`](@ref)) as
 current, so [`particle_velocities`](@ref) will serve them instead of throwing.
@@ -278,7 +278,9 @@ order, since the write alone leaves the slot stale.
 
 This slot is the one checked against **two** epochs — the fields epoch of the velocity that was
 interpolated, and the particles epoch of the positions it was interpolated at — so this call sets
-both from the cache's current counters. Returns the slot's array.
+both from the cache's current counters.
+
+Returns the particle-velocities slot.
 """
 deposit_sample!(cache::ObservablesCache) =
   (cache.sample_fields_epoch = cache.fields_epoch;

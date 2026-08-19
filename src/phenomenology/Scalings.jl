@@ -35,7 +35,7 @@ abstract type ScalingLaw <: TurbulenceLaw end
 
 
 """
-    stationary_dissipation(law, kinetic_energy, side_length)
+    stationary_dissipation(law, kinetic_energy, side_length) -> Float64
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
 dissipation `law` from the turbulent kinetic energy ``\\texttt{kinetic\\_energy} \\equiv k`` and the

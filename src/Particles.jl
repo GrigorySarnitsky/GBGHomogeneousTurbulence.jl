@@ -119,8 +119,10 @@ The trajectory scheme's own working storage is **not** here: it lives in a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `positions`: the
   same coordinates in the form `GBGPeriodicFields`' interpolation takes, which is why both exist.
 - `particle_velocities` — the interpolated velocity at the positions the tracers occupy, at the
-  instant they occupy them: the genuine Lagrangian sample, and the observables cache's
-  particle-velocities slot.
+  instant they occupy them: the genuine Lagrangian sample. This array **is** the observables cache's
+  particle-velocities slot, the same storage under two names, so it carries that slot's rules —
+  read it through
+  `particle_velocities`, which serves it only when current, and treat it as read-only, since the tracer advance writes here mid-iteration.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
 """
 struct Tracers{P, PSX, VV, S}
