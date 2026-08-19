@@ -1550,8 +1550,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
     favor of the slot epoch, and the sample is read through the checked `particle_velocities`
     (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
-    user-settled accessor prefix). The register `predictor_velocity` is deliberately **not** readable — an
-    off-trajectory value must not be servable as a plausible-looking Lagrangian velocity — and the
+    user-settled accessor prefix). The register `predictor_velocity` is deliberately **not served** as an
+    observable — an off-trajectory value must not be offered as a plausible-looking Lagrangian
+    velocity, though it remains an ordinary reachable field of its buffers type — and the
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
     would approximate the measured observable at ``\mathcal{O}(\Delta t^{2})``; never approximate the thing you
     measure).
