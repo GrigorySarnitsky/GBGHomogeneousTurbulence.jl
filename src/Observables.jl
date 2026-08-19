@@ -243,7 +243,7 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
 and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
-(Betchov 1956 — *An inequality concerning the production of vorticity in isotropic turbulence*,
+(Betchov 1956, *An inequality concerning the production of vorticity in isotropic turbulence*,
 *J. Fluid Mech.* **1**(5), 497–504,
 [doi:10.1017/S0022112056000317](https://doi.org/10.1017/S0022112056000317)). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
@@ -255,6 +255,13 @@ From the velocity field `û` in spectral representation, the strain is formed di
 transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
 ``\\langle\\det\\boldsymbol{S}\\rangle`` (the fused mapped mean over the pointwise determinant, which
 materializes no determinant field); `domain` also sizes the per-call tensor scratch.
+
+!!! note "This is the run's largest transient allocation"
+    The rank-2 strain tensor is allocated per call rather than kept resident — an occasional
+    diagnostic should not hold field-scale storage for a whole run — but while it lives it is the
+    biggest single memory episode a default configuration reaches, larger than the resident working
+    set. `warmup!` calls this every sampling interval, so a run near its memory ceiling should size
+    for the diagnostic rather than for the steady state.
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free.

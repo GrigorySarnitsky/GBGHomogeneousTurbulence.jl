@@ -118,8 +118,9 @@ depends on.
   will run ahead of
   [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A field-derived slot is
   readable exactly when its epoch equals this.
-- `particles_epoch` — the tracer positions' counter, advanced when
-  [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) moves them.
+- `particles_epoch` — the tracer positions' counter. The run layer advances it as part of the tracer
+  advance; a hand-run loop that moves tracers itself announces the change with
+  [`particles_modified!`](@ref), which is what advances it.
 """
 mutable struct ObservablesCache{PV, PS, TS}
   const velocity_physical::PV

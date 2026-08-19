@@ -32,9 +32,12 @@ the order the step calls them:
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain — a
 construction-time object, not a lifecycle hook.
 
-The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref) and
-[`ConstantPower`](@ref), one implementation serving both the velocity and the scalar through
-tensor-order-generic field operators.
+The strategies, one implementation each serving both the velocity and the scalar through
+tensor-order-generic field operators:
+- [`NoForcing`](@ref) — leave the field undriven.
+- [`BandRescaling`](@ref) — hold a band's amplitude by deterministic rescaling.
+- [`Linear`](@ref) — a fixed linear rate on a band.
+- [`ConstantPower`](@ref) — a linear rate re-solved each step to hold the injection rate.
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A strategy's canonical band — `lowest_shell = 1`, `highest_shell = 2`, the large-scale band of
@@ -271,6 +274,12 @@ run may no longer measure, and there is no answer that is right for every run.
 
 Rescaling preserves the divergence-free constraint either way.
 
+!!! note "It costs two host readbacks per step on a GPU"
+    Sizing the rescale means reducing the field to a number and comparing it to `target`, so each
+    step blocks on a device-to-host transfer — two of them under `over = :total`, which measures the
+    band and the whole field. A run that never needs its energy pinned pays none of this;
+    `ConstantPower` pays one.
+
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.
 - `target` — the held value.
@@ -293,7 +302,7 @@ Rescaling preserves the divergence-free constraint either way.
     by one factor each step, chosen to drag the instantaneous temperature toward its target, which is
     what this forcing does to the band's amplitude. Such a scheme has no conserved quantity, is not associated with a well-defined
     ensemble except in limiting cases, and suppresses the physical fluctuations of the quantity it
-    holds (Bussi, Donadio & Parrinello 2007 — *Canonical sampling through velocity rescaling*,
+    holds (Bussi, Donadio & Parrinello 2007, *Canonical sampling through velocity rescaling*,
     *J. Chem. Phys.* **126**, 014101,
     [doi:10.1063/1.2408420](https://doi.org/10.1063/1.2408420)). Use it to spin up or to pin an amplitude; when the held
     quantity is itself measured, prefer a fixed-injection forcing (`ConstantPower`), which leaves the
@@ -336,7 +345,7 @@ end
 Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band — the
 **fixed-rate** member of the two linear forcings, with
 [`ConstantPower`](@ref) the member whose rate is re-solved each step (a band-limited
-variant of Lundgren 2003 — *CTR Annual Research Briefs*, which carries no DOI — whose linear
+variant of Lundgren 2003, *CTR Annual Research Briefs*, which carries no DOI — whose linear
 forcing acts at every wavenumber), built on the
 [`FixedDomain`](@ref) `domain`. The rate is
 folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
