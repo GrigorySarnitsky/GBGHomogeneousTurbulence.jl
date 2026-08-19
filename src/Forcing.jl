@@ -152,8 +152,8 @@ declare it `true`.
 
 The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only for a forcing that
 declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
-storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`, not an
-optimization: a forcing that fills a rate without declaring one is never given an array to fill, and
+storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`: a forcing
+that fills a rate without declaring one is never given an array to fill, and
 the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) constructor
 rejects
 it rather than let the forcing go silently unapplied.
@@ -242,9 +242,10 @@ run may no longer measure, and there is no answer that is right for every run.
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).
     If the out-of-band value alone exceeds `target`, the band is zeroed — the closest reachable
-    state — and the most violent intervention the rescale can make, not the absence of one: it
+    state: it
     empties the energy-containing range in a single step, so ``L_{11}``, ``u'`` and
-    ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards. Here ``k`` is the artifact and
+    ``\\mathrm{Re}_\\lambda`` are meaningless for turnovers afterwards — the most violent intervention
+    the rescale can make. Here ``k`` is the artifact and
     the band is free.
 
 !!! note "Which one a run wants depends on what else reads the kinetic energy"

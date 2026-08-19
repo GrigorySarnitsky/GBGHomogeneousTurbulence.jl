@@ -192,10 +192,10 @@ stages compute their recoveries into those same slots, so the step allocates not
 no storage beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
 deposit is recorded at — is advanced when the step completes.
 
-The argument order is shared with `deposit!`, the call that closes the iteration: the dispatch
-object leads — the scheme here, the cache there — and the common arguments follow in the fixed order
-`state`, `domain`, `buffers`, so the chained pair transposes nothing. This signature interleaves two
-more: `generator` directly after `state`, and `cache` then `dt` at the end.
+Call it with the same arguments in the same order as `deposit!`, the call that closes the iteration:
+the dispatch object first, then `state`, `domain`, `buffers`. Only the extras differ — `generator`
+sits directly after `state` here, and `cache` and `dt` come last — so the two calls of a hand-run
+loop read as a pair.
 
 !!! note "A step alone leaves the cache mid-iteration"
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes

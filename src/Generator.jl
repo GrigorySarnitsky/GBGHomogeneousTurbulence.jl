@@ -297,7 +297,8 @@ Assemble the explicit right-hand side of the momentum equation into `N̂` — th
 Leray-projected rotational nonlinear term plus any additive forcing source — from the stage velocity
 `û` in spectral representation and its physical velocity `u` and vorticity `ω_consumed`, on the
 [`FixedDomain`](@ref) `domain`, using the [`ResolvedGenerator`](@ref) `generator`'s conditions and
-scratch. The vorticity argument carries `_consumed` in its name because it is: see the note below.
+scratch. The vorticity argument is named `ω_consumed` because the assembly overwrites it: on return it no
+longer holds the vorticity.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -445,7 +446,8 @@ Assemble the explicit right-hand side of the passive-scalar equation into `N̂` 
 advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
 spectral representation and their physical `u_consumed`, `φ`, on the [`FixedDomain`](@ref) `domain`,
 using the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch. The velocity argument
-carries `_consumed` in its name because it is: see the note below.
+is named `u_consumed` because the assembly overwrites it: on return it no longer holds the
+velocity.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
 ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form

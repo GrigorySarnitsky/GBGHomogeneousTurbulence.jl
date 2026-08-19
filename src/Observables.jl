@@ -141,12 +141,10 @@ device readback); it throws an `ErrorException` when no deposit is current, like
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
-    value, which makes the sampled maximum an under-estimate. The conservative
-    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling pulls the
-    other way, its eigenvalue bound over-estimating the true spectral radius — but the two are
-    independent, so the second is not guaranteed to cover the first, which is why that ceiling
-    carries a margin of its own. A CFL condition bounds the *stability* of the explicit advective
-    term; it is not by itself a guarantee of accuracy.
+    value, which makes the sampled maximum an under-estimate — one of the two loosenesses
+    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) prices when it sets
+    its margin. A CFL condition bounds the *stability* of the explicit advective term; it is not by
+    itself a guarantee of accuracy.
 
 !!! note "Why this observable alone has a cached form"
     The cache holds exactly what the iteration already computes and leaves alive at its end — its
@@ -156,9 +154,7 @@ device readback); it throws an `ErrorException` when no deposit is current, like
     consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
     not vary with how the run is driven. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
     because no part of the iteration leaves one alive at its end; caching either would mean adding a
-    reduction the run does not otherwise perform, which is the one thing the cache may not do. (A
-    constant-energy forcing does form ``k`` mid-step to size its rescale, but that is the pre-rescale
-    value, discarded before the deposit.)
+    reduction the run does not otherwise perform, which is the one thing the cache may not do.
 """
 function max_speed end
 

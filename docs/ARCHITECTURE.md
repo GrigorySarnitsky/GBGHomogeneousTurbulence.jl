@@ -86,7 +86,7 @@ never a wall in front of it.
 > **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example
 > above runs as written — a forcing can be named operator-free (`ConstantPower(injection_rate = 0.1)`, a
 > `DeferredForcing`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
-> the package's primary quality target, but it is no longer a sketch.
+> the package's primary quality target.
 
 ---
 

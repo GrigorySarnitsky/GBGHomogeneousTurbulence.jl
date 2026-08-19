@@ -22,7 +22,7 @@ a direct dependency.
 ## Physical variables
 
 
-Every **Code** entry naming a package object links to its documentation. The few that stay bare name no single object to link to: a constructor keyword, or a quantity carried as a field of the state rather than by a function of its own.
+The **Code** column gives the name each symbol carries in the package.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
@@ -122,4 +122,4 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 | **register** | storage a component computes one value into and overwrites at the next, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
 | **front door** | the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor that builds every component from a few keywords, as against assembling the pieces yourself. |
 | **observation** | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue. By extension the *occasion* — "computed at an observation" means computed in that callback, between iterations, from what the run already holds. It is never the cache, which is the storage the callback reads. |
-| **resolved** | in `ResolvedFields` and `ResolvedGenerator`, *made concrete as one value* — not the numerical sense of "resolved by the grid", which this package writes out in full wherever it is meant. |
+| **resolved** | in `ResolvedFields` and `ResolvedGenerator`, *made concrete as one value*. The numerical sense — a scale the grid resolves, as in the resolution criterion ``\kappa_{\max}\eta`` — is the other reading, and the docs write it out in full wherever it is meant. |

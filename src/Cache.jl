@@ -33,7 +33,7 @@ than served stale. - [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit
 
 The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
 which fills every slot at the iteration's end and sets its epoch. A caller reads through the
-accessors and never deposits. It is homed in `Propagator` rather than here because it needs the
+accessors and never deposits. `deposit!` lives in `Propagator` rather than here because it needs the
 scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —

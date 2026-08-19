@@ -27,8 +27,8 @@ The run layer:
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
 
-A `Simulation` is a container, not a reading surface: read the state through `sim.state` and the
-deposited observables through `sim.cache`, with the observables and cache accessors that own them.
+Read a run's state through `sim.state` and its deposited observables through `sim.cache`, with the
+observables and cache accessors that own them; the run layer adds no forwarding methods of its own.
 """
 module SimulationRun
 
