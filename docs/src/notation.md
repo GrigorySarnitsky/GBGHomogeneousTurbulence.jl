@@ -16,7 +16,7 @@ a direct dependency.
 | Imaginary unit | ``\mathrm{i}`` | Upright, always — never bare italic ``i``, never ``\imath``. Writing it upright frees ``i`` for use as an index. |
 | Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
 | Spatial average | ``\langle \cdot \rangle`` | The box average ``\frac{1}{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm{d}\boldsymbol{x}`` over the periodic domain ``\Omega`` — the single-realization estimate of the homogeneous ensemble average (exact only in the ergodic, infinite-box limit; at a finite box it retains the large-scale statistical fluctuation). |
-| Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, `to_spectral(f)`. A field is one physical object; physical and spectral are two representations of it. |
+| Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral). A field is one physical object; physical and spectral are two representations of it. |
 | Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*.  |
 
 ## Physical variables
@@ -56,7 +56,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers) |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
 | ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^{2}`` acts as multiplication by it | `domain.squared_wavenumber_kernel` |
-| ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral), [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
+| ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
 | ``\mathbb{P}`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
 | ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) |
@@ -121,5 +121,5 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 | **epoch** | a counter of *changes to the state*, one per dynamical factor (the fields, the tracer positions). A slot is readable exactly when its own epoch equals the counter it depends on. Not an iteration number: an announced out-of-band mutation advances an epoch without advancing the clock. |
 | **register** | storage a component computes one value into and overwrites at the next, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
 | **front door** | the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor that builds every component from a few keywords, as against assembling the pieces yourself. |
-| **observation** | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue. |
+| **observation** | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue. By extension the *occasion* — "computed at an observation" means computed in that callback, between iterations, from what the run already holds. It is never the cache, which is the storage the callback reads. |
 | **resolved** | in `ResolvedFields` and `ResolvedGenerator`, *made concrete as one value* — not the numerical sense of "resolved by the grid", which this package writes out in full wherever it is meant. |

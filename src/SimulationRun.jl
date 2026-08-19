@@ -209,7 +209,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
   scheme::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
-  cache::DF                # ObservablesCache: the observation cache over the state
+  cache::DF                # ObservablesCache: what the last iteration deposited, for an observation to read
   tracers::TR              # Tracers, or nothing — trajectory STATE only
   trajectory_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing

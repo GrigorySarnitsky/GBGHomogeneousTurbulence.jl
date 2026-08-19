@@ -21,11 +21,10 @@ The cache's operations:
   next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
-- [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed
-  ``\\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}\\rvert``, the number the timestep choice reads (one
-  generic with the field reduction in `Observables`, whose docstring is the home).
-- [`particle_velocities`](@ref) — the checked read of the particle velocities
-  ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
+- [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
+  the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
+  docstring is the home).
+- [`particle_velocities`](@ref) — the checked read of the velocity sampled along each trajectory.
 
 Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
 than served stale. - [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
@@ -40,13 +39,12 @@ scheme's own scratch to recover the fields, and that is the module owning the it
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
 
-!!! note "An epoch is not an iteration number"
-    An epoch counts *changes to the state*, not advances of the run. A completed
-    [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does
-    any announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value
-    still the right one?"; the clock's
-    [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has
-    the run gone?".
+An epoch counts *changes to the state*, not advances of the run: a completed
+[`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does any
+announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value still the
+right one?"; the clock's
+[`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has the run
+gone?".
 """
 module Cache
 

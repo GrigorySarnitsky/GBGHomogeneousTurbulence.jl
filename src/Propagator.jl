@@ -86,18 +86,6 @@ next, holding nothing a caller should read between steps. The observables cache'
 same purpose mid-iteration — the step computes its stage recoveries into them — which is why a cached
 field is meaningful only between iterations.
 
-# Fields
-- `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
-  [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
-- `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
-- `stage2`, `velocity_predictor_spectral` — the second stage register and the substage velocity predictor
-  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFRK2` only, else `nothing`.
-- `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
-  when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
-  fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
-  `stage2` and `predictor_spectral` (`IFRK2`'s corrector register and predictor state ``\\hat\\varphi^*``),
-  and `nonlinear` (`IFLowStorageRK3` only).
-
 There are deliberately **no physical-representation registers** here: the substage velocity,
 vorticity, and scalar recoveries write into the run's
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) slots, taken as scratch
@@ -111,6 +99,19 @@ products, the phase-shift buffers, the forcing-rate fields) lives with the gener
 [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here
 are
 only the scheme's own spectral stage registers.
+
+# Fields
+- `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
+  [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
+- `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
+- `stage2`, `velocity_predictor_spectral` — the second stage register and the substage velocity predictor
+  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFRK2` only, else `nothing`.
+- `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
+  when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
+  fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
+  `stage2` and `predictor_spectral` (`IFRK2`'s corrector register and predictor state ``\\hat\\varphi^*``),
+  and `nonlinear` (`IFLowStorageRK3` only).
+
 """
 struct IntegratorBuffers{VS, ST2, VSS, NL, SB}
   stage1::VS

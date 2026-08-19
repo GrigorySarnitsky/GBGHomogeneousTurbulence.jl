@@ -284,8 +284,7 @@ mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
 (see [`large_scale_length`](@ref) — ``L_{11}`` for most forms, ``k^{3/2}/\\varepsilon`` for Pope's) from
 `fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).
 
-This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000; Meyers &
-Meneveau 2008); the large-scale roll-off sets the low-wavenumber slope
+This is the standard generic form for a model spectrum (Sagaut & Cambon 2018; Pope 2000); the large-scale roll-off sets the low-wavenumber slope
 ``E(\\kappa\\to 0)\\propto\\kappa^\\sigma`` — ``\\sigma = 2`` (the Saffman-type ``\\kappa^{2}`` low-wavenumber
 spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelor-type ``\\kappa^{4}``,
 [`VonKarmanLarge`](@ref)).

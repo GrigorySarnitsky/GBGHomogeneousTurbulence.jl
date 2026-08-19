@@ -257,6 +257,15 @@ run may no longer measure, and there is no answer that is right for every run.
 
 Rescaling preserves the divergence-free constraint either way.
 
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `target` — the value of the held observable (the kinetic energy for a velocity, the scalar variance
+  for a scalar), as selected by `over`.
+- `over` — `:band` to hold the band's own value, `:total` to hold the whole field's. Required; the
+  paragraphs above give the consequences of each.
+- `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
+  box's fundamental ``2\\pi/L``.
+
 !!! note "A deterministic clamp, not a stationary sampler"
     This is a deterministic clamp, not a faithful stationary sampler.
     Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of

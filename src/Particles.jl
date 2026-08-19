@@ -110,6 +110,9 @@ trajectory velocities are read from the run's observables cache, through
 iteration's
 closing deposit leaves them.
 
+The trajectory scheme's own working storage is **not** here: it lives in a
+[`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
+
 # Fields
 - `positions` — the `(M, 3)` tracer positions (read with `particle_positions`).
 - `position_points` — a
@@ -119,9 +122,6 @@ closing deposit leaves them.
   instant they occupy them: the genuine Lagrangian sample, and the observables cache's
   particle-velocities slot.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
-
-The trajectory scheme's own working storage is **not** here: it lives in a
-[`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 """
 struct Tracers{P, PSX, VV, S}
   positions::P              # (M, 3)

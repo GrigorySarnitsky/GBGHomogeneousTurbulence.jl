@@ -592,7 +592,9 @@ Two standing rules follow:
 Precision and the memory-footprint/accuracy trade-off are **objects of study**, not fixed defaults — the
 numerical counterpart of the charter that the tool investigates the physics rather than assuming it (§8).
 
-- **Both precisions are supported equally, with no privileged default.** `Float32` buys twice the
+- **Both precisions are supported equally, and no kernel privileges either.** (The `Simulation`
+  front door must start somewhere and starts at `Float64` / `Array`; that is a convenience
+  constructor's choice, not a property of the library, and `FixedDomain` takes both from the caller.) `Float32` buys twice the
   grid per byte and roughly twice the throughput on a consumer GPU; `Float64` buys the accuracy
   margin a long integration or a sensitive diagnostic may need. Which one a run wants is a fitness
   question, settled by test rather than by a house default. The element type
@@ -1831,8 +1833,6 @@ The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law 
 self-contained citation in a `Reference` value, so this list need not duplicate the ~two dozen it
 cites.
 
-- Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
-  large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305. *(No DOI: the 1941 Doklady notes predate the system.)*
 - Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
   *J. Fluid Mech.* **1**(5), 497–504. <https://doi.org/10.1017/S0022112056000317> *(The isotropy
   relations behind the strain-skewness constant, §4.3.)*

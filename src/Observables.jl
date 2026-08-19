@@ -134,6 +134,11 @@ of the velocity field `u` in physical representation — the speed that sets the
 timestep. The magnitude is formed one grid point at a time and consumed by the maximum immediately,
 so no magnitude field is materialized.
 
+The second form reads the number back from an
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
+left it — the same quantity, measured once per iteration and served without a reduction (or a
+device readback); it throws an `ErrorException` when no deposit is current, like every cached read.
+
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
     value, which makes the sampled maximum an under-estimate. The conservative
@@ -142,11 +147,6 @@ so no magnitude field is materialized.
     independent, so the second is not guaranteed to cover the first, which is why that ceiling
     carries a margin of its own. A CFL condition bounds the *stability* of the explicit advective
     term; it is not by itself a guarantee of accuracy.
-
-The second form reads the number back from an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
-left it — the same quantity, measured once per iteration and served without a reduction (or a
-device readback); it throws an `ErrorException` when no deposit is current, like every cached read.
 
 !!! note "Why this observable alone has a cached form"
     The cache holds exactly what the iteration already computes and leaves alive at its end — its
