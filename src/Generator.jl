@@ -70,9 +70,11 @@ All keyword, all required:
 - `viscosity` — the kinematic viscosity ``\\nu``.
 - `schmidt` — the Schmidt number ``\\mathrm{Sc}``.
 - `velocity_forcing`, `scalar_forcing` — the forcing strategies for the velocity and the scalar, each
-  an `AbstractForcing` (pass `NoForcing()` to leave a field undriven). A *stateful* strategy must not
-  be the same instance for both fields — its per-step state belongs to one field — and the
-  constructor throws an `ArgumentError` naming the strategy if it is; build two.
+  an `AbstractForcing` (pass `NoForcing()` to leave a field undriven).
+
+!!! warning "A stateful forcing cannot drive both fields"
+    Its per-step state belongs to one field, so passing the same *mutable* strategy instance as both
+    `velocity_forcing` and `scalar_forcing` throws an `ArgumentError` naming it. Build two.
 
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
@@ -302,7 +304,8 @@ Assemble the explicit right-hand side of the momentum equation into `N̂` — th
 Leray-projected rotational nonlinear term plus any additive forcing source — from the stage velocity
 `û` in spectral representation and its physical velocity `u` and vorticity `ω_consumed`, on the
 [`FixedDomain`](@ref) `domain`, using the [`ResolvedGenerator`](@ref) `generator`'s conditions and
-scratch. The `ω_consumed` name marks the argument the assembly overwrites — see the note below.
+scratch. Two arguments are written, not one: `N̂` receives the result, and `ω_consumed` is consumed
+in place — the `_consumed` suffix marks it, since Julia's `!` convention flags only the first.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -449,8 +452,9 @@ scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
 Assemble the explicit right-hand side of the passive-scalar equation into `N̂` — the dealiased
 advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
 spectral representation and their physical `u_consumed`, `φ`, on the [`FixedDomain`](@ref) `domain`,
-using the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch. The `u_consumed` name
-marks the argument the assembly overwrites — see the note below.
+using the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch. Two arguments are
+written, not one: `N̂` receives the result, and `u_consumed` is consumed in place — the `_consumed`
+suffix marks it, since Julia's `!` convention flags only the first.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
 ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form

@@ -548,8 +548,10 @@ margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` fa
     This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the
     grid — but `IFRK2`'s margin is the one value that depends on a quantity it cannot see.
     The same `0.25` is returned at every Reynolds number while the viscous damping it rests on
-    weakens as ``\\nu`` falls, so at high Reynolds number verify the step against a run that holds
-    its energy, or set `cfl` yourself. `IFLowStorageRK3`'s ceiling carries no such dependence.
+    weakens as ``\\nu`` falls. There is no code-level guard for this, and adding one would mean
+    giving a grid-and-scheme property a physics argument; the practical course at high Reynolds
+    number is to prefer [`IFLowStorageRK3`](@ref), whose ceiling has no such dependence, or to pass
+    an explicit `cfl` and verify it against a run that holds its energy. `IFLowStorageRK3`'s ceiling carries no such dependence.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a

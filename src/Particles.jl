@@ -104,8 +104,10 @@ record_particle_velocity!(tracers, u)     # u(tₙ) at the current positions —
 advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 ```
 
-Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref); the
-trajectory velocities are read from the run's observables cache, through
+Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
+which read the tracer set directly. The velocities are the exception, and deliberately so: they are a
+*deposited observable* rather than tracer state, so they are read from the run's observables cache
+through
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the
 iteration's
 closing deposit leaves them.
@@ -203,7 +205,8 @@ lives here rather than in [`Tracers`](@ref).
 - `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
-- `predictor_velocity` — the velocity interpolated at the predicted positions. It is reachable like
+- `predictor_velocity` — the velocity interpolated at the predicted positions (the particle-side
+  counterpart of the field schemes' `velocity_predictor_spectral`). It is reachable like
   any field of this type, but it is a scheme intermediate rather than a sample of the flow at any
   instant, so nothing in the package offers it as one: read
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) for the Lagrangian

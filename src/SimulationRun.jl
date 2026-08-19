@@ -206,9 +206,11 @@ their contents as the scheme's business rather than the run's state.
 - `domain`, `buffers`, `generator`, `scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along
-  with the fields, the trajectory scheme advancing them, and that scheme's registers; all `nothing`
-  when the run carries no tracers.
+- `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along with the
+  fields, the scheme advancing them along their trajectories, and that scheme's registers. The two
+  roots are not interchangeable: *trajectory* names the path through time the scheme integrates,
+  *particle* the objects whose storage the buffers hold. All `nothing` when the run carries no
+  tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
 struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
@@ -603,8 +605,7 @@ build a fresh one per run.
 # Fields
 The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
 `skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
-that judge them. Build one through the keyword constructor above — the positional form takes
-assembled internals and is not part of the interface.
+that judge them. Build one through the keyword constructor above.
 - `monitor` — the sampled signals (the turnover clock, ``\\varepsilon``, the scalar variance, the
   skewness — not ``k``, which this criterion deliberately never gates on) and the
   gate settings and tolerances that test them.

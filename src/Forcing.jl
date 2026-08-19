@@ -106,6 +106,9 @@ therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taki
 `DeferredForcing`.
 
 # Examples
+The two-form construction is the non-obvious part of this module, so the example lives here; the
+strategies themselves are built by the forms shown below.
+
 ```julia
 # Name the forcing before any grid exists — the front door supplies the domain:
 sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
@@ -186,13 +189,13 @@ prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, dt::Real) = noth
 
 
 """
-    add_forcing_source!(forcing, nonlinear, domain) -> nonlinear
+    add_forcing_source!(forcing, N̂, domain) -> N̂
 
-Add the strategy `forcing`'s additive source to the dealiased nonlinear-term buffer `nonlinear` at each Runge–Kutta
+Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂` at each Runge–Kutta
 stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
 [`FixedDomain`](@ref) `domain`. The default does nothing.
 """
-add_forcing_source!(::AbstractForcing, nonlinear, domain::FixedDomain) = nonlinear
+add_forcing_source!(::AbstractForcing, N̂, domain::FixedDomain) = N̂
 
 
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
@@ -514,8 +517,8 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real
   return nothing
 end
 
-add_forcing_source!(ou::StochasticOU, nonlinear, domain::FixedDomain) =
-  add!(nonlinear, nonlinear, ou.state)
+add_forcing_source!(ou::StochasticOU, N̂, domain::FixedDomain) =
+  add!(N̂, N̂, ou.state)
 
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the

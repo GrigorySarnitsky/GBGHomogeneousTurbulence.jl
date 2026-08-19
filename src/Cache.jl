@@ -16,19 +16,18 @@ from the values the run has already computed.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
-- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
-  mutation made outside the iteration, so the affected slots go stale and reads throw until the
-  next deposit.
+- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
+  made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
+- [`deposit_sample!`](@ref) — the one writer this module owns: it records the particle velocities the
+  tracer advance wrote. The field slots are filled by
+  [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which `Propagator` owns because it
+  needs the scheme's scratch to recover the fields.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
   the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
   docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the velocity sampled along each trajectory.
-- [`deposit_sample!`](@ref) — the one writer this module owns: it records the particle velocities the
-  tracer advance wrote. The field slots are filled by
-  [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which `Propagator` owns because it
-  needs the scheme's scratch to recover the fields.
 
 Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
 than served stale.

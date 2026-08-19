@@ -369,7 +369,7 @@ the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spheri
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
 scalar field in spectral representation. Returns `field`.
 
-!!! note "Truncating the band is not always the whole of dealiasing"
+!!! note "This verb truncates; under PhaseShift that is half the dealiasing"
     For `TwoThirds` this call is the whole of it, and for `HouLi` the taper damps the aliases rather
     than removing them. Under `PhaseShift` it is only the second half, so calling it on a product
     assembled without the displaced-evaluation average leaves that product aliased — the generator
