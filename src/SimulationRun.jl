@@ -62,10 +62,10 @@ end
 
 
 """
-    Simulation(; grid_points_per_axis, κ_max_η = 2, kinetic_energy = 1.5,
+    Simulation(; grid_points_per_axis, κ_max_η = nothing, kinetic_energy = 1.5,
                  side_length = 2π, element_type = Float64, array_type = Array,
                  dealiasing = TwoThirds(), kwargs...)
-    Simulation(domain; κ_max_η = 2, kinetic_energy = 1.5, kwargs...)
+    Simulation(domain; κ_max_η = nothing, kinetic_energy = 1.5, kwargs...)
 
 A ready-to-run case — the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and
@@ -103,7 +103,10 @@ chosen from the grid rather than supplied:
     It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
     ``k``, `side_length` the side ``L``, and ``G`` a dimensionless constant calibrated on
-    box-confined DNS (``\\approx 0.9``; Li et al. 2008),
+    box-confined DNS (``\\approx 0.9``; Li et al. 2008) — a value that assumes forcing confined to the
+    same low-wavenumber band as the calibrating runs, since ``G`` is ``C_\\varepsilon`` rescaled by
+    ``L_{11}/L`` and that ratio is fixed by where the run is driven; a forcing moved to higher shells
+    invalidates the estimate and with it the ``\\nu`` grid mode chooses —
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η` — the
     resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
     **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
@@ -130,9 +133,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
   argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
-- `κ_max_η = 2` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
-  ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. Mutually exclusive with
-  `viscosity`.
+- `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
+  ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
+  and grid mode then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
+  an explicit one, so that giving both it and `viscosity` is an error rather than a silent drop.
 - `viscosity` — the kinematic viscosity ``\\nu``, which is how the Reynolds number is set (it is
   ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit for grid mode.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
@@ -175,17 +179,17 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 sim = Simulation(grid_points_per_axis = 128)
 
 # Explicit mode — set ν directly, carry a passive scalar, force at constant power:
-sim = Simulation(grid_points_per_axis = 128, viscosity = 5e-3;
+sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-first — build the frame yourself, then hand it to the second form:
 domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
                      element_type = Float64, array_type = Array)
-sim = Simulation(domain; viscosity = 5e-3)
+sim = Simulation(domain; viscosity = 1e-2)
 ```
 
 # Fields
-Two of these are what a user reads — `state` and `cache`. The rest are the machinery the step runs
+Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the machinery the step runs
 on: they hold partial values while a step is in flight, so read them only between steps, and treat
 their contents as the scheme's business rather than the run's state.
 
@@ -548,8 +552,10 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
 spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement on any freshly
-seeded run; write your own callback instead when the transient length is known (a fixed budget is a
-three-line callback — see `run!`).
+seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
+``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
+decaying run a fixed budget instead, which is a three-line callback (see `run!`). The same argument
+the scalar gate makes for an unforced scalar applies to the velocity.
 
 At each iteration it measures the dissipation ``\\varepsilon`` — the small scales
 settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
@@ -583,10 +589,10 @@ The criterion carries its own observation state (the sampled signals and the tur
 build a fresh one per run.
 
 # Fields
-The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn,
-last_time, started)` is internal. Note the keyword arguments above do **not** map one-to-one onto
-these fields: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and `skew_floor` are all
-stored inside `monitor`, which holds the sampled series together with the thresholds that judge them.
+The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
+`skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
+that judge them. Build one through the keyword constructor above — the positional form takes
+assembled internals and is not part of the interface.
 - `monitor` — the sampled signals (``\\varepsilon``, ``k``, the scalar variance, the skewness) and the
   gate settings and tolerances that test them.
 - `max_turnovers` — the give-up cap.

@@ -28,7 +28,11 @@ The cache's operations:
   ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
 
 Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
-than served stale. The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
+than served stale. - [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
+  [`deposit_sample!`](@ref) — the writers: the first fills every field slot at the iteration's end,
+  the second records the particle velocities the tracer advance wrote.
+
+The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
 which fills every slot at the iteration's end and sets its epoch. A caller reads through the
 accessors and never deposits. It is homed in `Propagator` rather than here because it needs the
 scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.

@@ -104,8 +104,10 @@ value into and overwrites at the next, holding nothing a reader should trust bet
 observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
 what removes one: a register overwritten before the iteration's end has nothing left to deposit. The contents
-are consequently a property of the solver's storage decisions, not a promise — §2.3's blocked reuse
-keeps the vorticity in the cache today, and landing that reuse will take it out (§1.4).
+are consequently a property of the solver's storage decisions, not a promise. §2.3's in-place product
+reuse is the case that shows how narrow the dependence is: it takes the vorticity slot as the Lamb
+vector's scratch mid-iteration, yet the vorticity is deposited at the iteration's end either way, so
+the reuse moved the run's residency and left the contents untouched (§1.4).
 
 ### 1.3 When a cached value is valid
 
@@ -190,15 +192,17 @@ end — the qualification §1.2 draws.
 It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. Each clause of that is an accounting statement: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
-read computes. The cache is a naming-and-dating layer over storage the run already owns: removing
-it would free no array, and the only work it adds is §1.3's final closing deposit — the one whose deposits no
-iteration consumes, kept because it serves the final observation, and paid per run rather than per
-iteration.
+read computes. Those are two different costs and it is worth keeping them apart: the maximum-speed
+reduction above recurs **every iteration**, while the only work the cache *adds* over a cacheless
+solver is §1.3's final closing deposit — the one whose deposits no iteration consumes, kept because it
+serves the final observation, and paid **once per run**. The cache is otherwise a naming-and-dating
+layer over storage the run already owns: removing it would free no array.
 
 What the design pays instead is control over the contents. Since nothing may be added, what the cache
 holds is decided by the solver's minimal-memory schedule, and it changes when the solver's storage
-decisions change: §2.3's blocked reuse keeps ``\boldsymbol{\omega}`` in the cache today, and the
-release that lands the reuse removes it. §2.4's table is therefore a consequence of the configuration
+decisions change. A storage change removes an observable only when it stops the iteration *holding*
+that value whole at its end — §2.3's in-place reuse does not, which is why it left
+``\boldsymbol{\omega}`` in the cache. §2.4's table is therefore a consequence of the configuration
 and the package version, not an interface a reader chooses from.
 
 A reader who needs an absent observable computes it at an observation, from the state or the cached

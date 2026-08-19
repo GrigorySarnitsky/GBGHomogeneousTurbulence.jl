@@ -147,8 +147,10 @@ device readback); it throws an `ErrorException` when no deposit is current, like
 !!! note "Why this observable alone has a cached form"
     The cache holds exactly what the iteration already computes and leaves alive at its end — its
     contents are derived from the schedule, never declared. The maximum speed qualifies because the
-    run itself needs it: the next timestep is chosen from it, so the reduction happens whether or not
-    anyone reads the value. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
+    run itself needs it: on the adaptive-CFL path the next timestep is chosen from it, so the
+    reduction happens whether or not anyone reads the value. Under a hand-fixed ``\\Delta t`` nothing
+    consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
+    not vary with how the run is driven. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
     because no part of the iteration leaves one alive at its end; caching either would mean adding a
     reduction the run does not otherwise perform, which is the one thing the cache may not do. (A
     constant-energy forcing does form ``k`` mid-step to size its rescale, but that is the pre-rescale

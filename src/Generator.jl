@@ -70,7 +70,9 @@ All keyword, all required:
 - `viscosity` — the kinematic viscosity ``\\nu``.
 - `schmidt` — the Schmidt number ``\\mathrm{Sc}``.
 - `velocity_forcing`, `scalar_forcing` — the forcing strategies for the velocity and the scalar, each
-  an `AbstractForcing` (pass `NoForcing()` to leave a field undriven).
+  an `AbstractForcing` (pass `NoForcing()` to leave a field undriven). A *stateful* strategy must not
+  be the same instance for both fields — its per-step state belongs to one field — and the
+  constructor throws an `ArgumentError` naming the strategy if it is; build two.
 
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the

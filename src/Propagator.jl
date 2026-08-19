@@ -524,9 +524,9 @@ A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C_{\\mathrm
 with ``\\Delta x = L/N`` the grid spacing.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times
-``C_{\\mathrm{CFL}}`` to stay within the scheme's imaginary-axis stability limit
-``y_{\\mathrm{s}}``. Two loosenesses sit in that estimate, and they pull in **opposite** directions.
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``, a rate; stability needs that rate times the
+step — ``C_{\\mathrm{CFL}}\\,\\kappa_{\\max}\\Delta x``, once ``\\Delta t`` is substituted — to stay
+within the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, which is a pure number. Two loosenesses sit in that estimate, and they pull in **opposite** directions.
 The speed in the denominator is
 [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid points, so the
 continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger — which makes the computed
@@ -538,6 +538,13 @@ ceiling is calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3
 taken conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
 relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
 margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
+
+!!! warning "The IFRK2 margin does not know the viscosity"
+    This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the
+    grid — but [`IFRK2`](@ref)'s margin is the one value that depends on a quantity it cannot see.
+    The same `0.25` is returned at every Reynolds number while the viscous damping it rests on
+    weakens as ``\\nu`` falls, so at high Reynolds number verify the step against a run that holds
+    its energy, or set `cfl` yourself. [`IFLowStorageRK3`](@ref)'s ceiling carries no such dependence.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a

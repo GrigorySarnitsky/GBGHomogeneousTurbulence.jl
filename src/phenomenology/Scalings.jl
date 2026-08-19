@@ -26,8 +26,8 @@ export ScalingLaw, Sreenivasan1998, Sreenivasan1995, Li2008, scaling, stationary
     ScalingLaw <: TurbulenceLaw
 
 Supertype of the laws for a **dimensionless turbulence constant** — a pure number characterizing
-developed turbulence (the normalized dissipation ``C_\\varepsilon``, the Kolmogorov constant ``C_K``,
-the derivative skewness, …), possibly Reynolds-number-dependent. A law predicts the constant via
+developed turbulence — here the normalized dissipation ``C_\\varepsilon``, the Kolmogorov constant
+``C_K``, and the box-normalized dissipation group ``G`` — possibly Reynolds-number-dependent. A law predicts the constant via
 [`scaling`](@ref)`(law, fp)`; the *measured* value comes from a run, and the comparison is prediction
 against measurement.
 """

@@ -69,7 +69,7 @@ abstract type TurbulenceLaw end
                      schmidt = 1.0, scalar_dissipation = NaN)
 
 The flow-state bundle a law is evaluated against — the analogue of `FlowConditions` and
-`FixedDomain` on the phenomenology side. It carries the independent dimensional quantities of a homogeneous
+`FixedDomain` on the phenomenology side. It carries the dimensional quantities a law reads off a homogeneous
 isotropic state (``\\nu``, ``\\varepsilon``, ``u'``, ``L_{11}``); the small scales and the dimensionless
 Taylor-scale Reynolds number are [derived](@ref taylor_reynolds) from them, not stored.
 
@@ -101,11 +101,11 @@ Built from a run's measured state — which is what `flow_parameters(sim)` retur
 evaluate a law at a state you specify:
 
 ```julia
-fp = FlowParameters(; viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
+fp = FlowParameters(; viscosity = 1e-3, dissipation = 1.0, rms_velocity = 1.0,
                       integral_scale = 0.5)                 # velocity-only: no scalar law applies
 
-fps = FlowParameters(; viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0,
-                       integral_scale = 0.5, schmidt = 0.7, scalar_dissipation = 0.05)
+fps = FlowParameters(; viscosity = 1e-3, dissipation = 1.0, rms_velocity = 1.0,
+                       integral_scale = 0.5, schmidt = 0.7, scalar_dissipation = 0.5)
 ```
 
 # Fields

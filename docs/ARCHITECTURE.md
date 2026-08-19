@@ -383,8 +383,9 @@ Method (§3).
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
-  **`IFRK2`** (Heun) is a cheaper two-stage option that is imaginary-axis unstable and leans on viscous
-  damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  **`IFRK2`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
+  three) but *dearer* in memory — three spectral registers per field against the low-storage scheme's
+  two — and imaginary-axis unstable, leaning on viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
