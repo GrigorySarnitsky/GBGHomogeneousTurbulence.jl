@@ -188,7 +188,7 @@ it can never assemble the right-hand side from a mismatched intermediate state.
 
 # Arguments
 - `domain` — the [`FixedDomain`](@ref) the assembly scratch is sized on.
-- `conditions` — the [`FlowConditions`](@ref) the generator resolves: the viscosity, the Schmidt
+- `conditions` — the `FlowConditions` the generator resolves: the viscosity, the Schmidt
   number, and the two forcing strategies.
 - `scalar = false` — pass `true` when the run carries a passive scalar; it allocates the scalar's
   forcing-rate array, required for a scalar-forced run.

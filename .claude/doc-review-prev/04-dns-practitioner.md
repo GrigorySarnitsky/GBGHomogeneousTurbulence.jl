@@ -1,125 +1,74 @@
-# Panel review — DNS practitioner / GPU performance hat
+# DNS-practitioner hat — findings
 
-Scope: numerical methods (rotational form, exact per-mode integrating factor, dealiasing bands,
-IFRK2 / IFLowStorageRK3, the deposit-driven cache schedule and its transform accounting, particle
-push, forcing) and performance claims (allocation-free hot loop, in-place, GPU-agnostic storage,
-minimal footprint, CFL scaling, the "2× transforms" cost of `PhaseShift`).
-
-**Overall verdict.** This is an unusually tightly cross-checked document. I re-derived the
-dealiasing-band arithmetic (`2/3` vs `√2/3·N` vs `2√2/3·κ_Ny`, all three consistent and mutually
-convertible), the transform-count table in `observables_cache` §2.3 (18/9, 21/18, 36/18, 42/36 —
-every entry reconciles exactly with the RK3 3-stage assembly recipe stated two paragraphs above
-it, and with the decision-log's "RK3 51→42 c2r / RK2 34→28 c2r" post-fix numbers), the CFL
-constants (`C_CFL ≲ 0.83` from `y_s=√3` and `κ_max Δx = 2π/3`, rounds correctly to the stated
-`0.5`), the Williamson RK3 coefficients (`A,B,d` match the standard "RKW3" case-7 set, `d` sums to
-1), the IFRK2 stability polynomial (`|R(iy)|² = 1+y⁴/4`, correctly unstable on the imaginary axis),
-the memory-ledger byte counts (322.5 MiB / 256³ frame reconciles exactly to a mix of one real and
-two complex-container `N²(N/2+1)` arrays; 384 MiB per physical vector; 768 MiB for two of them),
-and the `κ_p/√2` shell-peak / `Re_λ ∼ N^{2/3}` / Yaglom `-2/3 ε_φ` derivations. None of these
-turned up an error. The remaining findings are narrower — one substantive framing tension, and two
-minor/nit clarity points.
+Reviewer stance: a performance-focused DNS practitioner scrutinizing the numerical methods
+(integrating factor, dealiasing bands, IF-RK2/RK3, the deposit-driven cache schedule and its
+transform/traffic accounting, particle interpolation, forcing) and the performance claims
+(allocation-free hot loop, in-place buffers, transform counts, CFL scaling) across the rendered
+site. Extensive cross-page arithmetic verification was performed (transform counts, memory sizes
+in MiB/GiB, the √2/3·N PhaseShift band, the 2/3-rule band, Re_λ ~ N^(2/3) scaling, the Li2008
+dissipation-group inversion, the RKW3 coefficients, the IFRK2 stability-function derivation) — the
+document is unusually rigorous and internally consistent on nearly every numeric claim checked.
+The findings below are the genuine survivors of that pass.
 
 ---
 
-## Finding 1 — "Float64 is the production precision" sits oddly for a GPU-primary, consumer-GPU-targeted code
+## Finding 1 — The cache's one non-free cost is described as both a recurring per-iteration charge and a one-time per-run charge
 
-**Type:** performance
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- ARCHITECTURE §6: "Both precisions are supported equally, with no privileged default. `Float32`
-  is the development and desktop precision; `Float64` is the production precision."
-- Same section, two sentences later: "the working point is chosen by direct fitness test, never
-  decreed."
-- `SimulationRun.Simulation` docstring: `element_type = Float64` is the front-door default.
-
-**Description:** The document is explicit elsewhere that precision is "a studied axis…chosen by
-direct fitness test, never decreed," yet in the same breath it hands out a normative label —
-"`Float64` is the production precision" — before any such study is described as having been run.
-For a package whose stated primary target is the GPU (Home page, invariant 4), this framing cuts
-against common GPU-DNS practice: on non-datacenter cards (the class this package's own front-door
-default and this reviewer's own fleet run on) FP64 throughput is typically 1/32–1/64 of FP32, so
-defaulting new users toward "the production precision" being double is a real throughput
-concession that the doc does not weigh against the GPU-primary charter. This is not a
-self-contradiction inside the rendered text (the sentence is consistent with itself), but it reads
-as pre-judging the fitness-test outcome the same section says has not been decreed, and a reader
-skimming only the labeled recommendation could pick the more expensive default on exactly the
-hardware this package is built for.
-
-**Contradicts:** (soft, framing-level) "no privileged default" / "chosen by direct fitness
-test, never decreed" (ARCHITECTURE §6) vs. "`Float64` is the production precision" (same section,
-same paragraph).
+- **Type:** contradiction
+- **Severity:** blocker
+- **Confidence:** high
+- **Locations:**
+  - PAGE: observables_cache, §1.3: "so, relative to a cacheless solver serving only its own dynamics, the run pays one extra closing deposit: the state-only share of one first-stage evaluation, **one reduction**, and one interpolation, **per run rather than per iteration**."
+  - PAGE: observables_cache, §1.4 (two sentences later in the *same* section): "the closing deposit's maximum-speed reduction is **one physical-vector pass every iteration**, paid even by a hand-fixed-Δt run that never reads the number... the only work it adds is §1.3's final closing deposit ... **paid per run rather than per iteration**."
+  - PAGE: api / Propagator, `deposit!`: "It costs one pass: **the maximum-speed reduction runs every iteration**, including under a hand-fixed Δt that never reads it."
+  - PAGE: architecture, decision log (2026-08, "observables cache is deposit-driven"): "surfaces the **once-per-iteration** maximum-speed readback in the pass and synchronization ledgers (+1 physical-vector pass **in every cell**; a hand-fixed-Δt iteration still pays it — held by the new UNIFORM DEPOSIT SCHEDULE design holder)."
+- **Contradicts:** itself, within §1.4 of observables_cache — the same paragraph first names the max-speed reduction as "one exception" that costs "one physical-vector pass every iteration," then two sentences later says "the only work [the cache] adds" is a single closing deposit "paid per run rather than per iteration." Three other locations (§1.3 of the same page, the `deposit!` docstring, and the architecture decision log) split 1-vs-3 on which framing is correct, with the majority (and the more careful accounting in §1.4's own opening clause) supporting "every iteration."
+- **Description:** This is a load-bearing performance claim — whether the deposit-driven cache design is genuinely free except for a one-time end-of-run cost, or whether it pays a real per-iteration traffic tax (as ARCHITECTURE.md's UNIFORM_DEPOSIT_SCHEDULE holder explicitly records: a hand-fixed-Δt run pays a pass it never needs, on *every* iteration, not once). A reader budgeting traffic for a long fixed-Δt run would reach opposite conclusions depending which sentence they trust. The correct reading (every iteration, per the majority and per the explicitly-named design holder) should be the one stated consistently; §1.3's summary sentence and §1.4's closing sentence both need to stop lumping the max-speed reduction in with the (genuinely once-per-run) chart-recovery amortization argument.
 
 ---
 
-## Finding 2 — The §2.3 transform-count table's scheme scope is stated once, two paragraphs before the table, not at the table itself
+## Finding 2 — `recommended_cfl` cannot express the one variable IFRK2's own stability is said to depend on
 
-**Type:** clarity
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- `observables_cache` §2: "One configuration fixes the system: a mask dealiasing rule…, **a
-  three-stage scheme**, the default rescaling velocity forcing, an adaptive timestep."
-- `observables_cache` §2.3 table: `TwoThirds, HouLi | 18 inverse, 9 forward | 21 inverse, 18
-  forward` / `PhaseShift | 36 inverse, 18 forward | 42 inverse, 36 forward` — no scheme name in the
-  table or its immediately surrounding prose.
-
-**Description:** The transform counts are correct for `IFLowStorageRK3`'s three stages (I
-reconstructed them independently from the per-evaluation recipe given just above the table: 6
-inverse + 3 forward per velocity evaluation, ×3 stages = 18/9; +1 inverse/+3 forward per stage for
-the scalar = 21/18; `PhaseShift` doubles each = 36/18, 42/36 — all match). But the "three-stage
-scheme" qualifier that makes these numbers scheme-specific appears only once, in §2's opening
-sentence, and is not repeated at the table or in the paragraph that walks through the recipe
-immediately before it. Recomputing the same recipe for `IFRK2`'s two stages gives materially
-different counts (a reader who trusts the decision log's "RK2 34→28 c2r" figure would find no
-route from the rendered table alone to that smaller number). A reader who jumps straight to the
-table — a plausible use pattern for a reference page — could reasonably take it as scheme-agnostic.
-
-**Resolution hint:** repeat "(for the three-stage scheme)" in the table's caption or column header.
+- **Type:** method
+- **Severity:** major
+- **Confidence:** medium
+- **Locations:**
+  - PAGE: api / Propagator, `recommended_cfl(scheme, domain)`: "`IFRK2` is imaginary-axis unstable ($y_{\mathrm{s}} = 0$, relying on viscous damping), which makes the formula degenerate — its $0.25$ is an empirical margin, not a computed limit, **and the damping it leans on weakens as $\nu$ falls**."
+  - Same page, `IFRK2` type docstring: "the scheme is unstable on the imaginary axis, so it is stable only where the viscous damping of the integrating factor dominates... prefer `IFLowStorageRK3` for high Reynolds number or marginal resolution."
+  - The function signature itself takes only `(scheme, domain)` — no viscosity, no `FlowConditions` — so it structurally cannot scale the empirical margin with $\nu$.
+- **Description:** For every other scheme/dealiasing combination the CFL ceiling is a genuinely computed bound (stability limit ÷ eigenvalue estimate). For IFRK2 the docs candidly say the "conservative" 0.25 is empirical and that the very damping it depends on **weakens as ν falls** — i.e. exactly the axis this package is built to let a user push (the whole point of `viscosity`/grid-mode Re selection). Yet `recommended_cfl` has no way to see ν, so the same constant 0.25 is offered at every Reynolds number, including ones where the docs themselves say the stabilizing mechanism is weaker. This is a genuine numerical-safety gap in the API surface (mitigated only by prose telling the user to switch schemes), not merely a documentation slip.
 
 ---
 
-## Finding 3 — `IFLowStorageRK3`'s headline "two field registers per field" sits next to a three-array `IntegratorBuffers` field list
+## Finding 3 — `max_speed`'s stated justification for being cached overstates its necessity
 
-**Type:** clarity
-**Severity:** nit
-**Confidence:** low
-
-**Locations:**
-- `Propagator.IFLowStorageRK3` docstring: "…two field registers per field: the state's own array
-  plus one accumulator (`stage1`; the raw-assembly register `nonlinear` is the dealiasing seam's
-  addition, not the scheme's)."
-- `Propagator.IntegratorBuffers` Fields: `stage1` — "allocated by every scheme"; `nonlinear` — "the
-  assembled right-hand side; `IFLowStorageRK3` only, else `nothing`."
-
-**Description:** The docstring already anticipates and answers this, so I list it at low
-confidence: a reader who takes "two field registers per field" as the actual resident GPU footprint
-(rather than Williamson's classical accounting, which conventionally excludes the transient
-right-hand-side buffer any explicit RK scheme needs) will find a third field-sized array
-(`nonlinear`) genuinely resident and counted in the memory-audit ledger (per ARCHITECTURE's decision
-log, "the scalar's transient registers (`copy`/`nonlinear`/factor could share one slot)" treats
-`nonlinear` as a real, distinct buffer). This matches how the term is conventionally used in the
-spectral-DNS literature (Rai–Moin/Spalart–Moser–Rogers-style RK3 implementations also need a
-transient RHS array outside the "2N" count), so this is very likely *not* a defect — flagging only
-because the parenthetical explaining the attribution is easy to skim past on a first read of the
-headline claim.
+- **Type:** contradiction
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE: api / Observables, `max_speed`: "The maximum speed qualifies because **the run itself needs it**: the next timestep is chosen from it, so the reduction happens whether or not anyone reads the value."
+  - PAGE: api / Propagator, `deposit!`: "the maximum-speed reduction runs every iteration, **including under a hand-fixed Δt that never reads it**."
+  - PAGE: api / SimulationRun, `advance!`: "pass `dt` to force a fixed step" — confirming the fixed-Δt mode is a first-class, documented path.
+- **Description:** `max_speed`'s docstring justifies its cached slot on the premise that "the run itself needs it," implying the reduction is intrinsic to advancing the run. But the package explicitly supports fixed-Δt advancement (`advance!(sim; dt=...)`), in which case, per `deposit!`'s own docstring, the reduction is computed and never consumed. The justification is true only for the adaptive-CFL path; stated flatly it reads as a stronger necessity claim than the schedule actually delivers.
 
 ---
 
-## Not flagged (verified correct, noted for the record)
+## Finding 4 — `IFRK2` is called "cheaper" without the memory axis this codebase treats as primary
 
-- `PhaseShift` band: `κ_max = (√2/3)N·(2π/L) = (2√2/3)κ_Ny ≈ 0.94κ_Ny`, a factor `√2` wider radius
-  than `TwoThirds`'s `(2/3)κ_Ny`, `(√2)³ ≈ 2.8×` the retained-sphere mode count, at exactly `2×` the
-  transforms for both velocity and scalar (post the same-stage `u_shifted` reuse fix) — consistent
-  across ARCHITECTURE, `notation`, `observables_cache`, `Generator`, `Observables`, and
-  `SimulationDomain`.
-- Transform table cross-checked against the decision log's pre-/post-fix c2r counts for both RK3
-  (51→42) and RK2 (34→28, reconstructed from the two-stage recipe).
-- CFL derivation (`C_CFL ≲ y_s/(κ_max Δx)`, `κ_max Δx = fπ`) reproduces the stated `0.83`/`0.5`
-  (RK3) figures exactly.
-- Williamson RK3 coefficients, IFRK2 stability polynomial, Heun endpoint formula (verified against
-  the integrating-factor substitution by hand), `κ_p/√2` shell-peak derivation, `ConstantPower`'s
-  `A = target/(2E_band)`, and the frame/physical-vector byte counts (322.5 MiB, 384 MiB, 768 MiB,
-  2.3 GiB) all reconcile exactly.
+- **Type:** clarity
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE: architecture, §4.5: "`IFRK2` (Heun) is a cheaper two-stage option..."
+  - PAGE: api / Propagator (module docstring): "`IFRK2`/Heun a cheaper two-stage alternative, imaginary-axis unstable."
+  - PAGE: api / Propagator, `IntegratorBuffers` Fields: `IFLowStorageRK3` allocates `stage1` + `nonlinear` (2 spectral registers/field); `IFRK2` allocates `stage1` + `stage2` + `velocity_star_spectral` (3 spectral registers/field).
+- **Description:** "Cheaper" is accurate on the compute/transform axis (2 nonlinear evaluations vs. 3), but IFRK2 actually resides at **more** spectral registers per field than the default `IFLowStorageRK3` (3 vs. 2) — the opposite ranking on the memory axis. In a package whose own charter states "'Low footprint' is the default working point on a studied axis" (§6) and that elsewhere is careful to caveat exactly this kind of register-count nuance (e.g. RK3's own docstring explicitly notes its `IntegratorBuffers` "can hold more than" Williamson's nominal 2N count, "because the count measures the scheme, not the solver it is embedded in"), the unqualified "cheaper" for IFRK2 invites a memory-conscious reader to assume it is cheaper on both axes.
+
+---
+
+## Findings considered and ruled out (recorded for the panel's benefit, not to be re-flagged)
+
+- The PhaseShift band (√2/3·N·2π/L ≈ 0.94 κ_Ny, ≈2.8× the modes, exactly 2× the transforms for velocity and scalar alike) is stated identically and arithmetically consistently across architecture.md, notation.md, observables_cache.md's transform table, and the SimulationDomain/Propagator API pages — verified by direct recomputation, no defect.
+- The frame-memory "322.5 MiB (three field-scale arrays) / some 8% on top of the default working set" figure (decision 36) initially looked inconsistent with observables_cache.md's later "~2.3 GiB / six vector-shaped fields" working-set figure, but the two describe different points in time (decision 36 predates the decision-40/41 register reductions that shrank the working set); 322.5 MiB / (a ~3.8 GiB pre-reduction working set) ≈ 8%, consistent. Not a defect — decision-log entries are append-only history per the adjudication file.
+- The 21-inverse/18-forward (mask, with scalar) and 42-inverse/36-forward (PhaseShift, with scalar) transform counts in observables_cache.md §2.3 were independently re-derived from the stated per-evaluation transform breakdown and match exactly, including the RK3 51→42 / RK2 34→28 c2r figures from the decision log's shifted-velocity-reuse fix.
+- The grid-mode $\mathrm{Re}_\lambda \sim N^{2/3}$ scaling claim (architecture decision log, SimulationRun docstring) was independently re-derived from the stated $\kappa_{\max}\eta$ resolution criterion and the Li2008 dissipation law, and checks out exactly.

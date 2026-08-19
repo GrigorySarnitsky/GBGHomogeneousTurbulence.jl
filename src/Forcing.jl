@@ -257,7 +257,7 @@ run may no longer measure, and there is no answer that is right for every run.
     against has no such constraint, and `:band` is then the gentler clamp.
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `domain` — the `FixedDomain` the band is built on.
 - `target` — the value of the held observable (the kinetic energy for a velocity, the scalar variance
   for a scalar), as selected by `over`.
 - `over` — `:band` to hold the band's own value, `:total` to hold the whole field's. Required; the
@@ -331,7 +331,7 @@ folded into the integrating factor (exact for the linear term), so the forced ba
 rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `domain` — the `FixedDomain` the band is built on.
 - `rate` — the fixed linear rate ``A``. A positive value amplifies the field.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
@@ -389,7 +389,7 @@ into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
     band if a run needs the forcing to take hold.
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the band is built on.
+- `domain` — the `FixedDomain` the band is built on.
 - `injection_rate` — the energy-injection rate to hold: the value ``\\varepsilon`` relaxes to in the
   stationary mean, not an instantaneous dissipation the forcing measures or clamps.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
@@ -452,7 +452,7 @@ noise scratch — one field in physical and one in spectral representation, allo
 velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the band and the noise scratch are built on.
+- `domain` — the `FixedDomain` the band and the noise scratch are built on.
 - `variance` — the stationary forcing variance ``\\sigma^{2}``.
 - `correlation_time` — the correlation time ``T_L`` of each mode's process.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's

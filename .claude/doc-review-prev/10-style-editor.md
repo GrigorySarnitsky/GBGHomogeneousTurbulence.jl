@@ -1,145 +1,92 @@
-# Style / Copy-Editor hat — findings
+# Style / copy-edit review — hat: style-editor
 
-Fresh-eyed technical copy-edit for internal uniformity across the rendered GBGIsotropicTurbulence
-docs, cross-checked against the raw built HTML under `docs/build`. Ranked most-severe first.
+Scope: `manuscript-full.md` (full rendered site) plus spot-checks of the raw built HTML under
+`docs/build` for silent rendering failures. Findings ranked most-severe first. Items already
+settled in `.claude/doc-review-adjudicated.md` (Saffman attribution, `kinetic_energy` 1.5 vs 0.5,
+decision-log history, deferred capabilities, `vorticity_spectral(sim)`, `Lundgren2002` in
+StructureFunctions refs, `deposit_velocity!`/`take_velocity!` existence, host-device-sync floor
+vs achieved, `integrator` false cognate, PascalCase presets, `No DOI`/`no DOI`, bare `CatmullRom`,
+arrow vs `Returns` sentence, citation-opens-identity) are excluded.
 
 ---
 
-## 1. Admonition titles do not render Markdown code spans — literal backticks shown to the reader
+## Finding 1 — "observation" is used for three different objects
 
-- **Type:** typesetting (silent rendering failure)
+- **Type:** clarity / notation
 - **Severity:** major
 - **Confidence:** high
 - **Locations:**
-  - `docs/build/api/Forcing/index.html` — admonition header renders literally as
-    `Which one a run wants depends on what else reads ``k```
-  - `docs/build/api/SimulationRun/index.html` — admonition header renders literally as
-    `The default holds ``k`` fixed, so ``k`` is not a measurable of the default run`
-  - `docs/build/api/Generator/index.html` — admonition header renders literally as
-    `` `ω_consumed` is read and then overwritten `` (single backticks also unprocessed)
-- **Description:** Custom admonition titles (`!!! note "…"`-style headers) are not run through the
-  Markdown/code-span renderer, so a title written with backtick-wrapped code (`` `k` `` or a double
-  backtick escape ``` ``k`` ```) shows the literal backtick characters to the reader instead of
-  monospaced code. Every other admonition title in the corpus that avoids backticks (`Note`,
-  `Warning`, `An epoch is not an iteration number`, `Extraction-bound`, …) renders cleanly — so this
-  is a real, avoidable defect in exactly the three titles that tried to use inline code, not a
-  universal limitation the corpus already works around. A reader lands on three separate pages and
-  sees stray backtick characters in a section header.
-- **resolution_hint:** Either rewrite these three titles to avoid inline code (as every other title
-  in the corpus already does), or confirm Documenter's admonition-title Markdown support and fix the
-  source syntax.
+  - `notation.md`, Vocabulary: *"observation | the callback a run is driven by: it reads the run once per iteration and its return decides whether to continue."* (defines *observation* = the callback, a single object per run)
+  - `architecture.md` §3/§4.7 and `SimulationRun` module docstring: *"the callback is the observation — the thing that reads the run each iteration — and its return decides continuation"* (same sense: object)
+  - `architecture.md` §2 / `SimulationRun.run!`: *"n iterations, n+1 observations"*, *"A run of n iterations therefore observes n + 1 instants"* (here *observation* is a countable **event**, not an object — there is exactly one callback per run, never n+1 of them)
+  - `observables_cache.md` §1.1: *"between those times... sits the observation: the caller's callback reads the state and the cache"* (event again)
+  - `architecture.md` §8 and `SimulationRun.Simulation` docstring: *"the `ObservablesCache` observation cache"*, *"the observation cache holds spent compute, reconstructable from the record"* — here *observation cache* is used as an informal alias for **the `ObservablesCache` itself**, a third referent distinct from both the callback and the event.
+- **Contradicts:** `notation.md`'s own Vocabulary section states each term "means exactly this and nothing looser," yet *observation* is bound to three distinct kinds of object (the callback, the per-iteration event of it firing, and the cache) across the corpus — precisely the field/representation-style category conflation the house rules ask reviewers to guard against.
+- **Description:** This is a load-bearing term (it names the run's whole driving mechanism) used inconsistently enough that a cold reader cannot form one mental model of what "an observation" is. The event sense ("n+1 observations") and the object sense ("the callback is the observation") cannot both be literal; the "observation cache" sense adds a third name for something that already has a canonical name (`ObservablesCache`/"the cache") everywhere else, including the Cache module's own docstring.
+- **Resolution hint:** Pick one referent for the glossary entry (most usage supports "the discrete act of a callback reading the run"), retire "observation cache" in favor of "the cache"/`ObservablesCache" wherever it appears, and word the callback-defining sentences ("the callback is the observation") to say the callback *performs* the observation rather than *is* it.
 
 ---
 
-## 2. `Phenomenology` submodule References lists render every DOI as dead plain text, while the identical DOIs are live links everywhere else on the very same pages
+## Finding 2 — `deposit_sample!` is prescribed to the reader but never documented
 
-- **Type:** citation (silent rendering failure)
+- **Type:** api-gap / self-containedness
 - **Severity:** major
 - **Confidence:** high
-- **Locations:**
-  - `docs/build/api/phenomenology/Scalings/index.html`, `## References` — `doi:10.1063/1.869575`,
-    `doi:10.1063/1.868656`, `doi:10.1080/14685240802376389` all render as bare text, no `<a>` tag.
-  - `docs/build/api/phenomenology/Spectra/index.html`, `## References` — all four DOIs (Pope 2000,
-    von Kármán 1948, Pao 1965, Corrsin 1951) likewise unlinked.
-  - `docs/build/api/phenomenology/StructureFunctions/index.html`, `## References` — all three DOIs
-    unlinked.
-  - Contrast, on the **same** `Scalings` page, inside the `Li2008` docstring body: `Sreenivasan 1998,
-    <a href="https://doi.org/10.1063/1.869575">doi:10.1063/1.869575</a>` — the identical DOI is a
-    working hyperlink two sections above the dead one in the reference list.
-- **Description:** Every in-body citation across the docstrings (and the whole of
-  `ARCHITECTURE.md`'s `## References`) renders its `doi:10.xxxx` text as a clickable link to
-  `https://doi.org/10.xxxx`. The three `Phenomenology` submodule pages' trailing `## References`
-  lists — generated from each law's `provenance(law).citation` string — render the same DOI text as
-  inert plain text. Per the project's own stated policy ("A DOI here has been resolved against the
-  registry, never recalled"), a DOI on this surface is meant to be a working citation link; here it
-  silently is not, on nine separate entries across three pages.
-- **resolution_hint:** Wrap the DOI substring of each `Reference` citation string in a Markdown link
-  (or emit it as one at render time), matching the in-body citation convention.
+- **Locations:** `api/Cache/index.html` (`Cache.particles_modified!` docstring): *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*.
+- **Contradicts:** No other occurrence of `deposit_sample!` exists anywhere in the manuscript — not as its own docstring entry, not in the master `GBGIsotropicTurbulence` API index (which lists every other public verb, including the sibling `record_particle_velocity!`), and not on the Cache or Particles pages' section lists.
+- **Description:** The docstring tells a reader following a hand-run loop that they "must" call `deposit_sample!`, but a cold reader has no way to find its signature, its module, or confirm it is even public API — it fails the doc policy's own cold-read test ("every signature argument documented... a term of art... is explained or `@ref`-linked"). Either the function needs a docstring and an index entry, or the instruction is stale and should name whatever verb actually serves this role today.
+- **Resolution hint:** Add `deposit_sample!` to the Cache (or Particles) API page with its own docstring, or replace the reference with the currently-correct verb name.
 
 ---
 
-## 3. A stray space renders before closing punctuation after a linked/coded term, across five pages
+## Finding 3 — Two citation/DOI formats coexist across the corpus
 
-- **Type:** typesetting
+- **Type:** citation / format
+- **Severity:** minor
+- **Confidence:** medium-high
+- **Locations:**
+  - `architecture.md` §References: *"Orszag, S. A. (1971)... J. Atmos. Sci. 28, 1074. https://doi.org/10.1175/1520-0469(1971)028%3C1074:OTEOAI%3E2.0.CO;2"* — full `https://doi.org/` URL, percent-encoded `<`/`>`.
+  - `api/SimulationDomain/index.html` (`TwoThirds` docstring), citing the same Orszag (1971) work: *"doi:10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2"* — bare `doi:` prefix, literal (unescaped) `<`/`>`.
+  - Every `Phenomenology` submodule's own `## References` list (`Scalings`, `Spectra`, `StructureFunctions`) uniformly uses the bare `doi:10.xxxx` form with no article title, e.g. *"Sreenivasan (1998), Phys. Fluids 10, 528. doi:10.1063/1.869575"*, versus `architecture.md`'s `LastName, Initial. (Year). Title. Journal Vol, pages. https://doi.org/...` form.
+- **Contradicts:** the same physical citation (Orszag 1971) is rendered two different ways depending on which page cites it; the two DOI conventions are never reconciled or acknowledged as deliberate.
+- **Description:** `CLAUDE.md`'s citation rule ("Citations follow author–year; the full references are §References... never cite an inaccessible source") does not license a second citation-string format. This is a real, checkable, corpus-wide split between a verbose `ARCHITECTURE.md`-style reference and a terse docstring/Phenomenology-style reference, most visible where both cite the identical paper.
+- **Resolution hint:** Standardize on one DOI-string convention (either always the resolvable `https://doi.org/` URL, or always the bare `doi:` prefix) across `ARCHITECTURE.md`, inline docstring citations, and the `Phenomenology` reference lists.
+
+---
+
+## Finding 4 — `to_spectral` is `@extref`-linked on its second mention but bare on its first, same page
+
+- **Type:** typesetting / cross-referencing
 - **Severity:** minor
 - **Confidence:** high
 - **Locations:**
-  - `docs/build/api/Cache/index.html` — "…by `record_particle_velocity!` **,** both inside
-    `advance!`…"
-  - `docs/build/api/Forcing/index.html` — "…measured by `dissipation`) and $\varepsilon_\varphi$ for
-    the scalar (by `scalar_dissipation` **)**." and "`velocity_forcing` **,** `scalar_forcing`"
-  - `docs/build/api/Generator/index.html`, `docs/build/api/Propagator/index.html` — e.g. "a
-    `ResolvedFields` **)** the step has just produced", "an `ObservablesCache` **)**. Dispatches on…"
-  - `docs/build/api/phenomenology/Phenomenology/index.html` — "a `StructureFunction` **)** at
-    separation…"
-- **Description:** A visible extra space sits before a closing parenthesis or a comma immediately
-  following a linked code term, in at least 16 places across 5 pages (verified directly in the
-  rendered HTML: `</code></a> [,.)]`). It reads as a typo to anyone who notices it, and is
-  inconsistent with the ~equally common case elsewhere in the same docstrings where the punctuation
-  correctly hugs the preceding code span with no gap.
-- **resolution_hint:** Drop the trailing space inside the Markdown source immediately before the
-  closing bracket/punctuation that follows a `` `code` `` reference.
+  - `notation.md`, "## Conventions" table, row for $\hat f$: rendered HTML is `<code>to_spectral(f)</code>` — plain code span, **no link**.
+  - `notation.md`, "## Spectral representation and operators" table, a few rows below on the **same page**: `<a href="https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/dev/api/Fields/#GBGPeriodicFields.Fields.to_spectral"><code>to_spectral</code></a>` — properly `@extref`-linked to `GBGPeriodicFields`.
+- **Contradicts:** `CLAUDE.md`'s cross-referencing rule: "(1) Link a target at most once per docstring — its first genuine mention." The first genuine mention of `to_spectral` on `notation.md` is the unlinked one; the link appears only on the second mention.
+- **Description:** Confirmed directly in the built HTML (not an extraction artifact): identical identifier, same page, inconsistent linking. A reader hitting the first occurrence has no way to jump to the backend's actual documentation for it.
+- **Resolution hint:** Move the `@extref` link to the first occurrence (the Conventions-table row), or drop the link from the second and rely on the first.
 
 ---
 
-## 4. Prose sentences open with a lowercase code identifier, against the corpus's own stated rule
+## Finding 5 — No single convention for where a trailing caveat admonition sits relative to the closing "Returns" sentence
 
-- **Type:** language-tone
-- **Severity:** minor
+- **Type:** format (docstring skeleton)
+- **Severity:** nit
 - **Confidence:** medium
 - **Locations:**
-  - `ARCHITECTURE.md` decision log (2026-08, "The consumed operand is named for it…"): "…`ω_consumed`,
-    `u_consumed`. **`velocity_rhs!` reads the vorticity and overwrites it**; `scalar_rhs!` reads the
-    velocity and overwrites it."
-  - `observables_cache.md` §3.1 opens its very first sentence with "**`run!` is the observation-first
-    loop**: after every iteration…"
-- **Description:** The corpus's own house rule (stated verbatim in the project documentation policy)
-  is: "A prose sentence never opens with a lowercase code identifier… lead with a capitalized word…
-  (bulleted `` `arg` `` entries and signatures are exempt)." Neither instance above is a bulleted arg
-  entry or a signature — one is a plain decision-log sentence, the other opens a numbered
-  subsection's very first paragraph — so both read as the flagged typo pattern the rule exists to
-  prevent.
-- **resolution_hint:** Reword ("The `velocity_rhs!` verb reads…", "A `run!` call is the
-  observation-first loop…") or otherwise front-load a capitalized word.
+  - Admonition **before** the final `Returns` sentence (i.e. `Returns` is the true last line): `Generator.velocity_rhs!` (admonition *"The vorticity argument is read and then overwritten..."*, then eventually *"Returns `N̂`."*); `Propagator.step!` (admonition *"A step alone leaves the cache mid-iteration..."* immediately followed by *"Returns `state`."*).
+  - Admonition **after** the `Returns` sentence (i.e. `Returns` is not last): `State.random_solenoidal_velocity_spectral!` (*"Returns `û`."* then the admonition *"Seeding a running case invalidates the observables cache..."*); `State.random_scalar_spectral!` (same pattern with `φ̂`); `SimulationDomain.truncate_to_band!` (*"Returns `field`."* then *"Truncating the band is not always the whole of dealiasing..."*).
+- **Contradicts:** the two groups place the same two elements (a load-bearing caveat, and the closing `Returns` sentence) in opposite relative order, with no discernible rule distinguishing which docstrings get which order.
+- **Description:** `CLAUDE.md` states a caveat admonition is "the last substantive block... before `# Fields`" for **type** docstrings; for **function** docstrings with a `Returns` sentence, the corpus is split roughly evenly (3 vs 3 among the sampled instances) with no stated rule, so this reads as skeleton drift rather than a deliberate two-shape convention.
+- **Resolution hint:** Pick one order for function docstrings that both mutate a field and carry a caveat (recommend: caveat first, `Returns` last, mirroring the type-docstring rule) and apply it uniformly.
 
 ---
 
-## 5. "No DOI" / "no DOI" capitalization is inconsistent between `ARCHITECTURE.md` and the `Phenomenology` reference lists
+## Finding 6 — `notation.md`'s reference-conventions table has no header separator sanity issue, but the intro rule about `Code`-column linking doesn't apply to the "Conventions" table (design ambiguity, not a defect)
 
-- **Type:** citation
+- **Type:** organization
 - **Severity:** nit
-- **Confidence:** high
-- **Locations:**
-  - `ARCHITECTURE.md` References — "(**No** DOI: the 1941 Doklady notes predate the system.)",
-    "(**No** DOI; a NASA technical memorandum…)", "(**No** DOI; a Center for Turbulence Research
-    brief.)"
-  - `docs/build/api/phenomenology/Spectra/index.html` References — "Obukhov (1949)… (**no** DOI)"
-  - `docs/build/api/phenomenology/StructureFunctions/index.html` References — "…(**no** DOI, the
-    1941 Doklady notes predate the system)", "…(**no** DOI: a 1949 Doklady note)"
-- **Description:** The same stock parenthetical ("this citation has no DOI") is capitalized as a
-  sentence-initial "No DOI" in one bibliography and left lowercase "no DOI" in the other two,
-  despite both playing the identical grammatical role (a self-contained parenthetical aside).
-- **resolution_hint:** Pick one capitalization for the parenthetical and use it everywhere.
-
----
-
-## 6. The stated `@extref` exception for backend/element types is followed in `notation.md` but not in `ARCHITECTURE.md`'s own prose
-
-- **Type:** citation
-- **Severity:** minor
 - **Confidence:** low
-- **Locations:**
-  - `docs/build/notation/index.html` — `Float32` in the Numerics table links out to
-    `docs.julialang.org`, and `to_physical` links to the `GBGPeriodicFields` API docs.
-  - `docs/build/architecture/index.html` — the near-identical sentence "`element_type` fixes the real
-    element type (`Float32` or `Float64`) and `array_type` the storage (`Array`, `CuArray`,
-    `ROCArray`)" leaves every one of those five type names as plain, unlinked `<code>` — as do all
-    other `Float32`/`Float64`/`CuArray`/`to_physical!` mentions throughout `ARCHITECTURE.md`.
-- **Description:** The corpus's own cross-referencing rule names "the storage-backend and element
-  types (`Array` / `CuArray` / `ROCArray`, `Float32` / `Float64`) and the `GBGPeriodicFields` types"
-  as "the deliberate `@extref` exception". `notation.md` applies it; `ARCHITECTURE.md`, discussing the
-  identical objects in near-identical wording, never does. This may be a deliberate choice specific
-  to the design document (kept link-light on purpose), in which case this is not a defect — flagged
-  at low confidence for that reason.
-- **resolution_hint:** Either confirm `ARCHITECTURE.md` is intentionally exempt from the `@extref`
-  rule, or link the first mention of each type there too, for consistency with `notation.md`.
+- **Locations:** `notation.md`, "## Conventions" table (`Concept | Symbol | Convention`, no `Code` column) versus every later table on the same page (`Symbol | Meaning | Code`).
+- **Description:** Noted for completeness only: the page states "Every Code entry naming a package object links to its documentation," but the very first table has no `Code` column at all, so `to_spectral(f)` inside its "Convention" cell sits outside that rule's literal scope — which is why Finding 4 has to invoke the general cross-referencing rule rather than this one. Flagging as a low-confidence "smells inconsistent" observation, not a separate defect from Finding 4.
+- **Resolution hint:** none needed beyond Finding 4's fix.

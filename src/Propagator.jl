@@ -194,10 +194,10 @@ stages compute their recoveries into those same slots, so the step allocates not
 no storage beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
 deposit is recorded at — is advanced when the step completes.
 
-Call it with the same arguments in the same order as `deposit!`, the call that closes the iteration:
-the dispatch object first, then `state`, `domain`, `buffers`. Only the extras differ — `generator`
-sits directly after `state` here, and `cache` and `dt` come last — so the two calls of a hand-run
-loop read as a pair.
+The leading argument differs from `deposit!`'s in kind, and it is worth knowing which: `scheme` here
+is a stateless dispatch tag, and what this call mutates is `state`, the second argument; `deposit!`
+leads with `cache`, the object it mutates. After the leader both take `state`, `domain`, `buffers` in
+that order, so a hand-run loop's two calls still line up.
 
 Returns `state`.
 
@@ -546,10 +546,10 @@ margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` fa
 
 !!! warning "The IFRK2 margin does not know the viscosity"
     This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the
-    grid — but [`IFRK2`](@ref)'s margin is the one value that depends on a quantity it cannot see.
+    grid — but `IFRK2`'s margin is the one value that depends on a quantity it cannot see.
     The same `0.25` is returned at every Reynolds number while the viscous damping it rests on
     weakens as ``\\nu`` falls, so at high Reynolds number verify the step against a run that holds
-    its energy, or set `cfl` yourself. [`IFLowStorageRK3`](@ref)'s ceiling carries no such dependence.
+    its energy, or set `cfl` yourself. `IFLowStorageRK3`'s ceiling carries no such dependence.
 
 It scales that base by the domain's dealiasing: a strategy that keeps modes
 to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a

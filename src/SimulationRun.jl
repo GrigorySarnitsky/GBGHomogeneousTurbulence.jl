@@ -377,6 +377,8 @@ advective-CFL value for the current velocity; pass `dt` to force a fixed step. C
 with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
 returns. Advects the tracers,
 if any, by Heun-in-time on the start- and end-of-step velocities, and updates the clock.
+
+Returns `sim`.
 """
 function advance!(sim::Simulation; dt = nothing)
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
@@ -442,6 +444,8 @@ end
 
 run!(StationarityCriterion(), sim)               # spin up to statistical stationarity
 ```
+
+Returns `sim`.
 """
 function run!(callback, sim::Simulation)
   while true
@@ -661,6 +665,8 @@ and for every option. For a fixed spin-up budget, write the three-line budget ca
 warmup!(sim)                          # detect stationarity (ε- and skewness-plateau gates)
 warmup!(sim; gate_skewness = false)   # relax the skewness gate (a shorter, looser spin-up)
 ```
+
+Returns `sim`.
 """
 warmup!(sim::Simulation; kwargs...) = run!(StationarityCriterion(; kwargs...), sim)
 

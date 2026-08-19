@@ -1,121 +1,66 @@
-# Panel hat: latex-typesetter
+# Hat: latex-typesetter
 
-Fresh-eyed audit of math typesetting and house-style conformance, cross-referencing the rendered
-manuscript against the authored TeX in `src/*.jl` and `docs/src/*.md` / `docs/ARCHITECTURE.md`,
-against the rubric in `CLAUDE.md`'s "Documentation policy" (Notation + Silent-rendering
-micro-rules). Build-enforced items (`\mathbf`, bare-index `\partial_i`, inline-math-on-one-line)
-were checked and found clean corpus-wide — not repeated here. Findings below are the
-judgment-level residue a grep cannot make on its own.
+Panel round following `.claude/doc-review-adjudicated.md`. Scope: LaTeX/TeX typesetting idiom and
+the house math-authoring style (`CLAUDE.md` "Documentation policy" — Notation block and
+Silent-rendering micro-rules), audited against both the rendered manuscript and the authored source
+(`src/*.jl` docstrings, `docs/src/*.md`, `docs/ARCHITECTURE.md`).
 
----
-
-## Finding 1 — `C_{OC}` renders as a bare italic letter-product, not the upright abbreviation label
-
-- **Type:** formatting
-- **Severity:** major
-- **Confidence:** high
-- **Locations:**
-  - Source: `src/phenomenology/Spectra.jl:386` — `` E_\varphi(\kappa) = C_{OC} \varepsilon_\varphi \varepsilon^{-1/3} \kappa^{-5/3}, ``
-  - Rendered: PAGE `api / phenomenology / Spectra`, `ObukhovCorrsin1949` — "$E_\varphi(\kappa) = C_{OC} \varepsilon_\varphi \varepsilon^{-1/3} \kappa^{-5/3},$"
-- **Description:** `OC` is a two-letter abbreviation label (Obukhov–Corrsin), not a product of two
-  independent index letters, yet it is typeset bare inside the subscript braces (`C_{OC}`), so it
-  renders as the italic letter-product "O·C" rather than a unified label. This is the exact class
-  CLAUDE.md's own rubric names as the required upright-label case — "a multi-letter subscript LABEL
-  upright, `k_{\mathrm{lo}}`, vs a product of index letters italic" — and the corpus gets the
-  analogous cases right elsewhere (`\kappa_{\mathrm{Ny}}`, `C_{\mathrm{CFL}}`, `y_{\mathrm{s}}`).
-  Should be `C_{\mathrm{OC}}`. All four occurrences of `C_OC` in the same docstring (constructor
-  signature aside) carry the same subscript.
+**Method.** Read the house rulebook and the adjudicated list first. Then swept every `` ``...`` ``
+and `\[...\]`/````math``` span in `src/*.jl`, `docs/src/*.md`, and `docs/ARCHITECTURE.md` for: unbraced
+`\boldsymbol`/`\tfrac` groups, `\mathbf`, bare-index `\partial_i`, bare imaginary `i`, un-upright named
+operators, gratuitous `\,`/`\;`/`\:`/`\!`, `\left`/`\right` vs `\bigl`/`\Bigr`, `\mathbb` on a digit,
+unbraced multi-letter subscripts/superscripts, multi-line formulas without an alignment environment,
+and code identifiers loose inside math spans. The corpus turned out to be typeset with unusual
+discipline — most of the house rules I checked for are followed with zero exceptions across the whole
+tree (no unbraced `\boldsymbol`, no `\mathbf`, no bare `\partial_i`, no bare imaginary unit, no
+`\left`/`\right` delimiter use anywhere, every `\,` immediately precedes a `\mathrm{d}`, every named
+operator — `\det`, `\operatorname{tr}`, `\operatorname{sym}`, `\operatorname{dealias}`, `\sup`, `\log`,
+`\exp` — is upright). Two genuine findings survived that sweep.
 
 ---
 
-## Finding 2 — The Big-O order symbol is styled two different ways for the same concept
+## Finding 1 — the low-storage accumulator is bold `\boldsymbol{h}` at its home, bare `h` in the decision log
 
-- **Type:** formatting
-- **Severity:** minor
-- **Confidence:** high
-- **Locations:**
-  - `docs/src/observables_cache.md:363` — `` \mathcal O(\Delta t^{2}) `` (mirrored in the rendered
-    `observables_cache` page, §2.5: "differs from the endpoint by $\mathcal O(\Delta t^{2})$")
-  - `docs/ARCHITECTURE.md:414` — `` O(\Delta t^2) `` (rendered `architecture` page §4.6: "differs
-    from the next sample only at $O(\Delta t^2)$")
-  - `docs/ARCHITECTURE.md:1093` — `` O(\Delta t) `` (decision log)
-  - `docs/ARCHITECTURE.md:1538` — `` O(\Delta t^2) `` (decision log)
-- **Description:** The same asymptotic-order notation for the identical claim (the tracer
-  predictor-position error term, discussed almost verbatim in both places) is set calligraphic
-  (`\mathcal O`) once and plain italic (`O`) three times. One glyph should be chosen and used
-  throughout; `\mathcal O` is the more standard choice for Big-O and is already the corpus's
-  apparent intent in the design page.
+- **type:** typesetting
+- **severity:** minor
+- **confidence:** high
+- **locations:**
+  - `src/Propagator.jl:222-230` (the `IFLowStorageRK3` docstring, the formula's home): `` ``\\boldsymbol{h}`` `` and the display block `\boldsymbol{h} \leftarrow A_i \boldsymbol{h} + \Delta t \widehat{\boldsymbol{N}}(\hat q)`` — the RK3 accumulator is consistently bold throughout.
+  - `docs/ARCHITECTURE.md:1454` / `docs/src/architecture.md:1454` (decision-log entry 39): "the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal{E}(\hat{\boldsymbol{u}} + B_i h)``" — same accumulator, rendered as bare italic `h`.
+- **contradicts:** `Propagator.jl`'s own docstring, the formula's documented home per the house rule "the `!` form is the home … the allocating form is a thin wrapper with no notation that drifts across the pair" (the same discipline applies across any two renderings of one object) — here the accumulator vector is bold at its one true home and un-bold in the architecture's own abbreviated citation of the identical update rule.
+- **description:** `\boldsymbol{h}` is the Runge–Kutta low-storage accumulator, a vector field (spectral representation), per its house-mandated home docstring. The architecture decision log's shorthand mention of the same fused update drops the bold, rendering it as a plain scalar-looking `h`. Since vectors are bold italic house-wide and this is the identical mathematical object (not a new, scalar quantity), the bare `h` is a notation drift a reader who cross-references the two pages would notice.
+- **resolution_hint:** Render as `\boldsymbol{h}` in the decision-log entry to match its docstring home.
 
 ---
 
-## Finding 3 — Word-subscript labels mix `\text{…}` and `\mathrm{…}`, including within the same page
+## Finding 2 — two display formulas are laid out as if multi-line but carry no alignment environment, unlike every sibling formula in the same file
 
-- **Type:** formatting
-- **Severity:** minor
-- **Confidence:** medium-high
-- **Locations:**
-  - `docs/src/notation.md:604` (Forcing table) — `` \varepsilon_{\text{target}} ``, versus the same
-    page's `` C_{\mathrm{CFL}} `` (line 594) and `` y_{\mathrm{s}} `` (line 597)
-  - `docs/ARCHITECTURE.md:708` — `` S_{\text{fine}} ``, `` S_{\text{coarse}} ``
-  - `docs/ARCHITECTURE.md:1456` — `` (D, \tau, \text{rate}) `` (decision log)
-- **Description:** Both `\text{}` and `\mathrm{}` are legitimate ways to set a word as an upright
-  subscript label, but the corpus uses `\mathrm{}` as its evident default (Re, Sc, Ny, CFL, s,
-  max, target-in-code-form elsewhere) while these four instances switch to `\text{}` for no
-  apparent reason — including one on the very `notation.md` glossary page that fixes the house
-  convention. Pick one command for the word-label family and use it everywhere.
-
----
-
-## Finding 4 — The same numeric coefficient is typeset as a stacked fraction in most places and a bare slash fraction in others, within one file
-
-- **Type:** formatting
-- **Severity:** minor
-- **Confidence:** high
-- **Locations:**
-  - `src/SimulationDomain.jl:47,107,112,119` — `` \tfrac{2\sqrt{2}}{3}\kappa_{\mathrm{Ny}} ``
-    (stacked fraction, e.g. the `PhaseShift` docstring's headline formula)
-  - `src/SimulationDomain.jl:125,361` — `` 2\sqrt{2}/3 \kappa_{\mathrm{Ny}} `` (bare inline slash,
-    no `\tfrac`) — same quantity, the `PhaseShift`-cutoff Nyquist fraction, in the same file
-- **Description:** `2√2/3 · κ_Ny` is the identical numerical constant discussed four times with a
-  properly stacked `\tfrac{2\sqrt{2}}{3}` and twice with a bare `2\sqrt{2}/3` slash form (once in
-  a `!!! note` block, once in `truncate_to_band!`'s docstring). Both render legibly, but the
-  switch mid-file between the two conventions for the same symbol is an avoidable inconsistency —
-  line 283's compact parenthetical list (`2/3` for `TwoThirds`, `1` for `HouLi`, `2\sqrt{2}/3` for
-  `PhaseShift`) is a defensible exception since the whole list is in slash form; 125 and 361 are
-  standalone prose uses that break from the file's own display-formula convention.
+- **type:** typesetting
+- **severity:** major
+- **confidence:** high
+- **locations:**
+  - `src/Observables.jl:78-81` (the `dissipation` docstring):
+    ```
+    \\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle
+                = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
+    ```
+    — a bare ````math``` block, two source lines with the second manually indented to visually line up under the first "=", but *no* `\begin{aligned}...\end{aligned}` and no `\\` line-break command.
+  - `src/Observables.jl:99-103` (immediately below, the vorticity-identity block): three source lines (`\lvert\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}\rvert^{2} = ... - ...`), same pattern — manually indented, no alignment environment.
+- **contradicts:** the same file's own convention at `src/Observables.jl:229-234` (`derivative_skewness`, three lines wrapped in `\begin{aligned}...\end{aligned}` with explicit `&` alignment) and `src/Observables.jl:326-331` (`integral_scale`'s second formula, same treatment) — and the corpus-wide pattern in `src/Propagator.jl:225-231`, `:338-342` and `src/Particles.jl:262-268`, every one of which wraps a visually-multi-line formula in `aligned`.
+- **description:** TeX/KaTeX math mode ignores raw newlines and leading whitespace inside a plain (non-`aligned`) block — the source's careful indentation meant to align the two `=` signs has no effect on the render; the formula instead renders as one unbroken line (or, if it ever grows wide enough, produces the very horizontal-scroll the house rules warn against, with no alignment at all). Every other place in this exact file that wants a visually-stacked, `=`-aligned formula uses `\begin{aligned}`; these two do not, so the visual indentation is currently pure noise in the rendered page and a latent formatting bug if either formula is ever extended.
+- **resolution_hint:** Wrap both blocks in `\begin{aligned}...\end{aligned}` with `&=` on the continuation lines, matching the file's own established idiom.
 
 ---
 
-## Finding 5 — `θ` reused for an unrelated quantity in the archived `StochasticOU` docstring, against the house glyph rule
+## Notes on what was checked and found clean (for the record, not separate findings)
 
-- **Type:** formatting
-- **Severity:** nit
-- **Confidence:** medium
-- **Locations:** `src/Forcing.jl:383-384` — `` \hat f \leftarrow \theta \hat f + \sqrt{\sigma^{2}(1-\theta^{2})} \xi, \qquad \theta = \exp(-\Delta t / T_L), ``
-- **Description:** CLAUDE.md's Notation block states "the scalar is $\varphi$, never $\theta$" —
-  and `notation.md`'s glossary repeats it verbatim ("$\varphi$ | the passive scalar (never
-  $\theta$)"). `StochasticOU`'s docstring nonetheless uses `\theta` for the OU-process
-  autocorrelation coefficient `exp(-Δt/T_L)`. The quantity is legitimately different from the
-  passive scalar, and the docstring is currently archived (un-exported, absent from the rendered
-  API per ARCHITECTURE §7), so no live page collides — but the glyph is the one the house rule
-  singles out by name, and the type would surface again the day `StochasticOU` is de-archived. A
-  different letter (e.g. `\rho`) would remove the risk at no cost.
-
----
-
-## Finding 6 — `\exp\!\big(…\big)` uses the non-directional `\big` throughout, while other multi-tier formulas use directional `\bigl/\bigr`/`\Bigl/\Bigr`
-
-- **Type:** formatting
-- **Severity:** nit
-- **Confidence:** low
-- **Locations:** e.g. `src/Generator.jl:385`, `src/State.jl:75,78,147,150`,
-  `src/SimulationDomain.jl:73`, `docs/src/notation.md:62`, `docs/src/observables_cache.md:258`
-  (all `` \exp\!\big(\dots\big) ``) versus `src/phenomenology/StructureFunctions.jl:179`
-  (`` \Bigl[1-\bigl(\tfrac{2}{3}\bigr)^{p/3}\Bigr] ``, correctly directional and nested).
-- **Description:** `\big(`/`\big)` do not set the Open/Close math class the way `\bigl(`/`\bigr)`
-  do, so inter-atom spacing around them is technically less correct than the directional forms the
-  corpus otherwise knows to use (the She–Lévêque nesting is a good example of doing it right). The
-  `\exp\!\big(` idiom is at least internally consistent with itself everywhere it appears, and the
-  `\!` already overrides the operator-open spacing that would matter most, so this is a low-stakes
-  nit rather than a visible defect — noted for completeness since the corpus demonstrably knows the
-  directional forms and simply doesn't apply them to this one recurring construction.
+- `\boldsymbol{...}` is fully and consistently braced everywhere (`grep` for unbraced instances returned nothing).
+- No `\mathbf` anywhere; no bare-index `\partial_i` anywhere outside `\partial_t`/`\partial_{x_i}`.
+- The imaginary unit is `\mathrm{i}` at every occurrence, including immediately before `\boldsymbol{\kappa}` (no bare-`i·κ` letter-run anywhere).
+- No `\left`/`\right` delimiter usage exists in the corpus at all (only false-positive greps on `\leftarrow`); every sized delimiter uses `\bigl`/`\Bigl`/`\bigr`/`\Bigr`, consistent with the house preference.
+- Every `\,` in the whole tree is immediately followed by `\mathrm{d}` — the differential-only convention is observed with zero exceptions.
+- Named operators are uniformly upright: `\det`, `\operatorname{tr}`, `\operatorname{sym}`, `\operatorname{dealias}`, `\sup`, `\log`, `\exp`, `\max`/`\min` all appear as proper commands, never as an italic letter-product.
+- Multi-letter subscripts are consistently `\mathrm{...}`-wrapped when they are labels (`\kappa_{\mathrm{Ny}}`, `\kappa_{\mathrm{max}}`... via `\max`, `C_{\mathrm{CFL}}`, `E_{\mathrm{band}}`, `y_{\mathrm{s}}`) and left italic when they are genuine index products (`S_{ij}`, `\operatorname{tr}\boldsymbol{S}^{3}`); no mixed-up case found.
+- Every code-identifier-in-a-formula binding uses `\texttt{...}` (`\texttt{kinetic\_energy} \equiv k`, `\texttt{coefficient}`, `\texttt{offset\_scale}`, etc.) — none found loose inside a math span.
+- The repeated `\exp\!\bigl(...)` idiom (six-plus occurrences across `Generator.jl`, `State.jl`, `SimulationDomain.jl`, `Spectra.jl`) is a consistent, deliberate kerning correction before a sized delimiter, not a gratuitous or isolated `\!` — not flagged.
+- `\boldsymbol{A}^{\!\top}` (`docs/ARCHITECTURE.md:631`, the deferred sheared-frame formula) is the standard transpose-kerning idiom, a one-off but conventional use — not flagged.

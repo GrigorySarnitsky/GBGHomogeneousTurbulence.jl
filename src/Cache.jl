@@ -25,17 +25,16 @@ The cache's operations:
   the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
   docstring is the home).
 - [`particle_velocities`](@ref) — the checked read of the velocity sampled along each trajectory.
-- [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), [`deposit_sample!`](@ref) — the
-  writers: the first fills every field slot at the iteration's end, the second records the particle
-  velocities the tracer advance wrote.
+- [`deposit_sample!`](@ref) — the one writer this module owns: it records the particle velocities the
+  tracer advance wrote. The field slots are filled by
+  [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which `Propagator` owns because it
+  needs the scheme's scratch to recover the fields.
 
 Each slot carries the value **and** the epoch that value belongs to, so a read can be refused rather
 than served stale.
 
-The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!),
-which fills every slot at the iteration's end and sets its epoch. A caller reads through the
-accessors and never deposits. That verb lives in `Propagator` rather than here because it needs the
-scheme's own scratch to recover the fields, and that is the module owning the iteration it closes.
+The solver's side of the contract is that `deposit!` fills every slot at the iteration's end and sets
+its epoch. A caller reads through the accessors and never deposits.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
@@ -83,7 +82,7 @@ Build it on a [`FixedDomain`](@ref) `domain`. The [`Simulation`](@ref GBGIsotrop
 and seeds one for you; a hand-assembled run constructs it here.
 
 # Arguments
-- `domain` — the [`FixedDomain`](@ref) the run lives on; it sizes every slot.
+- `domain` — the `FixedDomain` the run lives on; it sizes every slot.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `particle_velocities = nothing` — the tracer set's own point-value storage, passed when the run
   advects tracers. Pass `tracers.particle_velocities`: the slot **is** that array, so the tracer
@@ -107,13 +106,14 @@ of the three states it is in — and the only repair is to fix the schedule that
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number).
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
-Two kinds of field share the word: the two **counters** below tick as the state changes, and each
-slot carries a **stamp**, the counter's value at the moment that slot was filled. A slot is readable
-exactly when its stamp still equals the counter it depends on.
+The word *epoch* names two things here, and the fields below are of both kinds. The two **counters**
+tick as the state changes; every other `*_epoch` field records the counter's value at the moment its
+slot was filled. A slot is readable exactly while the epoch it records still equals the counter it
+depends on.
 
-- `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — each slot's stamp, or a
-  sentinel (never deposited / in use as scratch).
-- `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two stamps, against
+- `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
+  value was deposited at, or a sentinel (never deposited / in use as scratch).
+- `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two epochs, against
   **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
   [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run and
@@ -277,7 +277,7 @@ the end of each iteration; a hand-run loop that advances tracers itself must cal
 order, since the write alone leaves the slot stale.
 
 This slot is the one checked against **two** epochs — the fields epoch of the velocity that was
-interpolated, and the particles epoch of the positions it was interpolated at — so this call stamps
+interpolated, and the particles epoch of the positions it was interpolated at — so this call sets
 both from the cache's current counters. Returns the slot's array.
 """
 deposit_sample!(cache::ObservablesCache) =
@@ -340,7 +340,7 @@ The sanctioned mutator calls it for you: the run layer announces its own tracer 
 both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
 the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
 this, then
-[`record_particle_velocity!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocity!) to
+`record_particle_velocity!` to
 write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
 alone leaves the slot stale, and a read of it throws.
 

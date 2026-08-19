@@ -1,77 +1,117 @@
-# Consistency Matrix — fresh-eyed cross-page audit
+# Consistency Matrix — fresh-eyed audit
 
-Hat: **consistency-matrix** (systematic entity/claim diff across every page of the rendered manuscript)
+Hat: **consistency-matrix** (systematic entity-diff across every rendered page)
 
-Method: built a running matrix of every recurring physical quantity, numerical constant, module-dependency
-claim, and cross-referenced code-object name across Home, API overview, `architecture`, `notation`,
-`observables_cache`, `phenomenology` (+ Spectra/StructureFunctions/Scalings), and every per-module API page;
-diffed each entity's stated value/definition/status pairwise. Most of the corpus (formulas, transform-count
-ledgers, byte-size figures, module include order, nav/section-heading cross-references, RK coefficients,
-dealiasing cutoff constants) checked out internally consistent under independent re-derivation — this
-report lists only the genuine divergences found, not the (much larger) set of checks that passed.
+Methodology: built a matrix of every recurring entity (physical quantities, notation, numerical
+constants, vocabulary terms, docstring structure) and diffed each entity's stated form across every
+page of the manuscript. Extensive cross-page formula/dimension expansion was performed (Reynolds
+number, dissipation-group identities, transform/pass ledger counts, frame-memory byte counts,
+skewness constant, CFL ceilings, PhaseShift band-volume ratio) — all of it checked out internally
+consistent; those are not reported below. What follows are the divergences that survived expansion.
 
 ---
 
-## Finding 1 — `GBGStreamingStatistics` is called a current architectural consumer in §1, but the actual bridge to it is stated deferred in §4.9
+## Finding 1 — "stamp" is a retired term, but the rendered docs still use it as the primary noun
 
 - **Type:** contradiction
 - **Severity:** major
-- **Confidence:** medium
-- **Locations:**
-  - PAGE: architecture, §1 Identity — *"It is a library of composable pieces with a thin ergonomic run layer on top, built as a consumer of `GBGPeriodicFields` (the field and spectral machinery) and `GBGStreamingStatistics` (the statistics)."*
-  - PAGE: architecture, §4.9 Layout summary — *"a statistics bridge that streams them to `GBGStreamingStatistics` is deferred (§7)"*
-- **Contradicts:** §1 states, in present tense and as a foundational architectural fact, that the package is "built as a consumer of ... `GBGStreamingStatistics`"; §4.9 (and §7's deferred-capabilities list, and the Home/API-overview pages' "accumulating statistics ... is the caller's own analysis") state that the actual code path which would make IT a consumer of SS does not exist yet.
-- **Description:** A fresh reader of §1 comes away believing GBGStreamingStatistics is already wired into the package on the same footing as `GBGPeriodicFields`. Nothing in §1 flags that this is aspirational. Only much later (§4.9, and the deferred-capabilities §7) does the reader learn the SS bridge is not built. This is not the adjudicated "absence of a statistics layer" finding (that one is about flagging the *absence itself* as a gap, which is out of scope) — this is about §1's wording actively overclaiming a *current* dependency relationship that §4.9 explicitly contradicts.
+- **Confidence:** high
+
+**Locations:**
+- PAGE: architecture, §11 decision log (2026-08, user-directed): *""Stamp" is retired; a slot carries
+  an epoch... The `*_stamp` fields become `*_epoch`... One noun now serves both roles: the counters
+  are epochs..."*
+- PAGE: notation, Vocabulary table, "epoch" row: *"the value of that counter **stamped** on it when
+  it was filled. A slot is readable exactly when the **stamp** it carries still equals the counter it
+  depends on."*
+- PAGE: api / Cache, `ObservablesCache` Fields section: *"each slot carries a **stamp**, the
+  counter's value at the moment that slot was filled. A slot is readable exactly when its **stamp**
+  still equals the counter it depends on."* — then: *"`velocity_epoch`, ... — each slot's **stamp**,
+  or a sentinel"* and *"`sample_fields_epoch`, `sample_particles_epoch` — the particle velocities'
+  two **stamps**"*.
+- PAGE: api / Cache, `deposit_sample!`: *"this call **stamps** both from the cache's current
+  counters."*
+
+**Contradicts:** the architecture page's own decision log explicitly retires "stamp" corpus-wide in
+favor of "epoch," and the design page (`observables_cache`) itself is fully compliant — §1.3 and §3.1
+there consistently say "epoch," never "stamp." The `notation.md` Vocabulary table is supposed to be
+*the* single reference the rest of the corpus points to ("this page is the single reference — a
+docstring introduces a symbol on first use and need not repeat the convention"), yet it is one of the
+two surfaces still carrying the retired word, and the `api/Cache` page — the most-read API surface for
+this exact concept — repeats it four more times.
+
+**Description:** A user reading `notation.md`'s Vocabulary entry or the `Cache` API page for "epoch"
+learns the retired vocabulary as if it were current, directly contradicting the decision log's own
+claim that the rename is complete ("One noun now serves both roles"). This is exactly the kind of
+"fix the instance, not the class" failure the project's own CLAUDE.md self-guards call out — the
+rename evidently swept the field names (`*_stamp` → `*_epoch`) but not the prose nouns describing them.
 
 ---
 
-## Finding 2 — `deposit_sample!` is named as something a user must call, but is unnamed in its sibling docstring and absent from the API index
+## Finding 2 — the shared `particle_velocities` array carries its read-only/staleness caveat on one documentation surface but not the other
 
-- **Type:** contradiction
-- **Severity:** major
-- **Confidence:** medium
-- **Locations:**
-  - PAGE: api / Cache, `particles_modified!` docstring — *"A hand-run loop that repositions tracers itself must call this, then `record_particle_velocity!` to write the new values, and finally `deposit_sample!` to record them at the current epochs"*
-  - PAGE: api / Particles, `record_particle_velocity!` docstring — describes the very same second step only as *"a second call the cache owns"* — never naming it.
-  - PAGE: api / GBGIsotropicTurbulence, the full `## Index` (lines listing every `Cache.*` and `Particles.*` export) — contains no `deposit_sample!` entry anywhere.
-- **Contradicts:** One docstring names the operation a hand-run-loop author must call (`deposit_sample!`); its sibling docstring, describing the exact same operation, declines to name it at all; and the function does not appear in the package's own public index. A reader who tries to follow the `particles_modified!` docstring's explicit instructions has no way to locate `deposit_sample!` from the API pages.
-- **Description:** Either `deposit_sample!` is a real, callable verb that should be indexed (and its sibling docstring should name it too), or it is a stale/renamed reference left over from an earlier vocabulary sweep (cf. the `check_boundary` → `check_deposits`, `tail` → `closing` renames recorded in the decision log) and the docstring text was not updated. As written, a reader cannot resolve the reference either way.
-
----
-
-## Finding 3 — `StationarityCriterion`'s `skew_floor` guidance disagrees with the architecture decision log on where to raise it
-
-- **Type:** contradiction
+- **Type:** api-gap
 - **Severity:** minor
 - **Confidence:** medium
-- **Locations:**
-  - PAGE: architecture, §11 decision log (2026-07, `warmup!` stationarity entry) — *"whose default floor is a permissive one to be raised toward the developed $\lvert S\rvert \approx 0.5$ when the run must be strict"*
-  - PAGE: api / SimulationRun, `StationarityCriterion` docstring — *"Raise it toward `0.4` when the run's statistics depend on the cascade being mature."*
-- **Contradicts:** The architecture doc's stated destination for a stricter skewness gate is "toward ≈0.5" (the fully developed value); the API docstring's concrete practical recommendation is "toward 0.4" — a different number for the same tuning action, on the same parameter.
-- **Description:** A reader who reads the architecture rationale first and then goes to configure `skew_floor` for a "strict" run gets two different target numbers for the same intent. Minor because both readings agree 0.4 is "closer to 0.5 than the 0.1 default," but the two pages do not actually agree on the recommended value.
+
+**Locations:**
+- PAGE: api / Cache, `ObservablesCache` Fields section: *"A cached array is the next iteration's
+  scratch — ... Treat every returned array as read-only — it is the storage the next iteration will
+  work in."* (repeated verbatim for `velocity_physical`, `vorticity_physical`, `scalar_physical`).
+- PAGE: api / Particles, `Tracers` Fields section: *"`particle_velocities` — the interpolated
+  velocity at the positions the tracers occupy, at the instant they occupy them: the genuine
+  Lagrangian sample, and the observables cache's particle-velocities slot."* — no read-only /
+  mid-iteration-staleness caveat given here.
+
+**Description:** The architecture page and `observables_cache` design page both establish that
+`tracers.particle_velocities` *is* the cache's particle-velocities slot — the identical array, not a
+copy ("the slot IS the register, as everywhere else"). Reading it through `Cache.particle_velocities`
+carries the epoch-checked-throw protection and an explicit read-only admonition; reading the same
+bytes directly off `tracers.particle_velocities` (a public field, per the Particles page's own "Fields"
+listing) bypasses both. The two documentation surfaces describing one shared array give it
+asymmetric safety coverage — a reader who only reads the Particles page has no warning that the field
+they can dot into is mid-iteration scratch part of the time.
 
 ---
 
-## Finding 4 — `HouLi`'s `order` default (36) coincides exactly with the unrelated Float64 `strength` auto-value (also ≈36)
+## Finding 3 — twin Parseval-polymorphic reductions are documented with an inconsistent signature style
 
-- **Type:** other
+- **Type:** format
 - **Severity:** nit
-- **Confidence:** low
-- **Locations:**
-  - PAGE: api / SimulationDomain, `HouLi` — signature shown as `HouLi(; order = 36, strength = nothing)`
-  - Same docstring — *"`strength` is chosen for the domain's element type as $-\log$ of its machine epsilon — $\approx 36$ for `Float64`, $\approx 16$ for `Float32`"*
-- **Contradicts:** N/A (not a stated contradiction — a suspicious numeric coincidence worth a second pair of eyes).
-- **Description:** `order` (the roll-off sharpness exponent) and `strength`'s Float64 auto-value (the Nyquist damping magnitude, a derived quantity) are conceptually unrelated parameters, yet the docstring's literal default for `order` is the same number (36) as the auto-derived `strength` for double precision. This may be a deliberate, independently-motivated literature convention (order≈36 is a common Hou–Li exponent choice in spectral codes) — flagged as low-confidence because I cannot rule out a copy/paste leak from one default into the other without seeing the source.
+- **Confidence:** medium
+
+**Locations:**
+- PAGE: api / Observables, `kinetic_energy`: signature block shows **two** explicit forms —
+  `` kinetic_energy(u) `` and `` kinetic_energy(û) `` — "so by Parseval's theorem it accepts the
+  velocity in either representation."
+- PAGE: api / Observables, `scalar_variance`: signature block shows **one** form only —
+  `` scalar_variance(φ) `` — yet the prose makes the identical claim: "so by Parseval's theorem it
+  accepts `φ` in either representation."
+
+**Description:** Both functions are the same structural case (a Parseval quadratic reduction generic
+over physical/spectral representation of its one argument), and the module docstring explicitly pairs
+them ("Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_dissipation`),
+it needs no dealiasing of its own"). Yet the two docstrings render the dual-signature capability
+differently — one spells out both call forms in the code block, the other doesn't — which reads as if
+`scalar_variance` supports only one representation until the prose sentence corrects that impression.
 
 ---
 
-## Finding 5 — `ParticleIntegratorBuffers.predictor_velocity` is called "not readable" / "never exposed," yet is documented as an ordinary public struct field
+## Notes on what was checked and found consistent (no findings filed)
 
-- **Type:** contradiction
-- **Severity:** nit
-- **Confidence:** low
-- **Locations:**
-  - PAGE: architecture, §4.6 — *"`ParticleIntegratorBuffers.predictor_velocity` is a stage register of the scheme, never a sample of the flow, and is not readable."*
-  - PAGE: api / Particles, `ParticleIntegratorBuffers` Fields section — *"`predictor_velocity` — the velocity interpolated at the predicted positions: an intermediate value the scheme works with, never a sample of the flow, and never exposed as one."*
-- **Contradicts:** Both passages assert the value is inaccessible/"not readable"/"never exposed," yet the second passage is itself a `# Fields` entry documenting `predictor_velocity` as a plain, dot-accessible field of a public type (`buffers.predictor_velocity` works in Julia like any other field). Nothing marks it `#`-internal or otherwise structurally hidden.
-- **Description:** Low confidence because this may simply be the package's established convention (per its own doc policy, a demoted `# Fields` section documents internals as reference detail even when a checked accessor is the sanctioned read path elsewhere, e.g. `ObservablesCache`'s "treat every returned array as read-only" caveat for a technically-public field). Flagged because the specific wording ("not readable," "never exposed") reads as a stronger claim than "discouraged" and is worth a second look against the actual export list.
+For the record, since this hat's job is exhaustive cross-page diffing, the following entities were
+independently re-derived from their stated formulas across every page they appear on and found
+internally consistent (not reported as findings): the Reynolds-number/viscosity convention
+($\mathrm{Re}=1/\nu$ at $u'=L=1$; $2\pi/\nu$ on the shipped defaults); the $u'=\sqrt{2k/3}$ /
+$k=\tfrac32u'^2$ round-trip between `notation.md` and `FlowParameters`; the $C_S=\tfrac47\sqrt{15/2}$
+skewness constant and the $\operatorname{tr}\boldsymbol S^3=3\det\boldsymbol S$ traceless identity;
+the $G=\tfrac32C_\varepsilon^{-2/3}$ cross-check between `Li2008`'s box-normalized group and
+`Sreenivasan1998`'s integral-scale constant, including the numeric $G\approx0.81$ vs quoted $0.9$
+reconciliation; the $E(\kappa)$ / $E_n$ dimensional pair ($L^3T^{-2}$ vs $L^2T^{-2}$); the
+`PhaseShift` retained-band volume ratio ($\approx2.8\times$) and its $2\times$-transform-cost claim
+against the observables-cache page's own transform-count table (18/9, 21/18, 36/18, 42/36 all
+expand correctly); the frame-memory ledger's 322.5 MiB figure (verified by reconstructing it as one
+rfft-shaped real array plus two rfft-shaped complex-container arrays); the `recommended_cfl` numeric
+derivation ($C_{\mathrm{CFL}}\lesssim0.83$ from $y_s=\sqrt3$ and $\kappa_{\max}\Delta x=2\pi/3$); and
+the `ConstantPower` injection-rate formula's self-consistency across the vector ($\tfrac12$-carrying)
+and scalar (full-variance) conventions.

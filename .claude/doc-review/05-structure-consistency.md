@@ -1,112 +1,232 @@
-# Documentation-structure audit — structure-consistency hat
+# Documentation-structure audit — hat: structure-consistency
 
-**Inferred template.**
+## Inferred template
 
-*Function docstring*: (1) identity sentence, often binding `code` ≡ symbol; (2) physical-meaning-first
-formula; (3) each argument explained inline (prose, not bulleted, for a plain function); (4) a caveat
-as a custom-titled admonition, placed as the **last substantive block** before `source`; (5) a
-`Returns x.` sentence when the signature carries no `-> Type` arrow, otherwise the arrow states it;
-(6) a named-method citation, which may open the identity sentence.
+**Function docstring** (the `f` / `f!` home carries all of this; the wrapper only links):
+1. Identity sentence — what it computes, in the user's terms, often binding `code` ≡ symbol.
+2. When to use it / vs. the alternative method or route (where more than one exists).
+3. Each argument's effect, given **inline in prose** (never a bulleted `## Arguments` — that
+   shape is reserved for types) — confirmed corpus-wide: no function docstring in this manuscript
+   uses a bulleted arguments list.
+4. Caveats, as one or more titled `!!! note`/`!!! warning` admonitions (rendered here as a title
+   glued to its first body word), the **last** substantive block before `source`.
+5. The physical-meaning-first formula.
+6. A named-method citation, which may open the identity sentence.
+7. A terminal **"Returns `x`."** sentence *only* when the signature carries no `-> Type` arrow;
+   an arrow and the sentence are the two sanctioned, mutually exclusive shapes.
 
-*Type docstring (constructor-first)*: (1) identity sentence; (2) constructor + a bulleted
-**Arguments** section when the keywords are independent settings; (3) an **Examples** section when
-construction is non-obvious; (4) a demoted **Fields** section, ending the docstring — the plain
-positional constructor named only for a small parameter record.
+**Type docstring** (constructor-first):
+1. Identity sentence.
+2. Constructor code block + prose.
+3. `## Arguments` (bulleted) when keywords are independent settings, folded into prose for one
+   coherent object.
+4. `## Examples` where construction is non-obvious.
+5. A trailing caveat admonition, last before `## Fields`.
+6. `## Fields` (demoted), naming the plain positional constructor only for a small parameter
+   record a reader might reasonably call directly.
 
-Findings below are outliers against this inferred shape, not against the physics.
+**Module docstring**: identity → contents list (linked one-liner per operation) → *one* optional
+trailing remark.
 
----
-
-### Finding 1 — `Returns x.` sentence: sometimes the literal last sentence, sometimes mid-docstring
-
-- **type**: organization
-- **severity**: major
-- **confidence**: high
-- **locations**:
-  - PAGE: api / Propagator — `step!`: "...and `deposit!`, and the run layer's `advance!` does both.\n\nReturns `state`.\n\nsource" (Returns is the final sentence, after its admonition)
-  - PAGE: api / Generator — `prepare!`: "...the integrating factors then consume what it prepared. Returns `generator`." (final sentence)
-  - PAGE: api / Cache — `fields_modified!`: "...that interval belongs to whoever made the change. Returns `cache`.\nThe sanctioned mutators call this for you: ..." (Returns mid-docstring, more prose follows)
-  - PAGE: api / Observables — `vorticity_physical!`: "...no preservation copy is needed. Returns `ω`.\nThe deposited value is read back with `vorticity_physical`..." (Returns mid-docstring)
-- **contradicts**: same "in-place mutator, no arrow" class, opposite placement of the one required sentence.
-- **description**: `step!`, `deposit!`, `finalize!`, `prepare!` all place `Returns x.` as the literal final sentence of the docstring. `fields_modified!`, `particles_modified!`, `vorticity_physical!`, `truncate_to_band!`, and both `random_*_spectral!` seeders place it mid-docstring, then continue with further explanatory prose or an admonition. Both groups are in-place mutators lacking a `-> Type` arrow, so nothing in the class predicts which shape a given mutator gets.
-
----
-
-### Finding 2 — Some constructors document their keywords only in prose, skipping the bulleted Arguments section their close siblings use
-
-- **type**: organization
-- **severity**: major
-- **confidence**: high
-- **locations**:
-  - PAGE: api / Forcing — `Linear`/`ConstantPower` both carry "Arguments\n\n- `domain` — ...\n- `rate` — ...\n- `lowest_shell = 1`, `highest_shell = 2` — ..."
-  - PAGE: api / Forcing — `BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)` has no "Arguments" heading at all; `domain`, `lowest_shell`, `highest_shell` are never explained anywhere in its docstring.
-  - PAGE: api / Generator — `ResolvedGenerator(domain, conditions; scalar = false)` likewise has no "Arguments" heading; its three keywords are described only in the sentence "Build it on the `FixedDomain` `domain` from the `conditions`; pass `scalar = true`..."
-- **contradicts**: `FixedDomain`, `FlowConditions`, `Tracers`, `ObservablesCache`, `StationarityCriterion` all give a comparable or smaller keyword count its own bulleted Arguments list.
-- **description**: Three of the eight forcing/generator/domain constructors with 3–5 independent keywords fold them into prose instead of the bulleted Arguments section every sibling of similar shape uses — and for `BandRescaling` two of its four keywords (`lowest_shell`, `highest_shell`) go completely undocumented as a result.
+Below are the entries that break shape or order against this inferred template.
 
 ---
 
-### Finding 3 — A Module docstring carries a Type-docstring device (the titled admonition)
+## Finding 1
 
-- **type**: organization
-- **severity**: major
-- **confidence**: medium
-- **locations**:
-  - PAGE: api / Cache (module docstring, not the `ObservablesCache` type): "An epoch is not an iteration numberAn epoch counts changes to the state, not advances of the run."
-- **contradicts**: every other module docstring (Forcing, Generator, Observables, Particles, Propagator, SimulationDomain, SimulationRun, State) ends its bullet list with at most a short trailing remark in plain prose — none carries a custom-titled caveat block, a device the corpus otherwise reserves for type and function docstrings.
-- **description**: The `Cache` module page's own docstring — the "map," per the inferred template — includes a fully-formed titled admonition about epochs, a unit of exposition every other module docstring omits. The content itself (epoch ≠ iteration) properly belongs on `ObservablesCache` or `fields_modified!`, both of which already restate it.
+- **Type**: organization
+- **Severity**: major
+- **Confidence**: high
+- **Locations**:
+  - PAGE: api / Cache, `ObservablesCache` — Fields block reads "`velocity_physical`,
+    `vorticity_physical` — the cached velocity and vorticity..." then, mid-list, "Two kinds of
+    field share the word: the two counters below tick as the state changes..." then resumes with
+    "`velocity_epoch`, `vorticity_epoch`, ...".
+- **Contradicts**: every other type's `## Fields` section in the corpus (`ResolvedFields`,
+  `FlowConditions`, `FixedDomain`, `Tracers`, `IntegratorBuffers`, `ResolvedGenerator`,
+  `ModelSpectrum`, `Reference`, …) is a single, uninterrupted bulleted list.
+- **Description**: `ObservablesCache` is the only type docstring in the corpus whose demoted
+  `# Fields` section is split into two bullet lists by an intervening paragraph of narrative
+  prose. Every peer type keeps Fields as one unbroken list; the epoch-explanation paragraph reads
+  as a stray caveat admonition that should sit before `# Fields`, not inside it.
 
----
+## Finding 2
 
-### Finding 4 — `StationarityCriterion`'s Fields section names its own constructor, then disclaims it as internal
+- **Type**: organization
+- **Severity**: major
+- **Confidence**: high
+- **Locations**:
+  - PAGE: api / Forcing, `BandRescaling` — ends "...`(e.g., `HouLi`, out to the Nyquist
+    wavenumber) ... `source`" straight after its two caveat admonitions, with no `# Fields`.
+  - Same page, `Linear` and `ConstantPower` — both end their `## Arguments` bullets (plus, for
+    `ConstantPower`, one caveat) and go straight to `source`.
+- **Contradicts**: `FlowConditions` ("Arguments\nAll keyword, all required" then "Fields\nThe
+  plain constructor...") — a comparably-sized multi-keyword constructor that does carry Fields.
+- **Description**: The three concrete, stateful `Forcing` strategies (`BandRescaling`, `Linear`,
+  `ConstantPower`) are constructor-first type docstrings with genuine multi-field state (`domain`,
+  `target`/`rate`, shell bounds) yet none carries the demoted `# Fields` section the template
+  requires and every comparably-scoped type elsewhere supplies. `NoForcing` is correctly exempt
+  (it truly has no fields); these three are not in that class.
 
-- **type**: organization
-- **severity**: major
-- **confidence**: medium
-- **locations**:
-  - PAGE: api / SimulationRun — `StationarityCriterion`: "The plain constructor `StationarityCriterion(monitor, max_turnovers, gate_scalar, elapsed_turn, last_time, started)` is internal."
-- **contradicts**: every other "plain constructor" line in the corpus (`FlowConditions`, `HouLi`, `FlowParameters`, `Reference`, `Sreenivasan1998`, `ModelSpectrum`, `Kolmogorov1941`, …) presents the positional form neutrally as something the reader may call, e.g. `FlowConditions`: "The plain constructor `FlowConditions(...)` takes the four fields directly."
-- **description**: Naming a "plain constructor" and giving its exact signature only to say in the next clause that it is internal and that the keywords "do not map one-to-one onto these fields" is a different shape from every other Fields section, which either fully documents the plain form or (per the corpus's own machinery-type class — `Simulation`, `ObservablesCache`, `Tracers`) omits naming it altogether.
+## Finding 3
 
----
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: high
+- **Locations**:
+  - PAGE: api / Cache — `deposit_sample!(cache) -> particle velocities`, body ends "...so this
+    call stamps both from the cache's current counters. Returns the slot's array."
+- **Contradicts**: every other arrow-bearing mutator omits the redundant sentence, e.g.
+  `advect!(...) -> tracers` ends on its caveat with no "Returns" line; `allocate_buffers(...) ->
+  IntegratorBuffers` likewise.
+- **Description**: `deposit_sample!` carries both the `-> Type` arrow *and* a terminal "Returns
+  `x`." sentence — the corpus's own stated rule treats these as the two sanctioned, mutually
+  exclusive shapes (arrow for a fixed return type, sentence for an arrow-less mutator). No other
+  function in the manuscript combines both.
 
-### Finding 5 — Two types append explanatory prose after their Fields bullet list, unlike every other Fields section
+## Finding 4
 
-- **type**: organization
-- **severity**: minor
-- **confidence**: high
-- **locations**:
-  - PAGE: api / Propagator — `IntegratorBuffers`, after its last Fields bullet: "There are deliberately no physical-representation registers here: the substage velocity, vorticity, and scalar recoveries write into the run's `ObservablesCache` slots..."
-  - PAGE: api / Particles — `Tracers`, after its last Fields bullet: "The trajectory scheme's own working storage is not here: it lives in a `ParticleIntegratorBuffers`, whose docstring explains the split."
-- **contradicts**: `ObservablesCache`, `ResolvedGenerator`, `ResolvedFields`, `ParticleIntegratorBuffers`, `FlowConditions`, `FlowParameters` all end their docstring exactly at the last Fields bullet, immediately followed by `source`.
-- **description**: The template's "Fields is the demoted, final section" is followed by the majority of types, but `IntegratorBuffers` and `Tracers` each tack a further paragraph on after the bullets — content that, by the template's own logic, belongs before Fields (as a caveat admonition) or inside the relevant bullet, not after the section that is supposed to close the docstring.
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: high
+- **Locations**:
+  - PAGE: api / phenomenology / Scalings — `stationary_dissipation(law, kinetic_energy,
+    side_length)`, no `-> Float64` and no terminal "Returns" sentence anywhere in the body.
+- **Contradicts**: every sibling pure evaluator in `Phenomenology` carries the arrow, e.g.
+  `kolmogorov_length(fp) -> Float64`, `taylor_reynolds(fp) -> Float64`, `scaling(law, fp) ->
+  Float64`, `provenance(law) -> Reference`.
+- **Description**: `stationary_dissipation` is the sole pure-function evaluator on the
+  Phenomenology side whose signature omits the `-> Float64` return-type arrow every peer in
+  `Phenomenology`/`Scalings`/`Spectra`/`StructureFunctions` uses, and it supplies no substitute
+  "Returns" sentence either — a return-type statement is simply absent.
 
----
+## Finding 5
 
-### Finding 6 — Two docstrings interleave ordinary prose between two caveat admonitions
+- **Type**: organization
+- **Severity**: major
+- **Confidence**: medium
+- **Locations**:
+  - PAGE: api / SimulationRun, `Simulation` — "Setting the Reynolds number\nBy default the run is
+    forced and stationary..." appears as a standalone lead-in before the constructor's `##
+    Arguments` heading.
+- **Contradicts**: no other type docstring in the corpus (including comparably complex ones like
+  `StationarityCriterion`, `FixedDomain`, `Tracers`) inserts a named internal subsection outside
+  the standard Arguments/Examples/Fields/admonition sections.
+- **Description**: `Simulation`'s docstring introduces an internal, hand-titled subsection
+  ("Setting the Reynolds number") holding a multi-paragraph discussion plus its own nested
+  admonition and a two-item bulleted Grid/Explicit-mode breakdown, before reaching `## Arguments`.
+  This is a structural device unique to this one docstring; every other type folds comparable
+  discussion into ordinary identity-sentence prose or a titled caveat admonition instead.
 
-- **type**: organization
-- **severity**: minor
-- **confidence**: medium
-- **locations**:
-  - PAGE: api / Observables — `max_speed`: admonition "A grid maximum, not a continuum supremum..." is followed by a plain paragraph ("The second form reads the number back from an `ObservablesCache`...") before a second admonition, "Why this observable alone has a cached form...".
-  - PAGE: api / Forcing — `BandRescaling`: admonition "Which one a run wants depends on..." is followed by the plain sentence "Rescaling preserves the divergence-free constraint either way." before the second admonition, "A deterministic clamp, not a stationary sampler...".
-- **contradicts**: `dissipation`, `scalar_dissipation`, `derivative_skewness`, `advect!`, and `PhaseShift` each carry exactly one caveat admonition, positioned as the literal last block before `source` — the pattern the template states explicitly.
-- **description**: Where most docstrings treat "the admonition" as a single, final block, these two instead sandwich a plain paragraph between two admonitions, breaking the last-block convention twice within the same docstring rather than once.
+## Finding 6
 
----
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: medium
+- **Locations**:
+  - PAGE: api / Generator, `FlowConditions` — "A stateful strategy must not be the same instance
+    for both fields... the constructor throws an `ArgumentError`" sits inside an `## Arguments`
+    bullet.
+  - PAGE: api / Forcing, `AbstractForcing` — the identical constraint is its own titled
+    admonition, "One instance per forced field, for a strategy that carries state".
+  - PAGE: api / Generator, `ResolvedGenerator` — the analogous constructor-validation caveat is
+    also a titled admonition, "The constructor rejects a misdeclared forcing".
+- **Contradicts**: same caveat *class* (a constructor that throws `ArgumentError` on a bad forcing
+  configuration) gets a titled admonition on two docstrings and plain in-bullet prose on a third.
+- **Description**: `FlowConditions` embeds its constructor-validation caveat inline in an
+  `Arguments` bullet rather than promoting it to a titled admonition, the shape its two closest
+  structural siblings both use for the same class of caveat.
 
-### Finding 7 — `energy_spectrum` states an explicit `Returns` sentence; its sibling pure Observables functions never do
+## Finding 7
 
-- **type**: organization
-- **severity**: minor
-- **confidence**: medium
-- **locations**:
-  - PAGE: api / Observables — `energy_spectrum`: "Returns a named tuple `(; wavenumbers, energy)`: the shell-center wavenumber magnitudes..."
-  - PAGE: api / Observables — `kinetic_energy`, `integral_scale`, `derivative_skewness`, `dissipation`: none states a trailing "Returns ..." sentence; each ends its identity/formula prose directly.
-- **contradicts**: none of these are in-place mutators, so the corpus's own rule ("a `Returns x.` sentence is required of any in-place mutator whose signature carries no arrow") does not obviously license `energy_spectrum`'s use of one while withholding it from its four closest siblings.
-- **description**: All five functions are pure, non-mutating reductions with no `-> Type` arrow in their signature block. Only `energy_spectrum` closes with an explicit "Returns a named tuple ..." sentence describing its return shape; the others leave the return value to be inferred from the identity sentence alone.
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: medium
+- **Locations**:
+  - PAGE: api / SimulationRun, `StationarityCriterion` — "Fields\nThe fields are not the
+    keywords... Build one through the keyword constructor above — the positional form takes
+    assembled internals and is not part of the interface."
+- **Contradicts**: `Simulation`, `ObservablesCache`, `IntegratorBuffers`, `ResolvedGenerator`, and
+  `ParticleIntegratorBuffers` — the corpus's other "internals" types — all omit any mention of
+  their plain positional constructor, silently.
+- **Description**: `StationarityCriterion` is the only type in the exempted-from-plain-constructor
+  group that spells out *why* the form is unadvertised; its structural peers apply the same
+  omission with no explanatory sentence, so the disclosure shape is inconsistent across one
+  otherwise-uniform group.
 
----
+## Finding 8
 
-*Seven findings reported, ranked most- to least-severe; none overlaps an adjudicated item.*
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: medium
+- **Locations**:
+  - PAGE: api / Propagator, module docstring — bulleted contents list, then directly "`source`",
+    no trailing remark.
+  - PAGE: api / Particles, module docstring — same: bullets then "`source`" with nothing after.
+  - PAGE: api / Cache, module docstring — three full paragraphs follow the bulleted list (the
+    solver's-side-of-the-contract paragraph, the epoch-counter paragraph, the epoch-vs-clock
+    paragraph).
+  - PAGE: api / Observables, module docstring — a four-plus-sentence trailing paragraph covering
+    element type, warm-up gating, and dealiasing exactness.
+- **Contradicts**: the template's "optional trailing remark" is singular; `SimulationDomain` and
+  `SimulationRun` each supply exactly one short sentence.
+- **Description**: The length of the module-docstring trailing remark ranges from none
+  (`Propagator`, `Particles`) to a single sentence (`SimulationDomain`, `SimulationRun`) to several
+  substantive paragraphs (`Cache`, `Observables`, `State`) — the "map, then one optional remark"
+  shape is not applied evenly across sibling modules.
+
+## Finding 9
+
+- **Type**: organization
+- **Severity**: nit
+- **Confidence**: medium
+- **Locations**:
+  - PAGE: api / State, `ResolvedFields` — "takes the two fields directly, in this order."
+  - PAGE: api / Generator, `FlowConditions` — "takes the four fields directly, in this order".
+  - PAGE: api / phenomenology / Phenomenology, `Reference` — "takes the two fields directly:" (no
+    "in this order").
+  - PAGE: api / SimulationDomain, `HouLi` — "takes the two fields directly:" (no "in this order").
+- **Contradicts**: `ResolvedFields`/`FlowConditions`/`FlowParameters`/`ModelSpectrum` all add ", in
+  this order" to an equally multi-field plain-constructor sentence that `Reference`, `HouLi`, and
+  `Sreenivasan1998` omit.
+- **Description**: The "in this order" qualifier — which flags that positional field order is
+  load-bearing — is attached to some two-plus-field plain constructors and not to others of
+  identical shape, with no apparent rule (field count and "all required"-ness are the same across
+  both groups).
+
+## Finding 10
+
+- **Type**: organization
+- **Severity**: minor
+- **Confidence**: low
+- **Locations**:
+  - PAGE: api / Forcing, `DeferredForcing` — carries a full `## Examples` block with two code
+    snippets.
+  - PAGE: api / Forcing, `BandRescaling` — no `## Examples` block, despite its `over` keyword
+    prose calling itself "the choice that decides which quantity your run may no longer measure".
+- **Contradicts**: the stated rule that Examples appear "where construction is non-obvious" — none
+  of `BandRescaling`, `Linear`, `ConstantPower` gets one, while the comparatively mechanical
+  `DeferredForcing` does.
+- **Description**: Among the `Forcing` family, only the pass-through `DeferredForcing` type shows
+  a worked construction example; the three concrete strategies — whose keyword semantics the prose
+  itself flags as consequential — have none, an uneven application of the Examples rule within one
+  tightly-related family.
+
+## Finding 11
+
+- **Type**: organization
+- **Severity**: nit
+- **Confidence**: low
+- **Locations**:
+  - PAGE: api / Cache, module docstring — bullet order "`ObservablesCache`" → "`fields_modified!`,
+    `particles_modified!`" → the three physical reads → "`max_speed`" → "`particle_velocities`" →
+    "`deposit!`, `deposit_sample!`".
+  - Same page, section headings — "## The observables cache" (covers `ObservablesCache`,
+    `fields_modified!`, `particles_modified!`, `deposit_sample!`) then "## The checked reads"
+    (covers the three physical reads plus `particle_velocities`).
+- **Contradicts**: the module map's linear bullet order interleaves items that the page itself
+  splits into two non-adjacent sections.
+- **Description**: `Cache`'s module docstring lists its contents in an order that does not track
+  the two `##`-level groupings the rendered page actually uses — `deposit_sample!` sits at the
+  bullet list's end though its page section is the first of the two, and the reads are separated
+  from `max_speed`/`particle_velocities` in the bullets but not on the page.
