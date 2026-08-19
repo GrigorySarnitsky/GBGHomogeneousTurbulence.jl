@@ -96,8 +96,9 @@ E(\\kappa) = C_K \\varepsilon^{2/3}\\kappa^{-5/3},
 ```
 
 the amplitude a `Spectra` model uses. Reviewing
-the experimental and numerical record, Sreenivasan (1995) found it close to universal, a reliable
-estimate being ``C_K = 1.5 \\pm 0.1`` (the default; Sagaut & Cambon 2018), with no significant
+the experimental and numerical record, Sreenivasan (1995) found it close to universal.
+The default ``C_K = 1.5 \\pm 0.1`` used here is the consensus value as quoted by Sagaut & Cambon
+(2018), not a figure read off the 1995 paper, with no significant
 Reynolds-number trend; [`scaling`](@ref)`(law, fp)` returns it, independent of `fp`.
 
 # Fields
@@ -128,7 +129,7 @@ G = \\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
 ```
 
 relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the dissipation
-rate ``\\varepsilon`` — nearly Reynolds-number-independent from the Johns Hopkins Turbulence Database
+rate ``\\varepsilon`` — nearly Reynolds-number-independent. The value is this package's own reduction of the Johns Hopkins Turbulence Database
 (JHTDB) forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``) and consistent with
 higher-Reynolds-number periodic-box DNS. It is a distinct group from the classical
 dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3``

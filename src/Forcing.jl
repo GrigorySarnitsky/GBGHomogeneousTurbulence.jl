@@ -276,7 +276,10 @@ Rescaling preserves the divergence-free constraint either way.
 
 !!! note "A deterministic clamp, not a stationary sampler"
     This is a deterministic clamp, not a faithful stationary sampler.
-    Holding an amplitude fixed by deterministic rescaling is the Berendsen-thermostat limit of
+    Holding an amplitude fixed by deterministic rescaling is the limit of the Berendsen thermostat
+    (Berendsen, Postma, van Gunsteren, DiNola & Haak 1984, *Molecular dynamics with coupling to an
+    external bath*, *J. Chem. Phys.* **81**, 3684,
+    [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)) — the limit of
     stochastic velocity rescaling: the molecular-dynamics thermostat that multiplies every velocity
     by one factor each step, chosen to drag the instantaneous temperature toward its target, which is
     what this forcing does to the band's amplitude. Such a scheme has no conserved quantity, is not associated with a well-defined

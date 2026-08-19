@@ -74,3 +74,11 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
 - **`Tracers`' two construction paths in one method.** `number_of_particles` and `positions` are
   mutually exclusive keywords, and keywords do not dispatch in Julia; the runtime `ArgumentError` is
   the language's behaviour, not a design choice, and the docstring says so.
+
+## Round 2026-08-19 (panel round 3) — settled, and an oscillation closed
+
+- **`ResolvedFields` does NOT name its plain positional constructor.** Two rounds disagreed: one hat
+  asked for it (as a small record like `FlowConditions`), the next flagged it as wrong. The written
+  rule settles it — name the positional form only where a reader might reasonably call it, and omit
+  it for a type whose positional form takes **preallocated internals**. `ResolvedFields` takes two
+  already-allocated spectral fields, so it is the omit case. Do not re-add it.

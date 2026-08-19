@@ -106,7 +106,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
-| ``\varepsilon_{\mathrm{target}}`` | target energy-injection rate | `ConstantPower(injection_rate=…)` |
+| ``\varepsilon_{\mathrm{target}}`` | the injection rate a `ConstantPower` holds: energy for the velocity, scalar variance for the scalar | `ConstantPower(injection_rate=…)` |
 
 ## Vocabulary
 

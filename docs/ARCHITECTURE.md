@@ -1869,6 +1869,10 @@ cites.
   sets ``\nu`` in the run layer's grid mode.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
+- Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
+  Molecular dynamics with coupling to an external bath. *J. Chem. Phys.* **81**, 3684–3690.
+  <https://doi.org/10.1063/1.448118> *(The thermostat whose deterministic-rescaling limit
+  `BandRescaling` is; named there and now cited.)*
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.
   *J. Chem. Phys.* **126**, 014101. <https://doi.org/10.1063/1.2408420> *(Stochastic velocity rescaling; its deterministic limit is the
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —

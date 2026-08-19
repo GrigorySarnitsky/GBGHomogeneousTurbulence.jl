@@ -49,9 +49,6 @@ go stale.
 Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
-The plain constructor `ResolvedFields(velocity_spectral, scalar_spectral)` takes the two fields
-directly, in this order.
-
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
 - `scalar_spectral` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the
   run carries no passive scalar.

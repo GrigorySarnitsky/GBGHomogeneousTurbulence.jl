@@ -278,7 +278,9 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 """
     max_wavenumber(domain)
 
-The highest wavenumber magnitude that `domain` (a [`FixedDomain`](@ref)) actually evolves — the
+The dealiasing cutoff of `domain` (a [`FixedDomain`](@ref)) — the highest wavenumber magnitude the
+run treats as resolved signal, and for a truncating strategy the highest it evolves at all (under
+[`HouLi`](@ref) the modes above it are damped rather than removed) — the
 dealiasing cutoff
 
 ```math

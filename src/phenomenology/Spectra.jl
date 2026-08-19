@@ -99,8 +99,11 @@ here do not use the same one. The default is the longitudinal integral scale ``L
 [`VonKarmanLarge`](@ref) uses. [`PopeLargeScale`](@ref) overrides it with
 ``L_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
 ``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
-same coefficient ``L_{11}`` instead — smaller by a factor of order three — leaves the model spectrum
-holding well under half the kinetic energy it is normalized to.
+same coefficient ``L_{11}`` instead breaks that normalization. The two lengths are related by
+``L_{11}/L_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is set by the normalized dissipation
+constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is 3.7 times smaller and the spectrum
+integrates to ``0.42k``, and at Pope's high-Reynolds-number ``L_{11} = 0.43 L_{0}`` it is 2.3 times
+smaller and integrates to ``0.57k`` (``\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}``).
 """
 function large_scale_length end
 
@@ -351,7 +354,9 @@ The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) wit
 ``\\bigl((\\kappa L)^{2}/((\\kappa L)^{2} + c_L)\\bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
 classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters).
-`C_K` is the Kolmogorov constant; `c_L` fixes the peak scale.
+`C_K` is the Kolmogorov constant; `c_L` fixes where the spectrum peaks and is a shape parameter of
+this form rather than a normalization — unlike [`PopeLargeScale`](@ref)'s `c_L`, no energy condition
+determines it, and the default `1.0` is the conventional choice.
 
 `VonKarman1948` is the `ModelSpectrum` carrying von Kármán's large-scale factor and no
 dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constructor returns.
