@@ -532,20 +532,22 @@ A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C_{\\mathrm
 with ``\\Delta x = L/N`` the grid spacing.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``, a rate; stability needs that rate times the
-step — ``C_{\\mathrm{CFL}} \\kappa_{\\max}\\Delta x``, once ``\\Delta t`` is substituted — to stay
-within the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, which is a pure number. Two loosenesses sit in that estimate, and they pull in **opposite** directions.
-The speed in the denominator is
-[`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid points, so the
-continuum ``\\sup\\lvert\\boldsymbol{u}\\rvert`` between them can be larger — which makes the computed
-step too long. Against it, the eigenvalue bound over-estimates the true spectral radius, since not
-every mode carries the peak speed — which makes the ceiling too small. The conservative factor below
-exists because the second is not guaranteed to cover the first. The base
-ceiling is calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
-[`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C_{\\mathrm{CFL}} \\lesssim 0.83``,
-taken conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
-relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
-margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert`` — a rate. Stability needs that rate times the
+step, which once ``\\Delta t`` is substituted is ``C_{\\mathrm{CFL}} \\kappa_{\\max}\\Delta x``, to
+stay inside the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, a pure number.
+
+Two loosenesses sit in that estimate and they pull in **opposite** directions. The speed in the
+denominator is [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid
+points, so the continuum supremum between them can be larger — making the computed step too long.
+Against it, the eigenvalue bound over-estimates the true spectral radius, since not every mode
+carries the peak speed — making the ceiling too small. They are independent, so the second is not
+guaranteed to cover the first, which is why the base ceiling carries a margin.
+
+That base is calibrated for the ``2/3`` rule, where ``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``.
+For [`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives
+``C_{\\mathrm{CFL}} \\lesssim 0.83``, taken conservatively as ``0.5``. [`IFRK2`](@ref) is
+imaginary-axis unstable (``y_{\\mathrm{s}} = 0``, relying on viscous damping), which makes the
+formula degenerate: its ``0.25`` is an empirical margin rather than a computed limit.
 
 !!! warning "The IFRK2 margin does not know the viscosity"
     This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the

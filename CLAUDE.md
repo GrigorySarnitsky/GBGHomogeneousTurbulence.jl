@@ -216,7 +216,10 @@ re-reads the whole. Measured 2026-08-19: `BandRescaling` reached 861 words with 
 admonitions, `# Arguments` mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode
 bullet reached a 120-word run-on with an ungrammatical clause. Every individual edit was correct.
 **When a docstring has taken three or more rounds of patches, rewrite it whole rather than append
-again** — the signature to watch is a long paragraph, an admonition count above two, or a section
+again** — and the build now measures this: `docs/make.jl`'s `lint_docstring_shape()` fails on a
+docstring that *grew* since `docs/docstring_shape.csv` was last written, and on a structural
+violation (`# Arguments` after a caveat, a caveat after `# Fields`). Rewrite, or re-baseline
+deliberately with `DOCSTRING_SHAPE_BASELINE=1 julia --project=docs docs/make.jl` — the signature to watch is a long paragraph, an admonition count above two, or a section
 out of the order above.
 
 **API pages are logically grouped.** Group public objects under hand-written `## Header` sections via

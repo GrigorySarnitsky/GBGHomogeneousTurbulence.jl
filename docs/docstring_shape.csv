@@ -1,0 +1,140 @@
+key,longest_paragraph_words,admonitions,total_words
+Cache.jl::Cache,116,0,317
+Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing),142,1,643
+Cache.jl::deposit_sample!(cache),75,0,141
+Cache.jl::fields_modified!(cache),57,0,108
+Cache.jl::particle_velocities(cache),87,0,88
+Cache.jl::particles_modified!(cache),76,0,128
+Cache.jl::scalar_physical(cache),55,0,56
+Cache.jl::velocity_physical(cache),83,0,84
+Cache.jl::vorticity_physical(cache),50,0,51
+Forcing.jl::AbstractForcing,86,1,258
+Forcing.jl::BandRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),54,3,600
+Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),91,1,376
+Forcing.jl::DeferredForcing,54,0,188
+Forcing.jl::Forcing,100,0,278
+Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),86,0,161
+Forcing.jl::NoForcing(),16,0,17
+Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
+Forcing.jl::add_forcing_source!(forcing， N̂， domain) -> N̂,39,0,44
+Forcing.jl::apply_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
+Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
+Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,103,0,109
+Forcing.jl::uses_linear_rate(forcing) -> Bool,72,0,107
+GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,99
+Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),75,1,243
+Generator.jl::Generator,142,0,206
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,528
+Generator.jl::finalize!(generator， state， domain),77,0,80
+Generator.jl::prepare!(generator， state， domain， dt),84,0,88
+Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
+Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain),121,1,335
+Generator.jl::velocity_integrating_factor(generator， τ),129,0,210
+Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,407
+Observables.jl::Observables,162,0,273
+Observables.jl::derivative_skewness(û， domain),81,1,363
+Observables.jl::dissipation(ω， viscosity),97,1,294
+Observables.jl::energy_spectrum(û， domain),176,0,178
+Observables.jl::integral_scale(û， domain),139,0,239
+Observables.jl::kinetic_energy(u),152,0,154
+Observables.jl::max_speed(u),47,2,312
+Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),134,0,137
+Observables.jl::scalar_variance(φ),31,0,33
+Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
+Particles.jl::AbstractParticleIntegrator,48,0,74
+Particles.jl::EndpointHeun(),53,0,73
+Particles.jl::ParticleIntegratorBuffers,43,0,169
+Particles.jl::Particles,127,0,128
+Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， rng = default_rng()),86,0,597
+Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,51,1,209
+Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
+Particles.jl::new_scalar_point_values(tracers),28,0,29
+Particles.jl::new_vector_point_values(tracers),28,0,29
+Particles.jl::number_of_particles(tracers),10,0,11
+Particles.jl::particle_positions(tracers),19,0,20
+Particles.jl::record_particle_velocities!(tracers， u) -> tracers,82,0,181
+Phenomenology.jl::FlowParameters(; viscosity， dissipation， rms_velocity， integral_scale，,52,0,368
+Phenomenology.jl::Phenomenology,93,1,278
+Phenomenology.jl::Reference(citation; valid_Reλ = (0.0， Inf)),42,0,86
+Phenomenology.jl::TurbulenceLaw,46,0,47
+Phenomenology.jl::fit(::Type{L}， ...) -> L,46,0,50
+Phenomenology.jl::kolmogorov_length(fp) -> Float64,22,0,25
+Phenomenology.jl::kolmogorov_time(fp) -> Float64,20,0,23
+Phenomenology.jl::provenance(law) -> Reference,28,0,31
+Phenomenology.jl::scalar_diffusivity(fp) -> Float64,25,0,28
+Phenomenology.jl::scaling(law， fp) -> Float64,40,0,44
+Phenomenology.jl::scaling_exponent(law; order) -> Float64,47,0,51
+Phenomenology.jl::spectrum(law， κ， fp) -> Float64,56,0,61
+Phenomenology.jl::structure_function(law， r， fp; order) -> Float64,69,0,75
+Phenomenology.jl::taylor_microscale(fp) -> Float64,28,0,31
+Phenomenology.jl::taylor_reynolds(fp) -> Float64,35,0,38
+Propagator.jl::AbstractIntegrator,36,0,37
+Propagator.jl::IFLowStorageRK3(),165,0,312
+Propagator.jl::IFRK2(),54,1,186
+Propagator.jl::IntegratorBuffers,110,0,322
+Propagator.jl::Propagator,41,0,122
+Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,54,0,164
+Propagator.jl::deposit!(cache， state， domain， buffers),111,0,323
+Propagator.jl::recommended_cfl(scheme， domain),87,1,436
+Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),134,1,327
+Scalings.jl::Li2008(; dissipation_group = 0.9),177,0,260
+Scalings.jl::Phenomenology.Scalings,10,0,82
+Scalings.jl::ScalingLaw <: TurbulenceLaw,57,0,60
+Scalings.jl::Sreenivasan1995(; C_K = 1.5),59,0,95
+Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
+Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,71,0,76
+SimulationDomain.jl::DealiasingStrategy,112,0,113
+SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,39,0,396
+SimulationDomain.jl::HouLi(; order = 36， strength = nothing),196,0,241
+SimulationDomain.jl::PhaseShift(),156,1,268
+SimulationDomain.jl::SimulationDomain,91,0,102
+SimulationDomain.jl::TwoThirds(),79,0,80
+SimulationDomain.jl::max_wavenumber(domain),114,0,137
+SimulationDomain.jl::new_scalar_field_physical(domain),17,0,18
+SimulationDomain.jl::new_scalar_field_spectral(domain),17,0,18
+SimulationDomain.jl::new_tensor_field_physical(domain),18,0,19
+SimulationDomain.jl::new_tensor_field_spectral(domain),18,0,19
+SimulationDomain.jl::new_vector_field_physical(domain),17,0,18
+SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
+SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,1564
+SimulationRun.jl::SimulationRun,89,0,121
+SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,89,0,552
+SimulationRun.jl::advance!(sim; dt = nothing),63,0,69
+SimulationRun.jl::current_step(sim),85,0,100
+SimulationRun.jl::current_time(sim),6,0,7
+SimulationRun.jl::flow_parameters(sim),96,0,97
+SimulationRun.jl::run!(callback， sim),121,0,258
+SimulationRun.jl::warmup!(sim; kwargs...),70,0,114
+Spectra.jl::DissipationFactor,39,1,115
+Spectra.jl::EnergySpectrum <: TurbulenceLaw,19,0,22
+Spectra.jl::ExponentialDissipation(β),176,0,194
+Spectra.jl::LargeScaleFactor,61,0,62
+Spectra.jl::ModelSpectrum(C_K， large_scale， dissipation， ref),74,0,197
+Spectra.jl::ObukhovCorrsin1949(; C_OC = 0.67),113,0,146
+Spectra.jl::Pao1965(; C_K = 1.5),64,0,109
+Spectra.jl::PaoDissipation(α),30,0,51
+Spectra.jl::Phenomenology.Spectra,57,0,201
+Spectra.jl::Pope2000(; C_K = 1.5， c_L = 6.78， p₀ = 2.0， c_η = 0.40， β = 5.2),46,0,113
+Spectra.jl::PopeDissipation(c_η， β),49,0,80
+Spectra.jl::PopeLargeScale(c_L， p₀),53,0,85
+Spectra.jl::SaffmanDissipation(),85,0,86
+Spectra.jl::ScalarSpectrum <: TurbulenceLaw,27,0,30
+Spectra.jl::UnitDissipation(),26,0,27
+Spectra.jl::UnitLargeScale(),25,0,26
+Spectra.jl::VonKarman1948(; C_K = 1.5， c_L = 1.0),85,0,135
+Spectra.jl::VonKarmanLarge(c_L),44,0,64
+Spectra.jl::dissipation_factor(f， κη) -> Float64,27,0,31
+Spectra.jl::large_scale_factor(f， κL) -> Float64,54,0,58
+Spectra.jl::large_scale_length(f， fp) -> Float64,128,0,150
+State.jl::ResolvedFields(domain; scalar = false),67,0,114
+State.jl::State,77,0,143
+State.jl::random_scalar_spectral!(φ̂， domain; scalar_variance， envelope_wavenumber，,154,1,311
+State.jl::random_solenoidal_velocity_spectral!(û， domain; kinetic_energy， envelope_wavenumber，,185,1,333
+StructureFunctions.jl::Kolmogorov1941(; C₂ = 2.0),46,0,143
+StructureFunctions.jl::Kolmogorov1962(; μ = 0.25),40,0,96
+StructureFunctions.jl::Lundgren2002(),38,1,168
+StructureFunctions.jl::Phenomenology.StructureFunctions,25,0,98
+StructureFunctions.jl::SheLeveque1994(),48,0,75
+StructureFunctions.jl::StructureFunction <: TurbulenceLaw,41,0,44
+StructureFunctions.jl::Yaglom1949(),87,0,122

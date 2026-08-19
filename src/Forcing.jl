@@ -383,13 +383,6 @@ named for the kind of quantity it is: a **rate**, where `BandRescaling`'s `targe
 **amplitude** — which is why the two strategies do not share one keyword name. The rate is folded
 into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
-!!! note "An empty band is left alone, not driven infinitely hard"
-    The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
-    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `BandRescaling(over = :total)`
-    zeroed the band. Below a small floor on ``E_{\\mathrm{band}}`` the rate is set to zero instead,
-    so an empty band stays empty rather than receiving an unbounded kick; seed some content in the
-    band if a run needs the forcing to take hold.
-
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `injection_rate` — the rate at which energy (for the velocity) or scalar variance (for the scalar)
@@ -398,6 +391,12 @@ into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
 
+!!! note "An empty band is left alone, not driven infinitely hard"
+    The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
+    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `BandRescaling(over = :total)`
+    zeroed the band. Below a small floor on ``E_{\\mathrm{band}}`` the rate is set to zero instead,
+    so an empty band stays empty rather than receiving an unbounded kick; seed some content in the
+    band if a run needs the forcing to take hold.
 # Fields
 - `band` — the band-pass kernel weighting the band observable.
 - `indicator` — the band indicator as a real array, the rate fill's factor.

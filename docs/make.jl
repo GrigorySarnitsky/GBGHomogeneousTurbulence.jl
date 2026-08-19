@@ -27,6 +27,103 @@ end
 # spaces) is parsed as a *new list item*, which silently drops the span out of math mode — and
 # Documenter does NOT flag it (the page builds, then renders the LaTeX as literal text). This guard
 # fails the build instead; keep each inline span on one source line (break the prose, not the span).
+# Doc lint: DOCSTRING SHAPE — the accretion guard.
+#
+# A docstring can satisfy every template rule in CLAUDE.md and still be unreadable, because a review
+# round edits clauses and never re-reads the whole. Measured 2026-08-19, after five rounds of
+# patches: `BandRescaling` had reached 861 words with four scattered admonitions, `# Arguments`
+# mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode bullet was a 120-word run-on
+# with an ungrammatical clause. Every individual edit had been correct. Nothing measured the shape,
+# so nothing objected.
+#
+# Two guards, because the two failure modes need different treatment:
+#
+#   STRUCTURE is absolute — `# Arguments` before any top-level caveat, `# Fields` last. These are
+#   binary, the corpus satisfies them, and any violation fails the build. (Only column-0 `!!!`
+#   counts: an indented admonition is part of a list item, not a trailing caveat.)
+#
+#   LENGTH is a RATCHET against `docs/docstring_shape.csv`, not a fixed ceiling. A hard threshold
+#   would either fire on the 20-odd long docstrings that predate the rule or be set so high it never
+#   fires. The ratchet instead fails when a docstring GROWS past what it was — which is exactly the
+#   accretion signal — and lets a rewrite bank the improvement. New docstrings get the hard cap.
+#
+# When a docstring legitimately grows, rewrite it whole rather than raise its number; when it
+# shrinks, re-baseline with `DOCSTRING_SHAPE_BASELINE=1 julia --project=docs docs/make.jl`.
+const SHAPE_BASELINE = joinpath(@__DIR__, "docstring_shape.csv")
+const SHAPE_NEW_PARAGRAPH_CAP = 120
+const SHAPE_NEW_ADMONITION_CAP = 3
+
+function _docstring_shapes()
+  shapes = Dict{String,Tuple{Int,Int,Int}}()
+  roots = [joinpath(@__DIR__, "..", "src"), joinpath(@__DIR__, "..", "src", "phenomenology")]
+  for root in roots, f in sort(readdir(root; join = true))
+    endswith(f, ".jl") || continue
+    for m in eachmatch(r"\"\"\"\n(.*?)\n\"\"\""s, read(f, String))
+      body = m.captures[1]
+      sig = strip(first(split(body, "\n")))
+      isempty(sig) && continue
+      key = string(basename(f), "::", sig)
+      admonitions = count(!isnothing, match.(r"^!!! ", split(body, "\n")))
+      longest = 0
+      for para in split(body, r"\n[ \t]*\n")
+        t = strip(para)
+        (isempty(t) || any(p -> startswith(t, p), ("-", "*", "!!!", "```", "#", "|"))) && continue
+        longest = max(longest, length(split(t)))
+      end
+      shapes[key] = (longest, admonitions, length(split(body)))
+      # STRUCTURE, checked here so one walk serves both guards.
+      tops = [i for (i, l) in enumerate(split(body, "\n")) if startswith(l, "!!! ")]
+      fields = findfirst(==("# Fields"), split(body, "\n"))
+      args = findfirst(==("# Arguments"), split(body, "\n"))
+      if !isempty(tops)
+        fields !== nothing && maximum(tops) > fields &&
+          error("doc lint failed — caveat admonition after `# Fields` in $key")
+        args !== nothing && args > minimum(tops) &&
+          error("doc lint failed — `# Arguments` after a caveat admonition in $key")
+      end
+    end
+  end
+  return shapes
+end
+
+function lint_docstring_shape()
+  shapes = _docstring_shapes()
+  if get(ENV, "DOCSTRING_SHAPE_BASELINE", "") == "1"
+    open(SHAPE_BASELINE, "w") do io
+      println(io, "key,longest_paragraph_words,admonitions,total_words")
+      for k in sort(collect(keys(shapes)))
+        (p, a, w) = shapes[k]
+        println(io, replace(k, "," => "，"), ",", p, ",", a, ",", w)
+      end
+    end
+    @info "docstring shape baseline rewritten" entries = length(shapes)
+    return
+  end
+  isfile(SHAPE_BASELINE) || error("doc lint failed — missing $SHAPE_BASELINE; regenerate with DOCSTRING_SHAPE_BASELINE=1")
+  base = Dict{String,Tuple{Int,Int,Int}}()
+  for line in Iterators.drop(eachline(SHAPE_BASELINE), 1)
+    isempty(strip(line)) && continue
+    parts = rsplit(line, ","; limit = 4)
+    base[replace(parts[1], "，" => ",")] = (parse(Int, parts[2]), parse(Int, parts[3]), parse(Int, parts[4]))
+  end
+  problems = String[]
+  for (key, (para, adm, words)) in shapes
+    if haskey(base, key)
+      bp, ba, bw = base[key]
+      para > bp && push!(problems, "$key: longest paragraph grew $bp → $para words")
+      adm > ba && push!(problems, "$key: admonitions grew $ba → $adm")
+      words > bw && push!(problems, "$key: docstring grew $bw → $words words")
+    else
+      para > SHAPE_NEW_PARAGRAPH_CAP && push!(problems, "$key: new docstring with a $para-word paragraph (cap $SHAPE_NEW_PARAGRAPH_CAP)")
+      adm > SHAPE_NEW_ADMONITION_CAP && push!(problems, "$key: new docstring with $adm admonitions (cap $SHAPE_NEW_ADMONITION_CAP)")
+    end
+  end
+  isempty(problems) || error("doc lint failed — docstrings grew rather than being rewritten " *
+                             "(rewrite whole, or re-baseline with DOCSTRING_SHAPE_BASELINE=1):\n  " *
+                             join(sort(problems), "\n  "))
+end
+
+
 function lint_inline_math()
   leader = r"^\s{0,3}([-*+>]|\d+[.)])\s"
   twobacktick = r"(?<!`)``(?!`)"
@@ -87,6 +184,7 @@ end
 copy_rationale_pages()
 lint_inline_math()
 lint_notation_variants()
+lint_docstring_shape()
 
 
 using Documenter

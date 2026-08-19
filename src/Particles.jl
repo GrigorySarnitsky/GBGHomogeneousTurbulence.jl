@@ -51,22 +51,23 @@ export Tracers, AbstractParticleIntegrator, EndpointHeun, ParticleIntegratorBuff
 
 (One method, shown as the two ways it is called — keywords do not dispatch.)
 
-A set of Lagrangian tracers, built on `domain`'s backend and element type. Give **exactly one** of
-`number_of_particles`, which seeds that many tracers uniformly at random in the periodic box of
-`domain`, or `positions`, an `(M, 3)` array of `M` tracer positions to wrap (the three columns are
+A set of Lagrangian tracers, built on `domain`'s backend and element type.
+
+Give **exactly one** of `number_of_particles`, which seeds that many tracers uniformly at random in
+the periodic box, or `positions`, an `(M, 3)` array of tracer positions to wrap (the columns being
 the ``x, y, z`` components), converted to `domain`'s backend and element type. Supplying both, or
-neither, is an `ArgumentError`. The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to
-evaluate the velocity (and any sampled field) at the tracer positions.
-[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) — a ready-made
-value rather than a type, so it is passed bare — is the ``C^1`` choice
-(the default `interpolation_scheme` of the
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door, the
-build-everything convenience
-constructor);
-[`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
-[`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
-smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
-acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and smoothness parameters.
+neither, raises an `ArgumentError`.
+
+The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
+sampled field — at the tracer positions.
+[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1``
+choice and the front door's default; it is a ready-made value rather than a type, so it is passed
+bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
+and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
+offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
+readouts such as acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and
+smoothness parameters.
+
 # Arguments
 
 - `domain` — the [`FixedDomain`](@ref) whose backend, element type and box the set is built on.
