@@ -132,3 +132,41 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     @test bytes < 4096
   end
 end
+
+# Adams–Bashforth: the variable-step weights are the machinery, so they are pinned against the
+# classical constants they must reduce to at uniform step — and the bootstrap/handover is pinned
+# end to end, since a multistep scheme that silently never leaves its startup would still "work".
+@testset "AdamsBashforth" begin
+  AB = GBGIsotropicTurbulence.Particles._adams_bashforth_weights
+
+  @testset "variable-step weights reduce to the classical coefficients" begin
+    @test AB(1.0, [1.0, 1.0, 1.0], 4) ≈ [55, -59, 37, -9] ./ 24
+    @test AB(1.0, [1.0, 1.0], 3)      ≈ [23, -16, 5] ./ 12
+    @test AB(1.0, [1.0], 2)           ≈ [3, -1] ./ 2
+    @test AB(1.0, Float64[], 1)       ≈ [1.0]
+    # a weight set must reproduce a constant exactly, whatever the step history
+    @test sum(AB(0.7, [0.3, 0.9, 0.2], 4)) ≈ 0.7
+  end
+
+  @testset "the history fills and the scheme takes over" begin
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
+                     trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
+    @test sim.particle_buffers isa MultistepBuffers
+    @test sim.particle_buffers.filled == 0            # nothing recorded before the first step
+    advance!(sim)
+    @test sim.particle_buffers.filled == 1            # still starting up
+    for _ in 1:4; advance!(sim); end
+    @test sim.particle_buffers.filled == 3            # history full: AB4 from here on
+    @test all(isfinite, particle_positions(sim.tracers))
+  end
+
+  @testset "positions stay in the box and tracers actually move" begin
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
+                     trajectory_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(8))
+    X0 = copy(particle_positions(sim.tracers))
+    for _ in 1:5; advance!(sim); end
+    X = particle_positions(sim.tracers)
+    @test !isapprox(X0, X)
+    @test all(0 .<= X .< sim.domain.grid.domain_size[1])
+  end
+end

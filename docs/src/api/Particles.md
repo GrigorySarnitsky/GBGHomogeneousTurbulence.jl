@@ -24,17 +24,21 @@ number_of_particles
 ## The trajectory scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes.
-`EndpointHeun` is the one scheme today; its storage is allocated by
+`EndpointHeun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches
+further by reusing the Lagrangian samples already deposited, at no extra interpolation. Each
+scheme's storage is allocated by
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
 you.
 
 ```@docs
 AbstractParticleIntegrator
 EndpointHeun
+AdamsBashforth
 ```
 
 ```@docs
 ParticleIntegratorBuffers
+MultistepBuffers
 ```
 
 ## The tracking loop

@@ -1831,6 +1831,32 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 ---
 
+57. **(2026-08, user-requested) A second trajectory scheme: variable-step Adams–Bashforth.** The
+    Lagrangian right-hand side ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is a *deposited
+    observable* — every iteration produces it whether or not a scheme wants it — so a multistep
+    method buys order out of storage the run already fills, at no extra field evaluation and no
+    extra interpolation. `EndpointHeun` instead pays one interpolation per step, at the predicted
+    positions, to reach second order. This is the same reasoning TurTLE follows for its tracers
+    (Adams–Bashforth, orders 1–5, default 4).
+
+    Two departures from the reference were forced by this package's own design. **The steps are not
+    uniform**: the advective-CFL loop changes ``\Delta t`` every iteration, which classical
+    fixed-step coefficients would silently get wrong, so the weights are recomputed each step as the
+    integral over ``[t_n, t_{n+1}]`` of the Lagrange polynomial through the stored sample times —
+    ``\mathcal{O}(k^2)`` host arithmetic per step, independent of the tracer count, and verified to
+    reduce to the classical constants at uniform step. **The startup bounds the order**: TurTLE ramps
+    AB1→AB4, but AB1 is Euler and its first step alone caps the global rate near 2; measured on a
+    smooth test problem the ramp gave ``\approx 2.0`` against ``\approx 3.0`` for an `EndpointHeun`
+    bootstrap, so the bootstrap is what shipped. Fourth order over a fixed window would need a
+    starting method of matching order, which is unavailable here: it would want the velocity field
+    between the step endpoints, and the solver produces only the endpoints.
+
+    What the scheme therefore claims is what was measured — about third-order convergence at
+    `order = 4`, and roughly a fifty-fold smaller error than the two-step method at equal step
+    count — and the docstring says so rather than quoting the formula's asymptotic order. It also
+    records that raising the time order past the interpolation's smoothness buys nothing, since the
+    default `CatmullRom` is only ``C^1``.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

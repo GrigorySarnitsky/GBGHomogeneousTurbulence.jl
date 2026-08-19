@@ -150,7 +150,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
-  are allocated for you.
+  are allocated for you. Pass
+  [`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`()` when trajectory
+  accuracy in time limits a measurement: it costs one stored array per extra order and saves an
+  interpolation per step.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 
