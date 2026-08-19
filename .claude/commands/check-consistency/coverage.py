@@ -22,7 +22,12 @@ sub = sys.argv[2] if len(sys.argv) > 2 else 'closure'
 closure = os.path.join(pile, sub)
 
 FINDING = re.compile(r'^#{2,3} +(?:Finding +)?(\d+)[.:) ]', re.M)
-VERDICT = re.compile(r'VERDICT[:*\s]*\**\s*(PRESENT|PARTIAL|REGRESSED|ABSENT|NOT-A-DEFECT)', re.I)
+# Agents render the verdict two ways — "VERDICT: PARTIAL" and a standalone "**PARTIAL**" — and an
+# earlier version of this regex demanded the literal word VERDICT, so it reported a complete 21/21
+# hat as SHORT by 21. A coverage gate that cries wolf is one the operator learns to wave through,
+# which is the failure it exists to prevent, so it accepts both renderings.
+TOKEN = r'(?:PRESENT|PARTIAL|REGRESSED|ABSENT|NOT-A-DEFECT)'
+VERDICT = re.compile(r'(?:VERDICT[:*\s]*\**\s*' + TOKEN + r'|^\s*\**' + TOKEN + r'\**\s*$)', re.I | re.M)
 
 rows, bad = [], 0
 for path in sorted(glob.glob(os.path.join(pile, '[0-9][0-9]-*.md'))):
