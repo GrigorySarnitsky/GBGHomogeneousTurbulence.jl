@@ -384,8 +384,9 @@ Method (§3).
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
-  three) but *dearer* in memory — three spectral registers per field against the low-storage scheme's
-  two — and imaginary-axis unstable, leaning on viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  three) but *dearer* in memory — three spectral registers per field against the low-storage
+  scheme's two, counting the same way on both sides: the scheme's own registers plus the dealiasing
+  seam's assembly register — and imaginary-axis unstable, leaning on viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -674,7 +675,7 @@ generalization is built for them until a second concrete case forces the abstrac
   FFTW planning concept that pays off on the **CPU** path, IT's development-and-small-run platform, not
   the GPU-primary production target (invariant 4), where the plan is effectively fixed. It is wired when a
   long CPU campaign makes the search worth the added front-door surface.
-- **The ``\nu = 0`` truncated-Euler experiment — an scheme and dealiasing oracle.** At zero
+- **The ``\nu = 0`` truncated-Euler experiment — a scheme and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
   continuous time — so measured energy drift isolates the time scheme alone: a per-scheme
@@ -774,7 +775,8 @@ one usually encodes a decision.
    runtime cost. **Each scheme allocates exactly its working set:** `allocate_buffers` dispatches on the
    concrete scheme and builds only the registers that scheme writes — there is no over-allocating
    `::AbstractIntegrator` fallback, so a scheme with no method is a hard error, never a silent superset
-   (an `IFLowStorageRK3` run does not carry `IFRK2`'s two predictor registers).
+   (an `IFLowStorageRK3` run carries neither of the two registers `IFRK2` adds — its corrector stage
+   and its velocity predictor).
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU scope
    (inherited from `GBGPeriodicFields`).
 6. **No baked-in physical model, closure, or universality assumption.** The tool investigates these; it

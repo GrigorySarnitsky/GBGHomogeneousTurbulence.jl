@@ -104,7 +104,8 @@ chosen from the grid rather than supplied:
     `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
     ``k``, `side_length` the side ``L``, and ``G`` a dimensionless constant calibrated on
     box-confined DNS (``\\approx 0.9``; Li et al. 2008) — a value that assumes forcing confined to the
-    same low-wavenumber band as the calibrating runs, since ``G`` is ``C_\\varepsilon`` rescaled by
+    same low-wavenumber band as the calibrating runs, since ``G`` carries
+    ``C_\\varepsilon^{-2/3}`` and the ratio
     ``L_{11}/L`` and that ratio is fixed by where the run is driven; a forcing moved to higher shells
     invalidates the estimate and with it the ``\\nu`` grid mode chooses —
     then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η` — the
@@ -159,9 +160,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale `initial_spectrum` is evaluated at.
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
-  `VonKarman1948()`) instead of the default large-scale Gaussian. The model is evaluated at the run's
-  state, with its integral scale taken as `1/envelope_wavenumber`, and the result normalized to
-  `kinetic_energy`.
+  `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
+  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed*: ``\\varepsilon`` from the
+  `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
+  that same energy, ``\\nu`` as resolved above, and the integral scale as `1/envelope_wavenumber`.
+  The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
+  assumed state only positions it.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -350,7 +354,8 @@ The number of steps `sim` has taken — how far the run has gone.
 
 Distinct from the observables cache's **epoch**, which counts *changes to the state* rather than
 advances of the run: a completed step advances the epoch, but so does any announced out-of-band
-mutation, so the two counts diverge: after two steps and one announced mutation the clock reads
+mutation, so the two counts diverge. The constructor's seeding deposit already leaves the fields
+epoch at 1, so after two steps and one announced mutation the clock reads
 step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, and the epoch to ask
 whether a cached value is still the right one.
 """
