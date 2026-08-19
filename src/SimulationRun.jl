@@ -98,32 +98,36 @@ chosen from the grid rather than supplied:
     suppresses the physical fluctuation of the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
     ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
 
-  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with the
-    chosen resolution criterion `κ_max_η`.
-    It reads the dissipation the box sustains from the box-normalized dissipation law `Li2008` (in
-    `Phenomenology.Scalings`), ``\\varepsilon = (k/G)^{3/2}/L`` with `kinetic_energy` the kinetic energy
-    ``k``, `side_length` the side ``L``, and ``G`` a dimensionless constant calibrated on
-    box-confined DNS (``\\approx 0.9``; Li et al. 2008) — a value that assumes forcing confined to the
-    same low-wavenumber band as the calibrating runs, since ``G`` carries
-    ``C_\\varepsilon^{-2/3}`` and the ratio
-    ``L_{11}/L`` and that ratio is fixed by where the run is driven; a forcing moved to higher shells
-    invalidates the estimate and with it the ``\\nu`` grid mode chooses —
-    then sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η` — the
-    resolution criterion, with ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) (the dealiasing cutoff,
-    **not** the grid Nyquist) and ``\\eta`` the Kolmogorov (dissipation) microscale. Since ``\\kappa_{\\max}\\eta = f\\pi \\eta/\\Delta x`` — ``\\Delta x = L/N`` the grid spacing — with ``f`` the
-    retained-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` for the default ``2/3`` rule
-    (``f = 2/3``); a wider-band strategy (larger ``f``) resolves a finer dissipation scale ``\\eta`` on the
-    same grid at the same `κ_max_η`. That criterion treats the whole retained band as clean signal — exact for
-    `TwoThirds` and [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped rather than
-    exactly dealiased. The gap is not cosmetic: ``f = 1`` puts ``\\eta \\approx 0.64\\,\\Delta x`` at
-    `κ_max_η = 2` (against ``0.96\\,\\Delta x`` for ``2/3``), and since ``\\nu \\propto f^{-4/3}``,
-    `HouLi` is handed a ``\\mathrm{Re}_\\lambda`` about 31% higher on the same grid at the same
-    nominal criterion — raise `κ_max_η` when comparing across strategies. The `kinetic_energy` and `side_length` fix
-    the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The choice is
-    self-consistent only if the run actually holds ``k`` at `kinetic_energy`, which the front door's
-    `BandRescaling(over = :total)` guarantees and `:band` does not — override `velocity_forcing` with
-    a forcing that lets ``k`` float and the ``\\nu`` grid mode picked no longer matches the run. The chosen ``\\nu``,
-    ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
+  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with
+    the resolution criterion `κ_max_η`, in two steps.
+
+    First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
+    `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
+    ``k``, `side_length` the side ``L``, and ``G \\approx 0.9`` a dimensionless constant. ``G``
+    carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a
+    run is forced — so the estimate assumes forcing in the same low shells as the runs it was
+    calibrated on, and a forcing moved higher invalidates it.
+
+    Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
+    ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) and ``\\eta`` the Kolmogorov microscale. Since
+    ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the retained-Nyquist fraction,
+    `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default ``2/3`` rule.
+
+    !!! note "The criterion is not equally strict across dealiasing strategies"
+        It treats the whole retained band as clean signal — exact for `TwoThirds` and
+        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
+        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
+        rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
+        ``\\eta \\approx 0.64\\,\\Delta x`` at `κ_max_η = 2` against ``0.96\\,\\Delta x`` for ``2/3``,
+        and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
+        higher on the same grid. Raise `κ_max_η` when comparing across strategies.
+
+    The grid and `κ_max_η` together fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
+    `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
+    are logged. One precondition: the choice is self-consistent only if the run really holds ``k`` at
+    `kinetic_energy`, which the front door's `BandRescaling(over = :total)` guarantees and `:band`
+    does not — give the velocity a forcing that lets ``k`` float and the ``\\nu`` chosen here no
+    longer matches the run.
   * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` rather than dropping one — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
