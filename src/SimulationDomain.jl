@@ -291,7 +291,7 @@ with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`).
 It is the cutoff the
 dealiasing sets — **not** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` itself. The modes above it are
-zeroed each step by the two sharp strategies; [`HouLi`](@ref), whose band runs to the Nyquist wavenumber,
+zeroed each step by the two sharp strategies; `HouLi`, whose band runs to the Nyquist wavenumber,
 damps them instead (to machine epsilon at Nyquist). It fixes both the advective-CFL step
 ([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)) and the resolution
 criterion
