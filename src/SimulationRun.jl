@@ -163,12 +163,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   ``\\varphi``), and its initial variance.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
-  ``\\kappa_p/\\sqrt{2}``); it also sets the integral scale in the assumed state `initial_spectrum` reads — though a roll-off
-  whose coefficient belongs to a different length forms its own (see `large_scale_length`).
+  ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
+  sets the integral scale of the *assumed state* that model is evaluated at.
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
-  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed*: ``\\varepsilon`` from the
+  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in state, not a measurement of the field about to be seeded, so its
+  integral scale is `1/envelope_wavenumber` rather than the ``L_{11}`` the seeded field will have:
+  ``\\varepsilon`` from the
   `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
   that same energy, ``\\nu`` as resolved above, and the integral scale as `1/envelope_wavenumber`.
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
@@ -199,7 +201,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-first — build the frame yourself, then hand it to the second form:
-domain = FixedDomain(grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
+domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
                      element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 1e-2)
 ```

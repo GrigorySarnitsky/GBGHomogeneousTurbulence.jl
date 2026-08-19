@@ -118,7 +118,7 @@ sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
                  velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Or build it directly, once the domain is in hand:
-domain = FixedDomain(grid_points_per_axis = 64)
+domain = FixedDomain(; grid_points_per_axis = 64)
 forcing = ConstantPower(domain; injection_rate = 0.1)
 ```
 
@@ -244,7 +244,9 @@ destroys the physical fluctuation of whatever it holds, so this choice decides w
 run may no longer measure, and there is no answer that is right for every run.
   * `:band` — hold the band's own value; the whole-field value then floats, oscillating slowly
     about its mean as the band feeds the cascade. The band's energy is then set by the
-    forcing rather than by the flow, while ``k`` still measures the flow itself.
+    forcing rather than by the flow. The whole-field ``k`` is then a measurable, though not an
+    untouched one: it still contains the pinned band, so on the default shells 1–2 — the
+    energy-containing range — most of it is held rather than free.
   * `:total` — rescale the band to absorb the whole-field deficit so the whole-field value equals
     `target` (for the velocity this pins the r.m.s. velocity ``u'``, setting the scale of
     ``\\mathrm{Re}_\\lambda`` — its value still fluctuates with the instantaneous dissipation).

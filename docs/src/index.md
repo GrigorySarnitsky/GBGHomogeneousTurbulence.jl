@@ -89,6 +89,9 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 
 ## Components
 
+Listed in build order — each module uses the ones above it. The
+[API overview](api.md) lists the same surface in *reading* order, leading with the run layer.
+
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step

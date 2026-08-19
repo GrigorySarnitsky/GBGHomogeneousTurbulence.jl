@@ -401,7 +401,7 @@ a cached read like the fields' — and [`interpolate_at_particles!`](@ref) inter
 particle positions.
 
 ```julia
-domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration — nothing is declared
 
 # With tracers, the particle-velocities slot is the tracer set's own storage, passed in.

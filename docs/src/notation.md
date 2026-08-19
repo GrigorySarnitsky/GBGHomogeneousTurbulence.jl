@@ -28,7 +28,7 @@ The **Code** column gives the name each symbol carries in the package.
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
-| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical) (the cached field; [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) recovers it) |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) |
@@ -86,7 +86,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |
-| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number, measured from the flow state | [`taylor_reynolds`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_reynolds) |
+| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu``, measured from the flow state | [`taylor_reynolds`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_reynolds) |
 | ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_microscale) |
 
 ## Numerics
@@ -118,7 +118,7 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 | Term | Meaning |
 |:---|:---|
 | **iteration** | one advance of the run, in this order: choose the timestep, [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) the fields, [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) to close them, then advance any tracers and record their sample — the tracers come last because their second velocity sample is interpolated from the field the deposit just made current. Wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
-| **deposit** | to write an observable into the cache and mark the moment it belongs to. The closing deposit is the one that ends an iteration; nothing is ever written to the cache on a read. |
+| **deposit** | to write an observable into the cache and mark the moment it belongs to. The particle velocities are the one slot where the two halves are separate calls — the tracer advance writes, `deposit_sample!` marks — because the cache borrows that storage rather than owning it. The closing deposit is the one that ends an iteration; nothing is ever written to the cache on a read. |
 | **slot** | one storage place in the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) — an array or a number, together with the epoch its value belongs to. |
 | **epoch** | a counter of *changes to the state*, one per dynamical factor (the fields, the tracer positions) — and, for a slot, the value that counter held when the slot was filled. A slot is readable exactly while the epoch it records still equals the counter it depends on. Not an iteration number: an announced out-of-band mutation advances an epoch without advancing the clock. |
 | **register** | storage a component computes one value into and overwrites at the next, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
