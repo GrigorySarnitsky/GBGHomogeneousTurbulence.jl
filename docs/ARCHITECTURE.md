@@ -196,7 +196,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
-  carrier so the arrows stay primary (§11 decision 26).
+  carrier so the operations acting on it, not the record itself, carry the design (§11 decision 26).
 
   The **chart map** — the recovery of the physical representations — is not a package verb. The
   velocity and scalar are recovered by the source-preserving four-argument form of
@@ -748,7 +748,7 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   map needs** (``\hat{\boldsymbol{u}}``, ``\hat\varphi``; the tracer positions; a stochastic
   forcing's internal state — the extended-phase-space discipline of molecular dynamics' thermostats);
   the observables cache holds spent compute, reconstructable from the record (delete it and the
-  trajectory is unchanged); and the clock and output cursors are the experimenter's logbook. The
+  trajectory is unchanged); and the clock and what a run records are the experimenter's logbook rather than physics. The
   `ObservablesCache` charts are the tower's *algebraic* variables — solved, never integrated — and their
   per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
 

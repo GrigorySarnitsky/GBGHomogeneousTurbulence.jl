@@ -136,8 +136,9 @@ schedule: the maximum speed is reduced from the just-deposited velocity for the 
 timestep choice, and the particle velocities are interpolated from that velocity at each particle's new
 position for the next advance's predictor.
 
-**The observation comes before the iteration.** Between iterations the callback reads
-what it wants and answers whether the run continues; only then does the next iteration run. Stopping
+**The loop observes, then advances.** The callback reads what it wants and answers whether the run
+continues; only then does the next iteration run. Read from the callback's side it runs *after* each
+iteration, which is how [`run!`](@ref) describes it — the same loop, named from the two ends. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
 instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
 reaches is observed exactly once: the first because a deposit seeding the initial state is made when

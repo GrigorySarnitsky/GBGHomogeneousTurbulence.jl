@@ -23,7 +23,7 @@ The run layer:
   callback stops the run (the callback *is* the observation — the thing that reads the run each
   iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
-  observation, and its one-line sugar.
+  observation, and `warmup!`, the one-line shorthand that runs it.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
 
@@ -428,7 +428,7 @@ iteration run: the timestep from the cached maximum speed, the step, the tracer 
 deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
 step, the last after the final one, with statistics recorded before the stop.
 
-Stopping is the observation's decision on observables, never a run option: a budget is a callback
+Stopping is the observation's decision on observables, never a run option: a fixed-length run is a callback
 that accumulates what it budgets. A span of simulation time compares [`current_time`](@ref) against
 a target; a step budget compares [`current_step`](@ref); an eddy-turnover budget accumulates
 ``\\Delta t \\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
@@ -561,7 +561,7 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
-spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement on any freshly
+spin-up, and [`warmup!`](@ref) is the one-line shorthand for exactly that call. Use it before measurement on any freshly
 seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
 ``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
 decaying run a fixed budget instead, which is a three-line callback (see `run!`). The same argument
