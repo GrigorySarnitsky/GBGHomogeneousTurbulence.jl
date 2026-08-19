@@ -116,7 +116,10 @@ chosen from the grid rather than supplied:
     same grid at the same `κ_max_η`. That criterion treats the whole retained band as clean signal — exact for
     `TwoThirds` and [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped rather than
     exactly dealiased. The `kinetic_energy` and `side_length` fix
-    the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The chosen ``\\nu``,
+    the units; the grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``. The choice is
+    self-consistent only if the run actually holds ``k`` at `kinetic_energy`, which the front door's
+    `BandRescaling(over = :total)` guarantees and `:band` does not — override `velocity_forcing` with
+    a forcing that lets ``k`` float and the ``\\nu`` grid mode picked no longer matches the run. The chosen ``\\nu``,
     ``\\varepsilon``, and ``\\mathrm{Re}_\\lambda`` are logged.
   * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` rather than dropping one — for a decaying

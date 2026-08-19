@@ -90,11 +90,10 @@ All keyword; a homogeneous-isotropic state fixes the rest:
     ``\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` instead is off by a factor of two
     with no error; only scalar laws read it, and the default is
     `NaN` for a run that carries no scalar. `NaN` rather than `nothing` keeps the bundle
-    a plain, type-stable set of `Float64`s. It is a **sentinel, not a value that propagates**: every
-    law that reads the field checks it first and throws an `ArgumentError` naming the law and the
-    missing rate, so a scalar law applied to a scalar-free state fails loudly rather than returning
-    `NaN`. Arithmetic a caller does on the field itself is not covered — there `NaN` propagates as
-    it always does.
+    a plain, type-stable set of `Float64`s. Every law here that reads the field checks it first and
+    throws an `ArgumentError` naming the law and the missing rate, so a scalar law applied to a
+    scalar-free state fails loudly rather than returning `NaN`. That guard covers the laws, not
+    arithmetic a caller does on the field itself, where `NaN` propagates as it always does.
 
 # Examples
 

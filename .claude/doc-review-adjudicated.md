@@ -82,3 +82,12 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   rule settles it — name the positional form only where a reader might reasonably call it, and omit
   it for a type whose positional form takes **preallocated internals**. `ResolvedFields` takes two
   already-allocated spectral fields, so it is the omit case. Do not re-add it.
+
+## Round 2026-08-19 (panel round 4) — settled as NOT defects (do not re-flag)
+
+- **"The decision log's entries carry no visible numbers."** An extraction artifact, not a defect.
+  `ARCHITECTURE.md` §11 is a markdown ordered list (`1.` … `56.`) and the built HTML wraps it in
+  `<ol>`, so the browser numbers every entry and every "decision N" citation resolves. What the hats
+  read is `consolidate.py`'s plain-text manuscript, which drops `<ol>` numbering. Verified in
+  `docs/build/architecture/index.html`. Any hat re-flagging this is reading the manuscript, not the
+  site — check the built page before acting.

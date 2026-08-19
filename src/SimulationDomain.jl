@@ -278,9 +278,7 @@ _blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_referenc
 """
     max_wavenumber(domain)
 
-The dealiasing cutoff of `domain` (a [`FixedDomain`](@ref)) — the highest wavenumber magnitude the
-run treats as resolved signal, and for a truncating strategy the highest it evolves at all (under
-[`HouLi`](@ref) the modes above it are damped rather than removed) — the
+The highest wavenumber magnitude `domain` (a [`FixedDomain`](@ref)) treats as resolved signal — the
 dealiasing cutoff
 
 ```math
@@ -289,8 +287,7 @@ dealiasing cutoff
 
 with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`).
-It is the cutoff the
-dealiasing sets, which for the two sharp strategies sits strictly **below** the grid Nyquist
+For the two sharp strategies sits strictly **below** the grid Nyquist
 ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each step. `HouLi` is the exception
 its ``f = 1`` implies: its cutoff *is* the Nyquist, so there is no band above to zero, and it instead
 damps modes as they approach it (to machine epsilon at Nyquist). It fixes both the advective-CFL step

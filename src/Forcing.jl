@@ -349,26 +349,26 @@ rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusi
   fundamental ``2\\pi/L``.
 
 # Fields
-- `mask` — the band indicator as a real array.
+- `indicator` — the band indicator as a real array.
 - `rate` — the fixed linear rate ``A``.
 """
 struct Linear{M, T} <: AbstractForcing
-  mask::M              # real array: the band indicator (1 in band, 0 outside)
+  indicator::M         # real array: the band indicator (1 in band, 0 outside)
   rate::T              # the linear rate A
 end
 
 function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
   # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
   # indicator is materialized once here — the same stored mask this forcing always carried.
-  mask = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
-  return Linear(mask, float(rate))
+  indicator = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
+  return Linear(indicator, float(rate))
 end
 
 uses_linear_rate(::Linear) = true
 
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
-  rate .= T(forcing.rate) .* forcing.mask
+  rate .= T(forcing.rate) .* forcing.indicator
   return rate
 end
 

@@ -496,8 +496,8 @@ hand-run loop calls it itself, and the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor makes the seeding
 deposit so the
 first iteration finds the initial state's observables. The argument order is shared with `step!` —
-the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
-same fixed order as there. After mutating the state out of band, announce
+the cache leads because it is what this call mutates — unlike `step!`, whose leading `scheme` is a
+dispatch tag — and `state`, `domain`, `buffers` follow in the same order as there. After mutating the state out of band, announce
 it with [`fields_modified!`](@ref) and re-deposit with the second form: `sim`, a
 `Simulation`, unpacks its own cache, state,
 domain and buffers and calls the first.

@@ -415,8 +415,8 @@ cache   = ObservablesCache(domain; scalar = true, particle_velocities = tracers.
 
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
 epoch — the particle velocities included, against both epochs — three-valued slot epochs that
-throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the deposit-
-completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
+throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the
+deposit-completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes the run after every iteration and once before the first — ``n`` iterations, ``n + 1``
 observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
 stopping is the caller's decision on observables and the budget vocabulary is gone. What §1.3

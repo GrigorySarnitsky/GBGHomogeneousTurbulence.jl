@@ -454,8 +454,8 @@ Over it:
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
-  the tracer advance on the sample and the deposited endpoint field, the new sample, and the deposit-
-  completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
+  the tracer advance on the sample and the deposited endpoint field, the new sample, and the
+  deposit-completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
   observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
 - **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
@@ -1441,12 +1441,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `GBGPeriodicFields` pin moved to a master that ships compressed kernel classes (its decisions
     50/51/60), and the `FixedDomain` adopted them: the de-alias mask of every strategy is a
     `RadialKernel` (`TwoThirds`/`PhaseShift` via `spectral_cutoff`, `HouLi` as its own radial symbol),
-    the Dirichlet-energy weight is `radial_kernel(identity, …)`, the stored real ``|\kappa|^2`` array
+    the Dirichlet-energy weight is `radial_kernel(identity, …)`, the stored real ``\lvert\boldsymbol{\kappa}\rvert^{2}`` array
     is gone (its consumers — the initial-condition envelopes, now composed radial kernels folded with
     the truncation; the integrating-factor builds, a transitional lazy broadcast; the backend/eltype
     template, now the multipliers' axis arrays), and the phase-shift translation kernels are per-axis
     `SeparableKernel`s. Decision 36's frame floor of zero is thereby **achieved** — 322.5 MiB retired
-    at ``256^3``/`Float64`, ``|\kappa|^2`` no longer resident twice — and the optimality audit's
+    at ``256^3``/`Float64`, ``\lvert\boldsymbol{\kappa}\rvert^{2}`` no longer resident twice — and the optimality audit's
     reconstruction demonstration inverted into a correctness pin: the lazy symbols, materialized on
     demand, must equal the explicit axis-vector reconstruction. Knock-on residency wins recorded in
     the same re-freeze: every band forcing's kernel is lazy (`BandRescaling` and `StochasticOU` store
