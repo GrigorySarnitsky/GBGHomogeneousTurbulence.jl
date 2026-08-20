@@ -1,0 +1,247 @@
+// /bug-hunt — the CODE instrument, as against /check-docs and /check-consistency which audit prose.
+//
+// THE ONE DESIGN RULE, from which everything else follows:
+//
+//     A STATIC CLAIM ABOUT CODE IS A HYPOTHESIS. THE ONLY ADMISSIBLE EVIDENCE IS A PROGRAM THAT
+//     FAILS.
+//
+// Reading code and reporting what "looks wrong" produces plausible, confident, unfalsifiable prose —
+// the exact failure this project has measured repeatedly in its documentation instruments, and it is
+// worse here, because a wrong bug report costs a fix pass on working code. So the hunt is static and
+// the confirmation is dynamic: every candidate defect must be reduced to a WITNESS — a self-contained
+// `@testset` asserting the CORRECT behaviour, which must be observed to FAIL on the current tree.
+//
+//   * A candidate whose witness passes is not a bug. It is discarded, whatever the argument for it.
+//   * A candidate whose witness cannot be written is not actionable. It is discarded too.
+//   * A witness that fails IS the finding. It is also, unchanged, the regression test the fix must
+//     flip, and it is promoted into test/ when the fix lands.
+//
+// That inverts the usual economics: the expensive step is proving the bug, not describing it, and
+// nothing reaches the fixer that has not already been demonstrated.
+//
+// TWO CLASSES ESCAPE THE WITNESS RULE, and are handled separately rather than smuggled through:
+//
+//   * ARCHITECTURE / MAINTAINABILITY (duplication, divergent copies, leaked abstraction, an invariant
+//     of CLAUDE.md broken). These are not runtime defects and no test can fail on them. They demand a
+//     different evidence standard: two or more quoted locations that a reader can diff, and a stated
+//     consequence. A single-site "this is ugly" is not a finding.
+//   * API-SEMANTICS claims ("`similar` does not preserve X", "`copyto!` requires Y"). Memory about
+//     Base and third-party behaviour is exactly where a model is confidently wrong, so these need
+//     BOTH: the official documentation fetched and quoted with its URL, AND a witness that runs.
+//
+// Args (absolute paths): { repo, pile, strength, lanes }
+//   repo     — the repository root
+//   pile     — where findings and witnesses are banked (.claude/bug-hunt)
+//   strength — 'economy' (DEFAULT: hunt lanes on the cheap model, reproduction at full strength)
+//              | 'full'  (everything at the session model)
+//   lanes    — optional subset, by key or number, for re-running a dead lane
+//
+// The reproduction stage is NEVER economized, in either mode. A cheap hunter that invents a
+// candidate costs one reproduction that fails to reproduce; a cheap reproducer that mis-runs a
+// witness corrupts the only evidence the instrument produces.
+export const meta = {
+  name: 'bug-hunt',
+  description: 'Static hunt across the code, every candidate defect confirmed by a failing witness before it is reported',
+  phases: [{ title: 'Hunt' }, { title: 'Reproduce' }],
+}
+
+const A = typeof args === 'string' ? JSON.parse(args) : (args || {})
+const REPO = A.repo
+const PILE = A.pile
+const STRENGTH = A.strength === 'full' ? 'full' : 'economy'
+if (!REPO || !PILE) throw new Error('bug-hunt needs { repo, pile } as absolute paths')
+
+const CANDIDATE_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    lane: { type: 'string' },
+    files_read: { type: 'array', items: { type: 'string' },
+                  description: 'every source file you actually opened — coverage is measured, not asserted' },
+    candidates: { type: 'array', items: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        kind: { type: 'string', enum: ['runtime', 'architecture', 'api-semantics'] },
+        severity: { type: 'string', enum: ['blocker', 'major', 'minor'] },
+        title: { type: 'string', description: 'one line, the defect not the location' },
+        file: { type: 'string' },
+        line: { type: 'integer' },
+        mechanism: { type: 'string', description: 'WHY it is wrong — the causal chain, not a restatement' },
+        witness_plan: { type: 'string',
+                        description: 'runtime/api-semantics: the concrete call and the assertion that should hold but will not. architecture: the second location to diff against and the maintenance consequence.' },
+        second_location: { type: 'string', description: 'architecture only: file:line of the divergent copy' },
+      },
+      required: ['kind', 'severity', 'title', 'file', 'line', 'mechanism', 'witness_plan'],
+    } },
+  },
+  required: ['lane', 'files_read', 'candidates'],
+}
+
+const VERDICT_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    verdict: { type: 'string', enum: ['REPRODUCED', 'NOT-REPRODUCED', 'NO-WITNESS-POSSIBLE', 'EVIDENCED', 'NOT-A-DEFECT'] },
+    witness_path: { type: 'string', description: 'REPRODUCED only: path of the banked .jl witness' },
+    observed: { type: 'string', description: 'the actual output that proves it — a failing @test line, or the two quoted divergent blocks. <= 60 words.' },
+    docs_url: { type: 'string', description: 'api-semantics only: the official page fetched, with the sentence it says' },
+    severity: { type: 'string', enum: ['blocker', 'major', 'minor'] },
+  },
+  required: ['title', 'verdict', 'observed'],
+}
+
+const HUNT_PREAMBLE = `You are hunting DEFECTS IN THE CODE of GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden.
+
+THE RULEBOOK IS ${REPO}/CLAUDE.md — read its "Core invariants" and "Style" sections first. THE CODE IS ${REPO}/src/*.jl and ${REPO}/src/phenomenology/*.jl. The tests are ${REPO}/test/*.jl and tell you what is already pinned.
+
+YOU ARE PRODUCING HYPOTHESES, NOT VERDICTS. Every candidate you raise will be handed to a separate agent whose only job is to write a program that demonstrates it, and which discards anything that does not reproduce. So:
+
+  * Do NOT report what merely looks unusual. Report what you can say will MISBEHAVE, and say with what input.
+  * For every candidate, give a WITNESS PLAN: the concrete call, the input that triggers it, and the assertion that ought to hold but will not. If you cannot name one, do not raise the candidate.
+  * Prefer one candidate you can specify a failing call for over five you cannot.
+  * Do not report style, naming, or documentation defects. Other instruments own those, and a finding here that turns out to be prose wastes a reproduction slot.
+
+THREE KINDS, and the kind decides the evidence:
+  * "runtime"       — wrong values, wrong types, aliasing, mutation of a caller's data, an edge case that errors or silently misbehaves. Witness = a failing @testset.
+  * "api-semantics"  — a claim about what Base or a dependency does. You are very likely to be wrong from memory here; say what you believe and the reproducer will check the official documentation AND run it.
+  * "architecture"   — duplication, divergent copies of one rule, a leaked abstraction, an invariant of CLAUDE.md broken in the code. No test can fail on these, so they need a SECOND LOCATION to diff and a stated maintenance consequence. One site is not a finding.
+
+Report your files_read honestly: it is cross-checked against the tree, and a lane that claims a sweep it did not do is worse than a lane that reports a narrow one.
+
+Cap: your 6 most substantial candidates. Ranked by what would actually go wrong.`
+
+const LANES = [
+  { key: 'aliasing-and-mutation', brief: `Aliasing and unintended mutation. Which arrays are shared between owners? The observables cache borrows the tracer set's particle-velocities storage; the step takes cache slots as scratch mid-iteration; the generator forms products IN PLACE over an operand's array (\`ω_consumed\`, \`u_consumed\`). Hunt for: a caller's array mutated without that being part of the contract, two owners writing one buffer in an order that is not enforced, a \`!\` function whose non-leading argument is written, a copy that should exist and does not (or exists and need not). Trace the actual assignment sites, not the docstrings.` },
+
+  { key: 'numerics-and-types', brief: `Numerical correctness and type behaviour. Hunt for: untyped literals promoting a Float32 computation to Float64; integer division or overflow; a tolerance that is absolute where it should be relative; division by a quantity that can be zero; \`≈\` with a default tolerance where the scale makes it meaningless; accumulation order that loses precision; a normalization (1/N, 2κ, the ½ in the kinetic energy, a Parseval factor) applied twice or not at all. The package is Float32/Float64 generic and that genericity is claimed in Observables' module docstring and pinned in test/validation.jl — check the claim holds wherever it is made.` },
+
+  { key: 'api-contracts', brief: `Claims about Base and about GBGPeriodicFields / GBGStreamingStatistics. Hunt for calls whose CORRECTNESS DEPENDS on a semantic detail: does \`similar\` preserve the axes/backend you assume? does \`copyto!\` accept these shapes? does \`mod\` behave as you want at the negative boundary? does \`sum\`/\`maximum\` over a device array do what you think? does a PF operation alias its output with an input, or require them distinct? Do NOT trust your memory of any of these — mark them api-semantics so the reproducer fetches the official documentation and runs them.` },
+
+  { key: 'gpu-and-hot-loop', brief: `The GPU-primary invariant and the allocation-free hot loop. Hunt for: scalar indexing of an array that may be a device array; an allocation inside \`step!\` / \`deposit!\` / \`advect!\` or anything they call; a host-device transfer (a \`sum\` to a scalar, an \`Array(...)\`, a comparison against a host number) inside the per-step path; a broadcast that materializes a temporary; \`Float64\` literals forcing a device kernel to double. Read the actual call chain of one iteration and say where the allocation or the sync happens.` },
+
+  { key: 'edge-cases', brief: `Degenerate and boundary configurations, which are where a solver silently misbehaves. Hunt by ENUMERATING the configuration space and picking the corners: zero tracers; one tracer; a scalar-free run reaching a scalar path; \`NoForcing\`; a forcing band with no content; odd or very small N; \`side_length\` other than 2π; Float32; \`dt\` given explicitly versus adaptive; the first iteration (no history) and the seeding deposit; an out-of-band mutation without the announce. For each, name the call that goes wrong and how.` },
+
+  { key: 'state-machine', brief: `The cache's epoch/staleness state machine and the iteration's ordering contract. Hunt for: a path that reads a slot whose epoch was not set; a producer that writes a slot without recording it; an ordering the code depends on but does not enforce (the tracer advance after the closing deposit; \`prepare!\` before the stages; \`record\` before \`deposit_sample!\`); a counter advanced twice or not at all; a state reachable by a documented public sequence that leaves the cache inconsistent. Follow \`advance!\` line by line and then try to break it from the public API.` },
+
+  { key: 'architecture', brief: `Maintainability, as a code property rather than a taste. Hunt for: THE SAME RULE IMPLEMENTED TWICE (a formula, a coefficient, a band construction, a normalization) where the copies can drift — quote both; a constant repeated as a literal instead of being named once; a near-duplicate function pair differing in one line; dead code and unreachable branches; an abstraction leaked (a caller reaching through a type to internals it should not know); a CLAUDE.md invariant broken in code (physics reimplementing a field or statistics operation that belongs in PF/SS; a resident N³ buffer serving an M×3 need). Every finding needs two locations or an invariant quoted.` },
+
+  { key: 'test-critic', brief: `What the suite does NOT pin, which is where a regression will land. Read test/*.jl against src/*.jl and hunt for: a documented guarantee with no test (search the docstrings for claims — "never", "exactly", "always", "in place", "returns the field's own element type"); a branch no test exercises (a scheme, a dealiasing strategy, a forcing, a code path behind a keyword); a test that would pass even if the function were wrong (asserts a type but not a value, or a value that is trivially true); a property tested only at the default configuration where the constant happens to be 1. Your candidates are "this claim is unpinned and here is the call that would expose it" — those ARE witnessable.` },
+]
+
+const selected = Array.isArray(A.lanes) && A.lanes.length
+  ? LANES.filter((l, i) => A.lanes.some(x => l.key === String(x) || String(i + 1) === String(x)))
+  : LANES
+if (!selected.length) throw new Error(`lanes ${JSON.stringify(A.lanes)} matched none of: ${LANES.map(l => l.key).join(', ')}`)
+
+const cheap = STRENGTH === 'economy' ? { model: 'sonnet' } : {}
+
+phase('Hunt')
+
+// Each lane's candidates go straight into reproduction — no barrier, so a lane that finishes early
+// starts proving while the slower lanes are still reading.
+const results = await pipeline(
+  selected,
+
+  (lane) => agent(`${HUNT_PREAMBLE}
+
+YOUR LANE: ${lane.key}
+
+${lane.brief}
+
+Return the structured object with lane="${lane.key}".`,
+    { label: `hunt:${lane.key}`, phase: 'Hunt', schema: CANDIDATE_SCHEMA, agentType: 'general-purpose', ...cheap }),
+
+  (found, lane) => {
+    if (!found || !found.candidates || !found.candidates.length) return { lane: lane.key, verdicts: [], files_read: (found && found.files_read) || [] }
+    return parallel(found.candidates.map((c, i) => () =>
+      agent(`You are the REPRODUCER for one candidate defect in GBGIsotropicTurbulence (Julia, at ${REPO}). A hunter claims the following. Your job is NOT to agree with it.
+
+  kind:      ${c.kind}
+  severity:  ${c.severity}
+  title:     ${c.title}
+  location:  ${c.file}:${c.line}
+  mechanism: ${c.mechanism}
+  plan:      ${c.witness_plan}
+  ${c.second_location ? 'second location: ' + c.second_location : ''}
+
+THE DEFAULT VERDICT IS "NOT-REPRODUCED". You must earn anything else with evidence a third party could re-run. An unproven bug report costs a fix pass on working code, which is worse than a missed bug, so failing to reproduce is the SAFE outcome and you should return it whenever the evidence is not in your hands.
+
+HOW TO PROVE IT, by kind:
+
+* kind = "runtime" — Write a SELF-CONTAINED Julia file that asserts the CORRECT behaviour and therefore FAILS on the current tree. Use this shape:
+
+      using Test, GBGIsotropicTurbulence     # plus whatever else it needs
+      @testset "<the claim, as a sentence>" begin
+        # minimal setup — small N, few tracers, fixed rng
+        @test <what SHOULD hold>
+      end
+
+  Save it to ${PILE}/witnesses/<NN>-<slug>.jl, then RUN it — NOTE THE QUOTES, these paths contain
+  spaces and an unquoted cd silently lands you in the wrong directory:
+      cd "${REPO}" && julia --project --startup-file=no "${PILE}/witnesses/<NN>-<slug>.jl"
+  Read the output. If a @test FAILS, the defect is real: verdict REPRODUCED, and quote the failing
+  line. If everything PASSES, the hunter was wrong: verdict NOT-REPRODUCED — do not rescue the
+  candidate by weakening the assertion until it fails, which proves nothing but your persistence.
+  Keep the file: on REPRODUCED it becomes the regression test, so it must assert the RIGHT behaviour
+  rather than merely exhibit the wrong one.
+
+* kind = "api-semantics" — Do BOTH, in this order. (1) Fetch the OFFICIAL documentation for the
+  function — docs.julialang.org for Base, the package's own docs for a dependency — and quote the
+  sentence that settles it, with the URL. Your memory of Base semantics is not evidence and is
+  frequently wrong. (2) Then write and run a witness as above. Verdict REPRODUCED only if the
+  documentation and the run agree that the code is wrong.
+
+* kind = "architecture" — No program can fail on this, so the evidence is textual and must be
+  DIFFABLE: read BOTH locations, quote the two blocks, and state precisely what a maintainer would
+  have to change in both places and what happens if they change only one. Verdict EVIDENCED if the
+  duplication/divergence/violation is real and you have both quotes; NOT-A-DEFECT if the second site
+  turns out to differ for a reason, or if there is no second site. Do not file an architecture
+  finding whose consequence is "it is untidy".
+
+If the claim is real but no program can distinguish it (a latent hazard nothing currently reaches),
+return NO-WITNESS-POSSIBLE and say what would have to change for it to bite. That is an honest
+outcome and is reported separately — it is not a bug.
+
+Number your witness ${String(i + 1).padStart(2, '0')} within lane "${lane.key}", i.e. use the slug
+"${lane.key}-${String(i + 1).padStart(2, '0')}".
+
+OUTPUT: the structured object. \`observed\` must contain the ACTUAL evidence — the failing @test line
+as printed, or the two quoted blocks — not a description of it.`,
+        { label: `repro:${lane.key}-${i + 1}`, phase: 'Reproduce', schema: VERDICT_SCHEMA, agentType: 'general-purpose' })
+        .then(v => ({ ...v, lane: lane.key, candidate: c }))))
+      .then(vs => ({ lane: lane.key, files_read: found.files_read || [], verdicts: vs.filter(Boolean) }))
+  },
+)
+
+// ── Reporting. A lane that died must not read as a lane that found nothing. ──────────────────────
+const anomalies = []
+const all = []
+for (let i = 0; i < selected.length; i++) {
+  const r = results[i]
+  if (!r) { anomalies.push(`${selected[i].key}: DEAD — no result`); continue }
+  all.push(r)
+}
+
+const tally = {}
+for (const r of all) for (const v of r.verdicts) tally[v.verdict] = (tally[v.verdict] || 0) + 1
+for (const r of all) {
+  const c = {}
+  for (const v of r.verdicts) c[v.verdict] = (c[v.verdict] || 0) + 1
+  log(`${r.lane}: ${r.verdicts.length} candidates → ${JSON.stringify(c)}  (${(r.files_read || []).length} files read)`)
+}
+log(`TOTAL: ${JSON.stringify(tally)}`)
+
+const confirmed = all.flatMap(r => r.verdicts.filter(v => v.verdict === 'REPRODUCED' || v.verdict === 'EVIDENCED'))
+log(`CONFIRMED (witnessed or evidenced): ${confirmed.length}`)
+for (const v of confirmed) log(`   [${v.severity || '?'}] ${v.title}`)
+
+if (anomalies.length) {
+  log(`!! ${anomalies.length} ANOMALY(S) — the hunt is INCOMPLETE, do not read the tally as a clean sweep:`)
+  for (const a of anomalies) log(`   !! ${a}`)
+}
+
+return {
+  tally, anomalies, complete: anomalies.length === 0,
+  lanes_run: selected.map(l => l.key),
+  files_read: [...new Set(all.flatMap(r => r.files_read || []))],
+  confirmed, results: all,
+}
