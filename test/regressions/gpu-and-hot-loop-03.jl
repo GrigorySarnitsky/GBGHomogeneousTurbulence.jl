@@ -40,7 +40,7 @@ end
   ab = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
                   trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(11))
   for _ in 1:5; advance!(ab); end
-  @test ab.particle_buffers.filled == 3                      # the multistep branch is the live one
+  @test ab.cache.history_filled == 3                      # the multistep branch is the live one
 
   ab_bytes = allocations_of(advect!, ab.trajectory_scheme, ab.tracers,
                             velocity_physical(ab.cache), ab.domain,

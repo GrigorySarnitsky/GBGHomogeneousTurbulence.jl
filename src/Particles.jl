@@ -42,7 +42,7 @@ import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
        ParticleIntegratorBuffers, MultistepBuffers,
-       record_particle_velocities!, advect!, restart!, interpolate_at_particles!,
+       record_particle_velocities!, advect!, restart!, history_depth, interpolate_at_particles!,
        particle_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
@@ -347,40 +347,59 @@ AdamsBashforth(; order::Integer = 4) =
 """
     MultistepBuffers
 
-The per-scheme registers of an [`AdamsBashforth`](@ref) trajectory integrator: the past Lagrangian
-samples it integrates over, the step sizes they were taken at, and the startup scheme's own
-registers.
+The per-scheme registers of an [`AdamsBashforth`](@ref) trajectory integrator: the startup scheme's
+registers, the host scratch its weight solve works in, and the cache it reads its past Lagrangian
+samples from.
 
 Build it with [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme,
-tracers)`; a run builds it for you. It holds `order - 1` past-sample arrays of the tracer set's
-shape, against `EndpointHeun`'s two — one array more, in exchange for one interpolation fewer per
-step.
+tracers, cache)`; a run builds it for you.
+
+The past samples themselves are **not** held here. They are deposited observables — measurements of
+the velocity along the trajectory — so they live in the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) beside the current sample
+they extend, which is what lets
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) invalidate the whole
+history when the tracers are repositioned.
 
 # Fields
-- `past` — the previous Lagrangian samples, most recent first.
-- `steps` — the step sizes those samples were taken at, aligned with `past`.
-- `filled` — how many entries of `past` are valid; below `order - 1` the scheme is still starting up.
+- `cache` — the `ObservablesCache` holding the sample history this scheme integrates over.
 - `startup` — the [`ParticleIntegratorBuffers`](@ref) the bootstrap `EndpointHeun` steps use.
 - `weights`, `nodes` — the `order`-element host scratch the per-step weight solve works in.
 """
-mutable struct MultistepBuffers{V, S}
-  const past::Vector{V}
-  const steps::Vector{Float64}
-  filled::Int
-  const startup::S
+struct MultistepBuffers{C, S}
+  cache::C
+  startup::S
   # Host scratch for the weight solve. Two `order`-element vectors, allocated once: the solve runs
   # every warmed-up step, and the hot loop is allocation-free over preallocated buffers.
-  const weights::Vector{Float64}
-  const nodes::Vector{Float64}
+  weights::Vector{Float64}
+  nodes::Vector{Float64}
 end
 
 
-function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers) where {K}
-  past = [similar(tracers.positions) for _ in 1:max(K - 1, 0)]
-  return MultistepBuffers(past, zeros(Float64, max(K - 1, 0)), 0,
-                          allocate_buffers(EndpointHeun(), tracers),
+function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache) where {K}
+  return MultistepBuffers(cache, allocate_buffers(EndpointHeun(), tracers),
                           zeros(Float64, K), zeros(Float64, K))
 end
+
+
+# A one-step scheme carries no history and ignores the cache; the three-argument form exists so a run
+# can allocate either scheme's registers through one call.
+allocate_buffers(scheme::EndpointHeun, tracers::Tracers, cache) = allocate_buffers(scheme, tracers)
+
+
+"""
+    history_depth(scheme) -> Int
+
+How many Lagrangian samples `scheme` must be able to look back over, counting the current one.
+
+A run reads this to size the sample history its
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) carries. A one-step scheme
+answers `1` and needs no history stored; an `order`-step method answers `order`.
+"""
+function history_depth end
+
+history_depth(::AbstractParticleIntegrator) = 1
+history_depth(::AdamsBashforth{K}) where {K} = K
 
 
 # Variable-step Adams–Bashforth weights. With samples f_j at times t_n = τ_0 > τ_1 > … > τ_{k-1},
@@ -427,34 +446,40 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   dt > 0 || throw(ArgumentError("`dt` must be positive, got $dt: a multistep history cannot carry " *
                                 "a zero-length or reversed step"))
 
-  if buffers.filled < K - 1                  # no history yet: start up on the one-step scheme
+  # The past samples are the cache's, not this scheme's: an announced reposition clears them there,
+  # so a history that survived one is not reachable from here.
+  cache = buffers.cache
+  past, steps = cache.particle_velocity_history, cache.sample_steps
+
+  if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
     advect!(EndpointHeun(), tracers, velocity_end, domain, buffers.startup, dt)
   else
-    b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), buffers.steps, K)
+    b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
     X .= X .+ T(b[1]) .* f0
     for j in 2:K
-      X .= X .+ T(b[j]) .* buffers.past[j-1]
+      X .= X .+ T(b[j]) .* point_values(past[j-1])
     end
     _wrap!(X, L)
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
-  # what keeps the deposited observable intact — the cache's slot is reused every iteration, so a
-  # multistep method that aliased it would integrate over values that have since been overwritten.
-  for j in min(buffers.filled + 1, K - 1):-1:2
-    copyto!(buffers.past[j], buffers.past[j-1])
-    buffers.steps[j] = buffers.steps[j-1]
+  # what keeps the deposited observable intact — the current slot is the tracer set's own storage and
+  # is rewritten every iteration, so a multistep method that aliased it would integrate over values
+  # that have since been overwritten.
+  for j in min(cache.history_filled + 1, K - 1):-1:2
+    copyto!(point_values(past[j]), point_values(past[j-1]))
+    steps[j] = steps[j-1]
   end
   if K > 1
-    copyto!(buffers.past[1], f0)
-    buffers.steps[1] = Float64(dt)
-    buffers.filled = min(buffers.filled + 1, K - 1)
+    copyto!(point_values(past[1]), f0)
+    steps[1] = Float64(dt)
+    cache.history_filled = min(cache.history_filled + 1, K - 1)
   end
   return tracers
 end
 
 
-restart!(::AdamsBashforth, buffers::MultistepBuffers) = (buffers.filled = 0; buffers)
+restart!(::AdamsBashforth, buffers::MultistepBuffers) = (buffers.cache.history_filled = 0; buffers)
 
 
 """

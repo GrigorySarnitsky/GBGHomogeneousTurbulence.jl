@@ -37,11 +37,7 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
-# `particles_modified!` is extended here with the `Simulation` form, so it is imported rather than
-# merely used — the run layer is the only place that can reach both the cache and the trajectory
-# history a repositioning invalidates.
-import ..Cache: particles_modified!
-using ..Cache: ObservablesCache, check_deposits, deposit_sample!,
+using ..Cache: ObservablesCache, particles_modified!, check_deposits, deposit_sample!, advance_particles_epoch!,
                velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
@@ -51,7 +47,7 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!,
-                   restart!
+                   restart!, history_depth
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
@@ -309,10 +305,13 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 
   tracers = number_of_particles > 0 ?
     Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, rng) : nothing
-  particle_buffers = tracers === nothing ? nothing : allocate_buffers(trajectory_scheme, tracers)
-
+  # The cache is built first: it carries the Lagrangian sample history a multistep trajectory scheme
+  # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
-                             particle_velocities = tracers === nothing ? nothing : tracers.particle_velocities)
+                           particle_velocities = tracers === nothing ? nothing : tracers.particle_velocities,
+                           history_depth = history_depth(trajectory_scheme))
+  particle_buffers = tracers === nothing ? nothing :
+                     allocate_buffers(trajectory_scheme, tracers, cache)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     (record_particle_velocities!(tracers, velocity_physical(cache)); deposit_sample!(cache))
@@ -433,7 +432,9 @@ function advance!(sim::Simulation; dt = nothing)
   if sim.tracers !== nothing
     advect!(sim.trajectory_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
             sim.particle_buffers, Δt)
-    particles_modified!(sim.cache)
+    # The run's own advance, not an out-of-band reposition: the epoch moves so the previous sample
+    # reads stale, but the history the advance just extended stays intact.
+    advance_particles_epoch!(sim.cache)
     record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)
   end
@@ -444,16 +445,6 @@ function advance!(sim::Simulation; dt = nothing)
   return sim
 end
 
-
-# The `Simulation` form of the announce. It exists because the cache form structurally cannot do the
-# whole job: a repositioning invalidates the deposited observables (which the cache owns) AND the
-# trajectory history a multistep scheme integrates over (which the run owns). Only here are both in
-# reach — so this is the form a caller who repositions tracers should reach for.
-function particles_modified!(sim::Simulation)
-  particles_modified!(sim.cache)
-  sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
-  return sim
-end
 
 
 """

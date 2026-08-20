@@ -82,6 +82,9 @@ and seeds one for you; a hand-assembled run constructs it here.
 # Arguments
 - `domain` — the `FixedDomain` the run lives on; it sizes every slot.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
+- `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
+  including the current one. A one-step scheme needs 1 and stores no history; an
+  `order`-step scheme needs `order`.
 - `particle_velocities = nothing` — the tracer set's own point-value storage, passed when the run
   advects tracers. Pass `tracers.particle_velocities`: the slot **is** that array, so the tracer
   advance writes the values and the cache only records which epochs they belong to.
@@ -109,6 +112,11 @@ depends on.
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
+- `particle_velocity_history` — the earlier Lagrangian samples, most recent first, and
+  `sample_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
+  multistep trajectory scheme integrates over these, which is why they are deposited observables
+  here rather than private scheme scratch: they are measurements of the state along the trajectory,
+  and an announced reposition must invalidate them the same way it invalidates the current sample.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two epochs, against
@@ -127,6 +135,13 @@ mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   const vorticity_physical::PV
   const scalar_physical::PS
   const particle_velocities::TS
+  # The earlier samples of the SAME observable, most recent first, with the step sizes they span.
+  # They live here, with the slot they extend, so that `particles_modified!` — which owns the epoch —
+  # can invalidate the whole history in one place. Held apart from the current slot rather than as a
+  # ring including it, because the current slot is the tracer set's own storage, written in place.
+  const particle_velocity_history::Vector{TS}
+  const sample_steps::Vector{Float64}
+  history_filled::Int
   velocity_epoch::Int
   vorticity_epoch::Int
   scalar_epoch::Int
@@ -138,16 +153,20 @@ mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   particles_epoch::Int
 end
 
-function ObservablesCache(domain::FixedDomain; scalar::Bool = false, particle_velocities = nothing)
+function ObservablesCache(domain::FixedDomain; scalar::Bool = false, particle_velocities = nothing,
+                          history_depth::Integer = 1)
   velocity = new_vector_field_physical(domain)
   # The speed slot takes the field's own element type, read off the velocity slot beside it: a
   # hardwired `Float64` promoted a Float32 run's timestep arithmetic and broke the element-type
   # contract the rest of the observables surface keeps. `NaN` in that type is the never-deposited
   # value, matching the epoch sentinel next to it.
   T = real(eltype(field_data(velocity)))
+  # `history_depth` past samples beyond the current one. A one-step scheme asks for 1 and gets none.
+  past = particle_velocities === nothing ? typeof(particle_velocities)[] :
+         [deepcopy(particle_velocities) for _ in 1:max(history_depth - 1, 0)]
   return ObservablesCache(velocity, new_vector_field_physical(domain),
                           scalar ? new_scalar_field_physical(domain) : nothing,
-                          particle_velocities,
+                          particle_velocities, past, zeros(Float64, length(past)), 0,
                           NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
                           T(NaN), NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
 end
@@ -334,6 +353,9 @@ Returns `cache`.
 fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
+# Invalidating the sample history is the whole reason it lives in this cache: the samples in it were
+# taken along the trajectory that has just been abandoned, and a multistep scheme integrating over
+# them would blend the old path into the new one.
 """
     particles_modified!(cache)
     particles_modified!(sim)
@@ -366,9 +388,16 @@ alone leaves the slot stale, and a read of it throws.
 
 Returns `cache`.
 """
-function particles_modified! end
+particles_modified!(cache::ObservablesCache) =
+  (advance_particles_epoch!(cache); cache.history_filled = 0; cache)
 
-particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
+
+# The run's OWN tracer advance, which is not an out-of-band change and must not clear the sample
+# history: the samples it just took are exactly what a multistep scheme integrates over next. The two
+# were one verb until the history moved into this cache, at which point the difference stopped being
+# cosmetic — the routine path was clearing the history on every step and the multistep scheme could
+# never leave its bootstrap.
+advance_particles_epoch!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
 
 end # module Cache

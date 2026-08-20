@@ -53,6 +53,7 @@ velocity, and the next iteration's `advect!` reads it back as the first half of 
 record_particle_velocities!
 advect!
 restart!
+history_depth
 interpolate_at_particles!
 ```
 

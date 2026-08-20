@@ -154,12 +154,24 @@ end
   @testset "the history fills and the scheme takes over" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
                      trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
+    # The sample history is the cache's: it holds earlier values of a deposited observable, so an
+    # announced reposition invalidates it where the epoch lives rather than in the scheme's registers.
     @test sim.particle_buffers isa MultistepBuffers
-    @test sim.particle_buffers.filled == 0            # nothing recorded before the first step
+    @test sim.cache.history_filled == 0               # nothing recorded before the first step
     advance!(sim)
-    @test sim.particle_buffers.filled == 1            # still starting up
+    @test sim.cache.history_filled == 1               # still starting up
     for _ in 1:4; advance!(sim); end
-    @test sim.particle_buffers.filled == 3            # history full: AB4 from here on
+    @test sim.cache.history_filled == 3               # history full: AB4 from here on
+
+    # The run's own advance must NOT be read as an out-of-band reposition: it announces the tracer
+    # push every step, and clearing the history there would pin the scheme in its bootstrap forever.
+    advance!(sim)
+    @test sim.cache.history_filled == 3
+
+    # An announced reposition does clear it, through the cache that owns both the epoch and the
+    # samples — no second call, and no reference from the cache to the scheme's registers.
+    particles_modified!(sim.cache)
+    @test sim.cache.history_filled == 0
     @test all(isfinite, particle_positions(sim.tracers))
   end
 
