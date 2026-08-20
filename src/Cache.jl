@@ -261,7 +261,14 @@ tracers.
 function particle_velocities(cache::ObservablesCache)
   cache.particle_velocities === nothing &&
     throw(ArgumentError("this run advects no tracers, so the cache has no particle-velocities slot"))
-  cache.sample_fields_epoch == cache.fields_epoch ||
+  # BOTH epochs, because the sample is a function of the state AND the positions — which is the whole
+  # reason the cache keeps two counters for this one slot. Testing only the fields epoch left the
+  # announced reposition, the very mutation the pair exists to catch, invisible to the read:
+  # `particles_modified!` advances the particles epoch and touches nothing else, so a sample measured
+  # along an abandoned trajectory was served as current, and `advance!`'s opening guard could never
+  # fire. `check_deposits` had the test right; this read did not.
+  (cache.sample_fields_epoch == cache.fields_epoch &&
+   cache.sample_particles_epoch == cache.particles_epoch) ||
     error("the cached particle velocities are stale: the state or the tracer positions have advanced " *
           "past the deposited values, and nothing in the cache is ever recomputed; read " *
           "between iterations, after the closing deposit")

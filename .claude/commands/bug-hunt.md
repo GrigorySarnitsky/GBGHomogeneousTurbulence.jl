@@ -175,6 +175,14 @@ python3 .claude/commands/bug-hunt/closure.py        # exit 0 = closed; non-zero 
   again the moment the bug returns in a different form.
 - **Never weaken an assertion until it fails.** That proves persistence, not a defect. If the witness
   passes, the verdict is NOT-REPRODUCED and the candidate dies.
+- **Witness filenames collide across rounds** — every round starts its numbering at `01-<lane>-01`,
+  so a bulk copy into `test/regressions/` silently OVERWRITES an earlier round's regression test with
+  a new, still-failing one. The earlier test is then gone and the suite fails for a reason that looks
+  like the new fix. Promote by explicit path, never `cp witnesses/*.jl`, and prefix the round.
+- **Promote a witness only AFTER its fix lands.** A witness is a *failing* program until then, so
+  copying the whole directory into `test/regressions/` at the end of a round drags every still-open
+  finding into the suite and turns it red — which looks like a broken fix and is really a broken
+  promotion. Promote per finding, as each one closes.
 - **A witness must locate files with `pkgdir`**, never by counting `..` hops. It is authored under
   `.claude/bug-hunt/witnesses/` and *promoted* into `test/regressions/`, so a path counted from its
   original depth resolves outside the repository the moment it moves — and the failure lands in the
