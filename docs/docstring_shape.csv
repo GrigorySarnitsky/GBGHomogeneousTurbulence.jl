@@ -4,7 +4,7 @@ Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothi
 Cache.jl::deposit_sample!(cache),75,0,141
 Cache.jl::fields_modified!(cache),57,0,108
 Cache.jl::particle_velocities(cache),87,0,88
-Cache.jl::particles_modified!(cache),76,1,250
+Cache.jl::particles_modified!(cache),76,0,226
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
@@ -28,7 +28,7 @@ Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,537
 Generator.jl::finalize!(generator， state， domain),77,0,80
 Generator.jl::prepare!(generator， state， domain， dt),84,0,88
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
-Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain),121,1,335
+Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,121,1,415
 Generator.jl::velocity_integrating_factor(generator， τ),129,0,210
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,407
 Observables.jl::Observables,162,0,273

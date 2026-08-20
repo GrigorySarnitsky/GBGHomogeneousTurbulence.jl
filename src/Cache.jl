@@ -365,16 +365,10 @@ correction, any direct write to the tracer storage) — the particle counterpart
 [`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
 trajectory-bound observable is stale and reads throw until the next deposit.
 
-**Prefer the `sim` form.** A repositioning invalidates two things, and a cache can only reach one of
-them: the deposited observables, which this stamps stale, and the *trajectory history* a multistep
-scheme integrates over, which lives in the run's own buffers. Given a `Simulation` this restarts that
-history too; given a bare cache it cannot, so a multistep scheme would keep blending Lagrangian
-samples taken along the path that was just abandoned.
-
-!!! warning "A bare cache cannot restart a multistep history"
-    `particles_modified!(cache)` stamps the epoch and nothing else. If you drive the loop by hand
-    with a multistep trajectory scheme, you must also restart its buffers yourself — pass the
-    `Simulation`, or call `restart!` on the scheme and its buffers.
+It also discards the Lagrangian **sample history** this cache carries, so a multistep trajectory
+scheme starts over from the new positions rather than integrating across the abandoned path. That is
+why the history lives here and not in the scheme's own registers: the object that owns the epoch owns
+the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
@@ -386,7 +380,11 @@ this, then
 write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
 alone leaves the slot stale, and a read of it throws.
 
-Returns `cache`.
+Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
+to that run's cache — the form to reach for when a run is what you are holding, mirroring
+[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)'s two forms.
+
+Returns its argument.
 """
 particles_modified!(cache::ObservablesCache) =
   (advance_particles_epoch!(cache); cache.history_filled = 0; cache)

@@ -215,7 +215,11 @@ struct EndpointHeun <: AbstractParticleIntegrator end
 # pass folds that endpoint back to 0, which is the same point of the periodic box.
 function _wrap!(X, L)
   X .= mod.(X, L)
-  X .= ifelse.(X .< L, X, zero(eltype(X)))
+  # Fold ONLY the excluded endpoint. An `X .< L` test would also catch NaN and Inf — for which `<` is
+  # false — and quietly rewrite them to 0.0, turning a diverged trajectory into tidy in-box positions
+  # and destroying the one signal that a run has blown up. `mod` cannot return anything above `L`, so
+  # equality is the whole of the correction.
+  X .= ifelse.(X .== L, zero(eltype(X)), X)
   return X
 end
 
@@ -377,6 +381,12 @@ end
 
 
 function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache) where {K}
+  # The history is the cache's, so a cache built for a shallower scheme would leave this one reading
+  # fewer past samples than its order claims — a silently lower-order integration.
+  length(cache.particle_velocity_history) >= K - 1 ||
+    throw(ArgumentError("this cache carries $(length(cache.particle_velocity_history)) past " *
+                        "sample(s), but `AdamsBashforth(order = $K)` integrates over $(K - 1); " *
+                        "build the cache with `history_depth = $K`"))
   return MultistepBuffers(cache, allocate_buffers(EndpointHeun(), tracers),
                           zeros(Float64, K), zeros(Float64, K))
 end

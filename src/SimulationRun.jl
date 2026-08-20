@@ -37,7 +37,8 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
-using ..Cache: ObservablesCache, particles_modified!, check_deposits, deposit_sample!, advance_particles_epoch!,
+import ..Cache: particles_modified!
+using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_particles_epoch!,
                velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
@@ -444,6 +445,11 @@ function advance!(sim::Simulation; dt = nothing)
   sim.clock.step += 1
   return sim
 end
+
+
+# Pure forwarding: the cache does the whole job, including discarding the sample history it owns.
+# This exists so a caller holding a run need not reach through it to announce a reposition.
+particles_modified!(sim::Simulation) = (particles_modified!(sim.cache); sim)
 
 
 

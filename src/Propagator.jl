@@ -294,7 +294,8 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
         φ = take_scalar!(cache)
         to_physical!(φ, φ̂, domain.scalar_plans, sb.nonlinear)                          # φ at the stage state
       end
-      scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, φ, domain)                   # N̂_φ (N̂_u already banked)
+      scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, φ, domain;                   # N̂_φ (N̂_u already banked)
+                  displaced_velocity_current = true)
     end
 
     if i == 1
@@ -382,7 +383,8 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   has_scalar && take_velocity!(cache)
   velocity_rhs!(buffers.stage1, generator, û, u, ω, domain)                      # N̂_u,1
   if has_scalar
-    scalar_rhs!(sb.stage1, generator, û, φ̂, u, scalar_physical(cache), domain)  # N̂_φ,1
+    scalar_rhs!(sb.stage1, generator, û, φ̂, u, scalar_physical(cache), domain;  # N̂_φ,1
+                displaced_velocity_current = true)
   end
 
   # Predictors û*, φ̂*, and the corrector's integrating-factor rotations banked in the same visit.
@@ -410,7 +412,8 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   if has_scalar
     φ_star = take_scalar!(cache)
     to_physical!(φ_star, sb.predictor_spectral, domain.scalar_plans, sb.stage2)
-    scalar_rhs!(sb.stage2, generator, buffers.velocity_predictor_spectral, sb.predictor_spectral, u_star, φ_star, domain)  # N̂_φ,2
+    scalar_rhs!(sb.stage2, generator, buffers.velocity_predictor_spectral, sb.predictor_spectral,   # N̂_φ,2
+                u_star, φ_star, domain; displaced_velocity_current = true)
   end
 
   # velocity update: ûₙ₊₁ = E_ν ûₙ + (Δt/2)(E_ν N̂_u,1 + N̂_u,2) — both rotated halves already banked

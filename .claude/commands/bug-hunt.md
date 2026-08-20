@@ -139,6 +139,11 @@ julia --project -e 'using Pkg; Pkg.test()'
   again the moment the bug returns in a different form.
 - **Never weaken an assertion until it fails.** That proves persistence, not a defect. If the witness
   passes, the verdict is NOT-REPRODUCED and the candidate dies.
+- **A witness must locate files with `pkgdir`**, never by counting `..` hops. It is authored under
+  `.claude/bug-hunt/witnesses/` and *promoted* into `test/regressions/`, so a path counted from its
+  original depth resolves outside the repository the moment it moves — and the failure lands in the
+  suite, not in the gate. Walking up to the first `Project.toml` is *also* wrong: `test/` carries one
+  of its own, so the walk stops a level early.
 - **A broken witness is evidence of nothing** — in *either* direction. `witnesses.jl` reports BROKEN
   separately from FAIL for exactly this reason: counting a load error as a proven bug is how a phantom
   gets promoted.

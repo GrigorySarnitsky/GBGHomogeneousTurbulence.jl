@@ -459,7 +459,8 @@ scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
 
 
 """
-    scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain)
+    scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain;
+                displaced_velocity_current = false)
 
 Assemble the explicit right-hand side of the passive-scalar equation into `N̂` — the dealiased
 advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
@@ -487,6 +488,13 @@ velocity evaluation rebuilds it from `û` instead) — before the spherical trun
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
+Pass `displaced_velocity_current = true` only if nothing has changed since this generator's
+`velocity_rhs!` was called on the same `û` — which a time-stepping scheme knows because it evaluates
+both right-hand sides at one stage before updating either field, and a hand-written caller generally
+does not. It permits the displaced-velocity reuse above; the default rebuilds instead, at the cost of one
+shift and three inverse transforms, and is what makes an unpaired call correct rather than quietly
+wrong.
+
 Returns `N̂`.
 
 !!! note "The assembly consumes the velocity argument"
@@ -497,14 +505,18 @@ Returns `N̂`.
     named for it. Only the spectral
     product scratch remains on
     the generator, and the operation allocates nothing.
+
 """
-scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain) =
-  (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain);
+scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain;
+            displaced_velocity_current::Bool = false) =
+  (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain,
+                      displaced_velocity_current);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, domain))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
 # sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.
-function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain)
+function _scalar_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain,
+                            displaced_velocity_current::Bool = false)
   _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, generator.product_spectral, domain.dealias, -1)
   return nonlinear
 end
@@ -514,7 +526,8 @@ end
 # both inside its divergence, the displaced term picks the truncation up through the composed
 # shift-back∘truncation kernel and the sign through the averaging α — so no whole-field truncation
 # pass remains.
-function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain)
+function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain,
+                            displaced_velocity_current::Bool = false)
   phase_shift = generator.phase_shift
   product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
@@ -522,7 +535,12 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_cons
   # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
   # Lamb consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
   # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
-  if generator.displaced_velocity_source !== û
+  # The reuse needs BOTH: the caller's assurance that no field has changed since `velocity_rhs!`
+  # (only a scheme evaluating both right-hand sides at one stage can give it), and a matching `û`.
+  # Identity alone is not enough — these containers are written in place, so the same object holds a
+  # different stage's velocity a moment later and `===` cannot tell the two apart. Defaulting to the
+  # rebuild makes a hand-run pairing correct rather than quietly wrong.
+  if !(displaced_velocity_current && generator.displaced_velocity_source === û)
     convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
     to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
   end
@@ -543,8 +561,14 @@ end
 function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_spectral,
                                   kernel = nothing, α = 1)
   _scalar_flux!(product_spectral, u, φ, domain)
-  kernel === nothing ? divergence!(out, product_spectral, domain.multipliers) :
-                       divergence!(out, product_spectral, domain.multipliers, kernel, α, 0)
+  if kernel === nothing
+    # No kernel to fold `α` into, so it is applied here. Dropping it — as this branch did — silently
+    # returned +∇·(uφ) to a caller who asked for the −∇· the scalar equation needs.
+    divergence!(out, product_spectral, domain.multipliers)
+    isone(α) || (field_data(out) .*= α)
+  else
+    divergence!(out, product_spectral, domain.multipliers, kernel, α, 0)
+  end
   return out
 end
 

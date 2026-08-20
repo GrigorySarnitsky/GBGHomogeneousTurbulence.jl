@@ -9,8 +9,10 @@
 #     plus a per-forcing DELTA table and a tracer DELTA, and an exhaustive sweep over the whole
 #     product (~360 combinations) asserts measured = base + deltas, cell by cell. Adding or removing
 #     a buffer anywhere fails the suite: a footprint change must be a conscious, recorded decision,
-#     never a drive-by. (The particle-scheme axis has one point today — the Heun scheme — so it
-#     enters as on/off; precision, backend, and the interpolation scheme change bytes, never counts.)
+#     never a drive-by. (The particle-scheme axis carries two points: `EndpointHeun`, which enters as
+#     on/off, and `AdamsBashforth{K}`, whose sample history adds K−1 (M, 3) arrays — priced below,
+#     since they scale with the ORDER and not with the grid; precision, backend, and the
+#     interpolation scheme change bytes, never counts.)
 #
 #  2. THE FRAME LEDGER — the same walk over what a run does NOT evolve: the read-only `FixedDomain`
 #     and its per-mode symbols. This storage sat outside every ledger until 2026-07-30 and is not
@@ -329,6 +331,30 @@ const EPISODE_UNITS = [
     @test length(_m_arrays(tracers)) + length(_m_arrays(buffers)) == 4
     # And no scheme register hides in the state.
     @test isempty(intersect((:predictor, :predictor_points, :velocity_predictor), fieldnames(Tracers)))
+  end
+
+  # The multistep scheme's extra storage is its SAMPLE HISTORY, and the history is a deposited
+  # observable — so it is priced on the cache, not on the scheme's registers, and it scales with the
+  # order rather than with the grid. Nothing else about the scheme costs storage: its weight solve
+  # works in two `order`-element host vectors and its bootstrap reuses the one-step registers.
+  @testset "the multistep trajectory scheme prices its history, and nothing else" begin
+    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
+                         array_type = Array, dealiasing = TwoThirds())
+    tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom)
+    m_arrays(owner) = (acc = AbstractArray[];
+                       collect_field_arrays!(acc, owner, Set{UInt}(), 2);
+                       [a for a in acc if size(a) == (4, 3)])
+    for K in (1, 2, 4, 8)
+      cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+                               history_depth = K)
+      buffers = allocate_buffers(AdamsBashforth(order = K), tracers, cache)
+      @test length(cache.particle_velocity_history) == K - 1     # the whole of the order's cost
+      # The scheme's OWN registers are the bootstrap pair and nothing else. Walked from `buffers`
+      # the count would be one higher, because the buffers now reach the cache holding the history —
+      # which is the point of the refactor, and is priced on the line above, not here.
+      @test length(m_arrays(buffers.startup)) == 2
+      @test length(cache.sample_steps) == K - 1                  # host scalars, one per past sample
+    end
   end
 
   @testset "op lists name real registers" begin
