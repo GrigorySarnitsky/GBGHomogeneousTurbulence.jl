@@ -190,6 +190,20 @@ the solver has just produced, so it needs nothing from inside the field scheme's
 
 It needs one set of predicted positions and the velocity interpolated there
 ([`ParticleIntegratorBuffers`](@ref)); the formula is given with [`advect!`](@ref).
+
+!!! note "Pair it with the default interpolant unless the grid is coarse"
+    Under the advective-CFL loop ``\\Delta t \\propto \\Delta x``, so this scheme's error falls as
+    ``\\Delta x^{2}`` while a degree-``d`` interpolant's trajectory floor falls as
+    ``\\Delta x^{d+1}``. For the default
+    [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) (degree 2)
+    the floor therefore falls *faster* than the time error, and the two cross over: measured on a
+    band-limited field, interpolation dominates at ``N = 16{-}32`` and the time error dominates from
+    ``N \\approx 64`` on (at ``N = 128``, floor ``1\\times10^{-5}`` against time error
+    ``6\\times10^{-5}``). So at production resolutions `CatmullRom` is not what limits a Heun
+    trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
+    below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
+    more than an order of magnitude. What governs this in a run is how well the grid resolves the
+    dissipation scale, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``.
 """
 struct EndpointHeun <: AbstractParticleIntegrator end
 
