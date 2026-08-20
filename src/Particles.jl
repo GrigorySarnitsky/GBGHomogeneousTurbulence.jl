@@ -234,47 +234,44 @@ end
 """
     AdamsBashforth(; order = 4)
 
-Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
-its default order — buying accuracy in time at **no extra field evaluation and no extra
-interpolation** per step.
+Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at its
+default order — buying accuracy in time at **no extra field evaluation and no extra interpolation**
+per step.
 
-Use it in place of [`EndpointHeun`](@ref) when trajectory accuracy in time is the limit on a
-measurement. Heun buys its second order by interpolating a second time, at predicted positions;
-Adams–Bashforth instead reuses the Lagrangian samples the run has *already* deposited at previous
-instants, so raising the order costs storage rather than work. That is the whole reason a multistep
-method suits this architecture: the trajectory right-hand side
-``\\\\boldsymbol{u}(t_n, \\\\boldsymbol{X}(t_n))`` is a deposited observable, produced every iteration
-whether or not a scheme wants it.
+Use it in place of [`EndpointHeun`](@ref) when trajectory accuracy in time limits a measurement. Heun
+buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
+reuses the Lagrangian samples the run has already deposited at earlier instants. The trade is one
+stored array per extra order against one interpolation per step.
 
-The steps are **not** assumed uniform. The run layer's advective-CFL loop changes ``\\\\Delta t``
-every iteration, which classical fixed-step Adams–Bashforth coefficients would silently get wrong,
-so the coefficients are recomputed each step from the actual step history — the integral over
-``[t_n, t_{n+1}]`` of the Lagrange polynomial through the stored samples. That is
-``\\\\mathcal{O}(\\\\texttt{order}^2)`` host arithmetic once per step, independent of the tracer count.
+The steps are **not** assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
+which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each
+step from the actual step history. That is ``\\mathcal{O}(\\texttt{order}^2)`` host arithmetic per
+step, independent of the tracer count.
 
-Since a multistep method has no history at ``t_0``, the first `order - 1` steps are taken with
-`EndpointHeun` and the scheme then switches over; the same restart happens if the tracer set is
-reseeded.
-
-That startup is what bounds the accuracy actually achieved, and the bound is worth stating plainly.
-The multistep formula itself is `order`-accurate, but a fixed number of second-order starting steps
-leaves a fixed error behind, so over a fixed integration window `order = 4` converges at about third
-order rather than fourth — measured on a smooth non-autonomous test problem, ``2.0`` for the
-two-step method against ``3.0`` for the four-step one. What it does buy at equal step count is
-size: on that problem the four-step method's error is ``\\approx 50\\times`` smaller. A
-higher-order start is not available here, because it would need the velocity field at instants
-between the endpoints and the solver produces only the endpoints.
+A multistep method has no history at ``t_0``, so the first `order - 1` steps are taken with
+`EndpointHeun` and the scheme then switches over; the same restart happens if the tracers are
+reseeded. Those second-order starting steps leave a fixed error behind, so over a fixed window
+`order = 4` converges at about third order rather than fourth — on a smooth test problem, ``3.0``
+against ``2.0`` for the two-step method, with an error some fifty times smaller at equal step count.
+A higher-order start would need the velocity between the step endpoints, which the solver does not
+produce.
 
 # Arguments
-- `order = 4` — the number of past samples used, and the order reached once the history fills.
-  `order = 1` is forward Euler, `2` the Adams–Bashforth two-step method, `4` TurTLE's default.
+- `order = 4` — how many past samples are used. `1` is forward Euler, `2` the two-step method, `4`
+  TurTLE's default.
 
-!!! warning "Time order is not trajectory order"
-    A trajectory's accuracy is limited by the interpolation as well as the time integration, and the
-    default [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is
-    only ``C^1``. Raising the time order past the interpolation's pays for nothing: pair a high
-    `order` with a correspondingly smooth `interpolation_scheme` on the [`Tracers`](@ref), or the
-    spatial error simply dominates.
+!!! warning "The interpolant sets a floor no timestep can cross"
+    Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
+    shrink with ``\\Delta t``: for a perturbation ``\\epsilon`` and Lipschitz constant ``L``, Grönwall
+    bounds the trajectory error by ``\\epsilon(\\mathrm{e}^{LT} - 1)/L`` however the time integration
+    is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
+
+    The floor is set by the interpolant's **polynomial reproduction degree**, not its smoothness
+    class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying
+    the smoothness at fixed degree left the time convergence unchanged. Raise the degree when the
+    floor is what limits you; smoothness buys something different, namely readouts that
+    *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
+    [doi:10.1016/j.jcp.2010.04.006](https://doi.org/10.1016/j.jcp.2010.04.006)).
 
 Reference: Adams–Bashforth applied to Lagrangian tracers as in TurTLE (Lalescu et al. 2022,
 *TurTLE: a fast and scalable code for turbulence*, *Comput. Phys. Commun.* **278**, 108406,

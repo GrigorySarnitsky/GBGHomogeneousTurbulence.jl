@@ -1832,30 +1832,28 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 ---
 
 57. **(2026-08, user-requested) A second trajectory scheme: variable-step Adams–Bashforth.** The
-    Lagrangian right-hand side ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is a *deposited
-    observable* — every iteration produces it whether or not a scheme wants it — so a multistep
-    method buys order out of storage the run already fills, at no extra field evaluation and no
-    extra interpolation. `EndpointHeun` instead pays one interpolation per step, at the predicted
-    positions, to reach second order. This is the same reasoning TurTLE follows for its tracers
-    (Adams–Bashforth, orders 1–5, default 4).
+    Lagrangian right-hand side is a *deposited observable* — every iteration produces it whether or
+    not a scheme wants it — so a multistep method buys order out of storage the run already fills, at
+    no extra field evaluation and no extra interpolation, where `EndpointHeun` pays one interpolation
+    per step. Same reasoning as TurTLE's tracers (Adams–Bashforth, orders 1–5, default 4).
 
-    Two departures from the reference were forced by this package's own design. **The steps are not
-    uniform**: the advective-CFL loop changes ``\Delta t`` every iteration, which classical
-    fixed-step coefficients would silently get wrong, so the weights are recomputed each step as the
-    integral over ``[t_n, t_{n+1}]`` of the Lagrange polynomial through the stored sample times —
-    ``\mathcal{O}(k^2)`` host arithmetic per step, independent of the tracer count, and verified to
-    reduce to the classical constants at uniform step. **The startup bounds the order**: TurTLE ramps
-    AB1→AB4, but AB1 is Euler and its first step alone caps the global rate near 2; measured on a
-    smooth test problem the ramp gave ``\approx 2.0`` against ``\approx 3.0`` for an `EndpointHeun`
-    bootstrap, so the bootstrap is what shipped. Fourth order over a fixed window would need a
-    starting method of matching order, which is unavailable here: it would want the velocity field
-    between the step endpoints, and the solver produces only the endpoints.
+    Two departures, both forced here. **Steps are not uniform** — the advective-CFL loop changes
+    ``\Delta t`` every iteration, so the weights are recomputed per step as the integral of the
+    Lagrange polynomial through the stored sample times, verified to reduce to the classical
+    constants at uniform step. **The startup bounds the order** — TurTLE ramps AB1→AB4, but AB1 is
+    Euler and measurement gave ``\approx 2.0`` for the ramp against ``\approx 3.0`` for an
+    `EndpointHeun` bootstrap, so the bootstrap shipped. Fourth order over a fixed window would need a
+    start of matching order, unavailable because it wants the velocity between step endpoints.
 
-    What the scheme therefore claims is what was measured — about third-order convergence at
-    `order = 4`, and roughly a fifty-fold smaller error than the two-step method at equal step
-    count — and the docstring says so rather than quoting the formula's asymptotic order. It also
-    records that raising the time order past the interpolation's smoothness buys nothing, since the
-    default `CatmullRom` is only ``C^1``.
+    **The interpolation caveat was corrected the same day**, having first read "raising the time order
+    past the interpolation's *smoothness* buys nothing." That misattributes the mechanism. The
+    interpolant perturbs the field by a ``\Delta t``-independent ``\epsilon``, so Grönwall gives a
+    trajectory-error floor no timestep can cross — and the floor is set by the interpolant's
+    **reproduction degree**, not its smoothness. Measured on a frozen ABC flow at ``64^3``, ``T = 1``:
+    `CatmullRom` (``C^1``, degree 2) floors at ``1.2\times10^{-5}``; `LalescuSpline(3, 1)` (same
+    ``C^1``, degree 3) at ``2.6\times10^{-7}``; `LagrangeSpline(3)` (``C^0``, degree 7) at
+    ``1.2\times10^{-11}``. At fixed degree 7, ``C^0`` and ``C^3`` gave identical time convergence, so
+    smoothness caps nothing here — it earns its keep in readouts that *differentiate* the interpolant.
 
 ## References
 
@@ -1898,6 +1896,14 @@ cites.
   sets ``\nu`` in the run layer's grid mode.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). Implementation of high order spline interpolations
+  for tracking test particles in discretized fields. *J. Comput. Phys.* **229**(17), 5862–5869.
+  <https://doi.org/10.1016/j.jcp.2010.04.006> *(The interpolation family `LalescuSpline` implements,
+  and the source for choosing interpolation order in particle tracking — decision 57's floor.)*
+- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). An efficient particle tracking
+  algorithm for large-scale parallel pseudo-spectral simulations of turbulence. *Comput. Phys.
+  Commun.* **278**, 108406. <https://doi.org/10.1016/j.cpc.2022.108406> *(TurTLE; the
+  Adams–Bashforth tracer integration `AdamsBashforth` follows, decision 57.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
   Molecular dynamics with coupling to an external bath. *J. Chem. Phys.* **81**, 3684–3690.
   <https://doi.org/10.1063/1.448118> *(The thermostat whose deterministic-rescaling limit

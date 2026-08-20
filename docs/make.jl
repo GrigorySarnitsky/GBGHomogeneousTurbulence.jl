@@ -1,10 +1,26 @@
 # Render the design-rationale doc into the site without moving it: docs/ARCHITECTURE.md stays the
-# single source (referenced by CLAUDE.md), copied into src/architecture.md at build time. The copy
-# (src/architecture.md) is gitignored.
+# single source (referenced by CLAUDE.md), copied into src/ at build time. The copies are gitignored.
+#
+# It is SPLIT at the decision log rather than copied whole. §11 is append-only by construction — it
+# grows by one entry per recorded decision and never shrinks — and in 2026-08 the combined page
+# reached 199.7 KiB against Documenter's 200 KiB `size_threshold`, so the next decision would have
+# failed the build. Raising the threshold would have deferred that by a few entries; splitting puts
+# the unbounded half on its own page, where its growth costs nothing. The source file stays one
+# document, which is what CLAUDE.md points at and what a reader edits.
+const DECISION_LOG_HEADING = "## 11. Decision log"
+
 function copy_rationale_pages()
-  for name in ("ARCHITECTURE.md",)
-    cp(joinpath(@__DIR__, name), joinpath(@__DIR__, "src", lowercase(name)); force = true)
-  end
+  text = read(joinpath(@__DIR__, "ARCHITECTURE.md"), String)
+  cut = findfirst(DECISION_LOG_HEADING, text)
+  cut === nothing && error("ARCHITECTURE.md: cannot find \"$DECISION_LOG_HEADING\" to split on")
+  body, log = text[1:prevind(text, first(cut))], text[first(cut):end]
+  write(joinpath(@__DIR__, "src", "architecture.md"),
+        body * "\n## 11. Decision log\n\nThe decision log lives on its own page: " *
+        "[Decision log](decisions.md).\n")
+  write(joinpath(@__DIR__, "src", "decisions.md"),
+        "# Decision log\n\nThe recorded design decisions of the package, append-only and dated. " *
+        "The rest of the rationale is on the [Architecture](architecture.md) page.\n\n" *
+        replace(log, DECISION_LOG_HEADING => ""; count = 1))
 end
 
 # The rendered-doc source set the lints scan: every src/*.jl docstring, ARCHITECTURE.md, and every
@@ -15,7 +31,7 @@ function _doc_lint_sources()
     endswith(f, ".jl") && push!(sources, f)
   end
   push!(sources, joinpath(@__DIR__, "ARCHITECTURE.md"))
-  generated = Set(["architecture.md"])
+  generated = Set(["architecture.md", "decisions.md"])
   for (root, _, files) in walkdir(joinpath(@__DIR__, "src")), f in files
     endswith(f, ".md") && !(f in generated) && push!(sources, joinpath(root, f))
   end
@@ -264,6 +280,7 @@ makedocs(
     ],
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",
+      "Decision log"   => "decisions.md",
       "Observables cache" => "observables_cache.md",
     ],
   ],
