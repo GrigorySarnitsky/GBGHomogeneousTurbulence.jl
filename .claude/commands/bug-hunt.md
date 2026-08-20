@@ -53,11 +53,23 @@ Memory is not evidence and is not accepted as any part of the chain.
 
 ## The lanes
 
-Eight, each a lens rather than a region, because a defect class is what an agent can hold in its head —
-a file is not.
+Ten: **two free** and **eight by class**. The split matters more than the classes do.
+
+The eight class lanes are cut by defect class rather than by file, because a class is what an agent
+can hold in its head and a file is not — a per-file split makes every cross-module defect invisible
+to everyone at once.
+
+But a list of classes is a *hypothesis about where bugs live*, and a defect outside all eight is
+invisible to all eight **by construction**, with the run still reporting `complete: true`. That is the
+"never narrow a reviewer's brief" failure, rebuilt one level down. So two lanes get **no class list at
+all** — only a starting point, so that two free readers do not open the same file first. Their brief
+is to find what is wrong with the code, and they are told in as many words that if they catch
+themselves working a checklist they should go back to reading.
 
 | Lane | Hunts |
 |------|-------|
+| `free-hot-path` | **no class list.** Reads one complete iteration end to end from `advance!`, following every call into whatever module it lands in |
+| `free-modules` | **no class list.** Picks the two or three files it judges most likely to be wrong and reads them whole |
 | `aliasing-and-mutation` | shared buffers, a caller's array written without contract, a missing (or gratuitous) copy, `!` functions writing a non-leading argument |
 | `numerics-and-types` | `Float32`/`Float64` genericity, untyped literals promoting, a normalization applied twice or never, a tolerance that is absolute where it must be relative, division by a possible zero |
 | `api-contracts` | calls whose correctness rests on a Base or PF/SS semantic detail — always filed `api-semantics`, never trusted from memory |
@@ -75,11 +87,20 @@ is this lane's whole thesis.
 
 ## Cost mode
 
-**Economy is the default**, and the asymmetry is deliberate and different from the doc instruments':
-the **hunt lanes** run cheap (Sonnet), the **reproduction stage never does, in any mode**. A cheap
-hunter that invents a candidate costs one reproduction that returns NOT-REPRODUCED — self-correcting.
-A cheap reproducer that mis-runs a witness corrupts the only evidence the instrument produces, and
-nothing downstream catches it. Pass `strength: "full"` to run the lanes at session strength too.
+**Economy is the default.** The **class lanes** run cheap (Sonnet); the **two free lanes are anchors**
+and stay at session strength in every mode, exactly as `/check-consistency` anchors its two physics
+hats. The reason is the same one: a cheap lane's *false positive* is caught downstream by the
+reproducer, but its *false negative* has no verifier anywhere — a bug nobody raises is never
+reproduced — and the free lanes are both the ones doing open-ended judgement (where a cheap model is
+weakest) and the ones covering what the class list omits. Pass `strength: "full"` to lift the class
+lanes too.
+
+**On the reproduction stage.** It also runs at session strength, but the argument for that is weaker
+than it first appears and is recorded honestly here: `witnesses.jl fail` re-runs every witness
+mechanically, so a reproducer that *misreports* a result is already caught by a program. What the
+gate cannot catch is a reproducer that gives up too early (a false NOT-REPRODUCED) or one that writes
+a witness asserting the wrong thing — and the second happened twice on round 1 **at full strength**.
+If reproduction is ever economized, that is the exposure to weigh, not misreporting.
 
 ## Run it
 

@@ -89,6 +89,40 @@ const VERDICT_SCHEMA = {
   required: ['title', 'verdict', 'observed'],
 }
 
+// The free lanes' preamble. It carries the EVIDENCE discipline (which is what makes a finding
+// admissible) and deliberately carries no taxonomy: naming classes here would recreate, one level
+// down, exactly the blind spot these lanes exist to cover.
+const FREE_PREAMBLE = `You are reading the code of GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden. The rulebook is ${REPO}/CLAUDE.md; the code is ${REPO}/src; the tests are ${REPO}/test.
+
+YOUR BRIEF IS TO FIND WHAT IS WRONG WITH THIS CODE. That is the whole brief.
+
+You are deliberately given NO list of defect classes to look for. Other lanes in this panel work from
+such lists, and those lists are somebody's guess about where bugs live — so a defect that falls
+outside every one of them is invisible to every one of them, and the run still reports success. You
+are the lane that is supposed to catch what the guess missed. If you find yourself working through a
+mental checklist, stop and read the actual code again: the finding that matters is usually the one
+that has no category yet.
+
+Read the source. Follow the data. Ask, of each thing you read, what would have to be true for it to
+be correct, and then check whether it is.
+
+WHAT MAKES A FINDING ADMISSIBLE. Every candidate you raise goes to a separate agent whose only job is
+to write a program demonstrating it, and which discards anything that does not reproduce. So a
+candidate is worth raising only if you can say what call, with what input, misbehaves — and how you
+would know. Give that as the witness plan. If you cannot name one, do not raise it. One candidate you
+can specify a failing call for beats five you cannot.
+
+Classify each as "runtime" (a witness can be a failing @testset), "api-semantics" (your claim rests on
+what Base or a dependency does — say so, and the reproducer will check the official documentation
+rather than trusting memory), or "architecture" (no program can fail on it, so it needs a SECOND
+location to diff against and a stated maintenance consequence).
+
+Do not report style, naming, or documentation defects — other instruments own those.
+
+Report files_read honestly; it is cross-checked against the tree.
+
+Cap: your 6 most substantial candidates.`
+
 const HUNT_PREAMBLE = `You are hunting DEFECTS IN THE CODE of GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden.
 
 THE RULEBOOK IS ${REPO}/CLAUDE.md — read its "Core invariants" and "Style" sections first. THE CODE IS ${REPO}/src/*.jl and ${REPO}/src/phenomenology/*.jl. The tests are ${REPO}/test/*.jl and tell you what is already pinned.
@@ -109,6 +143,18 @@ Report your files_read honestly: it is cross-checked against the tree, and a lan
 
 Cap: your 6 most substantial candidates. Ranked by what would actually go wrong.`
 
+// The FREE lanes. They exist because everything below them is a list I wrote, and a list is a
+// hypothesis about where bugs live: a defect outside all eight classes is invisible to the class
+// lanes BY CONSTRUCTION, and the run would still report complete. These get no class list at all —
+// only a starting point, so that two free readers do not open the same file first. They are also the
+// lanes whose failure mode is unrecoverable (a bug nobody raises is never reproduced), which is why
+// they are the anchors that stay at full strength when the class lanes go cheap — the same asymmetry
+// /check-consistency applies to its two physics hats, and which this instrument shipped without.
+const FREE_LANES = [
+  { key: 'free-hot-path', anchor: true, brief: `Start at \`SimulationRun.advance!\` and read ONE COMPLETE ITERATION end to end, following every call into whatever module it lands in — the generator's stages, the integrator, the deposit, the tracer push. Read the code, not the docstrings, and where a docstring makes a promise, check the code keeps it.` },
+  { key: 'free-modules', anchor: true, brief: `Choose the two or three source files you judge most likely to be wrong — by size, by intricacy, by how much state they carry, by how little the suite exercises them — and READ THEM WHOLE, top to bottom. Say at the start which you chose and why.` },
+]
+
 const LANES = [
   { key: 'aliasing-and-mutation', brief: `Aliasing and unintended mutation. Which arrays are shared between owners? The observables cache borrows the tracer set's particle-velocities storage; the step takes cache slots as scratch mid-iteration; the generator forms products IN PLACE over an operand's array (\`ω_consumed\`, \`u_consumed\`). Hunt for: a caller's array mutated without that being part of the contract, two owners writing one buffer in an order that is not enforced, a \`!\` function whose non-leading argument is written, a copy that should exist and does not (or exists and need not). Trace the actual assignment sites, not the docstrings.` },
 
@@ -127,12 +173,14 @@ const LANES = [
   { key: 'test-critic', brief: `What the suite does NOT pin, which is where a regression will land. Read test/*.jl against src/*.jl and hunt for: a documented guarantee with no test (search the docstrings for claims — "never", "exactly", "always", "in place", "returns the field's own element type"); a branch no test exercises (a scheme, a dealiasing strategy, a forcing, a code path behind a keyword); a test that would pass even if the function were wrong (asserts a type but not a value, or a value that is trivially true); a property tested only at the default configuration where the constant happens to be 1. Your candidates are "this claim is unpinned and here is the call that would expose it" — those ARE witnessable.` },
 ]
 
+const ALL_LANES = [...FREE_LANES, ...LANES]
 const selected = Array.isArray(A.lanes) && A.lanes.length
-  ? LANES.filter((l, i) => A.lanes.some(x => l.key === String(x) || String(i + 1) === String(x)))
-  : LANES
-if (!selected.length) throw new Error(`lanes ${JSON.stringify(A.lanes)} matched none of: ${LANES.map(l => l.key).join(', ')}`)
+  ? ALL_LANES.filter((l, i) => A.lanes.some(x => l.key === String(x) || String(i + 1) === String(x)))
+  : ALL_LANES
+if (!selected.length) throw new Error(`lanes ${JSON.stringify(A.lanes)} matched none of: ${ALL_LANES.map(l => l.key).join(', ')}`)
 
-const cheap = STRENGTH === 'economy' ? { model: 'sonnet' } : {}
+// An anchor lane never drops to the cheap model, in any mode.
+const laneModel = (lane) => (STRENGTH === 'economy' && !lane.anchor) ? { model: 'sonnet' } : {}
 
 phase('Hunt')
 
@@ -141,14 +189,19 @@ phase('Hunt')
 const results = await pipeline(
   selected,
 
-  (lane) => agent(`${HUNT_PREAMBLE}
+  (lane) => agent(lane.anchor ? `${FREE_PREAMBLE}
+
+WHERE TO START: ${lane.brief}
+
+Return the structured object with lane="${lane.key}".` : `${HUNT_PREAMBLE}
 
 YOUR LANE: ${lane.key}
 
 ${lane.brief}
 
 Return the structured object with lane="${lane.key}".`,
-    { label: `hunt:${lane.key}`, phase: 'Hunt', schema: CANDIDATE_SCHEMA, agentType: 'general-purpose', ...cheap }),
+    { label: `hunt:${lane.key}`, phase: 'Hunt', schema: CANDIDATE_SCHEMA, agentType: 'general-purpose',
+      ...laneModel(lane) }),
 
   (found, lane) => {
     if (!found || !found.candidates || !found.candidates.length) return { lane: lane.key, verdicts: [], files_read: (found && found.files_read) || [] }
