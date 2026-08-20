@@ -261,8 +261,7 @@ tracers.
 function particle_velocities(cache::ObservablesCache)
   cache.particle_velocities === nothing &&
     throw(ArgumentError("this run advects no tracers, so the cache has no particle-velocities slot"))
-  cache.sample_fields_epoch == cache.fields_epoch &&
-    cache.sample_particles_epoch == cache.particles_epoch ||
+  cache.sample_fields_epoch == cache.fields_epoch ||
     error("the cached particle velocities are stale: the state or the tracer positions have advanced " *
           "past the deposited values, and nothing in the cache is ever recomputed; read " *
           "between iterations, after the closing deposit")

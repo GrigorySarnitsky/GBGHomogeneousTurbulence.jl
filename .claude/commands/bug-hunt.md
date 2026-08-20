@@ -109,6 +109,37 @@ Workflow({ scriptPath: ".claude/commands/bug-hunt/hunt.js",
            args: { repo: "$REPO", pile: "$REPO/.claude/bug-hunt", strength: "economy" } })
 ```
 
+## The loop — mandatory, and it is the instrument, not an epilogue
+
+**One pass is never enough, and this instrument measured why.** Round 1 confirmed 20 defects and
+fixed them all; the follow-up hunt then confirmed **9 more, two of which were regressions introduced
+by round 1's own fixes** — a `_wrap!` that turned every non-finite tracer coordinate into `0.0`, and a
+PhaseShift guard closed only halfway. Both were declared verified. Neither was.
+
+So the procedure below is a **loop**, and the closure phase **is not optional** — the same rule
+`/check-docs` and `/check-consistency` already carry, for the same stated reason: *a fix pass
+introduces its own defects.*
+
+**Convergence here is sharper than theirs.** They stop when successive rounds agree within noise,
+because a doc finding is a judgement and fresh readers always produce some. A confirmed finding here
+is **a program that fails**, so the terminator is **exactly zero**:
+
+> Re-hunt after every fix pass. The round closes when a hunt run *after* the fixes confirms **nothing
+> new**. Anything left over is either an open defect or **a decision for the user** — escalate the
+> latter by name, and never close a round by reclassifying a defect as a decision.
+
+`closure.py` enforces all of it mechanically and refuses to be optimistic: it runs the witness gate,
+checks every witness was **promoted** into `test/regressions/` (a fix whose witness never became a
+regression test protects nothing), runs the suite, and — the part that is easy to skip and was
+skipped — **requires a recorded follow-up hunt with zero new confirmed findings.** A round with no
+follow-up recorded is not closed, however green everything else looks.
+
+```bash
+python3 .claude/commands/bug-hunt/closure.py                       # audit: may this round close?
+python3 .claude/commands/bug-hunt/closure.py --record 3 confirmed=N escalated=M
+python3 .claude/commands/bug-hunt/closure.py --record 3 followup_confirmed=0   # after re-hunting
+```
+
 Then, in order:
 
 ```bash
@@ -128,6 +159,11 @@ Workflow({ scriptPath: ".claude/commands/bug-hunt/verify-fixes.js",
 
 # 5. Promote every passing witness into test/ and run the suite.
 julia --project -e 'using Pkg; Pkg.test()'
+
+# 6. RE-HUNT. Not optional. Then record the result and ask whether the round may close.
+Workflow({ scriptPath: ".claude/commands/bug-hunt/hunt.js", args: {...} })
+python3 .claude/commands/bug-hunt/closure.py --record <N> followup_confirmed=<n>
+python3 .claude/commands/bug-hunt/closure.py        # exit 0 = closed; non-zero says what blocks it
 ```
 
 ## Discipline

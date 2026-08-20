@@ -574,7 +574,13 @@ function recommended_cfl end
 
 # The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
 # corrects it for the domain's dealiasing band.
-_base_cfl(::AbstractIntegrator) = 0.3
+#
+# NO `::AbstractIntegrator` FALLBACK, matching `allocate_buffers` on the same supertype: a scheme
+# that has not declared its stability limit gets a hard error, not a number. The fallback that stood
+# here returned 0.3, which is not a conservative choice — it sits ABOVE `IFRK2`'s 0.25 — so a new
+# scheme with a tighter limit would have been handed too large a timestep silently, and 0.3 appeared
+# in no docstring or doc page a reader could check it against. A stability limit is a property of the
+# scheme, so the scheme states it or the run refuses to guess.
 _base_cfl(::IFRK2) = 0.25
 _base_cfl(::IFLowStorageRK3) = 0.5
 

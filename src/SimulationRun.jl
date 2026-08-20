@@ -49,7 +49,7 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!,
                    restart!, history_depth
-using ..Phenomenology: FlowParameters
+using ..Phenomenology: FlowParameters, taylor_reynolds
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
@@ -281,7 +281,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
     resolution = isnothing(κ_max_η) ? 2 : κ_max_η
     ν = ε^(1//3) * (resolution / max_wavenumber(domain))^(4//3)
-    reλ = (2 * kinetic_energy / 3) * sqrt(15 / (ε * ν))
+    # Through the canonical reduction, not a second spelling of it: `integral_scale` does not enter
+    # Re_λ, so any positive value serves — the measured-state bridge is what owns this formula.
+    reλ = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = ε,
+                                         rms_velocity = sqrt(2 * kinetic_energy / 3),
+                                         integral_scale = one(ν), schmidt))
     @info "Simulation: grid-resolved at κ_max·η = $(resolution)" viscosity=ν dissipation=ε Re_λ=reλ
   else
     ν = Float64(viscosity)
@@ -449,7 +453,14 @@ end
 
 # Pure forwarding: the cache does the whole job, including discarding the sample history it owns.
 # This exists so a caller holding a run need not reach through it to announce a reposition.
-particles_modified!(sim::Simulation) = (particles_modified!(sim.cache); sim)
+function particles_modified!(sim::Simulation)
+  particles_modified!(sim.cache)
+  # Dispatch the scheme's own restart rather than relying on the cache's inline clear. They coincide
+  # today only because this scheme's history IS the cache's; a scheme carrying registers of its own
+  # would need them cleared here, and `Cache` — included before `Particles` — can never reach it.
+  sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
+  return sim
+end
 
 
 

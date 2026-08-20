@@ -234,9 +234,12 @@ Call it whenever the tracer positions are changed from outside the iteration —
 hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
 trajectory that has just been abandoned, and integrating over those would blend the old path with
-the new one. A run reaches this through
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!), which announces the
-reposition to the observables cache and restarts the trajectory history in the same call.
+the new one. The `Simulation` form of
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
+after announcing the reposition to the observables cache. Its bare-cache form clears the sample
+history the cache itself holds, but cannot dispatch here — so a hand-run loop that announces to the
+cache alone must call this as well, and a scheme carrying registers beyond that history is reached
+only this way.
 
 Returns `buffers`.
 """
