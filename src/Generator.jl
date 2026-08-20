@@ -157,15 +157,23 @@ function _forcing_rate(domain::FixedDomain, forcing)
 end
 
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
-# fallback? An unresolvable lookup (an ambiguity against the fallback) can only arise from a method
-# the forcing itself added, so it answers yes.
-_overrides_rate_hook(forcing) =
-  try
-    which(set_forcing_rate!, Tuple{typeof(forcing), Any, Any, FixedDomain}) !==
-      which(set_forcing_rate!, Tuple{AbstractForcing, Any, Any, FixedDomain})
-  catch
-    true
+# fallback? The question is about the FORCING argument alone, so it is asked of the method table
+# directly. A `which` probe cannot ask it: `which` resolves a call at specific argument types, and
+# passing `Any` for the remaining parameters matches nothing when an override annotates them — so an
+# override written `set_forcing_rate!(f::MyForcing, rate::AbstractArray, …)` looked identical to no
+# override at all, and the misdeclaration this guard exists to catch became a silently unapplied
+# forcing. Enumerating the table instead is indifferent to how the other parameters are spelled.
+function _overrides_rate_hook(forcing)
+  for m in methods(set_forcing_rate!, Tuple{typeof(forcing), Vararg{Any}})
+    signature = Base.unwrap_unionall(m.sig)
+    length(signature.parameters) >= 2 || continue
+    accepted = signature.parameters[2]
+    accepted isa TypeVar && (accepted = accepted.ub)
+    accepted === AbstractForcing && continue        # the do-nothing fallback itself
+    return true
   end
+  return false
+end
 
 
 """
@@ -208,9 +216,9 @@ you.
 
 !!! note "One optimization crosses two verbs"
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
-    stage's `scalar_rhs!` to reuse, through the `displaced_velocity_fresh` flag rather than through
-    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` that finds the flag clear
-    rebuilds the displaced velocity itself, value-identically.
+    stage's `scalar_rhs!` to reuse, recorded as the identity of the `û` it was taken of rather than
+    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` handed a different `û`
+    than the recorded one rebuilds the displaced velocity itself, value-identically.
 
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
@@ -228,7 +236,7 @@ you.
   [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate), so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
-- `displaced_velocity_fresh` — whether `phase_shift.u_shifted` still holds the current stage's
+- `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds
   displaced velocity, left fresh by `velocity_rhs!` for the same stage's
   `scalar_rhs!` to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
   rebuilds the recovery itself).
@@ -239,7 +247,11 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const phase_shift::PB
   const velocity_rate::RK
   const scalar_rate::SR
-  displaced_velocity_fresh::Bool   # PhaseShift: u_shifted still holds THIS stage's displaced velocity
+  # PhaseShift: WHICH û the displaced velocity in u_shifted was built from, or `nothing` when the
+  # scratch is stale. Identity rather than a bare freshness flag, because the reuse is only valid for
+  # the very field the shift was taken of — a flag says "fresh" just as readily about a different
+  # stage's velocity, and the mismatch is silent.
+  displaced_velocity_source::Any
 end
 
 ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false) =
@@ -248,7 +260,7 @@ ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool 
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
-                    false)
+                    nothing)
 
 
 """
@@ -265,7 +277,7 @@ stages; the stage evaluations and the integrating factors then consume what it p
 `generator`.
 """
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
-  generator.displaced_velocity_fresh = false        # a new step opens with the displaced scratch stale
+  generator.displaced_velocity_source = nothing     # a new step opens with the displaced scratch stale
   conditions = generator.conditions
   prepare_forcing!(conditions.velocity_forcing, state.velocity_spectral, domain, dt)
   generator.velocity_rate === nothing ||
@@ -376,7 +388,7 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω_cons
   # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
   # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
   # deletes its re-recovery, decision 45).
-  generator.displaced_velocity_fresh = true
+  generator.displaced_velocity_source = û
   _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_spectral)
   # Shift-back, two-grid average, and truncation in ONE α/β convolve: ½·(𝔻⊙back)⊙(displaced) +
   # ½·(primary, already truncated) — the composed kernel is built once at construction.
@@ -510,11 +522,11 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_cons
   # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
   # Lamb consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
   # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
-  if !generator.displaced_velocity_fresh
+  if generator.displaced_velocity_source !== û
     convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
     to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
   end
-  generator.displaced_velocity_fresh = false        # the flux below consumes u_shifted
+  generator.displaced_velocity_source = nothing     # the flux below consumes u_shifted
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
   to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain.scalar_plans, phase_shift.scalar_copy)
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain)                # (u_s φ_s)^, formed over u_s

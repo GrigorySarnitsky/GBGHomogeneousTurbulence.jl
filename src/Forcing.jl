@@ -58,6 +58,12 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
        set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 
+# Below this, the band observable is numerically indistinguishable from an empty band and the
+# amplitude it divides would be meaningless. One named floor, because two forcings guard the SAME
+# quantity with it and two bare literals can drift apart silently.
+const _BAND_OBSERVABLE_FLOOR = 1e-12
+
+
 """
     AbstractForcing
 
@@ -302,7 +308,7 @@ end
 function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
   band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
-  band_value < 1e-12 && return field                   # nothing in the band yet (guard)
+  band_value < _BAND_OBSERVABLE_FLOOR && return field  # nothing in the band yet (guard)
   # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
   target_band = if forcing.over === :total
     total_value = factor * inner(field, field)         # the observable over the whole field
@@ -421,7 +427,8 @@ uses_linear_rate(::ConstantPower) = true
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
-  amplitude = band_observable > 1e-12 ? forcing.injection_rate / (2 * band_observable) : 0.0
+  amplitude = band_observable > _BAND_OBSERVABLE_FLOOR ?
+              forcing.injection_rate / (2 * band_observable) : 0.0
   rate .= T(amplitude) .* forcing.indicator
   return rate
 end
@@ -502,7 +509,9 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real
   noise_physical, noise_spectral, plans = ou.noise_physical, ou.noise_spectral, _ou_plans(field, domain)
 
   # unit-variance band-limited (and, for the velocity, solenoidal) random increment ξ
-  copyto!(field_data(noise_physical), randn(ou.rng, T, size(field_data(noise_physical))...))
+  # In place: `randn` would allocate a fresh field-scale array on every step of the hot loop, and on
+  # a device backend a host array to copy across as well.
+  randn!(ou.rng, field_data(noise_physical))
   to_spectral!(noise_spectral, noise_physical, plans)
   convolve!(noise_spectral, noise_spectral, ou.band)
   field isa VectorFieldSpectral && helmholtz_projection!(noise_spectral, noise_spectral, domain.multipliers)

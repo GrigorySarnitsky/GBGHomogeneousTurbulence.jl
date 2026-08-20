@@ -52,6 +52,7 @@ velocity, and the next iteration's `advect!` reads it back as the first half of 
 ```@docs
 record_particle_velocities!
 advect!
+restart!
 interpolate_at_particles!
 ```
 

@@ -55,7 +55,7 @@ functions of state); **realization / infrastructure** concerns are named by thei
   deferred ladder, *tracer* only the massless kind (decision 51).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
-Include order: `SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator →
+Include order: `SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator →
 Particles → SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
 only through explicit `using ..Module: name` — never a bare `using`.
 

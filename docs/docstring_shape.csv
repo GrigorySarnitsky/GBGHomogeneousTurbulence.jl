@@ -1,10 +1,10 @@
 key,longest_paragraph_words,admonitions,total_words
 Cache.jl::Cache,116,0,317
-Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing),142,1,643
+Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing),142,1,649
 Cache.jl::deposit_sample!(cache),75,0,141
 Cache.jl::fields_modified!(cache),57,0,108
 Cache.jl::particle_velocities(cache),87,0,88
-Cache.jl::particles_modified!(cache),76,0,128
+Cache.jl::particles_modified!(cache),76,1,250
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
@@ -24,7 +24,7 @@ Forcing.jl::uses_linear_rate(forcing) -> Bool,72,0,107
 GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,99
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),75,1,243
 Generator.jl::Generator,142,0,206
-Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,528
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,537
 Generator.jl::finalize!(generator， state， domain),77,0,80
 Generator.jl::prepare!(generator， state， domain， dt),84,0,88
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
@@ -42,9 +42,9 @@ Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),134,0,137
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
-Particles.jl::AdamsBashforth(; order = 4),100,1,428
+Particles.jl::AdamsBashforth(; order = 4),100,1,464
 Particles.jl::EndpointHeun(),53,1,240
-Particles.jl::MultistepBuffers,39,0,124
+Particles.jl::MultistepBuffers,39,0,138
 Particles.jl::ParticleIntegratorBuffers,43,0,169
 Particles.jl::Particles,127,0,128
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， rng = default_rng()),86,0,597
@@ -55,6 +55,7 @@ Particles.jl::new_vector_point_values(tracers),28,0,29
 Particles.jl::number_of_particles(tracers),10,0,11
 Particles.jl::particle_positions(tracers),19,0,20
 Particles.jl::record_particle_velocities!(tracers， u) -> tracers,82,0,181
+Particles.jl::restart!(scheme， buffers) -> buffers,87,0,107
 Phenomenology.jl::FlowParameters(; viscosity， dissipation， rms_velocity， integral_scale，,52,0,368
 Phenomenology.jl::Phenomenology,93,1,278
 Phenomenology.jl::Reference(citation; valid_Reλ = (0.0， Inf)),42,0,86

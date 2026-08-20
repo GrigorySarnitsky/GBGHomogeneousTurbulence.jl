@@ -30,6 +30,8 @@ module State
 
 using GBGPeriodicFields
 using Random
+using ..Observables: kinetic_energy as measure_kinetic_energy,
+                     scalar_variance as measure_scalar_variance
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_vector_field_physical,
                           new_scalar_field_spectral, new_scalar_field_physical, _real_type
 
@@ -134,8 +136,18 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
   convolve!(û, û, convolve(envelope, domain.dealias))
   helmholtz_projection!(û, û, domain.multipliers)
 
-  current_energy = 0.5 * inner(û, û)
-  current_energy > 0 && (field_data(û) .*= sqrt(T(kinetic_energy) / current_energy))
+  # The canonical reduction, not a second spelling of it: the copy that stood here had already
+  # drifted from the original, promoting a Float32 seed's energy through a Float64 literal.
+  current_energy = measure_kinetic_energy(û)
+  # Every seeded mode annihilated (an envelope and a dealiasing band with no overlap) leaves nothing
+  # to rescale, and returning a zero field silently would hand back a state whose energy is not the
+  # one asked for — which the run layer then reports as though it were.
+  current_energy > 0 ||
+    throw(ArgumentError("the seeded velocity has no energy to rescale: every mode was annihilated " *
+                        "by the envelope and the dealiasing band together, so the requested " *
+                        "`kinetic_energy` cannot be realized. Lower `envelope_wavenumber` below " *
+                        "the dealiasing cutoff, or raise the resolution."))
+  field_data(û) .*= sqrt(T(kinetic_energy) / current_energy)
   return û
 end
 
@@ -204,8 +216,13 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
   end
   convolve!(φ̂, φ̂, convolve(envelope, domain.dealias))   # truncation folded in, as for the velocity
 
-  current_variance = inner(φ̂, φ̂)                         # ⟨φ²⟩ for a mean-zero field
-  current_variance > 0 && (field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance))
+  current_variance = measure_scalar_variance(φ̂)          # ⟨φ²⟩ for a mean-zero field
+  current_variance > 0 ||
+    throw(ArgumentError("the seeded scalar has no variance to rescale: every mode was annihilated " *
+                        "by the envelope and the dealiasing band together, so the requested " *
+                        "`scalar_variance` cannot be realized. Lower `envelope_wavenumber` below " *
+                        "the dealiasing cutoff, or raise the resolution."))
+  field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance)
   return φ̂
 end
 

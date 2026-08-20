@@ -555,7 +555,7 @@ seam is real but uncrossed (decision 18).
 
 ### 4.9 Layout summary
 
-`SimulationDomain → State → Observables → Cache → Forcing → Generator → Propagator → Particles →
+`SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator → Particles →
 SimulationRun`.
 Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
 order as the dependency-light leaf the initial-condition and validation consumers read.

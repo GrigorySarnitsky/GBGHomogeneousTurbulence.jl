@@ -275,7 +275,7 @@ function derivative_skewness(û, domain::FixedDomain)
   strain_physical = new_tensor_field_physical(domain)
   to_physical!(strain_physical, strain, domain.tensor_plans)            # S in physical space (Ŝ is consumed)
   ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
-  ss <= 0 && return 0.0
+  ss <= 0 && return zero(ss)      # degenerate strain: keep the field's element type, not a Float64 literal
   # ⟨det S⟩ as the fused mapped reduction: the determinant is formed per grid point in registers and
   # consumed by the mean immediately, so no determinant field is materialized.
   mean_det = mean(det, strain_physical)

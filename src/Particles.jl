@@ -42,7 +42,7 @@ import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
        ParticleIntegratorBuffers, MultistepBuffers,
-       record_particle_velocities!, advect!, interpolate_at_particles!,
+       record_particle_velocities!, advect!, restart!, interpolate_at_particles!,
        particle_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
@@ -208,6 +208,37 @@ It needs one set of predicted positions and the velocity interpolated there
 struct EndpointHeun <: AbstractParticleIntegrator end
 
 
+# Periodic wrap into the half-open box [0, L). `mod` alone does NOT deliver that in floating point:
+# for a position a hair below zero the exact quotient rounds to give back exactly `L` (measured:
+# `mod(-1e-20, 2π) === 2π`), so a tracer that drifts marginally out of the box lands on the excluded
+# endpoint and any consumer that buckets by `floor(x/Δx)` indexes one past the last cell. The second
+# pass folds that endpoint back to 0, which is the same point of the periodic box.
+function _wrap!(X, L)
+  X .= mod.(X, L)
+  X .= ifelse.(X .< L, X, zero(eltype(X)))
+  return X
+end
+
+
+"""
+    restart!(scheme, buffers) -> buffers
+
+Discard whatever history `buffers` holds, so the next [`advect!`](@ref) starts the scheme from
+scratch.
+
+Call it whenever the tracer positions are changed from outside the iteration — a reseed, a
+hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
+history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
+trajectory that has just been abandoned, and integrating over those would blend the old path with
+the new one. A run reaches this through
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!), which announces the
+reposition to the observables cache and restarts the trajectory history in the same call.
+
+Returns `buffers`.
+"""
+function restart! end
+
+
 """
     ParticleIntegratorBuffers
 
@@ -245,6 +276,10 @@ function allocate_buffers(::EndpointHeun, tracers::Tracers)
 end
 
 
+# A one-step scheme is memoryless: every register it owns is overwritten before it is read.
+restart!(::EndpointHeun, buffers::ParticleIntegratorBuffers) = buffers
+
+
 """
     AdamsBashforth(; order = 4)
 
@@ -272,7 +307,9 @@ produce.
 
 # Arguments
 - `order = 4` — how many past samples are used. `1` is forward Euler, `2` the two-step method, `4`
-  TurTLE's default.
+  TurTLE's default. Capped at `8`, which is where the four-point Gauss–Legendre rule that integrates
+  the interpolation weights stops being exact; the cap is far above any useful order, since an
+  Adams–Bashforth stability region shrinks with each step added.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
@@ -294,8 +331,16 @@ four-step method.
 """
 struct AdamsBashforth{K} <: AbstractParticleIntegrator end
 
+# The upper bound is the quadrature's, not a taste: `_adams_bashforth_weights` integrates the
+# degree-(order−1) Lagrange basis with a FOUR-point Gauss–Legendre rule, exact only through degree 7.
+# At order ≥ 9 the rule would return silently inexact weights — a wrong trajectory with no symptom —
+# so the ceiling is enforced here rather than documented and hoped for.
 AdamsBashforth(; order::Integer = 4) =
   (order >= 1 || throw(ArgumentError("`order` must be at least 1, got $order"));
+   order <= 8 || throw(ArgumentError("`order` must be at most 8, got $order: the four-point " *
+                                     "Gauss–Legendre rule that integrates the weights is exact " *
+                                     "only through degree 7, so a higher order would be given " *
+                                     "silently wrong coefficients"));
    AdamsBashforth{Int(order)}())
 
 
@@ -316,19 +361,25 @@ step.
 - `steps` — the step sizes those samples were taken at, aligned with `past`.
 - `filled` — how many entries of `past` are valid; below `order - 1` the scheme is still starting up.
 - `startup` — the [`ParticleIntegratorBuffers`](@ref) the bootstrap `EndpointHeun` steps use.
+- `weights`, `nodes` — the `order`-element host scratch the per-step weight solve works in.
 """
 mutable struct MultistepBuffers{V, S}
   const past::Vector{V}
   const steps::Vector{Float64}
   filled::Int
   const startup::S
+  # Host scratch for the weight solve. Two `order`-element vectors, allocated once: the solve runs
+  # every warmed-up step, and the hot loop is allocation-free over preallocated buffers.
+  const weights::Vector{Float64}
+  const nodes::Vector{Float64}
 end
 
 
 function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers) where {K}
   past = [similar(tracers.positions) for _ in 1:max(K - 1, 0)]
   return MultistepBuffers(past, zeros(Float64, max(K - 1, 0)), 0,
-                          allocate_buffers(EndpointHeun(), tracers))
+                          allocate_buffers(EndpointHeun(), tracers),
+                          zeros(Float64, K), zeros(Float64, K))
 end
 
 
@@ -339,12 +390,13 @@ end
 const _GAUSS_NODES = (-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526)
 const _GAUSS_WEIGHTS = (0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538)
 
-function _adams_bashforth_weights(h::Float64, steps::AbstractVector{Float64}, k::Int)
-  τ = zeros(Float64, k)                      # node times, relative to t_n, going backwards
+function _adams_bashforth_weights(b::Vector{Float64}, τ::Vector{Float64}, h::Float64,
+                                  steps::AbstractVector{Float64}, k::Int)
+  τ[1] = 0.0                                 # node times, relative to t_n, going backwards
   for j in 2:k
     τ[j] = τ[j-1] - steps[j-1]
   end
-  b = zeros(Float64, k)
+  fill!(b, 0.0)
   for (ξ, w) in zip(_GAUSS_NODES, _GAUSS_WEIGHTS)
     t = h * (ξ + 1) / 2                      # map [-1,1] → [0,h]
     scale = w * h / 2
@@ -368,15 +420,22 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   X = tracers.positions
   f0 = point_values(tracers.particle_velocities)
 
+  # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
+  # basis divides by the node differences — so the next warmed-up step divides by zero and returns
+  # NaN positions. Refused here, where the history is written, rather than left to surface as a
+  # silently ruined trajectory some steps later.
+  dt > 0 || throw(ArgumentError("`dt` must be positive, got $dt: a multistep history cannot carry " *
+                                "a zero-length or reversed step"))
+
   if buffers.filled < K - 1                  # no history yet: start up on the one-step scheme
     advect!(EndpointHeun(), tracers, velocity_end, domain, buffers.startup, dt)
   else
-    b = _adams_bashforth_weights(Float64(dt), buffers.steps, K)
+    b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), buffers.steps, K)
     X .= X .+ T(b[1]) .* f0
     for j in 2:K
       X .= X .+ T(b[j]) .* buffers.past[j-1]
     end
-    X .= mod.(X, L)
+    _wrap!(X, L)
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -393,6 +452,9 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   end
   return tracers
 end
+
+
+restart!(::AdamsBashforth, buffers::MultistepBuffers) = (buffers.filled = 0; buffers)
 
 
 """
@@ -466,14 +528,16 @@ function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDo
   Xstar = buffers.predictor
 
   v1 = point_values(tracers.particle_velocities)
-  Xstar .= mod.(X .+ Δt .* v1, L)
+  Xstar .= X .+ Δt .* v1
+  _wrap!(Xstar, L)
   # v₂ is evaluated at the PREDICTOR positions and is a stage register, never deposited particle velocities —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
   # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
   # the thing you measure).
   interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points, tracers.interpolation_scheme)
   v2 = point_values(buffers.velocity_predictor)
-  X .= mod.(X .+ (Δt / 2) .* (v1 .+ v2), L)
+  X .= X .+ (Δt / 2) .* (v1 .+ v2)
+  _wrap!(X, L)
   return tracers
 end
 

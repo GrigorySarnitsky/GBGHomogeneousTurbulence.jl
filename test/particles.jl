@@ -137,7 +137,10 @@ end
 # classical constants they must reduce to at uniform step — and the bootstrap/handover is pinned
 # end to end, since a multistep scheme that silently never leaves its startup would still "work".
 @testset "AdamsBashforth" begin
-  AB = GBGIsotropicTurbulence.Particles._adams_bashforth_weights
+  # The solve writes into caller-supplied scratch (the hot loop is allocation-free), so the test
+  # wrapper supplies it and returns the filled weights.
+  AB(h, steps, k) = GBGIsotropicTurbulence.Particles._adams_bashforth_weights(
+                      zeros(Float64, k), zeros(Float64, k), h, steps, k)
 
   @testset "variable-step weights reduce to the classical coefficients" begin
     @test AB(1.0, [1.0, 1.0, 1.0], 4) ≈ [55, -59, 37, -9] ./ 24

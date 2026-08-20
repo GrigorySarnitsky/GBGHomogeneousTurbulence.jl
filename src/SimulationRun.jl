@@ -37,7 +37,11 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
-using ..Cache: ObservablesCache, check_deposits, particles_modified!, deposit_sample!,
+# `particles_modified!` is extended here with the `Simulation` form, so it is imported rather than
+# merely used — the run layer is the only place that can reach both the cache and the trajectory
+# history a repositioning invalidates.
+import ..Cache: particles_modified!
+using ..Cache: ObservablesCache, check_deposits, deposit_sample!,
                velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
@@ -46,7 +50,8 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!
+using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!,
+                   restart!
 using ..Phenomenology: FlowParameters
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
@@ -440,6 +445,17 @@ function advance!(sim::Simulation; dt = nothing)
 end
 
 
+# The `Simulation` form of the announce. It exists because the cache form structurally cannot do the
+# whole job: a repositioning invalidates the deposited observables (which the cache owns) AND the
+# trajectory history a multistep scheme integrates over (which the run owns). Only here are both in
+# reach — so this is the form a caller who repositions tracers should reach for.
+function particles_modified!(sim::Simulation)
+  particles_modified!(sim.cache)
+  sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
+  return sim
+end
+
+
 """
     run!(callback, sim)
     run!(sim) do sim … end
@@ -663,7 +679,16 @@ function (criterion::StationarityCriterion)(sim::Simulation)
   ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
   Δt = current_time(sim) - criterion.last_time
   criterion.last_time = current_time(sim)
-  ε > 0 && (criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity_spectral)))
+  if ε > 0
+    criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity_spectral))
+  else
+    # No dissipation means no eddy-turnover clock, and `max_turnovers` is denominated in exactly the
+    # units that have stopped advancing — so the give-up cap below could never be reached and the
+    # loop would run forever. A run that is not dissipating also cannot reach the developed cascade
+    # this criterion tests for, so the honest outcome is to stop and say why.
+    @warn "StationarityCriterion: the dissipation rate is not positive (ε = $ε), so the eddy-turnover            clock cannot advance and stationarity can never be detected — stopping. A run with no            dissipation has no cascade to become stationary."
+    return false
+  end
   _observe_and_test!(criterion.monitor, sim, criterion.elapsed_turn, ε) && return false
   if criterion.elapsed_turn ≥ criterion.max_turnovers
     @warn "StationarityCriterion: hit the max_turnovers = $(criterion.max_turnovers) cap without detecting stationarity"

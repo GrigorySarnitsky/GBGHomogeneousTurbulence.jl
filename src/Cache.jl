@@ -46,7 +46,7 @@ gone?".
 """
 module Cache
 
-using GBGPeriodicFields: point_values
+using GBGPeriodicFields: point_values, field_data
 using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
@@ -107,7 +107,7 @@ depends on.
   representation. Mid-iteration the step also computes its stage recoveries *into these same
   arrays*, which is why they are not readable then.
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
-- `max_speed` — the cached fastest flow speed (a host number).
+- `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
@@ -122,7 +122,7 @@ depends on.
   advance; a hand-run loop that moves tracers itself announces the change with
   [`particles_modified!`](@ref), which is what advances it.
 """
-mutable struct ObservablesCache{PV, PS, TS}
+mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   const velocity_physical::PV
   const vorticity_physical::PV
   const scalar_physical::PS
@@ -130,7 +130,7 @@ mutable struct ObservablesCache{PV, PS, TS}
   velocity_epoch::Int
   vorticity_epoch::Int
   scalar_epoch::Int
-  max_speed::Float64
+  max_speed::T
   max_speed_epoch::Int
   sample_fields_epoch::Int
   sample_particles_epoch::Int
@@ -138,12 +138,19 @@ mutable struct ObservablesCache{PV, PS, TS}
   particles_epoch::Int
 end
 
-ObservablesCache(domain::FixedDomain; scalar::Bool = false, particle_velocities = nothing) =
-  ObservablesCache(new_vector_field_physical(domain), new_vector_field_physical(domain),
-                   scalar ? new_scalar_field_physical(domain) : nothing,
-                   particle_velocities,
-                   NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
-                   NaN, NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
+function ObservablesCache(domain::FixedDomain; scalar::Bool = false, particle_velocities = nothing)
+  velocity = new_vector_field_physical(domain)
+  # The speed slot takes the field's own element type, read off the velocity slot beside it: a
+  # hardwired `Float64` promoted a Float32 run's timestep arithmetic and broke the element-type
+  # contract the rest of the observables surface keeps. `NaN` in that type is the never-deposited
+  # value, matching the epoch sentinel next to it.
+  T = real(eltype(field_data(velocity)))
+  return ObservablesCache(velocity, new_vector_field_physical(domain),
+                          scalar ? new_scalar_field_physical(domain) : nothing,
+                          particle_velocities,
+                          NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
+                          T(NaN), NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
+end
 
 
 # The checked read shared by every accessor: serve the slot only when its epoch names the current
@@ -260,8 +267,8 @@ take_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = SCRATCH; cache.sca
 deposit_velocity!(cache::ObservablesCache) = (cache.velocity_epoch = cache.fields_epoch; cache.velocity_physical)
 deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = cache.fields_epoch; cache.vorticity_physical)
 deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_epoch; cache.scalar_physical)
-deposit_max_speed!(cache::ObservablesCache, value::Real) =
-  (cache.max_speed = Float64(value); cache.max_speed_epoch = cache.fields_epoch; value)
+deposit_max_speed!(cache::ObservablesCache{PV, PS, TS, T}, value::Real) where {PV, PS, TS, T} =
+  (cache.max_speed = T(value); cache.max_speed_epoch = cache.fields_epoch; value)
 """
     deposit_sample!(cache)
 
@@ -329,11 +336,23 @@ fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 """
     particles_modified!(cache)
+    particles_modified!(sim)
 
 Announce that the tracer positions were changed outside the iteration (a reseed, a hand-written
 correction, any direct write to the tracer storage) — the particle counterpart of
 [`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
 trajectory-bound observable is stale and reads throw until the next deposit.
+
+**Prefer the `sim` form.** A repositioning invalidates two things, and a cache can only reach one of
+them: the deposited observables, which this stamps stale, and the *trajectory history* a multistep
+scheme integrates over, which lives in the run's own buffers. Given a `Simulation` this restarts that
+history too; given a bare cache it cannot, so a multistep scheme would keep blending Lagrangian
+samples taken along the path that was just abandoned.
+
+!!! warning "A bare cache cannot restart a multistep history"
+    `particles_modified!(cache)` stamps the epoch and nothing else. If you drive the loop by hand
+    with a multistep trajectory scheme, you must also restart its buffers yourself — pass the
+    `Simulation`, or call `restart!` on the scheme and its buffers.
 
 The sanctioned mutator calls it for you: the run layer announces its own tracer advance
 ([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
@@ -347,6 +366,8 @@ alone leaves the slot stale, and a read of it throws.
 
 Returns `cache`.
 """
+function particles_modified! end
+
 particles_modified!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
 
 

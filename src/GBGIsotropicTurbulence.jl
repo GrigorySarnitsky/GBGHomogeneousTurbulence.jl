@@ -13,9 +13,11 @@
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
 # the instruments, the run layer, and the reference laws are named by their job.
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
-#   State            — the spectral state + initial conditions (the MZ State role)
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …), including
-#                      the field-valued vorticity recovery
+#                      the field-valued vorticity recovery. Ahead of `State` because the seeders
+#                      rescale to a requested energy or variance and call these reductions to do it,
+#                      rather than carrying a second spelling of the same formula.
+#   State            — the spectral state + initial conditions (the MZ State role)
 #   Cache            — the ObservablesCache: the storage the iteration deposits its
 #                      observables into at its end (no-recompute; slots double as the step's registers)
 #   Forcing          — energy-injection strategies (AbstractForcing) — the RHS source. Included BEFORE
@@ -58,8 +60,8 @@ using GBGPeriodicFields
 include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
-include("State.jl")
 include("Observables.jl")
+include("State.jl")
 include("Cache.jl")
 include("Forcing.jl")
 include("Generator.jl")
@@ -150,6 +152,7 @@ using .Particles:
   MultistepBuffers,
   ParticleIntegratorBuffers,
   record_particle_velocities!,
+  restart!,
   advect!,
   interpolate_at_particles!,
   particle_positions,
@@ -236,6 +239,7 @@ export FixedDomain,
        ParticleIntegratorBuffers,
        record_particle_velocities!,
        advect!,
+       restart!,
        interpolate_at_particles!,
        particle_positions,
        number_of_particles,

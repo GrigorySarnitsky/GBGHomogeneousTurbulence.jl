@@ -38,6 +38,12 @@ function main(args)
   expect in ("fail", "pass") || (println("expectation must be `fail` or `pass`, got `$expect`"); exit(2))
 
   isdir(DIR) || (println("no witness directory at $DIR"); exit(2))
+  # ONLY the confirmed findings' witnesses are gated. A candidate the reproducer withdrew leaves its
+  # witness behind as the EVIDENCE of the withdrawal — it passes by construction, which is precisely
+  # what killed the finding — so gating it would report a phantom on every run. Measured on the first
+  # hunt: 10 of 27 files "passed" the fail-gate and every one was a withdrawal or an architecture
+  # finding, i.e. the runner's own defect and not the tree's. Withdrawn witnesses live in
+  # `withdrawn/`, where they stay readable and remain promotable as coverage tests.
   files = sort(filter(f -> endswith(f, ".jl"), readdir(DIR)))
   if length(args) > 1
     wanted = args[2:end]
@@ -63,7 +69,13 @@ function main(args)
     # Test.jl exits 1 on a failed @test and prints a summary; a load error or a throw outside a
     # @test also exits 1, so the exit code alone cannot separate "the assertion failed" (evidence)
     # from "the file is broken" (no evidence at all).
-    testfail = occursin("Test Failed", text) || occursin("Some tests did not pass", text)
+    # An ERRORED testset also prints "Some tests did not pass", so that phrase alone cannot separate
+    # a failed assertion from a broken file — and counting an error as a failure is precisely how a
+    # stale witness masquerades as a proven bug. Test.jl reports the two separately in its summary
+    # ("N failed", "N errored") and marks an exception outside a @test with "Error During Test".
+    errored = occursin("Error During Test", text) ||
+              (m = match(r"(\d+) errored", text); m !== nothing && parse(Int, m.captures[1]) > 0)
+    testfail = !errored && (occursin("Test Failed", text) || occursin("Some tests did not pass", text))
     if code == 0
       push!(passed, f)
     elseif testfail

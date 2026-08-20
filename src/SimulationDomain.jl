@@ -246,12 +246,12 @@ end
 
 # Build the `domain.dealias` kernel for a strategy — each a compressed radial kernel (a symbol of
 # |κ|², evaluated per mode), so no strategy stores a field of coefficients.
-_build_dealias(::TwoThirds, reference, multipliers, N, L, ::Type{T}) where {T} =
-  spectral_cutoff(reference, multipliers, T(2 // 3) * (N / 2) * (2π / L))
-
-# Phase-shift: the spherical truncation that removes the two-axis aliases the half-cell average leaves.
-_build_dealias(::PhaseShift, reference, multipliers, N, L, ::Type{T}) where {T} =
-  spectral_cutoff(reference, multipliers, T(2 * sqrt(2) / 3) * (N / 2) * (2π / L))
+# Both sharp strategies keep a ball of radius (retained fraction)·κ_Ny. The fraction is read from
+# `_retained_nyquist_fraction` rather than re-spelled here, so the band this BUILDS and the cutoff
+# `max_wavenumber` REPORTS cannot drift apart.
+_build_dealias(strategy::Union{TwoThirds, PhaseShift}, reference, multipliers, N, L, ::Type{T}) where {T} =
+  spectral_cutoff(reference, multipliers,
+                  T(_retained_nyquist_fraction(strategy)) * (N / 2) * (2π / L))
 
 function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}) where {T}
   # The smooth filter is a closed-form radial symbol; the closure captures VALUES only (a captured

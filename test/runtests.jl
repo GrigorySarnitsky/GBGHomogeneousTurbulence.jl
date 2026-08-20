@@ -17,3 +17,13 @@ module ParticlesTests;     include("particles.jl");      end
 module SimulationRunTests; include("simulation_run.jl"); end
 module PhenomenologyTests;  include("phenomenology.jl");  end
 module ValidationTests;     include("validation.jl");     end
+
+# The /bug-hunt regression witnesses. Each file is the executable form of one confirmed defect: it
+# asserts the CORRECT behaviour and was observed to FAIL before its fix landed, so it is already a
+# regression test and is promoted here unchanged rather than re-written into the house style. Each
+# gets its own module because the witnesses were authored independently and may reuse helper names.
+for witness in sort(filter(f -> endswith(f, ".jl"), readdir(joinpath(@__DIR__, "regressions"))))
+  name = Symbol("Regression_", replace(splitext(witness)[1], "-" => "_"))
+  path = joinpath(@__DIR__, "regressions", witness)
+  @eval module $name; include($path); end
+end
