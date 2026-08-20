@@ -604,7 +604,10 @@ numerical counterpart of the charter that the tool investigates the physics rath
   parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
   commitment.) Field reductions do **not** break this: every observable returns the field's own element
   type, so a `Float32` run measures in `Float32` — the `Observables` module docstring states it and
-  `test/validation.jl` pins it over every exported observable. Whether the online statistics of a
+  `test/validation.jl` pins it over every exported observable. Accuracy is bought there by *summation
+order*, not by a wider accumulator: the backend's reductions sum pairwise, whose error grows as
+``O(\log n)`` against naive accumulation's ``O(n)``, so a reduction over an ``N^3`` grid stays
+faithful in the field's own precision and needs no `Float64` accumulator to rescue it. Whether the online statistics of a
   future `GBGStreamingStatistics` bridge should accumulate in `Float64` regardless is a question for
   that backend, not a property of this one.
 - **The footprint/accuracy trade-off is held at both ends** — low-storage integrators, the dealias
