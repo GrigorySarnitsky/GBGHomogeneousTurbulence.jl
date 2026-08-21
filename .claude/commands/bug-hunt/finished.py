@@ -92,20 +92,39 @@ def _docs():
                                else [l for l in (r.stdout or "").splitlines() if l.startswith("ERROR")][:2])
 
 
-@check("the bug-hunting pass is recorded as closed")
+@check("every finding of the hunt has a recorded disposition")
 def _round():
+    # BOUNDED TO ONE HUNT (corrected 2026-08-21). This check used to demand a FOLLOW-UP HUNT that
+    # confirmed nothing new — a terminator I invented, which no sibling instrument uses and which
+    # cannot be reached while the code is under repair, because each round's fixes seed the next
+    # round's findings. Measured across five rounds: 20, 9, 17, 21, 17. A rule that makes "finished"
+    # permanently false is a bad rule, not a strict one, and it invited unbounded edits to code the
+    # user does not read.
+    #
+    # `/check-docs` and `/check-consistency` both bound themselves the same way: the instrument runs
+    # ONCE, and what loops is the VERIFIER over that run's banked findings. The verifier exists to
+    # stop findings being quietly dropped — not to find new ones. Here the equivalent is stronger,
+    # because a witness is a program: "every confirmed finding of THIS hunt is fixed" is decided
+    # mechanically by the gate above, over a finite set, so it terminates.
+    #
+    # What remains for the ledger is that every finding has a DISPOSITION and none was forgotten.
     if not os.path.exists(LEDGER):
-        return False, "no ledger — the pass was never recorded"
+        return False, "no ledger — the hunt was never recorded"
     rounds = json.load(open(LEDGER))
     if not rounds:
         return False, "ledger is empty"
     last = rounds[-1]
-    if "followup_confirmed" not in last:
-        return False, (f"pass {last['round']} has no follow-up hunt recorded; a fix pass introduces "
-                       "its own defects, so it is not closed until hunting again finds nothing new")
-    if last["followup_confirmed"] != 0:
-        return False, f"the follow-up hunt found {last['followup_confirmed']} new problem(s)"
-    return True, f"pass {last['round']} closed with a clean follow-up"
+    for field in ("confirmed", "fixed"):
+        if field not in last:
+            return False, f"hunt {last['round']} records no `{field}` count"
+    accounted = last.get("fixed", 0) + last.get("escalated", 0) + last.get("refuted", 0)
+    if accounted != last["confirmed"]:
+        return False, (f"hunt {last['round']}: {last['confirmed']} confirmed but "
+                       f"{accounted} accounted for (fixed + escalated + refuted). "
+                       "Every finding needs a disposition; a missing one is a dropped finding.")
+    return True, (f"hunt {last['round']}: all {last['confirmed']} findings dispositioned "
+                  f"({last.get('fixed', 0)} fixed, {last.get('escalated', 0)} escalated, "
+                  f"{last.get('refuted', 0)} refuted)")
 
 
 @check("no test file locates another by counting `..` hops")

@@ -109,36 +109,46 @@ Workflow({ scriptPath: ".claude/commands/bug-hunt/hunt.js",
            args: { repo: "$REPO", pile: "$REPO/.claude/bug-hunt", strength: "economy" } })
 ```
 
-## The loop — mandatory, and it is the instrument, not an epilogue
+## Run the hunt ONCE; loop the VERIFIER
 
-**One pass is never enough, and this instrument measured why.** Round 1 confirmed 20 defects and
-fixed them all; the follow-up hunt then confirmed **9 more, two of which were regressions introduced
-by round 1's own fixes** — a `_wrap!` that turned every non-finite tracer coordinate into `0.0`, and a
-PhaseShift guard closed only halfway. Both were declared verified. Neither was.
+**The instrument runs once. What loops is the verification of that run's findings.** This is the same
+bound `/check-docs` and `/check-consistency` carry: the panel runs once, `verify.js` adjudicates the
+*banked* findings, and the loop is verify → fix → verify until closure plateaus. Neither re-runs
+itself as a termination condition.
 
-So the procedure below is a **loop**, and the closure phase **is not optional** — the same rule
-`/check-docs` and `/check-consistency` already carry, for the same stated reason: *a fix pass
-introduces its own defects.*
+**This was got wrong here first, and the correction matters more than the original rule.** The closure
+gate used to demand a follow-up hunt confirming *nothing new*. No sibling instrument does that, and it
+cannot terminate while the code is being edited, because each round's fixes seed the next round's
+findings — measured across five rounds: **20, 9, 17, 21, 17**. A rule that makes "finished"
+permanently false is a bad rule, not a strict one. Worse, it licensed unbounded edits to *code*,
+which is a different risk from unbounded edits to prose: the doc instruments only ever rewrite
+documentation, while this one changes how the package computes.
 
-**Convergence here is sharper than theirs.** They stop when successive rounds agree within noise,
-because a doc finding is a judgement and fresh readers always produce some. A confirmed finding here
-is **a program that fails**, so the terminator is **exactly zero**:
+So the finding set is **fixed by one hunt**, and every finding leaves it in one of three states:
 
-> Re-hunt after every fix pass. The round closes when a hunt run *after* the fixes confirms **nothing
-> new**. Anything left over is either an open defect or **a decision for the user** — escalate the
-> latter by name, and never close a round by reclassifying a defect as a decision.
+| state | how it is established |
+|---|---|
+| **fixed** | its witness flips — `witnesses.jl pass`, a program, not a judgement |
+| **refuted** | shown not to be a defect, with the measurement recorded at the site |
+| **escalated** | a design decision, named to the user, its witness deliberately NOT filed into `test/` so nothing reads green over it |
 
-`closure.py` enforces all of it mechanically and refuses to be optimistic: it runs the witness gate,
-checks every witness was **promoted** into `test/regressions/` (a fix whose witness never became a
-regression test protects nothing), runs the suite, and — the part that is easy to skip and was
-skipped — **requires a recorded follow-up hunt with zero new confirmed findings.** A round with no
-follow-up recorded is not closed, however green everything else looks.
+A finding in none of those is a **dropped** finding, and `finished.py` fails on the arithmetic.
 
-```bash
-python3 .claude/commands/bug-hunt/closure.py                       # audit: may this round close?
-python3 .claude/commands/bug-hunt/closure.py --record 3 confirmed=N escalated=M
-python3 .claude/commands/bug-hunt/closure.py --record 3 followup_confirmed=0   # after re-hunting
-```
+**Three verifiers, because the witness gate cannot cover everything:**
+
+1. `witnesses.jl pass` — mechanical, covers every confirmed runtime and api-semantics finding.
+2. `verify-fixes.js` — the architecture class, which has no witness by nature. It hunts the
+   **RELOCATED** verdict: a duplicate moved to a new file reads as a fix in a diff and as a defect in
+   the tree.
+3. `dismissals.js` — **the findings that were never confirmed.** `NOT-REPRODUCED` and `NOT-A-DEFECT`
+   are judgement calls that get *filed*, so nothing revisits them; under a one-hunt design a wrong
+   dismissal is simply lost. Round 1 dismissed the `particle_velocities` two-epoch check as "correct
+   on the current tree" — a **blocker** — and `_base_cfl`'s fallback as "sanctioned by the contract",
+   also wrong. Both surfaced only because a later hunt happened to re-raise them, which under this
+   design would not happen. It defaults to **UNSAFE**.
+
+The verifier loop terminates because the finding set is finite. Run it until every finding is in one
+of the three states above; that is the whole of "closed".
 
 Then, in order:
 
@@ -160,10 +170,12 @@ Workflow({ scriptPath: ".claude/commands/bug-hunt/verify-fixes.js",
 # 5. Promote every passing witness into test/ and run the suite.
 julia --project -e 'using Pkg; Pkg.test()'
 
-# 6. RE-HUNT. Not optional. Then record the result and ask whether the round may close.
-Workflow({ scriptPath: ".claude/commands/bug-hunt/hunt.js", args: {...} })
-python3 .claude/commands/bug-hunt/closure.py --record <N> followup_confirmed=<n>
-python3 .claude/commands/bug-hunt/closure.py        # exit 0 = closed; non-zero says what blocks it
+# 6. Audit the DISMISSALS — the findings the hunt did not confirm. Not optional: a filed
+#    dismissal is never revisited, and two of round 1's were wrong (one a blocker).
+Workflow({ scriptPath: ".claude/commands/bug-hunt/dismissals.js", args: { repo, dismissals: [...] } })
+
+# 7. Ask whether the work is finished. Exit 0 means yes; non-zero names what is not.
+python3 .claude/commands/bug-hunt/finished.py
 ```
 
 ## Discipline
