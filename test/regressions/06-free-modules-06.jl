@@ -6,11 +6,12 @@ using GBGIsotropicTurbulence
 using GBGPeriodicFields: CatmullRom
 using Random
 
+
 # `pkgdir` rather than a path counted from this file: a witness is authored under
 # .claude/bug-hunt/witnesses/ and PROMOTED into test/regressions/, so a fixed number of `..` hops
 # resolves outside the repository once it moves. (Walking up to the first Project.toml is also wrong
 # here — `test/` carries one of its own, so the walk stops a level early.)
-include(joinpath(pkgdir(GBGIsotropicTurbulence), "test", "audit_ops.jl"))
+include(joinpath((let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGIsotropicTurbulence.jl")); d = dirname(d); end; d end), "test", "audit_ops.jl"))
 
 M = 4
 domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,

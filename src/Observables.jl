@@ -355,7 +355,9 @@ function integral_scale(û, domain::FixedDomain)
   # Both sums run where the spectrum lives — no host transfer and no scalar indexing, so the
   # diagnostic works unchanged on a device backend. The κ = 0 shell is excluded from the numerator
   # by the branch rather than by skipping an index, which a fused broadcast cannot do.
-  total = sum(E)
+  # Excluding the κ = 0 shell, as the numerator does. Testing `sum(E)` instead let a field whose
+  # energy is entirely in the mean flow pass the emptiness guard and return a meaningless zero.
+  total = sum(broadcast((k, e) -> k > 0 ? e : zero(e), κ, E))
   weighted = sum(broadcast((k, e) -> k > 0 ? e / k : zero(e), κ, E))
   # A field with no energy has no integral scale, and 0/0 would hand back a silent NaN that then
   # propagates into every derived quantity — a Reynolds number, a turnover time — with nothing to

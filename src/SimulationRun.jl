@@ -274,6 +274,13 @@ function Simulation(domain::FixedDomain;
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
   # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
   # argument that caused it. Likewise a scalar variance, ⟨φ²⟩ ≥ 0.
+  number_of_particles >= 0 ||
+    throw(ArgumentError("`number_of_particles` must be non-negative, got $number_of_particles: a " *
+                        "negative count was silently routed to the tracer-free branch, so the run " *
+                        "carried no tracers and never said so"))
+  cfl > 0 ||
+    throw(ArgumentError("`cfl` must be positive, got $cfl: it scales the advective timestep " *
+                        "Δt = cfl·Δx/u_max, so a non-positive value stops or reverses the clock"))
   kinetic_energy > 0 ||
     throw(ArgumentError("`kinetic_energy` must be positive, got $kinetic_energy: it is " *
                         "k = ½⟨|u|²⟩, which cannot be negative, and a zero-energy field has no " *
@@ -425,7 +432,18 @@ function cfl_timestep(sim::Simulation)
   # Kept for a direct `cfl_timestep(sim)` call; `advance!` guards its own path independently, since
   # a hand-fixed `dt` never reaches here.
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
-  return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
+  # Bounded above by the same value the zero-speed branch returns. As an unforced run decays,
+  # u_max → 0 and the advective rule alone diverges — measured running away to Δt ≈ 1e15, at which
+  # point the integrating factor annihilates every mode, the state stops moving, and the clock keeps
+  # adding 1e15 an iteration. The ceiling is the step this rule gives at unit speed, which is exactly
+  # what the resting case already used, so the two branches now agree in the limit instead of
+  # diverging from each other.
+  #
+  # NOT a diffusive limit: diffusion is advanced EXACTLY by the integrating factor here, so it
+  # imposes no stability constraint to bound against — a ceiling of Δx²/ν would be reasoning from a
+  # restriction this solver does not have.
+  ceiling = sim.cfl * Δx
+  return speed > 0 ? min(sim.cfl * Δx / speed, ceiling) : ceiling
 end
 
 
@@ -444,11 +462,15 @@ function advance!(sim::Simulation; dt = nothing)
   # A step must be positive whichever route set it. `AdamsBashforth` already refuses a non-positive
   # step where it would poison the sample history, but a one-step scheme silently no-ops on `dt = 0`
   # and integrates backwards on a negative one, so the front door checks it for every scheme.
-  if dt !== nothing
-    Float64(dt) > 0 ||
-      throw(ArgumentError("`dt` must be positive, got $dt"))
-  end
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
+  # Whichever route set it. Checking only the explicit `dt` left the ADAPTIVE branch — the default
+  # one — unguarded: a negative `cfl` yields a negative Δt every step, and the integrating factor and
+  # the RK stages are algebraically fine with it, so nothing throws, nothing goes NaN, and the run
+  # marches BACKWARDS in time. A zero `cfl` freezes the clock while the step counter keeps climbing,
+  # so a loop gated on the step count runs forever accumulating no simulated time.
+  Δt > 0 ||
+    throw(ArgumentError("the timestep must be positive, got $Δt" *
+                        (dt === nothing ? " from the adaptive CFL rule (check `cfl`)" : "")))
 
   # The checked read at the iteration's start: the advance's v₁ must be the particle velocities the previous
   # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
@@ -504,6 +526,14 @@ function particles_modified!(sim::Simulation)
   sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
   return sim
 end
+
+
+# The fields twin, for the same reason its particle counterpart exists: an out-of-band replacement of
+# the state invalidates the Lagrangian sample history a multistep trajectory scheme integrates over,
+# and the cache form is what discards it. Added because the particle form was and this one was not —
+# a caller holding a run should not have to know which of the two verbs happens to have the
+# convenience method.
+fields_modified!(sim::Simulation) = (fields_modified!(sim.cache); sim)
 
 
 

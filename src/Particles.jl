@@ -463,6 +463,15 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   # so a history that survived one is not reachable from here.
   cache = buffers.cache
   past, steps = cache.particle_velocity_history, cache.sample_steps
+  # The history's depth IS the order this call will actually achieve. Handed buffers built for a
+  # shallower scheme, the loop below would read fewer past samples than `K` claims and integrate at
+  # a lower order without saying so.
+  length(past) == K - 1 ||
+    throw(ArgumentError("this `AdamsBashforth(order = $K)` integrates over $(K - 1) past sample(s), " *
+                        "but the buffers it was handed carry $(length(past)): they were built for a " *
+                        "different order. Equality, not sufficiency — the shared history's fill " *
+                        "level is capped against the order of whichever call last advanced it, so " *
+                        "mixing two orders over one history corrupts the bookkeeping in both."))
 
   if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
     advect!(EndpointHeun(), tracers, velocity_end, domain, buffers.startup, dt)
