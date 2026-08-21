@@ -260,7 +260,7 @@ _materialize_forcing(f, domain::FixedDomain) = f(domain)
 function Simulation(domain::FixedDomain;
                     kinetic_energy::Real = 1.5, κ_max_η = nothing, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = BandRescaling(domain; target = kinetic_energy, over = :total),
+                    velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),
                     scalar_forcing = NoForcing(),
                     scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(scheme, domain),
@@ -289,6 +289,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
     resolution = isnothing(κ_max_η) ? 2 : κ_max_η
+    # ν is solved from this, so a non-positive or non-finite resolution yields ν = 0, NaN or Inf and
+    # a run that is not a run. κ_max·η is a positive, finite resolution criterion by construction.
+    (isfinite(resolution) && resolution > 0) ||
+      throw(ArgumentError("`κ_max_η` must be positive and finite, got $κ_max_η: it is the " *
+                          "resolution criterion κ_max·η, from which the viscosity is solved"))
     # `kolmogorov_length`'s η = (ν³/ε)^(1/4), inverted: with κ_max·η fixed at `resolution`,
     # η = resolution/κ_max and ν = (ε η⁴)^(1/3). No inverse of that law exists to call, so the
     # arithmetic stays here — but the two are pinned against each other by a round-trip test
@@ -475,6 +480,13 @@ function advance!(sim::Simulation; dt = nothing)
   # Here the iteration refuses to report success on a state it has just made non-finite.
   isfinite(max_speed(sim.cache)) ||
     error("non-finite velocity at step $(sim.clock.step + 1): the run appears to have blown up")
+  # The state is the PAIR (û, φ̂), and the speed reduces the velocity alone. A passive scalar cannot
+  # feed back into the velocity, so a scalar that has gone non-finite leaves the guarded quantity
+  # perfectly finite and the iteration reports success on a ruined field. This costs one extra
+  # reduction and one readback, and only on a run that carries a scalar.
+  sim.state.scalar_spectral === nothing ||
+    isfinite(scalar_variance(sim.state.scalar_spectral)) ||
+    error("non-finite scalar at step $(sim.clock.step + 1): the run appears to have blown up")
 
   sim.clock.time += Δt
   sim.clock.step += 1

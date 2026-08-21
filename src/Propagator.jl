@@ -518,6 +518,17 @@ Returns `cache` (or `sim`).
 """
 function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
                   buffers::IntegratorBuffers)
+  # A scalar-carrying state paired with a scalar-less cache used to deposit the velocity and the
+  # vorticity and simply SKIP the scalar — leaving no slot to read, no error, and a run whose scalar
+  # is never observed. The pairing is a construction mistake, so it is named here rather than
+  # discovered later as a missing-slot throw from an accessor.
+  # Only this direction is checked. The reverse — a cache slot no state fills — is already caught
+  # when the iteration closes, as an undeposited slot; this one is the silent one, because a skipped
+  # deposit leaves nothing behind to notice.
+  state.scalar_spectral === nothing || cache.scalar_physical !== nothing ||
+    throw(ArgumentError("this state carries a passive scalar but the cache has no scalar slot to " *
+                        "receive it, so the scalar would be evolved and never observed. Build the " *
+                        "cache with `scalar = true`."))
   u = take_velocity!(cache)
   to_physical!(u, state.velocity_spectral, domain.velocity_plans, _recovery_scratch(buffers))
   deposit_velocity!(cache)

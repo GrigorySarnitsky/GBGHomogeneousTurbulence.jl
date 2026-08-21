@@ -25,17 +25,18 @@ function bounded_run!(criterion, sim; cap)
   return (steps, false)
 end
 
-@testset "warmup! terminates on a zero-viscosity run instead of looping forever" begin
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.0, rng = MersenneTwister(11))
-  @test sim.generator.conditions.viscosity == 0.0
+@testset "a zero-viscosity run cannot be built, and the criterion still terminates without one" begin
+  # UPDATED 2026-08-21. This reached the non-terminating warm-up by building a ν = 0 run — a route a
+  # LATER fix closed at the source, because ν sets the Reynolds number through Re = 1/ν and a
+  # non-positive value has no dissipation scale. The original defect (the eddy-turnover clock cannot
+  # advance when ε ≡ 0, while `max_turnovers` is denominated in exactly those units, so the give-up
+  # cap could never be reached) is still fixed, and the positive control below exercises it. What is
+  # testable here now is the stronger guarantee: the state that produced it cannot be constructed.
+  @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.0,
+                                        rng = MersenneTwister(11))
+  @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = -0.01,
+                                        rng = MersenneTwister(11))
 
-  criterion = StationarityCriterion(min_turnovers = 1, max_turnovers = 2,
-                                    window_turnovers = 0.5, gate_skewness = false)
-  steps, stopped = bounded_run!(criterion, sim; cap = 400)
-
-  # ε ≡ 0 with ν = 0, so the turnover clock must not be the only thing that can end the run.
-  @test stopped   # the criterion stopped the run within the 400-iteration budget
-  @info "witness" steps stopped elapsed_turn = criterion.elapsed_turn current_step = current_step(sim)
 
   # Positive control: the identical criterion on an otherwise identical run with ν > 0 does stop
   # well inside the same budget, so the assertion above is not merely a too-small step cap.

@@ -89,6 +89,17 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
 end
 
 function FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
+  # Both set a diffusivity, and a non-positive one is not a physical regime: ν is the inverse Reynolds
+  # number, and the scalar diffusivity is ν/Sc, so Sc = 0 divides by zero and NaNs the scalar on the
+  # first step. Nothing downstream notices — the run's blow-up guard reads the velocity, which stays
+  # perfectly finite while the scalar is entirely NaN — so the check belongs here, where the value
+  # arrives.
+  viscosity > 0 ||
+    throw(ArgumentError("`viscosity` must be positive, got $viscosity: it sets the Reynolds number " *
+                        "through Re = 1/ν, and a non-positive value has no dissipation scale"))
+  schmidt > 0 ||
+    throw(ArgumentError("`schmidt` must be positive, got $schmidt: the scalar diffusivity is ν/Sc, " *
+                        "so a non-positive Schmidt number makes it infinite or negative"))
   # One instance driving both fields conflates their bookkeeping — but only for a strategy that HAS
   # per-field state to conflate. An immutable forcing (`BandRescaling`, `Linear`, `ConstantPower`)
   # carries only its band and its target, so sharing one is harmless; `===` would not even
@@ -254,13 +265,23 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   displaced_velocity_source::Any
 end
 
-ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false) =
-  ResolvedGenerator(conditions,
+function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false)
+  # `scalar = false` means this generator assembles no scalar right-hand side, so a scalar forcing
+  # given alongside it has nowhere to act — it is never prepared, never applied, and never says so.
+  # A run built this way integrates a scalar the forcing was supposed to drive and reports nothing
+  # wrong, which is the quiet-wrong-answer this constructor already refuses in its sibling case.
+  scalar || conditions.scalar_forcing isa NoForcing ||
+    throw(ArgumentError("a $(nameof(typeof(conditions.scalar_forcing))) scalar forcing was given, " *
+                        "but this generator is built with `scalar = false` and assembles no scalar " *
+                        "right-hand side, so the forcing could never be applied. Pass " *
+                        "`scalar = true`, or leave `scalar_forcing` at `NoForcing()`."))
+  return ResolvedGenerator(conditions,
                     new_vector_field_spectral(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
                     nothing)
+end
 
 
 """
@@ -529,6 +550,14 @@ end
 function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_consumed, φ, domain::FixedDomain,
                             displaced_velocity_current::Bool = false)
   phase_shift = generator.phase_shift
+  # The generator's `scalar` keyword gates the displaced-scalar scratch as well as the forcing-rate
+  # array, so a generator built without it has nowhere to recover φ̂ on the displaced grid. Reaching
+  # that here surfaced as a `MethodError` from inside the field library, naming a dependency's
+  # internals rather than the keyword the caller set.
+  phase_shift.scalar_shifted === nothing &&
+    throw(ArgumentError("this generator was built with `scalar = false`, so it carries no " *
+                        "displaced-scalar scratch and cannot assemble a scalar right-hand side " *
+                        "under `PhaseShift` dealiasing. Rebuild it with `scalar = true`."))
   product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
   _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, product_spectral, domain.dealias, -1)   # primary −𝔻∇·(uφ)

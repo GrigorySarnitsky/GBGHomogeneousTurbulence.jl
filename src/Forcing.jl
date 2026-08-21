@@ -58,21 +58,18 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
        set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 
-# Is the band observable numerically indistinguishable from an empty band? The test is RELATIVE to
-# the field's own scale, not an absolute constant. The scalar equation is exactly linear in φ, so
-# φ → sφ with ε_φ → s²ε_φ is an exact symmetry of the forced problem — an absolute floor breaks it,
-# silently switching the forcing off for any run whose amplitudes happen to be small (and in Float32,
-# where 1e-12 is already near the representable noise, for many ordinary ones). Scaling by the whole
-# field's observable makes the guard answer the question it is actually asking: is there anything in
-# the band, compared with what is in the field?
+# Is there anything in the band to rescale? The test carries NO absolute scale, which is what the
+# forced problem requires: the scalar equation is exactly linear in φ, so φ → sφ with ε_φ → s²ε_φ is
+# an exact symmetry, and any constant floor breaks it — silently switching the forcing off for a run
+# whose amplitudes happen to be small, and in Float32 for many ordinary ones.
 #
-# The multiplier is generous rather than tight: a band holding less than ~1e-12 of the field's total
-# is empty for any purpose, and being conservative here costs nothing because the alternative branch
-# is "do not force this step".
-_band_is_empty(band_value, total_value) =
-  band_value <= eps(typeof(band_value)) * total_value ||
-  band_value <= 1e-12 * total_value ||
-  !(band_value > zero(band_value))
+# Positivity is the whole test, and it needs no second reduction. An earlier attempt normalized the
+# band observable by the WHOLE-FIELD observable, which was scale-free but bought it with an extra
+# `inner(field, field)` every step — a full vector pass and a device-to-host readback, computed twice
+# over on the `:total` branch where the rescale needs the same number again, and unaccounted for in
+# both frozen audit ledgers. Multiplying by s² cannot change a sign, so the sign alone already has
+# the invariance; the reduction was paying for nothing.
+_band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_value))
 
 
 """
@@ -228,7 +225,12 @@ end
 # The observable a forcing `target` agrees with: kinetic energy ½⟨|u|²⟩ for the velocity (a vector
 # field, tensor order 1), scalar variance ⟨φ²⟩ for the scalar (order 0) — the ½ convention only for the
 # vector, matching `Observables.kinetic_energy` / `Observables.scalar_variance`.
-_target_factor(field) = field_tensor_order(field) == 0 ? 1.0 : 0.5
+# An `Int` and a `Rational`, not floating literals: `0.5` is a `Float64` and promoted every band
+# observable — and the amplitude derived from it — off a Float32 run's element type, which the rest of
+# the observable surface is pinned to preserve. Exact types multiply through without promoting and
+# without asking the field what its element type is, so this needs no accessor and works against any
+# field-like value a caller substitutes.
+_target_factor(field) = field_tensor_order(field) == 0 ? 1 : 1 // 2
 
 
 """
@@ -312,6 +314,12 @@ function BandRescaling(domain::FixedDomain; target::Real, over::Symbol,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
   over in (:band, :total) ||
     throw(ArgumentError("BandRescaling `over` must be :band or :total; got :$over"))
+  # The target is an energy or a variance — both non-negative — and the rescale takes its square
+  # root, so a negative value surfaced as a bare `DomainError` out of `sqrt` naming nothing.
+  target >= 0 ||
+    throw(ArgumentError("BandRescaling `target` must be non-negative, got $target: it is the " *
+                        "kinetic energy or scalar variance the forcing holds, and the rescale " *
+                        "takes its square root"))
   return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over)
 end
 
@@ -319,7 +327,7 @@ end
 function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
   band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
-  _band_is_empty(band_value, factor * inner(field, field)) && return field   # nothing in the band yet
+  _band_is_empty(band_value) && return field           # nothing in the band yet
   # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
   target_band = if forcing.over === :total
     total_value = factor * inner(field, field)         # the observable over the whole field
@@ -438,8 +446,8 @@ uses_linear_rate(::ConstantPower) = true
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
-  amplitude = _band_is_empty(band_observable, _target_factor(field) * inner(field, field)) ?
-              0.0 : forcing.injection_rate / (2 * band_observable)
+  amplitude = _band_is_empty(band_observable) ? 0.0 :
+              forcing.injection_rate / (2 * band_observable)
   rate .= T(amplitude) .* forcing.indicator
   return rate
 end
@@ -500,6 +508,15 @@ end
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
                       lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0)
+  # Both are documented non-negative and neither was checked: the variance's square root is taken
+  # when the increment is scaled, so a negative one surfaced as a bare `DomainError` from `sqrt` two
+  # frames away, naming nothing the caller had typed.
+  variance >= 0 ||
+    throw(ArgumentError("`variance` must be non-negative, got $variance: it is the stationary " *
+                        "variance the process holds, and its square root sets the noise amplitude"))
+  correlation_time > 0 ||
+    throw(ArgumentError("`correlation_time` must be positive, got $correlation_time: it is the " *
+                        "Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
   band = _shell_band(domain, lowest_shell, highest_shell)
   return StochasticOU(band, float(correlation_time), float(variance), MersenneTwister(seed),
                       nothing, nothing, nothing)

@@ -159,6 +159,13 @@ device readback); it throws an `ErrorException` when no deposit is current, like
 """
 function max_speed end
 
+# `maximum(norm, u)` and not `lpnorm(u, Inf)`, which returns the identical number. The choice is a
+# measured trade, and it goes the way invariant 4 sets: `norm` on a fibre is StaticArrays'
+# overflow-guarded implementation, which rescales by the largest component before squaring, and that
+# guard costs ~2.9x the plain magnitude and ~1.7x `lpnorm` on this whole-grid reduction — but
+# `lpnorm(u, Inf)` ALLOCATES (2 MiB at 16³ here, scaling with the grid) while this route allocates
+# nothing. A per-step allocation in the hot loop is the thing the footprint invariant forbids
+# outright, so the compute cost is the one to accept. Measured both ways rather than argued.
 max_speed(u) = maximum(norm, u)
 
 

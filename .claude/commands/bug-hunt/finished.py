@@ -108,6 +108,20 @@ def _round():
     return True, f"pass {last['round']} closed with a clean follow-up"
 
 
+@check("no test file locates another by counting `..` hops")
+def _no_hop_paths():
+    # A witness is authored under .claude/bug-hunt/witnesses/ and PROMOTED into test/regressions/, so
+    # a path counted from its original depth resolves outside the repository the moment it moves —
+    # and the failure lands in the SUITE, not in the witness gate, which is why it keeps surviving a
+    # green gate. `pkgdir` is depth-independent. This has recurred across two rounds; hence a check.
+    import glob, re
+    hop = re.compile(r'joinpath\(@__DIR__(?:\s*,\s*"\.\.")+')
+    hits = [p for p in glob.glob(os.path.join(ROOT, "test", "regressions", "*.jl"))
+                   + glob.glob(os.path.join(WIT, "*.jl"))
+            if hop.search(open(p, encoding="utf-8").read())]
+    return not hits, ("none" if not hits else "; ".join(os.path.basename(h) for h in hits))
+
+
 @check("nothing is left uncommitted")
 def _clean():
     r = run("git", "status", "--porcelain", "src", "test", "docs", "CLAUDE.md", ".claude/commands")
