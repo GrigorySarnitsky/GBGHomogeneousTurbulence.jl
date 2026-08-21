@@ -58,10 +58,21 @@ export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, Const
        set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
 
 
-# Below this, the band observable is numerically indistinguishable from an empty band and the
-# amplitude it divides would be meaningless. One named floor, because two forcings guard the SAME
-# quantity with it and two bare literals can drift apart silently.
-const _BAND_OBSERVABLE_FLOOR = 1e-12
+# Is the band observable numerically indistinguishable from an empty band? The test is RELATIVE to
+# the field's own scale, not an absolute constant. The scalar equation is exactly linear in φ, so
+# φ → sφ with ε_φ → s²ε_φ is an exact symmetry of the forced problem — an absolute floor breaks it,
+# silently switching the forcing off for any run whose amplitudes happen to be small (and in Float32,
+# where 1e-12 is already near the representable noise, for many ordinary ones). Scaling by the whole
+# field's observable makes the guard answer the question it is actually asking: is there anything in
+# the band, compared with what is in the field?
+#
+# The multiplier is generous rather than tight: a band holding less than ~1e-12 of the field's total
+# is empty for any purpose, and being conservative here costs nothing because the alternative branch
+# is "do not force this step".
+_band_is_empty(band_value, total_value) =
+  band_value <= eps(typeof(band_value)) * total_value ||
+  band_value <= 1e-12 * total_value ||
+  !(band_value > zero(band_value))
 
 
 """
@@ -308,7 +319,7 @@ end
 function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
   band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
-  band_value < _BAND_OBSERVABLE_FLOOR && return field  # nothing in the band yet (guard)
+  _band_is_empty(band_value, factor * inner(field, field)) && return field   # nothing in the band yet
   # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
   target_band = if forcing.over === :total
     total_value = factor * inner(field, field)         # the observable over the whole field
@@ -427,8 +438,8 @@ uses_linear_rate(::ConstantPower) = true
 function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
   band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
-  amplitude = band_observable > _BAND_OBSERVABLE_FLOOR ?
-              forcing.injection_rate / (2 * band_observable) : 0.0
+  amplitude = _band_is_empty(band_observable, _target_factor(field) * inner(field, field)) ?
+              0.0 : forcing.injection_rate / (2 * band_observable)
   rate .= T(amplitude) .* forcing.indicator
   return rate
 end

@@ -271,6 +271,15 @@ function Simulation(domain::FixedDomain;
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
+  # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
+  # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
+  # argument that caused it. Likewise a scalar variance, ⟨φ²⟩ ≥ 0.
+  kinetic_energy > 0 ||
+    throw(ArgumentError("`kinetic_energy` must be positive, got $kinetic_energy: it is " *
+                        "k = ½⟨|u|²⟩, which cannot be negative, and a zero-energy field has no " *
+                        "spectrum to seed"))
+  scalar_variance >= 0 ||
+    throw(ArgumentError("`scalar_variance` must be non-negative, got $scalar_variance: it is ⟨φ²⟩"))
   side_length = domain.grid.domain_size[1]
   ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
   # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
@@ -280,6 +289,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
   if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
     resolution = isnothing(κ_max_η) ? 2 : κ_max_η
+    # `kolmogorov_length`'s η = (ν³/ε)^(1/4), inverted: with κ_max·η fixed at `resolution`,
+    # η = resolution/κ_max and ν = (ε η⁴)^(1/3). No inverse of that law exists to call, so the
+    # arithmetic stays here — but the two are pinned against each other by a round-trip test
+    # (solve for ν, then measure η through `kolmogorov_length` and recover `resolution`), so neither
+    # can drift from the other in silence.
     ν = ε^(1//3) * (resolution / max_wavenumber(domain))^(4//3)
     # Through the canonical reduction, not a second spelling of it: `integral_scale` does not enter
     # Re_λ, so any positive value serves — the measured-state bridge is what owns this formula.
@@ -403,6 +417,8 @@ function cfl_timestep(sim::Simulation)
   N = size(field_data(sim.cache.velocity_physical), 1)
   Δx = Float64(sim.domain.grid.domain_size[1]) / N
   speed = max_speed(sim.cache)
+  # Kept for a direct `cfl_timestep(sim)` call; `advance!` guards its own path independently, since
+  # a hand-fixed `dt` never reaches here.
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
   return speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
 end
@@ -420,6 +436,13 @@ if any, by Heun-in-time on the start- and end-of-step velocities, and updates th
 Returns `sim`.
 """
 function advance!(sim::Simulation; dt = nothing)
+  # A step must be positive whichever route set it. `AdamsBashforth` already refuses a non-positive
+  # step where it would poison the sample history, but a one-step scheme silently no-ops on `dt = 0`
+  # and integrates backwards on a negative one, so the front door checks it for every scheme.
+  if dt !== nothing
+    Float64(dt) > 0 ||
+      throw(ArgumentError("`dt` must be positive, got $dt"))
+  end
   Δt = dt === nothing ? cfl_timestep(sim) : Float64(dt)
 
   # The checked read at the iteration's start: the advance's v₁ must be the particle velocities the previous
@@ -444,6 +467,14 @@ function advance!(sim::Simulation; dt = nothing)
     deposit_sample!(sim.cache)
   end
   check_deposits(sim.cache)
+
+  # The blow-up guard belongs to the ADVANCE, and it belongs AFTER the closing deposit. It lived only
+  # inside `cfl_timestep`, so a run driven with a hand-fixed `dt` — the documented way to take a fixed
+  # step — never reached it at all. Checking on entry is not enough either: the step that first
+  # produces a non-finite field deposits it and returns normally, and only the NEXT call would notice.
+  # Here the iteration refuses to report success on a state it has just made non-finite.
+  isfinite(max_speed(sim.cache)) ||
+    error("non-finite velocity at step $(sim.clock.step + 1): the run appears to have blown up")
 
   sim.clock.time += Δt
   sim.clock.step += 1

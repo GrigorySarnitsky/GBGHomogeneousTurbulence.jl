@@ -278,8 +278,14 @@ struct SaffmanDissipation <: DissipationFactor end
 dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 
 
+# The `Reference` is NOT a field. It is a property of the parametrization — the (large-scale,
+# dissipation) pair that names a published model — not of a particular instance's coefficients, and
+# holding it here made the struct a non-bitstype: a `Reference` carries strings. That blocked the one
+# place a model is evaluated on a device, the `initial_spectrum` seeding closure, because a lazy
+# radial kernel captures its σ by value and a device rejects a non-bitstype capture at launch. So a
+# `Phenomenology`-seeded run could not start on a GPU at all.
 """
-    ModelSpectrum(C_K, large_scale, dissipation, ref)
+    ModelSpectrum(C_K, large_scale, dissipation)
 
 The composed model energy spectrum
 
@@ -303,18 +309,16 @@ spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelo
 [`VonKarmanLarge`](@ref)).
 
 # Fields
-The plain constructor `ModelSpectrum(C_K, large_scale, dissipation, ref)` takes the four fields
+The plain constructor `ModelSpectrum(C_K, large_scale, dissipation)` takes the three fields
 directly, in the order shown:
 - `C_K` — the Kolmogorov constant of the inertial-range core.
 - `large_scale` — the `LargeScaleFactor` giving ``f_L``.
 - `dissipation` — the `DissipationFactor` giving ``f_\\eta``.
-- `ref` — the `Reference` reported as the model's provenance.
 """
 struct ModelSpectrum{L<:LargeScaleFactor, D<:DissipationFactor} <: EnergySpectrum
   C_K::Float64
   large_scale::L
   dissipation::D
-  ref::Reference
 end
 
 spectrum(m::ModelSpectrum, κ, fp::FlowParameters) =
@@ -322,7 +326,16 @@ spectrum(m::ModelSpectrum, κ, fp::FlowParameters) =
   large_scale_factor(m.large_scale, κ * large_scale_length(m.large_scale, fp)) *
   dissipation_factor(m.dissipation, κ * kolmogorov_length(fp))
 
-provenance(m::ModelSpectrum) = m.ref
+provenance(m::ModelSpectrum) = _reference(m.large_scale, m.dissipation)
+
+# One published reference per strategy pair. An ad-hoc pairing has no published source, and saying so
+# is more useful than inventing one.
+_reference(::PopeLargeScale, ::PopeDissipation) = _POPE2000
+_reference(::VonKarmanLarge, ::UnitDissipation) = _VONKARMAN1948
+_reference(::UnitLargeScale, ::PaoDissipation) = _PAO1965
+_reference(::LargeScaleFactor, ::DissipationFactor) =
+  throw(ArgumentError("this combination of large-scale and dissipation factors is not a published " *
+                      "model, so it has no reference; the named presets each carry one"))
 
 
 const _POPE2000 = Reference("Pope (2000), *Turbulent Flows* (Cambridge University Press), §6.5. [doi:10.1017/CBO9780511840531](https://doi.org/10.1017/CBO9780511840531)"; valid_Reλ = (30.0, Inf))
@@ -345,7 +358,7 @@ plain structs.
 const Pope2000 = ModelSpectrum{PopeLargeScale, PopeDissipation}
 
 Pope2000(; C_K = 1.5, c_L = 6.78, p₀ = 2.0, c_η = 0.40, β = 5.2) =
-  ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β), _POPE2000)
+  ModelSpectrum(C_K, PopeLargeScale(c_L, p₀), PopeDissipation(c_η, β))
 
 
 const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* **34**, 530. [doi:10.1073/pnas.34.11.530](https://doi.org/10.1073/pnas.34.11.530)"; valid_Reλ = (0.0, Inf))
@@ -370,7 +383,7 @@ dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constru
 const VonKarman1948 = ModelSpectrum{VonKarmanLarge, UnitDissipation}
 
 VonKarman1948(; C_K = 1.5, c_L = 1.0) =
-  ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation(), _VONKARMAN1948)
+  ModelSpectrum(C_K, VonKarmanLarge(c_L), UnitDissipation())
 
 
 const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063. [doi:10.1063/1.1761356](https://doi.org/10.1063/1.1761356)"; valid_Reλ = (0.0, Inf))
@@ -393,7 +406,7 @@ roll-off, so `spec isa Pao1965` holds for a value this constructor returns.
 """
 const Pao1965 = ModelSpectrum{UnitLargeScale, PaoDissipation}
 
-Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K), _PAO1965)
+Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K))
 
 
 """

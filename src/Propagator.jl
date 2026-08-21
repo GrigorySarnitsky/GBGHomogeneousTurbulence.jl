@@ -44,7 +44,7 @@ using ..Generator: ResolvedGenerator, prepare!, finalize!,
                    velocity_rhs!, scalar_rhs!, velocity_integrating_factor, scalar_integrating_factor
 using ..State: ResolvedFields
 using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-               fields_modified!,
+               fields_modified!, advance_fields_epoch!,
                take_velocity!, take_vorticity!, take_scalar!,
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
@@ -324,8 +324,12 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
-  return û, φ̂
+  advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
+  # `state`, as the single home docstring says and as the in-place convention requires.
+  # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
+  # documented shape — `state = step!(...)` — silently rebound `state` to a Tuple and the
+  # next call failed on a type nothing in the docs had mentioned.
+  return state
 end
 
 
@@ -427,8 +431,12 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
-  fields_modified!(cache)                     # the step advanced the fields — the cache goes stale
-  return û, φ̂
+  advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
+  # `state`, as the single home docstring says and as the in-place convention requires.
+  # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
+  # documented shape — `state = step!(...)` — silently rebound `state` to a Tuple and the
+  # next call failed on a type nothing in the docs had mentioned.
+  return state
 end
 
 

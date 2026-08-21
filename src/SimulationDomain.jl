@@ -249,9 +249,16 @@ end
 # Both sharp strategies keep a ball of radius (retained fraction)·κ_Ny. The fraction is read from
 # `_retained_nyquist_fraction` rather than re-spelled here, so the band this BUILDS and the cutoff
 # `max_wavenumber` REPORTS cannot drift apart.
+# The retained cutoff, in ONE expression and ONE element type. Computing it as
+# `T(fraction) * (N/2) * (2π/L)` here while `max_wavenumber` reported `fraction * (N/2) * (2π/L)` in
+# Float64 made the two disagree on a Float32 grid: rounding the fraction to Float32 FIRST lands
+# slightly above the exact 2/3, so the band actually built was wider than the cutoff advertised —
+# and κ_max·η, the resolution criterion a run is judged by, was computed from the advertised one.
+_cutoff_wavenumber(strategy, N, L, ::Type{T}) where {T} =
+  T(_retained_nyquist_fraction(strategy)) * T(N / 2) * T(2π / L)
+
 _build_dealias(strategy::Union{TwoThirds, PhaseShift}, reference, multipliers, N, L, ::Type{T}) where {T} =
-  spectral_cutoff(reference, multipliers,
-                  T(_retained_nyquist_fraction(strategy)) * (N / 2) * (2π / L))
+  spectral_cutoff(reference, multipliers, _cutoff_wavenumber(strategy, N, L, T))
 
 function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}) where {T}
   # The smooth filter is a closed-form radial symbol; the closure captures VALUES only (a captured
@@ -298,7 +305,10 @@ up to meet.
 """
 function max_wavenumber(domain::FixedDomain)
   N = physical_field_shape(domain.grid, Val(0))[1]
-  return _retained_nyquist_fraction(domain.dealiasing) * (N / 2) * (2π / domain.grid.domain_size[1])
+  L = domain.grid.domain_size[1]
+  # Through the same expression, in the same element type, that `_build_dealias` truncates with —
+  # so the number reported here is the band the domain actually keeps.
+  return _cutoff_wavenumber(domain.dealiasing, N, L, typeof(L))
 end
 
 

@@ -35,6 +35,9 @@
 //   strength — 'economy' (DEFAULT: hunt lanes on the cheap model, reproduction at full strength)
 //              | 'full'  (everything at the session model)
 //   lanes    — optional subset, by key or number, for re-running a dead lane
+//   round    — the round number; prefixes every witness filename so a later round cannot overwrite
+//              an earlier round's promoted regression test (measured: it did, and the suite then
+//              failed for what looked like a bad fix)
 //
 // The reproduction stage is NEVER economized, in either mode. A cheap hunter that invents a
 // candidate costs one reproduction that fails to reproduce; a cheap reproducer that mis-runs a
@@ -49,6 +52,8 @@ const A = typeof args === 'string' ? JSON.parse(args) : (args || {})
 const REPO = A.repo
 const PILE = A.pile
 const STRENGTH = A.strength === 'full' ? 'full' : 'economy'
+// Witness filenames must not collide across rounds — see the slug instruction below.
+const ROUND = A.round === undefined ? '' : `r${A.round}-`
 if (!REPO || !PILE) throw new Error('bug-hunt needs { repo, pile } as absolute paths')
 
 const CANDIDATE_SCHEMA = {
@@ -255,7 +260,10 @@ return NO-WITNESS-POSSIBLE and say what would have to change for it to bite. Tha
 outcome and is reported separately — it is not a bug.
 
 Number your witness ${String(i + 1).padStart(2, '0')} within lane "${lane.key}", i.e. use the slug
-"${lane.key}-${String(i + 1).padStart(2, '0')}".
+"${ROUND}${lane.key}-${String(i + 1).padStart(2, '0')}". The round prefix is not decoration: every
+round numbers its lanes from 01, so without it a later round's still-failing witness OVERWRITES an
+earlier round's passing regression test of the same name — which destroys the older test and makes
+the suite fail for what looks like a bad fix.
 
 OUTPUT: the structured object. \`observed\` must contain the ACTUAL evidence — the failing @test line
 as printed, or the two quoted blocks — not a description of it.`,

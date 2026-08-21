@@ -354,9 +354,23 @@ the iteration's closing deposit then restores the cache. After a hand-made mutat
 run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 
+It also discards the Lagrangian **sample history** this cache carries. Those samples are the velocity
+measured along the trajectory *through the state being replaced*, so a multistep trajectory scheme
+integrating over them would blend the old field into the new one. The run's own field advance is not
+such a change and keeps its history.
+
 Returns `cache`.
 """
-fields_modified!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
+fields_modified!(cache::ObservablesCache) =
+  (advance_fields_epoch!(cache); cache.history_filled = 0; cache)
+
+
+# The run's OWN field advance, which is not an out-of-band replacement and must not clear the sample
+# history: the samples it took are exactly what a multistep trajectory scheme integrates over next.
+# `step!` calls this at every stage, so clearing there would pin the scheme in its bootstrap forever
+# — the same trap the particles counterpart carries, and for the same reason: one verb was serving
+# both "the run advanced" and "someone replaced the state behind the run's back".
+advance_fields_epoch!(cache::ObservablesCache) = (cache.fields_epoch += 1; cache)
 
 
 # Invalidating the sample history is the whole reason it lives in this cache: the samples in it were

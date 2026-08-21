@@ -350,6 +350,12 @@ function integral_scale(û, domain::FixedDomain)
   # by the branch rather than by skipping an index, which a fused broadcast cannot do.
   total = sum(E)
   weighted = sum(broadcast((k, e) -> k > 0 ? e / k : zero(e), κ, E))
+  # A field with no energy has no integral scale, and 0/0 would hand back a silent NaN that then
+  # propagates into every derived quantity — a Reynolds number, a turnover time — with nothing to
+  # say where it came from. The seeders already refuse to produce such a field; a hand-built one can
+  # still reach here.
+  total > 0 ||
+    throw(ArgumentError("this velocity field carries no energy, so it has no integral scale"))
   return oftype(weighted, 3 * π / 4) * weighted / total
 end
 

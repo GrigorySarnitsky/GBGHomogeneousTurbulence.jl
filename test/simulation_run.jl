@@ -6,6 +6,7 @@
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
 using Random
@@ -240,5 +241,26 @@ using Test
     # the target symbol is validated at construction
     domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)
+  end
+end
+
+
+# The grid-mode ν solve is `kolmogorov_length`'s law inverted, spelled as bare arithmetic because no
+# inverse exists to call. That is a duplication a maintainer could break from either side, so the two
+# are pinned together here: solve for ν through the constructor, then measure η through the canonical
+# law and recover the κ_max·η that was asked for. A change to either spelling alone fails this.
+@testset "grid mode inverts kolmogorov_length, and the round trip closes" begin
+  k = 1.5                                    # passed explicitly, not inherited from the default
+  for target in (1.0, 1.5, 2.0, 3.0)
+    sim = Simulation(grid_points_per_axis = 32, κ_max_η = target, kinetic_energy = k,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1))
+    ν = sim.generator.conditions.viscosity
+    # The constructor solved with the Li2008 stationary ESTIMATE, not the measured dissipation of
+    # the seeded state, so the round trip must use the same estimate.
+    ε_design = stationary_dissipation(Li2008(), k, sim.domain.grid.domain_size[1])
+    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_design,
+                                         rms_velocity = sqrt(2k / 3), integral_scale = 1.0,
+                                         schmidt = 1.0))
+    @test max_wavenumber(sim.domain) * η ≈ target rtol = 1e-10
   end
 end
