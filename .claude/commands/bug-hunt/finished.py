@@ -127,6 +127,38 @@ def _round():
                   f"{last.get('refuted', 0)} refuted)")
 
 
+@check("the edits were independently audited (/audit-changes) and every serious finding answered")
+def _edit_audit():
+    """The witness gate cannot see this class, which is why the audit is a phase and not an extra.
+
+    A witness exists only for a defect the hunt happened to FIND. So a regression introduced by a
+    fix — an edit wider than the defect required, a changed default, a broken convenience method —
+    is invisible to the gate, and the gate scores it as zero damage. Measured on this repository:
+    the witness set reported NEWLY BROKEN = 0 while two regressions were live and confirmed by hand
+    (a CFL ceiling cutting the timestep 1.9x on ordinary runs, and a `fields_modified!(sim)` that
+    always threw). Both were found by an independent auditor reading the DIFF, and by nothing else.
+
+    So: the diff must be audited by agents that did not make it, and the audit must cover the
+    CURRENT edits — an audit of an older tree certifies nothing about the code as it stands.
+    """
+    # DELEGATED. The edit audit is `/audit-changes`, a standalone instrument with its own gate — it
+    # was lifted out of this one because the question it asks ("was this change proportionate?") is
+    # orthogonal to how the edits arose, and applies equally to a docs sweep or a hand edit. This
+    # check does not reimplement it; it runs that gate and adopts its verdict, so there is one
+    # definition of "audited" rather than two that can drift.
+    gate = os.path.join(ROOT, ".claude", "commands", "audit-changes", "gate.py")
+    if not os.path.exists(gate):
+        return False, "the /audit-changes gate is missing; the edit audit cannot be verified"
+    r = run("python3", gate)
+    out = (r.stdout or "") + (r.stderr or "")
+    if r.returncode == 2:
+        return False, "no audit on record — an unaudited change set is not a clean one"
+    if r.returncode != 0:
+        lines = [l.strip() for l in out.splitlines() if l.strip().startswith("!!")]
+        return False, "the edit audit is not closed: " + ("; ".join(lines[:3]) or out[-300:])
+    return True, "the /audit-changes gate is closed"
+
+
 @check("no test file locates another by counting `..` hops")
 def _no_hop_paths():
     # A witness is authored under .claude/bug-hunt/witnesses/ and PROMOTED into test/regressions/, so

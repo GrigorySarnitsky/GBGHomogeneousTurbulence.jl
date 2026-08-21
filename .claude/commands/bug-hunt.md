@@ -134,7 +134,7 @@ So the finding set is **fixed by one hunt**, and every finding leaves it in one 
 
 A finding in none of those is a **dropped** finding, and `finished.py` fails on the arithmetic.
 
-**Three verifiers, because the witness gate cannot cover everything:**
+**Four verifiers, because the witness gate cannot cover everything:**
 
 1. `witnesses.jl pass` — mechanical, covers every confirmed runtime and api-semantics finding.
 2. `verify-fixes.js` — the architecture class, which has no witness by nature. It hunts the
@@ -146,6 +146,15 @@ A finding in none of those is a **dropped** finding, and `finished.py` fails on 
    on the current tree" — a **blocker** — and `_base_cfl`'s fallback as "sanctioned by the contract",
    also wrong. Both surfaced only because a later hunt happened to re-raise them, which under this
    design would not happen. It defaults to **UNSAFE**.
+
+4. **`/audit-changes`** — **the edits themselves**, which no witness covers, and which is now a
+   STANDALONE INSTRUMENT rather than a phase of this one. A witness exists only for a defect the hunt
+   *found*, so a regression introduced by a *fix* is invisible to the gate: measured here, the witness
+   set reported `NEWLY BROKEN = 0` while two regressions were live and confirmed by hand. The question
+   it asks — was this change proportionate? — is orthogonal to how the edits arose, which is why it
+   was lifted out: it applies equally to a `/check-docs` sweep, a `/check-consistency` fix round, or a
+   change made by hand. Its lens set was settled by adversarial attack rather than by taste, and it
+   carries its own disposition gate. See `.claude/commands/audit-changes.md`.
 
 The verifier loop terminates because the finding set is finite. Run it until every finding is in one
 of the three states above; that is the whole of "closed".
@@ -174,7 +183,15 @@ julia --project -e 'using Pkg; Pkg.test()'
 #    dismissal is never revisited, and two of round 1's were wrong (one a blocker).
 Workflow({ scriptPath: ".claude/commands/bug-hunt/dismissals.js", args: { repo, dismissals: [...] } })
 
-# 7. Ask whether the work is finished. Exit 0 means yes; non-zero names what is not.
+# 7. AUDIT THE EDITS — mandatory, and it is `/audit-changes`, a separate instrument. A witness
+#    exists only for a defect the hunt FOUND, so a regression introduced by a FIX is invisible to
+#    the gate. Run it over this hunt's diff and answer every serious finding; its own gate refuses
+#    to close on an unanswered one, or on an audit that no longer describes the tree.
+git diff <base>..HEAD -- src test docs > /tmp/changes.diff
+Workflow({ scriptPath: ".claude/commands/audit-changes/audit.js", args: {...} })
+python3 .claude/commands/audit-changes/gate.py
+
+# 8. Ask whether the work is finished. Exit 0 means yes; non-zero names what is not.
 python3 .claude/commands/bug-hunt/finished.py
 ```
 
