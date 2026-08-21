@@ -37,8 +37,9 @@ using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
-import ..Cache: particles_modified!
+import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_particles_epoch!,
+               advance_fields_epoch!,
                velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
@@ -144,6 +145,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
+- `max_dt = Inf` — a ceiling on the adaptive timestep, stated in the run's own time units. The
+  advective rule ``\\Delta t = C\\Delta x / u_{\\max}`` diverges as a decaying flow approaches rest,
+  which is harmless until it is not: past some step the integrating factor annihilates every mode and
+  the clock advances by a number that means nothing. There is no unit-free ceiling to supply by
+  default — any constant is a claim about the velocity scale the caller happened to choose — so the
+  bound is theirs to set and is off unless they do.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -246,6 +253,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   trajectory_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
   cfl::Float64
+  max_dt::Float64          # a ceiling on the adaptive step, in the caller's own units; Inf = none
   clock::Clock
 end
 
@@ -263,7 +271,7 @@ function Simulation(domain::FixedDomain;
                     velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),
                     scalar_forcing = NoForcing(),
                     scheme::AbstractIntegrator = IFLowStorageRK3(),
-                    cfl::Real = recommended_cfl(scheme, domain),
+                    cfl::Real = recommended_cfl(scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
@@ -278,6 +286,8 @@ function Simulation(domain::FixedDomain;
     throw(ArgumentError("`number_of_particles` must be non-negative, got $number_of_particles: a " *
                         "negative count was silently routed to the tracer-free branch, so the run " *
                         "carried no tracers and never said so"))
+  max_dt > 0 ||
+    throw(ArgumentError("`max_dt` must be positive, got $max_dt"))
   cfl > 0 ||
     throw(ArgumentError("`cfl` must be positive, got $cfl: it scales the advective timestep " *
                         "Δt = cfl·Δx/u_max, so a non-positive value stops or reverses the clock"))
@@ -348,7 +358,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     (record_particle_velocities!(tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), scheme, state, cache,
                     tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
-                    Float64(cfl), Clock(0.0, 0))
+                    Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
@@ -432,18 +442,18 @@ function cfl_timestep(sim::Simulation)
   # Kept for a direct `cfl_timestep(sim)` call; `advance!` guards its own path independently, since
   # a hand-fixed `dt` never reaches here.
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
-  # Bounded above by the same value the zero-speed branch returns. As an unforced run decays,
-  # u_max → 0 and the advective rule alone diverges — measured running away to Δt ≈ 1e15, at which
-  # point the integrating factor annihilates every mode, the state stops moving, and the clock keeps
-  # adding 1e15 an iteration. The ceiling is the step this rule gives at unit speed, which is exactly
-  # what the resting case already used, so the two branches now agree in the limit instead of
-  # diverging from each other.
+  # The advective rule, unmodified, plus whatever ceiling the CALLER asked for.
   #
-  # NOT a diffusive limit: diffusion is advanced EXACTLY by the integrating factor here, so it
-  # imposes no stability constraint to bound against — a ceiling of Δx²/ν would be reasoning from a
-  # restriction this solver does not have.
-  ceiling = sim.cfl * Δx
-  return speed > 0 ? min(sim.cfl * Δx / speed, ceiling) : ceiling
+  # A ceiling of `cfl*Δx` stood here briefly and was wrong in a way worth recording: it is the step
+  # this rule gives at UNIT SPEED, so it binds for every run whose characteristic velocity is below
+  # 1 — a property of the units the caller chose, not of the physics. Six independent audit lanes
+  # caught it; measured, it cut Δt by 1.9x at t = 0 on an ordinary decaying run. The runaway it
+  # aimed at is real (u_max → 0 sends this to ~1e15, the integrating factor then annihilates every
+  # mode, and the clock advances by a number that means nothing), but the bound for it has to be
+  # stated in the caller's own units, which is what `max_dt` is for. Defaulting to `Inf` keeps the
+  # documented rule Δt = cfl·Δx/u_max exactly as it was.
+  advective = speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
+  return min(advective, sim.max_dt)
 end
 
 
