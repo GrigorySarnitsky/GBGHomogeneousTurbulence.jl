@@ -37,8 +37,8 @@ The interchangeable energy-injection strategies:
 A strategy acts on the step through up to four methods, each defaulting to doing nothing, listed in
 the order the step calls them:
 - [`prepare_forcing!`](@ref) — advance the forcing's own internal state, once per step.
-- [`set_forcing_rate!`](@ref) — supply a linear forcing rate to be folded into the integrating
-  factor; [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
+- [`set_forcing_rate!`](@ref) — supply a *steady* linear rate, folded into the integrating factor;
+  [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
 
@@ -49,15 +49,17 @@ construction-time object, not a lifecycle hook.
 The strategies, one implementation each serving both the velocity and the scalar through
 tensor-order-generic field operators:
 - [`NoForcing`](@ref) — leave the field undriven.
-- [`VarianceRescaling`](@ref) — hold a band's amplitude by deterministic rescaling.
 - [`Linear`](@ref) — a fixed linear rate on a band.
-- [`ConstantPower`](@ref) — a linear rate re-solved each step to hold the injection rate.
+- [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate.
+- [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
+- [`VarianceRescaling`](@ref) — hold a band's amplitude by deterministic rescaling, at first order.
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
-run?** A strategy's canonical band — `lowest_shell = 1`, `highest_shell = 2`, the large-scale band of
-homogeneous isotropic turbulence — is a property of the method and defaults. What a run holds fixed —
-`target`, `rate`, and `VarianceRescaling`'s `over` — has no canonical value and is therefore required. So a default here never hides a
-choice you needed to make. The two fields are forced **independently**:
+run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
+a run holds fixed — `target`, `rate`, `over` — has no canonical value and is required. A default
+here never hides a choice you needed to make.
+
+The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
 `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
 
@@ -181,9 +183,15 @@ set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate
 """
     uses_steady_linear_rate(forcing) -> Bool
 
-Whether `forcing` drives its field through a linear per-mode rate — that is, whether it implements
+Whether `forcing` drives its field through a per-mode rate that is **constant in time**, and can
+therefore be folded into the integrating factor — that is, whether it implements
 [`set_forcing_rate!`](@ref). The default is `false`; a forcing that does implement the hook **must**
 declare it `true`.
+
+*Steady*, not merely linear, is the load-bearing word: a per-mode rate re-solved from the state each
+step must **not** declare this. Freezing it would be the left-endpoint rectangle rule on
+``\\int A\\,\\mathrm dt``, dropping the scheme to first order; such a forcing goes through
+[`add_forcing_source!`](@ref) instead.
 
 The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only for a forcing that
 declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
@@ -476,25 +484,29 @@ end
     VarianceController(; target, gain = 1.0, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
 
-Hold the band's variance at `target` by feedback, with the constant-``k`` controller of Bassenne,
+Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
+``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of Bassenne,
 Urzay, Park & Moin (2016, [doi:10.1063/1.4944629](https://doi.org/10.1063/1.4944629)).
 
-Use it in preference to [`VarianceRescaling`](@ref) whenever the run's accuracy in time matters,
-which is nearly always: this forcing enters the right-hand side as a smooth rate the time-stepping
-scheme integrates, so the scheme keeps the order it advertises, while a rescaling is a projection
-applied after the step and caps the whole iteration at first order however good the scheme is.
+Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, which is nearly always:
+it enters the right-hand side as a smooth rate the scheme integrates, keeping the order the scheme
+advertises, where a rescaling is a post-step projection that caps the iteration at first order.
 
 The rate is the marginal law ``A = \\varepsilon/2k`` plus a proportional restoring term:
 
 ```math
-A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k_f(t) - k_\\infty]/t_\\ell}{2k_f(t)}
+A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\ell}{2k_f(t)}
 \\quad\\text{in the band, } 0 \\text{ outside,}
 ```
 
-so that ``\\mathrm{d}k_f/\\mathrm{d}t = -G(k_f - k_\\infty)/t_\\ell`` exactly: the band variance
-relaxes exponentially to a **stable attractor** with settling time ``t_\\ell/G``. Without the
-restoring term the marginal law makes every ``k`` an equilibrium and the variance random-walks with
-nothing to return it — which is what the rate-clamping forcings do.
+so that ``\\mathrm{d}k/\\mathrm{d}t = -G(k - k_\\infty)/t_\\ell`` exactly: the variance relaxes
+exponentially to a **stable attractor** with settling time ``t_\\ell/G``. Without the restoring term
+the marginal law makes every ``k`` an equilibrium and the variance random-walks with nothing to
+return it — which is what the rate-clamping forcings do.
+
+The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held, and
+``k_f`` the forced band's, dividing out because the forcing injects only there. Restoring toward
+``k_f`` would hold the *band* and let ``k`` settle wherever the cascade puts it.
 
 The mechanism is the one molecular dynamics settled on for the same problem. Holding a quantity fixed
 by rescaling the field every step is naive velocity rescaling; extending the dynamics with a feedback
@@ -504,8 +516,8 @@ al. 1984, [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deter
 limit is [`VarianceRescaling`](@ref).
 
 # Arguments
-- `target` — the band variance ``k_\\infty`` to hold, in the field's own convention: the kinetic
-  energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
+- `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
+  kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
 - `gain = 1.0` — the dimensionless gain ``G``. Larger relaxes faster; Bassenne report ``O(1-10)``.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell``. When omitted it is taken as
   ``2k_\\infty/3\\varepsilon_\\infty`` with ``\\varepsilon_\\infty`` the stationary estimate for
@@ -531,12 +543,15 @@ end
 function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
                             turnover_time = nothing, lowest_shell::Integer = 1,
                             highest_shell::Integer = 2)
-  target > 0 ||
-    throw(ArgumentError("`target` must be positive, got $target: it is the variance the controller " *
-                        "holds, and the rate divides by the band's own variance"))
-  gain > 0 ||
-    throw(ArgumentError("`gain` must be positive, got $gain: a non-positive gain makes the " *
-                        "restoring term push the variance AWAY from the target"))
+  # Finite AND positive, as the codebase's other positive-scalar guards read: `Inf` passes `> 0` and
+  # then propagates a NaN amplitude into the right-hand side, which surfaces as a blown-up run far
+  # from the constructor that accepted it.
+  (isfinite(target) && target > 0) ||
+    throw(ArgumentError("`target` must be finite and positive, got $target: it is the variance the " *
+                        "controller holds, and the rate divides by the band's own variance"))
+  (isfinite(gain) && gain > 0) ||
+    throw(ArgumentError("`gain` must be finite and positive, got $gain: a non-positive gain makes " *
+                        "the restoring term push the variance AWAY from the target"))
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
   # the same estimate the grid-mode viscosity solve uses, so the two agree on what "stationary" means.
@@ -544,7 +559,8 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
        2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
                                                                  domain.grid.domain_size[1])) :
        float(turnover_time)
-  tℓ > 0 || throw(ArgumentError("`turnover_time` must be positive, got $turnover_time"))
+  (isfinite(tℓ) && tℓ > 0) ||
+    throw(ArgumentError("`turnover_time` must be finite and positive, got $turnover_time"))
   # promote, not three independent `float`s: the struct ties `target`, `gain` and `relaxation_time` to
   # ONE parameter, so a Float32 target with the Float64 default gain has no matching constructor.
   return VarianceController(band, promote(float(target), float(gain), tℓ)...)

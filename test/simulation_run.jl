@@ -267,4 +267,30 @@ end
                                          schmidt = 1.0))
     @test max_wavenumber(sim.domain) * η ≈ target rtol = 1e-10
   end
+
+
+  @testset "the default run holds the kinetic energy grid mode calibrated it against" begin
+    # Grid mode chooses ν from the ASSUMED kinetic energy, so κ_max·η is self-consistent only if the
+    # run really holds k there. That makes this an end-to-end check of a *precondition*, not a
+    # forcing unit test: it is the only place the calibration's assumption is confronted with the
+    # integrated trajectory. It caught nothing when written, because it did not exist — the audit
+    # measured k settling ~30% high under a controller restoring toward the band instead of the field.
+    for k_target in (1.5, 0.8)
+      sim = Simulation(grid_points_per_axis = 24, kinetic_energy = k_target)
+      for _ in 1:200; advance!(sim); end
+      k = kinetic_energy(sim.state.velocity_spectral)
+      @test isapprox(k, k_target; rtol = 0.05)
+    end
+
+    # And it converges TO the target rather than merely starting there. The initial condition is
+    # seeded well below the controller's target — through the constructor, since the cache refuses a
+    # state mutated behind its back — so the run has to climb, which a band-restoring controller
+    # would not do to the whole field.
+    sim = Simulation(grid_points_per_axis = 24, viscosity = 0.05, kinetic_energy = 0.4,
+                     velocity_forcing = VarianceController(target = 1.5))
+    û = sim.state.velocity_spectral
+    @test kinetic_energy(û) < 0.6
+    for _ in 1:600; advance!(sim); end
+    @test isapprox(kinetic_energy(û), 1.5; rtol = 0.1)
+  end
 end
