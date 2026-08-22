@@ -91,11 +91,10 @@ through the cache's deposited observables (`velocity_physical(sim.cache)`); summ
 # Setting the Reynolds number
 
 By default the run is **forced and stationary** — a
-[`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling) holds the whole-field kinetic
-energy at the value given by the
-[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword (`over = :total`)
-— and the viscosity is
-chosen from the grid rather than supplied:
+[`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) holds the whole-field
+kinetic energy at the value given by the
+[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword — and the
+viscosity is chosen from the grid rather than supplied:
 
 # Arguments
 
@@ -121,8 +120,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
-  operator-free constructor); `velocity_forcing` defaults to a `VarianceRescaling` holding the total
-  (whole-field) energy at the value given by the `kinetic_energy` keyword (`over = :total`), and
+  operator-free constructor); `velocity_forcing` defaults to a `VarianceController` holding the
+  whole-field kinetic energy at the value given by the `kinetic_energy` keyword, and
   `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
@@ -166,11 +165,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 
-!!! note "The default holds the kinetic energy fixed, so it is not a measurable of the default run"
-    `VarianceRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
-    energy at the target **value**, which pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and
-    suppresses the physical fluctuation of the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
-    ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
+!!! note "The default drives the kinetic energy to a set value, so read it as a control target"
+    `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
+    scale of ``\\mathrm{Re}_\\lambda``. It does not *impose* the value step by step as a rescale
+    does, so the fluctuation it leaves is genuine — but it is a controlled variable's fluctuation,
+    with the gain setting its amplitude. For the free fluctuation of ``k``, force with fixed
+    injection ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead.
 
   * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with
     the resolution criterion `κ_max_η`, in two steps.
@@ -201,9 +201,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
     are logged.
 
     One precondition: the choice is self-consistent only if the run really holds ``k`` at
-    `kinetic_energy`, which the front door's `VarianceRescaling(over = :total)` guarantees and `:band`
-    does not. Give the velocity a forcing that lets ``k`` float and the ``\\nu`` chosen here no
-    longer matches the run.
+    `kinetic_energy`. The default `VarianceController` does — its restoring term measures the
+    whole-field ``k`` — which is what makes this calibration legitimate. Give the velocity a forcing
+    that lets ``k`` float, or one holding some *other* quantity (a `VarianceRescaling(over = :band)`
+    holds the band instead), and the ``\\nu`` chosen here no longer matches the run.
 
   * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` rather than dropping one — for a decaying

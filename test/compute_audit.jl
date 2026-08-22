@@ -161,8 +161,17 @@ _forcing_transform_delta(tag, slot) =
 #           convolve [field r/w].
 #   linear — set_forcing_rate!: rate .= A·mask [mask (real) read + rate (spectral scalar) write],
 #           then the armed exponential reads the rate once per application.
-#   power — set_forcing_rate!: weighted_inner(field, band) [field read] + rate .= a·indicator
-#           [indicator (real) read + rate write] + per-application rate reads.
+#   power — add_forcing_source!, at EVERY right-hand-side evaluation (the amplitude tracks the band
+#           observable, so it cannot be armed once per step): weighted_inner(field, band)
+#           [1 field read; the band kernel is lazy, so no configuration array is read] + the
+#           accumulating convolve! [N̂ read, field read, N̂ write = 3] = 4 slot-shaped passes per
+#           evaluation. No rate array and no materialized indicator: both went with the rate route.
+#   controller — the same shape with two further reductions of the same field against different
+#           weights, since it holds the WHOLE-field variance while normalizing by the BAND's:
+#           inner(field, field) + weighted_inner(field, band) + weighted_inner(field, |κ|²)
+#           [3 field reads, all three kernels lazy] + the accumulating convolve! [3] = 6 slot-shaped
+#           passes per evaluation. The three reductions sharing one traversal is the fused
+#           multi-weight reduction the synchronization ledger's holder describes.
 #   ou    — prepare_forcing!: draw + band-limit + project + normalize + state fold (8 slot-shaped
 #           passes + the physical noise write; the unit-variance rescale folds into the state
 #           combination's coefficient), then the per-stage additive source read/accumulate
@@ -174,8 +183,11 @@ function _forcing_pass_delta(tag, slot, scheme)
   elseif tag === :linear
     return _ex(spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1)
   elseif tag === :power
-    return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1) :
-                                _ex(spectral_scalar = 2 + _applies(scheme), real_spectral_scalar = 1)
+    return slot === :velocity ? _ex(spectral_vector = 4 * _evals(scheme)) :
+                                _ex(spectral_scalar = 4 * _evals(scheme))
+  elseif tag === :controller
+    return slot === :velocity ? _ex(spectral_vector = 6 * _evals(scheme)) :
+                                _ex(spectral_scalar = 6 * _evals(scheme))
   end
   return slot === :velocity ?
     _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1) :
@@ -286,8 +298,13 @@ end
     @test NamedTuple{CLASSES}(Tuple(getproperty(_passes(with), c) - getproperty(_passes(without), c)
                                     for c in CLASSES)) ==
           _forcing_pass_delta(:ou, :velocity, :RK3)
-    for tag in (:none, :band, :linear, :power), slot in (:velocity, :scalar)
+    for tag in (:none, :band, :linear, :power, :controller), slot in (:velocity, :scalar)
       @test _forcing_transform_delta(tag, slot) == (c2r = 0, r2c = 0)
+    end
+    # Every tag must be MODELLED, not fall through to the OU catch-all. An unlisted tag silently
+    # priced as a stochastic forcing is the exact drift this round found in the `:power` cell.
+    for tag in (:band, :linear, :power, :controller)
+      @test _forcing_pass_delta(tag, :velocity, :RK3) != _forcing_pass_delta(:ou, :velocity, :RK3)
     end
   end
 

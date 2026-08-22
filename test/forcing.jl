@@ -6,7 +6,15 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
-using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner
+using GBGIsotropicTurbulence.Forcing: add_forcing_source!
+using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+
+
+# The two weighted reductions the controller's own kernel performs, written out here rather than
+# reached for, so the witness cannot be satisfied by reusing the code under test.
+inner_band(f, band) = weighted_inner(f, band)
+inner_kappa2(f, domain) = weighted_inner(f, domain.squared_wavenumber_kernel)
 using Random
 using Test
 
@@ -16,6 +24,12 @@ using Test
 struct UndeclaredRateForcing <: AbstractForcing end
 GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, field,
                                                  domain::FixedDomain) = (rate .= 1; true)
+
+
+# A forcing written to the source hook's pre-2026-08-22 three-argument form. Dispatch would fall
+# straight through to the do-nothing default, so the forcing would be silently ignored.
+struct StaleSourceForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, domain) = N̂
 
 
 @testset "forcing" begin
@@ -179,5 +193,57 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     # The declaration is a contract, and breaking it is loud: a forcing that fills a rate without
     # declaring one would be handed nothing and go silently unapplied, so construction rejects it.
     @test_throws ArgumentError generator(UndeclaredRateForcing())
+
+    # The same contract on the other hook: a strategy still written to the three-argument source
+    # form defines a method the run never calls, so construction refuses it rather than integrating
+    # an unforced run that reports nothing wrong. Every real strategy must pass unchallenged.
+    @test_throws ArgumentError generator(StaleSourceForcing())
+    for f in (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
+              ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
+              Linear(domain; rate = 0.1), StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
+      @test generator(f) isa ResolvedGenerator
+    end
+  end
+
+
+  @testset "VarianceController holds the WHOLE-field variance, normalizing by the band it forces" begin
+    # Bassenne et al. (2016) Eq. 20 puts two DIFFERENT reductions in two places: the forcing acts on
+    # the band, so the amplitude is normalized by k_f; the quantity held is the whole field, so the
+    # restoring term measures k. Using k_f in both holds the band instead and lets k settle wherever
+    # the cascade puts it — which is what this package shipped once, ~30% above the requested value.
+    # The witness works on the amplitude directly, so it cannot be satisfied by a lucky steady state.
+    target = 0.5
+    forcing = VarianceController(domain; target, gain = 1.0)
+    û = new_vector_field_spectral(domain); copyto!(field_data(û), field_data(û0))
+    N̂ = new_vector_field_spectral(domain); fill!(field_data(N̂), 0)
+    add_forcing_source!(forcing, N̂, û, domain, ν)
+
+    k_whole = 0.5 * inner(û, û)
+    k_band = 0.5 * inner_band(û, forcing.band)
+    ε = ν * inner_kappa2(û, domain)
+    expected = (ε - forcing.gain * (k_whole - target) / forcing.relaxation_time) / (2 * k_band)
+
+    # Recover the amplitude the hook applied: N̂ = A·𝟙_band·û, so compare against A·(band-projected û).
+    probe = new_vector_field_spectral(domain); copyto!(field_data(probe), field_data(û))
+    convolve!(probe, probe, forcing.band, one(T), zero(T))
+    applied = inner(N̂, probe) / inner(probe, probe)
+    @test isapprox(applied, expected; rtol = 1e-10)
+
+    # The discriminating half: with k_whole ≠ k_band the two models differ, and they do here.
+    wrong = (ε - forcing.gain * (k_band - target) / forcing.relaxation_time) / (2 * k_band)
+    @test !isapprox(applied, wrong; rtol = 1e-3)
+  end
+
+
+  @testset "the local stationary-dissipation estimate matches Phenomenology's Li2008" begin
+    # Forcing.jl spells the law locally because `Phenomenology` is an extraction-bound leaf it must
+    # not depend on. That duplication is deliberate and this is the pin that keeps the copy honest:
+    # the controller's default relaxation time and the grid-mode viscosity solve must agree on what
+    # "stationary for this box" means, or the run is driven toward a target on one clock and
+    # resolved on another. They disagreed by a factor of 2.68 when the copy was written by hand.
+    local_estimate = getfield(GBGIsotropicTurbulence.Forcing, :_stationary_dissipation_estimate)
+    for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)
+      @test local_estimate(k, L) ≈ stationary_dissipation(Li2008(), k, L)
+    end
   end
 end

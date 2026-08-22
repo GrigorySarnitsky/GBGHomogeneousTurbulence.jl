@@ -67,26 +67,35 @@ function measure(forcing, kind)
   û = new_vector_field_spectral(DOMAIN)
   random_solenoidal_velocity_spectral!(û, DOMAIN; kinetic_energy = 0.5,
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(11))
-  c = CF(û)
+  field = CF(û)
+  # BOTH sides are counted and BOTH are returned. The source hook accumulates into a DIFFERENT field
+  # from the one it reduces, so `convolve!`'s counter lands on the output double — and a witness that
+  # returned only the input double would report zero convolutions and pass whatever the code did.
+  # That is exactly how this test went vacuous when the state-dependent forcings moved to the source
+  # hook (2026-08-22): the term it was written to measure quietly stopped being measured.
+  out = CF(new_vector_field_spectral(DOMAIN))
   if kind === :apply
-    F.project_forcing!(forcing, c, DOMAIN)
+    F.project_forcing!(forcing, field, DOMAIN)
   elseif kind === :source
-    # The hook a state-dependent forcing uses since 2026-08-22 — evaluated at the STAGE field.
-    F.add_forcing_source!(forcing, CF(new_vector_field_spectral(DOMAIN)), c, DOMAIN, 0.05)
+    F.add_forcing_source!(forcing, out, field, DOMAIN, 0.05)
   else
-    F.set_forcing_rate!(forcing, new_scalar_field_spectral(DOMAIN), c, DOMAIN)
+    F.set_forcing_rate!(forcing, new_scalar_field_spectral(DOMAIN), field, DOMAIN)
   end
-  return c
+  return (; field, out)
 end
 
-const BAND  = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :band),  :apply)
-const TOTAL = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :total), :apply)
-const POWER = measure(ConstantPower(DOMAIN; injection_rate = 1.0),        :source)
+const BAND       = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :band),  :apply)
+const TOTAL      = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :total), :apply)
+const POWER      = measure(ConstantPower(DOMAIN; injection_rate = 1.0),            :source)
+const CONTROLLER = measure(VarianceController(DOMAIN; target = 1.0),               :source)
 
 # every reduction below returns a Julia scalar ⇒ one blocking device→host readback on a GPU
-readbacks(c) = c.inner + c.weighted_inner
-# a reduction reads the field once; the in-band rescale `convolve!` reads and writes it
-vector_passes(c) = c.inner + c.weighted_inner + 2 * c.convolve
+readbacks(m) = m.field.inner + m.field.weighted_inner
+# A reduction reads the field once. A rescale's `convolve!` is in place: read + write = 2. The
+# source hook's `convolve!` accumulates ACROSS two fields: N̂ read, field read, N̂ write = 3, which is
+# how test/audit_ops.jl prices `Op("add OU source", [out, ou_state], [out])`.
+rescale_passes(m) = readbacks(m) + 2 * m.field.convolve
+source_passes(m)  = readbacks(m) + 3 * m.out.convolve
 
 # how many `Sync` entries the optimality audit's model attributes to one velocity forcing
 model_syncs(tag; stages = 1) = count(s -> occursin("(velocity)", s.site),
@@ -94,17 +103,29 @@ model_syncs(tag; stages = 1) = count(s -> occursin("(velocity)", s.site),
                                                      stages))
 # how many spectral-vector passes the compute audit's model attributes to one velocity forcing
 model_vector_passes(tag) = PassModel._forcing_pass_delta(tag, :velocity, :RK3).spectral_vector
+# The source-routed models are quoted per STEP; `measure` exercises one stage.
+const EVALS_RK3 = 3
 
 
 @testset "the frozen audit models count every reduction the forcing hooks perform" begin
+  @testset "the measurement is not vacuous" begin
+    # The guard on the guard: if a hook stops convolving where this test expects it to, the pass
+    # comparisons below still balance at zero and certify nothing. Assert the traffic exists first.
+    @test BAND.field.convolve > 0
+    @test POWER.out.convolve > 0
+    @test CONTROLLER.out.convolve > 0
+    @test readbacks(CONTROLLER) > readbacks(POWER)   # it holds k AND normalizes by k_f
+  end
   @testset "synchronization ledger (test/optimality_audit.jl `_syncs`)" begin
     @test model_syncs(:band)       == readbacks(BAND)
     @test model_syncs(:band_total) == readbacks(TOTAL)
     # ONE stage's worth, which is what `measure` exercises; the model multiplies by the stage count.
-    @test model_syncs(:power; stages = 1) == readbacks(POWER)
+    @test model_syncs(:power;      stages = 1) == readbacks(POWER)
+    @test model_syncs(:controller; stages = 1) == readbacks(CONTROLLER)
   end
   @testset "pass ledger (test/compute_audit.jl `_forcing_pass_delta`)" begin
-    @test model_vector_passes(:band)  == vector_passes(BAND)
-    @test model_vector_passes(:power) == vector_passes(POWER)
+    @test model_vector_passes(:band) == rescale_passes(BAND)
+    @test model_vector_passes(:power)      == EVALS_RK3 * source_passes(POWER)
+    @test model_vector_passes(:controller) == EVALS_RK3 * source_passes(CONTROLLER)
   end
 end

@@ -1803,7 +1803,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
     Recorded alongside: `:total` zeroes the band when the out-of-band energy alone exceeds `target`.
     The docstring states what that is — the most violent intervention the strategy can make, not the
-    absence of one.
+    absence of one. *(Superseded in part by decision 58: the front door now passes a
+    `VarianceController`, not a `VarianceRescaling`, so `over` is no longer a front-door choice at
+    all. The calibration argument survives intact and is what the controller had to be checked
+    against — it holds the whole-field ``k``, which is the quantity grid mode assumes.)*
 
 55. **(2026-08, user-directed) `integrator` → `scheme` on the binding; the composite spectrum presets
     are types, not factory functions.** Two naming defects the panel found, both of the same kind: a
@@ -1918,6 +1921,19 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `VarianceController` and the default `Simulation` all converge at 3.01; `VarianceRescaling` at
     1.02. The controller was verified to converge on its target from both sides (``k_0 = 0.4`` and
     ``k_0 = 2.6`` toward ``1.5``), which a clamp cannot be said to do at all.
+
+    **A postscript, because the round nearly shipped the wrong physics.** The first implementation
+    put the *band* variance in both places of that formula — normalizing by ``k_f`` (right) and
+    restoring toward ``k_f`` (wrong). Both readings are dimensionally sound and the code looked
+    symmetric, which is what made it survive review: it is a category error, not an arithmetic one,
+    between the quantity a forcing *acts on* and the quantity it *holds*. The consequence was
+    precise and invisible from the test suite — the run held the band at ``1.5`` and let ``k`` settle
+    about 30% above it, silently breaking the grid-mode ``\nu`` calibration that decision 15 had
+    made conditional on the run really holding ``k``. The `/audit-changes` run over this very commit
+    caught it, by *executing* the default configuration and measuring ``k`` rather than reading the
+    diff. Two things now hold it: the whole-field and band reductions are separated and commented at
+    the point of use, and a witness compares the applied amplitude against both candidate formulas,
+    asserting it matches one and not the other — a steady state cannot satisfy it by luck.
 
 ## References
 

@@ -221,11 +221,26 @@ prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, dt::Real) = noth
 
 
 """
-    add_forcing_source!(forcing, N̂, domain) -> N̂
+    add_forcing_source!(forcing, N̂, field, domain, diffusivity) -> N̂
 
-Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂` at each Runge–Kutta
-stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
+Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂`, on the
 [`FixedDomain`](@ref) `domain`. The default does nothing.
+
+This is the route a **state-dependent** forcing must take. It is called at every Runge–Kutta stage and
+is handed that stage's own `field` — the velocity ``\\hat{\\boldsymbol{u}}`` or the scalar
+``\\hat{\\varphi}`` in spectral representation, whichever this forcing drives — together with the
+`diffusivity` acting on it (``\\nu`` for the velocity, ``\\varkappa`` for the scalar), so a strategy
+whose amplitude depends on the current state can measure that state where the scheme will integrate
+the result. A rate that instead varies with the *state* and is frozen once per step is the
+left-endpoint rectangle rule on ``\\int A\\,\\mathrm dt``, and costs the scheme its order however
+good the scheme is — which is why only a genuinely steady rate may go through
+[`set_forcing_rate!`](@ref).
+
+Returns `N̂`.
+
+!!! warning "The source is accumulated, never assigned"
+    Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
+    implementation must **add** its contribution and must not overwrite the buffer.
 """
 add_forcing_source!(::AbstractForcing, N̂, field, domain::FixedDomain, diffusivity::Real) = N̂
 
@@ -290,10 +305,10 @@ measure:
     (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the forcing
     sets and the band is free.
 
-The front door passes `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the
-*assumed* kinetic energy, so the resolution criterion ``\\kappa_{\\max}\\eta`` is self-consistent only
-if the run really holds ``k``. A hand-built forcing that nothing downstream calibrates against has no
-such constraint, and `:band` is the gentler clamp.
+Neither is a default, because the right answer depends on what the run is calibrated against.
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) in grid mode chooses ``\\nu``
+from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
+calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
 Sizing the rescale means reducing the field to a number and comparing it to `target`, so each step
 blocks on a device-to-host transfer — two under `:total`, which measures the band and the whole field.
@@ -366,14 +381,14 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band — the
-**fixed-rate** member of the two linear forcings, with
-[`ConstantPower`](@ref) the member whose rate is re-solved each step (a band-limited
-variant of Lundgren 2003, *CTR Annual Research Briefs*, which carries no DOI — whose linear
-forcing acts at every wavenumber), built on the
-[`FixedDomain`](@ref) `domain`. The rate is
-folded into the integrating factor (exact for the linear term), so the forced band modes grow at net
-rate ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
+Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
+variant of Lundgren 2003, *CTR Annual Research Briefs*, which carries no DOI — whose linear forcing
+acts at every wavenumber), built on the [`FixedDomain`](@ref) `domain`. The rate is folded into the
+integrating factor, so the forced band modes grow at net rate
+``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
+
+It is the only strategy taking that route — exactness there is a statement about a *steady* ``A`` —
+which makes it the cheapest forcing here, at no per-stage reduction and no host readback.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
@@ -425,28 +440,31 @@ relaxes to in the stationary mean — chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
-[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword is
-named for the kind of quantity it is: a **rate**, where `VarianceRescaling`'s `target` is an
-**amplitude** — which is why the two strategies do not share one keyword name. The rate is folded
-into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
+[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword
+names the kind of quantity it is — a **rate**, where `VarianceRescaling`'s `target` is an
+**amplitude**.
+
+Since that amplitude is re-solved from the state, it enters the right-hand side at **every stage**
+rather than the integrating factor, where freezing it would cost the scheme its order. Like
+[`Linear`](@ref) it is a per-mode multiple of the field, so it preserves a solenoidal velocity.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `injection_rate` — the rate at which energy (for the velocity) or scalar variance (for the scalar)
-  is injected. In the stationary mean the corresponding dissipation relaxes to it; it is not an
-  instantaneous dissipation the forcing measures or clamps.
+  is injected; not an instantaneous dissipation the forcing measures or clamps.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
-    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `VarianceRescaling(over = :total)`
-    zeroed the band. Below a small floor on ``E_{\\mathrm{band}}`` the rate is set to zero instead,
-    so an empty band stays empty rather than receiving an unbounded kick; seed some content in the
-    band if a run needs the forcing to take hold.
+    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells,
+    or the step after a `VarianceRescaling(over = :total)` zeroed the band. Below a small floor on
+    ``E_{\\mathrm{band}}`` the amplitude is set to zero, so an empty band stays empty rather than
+    taking an unbounded kick; seed content in the band if a run needs the forcing to take hold.
+
 # Fields
-- `band` — the band-pass kernel weighting the band observable.
-- (no stored band: the kernel is lazy, and the per-stage source convolves against it directly.)
+- `band` — the band-pass kernel, lazy: the per-stage source both weights the band observable with it
+  and convolves against it, so no indicator array is stored.
 - `injection_rate` — the held rate.
 """
 struct ConstantPower{K, T} <: AbstractForcing
@@ -527,14 +545,21 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
                                                                  domain.grid.domain_size[1])) :
        float(turnover_time)
   tℓ > 0 || throw(ArgumentError("`turnover_time` must be positive, got $turnover_time"))
-  return VarianceController(band, float(target), float(gain), tℓ)
+  # promote, not three independent `float`s: the struct ties `target`, `gain` and `relaxation_time` to
+  # ONE parameter, so a Float32 target with the Float64 default gain has no matching constructor.
+  return VarianceController(band, promote(float(target), float(gain), tℓ)...)
 end
 
 
-# ε_∞ ≈ C_ε k^{3/2}/L for a stationary box-filling flow. Spelled here rather than reached for from
-# `Phenomenology` so this module keeps its independence; the constant is the same one that module
-# fits, and the two are pinned against each other by a test.
-_stationary_dissipation_estimate(k, L) = 0.5 * k^(3 / 2) / (L / (2π))
+# ε_∞ = (k/G)^{3/2}/L for a stationary box-filling flow, with G ≈ 0.9 the box-normalized dissipation
+# group Li et al. (2008) fit to JHTDB. Spelled here rather than reached for from `Phenomenology`,
+# which is an extraction-bound leaf this module must not depend on — so the value is duplicated
+# deliberately, and `test/forcing.jl` pins it against `Scalings.Li2008` so the copy cannot drift.
+# It has to be the SAME estimate the grid-mode viscosity solve uses: that solve chooses ν from the
+# assumed k, and the controller's default relaxation time sets how fast the run reaches it. Two
+# different notions of "stationary for this box" would put the two out of step with each other.
+const _DISSIPATION_GROUP = 0.9
+_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 / 2) / L
 
 
 uses_steady_linear_rate(::VarianceController) = false
@@ -544,11 +569,17 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
                              diffusivity::Real)
   T = field_scalar_type(N̂)
   factor = _target_factor(field)
-  band_variance = factor * weighted_inner(field, forcing.band)            # k_f, at the STAGE state
+  # Two DIFFERENT reductions, and which one goes where is the whole content of Bassenne's Eq. 20.
+  # The forcing acts on the band alone, so it injects 2·A·k_f and the amplitude must be normalized by
+  # the BAND's variance; the quantity being held is the field's whole-field variance, so the restoring
+  # term must measure THAT. Using k_f in both places holds the band at `target` instead, which is a
+  # different physical model and leaves the whole field wherever the cascade puts it.
+  whole_variance = factor * inner(field, field)                          # k, the quantity held
+  band_variance = factor * weighted_inner(field, forcing.band)           # k_f, the forced band
   # ε = D⟨|∇f|²⟩ = D·⟨f, |κ|²f⟩, the field's own dissipation at this stage. The factor is the same
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * weighted_inner(field, domain.squared_wavenumber_kernel)
-  restoring = forcing.gain * (band_variance - forcing.target) / forcing.relaxation_time
+  restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time
   amplitude = _band_is_empty(band_variance) ? 0.0 :
               (dissipation - restoring) / (2 * band_variance)
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))

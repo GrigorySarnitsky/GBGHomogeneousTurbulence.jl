@@ -85,11 +85,12 @@ could enter only by making the iteration compute it, which the choice forbids. T
 component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
 wants one computes it at an observation (§2.4).
 
-One case looks like a counterexample and is worth stating. Under the `VarianceRescaling(over = :total)`
-the front door builds, the forcing *does* form the whole-field ``k`` every step, to size its own
-rescale. That value is the **pre-rescale** energy, taken mid-step and discarded — not the
-observable at the iteration's end, which is what a slot must hold — so it fails the surviving test
-below rather than this one.
+One case looks like a counterexample and is worth stating. The default `VarianceController` *does*
+form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
+**mid-step** ones — each measured at a Runge–Kutta stage's own state and discarded — not the
+observable at the iteration's end, which is what a slot must hold, so the case fails the surviving
+test below rather than this one. A `VarianceRescaling(over = :total)` forms the same quantity once
+per step and is the same story, its value taken before the rescale it sizes.
 
 **Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.

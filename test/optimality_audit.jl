@@ -192,7 +192,11 @@ function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::S
         push!(syncs, Sync("ConstantPower band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
       end
     elseif tag === :controller
-      for _ in 1:stages   # the controller reads the band variance AND the dissipation, each stage
+      # THREE reductions of the same field per stage, each against a different weight: the whole-field
+      # variance it holds, the band variance it normalizes by, and the dissipation it replaces. They
+      # are the multi-weight shape the fused-reduction holder describes, not three separate needs.
+      for _ in 1:stages
+        push!(syncs, Sync("VarianceController whole variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
         push!(syncs, Sync("VarianceController band variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
         push!(syncs, Sync("VarianceController dissipation ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
       end
@@ -210,7 +214,14 @@ _floor_syncs(syncs) = sum(s -> s.floor, syncs; init = 0)
 # the first row — an adaptive timestep and a whole-field VarianceRescaling — and it issues three
 # blocking readbacks per step where one is irreducible.
 const SYNC_LEDGER = (
-  (name = "default (adaptive dt, VarianceRescaling :total)",
+  # The DEFAULT run: VarianceController on the three-stage IFLowStorageRK3. `stages` is not optional
+  # here — a state-dependent forcing is evaluated at every stage, and a row that omits it silently
+  # prices the forcing as if it were armed once per step, which is the arrangement this whole round
+  # replaced. Ten crossings against a floor of one is the largest gap in this ledger, and it is held,
+  # not accepted: the three per-stage reductions are one fused multi-weight reduction away.
+  (name = "default (adaptive dt, VarianceController, 3-stage)",
+   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),
+  (name = "adaptive dt, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),
   (name = "adaptive dt, VarianceRescaling :band",
    cfg = (; adaptive_dt = true, velocity_forcing = :band),                       achieved = 2, floor = 1),
@@ -218,8 +229,8 @@ const SYNC_LEDGER = (
    cfg = (; adaptive_dt = false, velocity_forcing = :none),                      achieved = 1, floor = 0),
   (name = "adaptive dt, unforced",
    cfg = (; adaptive_dt = true, velocity_forcing = :none),                       achieved = 1, floor = 1),
-  (name = "adaptive dt, ConstantPower",
-   cfg = (; adaptive_dt = true, velocity_forcing = :power),                      achieved = 2, floor = 1),
+  (name = "adaptive dt, ConstantPower, 3-stage",
+   cfg = (; adaptive_dt = true, velocity_forcing = :power, stages = 3),          achieved = 4, floor = 1),
   (name = "adaptive dt, stochastic velocity + scalar",
    cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 3, floor = 1),
   (name = "turnover-budgeted, VarianceRescaling :total",

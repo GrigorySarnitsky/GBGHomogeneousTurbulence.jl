@@ -167,6 +167,24 @@ function _forcing_rate(domain::FixedDomain, forcing)
   return new_scalar_field_spectral(domain)
 end
 
+# Does this forcing define an `add_forcing_source!` that the run cannot call — one written to the
+# three-argument form the hook carried before the stage field and the diffusivity were added? The
+# arity is the whole question, so the method table is enumerated exactly as the rate probe does it,
+# and for the same reason: `which` resolves a call, not a definition.
+function _defines_stale_source_hook(forcing)
+  for m in methods(add_forcing_source!, Tuple{typeof(forcing), Vararg{Any}})
+    signature = Base.unwrap_unionall(m.sig)
+    length(signature.parameters) >= 2 || continue
+    accepted = signature.parameters[2]
+    accepted isa TypeVar && (accepted = accepted.ub)
+    accepted === AbstractForcing && continue        # the do-nothing fallback itself
+    # the function type plus five arguments
+    m.isva || length(signature.parameters) >= 6 || return true
+  end
+  return false
+end
+
+
 # Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
 # fallback? The question is about the FORCING argument alone, so it is asked of the method table
 # directly. A `which` probe cannot ask it: `which` resolves a call at specific argument types, and
@@ -275,6 +293,19 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                         "but this generator is built with `scalar = false` and assembles no scalar " *
                         "right-hand side, so the forcing could never be applied. Pass " *
                         "`scalar = true`, or leave `scalar_forcing` at `NoForcing()`."))
+  # The source hook gained the stage field and the diffusivity when state-dependent forcings moved
+  # onto it. A strategy still written to the old three-argument form defines a method the run never
+  # calls — dispatch simply falls through to the do-nothing default — so the forcing goes silently
+  # unapplied, exactly the failure the rate guard above exists to prevent. Refuse at construction.
+  for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)
+    _defines_stale_source_hook(forcing) &&
+      throw(ArgumentError("$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than " *
+                          "five arguments. The hook is now " *
+                          "`add_forcing_source!(forcing, N̂, field, domain, diffusivity)` — it is " *
+                          "called at every Runge-Kutta stage and is handed that stage's own field " *
+                          "and the diffusivity acting on it. A method written to the old form is " *
+                          "never called, so the forcing would be silently ignored."))
+  end
   return ResolvedGenerator(conditions,
                     new_vector_field_spectral(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
