@@ -98,7 +98,14 @@ const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "clock, the scalar variance for the stationarity detector — are independent sweeps of the same " *
   "state, one barrier each, where a single multi-output reduction would cost one barrier for all of " *
   "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
-  "operand and needs its own pass.")
+  "operand and needs its own pass. " *
+  "THE DOMINANT INSTANCE since decision 58 is the default forcing: VarianceController reduces the " *
+  "SAME field three times at EVERY stage — nine of the default run's ten crossings — and the three " *
+  "differ only in their weight. Expanded and verified against GBGPeriodicFields' current method " *
+  "set: inner(f, f) == weighted_inner(f, unit) for a unit radial_kernel, so all three are one op, " *
+  "⟨f, w·f⟩ with w in {1, band, |κ|²}. The request is therefore exact and uniform — one field, n " *
+  "kernels, n scalars, one traversal — and would take the default from ten crossings to four. " *
+  "Recorded on the roadmap 2026-08-22 at the user's direction; the code is left as it stands.")
 
 # CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the closing refresh its text
 # prescribed: the iteration now deposits the charts at its end and the step takes the same slots as

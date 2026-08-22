@@ -649,6 +649,18 @@ generalization is built for them until a second concrete case forces the abstrac
   absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
   increment is the one allocation-free exception
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
+- **A fused multi-weight spectral reduction, raised to `GBGPeriodicFields`.** The default run reduces
+  the same field three times at every stage — ``\langle f, f\rangle`` for the variance the controller
+  holds, ``\langle f, b\,f\rangle`` for the band it normalizes by, and
+  ``\langle f, \lvert\boldsymbol{\kappa}\rvert^{2} f\rangle`` for the dissipation it replaces —
+  nine of its ten blocking host readbacks per step (§6). Expanded against PF's current method set
+  rather than assumed: `weighted_inner` and `inner` carry single-weight forms only, and
+  ``\langle f, f\rangle`` equals `weighted_inner` against a unit `radial_kernel` (verified
+  numerically), so the three are **one** operation ``\langle f, w f\rangle`` at three weights. The
+  request is correspondingly exact — one field, ``n`` kernels, ``n`` scalars, one traversal — and
+  would take the default from ten crossings to four. It is a *request*, not a local workaround
+  (invariant 2): reimplementing a fused reduction here would be field machinery in a physics package.
+  Held open by the optimality audit's `UNFUSED QUADRATIC REDUCTIONS`, whose shape it now dominates.
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
