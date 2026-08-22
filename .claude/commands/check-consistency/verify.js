@@ -39,13 +39,35 @@ const REPO = A.repo
 // verified — silently, because the run still reports success over the hats it does know. That is
 // exactly the accounting failure this instrument exists to catch: on 2026-08-18 the list still held
 // the original 11 while the panel banked 15, leaving four hats' findings unaudited.
-const ALL_HATS = [
-  '01-consistency-matrix', '02-software-architect', '03-turbulence-theoretician',
-  '04-dns-practitioner', '05-structure-consistency', '06-latex-typesetter',
-  '07-api-user', '08-dimensional', '09-citations-integrity', '10-style-editor',
-  '11-cold-reader', '12-plain-sense', '13-naming-policy', '14-doc-policy',
-  '15-invariants-and-decisions',
-]
+// THE ROSTER IS READ, NEVER WRITTEN HERE. It used to be the hand-maintained list below, a duplicate
+// of panel.js's own, and duplicates drift: by the time the panel reached 23 hats this copy still
+// named 15 — and worse, the panel's renumbering meant it looked for `01-consistency-matrix` while the
+// panel banks `01-free-reader-a`, so every hat would have been verified under the wrong filename and
+// the newest lanes would have had no closure audit at all. `attack-design.js` found it and called it
+// fatal, correctly: an instrument whose adversarial half silently verifies nothing is worse than one
+// with no adversarial half, because it reports success. panel.js now emits `<pile>/hats.json` from
+// the list it actually ran; this reads it. Absence is a hard error, not a fallback to a guess.
+//   const ALL_HATS = ['01-consistency-matrix', … , '15-invariants-and-decisions']   // RETIRED
+const MANIFEST = `${PILE}/hats.json`
+
+// A workflow script has no filesystem access, so the manifest is fetched by an agent. Cheap, one
+// call, and it happens BEFORE any selector is validated — a verifier that guessed its roster while
+// reporting success is the failure being closed here, so an unreadable manifest is fatal.
+const ROSTER = await agent(
+  `Read the JSON file at ${MANIFEST} with the Read tool and return its "hats" array verbatim, in order. ` +
+  `If the file does not exist or has no "hats" array, return an empty array — do NOT invent hat names ` +
+  `and do NOT read any other file to reconstruct the list.`,
+  { label: 'read-hat-manifest', model: 'sonnet',
+    schema: { type: 'object', additionalProperties: false,
+              properties: { hats: { type: 'array', items: { type: 'string' } } },
+              required: ['hats'] } })
+const ALL_HATS = (ROSTER && Array.isArray(ROSTER.hats)) ? ROSTER.hats : []
+if (!ALL_HATS.length) {
+  throw new Error(`no hat manifest at ${MANIFEST} — this verifier reads the roster the panel actually ` +
+                  `ran and will not guess it. Re-run the panel (which writes hats.json), or point ` +
+                  `\`pile\` at the directory that panel wrote to.`)
+}
+log(`roster from manifest: ${ALL_HATS.length} hat(s)`)
 
 // `hats` runs a SUBSET (by name or by numeric prefix). Its purpose is re-running the hats that died
 // — the whole panel once came back rate-limited, 11 agents launched at once — so a retry need not

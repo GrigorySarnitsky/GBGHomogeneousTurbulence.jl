@@ -117,7 +117,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door only).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
-- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
+- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
+  ``\\varkappa = \\nu/\\mathrm{Sc}``). **Grid mode resolves the velocity, not the scalar.** It sets
+  ``\\nu`` from ``\\kappa_{\\max}\\eta``, and at ``\\mathrm{Sc} > 1`` the scalar's cutoff is the
+  finer Batchelor scale ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}``, so the scalar is under-resolved by
+  ``\\sqrt{\\mathrm{Sc}}`` on the same grid and `scalar_dissipation` then measures a truncated field.
+  This package targets ``\\mathrm{Sc} = O(1)`` and carries no Batchelor-range machinery; for
+  ``\\mathrm{Sc}`` appreciably above 1, raise `κ_max_η` by ``\\sqrt{\\mathrm{Sc}}`` or set `viscosity`
+  yourself. Nothing enforces this — the value is accepted as given.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `VarianceController` driving the
@@ -144,12 +151,15 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
-- `max_dt = Inf` — a ceiling on the adaptive timestep, stated in the run's own time units. The
-  advective rule ``\\Delta t = C\\Delta x / u_{\\max}`` diverges as a decaying flow approaches rest,
-  which is harmless until it is not: past some step the integrating factor annihilates every mode and
-  the clock advances by a number that means nothing. There is no unit-free ceiling to supply by
-  default — any constant is a claim about the velocity scale the caller happened to choose — so the
-  bound is theirs to set and is off unless they do.
+- `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
+  and off unless set. It is a *third* bound, not the only one: the adaptive step is the smallest of
+  the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, a resolution bound
+  ``1/(D\\kappa_{\\min}^{2})`` built from the run's own diffusivity and box, and this. The advective
+  rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
+  annihilates every mode and the clock advances by a number that means nothing — and it is the
+  resolution bound that stops that, needing no constant from the caller. `max_dt` is for a ceiling
+  only the caller knows, since any *default* constant would be a claim about the velocity scale they
+  happened to choose.
 - `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -487,11 +497,13 @@ end
 """
     advance!(sim; dt = nothing)
 
-Advance `sim` by one timestep in place and return it. With `dt = nothing` the step size is the
-advective-CFL value for the current velocity; pass `dt` to force a fixed step. Closes the iteration
-with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
-returns. Advects the tracers,
-if any, by Heun-in-time on the start- and end-of-step velocities, and updates the clock.
+Advance `sim` by one timestep in place and return it. Pass `dt` to force a fixed step; with
+`dt = nothing` the step is adaptive — the smallest of the advective-CFL value for the current
+velocity, the resolution bound the box and its diffusivity impose, and `max_dt`.
+
+Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
+is readable when it returns. Advects the tracers, if any, by Heun-in-time on the start- and
+end-of-step velocities, and updates the clock.
 
 Returns `sim`.
 """

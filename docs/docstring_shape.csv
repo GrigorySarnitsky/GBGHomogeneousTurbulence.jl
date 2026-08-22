@@ -16,7 +16,7 @@ Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,1
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
 Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,71,1,446
-Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),86,1,679
+Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,674
 Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,212
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
@@ -102,10 +102,10 @@ SimulationDomain.jl::new_tensor_field_spectral(domain),18,0,19
 SimulationDomain.jl::new_vector_field_physical(domain),17,0,18
 SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,1712
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,1829
 SimulationRun.jl::SimulationRun,89,0,121
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,89,0,552
-SimulationRun.jl::advance!(sim; dt = nothing),63,0,69
+SimulationRun.jl::advance!(sim; dt = nothing),47,0,84
 SimulationRun.jl::current_step(sim),85,0,100
 SimulationRun.jl::current_time(sim),6,0,7
 SimulationRun.jl::flow_parameters(sim),96,0,97

@@ -33,7 +33,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (23 hats)
+## The panel (24 hats)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -64,6 +64,30 @@ self-containedness and structure without the design docs as a crutch.
 | 21 | `pf-parity` | divergences from the sibling package PF that were never deliberately decided | FULL + PF clone |
 | 22 | `logician` | defective **inference and definition** — circularity, equivocation, non sequitur, **unfalsifiability** | FULL |
 | 23 | `conceptual-clarity` | identity & category confusions in the **non-physics** prose — two nouns for one thing, clock vs reading | FULL |
+| 24 | `code-truth` | **is the docstring TRUE of the function it sits on** — read the body first, then discharge each claim | src/*.jl |
+
+**`code-truth` exists because the panel was attacked and broke.** `attack-design.js` — generalized on
+2026-08-22 to attack any instrument's lens set, not only `/audit-changes`'s — was turned on this
+panel, and **two of its four attackers converged independently** on the same fatal gap: *no lane asks
+whether a docstring is true of the function it sits on.* Every other lens takes another **text** as
+its oracle — sibling pages, the literature, the rulebook, the corpus's majority, git history, the
+sibling package, or the reader's own comprehension. Four hats do open `src/`, and every one carries a
+**policy** brief. So a docstring could be internally perfect, template-conformant, correctly typeset,
+physically plausible, cross-page consistent — and simply false about the code. `doctest = false`, so
+no example executes either.
+
+The attack's evading examples were **real and live**: `advance!` said the step was "the advective-CFL
+value" when the code takes the minimum of three bounds, and the `max_dt` bullet said "there is no
+unit-free ceiling by default" beside a resolution bound that is exactly one. Both had passed every
+hat. `code-truth` reads the **body first**, writes down what it computes, and only then decomposes
+the docstring into operational claims and discharges each one.
+
+**The verifier no longer holds its own roster.** `verify.js` carried a hand-written copy of the hat
+list; by 23 hats it was not merely short but *misnumbered* — it looked for `01-consistency-matrix`
+while the panel banks `01-free-reader-a`, so every hat would have been verified under the wrong
+filename and the newest lanes would have had no closure audit at all. `panel.js` now emits
+`<pile>/hats.json` from the list it actually ran, and `verify.js` reads it; a missing manifest is a
+hard error, never a fallback to a guess.
 
 **Why the logician is an anchor, and why there is no "philosopher".** `consistency-matrix` finds
 contradictions *between* statements; the logician finds defective inference and definition *inside*

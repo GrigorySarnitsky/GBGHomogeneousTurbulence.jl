@@ -1,7 +1,7 @@
-// /check-consistency panel — a fresh-eyed 23-expert audit of the RENDERED docs, sequential & collect-only.
+// /check-consistency panel — a fresh-eyed 24-expert audit of the RENDERED docs, sequential & collect-only.
 // Args (absolute paths): { full, siteonly, rawhtml, pile, adjudicated, strength }
 //   strength — 'economy' (DEFAULT: nineteen hats on the cheap scan model; the two physics hats,
-//              plain-sense and the logician anchored at the session model) | 'full' (every hat at the session model, on explicit request
+//              plain-sense, the logician and code-truth anchored at the session model) | 'full' (every hat at the session model, on explicit request
 //              only). The main-thread verification/consolidation that follows the panel is never
 //              economized — same policy as /check-docs (ported from PF, 2026-08-06).
 //   full     — manuscript of every page incl. the design docs (for most hats).
@@ -18,7 +18,7 @@
 // token-out loses at most the current hat, so hats are in PRIORITY order.
 export const meta = {
   name: 'check-consistency-panel',
-  description: 'Fresh-eyed 23-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure, design, existence, quantifiers, history & cross-package parity (sequential, collect-only)',
+  description: 'Fresh-eyed 24-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure, design, existence, quantifiers, history & cross-package parity (sequential, collect-only)',
   phases: [ { title: 'Panel' } ],
 }
 
@@ -135,6 +135,22 @@ Your quarry ALSO includes the CATEGORY/TYPE ERROR — the class invisible to a v
   { key: 'conceptual-clarity', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a CONCEPTUAL EDITOR trained in analytic philosophy, and your scope is deliberately NARROW: identity and category confusions in the NON-PHYSICS prose. The physics hats own the physical category errors (a field versus its representation, a rate versus its time-integral, an operator versus its parameter). You own the same class everywhere else — in the machinery, the run layer, the cache, the instruments — where no hat is watching. Ask of the vocabulary, relentlessly: (a) IDENTITY CONDITIONS — for each pair of terms that seem to name the same thing, do they? If two nouns denote one object, say so and quote both; if ONE noun denotes two different objects in different places, that is the same defect inverted and usually worse. State the identity criterion the docs should give and do not. (b) TYPE vs TOKEN, and CLOCK vs READING — a counter versus a value recorded from it, a schedule versus an instance of it, a kind versus an occurrence. These are routinely collapsed and the collapse is invisible once the vocabulary settles. (c) MAP vs TERRITORY outside physics — a description of a thing presented as the thing, a model's parameter presented as a property of the system. (d) PRESUPPOSITION — a sentence that can only be understood by a reader who already accepts something the documentation never states; name the unstated presupposition. (e) A DISTINCTION DRAWN AND THEN NOT USED — a contrast the text sets up carefully and never again relies on, which means either the distinction is idle or its consequences are missing. Do NOT write essays, do NOT question the package's design choices or its organizing framework (those are recorded decisions and out of scope), and do NOT report readability or style — the plain-sense hat owns those. Every finding is a specific confusion between two specific things, quoted.` },
 
+  // ── CODE-TRUTH. Added 2026-08-22 after `attack-design.js` was turned on this panel and TWO
+  // attackers converged, independently, on the same fatal gap: NO LANE ASKS WHETHER A DOCSTRING IS
+  // TRUE OF THE FUNCTION IT SITS ON. Every other lens takes another TEXT as its oracle — sibling
+  // pages, the literature, the rulebook, the corpus's majority, git history, the sibling package, or
+  // the reader's own comprehension. Four hats do open src/, and every one of them carries a POLICY
+  // brief (naming, template shape, recorded invariants, orphaned text), so a docstring can be
+  // internally perfect, template-conformant, correctly typeset, physically plausible, cross-page
+  // consistent — and simply false about the code. `doctest = false`, so no example executes either.
+  // The attack's own evading examples were real and live: `advance!` said the step was "the
+  // advective-CFL value" when the code takes the minimum of three bounds, and the `max_dt` bullet
+  // said "there is no unit-free ceiling by default" beside a resolution bound that is exactly one.
+  // Both had passed every hat. Anchored: this is the panel's only correspondence check, and a cheap
+  // miss here has nothing behind it.
+  { key: 'code-truth', anchor: true, substrate: `The authored source ${REPO}/src/*.jl — the docstrings AND the bodies they sit on. Read the rendered site ${FULL} only if you need context for what a name means.`,
+    persona: `You are a CONTRACT VERIFIER, and your procedure is INVERTED from every other reviewer on this panel. They read the documentation and judge it. You read the CODE FIRST. Work one exported operation at a time, and for each: (1) read the function BODY before its docstring, and write down in one sentence what it actually computes, mutates and returns — including the branches, the guards, the defaults it applies, and anything it does that its name does not advertise; (2) THEN read the docstring, and decompose it into OPERATIONAL CLAIMS — propositions about what the call does, what it returns, what it requires, what it guarantees, what it costs. A statement of physical meaning or motivation is not an operational claim; skip those. (3) Discharge each operational claim against the body, and report every one the body does not support, quoting BOTH the docstring sentence and the decisive line of code. The defect you exist to catch is a docstring that is well-written, well-formed and FALSE — most often because the code changed underneath it and the sentence was left standing, or because a claim was true of an earlier design. Pay particular attention to: a stated DEFAULT that differs from the signature's; a claim that something is "the" value when the code takes a minimum, a maximum or a branch; a documented ERROR that the code does not throw, or a throw the docs do not mention; an ordering or timing claim ("once per step", "at every stage", "after the step") checked against where the call actually sits; a claim of no-allocation, exactness, or preservation of a property, checked against what the body does; and an argument whose documented effect is not the effect the body gives it. Do NOT report naming, style, template shape, notation, or missing documentation — other hats own those. Every finding is a specific sentence, a specific line of code, and the contradiction between them.` },
+
   { key: 'structure-consistency', substrate: `The rendered user-facing site, the design docs EXCLUDED on purpose: ${SITEONLY}`,
     persona: `You are a DOCUMENTATION-STRUCTURE auditor, and you do NOT see the design docs — you judge the user-facing docstrings and API pages purely on the UNIFORMITY of their logical organization. FIRST, infer the implicit template the corpus follows and STATE it: the standard skeleton of a function docstring (e.g. identity sentence -> when-to-use -> each argument -> caveats -> formula -> citation) and of a type docstring (constructor-first: identity -> constructor+arguments -> example -> a demoted # Fields). THEN flag every OUTLIER against that inferred template: a docstring whose sections run in a different order, one missing a section its siblings have (or carrying one they don't), reference detail mixed into the opening sentence, a formula placed before the identity, an f/f! pair organized differently across its two docstrings, a # Fields section present on some types but absent on others, an arguments block enumerated differently from its peers, inconsistent admonition use (!!! note/warning). You care about the SHAPE and ORDER of the exposition, not its physics or wording — is the whole corpus written to ONE consistent organizing principle, and which entries break it?` },
 
@@ -222,7 +238,15 @@ const selected = hats
   .filter(({ h, nn }) => !SELECT || SELECT.some(x => h.key === x || nn === x.padStart(2, '0')))
 if (SELECT) log(`subset run: ${selected.map(s => `${s.nn}-${s.h.key}`).join(', ')}`)
 
+// THE HAT MANIFEST. `verify.js` used to carry its own hand-written copy of this roster, and by the
+// time the panel reached 23 hats that copy was not merely short — the renumbering meant it looked for
+// `01-consistency-matrix` while the panel banked `01-free-reader-a`, so EVERY hat would have been
+// verified under the wrong filename and the eight newest would have had no closure audit at all.
+// The roster is emitted here, from the list actually run, and read there. Staleness is now
+// structurally impossible rather than maintained by hand.
 phase('Panel')
+await agent(`Write EXACTLY this JSON to ${PILE}/hats.json using the Write tool, and return the single word done. No other text, no commentary.\n\n${JSON.stringify({ hats: selected.map(s => `${s.nn}-${s.h.key}`) }, null, 2)}`,
+            { label: 'hat-manifest', phase: 'Panel', model: 'sonnet' })
 const results = []
 const dead = []
 const empty = []
