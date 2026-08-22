@@ -364,6 +364,14 @@ with no notation that drifts across the pair.
   with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; never use `[skip ci]`.
 - Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are **study-only,
   gitignored** — never copied into the package, only properly cited.
+- **`inspiration/OldCode` is not a reference clone and is not inspiration.** It is the previous
+  generation of this work, kept only so the question *what was done before, and what came of it?* can
+  be answered from the record rather than from memory. **Do not follow it.** The current direction of
+  the GBG packages is to **replace it entirely**, because it was problematic — so its arrangements
+  carry no authority, and "the old code did it this way" is never a reason to do anything. Read it
+  **critically**: when it is consulted, the useful output is a diagnosis (what it did, why that
+  failed, what replaced it), never a pattern to copy. It is study-only and gitignored like the rest,
+  and it is **not** citable — a published method gets cited to its paper, not to this archive.
 
 ## Known weaknesses — self-guards
 

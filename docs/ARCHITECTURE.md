@@ -725,6 +725,15 @@ generalization is built for them until a second concrete case forces the abstrac
 
 ## 8. Lenses and prior art
 
+**One piece of prior art is excluded by name.** The previous generation of this work — kept privately,
+outside the package — is *not* among the lenses below and is not a source of design. It is retained
+only as a record to interrogate: what was done before, and what came of it. The direction of the GBG
+packages is to replace it entirely, because it was problematic, and this architecture is the
+replacement rather than a refinement of it. It follows that nothing here is justified by continuity
+with it — an arrangement it shared is neither evidence for nor against the arrangement here, and must
+stand on the reasoning in this document (the same rule §11 applies to a recorded decision: legacy is
+not evidence of correctness). Where it is consulted, the product is a diagnosis, not a pattern.
+
 The package makes real theory legible. One framework — **Mori–Zwanzig — is its foundation** (§3); the rest
 are lenses read through it. Nothing in the *numerics* is load-bearing on the subordinate lenses — the
 arithmetic would be identical had they never been named — but the *architecture* is founded on the
