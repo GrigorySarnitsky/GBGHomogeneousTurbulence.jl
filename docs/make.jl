@@ -47,7 +47,8 @@ end
 #
 # A docstring can satisfy every template rule in CLAUDE.md and still be unreadable, because a review
 # round edits clauses and never re-reads the whole. Measured 2026-08-19, after five rounds of
-# patches: `BandRescaling` had reached 861 words with four scattered admonitions, `# Arguments`
+# patches: `VarianceRescaling` (then named `BandRescaling`) had reached 861 words with four
+# scattered admonitions, `# Arguments`
 # mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode bullet was a 120-word run-on
 # with an ungrammatical clause. Every individual edit had been correct. Nothing measured the shape,
 # so nothing objected.

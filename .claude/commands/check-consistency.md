@@ -33,7 +33,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (15 hats)
+## The panel (21 hats)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -56,8 +56,28 @@ self-containedness and structure without the design docs as a crutch.
 | 13 | `naming-policy` | the public surface against the **written** naming rules — the rulebook outranks the corpus | FULL + source + CLAUDE.md |
 | 14 | `doc-policy` | each docstring against the **written** documentation policy (map / home / constructor-first, physical-meaning-first, one home per f/f! pair) | FULL + source + CLAUDE.md |
 | 15 | `invariants-and-decisions` | the code and docs against the **recorded** invariants and §11 decision log, both directions | FULL + source + CLAUDE.md + §11 |
+| 16 | `free-reader-a` | **no checklist at all** — read front to back and chase whatever is genuinely wrong | FULL |
+| 17 | `free-reader-b` | **no checklist**, an independent second sample — would you adopt this package? | FULL |
+| 18 | `existence-auditor` | should this public form EXIST, and is the SET complete and coherent | FULL |
+| 19 | `quantifier-auditor` | every *every / all / none / only* checked member-by-member against its set | FULL |
+| 20 | `fossil-and-drift` | the ONLY hat with history — claims orphaned by a rename, twin copies that diverged | repo + git |
+| 21 | `pf-parity` | divergences from the sibling package PF that were never deliberately decided | FULL + PF clone |
 
-**Why three hats hold the rulebook.** Hats 1–12 are deliberately blind to `CLAUDE.md`, and that
+**The two free readers run FIRST, and that ordering is a measurement, not a preference.** Run order
+is priority order because a token-out truncates the tail. `/bug-hunt` ran eight class lanes and two
+unconstrained ones over the same tree: the class lanes reported `complete: true` over their own blind
+spot, and the free lanes found nine defects at a third the cost — four of them regressions from the
+preceding 48 hours. A class list is a *hypothesis* about where defects live, and the panel's measured
+failure was the rubric rather than the reading. Hats 16–17 carry no rubric on purpose; there are two
+because their value is independent sampling, and the overlap between them is itself signal.
+
+**Hats 18–21 each came from a finding the owner produced that no hat produced** (the 2026-08-15
+read-through, § END-OF-ROUND TASK). Each got its own lane rather than a duty appended to a
+neighbouring persona — appending is exactly the failure mode measured above, a class lane reporting
+`complete` over a duty it was also told to perform. `fossil-and-drift` is the one hat deliberately
+*not* fresh-eyed: text orphaned by a rename is self-consistent, so only history exposes it.
+
+**Why three hats hold the rulebook.** Every hat but these is deliberately blind to `CLAUDE.md`, and that
 blindness is what makes them fresh-eyed — but it leaves one class structurally invisible: a
 convention violated **uniformly**. Two of them (`style-editor`, `structure-consistency`) are told
 outright to derive norms from the corpus's majority style, so a rule the corpus breaks everywhere

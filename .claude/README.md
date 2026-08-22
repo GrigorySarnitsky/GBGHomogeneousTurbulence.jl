@@ -20,7 +20,21 @@ file described the July rounds as live and was wrong on nearly every line.
 | `pf-api-survey-2026-08-05.md`, `observables-cache-notes.md` | Reference notes, not task lists. |
 | `doc-review-adjudicated.md` | **Tracked and live** — the do-not-re-flag list injected into every hat. |
 
-## LIVE — one open user-assigned task
+## DISCHARGED 2026-08-22 — the panel rubric-gap re-audit
+
+Record: `panel-rubric-reaudit-2026-08-22.md` (untracked). **The panel went 15 hats → 21.** Four lanes
+came from the banked candidates (`existence-auditor`, `quantifier-auditor`, `fossil-and-drift`,
+`pf-parity`); two were NOT on the list — `free-reader-a` / `free-reader-b`, which run **first**,
+because the measurement below says the fix is not only sharper lenses but readers carrying no rubric
+at all. `plain-sense` was re-read against its five findings and needed no change. The banked
+`/check-docs` scans were already built (`abutting_spans.py`, `doi_crosscheck.py`, `xlink.jl`). All six
+additions run on the economy model — the anchor criterion is about a *rubric* whose false negatives
+have no downstream verifier, and a free reader has no rubric to fail.
+
+**Not yet validated:** the panel has not been RUN since the change. The next `/check-consistency` is
+the real test of whether the six lanes produce the findings they were built for.
+
+## Superseded — the task as originally written
 
 **The panel rubric-gap re-audit** (`doc-reading-pile-2026-08-15.md`, § END-OF-ROUND TASK, user
 2026-08-17). Every finding the user's own read-through produced that **no hat produced** is a rubric

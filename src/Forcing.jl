@@ -299,9 +299,9 @@ holds `target`. The rescale is per-mode, so a divergence-free velocity stays div
 
 **Prefer [`VarianceController`](@ref) for a run whose accuracy in time matters**, which is nearly
 always. It holds the same quantity through a rate the scheme integrates and keeps the scheme's order;
-this one is applied after the step and costs it (see the caveat below). `VarianceRescaling` is kept
-because it is a published method a reader may need to reproduce, and because holding the band's value
-*exactly* is occasionally what is wanted.
+this one is applied after the step and costs it (see the caveat below). It is kept because it is a published
+method a reader may need to reproduce, and because holding a band's value *exactly* is occasionally
+what is wanted.
 
 Which observable is held follows from the field, chosen to agree with the diagnostics: the **kinetic
 energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
@@ -327,8 +327,8 @@ Neither is a default, because the right answer depends on what the run is calibr
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
 calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
-Sizing the rescale means reducing the field to a number and comparing it to `target`, so each step
-blocks on a device-to-host transfer — two under `:total`, which measures the band and the whole field.
+Sizing the rescale reduces the field to a number, so each step blocks on a device-to-host transfer —
+two under `:total`, which measures the band and the whole field.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
@@ -342,16 +342,17 @@ blocks on a device-to-host transfer — two under `:total`, which measures the b
     This is the one forcing that costs the scheme its order, by construction rather than by defect:
     the rescale is applied *after* the step, which is Lie–Trotter operator splitting, and Lie–Trotter
     is first-order however good the scheme is. Measured on the third-order `IFLowStorageRK3`: **1.02**
-    here against **3.01** for every other forcing in the module. Molecular dynamics reached the same
+    here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
+    (A stochastic forcing is outside that comparison — it has no classical order to lose.)
+    Molecular dynamics reached the same
     conclusion about the same manoeuvre — rescaling to fix a quantity each step is the naive
     thermostat, and the fix is to extend the dynamics with feedback rather than project after the fact.
 
-    Two configurations also behave sharply. Under `:total`, if the value outside the forced shells
-    alone exceeds `target`, the band is **zeroed** — the closest reachable state, and the most violent
-    intervention the rescale can make. At the other end a band with nothing in it is **left alone**,
-    since the rescale returns the field untouched rather than dividing by ~0; an empty band therefore
-    stays empty instead of being driven to `target`. Seed content in the band if a run depends on the
-    clamp taking hold.
+    Two configurations also behave sharply. Under `:total`, if the out-of-band value alone exceeds
+    `target`, the band is **zeroed** — the closest reachable state, and the most violent intervention
+    the rescale can make. At the other end an empty band is **left alone** rather than divided by ~0,
+    so it stays empty instead of being driven to `target`. Seed content in the band if a run depends
+    on the clamp taking hold.
 
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.

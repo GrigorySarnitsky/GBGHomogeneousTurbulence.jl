@@ -1,4 +1,21 @@
-# Open code defects — found by /bug-hunt rounds 4-5, NOT yet fixed
+# Open code defects — found by /bug-hunt rounds 4-5
+
+**RE-VERIFIED 2026-08-22 by running every witness.** The witnesses had gone BROKEN on the
+`BandRescaling`/`uses_linear_rate`/`apply_forcing!` renames — five of seven reported nothing at all,
+which is why this file must never be read without re-running. Renames repaired; verdicts below are
+measured, not remembered.
+
+**CLOSED by decision 58** (state-dependent rates moved to the per-stage source):
+`r5-free-hot-path-01` and `r4-free-hot-path-01` — both now PASS. The two "first order" entries below
+are historical.
+
+**STILL LIVE (5):** `02-r5-aliasing-and-mutation-02` (FlowConditions positional constructor bypasses
+all three guards), `r5-gpu-and-hot-loop-01` (step! per-call host allocation, invariant 4),
+`01-r5-free-modules-01` (κ=0 mode neither conserved nor damped), `r5-aliasing-and-mutation-01`
+(shared mutable StochasticOU couples two Simulations), `03-r5-free-hot-path-03` (deposit!'s
+scalar-pairing guard is one-sided).
+
+---
 
 Each has a failing witness under `.claude/bug-hunt/witnesses/`. None is filed into
 `test/regressions/`, so the suite does not read green over any of them.
