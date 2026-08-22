@@ -54,6 +54,24 @@ reading is not a check.
    **category/type errors** (a field vs its representation, an operator vs its parameter, a rate vs its
    time-integral, a diagnostic scalar vs the field it reduces, a per-``\kappa`` density vs an energy —
    type each object from the code).
+
+   **And the OPERATIONAL claims, not only the mathematical ones.** The list above is *content* —
+   formulas, factors, relations, quantifiers — and a docstring also makes claims about what the call
+   *does*, which this check missed until 2026-08-22, when two live falsehoods survived every lane and
+   a 23-hat judgement panel: `advance!` said the step was "the advective-CFL value" where the code
+   takes the smallest of three bounds, and a keyword bullet said "there is no unit-free ceiling by
+   default" beside a bound that is exactly one. Neither is a formula, so nothing looked at them.
+   Run this as its own positive procedure — **read the body first**, write down in one sentence what
+   it computes, mutates and returns, and only then discharge the docstring's claims against it:
+   - a stated **default** that differs from the signature's;
+   - **"the" value** where the body branches, or takes a minimum, a maximum, or a fallback;
+   - a documented **error** the code does not throw, or a throw the docs never mention;
+   - an **ordering or timing** claim ("once per step", "at every stage", "after the step") checked
+     against where the call actually sits;
+   - a claim of **no allocation, exactness, or preservation** of a property, checked against the body;
+   - an **argument** whose documented effect is not the effect the body gives it;
+   - a claim about what the code **does not** do — the hardest, since there is no line to quote and
+     the check is to search for the thing whose absence is asserted.
 2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
    every signature argument documented** — enumerated *from the signature* (positional + keyword), each
    its own entry, so an "obvious" `domain` or `dt` cannot be skipped. A **term of art** naming a package
@@ -92,6 +110,9 @@ reading is not a check.
 - Fan out subagents across the surfaces in parallel, **on the cheaper (economy) lane model by
   default** (see Cost modes) — each runs checks 1–6 on its surface via the positive procedures,
   reading `src/` as ground truth, and returns genuine findings with evidence and a proposed fix.
+  **The `src/*.jl` surface agents own check 1's operational half** — they are the only lanes in any
+  instrument that hold a docstring and its body together, which is why the correspondence check lives
+  here and not in the `/check-consistency` panel, whose hats read the rendered site.
 - Two **cross-cutting lanes** (their grouping is not per-surface, so the surface agents cannot run
   them): the **family lane** (check 7) and the **cold-reader lane** (check 2's audience half).
   **Substrate rule for the cold-reader lane:** feed it the reader's *actual* `?name` view — include
