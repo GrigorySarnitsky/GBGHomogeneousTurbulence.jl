@@ -1,0 +1,59 @@
+----- src/State.jl (around line 63) -----
+
+export ResolvedFields, random_solenoidal_velocity!, random_scalar!
+
+
+"""
+    ResolvedFields(domain; scalar = false)
+
+The record of the evolving fields a run advances, in spectral representation — the single source of
+truth, a passive container with every operation external. The velocity, vorticity, and scalar in
+physical representation are recoveries of it, not part of it: the iteration recovers them into the stamped slots of the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) at its end (a slot's stamp
+records the instant its value belongs to; never on a
+read — a cached read serves the deposited value or throws), so the state itself cannot go stale.
+Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
+
+# Fields
+- `velocity` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
+- `scalar` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the run carries
+  no passive scalar.
+"""
+struct ResolvedFields{UH, PH}
+  velocity::UH                   # û (spectral) — the resolved velocity, the single source of truth
+  scalar::PH                     # φ̂ (spectral), or nothing when the run carries no scalar
+end
+
+ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
+  ResolvedFields(new_vector_field_spectral(domain), scalar ? new_scalar_field_spectral(domain) : nothing)
+
+
+"""
+    random_solenoidal_velocity!(û, domain; kinetic_energy, peak_wavenumber,
+                                spectrum = nothing, rng = default_rng())
+
+Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
+``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals `kinetic_energy`. The Leray–Helmholtz
+projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
+
+By default (`spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
+``\\exp\\!\\big(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\big)`` on the mode amplitudes (zeroed
+at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so the mean mode stays empty), whose
+characteristic wavenumber is ``\\kappa_p`` (`peak_wavenumber`). Because the envelope multiplies the
+amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\big(-2\\kappa^{2}/\\kappa_p^{2}\\big)``
+peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
+Pass `spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum, to
+seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
+spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
+shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or
+Pope form from the [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model
+spectra, which the run layer can wire in for you.
+
+The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
+stream (defaults to `Random.default_rng()`).
+
+!!! note
+    Seeding into a running case mutates the resolved fields out of band — announce it with
+    [`resolved_fields_modified!`](@ref GBGIsotropicTurbulence.Cache.resolved_fields_modified!), and
+

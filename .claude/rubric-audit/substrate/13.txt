@@ -1,0 +1,173 @@
+----- src/Observables.jl (around line 25) -----
+# Observables — the functions of the flow state that are measured: kinetic energy, dissipation, the
+# velocity-derivative skewness, the scalar variance and its dissipation, the maximum component
+# speed (which feeds the CFL), and the field-valued vorticity recovery. In the Mori–Zwanzig reading
+# (ARCHITECTURE §8) these are the observables of the `Generator`: their plateaus gate warm-up and
+# their statistics are to be tracked by GBGStreamingStatistics. Most reduce a field to a scalar — a
+# GBGPeriodicFields inner product or moment.
+
+"""
+    Observables
+
+The measured functions of the flow state:
+- [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
+  variance.
+- [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
+- [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
+  developed cascade.
+- [`max_speed`](@ref) — the maximum velocity component, which sets the advective-CFL step (one
+  generic shared with `Cache`: the field reduction is homed here, the cached read there).
+- [`vorticity_physical!`](@ref) — the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}``
+  recovered in physical representation from the spectral state — the field-valued observable
+  (its cached read, `vorticity_physical`, lives in `Cache`).
+- [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
+  length scale derived from it.
+
+Their plateaus gate warm-up (`warmup!`). Each is a function of the state: most reduce a field to a
+scalar (the energy spectrum, to a distribution over wavenumber; the vorticity recovery alone
+produces a field). None dealiases first — the quadratic reductions are exactly
+alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition; `HouLi` meets
+it only to machine precision), and the cubic skewness carries the slight residual its own docstring
+prices.
+"""
+module Observables
+
+using GBGPeriodicFields
+using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
+using ..SimulationDomain: FixedDomain, new_tensor_field_physical
+
+export kinetic_energy, dissipation, max_speed, vorticity_physical!,
+       scalar_variance, scalar_dissipation, derivative_skewness,
+       energy_spectrum, integral_scale
+
+
+"""
+    kinetic_energy(u)
+
+The turbulent kinetic energy ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` of the
+velocity field `u`. Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
+the normalized inner product, so by Parseval's theorem it accepts `u` in either
+representation. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
+`scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
+exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
+zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —
+satisfied by the ``2/3`` rule, by `PhaseShift`'s wider ``\\sqrt{2}N/3`` band, and by every narrower
+
+----- src/SimulationRun.jl (around line 561) -----
+  end
+  (n1 == 0 || n2 == 0) && return false
+  mean_all = (s1 + s2) / (n1 + n2)
+  abs(mean_all) < 1e-30 && return true
+  return abs(s2 / n2 - s1 / n1) / abs(mean_all) < tol
+end
+
+# Mean of the series `y(turn)` over the trailing window `[now-W, now]`.
+function _window_mean(turn, y, now, W)
+  s = 0.0; n = 0
+  @inbounds for i in eachindex(turn)
+    turn[i] < now - W && continue
+    s += y[i]; n += 1
+  end
+  return n == 0 ? 0.0 : s / n
+end
+
+# Downsample-store the signals at `elapsed_turn` and report whether warm-up is complete (the testable
+# core — takes precomputed signals).
+function _push_and_test!(m::StationarityMonitor, elapsed_turn, ε, φ2, S)
+  if isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap
+    push!(m.turn, elapsed_turn); push!(m.eps, ε); push!(m.phi2, φ2); push!(m.skew, S)
+    while length(m.turn) > 2 && m.turn[1] < elapsed_turn - m.window_turnovers - m.sample_gap
+      popfirst!(m.turn); popfirst!(m.eps); popfirst!(m.phi2); popfirst!(m.skew)
+    end
+  end
+  elapsed_turn ≥ m.min_turnovers || return false
+  m.turn[1] ≤ elapsed_turn - m.window_turnovers || return false
+  flat_v = _is_flat(m.turn, m.eps, elapsed_turn, m.window_turnovers, m.tol)
+  flat_s = !m.gate_scalar || _is_flat(m.turn, m.phi2, elapsed_turn, m.window_turnovers, m.tol)
+  flat_k = !m.gate_skew ||
+           (_is_flat(m.turn, m.skew, elapsed_turn, m.window_turnovers, m.tol) &&
+            abs(_window_mean(m.turn, m.skew, elapsed_turn, m.window_turnovers)) ≥ m.skew_floor)
+  m.converged = flat_v && flat_s && flat_k
+  return m.converged
+end
+
+# Compute the signals from `sim` (only when a sample is due — the skewness costs three inverse
+# transforms) and test.
+function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
+  (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
+  φ2 = m.gate_scalar ? (sim.state.scalar === nothing ? NaN : scalar_variance(sim.state.scalar)) : 0.0
+  S = m.gate_skew ? derivative_skewness(sim.state.velocity, sim.domain) : 0.0
+  return _push_and_test!(m, elapsed_turn, ε, φ2, S)
+end
+
+_scalar_forced(sim::Simulation) = sim.state.scalar !== nothing && !(sim.generator.conditions.scalar_forcing isa NoForcing)
+
+
+"""
+    StationarityCriterion(; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
+                            window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
+                            max_turnovers = 60)
+
+The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
+statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
+spin-up, and [`warmup!`](@ref) is its one-line sugar. Use it before measurement on any freshly
+
+----- src/SimulationRun.jl (around line 495) -----
+run!(sim) do s
+    current_time(s) < 5.0                        # a span of simulation time
+end
+
+history = Float64[]                              # record k at every observation; stop at 200 steps
+run!(sim) do s
+    push!(history, kinetic_energy(s.state.velocity))
+    current_step(s) < 200
+end
+
+run!(StationarityCriterion(), sim)               # spin up to statistical stationarity
+```
+"""
+function run!(callback, sim::Simulation)
+  while true
+    keep = callback(sim)
+    keep isa Bool ||
+      throw(ArgumentError("the observation callback must return a Bool — true to continue the " *
+                          "run, false to stop it; it returned a $(typeof(keep))"))
+    keep || break
+    advance!(sim)
+  end
+  return sim
+end
+
+
+# Stationarity detector. Warm-up completes when the running dissipation ``ε(t)`` — and, for a forced
+# scalar, the scalar variance ``⟨φ²⟩(t)`` — stop drifting. ε (equivalently enstrophy) is used rather
+# than the kinetic energy ``k(t)``, which is clamped flat by constant-energy forcing and rings under
+# fixed-injection forcing; the small scales settle last, so a flat ε is the strict indicator. Flatness
+# is a two-half-window mean comparison over a trailing window in eddy-turnover units. The strict gate
+# is the velocity-derivative skewness S(t) (≈0 for a random-phase field, →−0.5 for a developed
+# cascade): a flat S with |S| ≥ skew_floor marks real turbulence. The transform-heavy skewness is
+# sampled only at the storage cadence.
+mutable struct StationarityMonitor
+  min_turnovers::Float64        # do not test before this (past the start-up overshoot)
+  window_turnovers::Float64     # trailing window for the flatness test
+  tol::Float64                  # relative-drift threshold
+  gate_scalar::Bool             # also require ⟨φ²⟩ to be flat
+  gate_skew::Bool               # also require S to have plateaued (and |S| ≥ skew_floor)
+  skew_floor::Float64           # minimum |S| for a plateau to count as developed turbulence
+  sample_gap::Float64           # min turnover spacing between stored samples
+  turn::Vector{Float64}
+  eps::Vector{Float64}
+  phi2::Vector{Float64}
+  skew::Vector{Float64}
+  converged::Bool
+end
+
+StationarityMonitor(; min_turnovers, window_turnovers, tol, gate_scalar, gate_skew, skew_floor) =
+  StationarityMonitor(Float64(min_turnovers), Float64(window_turnovers), Float64(tol),
+                      gate_scalar, gate_skew, Float64(skew_floor), Float64(window_turnovers) / 40,
+                      Float64[], Float64[], Float64[], Float64[], false)
+
+# No net drift of the series y(turn) across the trailing window [now−W, now]:
+# |mean(2nd half) − mean(1st half)| / |mean| < tol.
+function _is_flat(turn, y, now, W, tol)
+

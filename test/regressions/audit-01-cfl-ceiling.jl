@@ -1,24 +1,39 @@
-# Witness — AUDIT finding (six lanes independently): the CFL ceiling added while fixing the runaway
-# is a statement about UNITS. It caps Δt at `cfl*Δx`, the value the rule gives at unit speed, so it
-# binds for every run whose characteristic velocity is below 1 — which is a property of the units the
-# caller chose, not of the physics. The runaway it targets (u_max → 0 sending Δt → 1e15) is real; the
-# clamp is not a bound at u_max → 0, it is a silent throttle everywhere below unit speed.
+# Witness — the adaptive timestep must obey the documented advective rule in the regime the rule is
+# for, and must not run away where the rule goes vacuous.
+#
+# History: a ceiling of `cfl*Δx` was tried and is the step the rule gives at UNIT SPEED, so it bound
+# every sub-unit-speed run — a units claim, caught by six audit lanes. The bound kept instead is the
+# RESOLUTION limit 1/(D·κ_min²), the decay time of the longest mode the box holds, which is derived
+# from the run's own ν and L and binds only below Re_L ≈ 1.
 using Test, GBGIsotropicTurbulence, Random
 const SR = GBGIsotropicTurbulence.SimulationRun
 
-@testset "the adaptive timestep is not silently throttled for a sub-unit-speed run" begin
+@testset "a sub-unit-speed turbulent run gets the documented advective step, unthrottled" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, kinetic_energy = 0.02,
                    velocity_forcing = NoForcing(), rng = MersenneTwister(1))
   speed = max_speed(sim.cache)
-  @test 0 < speed < 1                       # the regime under test: legitimate, and previously fine
-  advective = sim.cfl * (2π / 16) / speed   # what the documented rule Δt = cfl·Δx/u_max gives
-  @test SR.cfl_timestep(sim) ≈ advective    # the rule, unthrottled
+  @test 0 < speed < 1                                  # the regime the units-claim ceiling broke
+  @test SR.cfl_timestep(sim) ≈ sim.cfl * (2π / 16) / speed
 end
 
-@testset "and the runaway it was meant to bound is still bounded" begin
-  # A decaying run drives u_max → 0. Δt must not diverge; a caller may bound it explicitly.
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.5, kinetic_energy = 1e-8,
-                   velocity_forcing = NoForcing(), max_dt = 0.05, rng = MersenneTwister(2))
-  for _ in 1:10; advance!(sim); end
-  @test SR.cfl_timestep(sim) <= 0.05        # the bound is the caller's, stated in their own units
+@testset "the runaway is bounded by the box's own slowest decay, with no constant chosen" begin
+  ν = 0.05
+  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, kinetic_energy = 1e-10,
+                   velocity_forcing = NoForcing(), rng = MersenneTwister(2))
+  resolution = 1 / (ν * (2π / 2π)^2)                   # 1/(ν κ_min²) = 20 here
+  @test SR.cfl_timestep(sim) <= resolution * (1 + 1e-9)
+  @test SR.cfl_timestep(sim) < 1e3                     # not ~1e15
+end
+
+@testset "a scalar that diffuses faster than the velocity sets the tighter bound" begin
+  ν, Sc = 0.05, 0.25                                   # scalar diffusivity ν/Sc = 4x the velocity's
+  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, schmidt = Sc, scalar = true,
+                   kinetic_energy = 1e-10, velocity_forcing = NoForcing(), rng = MersenneTwister(3))
+  @test SR.cfl_timestep(sim) <= 1 / ((ν / Sc) * 1.0) * (1 + 1e-9)
+end
+
+@testset "max_dt still tightens it, and defaults to imposing nothing" begin
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, kinetic_energy = 1e-10,
+                   velocity_forcing = NoForcing(), max_dt = 0.5, rng = MersenneTwister(4))
+  @test SR.cfl_timestep(sim) <= 0.5
 end

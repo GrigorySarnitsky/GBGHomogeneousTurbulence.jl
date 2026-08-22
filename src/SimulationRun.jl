@@ -442,18 +442,43 @@ function cfl_timestep(sim::Simulation)
   # Kept for a direct `cfl_timestep(sim)` call; `advance!` guards its own path independently, since
   # a hand-fixed `dt` never reaches here.
   isfinite(speed) || error("non-finite velocity at step $(sim.clock.step): the run appears to have blown up")
-  # The advective rule, unmodified, plus whatever ceiling the CALLER asked for.
+  # Three bounds, and the step is the smallest.
   #
-  # A ceiling of `cfl*Δx` stood here briefly and was wrong in a way worth recording: it is the step
-  # this rule gives at UNIT SPEED, so it binds for every run whose characteristic velocity is below
-  # 1 — a property of the units the caller chose, not of the physics. Six independent audit lanes
-  # caught it; measured, it cut Δt by 1.9x at t = 0 on an ordinary decaying run. The runaway it
-  # aimed at is real (u_max → 0 sends this to ~1e15, the integrating factor then annihilates every
-  # mode, and the clock advances by a number that means nothing), but the bound for it has to be
-  # stated in the caller's own units, which is what `max_dt` is for. Defaulting to `Inf` keeps the
-  # documented rule Δt = cfl·Δx/u_max exactly as it was.
+  # ADVECTIVE — the documented rule, Δt = C·Δx/u_max. It is a CONSTRAINT, not a target: it answers
+  # "how far can I step before advection carries information across a cell?" As a decaying flow
+  # approaches rest that answer becomes "no limit at all", which is true and useless, and the step
+  # runs away — measured reaching ~1e15, at which point the integrating factor annihilates every
+  # mode, the state stops moving, and the clock advances by a number that means nothing. Worse, the
+  # annihilated state has a smaller u_max still, so the runaway feeds itself.
+  #
+  # RESOLUTION — the missing term, and it is not a stability limit: diffusion is advanced EXACTLY by
+  # the integrating factor, so it constrains nothing. It is a statement about what a step can still
+  # resolve. The slowest thing the box holds is the decay of its longest mode, κ_min = 2π/L, at rate
+  # D·κ_min²; a step longer than 1/(D·κ_min²) decays that mode by more than a factor e in ONE step,
+  # which is the precise sense in which the state "stops moving". `D` is the largest diffusivity the
+  # run carries — ν for the velocity, ν/Sc for the scalar — so a scalar with Sc < 1 diffuses faster
+  # than the velocity and sets the tighter bound.
+  #
+  # It is permissive where it should be. The ratio to the advective step is (N/4π²C)·Re_L with
+  # Re_L = L·u_max/ν, so it grows with resolution AND Reynolds number: measured 53x at N = 16,
+  # Re_L = 65, and 8e4 at N = 256, Re_L = 6283. It binds only below Re_L ≈ 1, which is not
+  # turbulence — exactly the dying flow the runaway comes from.
+  #
+  # Other codes solve this differently and neither derives a bound: hit3d nudges Δt multiplicatively
+  # with a 1% growth limiter and a hard `min(DT, 0.01)`, and fluidsim caps at a `deltat_max`
+  # parameter (default 0.2) with its zero-velocity branch returning that cap outright. A dimensionless
+  # growth limiter would also bound the runaway without asserting anything about units; this route was
+  # taken instead because it needs no constant at all — ν and L are already the run's own.
+  #
+  # MAX_DT — the caller's own ceiling, in their own units. `Inf` by default: nothing is imposed that
+  # the run's parameters do not already imply.
   advective = speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
-  return min(advective, sim.max_dt)
+  conditions = sim.generator.conditions
+  diffusivity = sim.state.scalar_spectral === nothing ? conditions.viscosity :
+                max(conditions.viscosity, conditions.viscosity / conditions.schmidt)
+  κ_min = 2π / Float64(sim.domain.grid.domain_size[1])
+  resolution = 1 / (diffusivity * κ_min^2)
+  return min(advective, resolution, sim.max_dt)
 end
 
 

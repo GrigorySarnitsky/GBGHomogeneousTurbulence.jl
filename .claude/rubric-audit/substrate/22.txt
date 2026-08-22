@@ -1,0 +1,55 @@
+----- src/Cache.jl (around line 25) -----
+# Cache — the observables cache: the stamped storage where a component of the iteration
+# puts a value another component (or an observation) will read. The design is the no-recompute rule
+# (docs/src/observables_cache.md): the schedule is fixed at construction and identical on every
+# iteration; every slot is deposited at the end of the iteration from the state it has just
+# produced; a read either finds the stamped value or throws — there is no path, internal or on
+# request, by which reading causes a computation. A slot IS the register its producer computes in:
+# mid-iteration the step takes the array as stage scratch (clearing the stamp), and the closing deposit
+# re-fills it, so caching adds nothing to what an iteration computes, moves, or stores.
+
+"""
+    Cache
+
+The observables cache — the stamped storage where the iteration leaves the observables it produces,
+for the run's own components and any observation to read. An **iteration** is one advance of the
+run — one `step!` and the `deposit!` that closes it; between iterations the run stands at one
+``t_n``, after one advance and before the next — an instant of the run's clock, not a face of the
+periodic box; a slot's **stamp** records which of these instants its value belongs to, so a read
+can be refused rather than served stale. The cache's operations:
+- [`ObservablesCache`](@ref) — the cache itself: the slots, their stamps, and the epoch counters.
+- [`resolved_fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer
+  mutation made outside the iteration, so the affected stamps go stale and reads throw until the
+  next deposit.
+- [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
+  reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
+- `max_speed` — the cached maximum velocity component, the number the timestep choice reads (one
+  generic with the field reduction in `Observables`, whose docstring is the home).
+- [`particle_velocities`](@ref) — the checked read of the particle velocities
+  ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
+
+The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
+— homed in `Propagator`, with the iteration it closes — which fills and stamps every slot at the
+iteration's end; internal per-slot deposit and take verbs move the individual stamps. A caller
+reads through the accessors and never deposits.
+"""
+module Cache
+
+using GBGPeriodicFields: point_values
+using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
+import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
+
+export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
+       particle_velocities, resolved_fields_modified!, particles_modified!
+
+
+# Stamp sentinels. A slot's stamp is the fields epoch it was deposited at; the sentinels mark the
+# two states with no value: never deposited (fresh construction, or a cleared cache) and taken as a
+# producer's mid-iteration scratch.
+const NEVER_DEPOSITED = -2
+const SCRATCH = -1
+
+
+"""
+    ObservablesCache(domain; scalar = false, particle_velocities = nothing)
+

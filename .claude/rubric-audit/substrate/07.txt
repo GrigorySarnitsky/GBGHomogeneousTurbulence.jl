@@ -1,0 +1,59 @@
+----- docs/ARCHITECTURE.md (around line 1633) -----
+    has; a source of truth calls the scratch arity — and no `to_spectral!` twin exists or is wanted,
+    because every forward transform in the package reads a consumable source by design (IC and
+    forcing noise, quadratic products formed in place over registers the closing deposit refreshes). The umbrella
+    re-exports no `GBGPeriodicFields` name, this operation included — the recovery is reached
+    through the backend, as every other field operation is. Bit-identical: the arity performs
+    exactly the copy-then-transform the deleted wrappers performed, so the transform and pass
+    ledgers and the memory audit are unchanged.
+48. **(2026-08, user-directed) The iteration vocabulary: "closing deposit", not "tail"; no
+    "boundary" for the instant between iterations.** Two informal house terms are retired from
+    every surface, prose and code alike, after the user's documentation read-through flagged both
+    as unclear ("tail" is not a standard term for the end of a loop body; "boundary" invites the
+    spatial reading — on a triple-periodic box, of all packages). The **closing deposit** is the
+    `deposit!` that ends an iteration ("tail deposit", "the tail", "at its tail" before); the
+    instant between iterations is named plainly — *between iterations*, *the iteration's end*,
+    *the instant* ``t_n`` — and the cache values carry the adjective **deposited** (the deposited
+    velocity, the deposited observables) where "boundary velocity/observables" stood.
+    `check_boundary` is renamed **`check_deposits`** (the deposit-completeness check), and the op
+    model's `_tail_deposit`/`tail` become `_closing_deposit`/`closing`. Untouched, being different
+    senses of the same words: the spatial box boundary, an ownership or kernel-granularity
+    boundary, a spectrum's ``\kappa^{2}`` tail, and the phase-shift chain's final convolve
+    (formerly "the phase-shift tail", now named for what it is). The rename swept the decision-log
+    prose as well, so the log reads in the current vocabulary; this entry is the record that the
+    older entries originally said "tail deposit" and "boundary".
+
+---
+
+## References
+
+Cited author–year above; full entries here (DOIs are omitted rather than filled from memory, per the
+no-guessed-citation rule). The extraction-bound
+`Phenomenology` leaf (§4.8) is exempt: each reference law carries its own self-contained citation in a
+`Reference` value, so this list need not duplicate the ~two dozen it cites.
+
+- Kolmogorov, A. N. (1941). The local structure of turbulence in incompressible viscous fluid for very
+  large Reynolds numbers. *Dokl. Akad. Nauk SSSR* **30**, 301–305.
+- Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
+  *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy relations behind the strain-skewness constant, §4.3.)*
+- Patterson, G. S. & Orszag, S. A. (1971). Spectral calculations of isotropic turbulence: efficient
+  removal of aliasing interactions. *Phys. Fluids* **14**, 2538–2541. *(Phase-shift dealiasing; the
+  `PhaseShift` strategy, §7, decision 27.)*
+- Orszag, S. A. (1971). On the elimination of aliasing in finite-difference schemes by filtering
+  high-wavenumber components. *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
+- Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
+  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
+- Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(The
+  sheared-frame scheme, §7; the spherical-truncation dealiasing of the `PhaseShift` strategy,
+  decision 27.)*
+- Hou, T. Y. & Li, R. (2007). Computing nearly singular solutions using pseudo-spectral methods.
+  *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
+- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). Effective dissipation and turbulence
+  in spectrally truncated Euler flows. *Phys. Rev. Lett.* **95**, 264502. *(Thermalization of the
+  Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
+- Chollet, J.-P. & Lesieur, M. (1981). Parameterization of small scales of three-dimensional isotropic
+  turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
+  viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
+- Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
+  turbulence. *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
+

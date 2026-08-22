@@ -1,0 +1,160 @@
+----- src/SimulationDomain.jl (around line 325) -----
+    new_scalar_field_physical(domain)
+
+Allocate a single zeroed scalar field in physical representation on `domain`'s backend and element type.
+"""
+new_scalar_field_physical(domain::FixedDomain) =
+  ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid, domain.layout)
+
+
+"""
+    new_tensor_field_spectral(domain)
+
+Allocate a single zeroed second-order tensor field in spectral representation on `domain`'s backend and element type.
+"""
+new_tensor_field_spectral(domain::FixedDomain) =
+  TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid, domain.layout)
+
+
+"""
+    new_tensor_field_physical(domain)
+
+Allocate a single zeroed second-order tensor field in physical representation on `domain`'s backend and element type.
+"""
+new_tensor_field_physical(domain::FixedDomain) =
+  TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid, domain.layout)
+
+
+"""
+    dealias!(field, domain)
+
+Apply the run's dealias low-pass kernel `domain.dealias` — `domain` a [`FixedDomain`](@ref) — to
+`field` in place: a coefficientwise multiply that
+controls the aliasing of the quadratic nonlinearity. The kernel is whatever the run's
+[`DealiasingStrategy`](@ref) built: the sharp ``2/3`` cutoff ([`TwoThirds`](@ref), exact dealiasing),
+the smooth [`HouLi`](@ref) filter (which only damps the aliasing), or the spherical
+``2\\sqrt{2}/3 \\kappa_{\\mathrm{Ny}}`` truncation ([`PhaseShift`](@ref)). The `field` may be a vector or
+scalar field in spectral representation. Returns `field`.
+"""
+dealias!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
+
+end # module SimulationDomain
+
+----- src/Generator.jl (around line 302) -----
+leaving `û` unused; [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
+recovered on a grid displaced by half a cell (using `û` and the generator's displaced-evaluation
+scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
+
+Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
+forcing are advanced exactly by the integrating factor ([`velocity_factor`](@ref)).
+
+!!! note
+    The assembly **consumes `ω` as its own register**: the Lamb vector is formed in place over the
+    vorticity's array (the backend's cross product may write into one of its operands), so on return
+    `ω` no longer holds the vorticity — while `u` is only read. Which physical argument a right-hand
+    side consumes is stated in each verb's own note and follows the physics (the Lamb vector forms over
+    the vorticity, the scalar flux over the velocity), not the argument position. Only the spectral
+    product scratch remains on the generator, and the operation allocates nothing.
+
+Returns `N̂`.
+"""
+velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω, domain::FixedDomain) =
+  (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω, domain);
+   add_forcing_source!(generator.conditions.velocity_forcing, N̂, domain))
+
+# Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
+# projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
+function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, u, ω, domain::FixedDomain)
+  _velocity_lamb!(nonlinear, u, ω, domain, generator.product_spectral, domain.dealias)
+  return nonlinear
+end
+
+# Phase-shift: average the primary and the half-cell-displaced evaluation (cancels the odd-parity
+# aliases); the spherical `domain.dealias` truncation removes the surviving two-axis aliases, folded
+# into the passes rather than swept separately — the primary carries it inside its projection, and
+# the displaced term picks it up through the composed shift-back∘truncation kernel of the averaging
+# convolve, so no whole-field truncation pass remains.
+function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω, domain::FixedDomain)
+  phase_shift = generator.phase_shift
+  product_spectral = generator.product_spectral
+  T = real(eltype(field_data(nonlinear)))
+  _velocity_lamb!(nonlinear, u, ω, domain, product_spectral, domain.dealias)                          # primary, truncated
+  convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
+  to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
+  vorticity_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
+  # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
+  # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
+  # deletes its re-recovery, decision 45).
+  generator.displaced_velocity_fresh = true
+  _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_spectral)
+  # Shift-back, two-grid average, and truncation in ONE α/β convolve: ½·(𝔻⊙back)⊙(displaced) +
+  # ½·(primary, already truncated) — the composed kernel is built once at construction.
+  convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back_dealiased, T(1 // 2), T(1 // 2))
+  return nonlinear
+end
+
+# The pseudospectral ℙ(u×ω) in spectral representation — with an optional dealias kernel folded into
+# the projection's own pass (the kernel-composed arity; `nothing` gives the raw projected term).
+# The Lamb vector is formed IN PLACE over ω's array: the backend's cross product reads each grid
+# point's whole fiber before writing, so the destination may be an operand, and the product needs no
+# physical register of its own (ω is dead the instant after the cross — the projection's spectral
+
+----- test/integrators.jl (around line 42) -----
+function integrate_fixed(integrator, domain, û0, conditions, dt, nsteps)
+  buffers = allocate_buffers(integrator, domain; scalar = true)
+  generator = ResolvedGenerator(domain, conditions; scalar = true)
+  cache = ObservablesCache(domain; scalar = true)
+  û = new_vector_field_spectral(domain)
+  copyto!(field_data(û), field_data(û0))
+  state = ResolvedFields(û, new_scalar_field_spectral(domain))
+  deposit!(cache, state, domain, buffers)                 # the seeding deposit
+  for _ in 1:nsteps
+    step!(integrator, state, generator, domain, buffers, cache, dt)
+    deposit!(cache, state, domain, buffers)               # the closing deposit ends the iteration
+  end
+  return û
+end
+
+diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
+
+
+@testset "integrators" begin
+  T = Float64
+  N = 16
+  L = 2π
+  ν = 0.1
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
+
+  û0 = new_vector_field_spectral(domain)
+  random_solenoidal_velocity!(û0, domain; kinetic_energy = 0.5, peak_wavenumber = 2.0, rng = MersenneTwister(7))
+  dealias!(û0, domain)
+
+  Tfinal = 0.5
+  n = 8
+
+  @testset "temporal convergence order" begin
+    unforced = FlowConditions(viscosity = ν, schmidt = 1.0, velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+    rk3 = IFLowStorageRK3()
+    u1 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / n, n)
+    u2 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / (2n), 2n)
+    u4 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / (4n), 4n)
+    rk3_ratio = diffnorm(u1, u2) / diffnorm(u2, u4)
+
+    rk2 = IFRK2()
+    v1 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / n, n)
+    v2 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (2n), 2n)
+    v4 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (4n), 4n)
+    rk2_ratio = diffnorm(v1, v2) / diffnorm(v2, v4)
+
+    @test 5.0 < rk3_ratio < 12.0      # third order ⇒ ≈ 8
+    @test 3.0 < rk2_ratio < 6.0       # second order ⇒ ≈ 4
+    @test rk3_ratio > rk2_ratio       # RK3 converges faster than RK2
+  end
+
+  @testset "IFLowStorageRK3 forced-HIT invariants" begin
+    conditions = FlowConditions(viscosity = ν,
+                      velocity_forcing = BandRescaling(domain; target = 0.5, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
+    integrator = IFLowStorageRK3()
+    generator = ResolvedGenerator(domain, conditions; scalar = true)
+

@@ -1,0 +1,59 @@
+----- src/Cache.jl (around line 124) -----
+"""
+mutable struct ObservablesCache{PV, PS, TS}
+  const velocity::PV
+  const vorticity::PV
+  const scalar::PS
+  const particle_velocities::TS
+  velocity_stamp::Int
+  vorticity_stamp::Int
+  scalar_stamp::Int
+  max_speed::Float64
+  max_speed_stamp::Int
+  sample_fields_stamp::Int
+  sample_particles_stamp::Int
+  fields_epoch::Int
+  particles_epoch::Int
+end
+
+ObservablesCache(domain::FixedDomain; scalar::Bool = false, particle_velocities = nothing) =
+  ObservablesCache(new_vector_field_physical(domain), new_vector_field_physical(domain),
+                   scalar ? new_scalar_field_physical(domain) : nothing,
+                   particle_velocities,
+                   NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED,
+                   NaN, NEVER_DEPOSITED, NEVER_DEPOSITED, NEVER_DEPOSITED, 1, 1)
+
+
+# The checked read shared by every accessor: serve the slot only when its stamp names the current
+# fields epoch; otherwise throw with the schedule-facing message.
+function _checked(cache::ObservablesCache, stamp::Int, what::String)
+  stamp == cache.fields_epoch && return nothing
+  if stamp == SCRATCH
+    error("the cached $what is in use as a producer's scratch: mid-iteration the slot holds a " *
+          "stage intermediate, not the observable; read it only between iterations")
+  elseif stamp == NEVER_DEPOSITED
+    error("the cached $what was never deposited: the schedule of this run does not fill the slot " *
+          "before this read (a fresh cache is seeded by its deposit at construction)")
+  else
+    error("the cached $what is stale: the state has advanced past the deposited value, and " *
+          "nothing in the cache is ever recomputed; read between iterations, after the closing deposit")
+  end
+end
+
+
+"""
+    velocity_physical(cache)
+    velocity_physical(sim)
+
+The velocity ``\\boldsymbol{u}`` in physical representation at the current epoch — the checked
+read of the [`ObservablesCache`](@ref) `cache`'s velocity slot. Returns the deposited field when its
+stamp is current, and throws otherwise (the slot is mid-iteration scratch, stale, or was never
+deposited): the throw is an `ErrorException` naming the slot and which of the three states it is in,
+and nothing is ever recomputed on a read. Treat the returned field as read-only — it is the
+storage the next iteration works in. The second form reads a `Simulation`'s cache.
+"""
+function velocity_physical(cache::ObservablesCache)
+  _checked(cache, cache.velocity_stamp, "velocity")
+  return cache.velocity
+end
+

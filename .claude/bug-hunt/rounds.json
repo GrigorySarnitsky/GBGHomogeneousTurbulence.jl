@@ -1,0 +1,24 @@
+[
+ {
+  "round": 1,
+  "confirmed": 20,
+  "escalated": 0
+ },
+ {
+  "round": 2,
+  "confirmed": 9,
+  "escalated": 0
+ },
+ {
+  "round": 3
+ },
+ {
+  "round": 5,
+  "confirmed": 17,
+  "fixed": 7,
+  "escalated": 2,
+  "refuted": 0,
+  "open": 8,
+  "note": "8 findings still open \u2014 see .claude/bug-hunt/OPEN-DEFECTS.md; the gate fails on this until they are dispositioned"
+ }
+]

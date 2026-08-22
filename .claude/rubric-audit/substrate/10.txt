@@ -1,0 +1,42 @@
+----- src/State.jl (around line 12) -----
+# State — the DNS realization of the Mori–Zwanzig State role: `ResolvedFields` (the evolving spectral
+# velocity and scalar — the single source of truth; the physical fields are recovered from it, never
+# held in the state) and the random initial conditions that seed a run. The physical representations
+# are recovered where they are consumed — through the preserving scratch arity of PF's `to_physical!`
+# (the state is never consumed; PF decision 64) and, for the vorticity, `Observables.vorticity_physical!`
+# — and land in `Cache` (`ObservablesCache`); the per-step scratch lives with the integrator
+# (`IntegratorBuffers` in `Propagator`). Everything is sized to a `FixedDomain` from `SimulationDomain`.
+
+"""
+    State
+
+The evolving state a run advances, and how it is seeded:
+- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation: a passive
+  record with every operation external (the single source of truth; the physical fields are
+  recovered from it, never held in the state).
+- [`random_solenoidal_velocity!`](@ref) and [`random_scalar!`](@ref) — the random initial conditions
+  (a divergence-free velocity, a mean-zero scalar) that seed it.
+
+All sized to a [`FixedDomain`](@ref). The physical representations are recovered from the state with
+the four-argument, source-preserving form (the extra argument is a scratch field the transform consumes
+in the state's place) of
+[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the inverse
+transform consumes the coefficients it runs from (a property of the FFT backends), so the recovery
+copies into scratch and the state survives every recovery — and the vorticity with
+[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!); the recovered
+values are deposited into the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+"""
+module State
+
+using GBGPeriodicFields
+using Random
+using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_vector_field_physical,
+                          new_scalar_field_spectral, new_scalar_field_physical, _real_type
+
+export ResolvedFields, random_solenoidal_velocity!, random_scalar!
+
+
+"""
+    ResolvedFields(domain; scalar = false)
+

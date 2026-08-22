@@ -1,8 +1,31 @@
 # ARCHITECTURE.md review pile — problems the user found reading the rewrite
 
-> **Per-item status (done vs pending) and the post-refactor name map: see [`.claude/README.md`](./README.md).**
-> #7, #8, #11, #12 are closed; #1–#6, #9, #10 are pending ARCHITECTURE.md prose edits. Names predate the
-> `4e2c0bd` refactor.
+> **SETTLED 2026-08-20 — this pile is CLOSED.** Every item re-verified against the current tree, not
+> against this file's own earlier status line (which was stale: it listed #1–#6, #9, #10 as pending,
+> and all of them had in fact landed).
+>
+> | # | Verdict | Evidence in the current tree |
+> |---|---|---|
+> | 1 | CLOSED | all three siblings link to their docs sites (`ARCHITECTURE.md:23,25,35`) |
+> | 2 | CLOSED | no asymmetric "velocity … ``\varphi``" pairing survives; the surviving hits pair word+symbol for both |
+> | 3 | CLOSED | the §4.1 option list is gone; §7's comparative passage names the family deliberately and is accurate |
+> | 4 | CLOSED | zero `\texttt{Float` occurrences |
+> | 5 | CLOSED | "each allocates exactly its working set" (`:393`) — the over-provisioning prose is gone |
+> | 6 | CLOSED | the coordinate-free policy is stated in §10 (`:802`) |
+> | 7 | CLOSED | `set_forcing_rate!` / `add_forcing_source!` are the live names |
+> | 8 | CLOSED | `struct Physics` no longer exists; `FlowConditions` lives in `Generator` |
+> | 9 | CLOSED (premise refuted) | see below |
+> | 10 | CLOSED | "The scalar is **denoted** ``\varphi``" (`:790`) |
+> | 11 | DEFERRED, correctly | `StochasticOU` is still archived, so the defect is inactive; landing site (the `modeled` slot) recorded |
+> | 12 | CLOSED | the open-systems sub-lens is in §8 (`:716`), with the naming inversion recorded |
+>
+> **On #9 — the premise was false and the pile would have written a falsehood.** It proposed noting
+> that "statistics is the sole exception since it aggregates in `Float64`". Verified: IT does not
+> depend on `GBGStreamingStatistics` at all (it is named in prose only, absent from `Project.toml`),
+> and the backend's reductions do **not** widen — `kinetic_energy` on a `Float32` field returns
+> `Float32`, measured. What actually buys the accuracy is **pairwise summation** (`_tree_sum`, Base's
+> `mapreduce` blocking), error ``O(\log n)`` against naive ``O(n)``. §6 already carried the honest
+> version of this note; the pairwise fact was added 2026-08-20 to say *why* it holds.
 
 **Collection only.** The user is reading `docs/ARCHITECTURE.md` (the holistic MZ-foundation rewrite)
 and reporting problems. I **collect** them here and do **not** edit the doc — or the code — until the

@@ -1,0 +1,330 @@
+[
+ {
+  "id": 1,
+  "title": "The CFL ceiling should not wear the bare glyph `C` (screenshot: `docs/src/notation.md:94`)",
+  "locations": [
+   "docs/src/notation.md:94",
+   "src/Propagator.jl:488",
+   "src/Propagator.jl:490",
+   "src/Propagator.jl:493",
+   "src/Propagator.jl:498",
+   "docs/ARCHITECTURE.md:374",
+   "ARCHITECTURE.md:640"
+  ]
+ },
+ {
+  "id": 2,
+  "title": "\"Stamped storage\" \u2014 a house coinage, and it never says stamped *with what*",
+  "locations": [
+   "docs/src/api.md:13",
+   "index.md:94",
+   "src/Cache.jl:17",
+   "docs/src/index.md:94",
+   "src/Cache.jl:1",
+   "src/GBGIsotropicTurbulence.jl:18",
+   "src/State.jl:44",
+   "src/SimulationRun.jl:192",
+   "docs/ARCHITECTURE.md:202",
+   "CLAUDE.md:40"
+  ]
+ },
+ {
+  "id": 3,
+  "title": "The overview bullets describe contents, not identity \u2014 and the Generator bullet explains a",
+  "locations": [
+   "docs/src/api.md:15",
+   "index.md:101",
+   "docs/src/api.md:10",
+   "docs/src/index.md:86"
+  ]
+ },
+ {
+  "id": 4,
+  "title": "\"The forthcoming Eulerian + Lagrangian statistics\" \u2014 wrong owner, on four surfaces",
+  "locations": [
+   "src/GBGIsotropicTurbulence.jl:35",
+   "README.md:6",
+   "docs/src/index.md:82",
+   "src/Particles.jl:177",
+   "src/Observables.jl:5",
+   "src/Particles.jl:116",
+   "src/Cache.jl:203",
+   "docs/src/api.md:17",
+   "ARCHITECTURE.md:625"
+  ]
+ },
+ {
+  "id": 5,
+  "title": "`recommended_cfl` is named six times in `SimulationDomain` and linked zero times",
+  "locations": [
+   "src/SimulationDomain.jl:143",
+   "src/Observables.jl:125",
+   "src/SimulationDomain.jl:43",
+   "src/SimulationDomain.jl:76",
+   "src/SimulationDomain.jl:110",
+   "src/SimulationDomain.jl:259",
+   "src/SimulationDomain.jl:37",
+   "docs/ARCHITECTURE.md:374"
+  ]
+ },
+ {
+  "id": 6,
+  "title": "Default-narration survives on the dealiasing surface \u2014 and it is half-applied, my error",
+  "locations": [
+   "docs/src/api/SimulationDomain.md:19",
+   "src/SimulationDomain.jl:44",
+   "SimulationRun.jl:69",
+   "src/SimulationDomain.jl:57",
+   "docs/src/index.md:73",
+   "docs/src/index.md:77",
+   "ARCHITECTURE.md:1055",
+   "docs/src/api/SimulationDomain.md:20",
+   "src/Propagator.jl:28",
+   "src/Propagator.jl:225",
+   "src/Propagator.jl:334",
+   "docs/src/api/Propagator.md:10",
+   "docs/src/notation.md:95",
+   "src/Generator.jl:399",
+   "src/Particles.jl:46"
+  ]
+ },
+ {
+  "id": 7,
+  "title": "No DOIs anywhere in IT \u2014 the stated policy is the inverse of PF's, and its stated reason is my",
+  "locations": [
+   "docs/ARCHITECTURE.md:1633",
+   "src/Interpolation.jl:61"
+  ]
+ },
+ {
+  "id": 9,
+  "title": "`dealias!` names an outcome it cannot deliver alone \u2014 rename, don't just caveat",
+  "locations": [
+   "src/SimulationDomain.jl:325",
+   "src/Generator.jl:302",
+   "test/integrators.jl:42",
+   "particles.jl:103",
+   "scalar.jl:65",
+   "simulation_run.jl:197",
+   "velocity_slice.jl:27",
+   "forcing.jl:31"
+  ]
+ },
+ {
+  "id": 10,
+  "title": "The `State` module docstring: an obvious clause, a parenthetical that should be a sentence,",
+  "locations": [
+   "src/State.jl:12"
+  ]
+ },
+ {
+  "id": 11,
+  "title": "`ResolvedFields` / the State page \u2014 four wording items and one naming decision",
+  "locations": [
+   "docs/src/api/State.md:10",
+   "src/State.jl:41",
+   "src/State.jl:4",
+   "docs/src/api/State.md:11",
+   "docs/src/api.md:15",
+   "docs/ARCHITECTURE.md:199",
+   "src/State.jl:56",
+   "src/Cache.jl:98",
+   "SimulationRun.jl:279",
+   "CLAUDE.md:97"
+  ]
+ },
+ {
+  "id": 12,
+  "title": "Suffix the seeders too, and the seeding `!!! note` buries its own subject",
+  "locations": [
+   "src/State.jl:63",
+   "State.jl:89"
+  ]
+ },
+ {
+  "id": 13,
+  "title": "\"Their plateaus gate warm-up\" \u2014 an unbound pronoun over a false quantifier",
+  "locations": [
+   "src/Observables.jl:25",
+   "src/SimulationRun.jl:561",
+   "src/SimulationRun.jl:495"
+  ]
+ },
+ {
+  "id": 14,
+  "title": "The code-span-abutting-math-span pattern \u2014 a named house-rule violation, 16 sites; and the",
+  "locations": [
+   "src/Observables.jl:84",
+   "CLAUDE.md:193",
+   "src/Observables.jl:176",
+   "src/Observables.jl:66",
+   "src/Forcing.jl:301",
+   "src/Phenomenology.jl:201",
+   "docs/ARCHITECTURE.md:307"
+  ]
+ },
+ {
+  "id": 15,
+  "title": "`max_speed`'s three forms look arbitrary because the rule behind them is nowhere on the",
+  "locations": [
+   "src/Observables.jl:117",
+   "src/Cache.jl:98"
+  ]
+ },
+ {
+  "id": 16,
+  "title": "`energy_spectrum` \"brought to the host\" \u2014 TRUE, but the agent and the cost are unstated",
+  "locations": [
+   "src/Observables.jl:236",
+   "src/Observables.jl:281",
+   "src/SimulationRun.jl:352"
+  ]
+ },
+ {
+  "id": 17,
+  "title": "OPEN QUESTION FOR THE USER \u2014 should `kinetic_energy(sim)` / `(cache)` exist? The two halves",
+  "locations": [
+   "src/Cache.jl:60",
+   "ARCHITECTURE.md:1066",
+   "ARCHITECTURE.md:444",
+   "src/SimulationRun.jl:468",
+   "SimulationRun.jl:300"
+  ]
+ },
+ {
+  "id": 18,
+  "title": "THREE DESIGN QUESTIONS FROM THE USER (2026-08-15) \u2014 the `(sim)` surface, cache-defined",
+  "locations": [
+   "test/validation.jl:56"
+  ]
+ },
+ {
+  "id": 19,
+  "title": "DECIDED \u2014 drop the 8 forwarding reads + the announcement; full `Simulation` inventory",
+  "locations": [
+   "test/validation.jl:56"
+  ]
+ },
+ {
+  "id": 21,
+  "title": "The `Cache` module docstring's opening \u2014 rewrite completely (`src/Cache.jl:13\u201318`)",
+  "locations": [
+   "src/Cache.jl:13"
+  ]
+ },
+ {
+  "id": 22,
+  "title": "`max_speed` is the only unlinked name in the `Cache` map \u2014 finding 5's class, second instance",
+  "locations": [
+   "src/Cache.jl:25"
+  ]
+ },
+ {
+  "id": 23,
+  "title": "\"Stamp\" vs \"epoch\" \u2014 two names for one integer, and the relation is stated only in a `#` comment",
+  "locations": [
+   "src/Cache.jl:124"
+  ]
+ },
+ {
+  "id": 26,
+  "title": "\"register\" \u2014 a borrowed term of art, 80 rendered uses, defined nowhere; worst in `Cache`",
+  "locations": [
+   "src/Cache.jl:82",
+   "architecture.md:1493",
+   "src/Particles.jl:68"
+  ]
+ },
+ {
+  "id": 27,
+  "title": "`particle_velocities`' `# Fields` entry explains another function's mechanics \u2014 cut it",
+  "locations": [
+   "src/Cache.jl:88"
+  ]
+ },
+ {
+  "id": 28,
+  "title": "`particle_velocities`' predictor Note \u2014 cut it (`src/Cache.jl:205\u2013209`)",
+  "locations": [
+   "src/Cache.jl:205",
+   "Particles.jl:6",
+   "Particles.jl:67"
+  ]
+ },
+ {
+  "id": 29,
+  "title": "The `Forcing` map inserts a TYPE into the four-hook list, breaking its stated order",
+  "locations": [
+   "src/Forcing.jl:26"
+  ]
+ },
+ {
+  "id": 30,
+  "title": "`AbstractForcing` says \"a per-step state advance\" \u2014 \"state\" is a term of art here",
+  "locations": [
+   "src/Forcing.jl:57"
+  ]
+ },
+ {
+  "id": 31,
+  "title": "\"`target` is the observable the forcing holds\" \u2014 it is the observable's VALUE, a number",
+  "locations": [
+   "src/Forcing.jl:207",
+   "src/Forcing.jl:231",
+   "src/Forcing.jl:309"
+  ]
+ },
+ {
+  "id": 33,
+  "title": "`ResolvedGenerator`'s two sentences run 52 and 55 words; `Simulation` is never linked from any",
+  "locations": [
+   "src/Generator.jl:141",
+   "src/Generator.jl:107",
+   "test/memory_audit.jl:190"
+  ]
+ },
+ {
+  "id": 36,
+  "title": "`velocity_buffer` allocates a *generic* vector buffer but is named for one use",
+  "locations": [
+   "src/Particles.jl:206"
+  ]
+ },
+ {
+  "id": 37,
+  "title": "`sample!` \u2014 the verb collides with the noun *sample*, and says nothing about interpolation",
+  "locations": [
+   "src/Particles.jl:172",
+   "src/Cache.jl:244"
+  ]
+ },
+ {
+  "id": 38,
+  "title": "*particle* vs *tracer* \u2014 three nouns for one concept, and no stated convention",
+  "locations": [
+   "src/Particles.jl:32"
+  ]
+ },
+ {
+  "id": 40,
+  "title": "`Tracers`: which arguments are keyword is unprincipled \u2014 and this is round 1's finding 4a,",
+  "locations": [
+   "src/Particles.jl:37"
+  ]
+ },
+ {
+  "id": 41,
+  "title": "`particle_velocities` is the only unlinked name in its sentence \u2014 and the cross-module link",
+  "locations": [
+   "src/Particles.jl:55"
+  ]
+ },
+ {
+  "id": 42,
+  "title": "`Tracers` mixes trajectory **state** with one integrator's **scratch** \u2014 CODE/ARCHITECTURE",
+  "locations": [
+   "src/Particles.jl:71",
+   "src/Propagator.jl:418"
+  ]
+ }
+]

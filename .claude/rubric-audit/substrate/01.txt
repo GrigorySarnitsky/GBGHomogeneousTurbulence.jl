@@ -1,0 +1,219 @@
+----- docs/src/notation.md (around line 94) -----
+|:---|:---|:---|
+| ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | `kinetic_energy` |
+| ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | `dissipation` |
+| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | `spectrum` |
+| ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | `energy_spectrum` (the `GBGPeriodicFields` radial spectrum, halved) |
+| ``\langle\varphi^2\rangle`` | scalar variance | `scalar_variance` |
+| ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | `scalar_dissipation` |
+
+## Derived scales
+
+Measured from the resolved state, or derived from it through a `FlowParameters` bundle and its helpers.
+
+| Symbol | Meaning | Code |
+|:---|:---|:---|
+| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | `flow_parameters` |
+| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | `integral_scale` |
+| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | `kolmogorov_length` |
+| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | `kolmogorov_time` |
+| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number, measured from the flow state | `taylor_reynolds` |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | `taylor_microscale` |
+
+## Numerics
+
+| Symbol | Meaning | Code |
+|:---|:---|:---|
+| ``N`` | grid points per side | `grid_points_per_axis` |
+| ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
+| ``\Delta t`` | timestep | `dt` |
+| ``C`` | advective-CFL ceiling, ``\Delta t = C \Delta x/\max_i\lvert u_i\rvert`` (the derivative-skewness isotropy constant wears the subscripted ``C_S``) | `recommended_cfl` |
+| ``\kappa_{\max}`` | dealiased maximum wavenumber, ``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule (``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`; set by the `dealiasing` strategy) | `DealiasingStrategy` |
+| ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | `IFLowStorageRK3` |
+| ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3`; ``0`` for the imaginary-axis-unstable `IFRK2`) | `recommended_cfl` |
+| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
+
+## Forcing
+
+| Symbol | Meaning | Code |
+|:---|:---|:---|
+| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | `set_forcing_rate!` |
+| ``\varepsilon_{\text{target}}`` | target energy-injection rate | `ConstantPower(target=…)` |
+
+----- src/Propagator.jl (around line 488) -----
+first iteration finds the initial state's observables. The argument order is shared with `step!` —
+the mutated dispatch object (here the cache) leads, and `state`, `domain`, `buffers` follow in the
+same fixed order as there. After mutating the state out of band, announce
+it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
+
+Returns `cache` (or `sim`).
+"""
+function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
+                  buffers::IntegratorBuffers)
+  u = take_velocity!(cache)
+  to_physical!(u, state.velocity, domain.velocity_plans, _recovery_scratch(buffers))
+  deposit_velocity!(cache)
+  ω = take_vorticity!(cache)
+  vorticity_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
+  deposit_vorticity!(cache)
+  if state.scalar !== nothing && cache.scalar !== nothing
+    φ = take_scalar!(cache)
+    to_physical!(φ, state.scalar, domain.scalar_plans, _recovery_scratch(buffers.scalar))
+    deposit_scalar!(cache)
+  end
+  deposit_max_speed!(cache, max_speed(u))
+  return cache
+end
+
+
+"""
+    recommended_cfl(integrator, domain)
+
+A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C`` for the scheme `integrator` on the
+[`FixedDomain`](@ref) `domain`, for a timestep
+``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
+
+The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap and the looseness of the eigenvalue bound together justify the conservative factor below, since the eigenvalue bound itself
+over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
+calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
+[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
+conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
+relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
+margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
+
+It scales that base by the domain's dealiasing: a strategy that keeps modes
+to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
+override `cfl` for a specific run.
+"""
+function recommended_cfl end
+
+# The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
+# corrects it for the domain's dealiasing band.
+_base_cfl(::AbstractIntegrator) = 0.3
+_base_cfl(::IFRK2) = 0.25
+_base_cfl(::IFLowStorageRK3) = 0.5
+
+# Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
+
+----- src/Propagator.jl (around line 490) -----
+same fixed order as there. After mutating the state out of band, announce
+it with [`resolved_fields_modified!`](@ref) and re-deposit with the second form, which unpacks `sim`.
+
+Returns `cache` (or `sim`).
+"""
+function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
+                  buffers::IntegratorBuffers)
+  u = take_velocity!(cache)
+  to_physical!(u, state.velocity, domain.velocity_plans, _recovery_scratch(buffers))
+  deposit_velocity!(cache)
+  ω = take_vorticity!(cache)
+  vorticity_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
+  deposit_vorticity!(cache)
+  if state.scalar !== nothing && cache.scalar !== nothing
+    φ = take_scalar!(cache)
+    to_physical!(φ, state.scalar, domain.scalar_plans, _recovery_scratch(buffers.scalar))
+    deposit_scalar!(cache)
+  end
+  deposit_max_speed!(cache, max_speed(u))
+  return cache
+end
+
+
+"""
+    recommended_cfl(integrator, domain)
+
+A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C`` for the scheme `integrator` on the
+[`FixedDomain`](@ref) `domain`, for a timestep
+``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
+
+The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap and the looseness of the eigenvalue bound together justify the conservative factor below, since the eigenvalue bound itself
+over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
+calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
+[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
+conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
+relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
+margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
+
+It scales that base by the domain's dealiasing: a strategy that keeps modes
+to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
+override `cfl` for a specific run.
+"""
+function recommended_cfl end
+
+# The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
+# corrects it for the domain's dealiasing band.
+_base_cfl(::AbstractIntegrator) = 0.3
+_base_cfl(::IFRK2) = 0.25
+_base_cfl(::IFLowStorageRK3) = 0.5
+
+# Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
+# (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
+recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
+
+----- src/Propagator.jl (around line 493) -----
+Returns `cache` (or `sim`).
+"""
+function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
+                  buffers::IntegratorBuffers)
+  u = take_velocity!(cache)
+  to_physical!(u, state.velocity, domain.velocity_plans, _recovery_scratch(buffers))
+  deposit_velocity!(cache)
+  ω = take_vorticity!(cache)
+  vorticity_physical!(ω, state.velocity, domain, _recovery_scratch(buffers))
+  deposit_vorticity!(cache)
+  if state.scalar !== nothing && cache.scalar !== nothing
+    φ = take_scalar!(cache)
+    to_physical!(φ, state.scalar, domain.scalar_plans, _recovery_scratch(buffers.scalar))
+    deposit_scalar!(cache)
+  end
+  deposit_max_speed!(cache, max_speed(u))
+  return cache
+end
+
+
+"""
+    recommended_cfl(integrator, domain)
+
+A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C`` for the scheme `integrator` on the
+[`FixedDomain`](@ref) `domain`, for a timestep
+``\\Delta t = C \\Delta x / \\max_i\\lvert u_i\\rvert``, with ``\\Delta x = L/N`` the grid spacing.
+
+The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
+``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert``; stability needs this times ``C`` to stay within the
+scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``. The timestep divides by the cheaply-measured
+maximum component ``\\max_i\\lvert u_i\\rvert`` (within a factor ``\\sqrt{3}`` of ``\\sup\\lvert\\boldsymbol{u}\\rvert``); that gap and the looseness of the eigenvalue bound together justify the conservative factor below, since the eigenvalue bound itself
+over-estimates the true spectral radius (not every mode carries the peak speed). The base ceiling is
+calibrated for the ``2/3`` rule (``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``): for
+[`IFLowStorageRK3`](@ref) ``y_{\\mathrm{s}} = \\sqrt{3}`` gives ``C \\lesssim 0.83``, taken
+conservatively as ``0.5``; [`IFRK2`](@ref) is imaginary-axis unstable (``y_{\\mathrm{s}} = 0``,
+relying on viscous damping), which makes the formula degenerate — its ``0.25`` is an empirical
+margin, not a computed limit, and the damping it leans on weakens as ``\\nu`` falls.
+
+It scales that base by the domain's dealiasing: a strategy that keeps modes
+to a higher ``\\kappa_{\\max}`` (e.g. `HouLi`, out to the Nyquist wavenumber) takes a
+proportionally smaller step, ``C \\propto 1/\\kappa_{\\max}``. This is the value `Simulation` uses;
+override `cfl` for a specific run.
+"""
+function recommended_cfl end
+
+# The base (2/3-calibrated) advective-CFL ceiling per scheme — internal; the public `recommended_cfl`
+# corrects it for the domain's dealiasing band.
+_base_cfl(::AbstractIntegrator) = 0.3
+_base_cfl(::IFRK2) = 0.25
+_base_cfl(::IFLowStorageRK3) = 0.5
+
+# Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
+# (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
+recommended_cfl(integrator::AbstractIntegrator, domain::FixedDomain) =
+  _base_cfl(integrator) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
+
+
+

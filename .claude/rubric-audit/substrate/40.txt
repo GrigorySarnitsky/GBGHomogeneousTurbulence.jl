@@ -1,0 +1,59 @@
+----- src/Particles.jl (around line 37) -----
+# already produces each step, so the tracer push stays decoupled from the field Runge–Kutta internals.
+
+"""
+    Particles
+
+Lagrangian tracer tracking:
+- [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
+- [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
+  trajectory velocities are read from the run's observables cache through
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
+  deposit stamps them).
+- [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the velocity at both ends of the step).
+- [`record_trajectory_velocity!`](@ref) — put the Lagrangian velocity at the new positions on record,
+  for the next push's first half.
+- [`sample!`](@ref) — read a field along the trajectories; [`velocity_buffer`](@ref) /
+  [`scalar_buffer`](@ref) allocate its `out` buffers.
+"""
+module Particles
+
+using GBGPeriodicFields
+using Random
+using ..SimulationDomain: FixedDomain, _reference, _real_type
+
+export Tracers, record_trajectory_velocity!, advect!, sample!,
+       particle_positions, number_of_tracers, velocity_buffer, scalar_buffer
+
+
+"""
+    Tracers(domain, number_of_tracers; scheme, rng = default_rng())
+    Tracers(domain, positions; scheme)
+
+A set of Lagrangian tracers, built on `domain`'s backend and element type. The first form seeds `number_of_tracers`
+tracers uniformly at random in the periodic box of `domain`; the second wraps a given `(M, 3)` array of
+`M` tracer positions (the three columns are the ``x, y, z`` components), converting it to `domain`'s
+backend and element type. The `scheme` is the `GBGPeriodicFields` velocity-interpolation scheme used to
+evaluate the velocity (and any sampled field) at the tracer positions.
+[`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1`` choice
+(the default `tracer_scheme` of the `Simulation` front door, the build-everything convenience
+constructor);
+[`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline) and
+[`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline) offer higher
+smoothness or interpolation order — at a wider stencil, useful for derivative-sensitive readouts such as
+acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and smoothness parameters.
+The `rng` (first form only) is the random stream seeding the uniformly-random tracer positions; it
+defaults to `Random.default_rng()`.
+
+Read the particle state with [`particle_positions`](@ref) and [`number_of_tracers`](@ref); the
+trajectory velocities are read from the run's observables cache (`particle_velocities`), where the
+iteration's closing deposit stamps them. The remaining fields are preallocated predictor and
+point-value scratch, so the tracer push allocates no per-step memory.
+
+# Fields
+- `positions` — the `(M, 3)` tracer positions (read with [`particle_positions`](@ref)).
+- `predictor` — `(M, 3)` scratch for the Heun predictor positions.
+- `position_points`, `predictor_points` — `PointSet`s wrapping `positions` / `predictor` for interpolation.
+- `trajectory_velocity` — the interpolated velocity at the positions the tracers occupy, at the
+  instant they occupy them: the genuine Lagrangian sample, and the observables cache's
+

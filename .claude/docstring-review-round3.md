@@ -1,4 +1,4 @@
-# docstring-review-round3.md — user read-through, round 3 (LIVE — collect-only)
+# docstring-review-round3.md — user read-through, round 3 (SETTLED — worked off in a3a523c…08c2c4d; header corrected 2026-08-20)
 
 A fresh human read of the **rendered** docs after the 8-hat panel fix pass (commits `90c9829`,
 `3e6c5e7`). The user finds problems by reading and reports them; collected here verbatim, then distilled
