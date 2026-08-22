@@ -95,8 +95,8 @@ _band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_va
 Supertype of the energy-injection strategies. A strategy may implement any of
 [`prepare_forcing!`](@ref) (advance the strategy's **own** internal state — a stochastic forcing's
 random process, say — never the simulation state), [`set_forcing_rate!`](@ref)
-(a linear forcing rate folded into the integrating factor — a strategy implementing it **must** also
-declare [`uses_steady_linear_rate`](@ref), or it is never given a rate array to fill),
+(a rate that is **constant in time**, folded into the integrating factor — a strategy implementing it
+**must** also declare [`uses_steady_linear_rate`](@ref), or it is never given a rate array to fill),
 [`add_forcing_source!`](@ref) (an additive per-stage source), and [`project_forcing!`](@ref) (a
 post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
 need.
@@ -104,9 +104,13 @@ need.
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
 `set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook
 consumes must be prepared here), `add_forcing_source!` runs at every stage, and `project_forcing!` runs after the completed
-step. The linear rate and the additive source are two channels of **one** forcing term — the part linear
-in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
-single strategy may legitimately use both.
+step. The rate and the source are two channels of **one** forcing term — the *steady* part is folded
+exactly into the integrating factor, the remainder is added at the stages — so a single strategy may
+legitimately use both.
+
+Which channel a rate may take is decided by steadiness in time, **not** linearity in the field: the
+integrating factor holds a rate fixed for the whole step, so one re-solved from the state must go
+through `add_forcing_source!` instead. The declaration is measured at construction, not trusted.
 
 Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
 `add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns
@@ -234,15 +238,20 @@ prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, dt::Real) = noth
 Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂`, on the
 [`FixedDomain`](@ref) `domain`. The default does nothing.
 
-This is the route a **state-dependent** forcing must take. It is called at every Runge–Kutta stage and
-is handed that stage's own `field` — the velocity ``\\hat{\\boldsymbol{u}}`` or the scalar
+This is the route a **state-dependent** forcing must take. It is called at every Runge–Kutta stage
+and is handed that stage's own `field` — the velocity ``\\hat{\\boldsymbol{u}}`` or the scalar
 ``\\hat{\\varphi}`` in spectral representation, whichever this forcing drives — together with the
-`diffusivity` acting on it (``\\nu`` for the velocity, ``\\varkappa`` for the scalar), so a strategy
-whose amplitude depends on the current state can measure that state where the scheme will integrate
-the result. A rate that instead varies with the *state* and is frozen once per step is the
-left-endpoint rectangle rule on ``\\int A\\,\\mathrm dt``, and costs the scheme its order however
-good the scheme is — which is why only a genuinely steady rate may go through
-[`set_forcing_rate!`](@ref).
+`diffusivity` acting on it (``\\nu`` for the velocity, ``\\varkappa`` for the scalar). A strategy
+whose amplitude depends on the current state can therefore measure that state exactly where the
+scheme will integrate the result.
+
+The alternative costs accuracy: a state-dependent rate frozen once per step is the left-endpoint
+rectangle rule on ``\\int A\\,\\mathrm dt``, dropping the scheme to first order however good it is.
+Only a steady rate may go through [`set_forcing_rate!`](@ref).
+
+Each reduction costs one blocking device-to-host transfer, **at every stage** — three per stage for
+[`VarianceController`](@ref), one for [`ConstantPower`](@ref), where [`Linear`](@ref) pays none.
+That is the price of the order this route preserves.
 
 Returns `N̂`.
 
@@ -481,7 +490,7 @@ struct ConstantPower{K, T} <: AbstractForcing
 end
 
 """
-    VarianceController(; target, gain = 1.0, turnover_time = nothing,
+    VarianceController(; target, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
@@ -518,7 +527,7 @@ limit is [`VarianceRescaling`](@ref).
 # Arguments
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
-- `gain = 1.0` — the dimensionless gain ``G``. Larger relaxes faster; Bassenne report ``O(1-10)``.
+- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster; Bassenne report ``O(1-10)``.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell``. When omitted it is taken as
   ``2k_\\infty/3\\varepsilon_\\infty`` with ``\\varepsilon_\\infty`` the stationary estimate for
   this box, the same estimate the grid-mode viscosity solve uses.
@@ -540,7 +549,7 @@ struct VarianceController{K, T} <: AbstractForcing
 end
 
 
-function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
+function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                             turnover_time = nothing, lowest_shell::Integer = 1,
                             highest_shell::Integer = 2)
   # Finite AND positive, as the codebase's other positive-scalar guards read: `Inf` passes `> 0` and
@@ -558,12 +567,13 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
   tℓ = turnover_time === nothing ?
        2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
                                                                  domain.grid.domain_size[1])) :
-       float(turnover_time)
+       turnover_time
   (isfinite(tℓ) && tℓ > 0) ||
     throw(ArgumentError("`turnover_time` must be finite and positive, got $turnover_time"))
-  # promote, not three independent `float`s: the struct ties `target`, `gain` and `relaxation_time` to
-  # ONE parameter, so a Float32 target with the Float64 default gain has no matching constructor.
-  return VarianceController(band, promote(float(target), float(gain), tℓ)...)
+  # Promote the three together, and `float` only `target` — which is what fixes the element type.
+  # Flooring each argument separately re-imports Float64 through the back door, because `float(1)` on
+  # the integer default gain is a Float64 and promotion then carries the whole struct up with it.
+  return VarianceController(band, promote(float(target), gain, tℓ)...)
 end
 
 
@@ -574,8 +584,11 @@ end
 # It has to be the SAME estimate the grid-mode viscosity solve uses: that solve chooses ν from the
 # assumed k, and the controller's default relaxation time sets how fast the run reaches it. Two
 # different notions of "stationary for this box" would put the two out of step with each other.
-const _DISSIPATION_GROUP = 0.9
-_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 / 2) / L
+# A `Rational` and a rational exponent, never floating literals — the same rule `_target_factor`
+# carries and for the same reason: a bare `0.9` or `3/2` is a `Float64` and promotes the estimate,
+# the turnover time, and then the whole controller off a Float32 run's element type.
+const _DISSIPATION_GROUP = 9 // 10
+_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 // 2) / L
 
 
 uses_steady_linear_rate(::VarianceController) = false
@@ -756,7 +769,7 @@ ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::
 VarianceRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> VarianceRescaling(domain; target, over, lowest_shell, highest_shell))
 
-VarianceController(; target::Real, gain::Real = 1.0, turnover_time = nothing,
+VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
                    lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> VarianceController(domain; target, gain, turnover_time,
                                                lowest_shell, highest_shell))

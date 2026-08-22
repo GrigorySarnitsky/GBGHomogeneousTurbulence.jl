@@ -154,7 +154,7 @@ end
 # A rate array exists only for a forcing that declares one — the storage tracks the physics, not the
 # possibility of it. A forcing that fills a rate without declaring it would be handed `nothing` and go
 # silently unapplied, so that mismatch is a construction-time error rather than a wrong quiet run.
-function _forcing_rate(domain::FixedDomain, forcing)
+function _forcing_rate(domain::FixedDomain, forcing, allocate_probe = new_vector_field_spectral)
   if !uses_steady_linear_rate(forcing)
     _overrides_rate_hook(forcing) &&
       throw(ArgumentError("$(nameof(typeof(forcing))) implements set_forcing_rate! but does not " *
@@ -162,9 +162,41 @@ function _forcing_rate(domain::FixedDomain, forcing)
                           "would be given no rate array to fill and would never be applied"))
     return nothing
   end
+  _check_rate_is_steady(domain, forcing, allocate_probe)
   # A scalar field in spectral representation holding REAL values (the complex container is what the
   # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
   return new_scalar_field_spectral(domain)
+end
+
+
+# The declaration says the rate is STEADY, and steadiness is the property that makes folding it into
+# the integrating factor exact. Unlike the arity guards this one is semantic, so it is measured
+# rather than trusted: the hook is armed from two different states, and a rate that tracks the state
+# gives two different answers. Letting it lie is not a cosmetic error — a state-dependent rate frozen
+# for the step is the left-endpoint rectangle rule on ∫A dt, which drops a third-order scheme to
+# first order and does so silently, because every value in sight stays finite and plausible.
+#
+# The probes are all-ones and a spatially varying ramp, so the pair differs in BOTH magnitude and
+# shape: a rate keyed to the field's amplitude and one keyed to its distribution across modes are
+# each caught. Twice at construction, never in the loop.
+function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
+  probe = allocate_probe(domain)
+  first_rate, second_rate = new_scalar_field_spectral(domain), new_scalar_field_spectral(domain)
+
+  fill!(field_data(probe), 1)
+  set_forcing_rate!(forcing, first_rate, probe, domain)
+  data = field_data(probe)
+  data .= reshape(1:length(data), size(data)) ./ length(data)
+  set_forcing_rate!(forcing, second_rate, probe, domain)
+
+  field_data(first_rate) == field_data(second_rate) ||
+    throw(ArgumentError("$(nameof(typeof(forcing))) declares uses_steady_linear_rate = true, but " *
+                        "the rate it supplies changes with the field, so it is not steady in time. " *
+                        "A state-dependent rate folded into the integrating factor is frozen for " *
+                        "the whole step, which costs the scheme its order — a third-order scheme " *
+                        "measures 1.0. Supply it through add_forcing_source! instead, where every " *
+                        "stage evaluates it, and leave uses_steady_linear_rate at false."))
+  return nothing
 end
 
 # Does this forcing define an `add_forcing_source!` that the run cannot call — one written to the
@@ -172,16 +204,23 @@ end
 # arity is the whole question, so the method table is enumerated exactly as the rate probe does it,
 # and for the same reason: `which` resolves a call, not a definition.
 function _defines_stale_source_hook(forcing)
+  overrides = false
+  callable = false
   for m in methods(add_forcing_source!, Tuple{typeof(forcing), Vararg{Any}})
     signature = Base.unwrap_unionall(m.sig)
     length(signature.parameters) >= 2 || continue
     accepted = signature.parameters[2]
     accepted isa TypeVar && (accepted = accepted.ub)
     accepted === AbstractForcing && continue        # the do-nothing fallback itself
-    # the function type plus five arguments
-    m.isva || length(signature.parameters) >= 6 || return true
+    overrides = true
+    # the function type plus five arguments, or a vararg that can absorb them
+    (m.isva || length(signature.parameters) >= 6) && (callable = true)
   end
-  return false
+  # The question is whether a callable method EXISTS, not whether every method is one. Julia
+  # auto-generates a short stub for an optional trailing argument, and a strategy may keep an old
+  # overload for its own harness; both dispatch correctly on the run-shaped call, and an
+  # every-method test locks them out of building a generator at all.
+  return overrides && !callable
 end
 
 
@@ -310,7 +349,8 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                     new_vector_field_spectral(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
                     _forcing_rate(domain, conditions.velocity_forcing),
-                    scalar ? _forcing_rate(domain, conditions.scalar_forcing) : nothing,
+                    scalar ? _forcing_rate(domain, conditions.scalar_forcing,
+                                           new_scalar_field_spectral) : nothing,
                     nothing)
 end
 

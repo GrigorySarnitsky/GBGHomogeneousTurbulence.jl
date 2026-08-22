@@ -1362,10 +1362,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\lvert\boldsymbol{\kappa}\rvert^{2}`` swept once per integrating-factor build), so a lazy
     per-mode symbol apply would delete that class outright and do nothing for the other.
 
-    On the synchronization axis the default configuration issues **three** blocking readbacks per
-    step — the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables — against a
-    floor of **one**. Only the timestep's is irreducible; a forcing's scalar is consumed by the very
-    next kernel and visits the host only because it is written as a Julia number.
+    On the synchronization axis the default configuration issues **ten** blocking readbacks per step
+    against a floor of **one** — the CFL speed bound, plus `VarianceController`'s three reductions at
+    each of the three stages. Only the timestep's is irreducible; a forcing's scalar is consumed by
+    the very next kernel and visits the host only because it is written as a Julia number. *(Three
+    when this was written, under the `VarianceRescaling` default; decision 58 changed the default,
+    and the count with it. That decision bought temporal order at this axis's expense, and the gap
+    is held rather than accepted — the three per-stage reductions differ only in their weight, so one
+    fused multi-weight reduction collapses them.)*
 
     First fruits, each verified and each retiring its holder rather than recording it: the tracer
     push no longer retains a start-of-step velocity **field** (§4.6) — an ``N^{3}\times3`` resident
@@ -1904,8 +1908,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the caveat cannot rot into a claim.
 
     The replacement is `VarianceController`, the constant-``k`` controller of Bassenne, Urzay, Park &
-    Moin (2016, Eq. 20): ``A = [\varepsilon - G(k_f - k_\infty)/t_\ell]/(2k_f)``, whose marginal term
-    ``\varepsilon/2k_f`` reinjects exactly what dissipation removes and whose proportional term gives
+    Moin (2016, Eq. 20): ``A = [\varepsilon - G(k - k_\infty)/t_\ell]/(2k_f)`` — the whole field's
+    variance ``k`` in the restoring term, the forced band's ``k_f`` normalizing, and the two are not
+    interchangeable (see the postscript). Its marginal term
+    ``\varepsilon/2k_f`` reinjects exactly what dissipation removes, and its proportional term gives
     ``\mathrm dk/\mathrm dt = -G(k - k_\infty)/t_\ell`` — exponential relaxation to a **stable
     attractor**. That is the structural difference from the rescale, not a numerical refinement: the
     clamp *imposes* the target and destroys the fluctuation of the quantity it holds, while the

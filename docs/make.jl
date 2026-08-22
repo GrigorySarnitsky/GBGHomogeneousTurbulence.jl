@@ -102,6 +102,37 @@ function _docstring_shapes()
   return shapes
 end
 
+# Paragraphs that predate the always-on cap, enumerated rather than hidden. The cap used to apply
+# only to a docstring the baseline did not know, which meant a re-baseline in the same commit as the
+# growth blessed an over-cap paragraph permanently, and a RENAME minted a fresh key whose over-cap
+# shape was frozen on the next baseline. Closing those holes exposed 21 paragraphs already over the
+# limit. They are listed here so the debt is a number rather than a silence: an entry may be removed
+# when its paragraph is split, and NOTHING may be added — a new or edited docstring is capped.
+const SHAPE_CAP_GRANDFATHERED = Set([
+  "Cache.jl::ObservablesCache(domain; scalar = false, particle_velocities = nothing)",
+  "Generator.jl::Generator",
+  "Generator.jl::scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain;",
+  "Generator.jl::velocity_integrating_factor(generator, τ)",
+  "Observables.jl::energy_spectrum(û, domain)",
+  "Observables.jl::integral_scale(û, domain)",
+  "Observables.jl::kinetic_energy(u)",
+  "Observables.jl::Observables",
+  "Observables.jl::scalar_dissipation(φ̂, domain, diffusivity)",
+  "Particles.jl::Particles",
+  "Particles.jl::restart!(scheme, buffers) -> buffers",
+  "Propagator.jl::IFLowStorageRK3()",
+  "Propagator.jl::step!(scheme, state, generator, domain, buffers, cache, dt)",
+  "Scalings.jl::Li2008(; dissipation_group = 0.9)",
+  "SimulationDomain.jl::HouLi(; order = 36, strength = nothing)",
+  "SimulationDomain.jl::PhaseShift()",
+  "SimulationRun.jl::run!(callback, sim)",
+  "Spectra.jl::ExponentialDissipation(β)",
+  "Spectra.jl::large_scale_length(f, fp) -> Float64",
+  "State.jl::random_scalar_spectral!(φ̂, domain; scalar_variance, envelope_wavenumber,",
+  "State.jl::random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,",
+])
+
+
 function lint_docstring_shape()
   shapes = _docstring_shapes()
   if get(ENV, "DOCSTRING_SHAPE_BASELINE", "") == "1"
@@ -124,14 +155,20 @@ function lint_docstring_shape()
   end
   problems = String[]
   for (key, (para, adm, words)) in shapes
+    # The caps bind ALWAYS, baselined or not. They used to apply only to an unknown key, which left
+    # two ways through: re-baselining in the same commit turned a new over-cap docstring into a known
+    # one and skipped the cap forever, and because the key is the signature string, any RENAME
+    # produced a fresh key whose over-cap shape was then frozen on the next baseline. Both were
+    # exercised at once in 2026-08. A cap is an absolute limit; the ratchet is a separate mechanism
+    # against accretion, and they compose rather than substitute.
+    (para > SHAPE_NEW_PARAGRAPH_CAP && !(key in SHAPE_CAP_GRANDFATHERED)) &&
+      push!(problems, "$key: $para-word paragraph (cap $SHAPE_NEW_PARAGRAPH_CAP)")
+    adm > SHAPE_NEW_ADMONITION_CAP && push!(problems, "$key: $adm admonitions (cap $SHAPE_NEW_ADMONITION_CAP)")
     if haskey(base, key)
       bp, ba, bw = base[key]
       para > bp && push!(problems, "$key: longest paragraph grew $bp → $para words")
       adm > ba && push!(problems, "$key: admonitions grew $ba → $adm")
       words > bw && push!(problems, "$key: docstring grew $bw → $words words")
-    else
-      para > SHAPE_NEW_PARAGRAPH_CAP && push!(problems, "$key: new docstring with a $para-word paragraph (cap $SHAPE_NEW_PARAGRAPH_CAP)")
-      adm > SHAPE_NEW_ADMONITION_CAP && push!(problems, "$key: new docstring with $adm admonitions (cap $SHAPE_NEW_ADMONITION_CAP)")
     end
   end
   isempty(problems) || error("doc lint failed — docstrings grew rather than being rewritten " *

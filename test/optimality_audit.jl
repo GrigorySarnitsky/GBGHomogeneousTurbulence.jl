@@ -211,8 +211,10 @@ _achieved_syncs(syncs) = length(syncs)
 _floor_syncs(syncs) = sum(s -> s.floor, syncs; init = 0)
 
 # The frozen synchronization ledger: (achieved, floor) per step. The default run configuration is
-# the first row — an adaptive timestep and a whole-field VarianceRescaling — and it issues three
-# blocking readbacks per step where one is irreducible.
+# the first row — an adaptive timestep and a VarianceController on the three-stage scheme — and it
+# issues ten blocking readbacks per step where one is irreducible. The count rose from three when
+# decision 58 moved the state-dependent forcings onto the per-stage source to recover the scheme's
+# order; the gap is held by HOST_SIDE_FORCING_SCALARS, not accepted.
 const SYNC_LEDGER = (
   # The DEFAULT run: VarianceController on the three-stage IFLowStorageRK3. `stages` is not optional
   # here — a state-dependent forcing is evaluated at every stage, and a row that omits it silently
@@ -409,9 +411,11 @@ const SYNC_LEDGER = (
       @test _achieved_syncs(_syncs(; adaptive_dt = false, velocity_forcing = tag)) > 0
     end
 
-    # The default configuration pays three crossings for one — the headline of this axis.
-    default = _syncs(; adaptive_dt = true, velocity_forcing = :band_total)
-    @test _achieved_syncs(default) == 3 && _floor_syncs(default) == 1
+    # The default configuration pays ten crossings for one — the headline of this axis. It must be
+    # the DEFAULT that is asserted here, not a configuration that merely used to be: this line read
+    # `:band_total` for a commit after the default changed, and so measured a run nobody gets.
+    default = _syncs(; adaptive_dt = true, velocity_forcing = :controller, stages = 3)
+    @test _achieved_syncs(default) == 10 && _floor_syncs(default) == 1
   end
 
   @testset "every holder is dispositioned and described" begin

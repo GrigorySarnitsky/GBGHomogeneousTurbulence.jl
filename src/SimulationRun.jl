@@ -91,10 +91,10 @@ through the cache's deposited observables (`velocity_physical(sim.cache)`); summ
 # Setting the Reynolds number
 
 By default the run is **forced and stationary** — a
-[`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) holds the whole-field
-kinetic energy at the value given by the
-[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword — and the
-viscosity is chosen from the grid rather than supplied:
+[`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) drives the whole-field
+kinetic energy to the value given by the
+[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword and holds it
+there — and the viscosity is chosen from the grid rather than supplied:
 
 # Arguments
 
@@ -120,8 +120,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
-  operator-free constructor); `velocity_forcing` defaults to a `VarianceController` holding the
-  whole-field kinetic energy at the value given by the `kinetic_energy` keyword, and
+  operator-free constructor); `velocity_forcing` defaults to a `VarianceController` driving the
+  whole-field kinetic energy to the value given by the `kinetic_energy` keyword, and
   `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
@@ -200,11 +200,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
     `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
     are logged.
 
-    One precondition: the choice is self-consistent only if the run really holds ``k`` at
-    `kinetic_energy`. The default `VarianceController` does — its restoring term measures the
-    whole-field ``k`` — which is what makes this calibration legitimate. Give the velocity a forcing
-    that lets ``k`` float, or one holding some *other* quantity (a `VarianceRescaling(over = :band)`
-    holds the band instead), and the ``\\nu`` chosen here no longer matches the run.
+    One precondition: the choice is self-consistent only if the run holds ``k`` near
+    `kinetic_energy`. The default `VarianceController` does, to the tolerance its gain sets — its
+    restoring term measures the whole-field ``k``, which is the quantity assumed here. Give the
+    velocity a forcing that lets ``k`` float, or one holding some *other* quantity (a
+    `VarianceRescaling(over = :band)` holds the band instead), and the ``\\nu`` chosen here no
+    longer matches the run.
 
   * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` rather than dropping one — for a decaying

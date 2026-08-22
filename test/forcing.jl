@@ -6,7 +6,7 @@
 
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
-using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type
 using GBGIsotropicTurbulence.Forcing: add_forcing_source!
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 
@@ -15,6 +15,7 @@ using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipat
 # reached for, so the witness cannot be satisfied by reusing the code under test.
 inner_band(f, band) = weighted_inner(f, band)
 inner_kappa2(f, domain) = weighted_inner(f, domain.squared_wavenumber_kernel)
+_probe_band(domain) = getfield(GBGIsotropicTurbulence.Forcing, :_shell_band)(domain, 1, 2)
 using Random
 using Test
 
@@ -30,6 +31,34 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 # straight through to the do-nothing default, so the forcing would be silently ignored.
 struct StaleSourceForcing <: AbstractForcing end
 GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, domain) = N̂
+
+
+# The two shapes the arity guard must NOT reject: an idiomatic optional trailing argument (Julia
+# auto-generates a short stub alongside the real method) and a strategy keeping a legacy overload for
+# its own harness. Both dispatch correctly on the run-shaped five-argument call.
+struct OptionalArgForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::OptionalArgForcing, N̂, field, domain,
+                                                   diffusivity = 0.0) = N̂
+struct KeptLegacyForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain,
+                                                   diffusivity) = N̂
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, domain) = N̂
+
+
+# A forcing whose rate tracks the state — the pre-2026-08-22 `ConstantPower` — but which declares it
+# steady. Folded into the integrating factor it is frozen for the step, and the scheme silently drops
+# to first order; measured at 1.05 against 3.01. Nothing about the values looks wrong, which is why
+# the declaration is measured rather than trusted.
+struct LyingRateForcing{K} <: AbstractForcing
+  band::K
+end
+GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate(::LyingRateForcing) = true
+function GBGIsotropicTurbulence.Forcing.set_forcing_rate!(forcing::LyingRateForcing, rate, field,
+                                                          domain::FixedDomain)
+  amplitude = 0.1 / (2 * max(weighted_inner(field, forcing.band), 1e-30))
+  field_data(rate) .= field_scalar_type(rate)(amplitude)
+  return rate
+end
 
 
 @testset "forcing" begin
@@ -198,6 +227,15 @@ GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, do
     # form defines a method the run never calls, so construction refuses it rather than integrating
     # an unforced run that reports nothing wrong. Every real strategy must pass unchallenged.
     @test_throws ArgumentError generator(StaleSourceForcing())
+
+    # …but only that shape. The guard asks whether a CALLABLE five-argument method exists, not
+    # whether every method in the table is one, so neither of these is locked out.
+    @test generator(OptionalArgForcing()) isa ResolvedGenerator
+    @test generator(KeptLegacyForcing()) isa ResolvedGenerator
+
+    # `uses_steady_linear_rate` carries a semantic conjunct the arity guards cannot see, so it is
+    # measured: the hook is armed from two different states and must give the same rate.
+    @test_throws ArgumentError generator(LyingRateForcing(_probe_band(domain)))
     for f in (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
               ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
               Linear(domain; rate = 0.1), StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
@@ -244,6 +282,19 @@ GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, do
     local_estimate = getfield(GBGIsotropicTurbulence.Forcing, :_stationary_dissipation_estimate)
     for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)
       @test local_estimate(k, L) ≈ stationary_dissipation(Li2008(), k, L)
+    end
+  end
+
+
+  @testset "VarianceController preserves a Float32 run's element type" begin
+    # The house rule `_target_factor` states and this constructor has to keep: a bare Float64 literal
+    # in a default or a constant promotes the whole strategy off a Float32 run's element type. The
+    # controller is the DEFAULT velocity forcing, so the leak would be on every run's path.
+    for T in (Float32, Float64)
+      d = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = T,
+                      dealiasing = TwoThirds(), array_type = Array)
+      @test typeof(VarianceController(d; target = T(1.5))).parameters[2] === T
+      @test typeof(VarianceController(d; target = T(1.5), gain = 2, turnover_time = 3)).parameters[2] === T
     end
   end
 end
