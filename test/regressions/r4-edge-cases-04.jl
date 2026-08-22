@@ -15,7 +15,7 @@ using Test
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: AbstractForcing, ConstantPower, NoForcing
 using GBGIsotropicTurbulence.SimulationDomain: FixedDomain
-import GBGIsotropicTurbulence.Forcing: prepare_forcing!, apply_forcing!
+import GBGIsotropicTurbulence.Forcing: prepare_forcing!, project_forcing!
 
 # A forcing that only records whether the generator ever reached it.
 mutable struct HookSpy <: AbstractForcing
@@ -24,7 +24,7 @@ mutable struct HookSpy <: AbstractForcing
 end
 HookSpy() = HookSpy(0, 0)
 prepare_forcing!(f::HookSpy, field, domain::FixedDomain, dt::Real) = (f.prepares += 1; nothing)
-apply_forcing!(f::HookSpy, advanced_field, domain::FixedDomain) = (f.applies += 1; advanced_field)
+project_forcing!(f::HookSpy, advanced_field, domain::FixedDomain) = (f.applies += 1; advanced_field)
 
 const N = 16
 const NU = 0.05

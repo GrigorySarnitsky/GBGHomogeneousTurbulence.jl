@@ -1,5 +1,5 @@
 # Witness: the misdeclared-forcing guard in `ResolvedGenerator` must fire for ANY forcing that
-# implements `set_forcing_rate!` without declaring `uses_linear_rate`, including one whose
+# implements `set_forcing_rate!` without declaring `uses_steady_linear_rate`, including one whose
 # non-dispatch parameters are typed narrower than `Any` (the idiomatic way to write the hook).
 #
 # `_overrides_rate_hook` (src/Generator.jl:162) probes with

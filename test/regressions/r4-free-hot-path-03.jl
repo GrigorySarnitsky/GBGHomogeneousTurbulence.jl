@@ -1,4 +1,4 @@
-# Witness r4-free-hot-path-03 — `apply_forcing!(::BandRescaling, …; over = :total)` must reduce the
+# Witness r4-free-hot-path-03 — `project_forcing!(::VarianceRescaling, …; over = :total)` must reduce the
 # whole field ONCE per step, not twice.
 #
 # `Forcing.jl` (as of this witness) reads:
@@ -12,11 +12,11 @@
 # line 325 recomputes the byte-identical value — nothing writes `field` between them. Each call is a
 # full N³ reduction over the whole vector field and, on the GPU-primary target, a blocking
 # device-to-host readback; `:total` is what the `Simulation` front door passes, so this sits in the
-# default hot loop. The `BandRescaling` docstring itself states the intended cost: "two host
+# default hot loop. The `VarianceRescaling` docstring itself states the intended cost: "two host
 # readbacks per step … two under `over = :total`, which measures the band and the whole field" —
 # i.e. ONE band reduction plus ONE whole-field reduction, not two whole-field reductions.
 #
-# The whole-field observable is counted by handing `apply_forcing!` (whose `field` argument is
+# The whole-field observable is counted by handing `project_forcing!` (whose `field` argument is
 # untyped) a wrapper that forwards every field operation to the real field and tallies `inner`.
 
 using Test
@@ -59,7 +59,7 @@ function forced_velocity(domain, rng)
   return û
 end
 
-@testset "BandRescaling(over = :total) reduces the whole field once per forced step" begin
+@testset "VarianceRescaling(over = :total) reduces the whole field once per forced step" begin
   domain = SD.FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
                             dealiasing = SD.TwoThirds(),
                             element_type = Float64, array_type = Array)
@@ -72,17 +72,17 @@ end
   # and needs no second reduction (φ → sφ scales the band value by s² and cannot change its sign).
   # So `:band` now reduces the whole field zero times, which is stronger than the control claimed.
   û_band = forced_velocity(domain, rng)
-  band_forcing = F.BandRescaling(domain; target = 1.0, over = :band)
+  band_forcing = F.VarianceRescaling(domain; target = 1.0, over = :band)
   NINNER[] = 0; NWEIGHTED[] = 0
-  F.apply_forcing!(band_forcing, CountingField(û_band), domain)
+  F.project_forcing!(band_forcing, CountingField(û_band), domain)
   @test NWEIGHTED[] == 1                      # the band observable
   @test NINNER[] == 0                         # and no whole-field reduction at all
 
   # --- the claim: `over = :total` needs the SAME whole-field value, so still exactly one ---------
   û_total = forced_velocity(domain, rng)
-  total_forcing = F.BandRescaling(domain; target = 1.0, over = :total)
+  total_forcing = F.VarianceRescaling(domain; target = 1.0, over = :total)
   NINNER[] = 0; NWEIGHTED[] = 0
-  F.apply_forcing!(total_forcing, CountingField(û_total), domain)
+  F.project_forcing!(total_forcing, CountingField(û_total), domain)
   @test NWEIGHTED[] == 1                      # the band observable
   @test NINNER[] == 1                         # the whole-field observable, once — not twice
 

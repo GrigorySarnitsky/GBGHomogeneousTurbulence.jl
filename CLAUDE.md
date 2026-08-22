@@ -212,7 +212,7 @@ line rather than a clause:
 
 **Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
 docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never
-re-reads the whole. Measured 2026-08-19: `BandRescaling` reached 861 words with four scattered
+re-reads the whole. Measured 2026-08-19: `VarianceRescaling` reached 861 words with four scattered
 admonitions, `# Arguments` mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode
 bullet reached a 120-word run-on with an ungrammatical clause. Every individual edit was correct.
 **When a docstring has taken three or more rounds of patches, rewrite it whole rather than append

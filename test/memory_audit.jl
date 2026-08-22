@@ -84,8 +84,8 @@ end
 # evaluation scratch on top (+1 sv, +2 pv; scalar +2 ss +1 ps).
 # The real_spectral_scalar column is ZERO throughout, and the zero is the point (2026-07-28,
 # decision 35): a rate
-# array exists only where a forcing declares `uses_linear_rate`, so an unforced field — and the
-# default configuration, whose BandRescaling is a post-step projection — carries none. It used to
+# array exists only where a forcing declares `uses_steady_linear_rate`, so an unforced field — and the
+# default configuration, whose VarianceRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
   (:RK3, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
@@ -114,16 +114,21 @@ _forcing_delta(tag, slot) =
   tag === :none  ? ZERO :
   tag === :band  ? ZERO :
   tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
-  tag === :power ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
+  tag === :power ? ZERO :
+  tag === :controller ? ZERO :
   slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0) :
                        (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2, physical_scalar = 1, real_spectral_scalar = 0)
 # (:ou — in the forced field's shape, the OU state f̂ and the two noise buffers; its band is lazy.)
-# Each rate-driven forcing carries the generator's rate array — which now exists precisely because
-# such a forcing is present, so the storage appears on the axis that causes it instead of
-# unconditionally in the base. `Linear` and `ConstantPower` each add a materialized real band
-# indicator on top: with the band kernel lazy there are no stored coefficients for the rate fill to
-# read, so the indicator is built once at construction (half the complex field the stored band once
-# was; the pre-adoption ConstantPower read its indicator lazily from that stored kernel instead).
+# Only a STEADY-rate forcing carries the generator's rate array, plus the materialized real band
+# indicator its rate fill reads (the band kernel being lazy, there are no stored coefficients to read
+# from). Today that is `Linear` alone.
+#
+# `ConstantPower` and `VarianceController` are ZERO as of 2026-08-22, and the change is a REDUCTION
+# of two field-scale arrays each. Their rates depend on the state, so folding them into the
+# integrating factor evaluated ∫A dt by a left-endpoint rectangle rule and collapsed a third-order
+# scheme to first (measured 1.018 against 2.995 unforced). They moved to the per-stage source, where
+# `convolve!` reads the lazy band kernel directly — so neither the rate array nor the indicator is
+# allocated at all. The footprint fell out of the accuracy fix rather than being traded for it.
 # The rate itself is a scalar FIELD in spectral representation since decision 39 — the complex
 # container the fused exponential's per-mode offset takes — so a rate-armed forcing shows one
 # spectral scalar (the rate) plus one real array (the indicator/mask).
@@ -140,13 +145,14 @@ const TRACER_DELTA = ZERO
 
 _build_forcing(tag, domain) =
   tag === :none  ? NoForcing() :
-  tag === :band  ? BandRescaling(domain; target = 0.5, over = :band) :
+  tag === :band  ? VarianceRescaling(domain; target = 0.5, over = :band) :
   tag === :linear ? Linear(domain; rate = 0.1) :
   tag === :power ? ConstantPower(domain; injection_rate = 0.1) :
+  tag === :controller ? VarianceController(domain; target = 0.5) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFRK2()
-const FORCING_TAGS = (:none, :band, :linear, :power, :ou)
+const FORCING_TAGS = (:none, :band, :linear, :power, :controller, :ou)
 
 
 # ---------------------------------------------------------------- the frame ledger

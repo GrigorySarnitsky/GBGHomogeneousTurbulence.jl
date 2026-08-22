@@ -9,18 +9,19 @@ Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
 Forcing.jl::AbstractForcing,86,1,258
-Forcing.jl::BandRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),54,3,600
-Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),91,1,376
+Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),91,1,378
 Forcing.jl::DeferredForcing,54,0,188
 Forcing.jl::Forcing,100,0,278
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),86,0,161
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
+Forcing.jl::VarianceController(; target， gain = 1.0， turnover_time = nothing，,71,1,407
+Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),86,1,677
 Forcing.jl::add_forcing_source!(forcing， N̂， domain) -> N̂,39,0,44
-Forcing.jl::apply_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
+Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,103,0,109
-Forcing.jl::uses_linear_rate(forcing) -> Bool,72,0,107
+Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,107
 GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,99
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),75,1,243
 Generator.jl::Generator,142,0,206

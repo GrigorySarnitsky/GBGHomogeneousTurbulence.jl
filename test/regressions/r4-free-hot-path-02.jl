@@ -2,7 +2,7 @@
 # forcing hooks actually do.
 #
 # Commit f557311 made the empty-band guard RELATIVE (`_band_is_empty(band_value, total_value)`),
-# adding an unconditional whole-field `inner(field, field)` to `apply_forcing!(::BandRescaling, …)`
+# adding an unconditional whole-field `inner(field, field)` to `project_forcing!(::VarianceRescaling, …)`
 # (src/Forcing.jl:322) and to `set_forcing_rate!(::ConstantPower, …)` (src/Forcing.jl:441). Neither
 # test/optimality_audit.jl's `_syncs` nor test/compute_audit.jl's `_forcing_pass_delta` was updated,
 # so both instruments report FEWER host readbacks and FEWER field-scale passes than the code
@@ -53,6 +53,9 @@ end
 CF(f) = CF(f, 0, 0, 0)
 
 PF.field_tensor_order(c::CF) = PF.field_tensor_order(c.f)
+# Forwarded, not counted: an element-type query is not a reduction and crosses no device boundary.
+# The source hook asks for it, so the double must answer — it is part of the field protocol.
+PF.field_scalar_type(c::CF) = PF.field_scalar_type(c.f)
 PF.inner(a::CF, b::CF) = (a.inner += 1; PF.inner(a.f, b.f))
 PF.weighted_inner(a::CF, k) = (a.weighted_inner += 1; PF.weighted_inner(a.f, k))
 PF.convolve!(o::CF, a::CF, k, α, β) = (o.convolve += 1; PF.convolve!(o.f, a.f, k, α, β); o)
@@ -66,16 +69,19 @@ function measure(forcing, kind)
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(11))
   c = CF(û)
   if kind === :apply
-    F.apply_forcing!(forcing, c, DOMAIN)
+    F.project_forcing!(forcing, c, DOMAIN)
+  elseif kind === :source
+    # The hook a state-dependent forcing uses since 2026-08-22 — evaluated at the STAGE field.
+    F.add_forcing_source!(forcing, CF(new_vector_field_spectral(DOMAIN)), c, DOMAIN, 0.05)
   else
     F.set_forcing_rate!(forcing, new_scalar_field_spectral(DOMAIN), c, DOMAIN)
   end
   return c
 end
 
-const BAND  = measure(BandRescaling(DOMAIN; target = 1.0, over = :band),  :apply)
-const TOTAL = measure(BandRescaling(DOMAIN; target = 1.0, over = :total), :apply)
-const POWER = measure(ConstantPower(DOMAIN; injection_rate = 1.0),        :rate)
+const BAND  = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :band),  :apply)
+const TOTAL = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :total), :apply)
+const POWER = measure(ConstantPower(DOMAIN; injection_rate = 1.0),        :source)
 
 # every reduction below returns a Julia scalar ⇒ one blocking device→host readback on a GPU
 readbacks(c) = c.inner + c.weighted_inner
@@ -83,8 +89,9 @@ readbacks(c) = c.inner + c.weighted_inner
 vector_passes(c) = c.inner + c.weighted_inner + 2 * c.convolve
 
 # how many `Sync` entries the optimality audit's model attributes to one velocity forcing
-model_syncs(tag) = count(s -> occursin("(velocity)", s.site),
-                         OptModel._syncs(; adaptive_dt = false, velocity_forcing = tag))
+model_syncs(tag; stages = 1) = count(s -> occursin("(velocity)", s.site),
+                                     OptModel._syncs(; adaptive_dt = false, velocity_forcing = tag,
+                                                     stages))
 # how many spectral-vector passes the compute audit's model attributes to one velocity forcing
 model_vector_passes(tag) = PassModel._forcing_pass_delta(tag, :velocity, :RK3).spectral_vector
 
@@ -93,7 +100,8 @@ model_vector_passes(tag) = PassModel._forcing_pass_delta(tag, :velocity, :RK3).s
   @testset "synchronization ledger (test/optimality_audit.jl `_syncs`)" begin
     @test model_syncs(:band)       == readbacks(BAND)
     @test model_syncs(:band_total) == readbacks(TOTAL)
-    @test model_syncs(:power)      == readbacks(POWER)
+    # ONE stage's worth, which is what `measure` exercises; the model multiplies by the stage count.
+    @test model_syncs(:power; stages = 1) == readbacks(POWER)
   end
   @testset "pass ledger (test/compute_audit.jl `_forcing_pass_delta`)" begin
     @test model_vector_passes(:band)  == vector_passes(BAND)

@@ -7,16 +7,20 @@ Order   = [:module]
 
 ## Forcing strategies
 
-The forcing supertype and its concrete strategies: the unforced baseline, deterministic band rescaling,
-and the two linear-rate forcings. One implementation serves
-either the velocity or the scalar.
+The forcing supertype and its concrete strategies, grouped by the route each takes through the step —
+which is what decides whether it preserves the scheme's order. `Linear` supplies a steady rate folded
+into the integrating factor, exactly and for free. `ConstantPower` and `VarianceController` supply
+rates that track the state, so they enter the right-hand side at every stage. `VarianceRescaling`
+rescales after the step, which is operator splitting and first-order by construction. One
+implementation serves either the velocity or the scalar.
 
 ```@docs
 AbstractForcing
 NoForcing
-BandRescaling
 Linear
 ConstantPower
+VarianceController
+VarianceRescaling
 ```
 
 ## Deferred forcing
@@ -39,6 +43,6 @@ declared.
 prepare_forcing!
 set_forcing_rate!
 add_forcing_source!
-apply_forcing!
-uses_linear_rate
+project_forcing!
+uses_steady_linear_rate
 ```

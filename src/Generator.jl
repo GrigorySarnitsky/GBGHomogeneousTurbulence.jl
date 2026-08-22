@@ -41,7 +41,7 @@ using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, Pha
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..Observables: vorticity_physical!
 using ..Forcing: AbstractForcing, NoForcing,
-                 set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!,
+                 set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!,
                  add_forcing_source!
 
 export FlowConditions, ResolvedGenerator,
@@ -101,7 +101,7 @@ function FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
     throw(ArgumentError("`schmidt` must be positive, got $schmidt: the scalar diffusivity is ν/Sc, " *
                         "so a non-positive Schmidt number makes it infinite or negative"))
   # One instance driving both fields conflates their bookkeeping — but only for a strategy that HAS
-  # per-field state to conflate. An immutable forcing (`BandRescaling`, `Linear`, `ConstantPower`)
+  # per-field state to conflate. An immutable forcing (`VarianceRescaling`, `Linear`, `ConstantPower`)
   # carries only its band and its target, so sharing one is harmless; `===` would not even
   # distinguish two separately-built copies of it, since Julia compares immutables by value. The
   # hazard is exactly the mutable strategies, whose scratch and random stream are per-field. Caught
@@ -155,10 +155,10 @@ end
 # possibility of it. A forcing that fills a rate without declaring it would be handed `nothing` and go
 # silently unapplied, so that mismatch is a construction-time error rather than a wrong quiet run.
 function _forcing_rate(domain::FixedDomain, forcing)
-  if !uses_linear_rate(forcing)
+  if !uses_steady_linear_rate(forcing)
     _overrides_rate_hook(forcing) &&
       throw(ArgumentError("$(nameof(typeof(forcing))) implements set_forcing_rate! but does not " *
-                          "declare uses_linear_rate(::$(nameof(typeof(forcing)))) = true, so it " *
+                          "declare uses_steady_linear_rate(::$(nameof(typeof(forcing)))) = true, so it " *
                           "would be given no rate array to fill and would never be applied"))
     return nothing
   end
@@ -220,7 +220,7 @@ you.
 !!! warning "The constructor rejects a misdeclared forcing"
     A forcing that implements
     [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) without also
-    declaring `uses_linear_rate` is given no
+    declaring `uses_steady_linear_rate` is given no
     rate array to fill, so its forcing would silently never be applied. Building a
     `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
     the run proceed quietly wrong.
@@ -244,7 +244,7 @@ you.
   `prepare!` fills them at the start of each step; a rate that has been filled is one the
   integrating-factor verbs then return alongside the viscous coefficient, so the forcing rides the
   exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
-  [`uses_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_linear_rate), so a field driven by
+  [`uses_steady_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate), so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds
@@ -316,16 +316,16 @@ end
     finalize!(generator, state, domain)
 
 Close a step of the [`ResolvedGenerator`](@ref) `generator`: apply each of its forcings' post-step
-projections (the [`apply_forcing!`](@ref GBGIsotropicTurbulence.Forcing.apply_forcing!) hook —
-e.g. the energy rescale of a [`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling))
+projections (the [`project_forcing!`](@ref GBGIsotropicTurbulence.Forcing.project_forcing!) hook —
+e.g. the energy rescale of a [`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling))
 to the advanced `state`, velocity first, then the scalar
 when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
 the step — the diagnostics, the derived observables, the tracer advance — sees the forced end-of-step fields.
 Returns `state`.
 """
 function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)
-  apply_forcing!(generator.conditions.velocity_forcing, state.velocity_spectral, domain)
-  state.scalar_spectral === nothing || apply_forcing!(generator.conditions.scalar_forcing, state.scalar_spectral, domain)
+  project_forcing!(generator.conditions.velocity_forcing, state.velocity_spectral, domain)
+  state.scalar_spectral === nothing || project_forcing!(generator.conditions.scalar_forcing, state.scalar_spectral, domain)
   return state
 end
 
@@ -384,7 +384,8 @@ Returns `N̂`.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
-   add_forcing_source!(generator.conditions.velocity_forcing, N̂, domain))
+   add_forcing_source!(generator.conditions.velocity_forcing, N̂, û, domain,
+                       generator.conditions.viscosity))
 
 # Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
 # projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
@@ -532,7 +533,8 @@ scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain:
             displaced_velocity_current::Bool = false) =
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain,
                       displaced_velocity_current);
-   add_forcing_source!(generator.conditions.scalar_forcing, N̂, domain))
+   add_forcing_source!(generator.conditions.scalar_forcing, N̂, φ̂, domain,
+                       generator.conditions.viscosity / generator.conditions.schmidt))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
 # sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.

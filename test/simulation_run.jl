@@ -68,7 +68,11 @@ using Test
     ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
-    @test sim.generator.conditions.velocity_forcing isa BandRescaling        # forced by default
+    # Forced by default, and by the CONTROLLER since 2026-08-22: the default was `VarianceRescaling`,
+    # a post-step projection, which is Lie–Trotter splitting and held every default run to first
+    # order in time (measured 1.02 against 3.01). `VarianceController` holds the same quantity
+    # through a rate the scheme integrates, so a default run is now third order.
+    @test sim.generator.conditions.velocity_forcing isa VarianceController
     @test ν > 0
 
     @test Simulation(grid_points_per_axis = 32, κ_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
@@ -126,7 +130,7 @@ using Test
 
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(injection_rate = 0.1), Linear(rate = 0.5),
-                 BandRescaling(target = 0.5, over = :band), StochasticOU(variance = 1.0, correlation_time = 0.3))
+                 VarianceRescaling(target = 0.5, over = :band), StochasticOU(variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
@@ -225,22 +229,22 @@ using Test
     @test current_step(sim) > 0
   end
 
-  @testset "BandRescaling over = :total pins total energy" begin
+  @testset "VarianceRescaling over = :total pins total energy" begin
     # :total rescales the band to make the whole-field energy equal the target each step
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                     velocity_forcing = BandRescaling(target = 0.8, over = :total),
+                     velocity_forcing = VarianceRescaling(target = 0.8, over = :total),
                      scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(sim; dt = 0.01)
     @test kinetic_energy(sim.state.velocity_spectral) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
     simb = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                      velocity_forcing = BandRescaling(target = 0.3, over = :band),
+                      velocity_forcing = VarianceRescaling(target = 0.3, over = :band),
                       scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb.state.velocity_spectral)) && kinetic_energy(simb.state.velocity_spectral) > 0
     # the target symbol is validated at construction
     domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
-    @test_throws ArgumentError BandRescaling(domain; target = 0.5, over = :bogus)
+    @test_throws ArgumentError VarianceRescaling(domain; target = 0.5, over = :bogus)
   end
 end
 

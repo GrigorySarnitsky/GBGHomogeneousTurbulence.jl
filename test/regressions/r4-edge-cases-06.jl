@@ -1,12 +1,12 @@
 # Candidate (r4, edge-cases, 06): "Grid-mode viscosity selection assumes `over = :total`
-# `BandRescaling` but never checks the actual `velocity_forcing`" — SimulationRun.jl:297.
+# `VarianceRescaling` but never checks the actual `velocity_forcing`" — SimulationRun.jl:297.
 #
-# The hunter's discriminator was: in grid mode with a non-`BandRescaling(over = :total)` forcing,
+# The hunter's discriminator was: in grid mode with a non-`VarianceRescaling(over = :total)` forcing,
 # the measured `max_wavenumber * kolmogorov_length` should stay near the nominal `κ_max_η = 2` the
 # constructor's `@info` reports, and does not.
 #
 # This file runs that discriminator against BOTH arms — the accused forcing AND the control the
-# docstring (lines 196-199) declares self-consistent, `BandRescaling(over = :total)`. The control
+# docstring (lines 196-199) declares self-consistent, `VarianceRescaling(over = :total)`. The control
 # misses 2 as well, because grid mode's ν comes from the *modeled* `Li2008` dissipation
 # (`ε = (k/G)^{3/2}/L`, "a modeled estimate, not a measurement" — the comment at line 272), and at
 # 32³ that model underestimates the box's actual ε by ~2×. The forcing check the candidate asks for
@@ -31,7 +31,7 @@ end
 
 
 @testset "Grid-mode ν is forcing-independent by contract, and its κ_max·η target is a modeled design value" begin
-  ν_band,  ratio_band  = grid_mode_run(BandRescaling(target = 1.5, over = :total))
+  ν_band,  ratio_band  = grid_mode_run(VarianceRescaling(target = 1.5, over = :total))
   ν_cp01,  ratio_cp01  = grid_mode_run(ConstantPower(injection_rate = 0.1))
   ν_cp30,  ratio_cp30  = grid_mode_run(ConstantPower(injection_rate = 3.0))
   @info "measured" ν_band ratio_band ratio_cp01 ratio_cp30

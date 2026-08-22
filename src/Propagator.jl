@@ -323,7 +323,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     end
   end
 
-  finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
+  finalize!(generator, state, domain)             # post-step forcing projections (e.g. VarianceRescaling)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
@@ -430,7 +430,7 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
     combine!(φ̂, one(T), φ̂, half, sb.stage2)
   end
 
-  finalize!(generator, state, domain)             # post-step forcing projections (e.g. BandRescaling)
+  finalize!(generator, state, domain)             # post-step forcing projections (e.g. VarianceRescaling)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the

@@ -17,7 +17,7 @@ function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
   scheme = IFRK2()
   buffers = allocate_buffers(scheme, domain; scalar = scalar)
   conditions = FlowConditions(viscosity = 5.0e-2, schmidt = 1.0,
-                              velocity_forcing = BandRescaling(domain; target = 0.6, over = :band,
+                              velocity_forcing = VarianceRescaling(domain; target = 0.6, over = :band,
                                                                lowest_shell = 1, highest_shell = 2),
                               scalar_forcing = NoForcing())
   generator = ResolvedGenerator(domain, conditions; scalar = scalar)

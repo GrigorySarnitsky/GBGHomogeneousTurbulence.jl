@@ -43,7 +43,7 @@ using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_partic
                velocity_physical, max_speed, particle_velocities
 using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
                      integral_scale, derivative_skewness
-using ..Forcing: AbstractForcing, NoForcing, BandRescaling
+using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController
 using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -91,7 +91,7 @@ through the cache's deposited observables (`velocity_physical(sim.cache)`); summ
 # Setting the Reynolds number
 
 By default the run is **forced and stationary** — a
-[`BandRescaling`](@ref GBGIsotropicTurbulence.Forcing.BandRescaling) holds the whole-field kinetic
+[`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling) holds the whole-field kinetic
 energy at the value given by the
 [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword (`over = :total`)
 — and the viscosity is
@@ -121,7 +121,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``).
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
-  operator-free constructor); `velocity_forcing` defaults to a `BandRescaling` holding the total
+  operator-free constructor); `velocity_forcing` defaults to a `VarianceRescaling` holding the total
   (whole-field) energy at the value given by the `kinetic_energy` keyword (`over = :total`), and
   `scalar_forcing` to `NoForcing()`. The
   velocity and scalar are forced independently.
@@ -167,7 +167,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   `Random.default_rng()`).
 
 !!! note "The default holds the kinetic energy fixed, so it is not a measurable of the default run"
-    `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
+    `VarianceRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic
     energy at the target **value**, which pins ``u'`` (hence the scale of ``\\mathrm{Re}_\\lambda``) and
     suppresses the physical fluctuation of the quantity it holds. For fluctuation statistics of the *held* quantity, force with fixed injection
     ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead and let ``k`` find its own level.
@@ -192,7 +192,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
         [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
         [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
         rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
-        ``\\eta \\approx 0.64\\,\\Delta x`` at `κ_max_η = 2` against ``0.96\\,\\Delta x`` for ``2/3``,
+        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.96\\Delta x`` for ``2/3``,
         and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
         higher on the same grid. Raise `κ_max_η` when comparing across strategies.
 
@@ -201,7 +201,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
     are logged.
 
     One precondition: the choice is self-consistent only if the run really holds ``k`` at
-    `kinetic_energy`, which the front door's `BandRescaling(over = :total)` guarantees and `:band`
+    `kinetic_energy`, which the front door's `VarianceRescaling(over = :total)` guarantees and `:band`
     does not. Give the velocity a forcing that lets ``k`` float and the ``\\nu`` chosen here no
     longer matches the run.
 
@@ -268,7 +268,7 @@ _materialize_forcing(f, domain::FixedDomain) = f(domain)
 function Simulation(domain::FixedDomain;
                     kinetic_energy::Real = 1.5, κ_max_η = nothing, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),
+                    velocity_forcing = d -> VarianceController(d; target = kinetic_energy),
                     scalar_forcing = NoForcing(),
                     scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(scheme, domain), max_dt::Real = Inf,

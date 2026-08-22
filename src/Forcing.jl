@@ -1,11 +1,25 @@
 # Forcing — the interchangeable energy-injection strategies, concrete `AbstractForcing` subtypes that act
 # on the time step in one of two ways:
 #
-#   * `set_forcing_rate!` — for forcings LINEAR in the field (`f = A·field`): fill a per-mode rate A(k)
-#     that is folded into the integrating factor, so the linear operator becomes A(k) - D|k|². This
-#     is exact for the linear forcing and preserves the scheme's order (no operator splitting).
-#     `Linear` (fixed A) and `ConstantPower` (A set each step so the injection rate is ε_target) use it.
-#   * `apply_forcing!` — a post-step projection/rescale. `BandRescaling` (hold band or total energy fixed) uses it.
+#   * `set_forcing_rate!` — for a forcing whose rate is linear in the field AND STEADY IN TIME: fill a
+#     per-mode A(k) folded into the integrating factor, so the linear operator becomes A(k) - D|k|².
+#     Exact, and free. `uses_steady_linear_rate` declares it, and BOTH words are load-bearing: the
+#     exponent is ∫A dt, so a rate that varies over the step is integrated by a left-endpoint
+#     rectangle rule — local error O(Δt²), and the whole iteration collapses to FIRST order however
+#     good the scheme is. Only `Linear`, whose A is a fixed coefficient, qualifies.
+#   * `add_forcing_source!` — a source added at each stage, at the STAGE state. This is where a
+#     state-dependent rate belongs: the scheme's own order conditions then apply to it, with nothing
+#     to prove. `ConstantPower` and `VarianceController` use it. (TurTLE does the same — its
+#     `add_forcing_term` writes into the RHS and is called once per Runge-Kutta stage.)
+#   * `project_forcing!` — a post-step projection. `VarianceRescaling` uses it, and this route is
+#     LIE-TROTTER SPLITTING: first order by construction, independent of the scheme. Kept as the
+#     reference implementation of Sullivan-Mahalingam-Kerr (1994) with that caveat documented; prefer
+#     `VarianceController`, which holds the same quantity through the rate route.
+#
+# Measured on IFLowStorageRK3 (third order), refinement ladder: NoForcing 2.995, Linear 2.987,
+# ConstantPower 1.018 and VarianceRescaling 1.023 BEFORE this split — the `Linear`/`ConstantPower`
+# contrast isolates the mechanism exactly, since they share the code path and differ only in whether
+# A is steady.
 #
 # One implementation serves both the velocity (a vector field) and the scalar φ (a scalar field),
 # since the methods are written through tensor-order-generic field operators. A linear rate keeps a
@@ -24,9 +38,9 @@ A strategy acts on the step through up to four methods, each defaulting to doing
 the order the step calls them:
 - [`prepare_forcing!`](@ref) — advance the forcing's own internal state, once per step.
 - [`set_forcing_rate!`](@ref) — supply a linear forcing rate to be folded into the integrating
-  factor; [`uses_linear_rate`](@ref) declares that a forcing supplies one.
+  factor; [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
-- [`apply_forcing!`](@ref) — project or rescale the field after the step.
+- [`project_forcing!`](@ref) — project or rescale the field after the step.
 
 [`DeferredForcing`](@ref) is the operator-free keyword form of a strategy, materialized once the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain — a
@@ -35,14 +49,14 @@ construction-time object, not a lifecycle hook.
 The strategies, one implementation each serving both the velocity and the scalar through
 tensor-order-generic field operators:
 - [`NoForcing`](@ref) — leave the field undriven.
-- [`BandRescaling`](@ref) — hold a band's amplitude by deterministic rescaling.
+- [`VarianceRescaling`](@ref) — hold a band's amplitude by deterministic rescaling.
 - [`Linear`](@ref) — a fixed linear rate on a band.
 - [`ConstantPower`](@ref) — a linear rate re-solved each step to hold the injection rate.
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A strategy's canonical band — `lowest_shell = 1`, `highest_shell = 2`, the large-scale band of
 homogeneous isotropic turbulence — is a property of the method and defaults. What a run holds fixed —
-`target`, `rate`, and `BandRescaling`'s `over` — has no canonical value and is therefore required. So a default here never hides a
+`target`, `rate`, and `VarianceRescaling`'s `over` — has no canonical value and is therefore required. So a default here never hides a
 choice you needed to make. The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
 `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
@@ -54,8 +68,9 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical
 
-export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,
-       set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!
+export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
+       Linear, ConstantPower,
+       set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!, add_forcing_source!
 
 
 # Is there anything in the band to rescale? The test carries NO absolute scale, which is what the
@@ -79,20 +94,20 @@ Supertype of the energy-injection strategies. A strategy may implement any of
 [`prepare_forcing!`](@ref) (advance the strategy's **own** internal state — a stochastic forcing's
 random process, say — never the simulation state), [`set_forcing_rate!`](@ref)
 (a linear forcing rate folded into the integrating factor — a strategy implementing it **must** also
-declare [`uses_linear_rate`](@ref), or it is never given a rate array to fill),
-[`add_forcing_source!`](@ref) (an additive per-stage source), and [`apply_forcing!`](@ref) (a
+declare [`uses_steady_linear_rate`](@ref), or it is never given a rate array to fill),
+[`add_forcing_source!`](@ref) (an additive per-stage source), and [`project_forcing!`](@ref) (a
 post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
 need.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
 `set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook
-consumes must be prepared here), `add_forcing_source!` runs at every stage, and `apply_forcing!` runs after the completed
+consumes must be prepared here), `add_forcing_source!` runs at every stage, and `project_forcing!` runs after the completed
 step. The linear rate and the additive source are two channels of **one** forcing term — the part linear
 in the field is folded exactly into the integrating factor, the remainder is added at the stages — so a
 single strategy may legitimately use both.
 
 Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
-`add_forcing_source!` the right-hand side, `apply_forcing!` the field); `prepare_forcing!` returns
+`add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns
 `nothing`.
 
 !!! warning "One instance per forced field, for a strategy that carries state"
@@ -112,7 +127,7 @@ A deferred forcing. The operator-free keyword constructors
 
     Linear(; rate, lowest_shell = 1, highest_shell = 2)
     ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
-    BandRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
+    VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is materialized into the concrete
@@ -155,7 +170,7 @@ representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
 integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
-(``D`` the field's diffusivity). Only a forcing declaring [`uses_linear_rate`](@ref) is ever handed
+(``D`` the field's diffusivity). Only a forcing declaring [`uses_steady_linear_rate`](@ref) is ever handed
 a rate array, so the default method is never reached in a run; it returns `rate` untouched. The
 `field` is the start-of-step field in spectral representation; `domain` is the
 [`FixedDomain`](@ref).
@@ -164,7 +179,7 @@ set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate
 
 
 """
-    uses_linear_rate(forcing) -> Bool
+    uses_steady_linear_rate(forcing) -> Bool
 
 Whether `forcing` drives its field through a linear per-mode rate — that is, whether it implements
 [`set_forcing_rate!`](@ref). The default is `false`; a forcing that does implement the hook **must**
@@ -178,21 +193,21 @@ the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerato
 rejects
 it rather than let the forcing go silently unapplied.
 """
-uses_linear_rate(::AbstractForcing) = false
+uses_steady_linear_rate(::AbstractForcing) = false
 
 
 """
-    apply_forcing!(forcing, advanced_field, domain) -> advanced_field
+    project_forcing!(forcing, advanced_field, domain) -> advanced_field
 
 Apply the strategy `forcing`'s post-step projection to `advanced_field` (a velocity or scalar
 ``\\varphi`` field in spectral representation) in place, on the [`FixedDomain`](@ref) `domain`. The
-default does nothing; see `BandRescaling`.
+default does nothing; see `VarianceRescaling`.
 
 Unlike the two hooks that read the start-of-step field, this one is handed the field the step has
 already advanced — the argument is named for that instant, since a strategy that rescales toward a
 target must measure the state it is correcting, not the one it started from.
 """
-apply_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advanced_field
+project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advanced_field
 
 
 """
@@ -212,7 +227,7 @@ Add the strategy `forcing`'s additive source to the assembled right-hand side `N
 stage (the source is held fixed over the step, so it integrates at the scheme's order), on the
 [`FixedDomain`](@ref) `domain`. The default does nothing.
 """
-add_forcing_source!(::AbstractForcing, N̂, domain::FixedDomain) = N̂
+add_forcing_source!(::AbstractForcing, N̂, field, domain::FixedDomain, diffusivity::Real) = N̂
 
 
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
@@ -242,12 +257,19 @@ struct NoForcing <: AbstractForcing end
 
 
 """
-    BandRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
+    VarianceRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
-Deterministic rescaling forcing (post-step) that holds a field's amplitude fixed, built on the
-[`FixedDomain`](@ref) `domain`. Each step the in-band Fourier modes — the integer shells
-`lowest_shell` to `highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a
-single factor to hold `target`. Rescaling preserves the divergence-free constraint.
+The deterministic rescaling forcing of Sullivan, Mahalingam & Kerr (1994,
+[doi:10.1063/1.868274](https://doi.org/10.1063/1.868274)), built on the [`FixedDomain`](@ref)
+`domain`: after each step the in-band Fourier modes — the integer shells `lowest_shell` to
+`highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a single factor that
+holds `target`. The rescale is per-mode, so a divergence-free velocity stays divergence-free.
+
+**Prefer [`VarianceController`](@ref) for a run whose accuracy in time matters**, which is nearly
+always. It holds the same quantity through a rate the scheme integrates and keeps the scheme's order;
+this one is applied after the step and costs it (see the caveat below). `VarianceRescaling` is kept
+because it is a published method a reader may need to reproduce, and because holding the band's value
+*exactly* is occasionally what is wanted.
 
 Which observable is held follows from the field, chosen to agree with the diagnostics: the **kinetic
 energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
@@ -257,17 +279,24 @@ energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for 
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
 to the field being a vector.
 
-`over` selects *where* that target applies, and the two choices differ in which quantity a run may no
-longer measure:
+`over` selects *where* that target applies, and the two differ in which quantity a run may no longer
+measure:
 
   * `:band` holds the band's own value. The whole-field value then floats, oscillating about its mean
-    as the band feeds the cascade. The band's energy is set by the forcing rather than by the flow;
-    the whole-field ``k`` remains a measurable, though on the default shells 1–2 — the
-    energy-containing range — most of it is held rather than free.
+    as the band feeds the cascade. On the default shells 1–2 — the energy-containing range — most of
+    ``k`` is held rather than free, though it remains a measurable.
   * `:total` rescales the band to absorb the whole-field deficit, so the whole-field value equals
     `target`. For the velocity this pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``
     (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the forcing
     sets and the band is free.
+
+The front door passes `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the
+*assumed* kinetic energy, so the resolution criterion ``\\kappa_{\\max}\\eta`` is self-consistent only
+if the run really holds ``k``. A hand-built forcing that nothing downstream calibrates against has no
+such constraint, and `:band` is the gentler clamp.
+
+Sizing the rescale means reducing the field to a number and comparing it to `target`, so each step
+blocks on a device-to-host transfer — two under `:total`, which measures the band and the whole field.
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
@@ -277,54 +306,47 @@ longer measure:
 - `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
   box's fundamental ``2\\pi/L``.
 
-!!! note "Which one a run wants depends on what else reads the kinetic energy"
-    The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door passes
-    `:total`, and not as a preference: in grid mode it chooses ``\\nu`` from the *assumed* kinetic
-    energy, so the resolution criterion ``\\kappa_{\\max}\\eta`` is self-consistent only if the run
-    really holds ``k`` there — which is exactly what `:total` guarantees. A hand-built forcing that
-    nothing downstream calibrates against has no such constraint, and `:band` is the gentler clamp.
+!!! warning "First order in time, and two extremes worth knowing"
+    This is the one forcing that costs the scheme its order, by construction rather than by defect:
+    the rescale is applied *after* the step, which is Lie–Trotter operator splitting, and Lie–Trotter
+    is first-order however good the scheme is. Measured on the third-order `IFLowStorageRK3`: **1.02**
+    here against **3.01** for every other forcing in the module. Molecular dynamics reached the same
+    conclusion about the same manoeuvre — rescaling to fix a quantity each step is the naive
+    thermostat, and the fix is to extend the dynamics with feedback rather than project after the fact.
 
-!!! warning "Two extremes worth knowing before you rely on the clamp"
-    Under `:total`, if the value outside the forced shells alone exceeds `target`, the band is
-    **zeroed** — the closest reachable state, and the most violent intervention the rescale can make:
-    it empties the energy-containing range in one step, leaving ``L_{11}``, ``u'`` and
-    ``\\mathrm{Re}_\\lambda`` meaningless for turnovers afterwards. At the other end, a band with
-    nothing in it is **left alone**: below a small floor the rescale returns the field untouched
-    rather than dividing by ~0, so an empty band stays empty instead of being driven to `target` —
-    reachable the step after a zeroing, and it means the clamp can stop applying. Seed content in the
-    band if a run depends on it taking hold.
-
-!!! note "It costs two host readbacks per step on a GPU"
-    Sizing the rescale means reducing the field to a number and comparing it to `target`, so each
-    step blocks on a device-to-host transfer — two under `over = :total`, which measures the band and
-    the whole field. `ConstantPower` pays one; an unforced run pays none.
+    Two configurations also behave sharply. Under `:total`, if the value outside the forced shells
+    alone exceeds `target`, the band is **zeroed** — the closest reachable state, and the most violent
+    intervention the rescale can make. At the other end a band with nothing in it is **left alone**,
+    since the rescale returns the field untouched rather than dividing by ~0; an empty band therefore
+    stays empty instead of being driven to `target`. Seed content in the band if a run depends on the
+    clamp taking hold.
 
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.
 - `target` — the held value.
 - `over` — `:band` or `:total`.
 """
-struct BandRescaling{K, T} <: AbstractForcing
+struct VarianceRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
   target::T            # the VALUE to hold, of kinetic_energy (velocity) or scalar_variance (scalar)
   over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
 end
 
-function BandRescaling(domain::FixedDomain; target::Real, over::Symbol,
+function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
   over in (:band, :total) ||
-    throw(ArgumentError("BandRescaling `over` must be :band or :total; got :$over"))
+    throw(ArgumentError("VarianceRescaling `over` must be :band or :total; got :$over"))
   # The target is an energy or a variance — both non-negative — and the rescale takes its square
   # root, so a negative value surfaced as a bare `DomainError` out of `sqrt` naming nothing.
   target >= 0 ||
-    throw(ArgumentError("BandRescaling `target` must be non-negative, got $target: it is the " *
+    throw(ArgumentError("VarianceRescaling `target` must be non-negative, got $target: it is the " *
                         "kinetic energy or scalar variance the forcing holds, and the rescale " *
                         "takes its square root"))
-  return BandRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over)
+  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over)
 end
 
 
-function apply_forcing!(forcing::BandRescaling, field, domain::FixedDomain)
+function project_forcing!(forcing::VarianceRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
   band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
   _band_is_empty(band_value) && return field           # nothing in the band yet
@@ -375,7 +397,7 @@ function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, high
   return Linear(indicator, float(rate))
 end
 
-uses_linear_rate(::Linear) = true
+uses_steady_linear_rate(::Linear) = true
 
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
   T = field_scalar_type(rate)
@@ -404,7 +426,7 @@ the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
 [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword is
-named for the kind of quantity it is: a **rate**, where `BandRescaling`'s `target` is an
+named for the kind of quantity it is: a **rate**, where `VarianceRescaling`'s `target` is an
 **amplitude** — which is why the two strategies do not share one keyword name. The rate is folded
 into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
@@ -418,38 +440,155 @@ into the integrating factor; like `Linear`, it preserves a solenoidal velocity.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
-    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `BandRescaling(over = :total)`
+    variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells, or the step after a `VarianceRescaling(over = :total)`
     zeroed the band. Below a small floor on ``E_{\\mathrm{band}}`` the rate is set to zero instead,
     so an empty band stays empty rather than receiving an unbounded kick; seed some content in the
     band if a run needs the forcing to take hold.
 # Fields
 - `band` — the band-pass kernel weighting the band observable.
-- `indicator` — the band indicator as a real array, the rate fill's factor.
+- (no stored band: the kernel is lazy, and the per-stage source convolves against it directly.)
 - `injection_rate` — the held rate.
 """
-struct ConstantPower{K, I, T} <: AbstractForcing
+struct ConstantPower{K, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
-  indicator::I         # the band indicator as a real array — the rate fill's factor
   injection_rate::T    # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
 end
 
-function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
-  band = _shell_band(domain, lowest_shell, highest_shell)
-  # The kernel is lazy and carries no coefficients to read, so the rate fill's indicator is
-  # materialized once here as a real array (half the complex field the stored band once was).
-  indicator = real.(field_data(materialize_kernel(band).field))
-  return ConstantPower(band, indicator, float(injection_rate))
+"""
+    VarianceController(; target, gain = 1.0, turnover_time = nothing,
+                       lowest_shell = 1, highest_shell = 2)
+
+Hold the band's variance at `target` by feedback, with the constant-``k`` controller of Bassenne,
+Urzay, Park & Moin (2016, [doi:10.1063/1.4944629](https://doi.org/10.1063/1.4944629)).
+
+Use it in preference to [`VarianceRescaling`](@ref) whenever the run's accuracy in time matters,
+which is nearly always: this forcing enters the right-hand side as a smooth rate the time-stepping
+scheme integrates, so the scheme keeps the order it advertises, while a rescaling is a projection
+applied after the step and caps the whole iteration at first order however good the scheme is.
+
+The rate is the marginal law ``A = \\varepsilon/2k`` plus a proportional restoring term:
+
+```math
+A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k_f(t) - k_\\infty]/t_\\ell}{2k_f(t)}
+\\quad\\text{in the band, } 0 \\text{ outside,}
+```
+
+so that ``\\mathrm{d}k_f/\\mathrm{d}t = -G(k_f - k_\\infty)/t_\\ell`` exactly: the band variance
+relaxes exponentially to a **stable attractor** with settling time ``t_\\ell/G``. Without the
+restoring term the marginal law makes every ``k`` an equilibrium and the variance random-walks with
+nothing to return it — which is what the rate-clamping forcings do.
+
+The mechanism is the one molecular dynamics settled on for the same problem. Holding a quantity fixed
+by rescaling the field every step is naive velocity rescaling; extending the dynamics with a feedback
+term, so the constraint rides inside the equations rather than being imposed after them, is the
+Nosé–Hoover move. A gain-limited relaxation toward a target is Berendsen weak coupling (Berendsen et
+al. 1984, [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deterministic-rescaling
+limit is [`VarianceRescaling`](@ref).
+
+# Arguments
+- `target` — the band variance ``k_\\infty`` to hold, in the field's own convention: the kinetic
+  energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
+- `gain = 1.0` — the dimensionless gain ``G``. Larger relaxes faster; Bassenne report ``O(1-10)``.
+- `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell``. When omitted it is taken as
+  ``2k_\\infty/3\\varepsilon_\\infty`` with ``\\varepsilon_\\infty`` the stationary estimate for
+  this box, the same estimate the grid-mode viscosity solve uses.
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
+
+!!! note "The settling time, not the gain, is the physical parameter"
+    Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a
+    disturbance. The two are kept separate because that is how the source states them.
+
+# Fields
+- `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
+- `target`, `gain`, `relaxation_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
+"""
+struct VarianceController{K, T} <: AbstractForcing
+  band::K
+  target::T
+  gain::T
+  relaxation_time::T
 end
 
-uses_linear_rate(::ConstantPower) = true
 
-function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)
-  T = field_scalar_type(rate)
-  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)
-  amplitude = _band_is_empty(band_observable) ? 0.0 :
-              forcing.injection_rate / (2 * band_observable)
-  rate .= T(amplitude) .* forcing.indicator
-  return rate
+function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1.0,
+                            turnover_time = nothing, lowest_shell::Integer = 1,
+                            highest_shell::Integer = 2)
+  target > 0 ||
+    throw(ArgumentError("`target` must be positive, got $target: it is the variance the controller " *
+                        "holds, and the rate divides by the band's own variance"))
+  gain > 0 ||
+    throw(ArgumentError("`gain` must be positive, got $gain: a non-positive gain makes the " *
+                        "restoring term push the variance AWAY from the target"))
+  band = _shell_band(domain, lowest_shell, highest_shell)
+  # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
+  # the same estimate the grid-mode viscosity solve uses, so the two agree on what "stationary" means.
+  tℓ = turnover_time === nothing ?
+       2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
+                                                                 domain.grid.domain_size[1])) :
+       float(turnover_time)
+  tℓ > 0 || throw(ArgumentError("`turnover_time` must be positive, got $turnover_time"))
+  return VarianceController(band, float(target), float(gain), tℓ)
+end
+
+
+# ε_∞ ≈ C_ε k^{3/2}/L for a stationary box-filling flow. Spelled here rather than reached for from
+# `Phenomenology` so this module keeps its independence; the constant is the same one that module
+# fits, and the two are pinned against each other by a test.
+_stationary_dissipation_estimate(k, L) = 0.5 * k^(3 / 2) / (L / (2π))
+
+
+uses_steady_linear_rate(::VarianceController) = false
+
+
+function add_forcing_source!(forcing::VarianceController, N̂, field, domain::FixedDomain,
+                             diffusivity::Real)
+  T = field_scalar_type(N̂)
+  factor = _target_factor(field)
+  band_variance = factor * weighted_inner(field, forcing.band)            # k_f, at the STAGE state
+  # ε = D⟨|∇f|²⟩ = D·⟨f, |κ|²f⟩, the field's own dissipation at this stage. The factor is the same
+  # convention `target` carries — ½ for the velocity, 1 for the scalar.
+  dissipation = 2 * factor * diffusivity * weighted_inner(field, domain.squared_wavenumber_kernel)
+  restoring = forcing.gain * (band_variance - forcing.target) / forcing.relaxation_time
+  amplitude = _band_is_empty(band_variance) ? 0.0 :
+              (dissipation - restoring) / (2 * band_variance)
+  convolve!(N̂, field, forcing.band, T(amplitude), one(T))
+  return N̂
+end
+
+function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
+  # No materialized indicator: it existed only to fill the integrating-factor rate array, and this
+  # forcing no longer uses that route. The lazy kernel is convolved against directly, so a
+  # `ConstantPower` run now carries NO field-scale storage of its own — two arrays fewer.
+  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(injection_rate))
+end
+
+# NOT a steady rate, and declaring it one was the defect. `A = ε/2k_band` is linear in the field but
+# depends on the band energy, which changes across the step — so folding it into the integrating
+# factor evaluates ∫A dt by a LEFT-ENDPOINT RECTANGLE RULE, local error O(Δt²), and collapses the
+# whole iteration to first order however good the scheme is. Measured before the move: IFLowStorageRK3
+# gave 1.02 under this forcing against 2.995 unforced, while `Linear` — the same code path, the same
+# exponent, differing only in that its A is genuinely steady — kept 2.987. That contrast is the proof.
+# It goes through the per-stage source instead, where the scheme's own order conditions apply.
+uses_steady_linear_rate(::ConstantPower) = false
+
+# The amplitude A that injects `injection_rate` into the band, evaluated AT THE FIELD IT IS GIVEN.
+# Shared by `ConstantPower` and `VarianceController`, which differ only in what A is asked to hold.
+function _injection_amplitude(injection_rate, band_observable)
+  # TurTLE guards the same division with `if (energy_in_shell < 10*eps) energy_in_shell = 1`, a
+  # machine-epsilon-relative floor substituting a benign denominator rather than skipping the step.
+  return _band_is_empty(band_observable) ? 0.0 : injection_rate / (2 * band_observable)
+end
+
+
+function add_forcing_source!(forcing::ConstantPower, N̂, field, domain::FixedDomain,
+                             diffusivity::Real)
+  T = field_scalar_type(N̂)
+  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)   # at the STAGE state
+  amplitude = _injection_amplitude(forcing.injection_rate, band_observable)
+  # N̂ ← N̂ + A·𝟙_band·field, the band-limited linear forcing as an explicit source. `convolve!`'s
+  # α/β form accumulates in place, so this costs one fused pass and no scratch.
+  convolve!(N̂, field, forcing.band, T(amplitude), one(T))
+  return N̂
 end
 
 
@@ -554,8 +693,8 @@ function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real
   return nothing
 end
 
-add_forcing_source!(ou::StochasticOU, N̂, domain::FixedDomain) =
-  add!(N̂, N̂, ou.state)
+add_forcing_source!(ou::StochasticOU, N̂, field, domain::FixedDomain, diffusivity::Real) =
+  add!(N̂, N̂, ou.state)   # the increment was drawn once per step; the stage field is not needed
 
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
@@ -567,8 +706,13 @@ Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
 ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
   DeferredForcing(domain -> ConstantPower(domain; injection_rate, lowest_shell, highest_shell))
 
-BandRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
-  DeferredForcing(domain -> BandRescaling(domain; target, over, lowest_shell, highest_shell))
+VarianceRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> VarianceRescaling(domain; target, over, lowest_shell, highest_shell))
+
+VarianceController(; target::Real, gain::Real = 1.0, turnover_time = nothing,
+                   lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+  DeferredForcing(domain -> VarianceController(domain; target, gain, turnover_time,
+                                               lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =

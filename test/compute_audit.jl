@@ -157,7 +157,7 @@ _forcing_transform_delta(tag, slot) =
 # cross-checked against its op list below; the rest are frozen by derivation). Every band kernel is
 # a lazy radial symbol since the PF adoption, so no hook reads a stored kernel; an ARMED rate is a
 # spectral-scalar field the fused exponential reads once per application (_applies below).
-#   band  — apply_forcing!: weighted_inner(field, band) [field read] + the in-band rescale
+#   band  — project_forcing!: weighted_inner(field, band) [field read] + the in-band rescale
 #           convolve [field r/w].
 #   linear — set_forcing_rate!: rate .= A·mask [mask (real) read + rate (spectral scalar) write],
 #           then the armed exponential reads the rate once per application.

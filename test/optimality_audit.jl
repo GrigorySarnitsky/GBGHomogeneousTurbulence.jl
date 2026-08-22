@@ -140,7 +140,7 @@ end
 #                                                    scalar arithmetic on it — no crossing of its own)
 #   StationarityCriterion   (src/SimulationRun.jl) — the packaged observation's ε and k reductions
 #                                                    (a turnover-budget callback pays the same two)
-#   apply_forcing!          (src/Forcing.jl)       — BandRescaling's band observable, and the whole-field
+#   project_forcing!          (src/Forcing.jl)       — VarianceRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
 #   set_forcing_rate!       (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
 #   prepare_forcing!        (src/Forcing.jl)       — the stochastic forcing's noise variance → the rescale
@@ -154,8 +154,15 @@ end
 # parameterizes every kernel of the step it opens, so the reduction that sets it must land before
 # anything launches. A fixed timestep needs none. Every other scalar here is consumed by a following
 # device kernel and only visits the host because it is written as a Julia number.
+# `stages` is the number of right-hand-side evaluations a step makes (3 for IFLowStorageRK3, 2 for
+# IFRK2). It multiplies the readbacks of a STATE-DEPENDENT forcing, because such a forcing is
+# evaluated at every stage rather than armed once per step. That is a deliberate cost, taken in
+# exchange for the scheme's order: `ConstantPower` and `VarianceController` have rates that track the
+# band observable, and folding a varying rate into the integrating factor integrates ∫A dt by a
+# left-endpoint rectangle rule — measured collapsing IFLowStorageRK3 from 2.995 to 1.018. A
+# steady-rate forcing (`Linear`) is unaffected: it is still armed once and costs no readback here.
 function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,
-                  turnover_budget::Bool = false, monitor::Symbol = :none)
+                  turnover_budget::Bool = false, monitor::Symbol = :none, stages::Int = 1)
   syncs = Sync[]
   # The closing deposit reduces the maximum speed on EVERY iteration (the uniform schedule): with an
   # adaptive timestep the crossing is the irreducible Δt choice; with a hand-fixed Δt its floor is
@@ -176,12 +183,19 @@ function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::S
   end
   for (tag, slot) in ((velocity_forcing, :velocity), (scalar_forcing, :scalar))
     if tag === :band
-      push!(syncs, Sync("BandRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      push!(syncs, Sync("VarianceRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
     elseif tag === :band_total
-      push!(syncs, Sync("BandRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
-      push!(syncs, Sync("BandRescaling total observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      push!(syncs, Sync("VarianceRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      push!(syncs, Sync("VarianceRescaling total observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
     elseif tag === :power
-      push!(syncs, Sync("ConstantPower band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      for _ in 1:stages   # per STAGE: the rate tracks the band observable, so it cannot be frozen
+        push!(syncs, Sync("ConstantPower band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      end
+    elseif tag === :controller
+      for _ in 1:stages   # the controller reads the band variance AND the dissipation, each stage
+        push!(syncs, Sync("VarianceController band variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+        push!(syncs, Sync("VarianceController dissipation ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      end
     elseif tag === :ou
       push!(syncs, Sync("OU noise variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
     end
@@ -193,12 +207,12 @@ _achieved_syncs(syncs) = length(syncs)
 _floor_syncs(syncs) = sum(s -> s.floor, syncs; init = 0)
 
 # The frozen synchronization ledger: (achieved, floor) per step. The default run configuration is
-# the first row — an adaptive timestep and a whole-field BandRescaling — and it issues three
+# the first row — an adaptive timestep and a whole-field VarianceRescaling — and it issues three
 # blocking readbacks per step where one is irreducible.
 const SYNC_LEDGER = (
-  (name = "default (adaptive dt, BandRescaling :total)",
+  (name = "default (adaptive dt, VarianceRescaling :total)",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),
-  (name = "adaptive dt, BandRescaling :band",
+  (name = "adaptive dt, VarianceRescaling :band",
    cfg = (; adaptive_dt = true, velocity_forcing = :band),                       achieved = 2, floor = 1),
   (name = "fixed dt, unforced",
    cfg = (; adaptive_dt = false, velocity_forcing = :none),                      achieved = 1, floor = 0),
@@ -208,14 +222,14 @@ const SYNC_LEDGER = (
    cfg = (; adaptive_dt = true, velocity_forcing = :power),                      achieved = 2, floor = 1),
   (name = "adaptive dt, stochastic velocity + scalar",
    cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 3, floor = 1),
-  (name = "turnover-budgeted, BandRescaling :total",
+  (name = "turnover-budgeted, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total,
             turnover_budget = true),                                             achieved = 5, floor = 2),
   (name = "turnover-budgeted, fixed dt, unforced",
    cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 3, floor = 1),
   # The warm-up surface — past step!, where the stationarity detector samples. ε is measured once
   # per iteration and shared with the turnover clock, so it appears here once, not twice.
-  (name = "warm-up sample, BandRescaling :total",
+  (name = "warm-up sample, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total, monitor = :skew),
    achieved = 6, floor = 3),
   (name = "warm-up sample, scalar gate, unforced",

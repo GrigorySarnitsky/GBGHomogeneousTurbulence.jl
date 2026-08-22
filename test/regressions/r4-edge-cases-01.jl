@@ -7,7 +7,7 @@
 # and guards `kinetic_energy > 0` / `scalar_variance >= 0` accordingly. `StochasticOU`'s `variance`
 # — documented as the stationary ⟨|f|²⟩ = σ², which cannot be negative — carries no such guard, and
 # `prepare_forcing!` computes s = sqrt(variance · (1 − α²)) with (1 − α²) > 0 for every dt > 0.
-# `BandRescaling`'s `target` (an exported, front-door forcing) is the same shape via `apply_forcing!`.
+# `VarianceRescaling`'s `target` (an exported, front-door forcing) is the same shape via `project_forcing!`.
 using Test, Random, GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Forcing: StochasticOU
 
@@ -49,29 +49,29 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU
 end
 
 
-# The same class on an EXPORTED, front-door forcing: `BandRescaling`'s `target` is a kinetic energy
-# (velocity) or a scalar variance (scalar), so it too cannot be negative — and `apply_forcing!`
+# The same class on an EXPORTED, front-door forcing: `VarianceRescaling`'s `target` is a kinetic energy
+# (velocity) or a scalar variance (scalar), so it too cannot be negative — and `project_forcing!`
 # computes scale = sqrt(target_band / band_value). `over = :total` is shielded by its `max(0, …)`;
 # `over = :band` passes the raw target straight into `sqrt`. Fix the class, not the line.
-@testset "a negative BandRescaling target is rejected at construction, not as a downstream sqrt DomainError" begin
+@testset "a negative VarianceRescaling target is rejected at construction, not as a downstream sqrt DomainError" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
                        element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
 
-  @test_throws ArgumentError BandRescaling(domain; target = -1.0, over = :band)
+  @test_throws ArgumentError VarianceRescaling(domain; target = -1.0, over = :band)
 
   state = ResolvedFields(domain)
   random_solenoidal_velocity_spectral!(state.velocity_spectral, domain;
                                        kinetic_energy = 1.0, envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(1))
   raised = try
-    forcing = BandRescaling(domain; target = -1.0, over = :band)
-    apply_forcing!(forcing, state.velocity_spectral, domain)
+    forcing = VarianceRescaling(domain; target = -1.0, over = :band)
+    project_forcing!(forcing, state.velocity_spectral, domain)
     nothing
   catch err
     err
   end
   @test !(raised isa DomainError)
-  @info "negative-target BandRescaling" construction_or_apply_error = raised
+  @info "negative-target VarianceRescaling" construction_or_apply_error = raised
 end
 
 end  # outer testset

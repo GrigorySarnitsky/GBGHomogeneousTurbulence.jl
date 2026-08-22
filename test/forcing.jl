@@ -56,14 +56,19 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
     @test minimum(real.(field_data(rate))) == 0     # zero outside the band
   end
 
-  @testset "ConstantPower sets injection rate = power" begin
+  @testset "ConstantPower injects exactly its injection rate, through the per-stage source" begin
+    # The property is unchanged — ⟨u·f⟩ = ε_target — but the route is. `ConstantPower`'s rate depends
+    # on the band energy and so is NOT steady, which is why it left the integrating factor (folding a
+    # varying A into the exponent integrates ∫A dt by a left-endpoint rectangle rule and costs the
+    # scheme its order). The source hook receives the STAGE field, which is the point.
     power = 0.3
     forcing = ConstantPower(domain; injection_rate = power, lowest_shell = 1, highest_shell = 2)
     E_band = band_energy(û0)
-    rate = new_scalar_field_spectral(domain)
-    set_forcing_rate!(forcing, rate, û0, domain)
-    A = maximum(real.(field_data(rate)))
-    @test A * 2 * E_band ≈ power                # ⟨u·f⟩ = A·2E_band = ε_target
+    N̂ = new_vector_field_spectral(domain)
+    field_data(N̂) .= 0
+    add_forcing_source!(forcing, N̂, û0, domain, ν)
+    # ⟨u·f⟩ over the band, with f the source just added: the injected power.
+    @test real(inner(û0, N̂)) ≈ power  rtol = 1e-8
   end
 
   @testset "Linear injects energy, stays solenoidal" begin
@@ -150,20 +155,24 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 
   @testset "a rate array exists exactly where a forcing declares one" begin
     # The storage tracks the physics: only a forcing that drives its field through a linear per-mode
-    # rate gets an A(κ) array. A post-step projection (BandRescaling — the run layer's default), a
+    # rate gets an A(κ) array. A post-step projection (VarianceRescaling — the run layer's default), a
     # stochastic source, and no forcing at all carry none.
-    rate_driven = (Linear(domain; rate = 0.5), ConstantPower(domain; injection_rate = 0.1))
-    other = (NoForcing(), BandRescaling(domain; target = 0.5, over = :band),
+    # Only `Linear` has a rate that is BOTH linear in the field and steady in time, so only `Linear`
+    # earns the integrating factor. `ConstantPower` and `VarianceController` are linear but not
+    # steady — their A tracks the band energy — and go through the per-stage source instead.
+    rate_driven = (Linear(domain; rate = 0.5),)
+    other = (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
+             ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
              StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
     generator(f) = ResolvedGenerator(domain, FlowConditions(; viscosity = ν, schmidt = 1.0,
                      velocity_forcing = f, scalar_forcing = NoForcing()); scalar = false)
 
     for f in rate_driven
-      @test uses_linear_rate(f)
+      @test uses_steady_linear_rate(f)
       @test generator(f).velocity_rate !== nothing
     end
     for f in other
-      @test !uses_linear_rate(f)
+      @test !uses_steady_linear_rate(f)
       @test generator(f).velocity_rate === nothing
     end
 

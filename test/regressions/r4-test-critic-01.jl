@@ -30,7 +30,7 @@ using Test
                        velocity_forcing = ou, scalar_forcing = ou2) isa FlowConditions
 
   # … and one shared IMMUTABLE strategy stays legal (no per-field state to conflate).
-  band = BandRescaling(domain; target = 0.5, over = :band)
+  band = VarianceRescaling(domain; target = 0.5, over = :band)
   @test !ismutable(band)
   @test FlowConditions(viscosity = 0.05, schmidt = 1.0,
                        velocity_forcing = band, scalar_forcing = band) isa FlowConditions

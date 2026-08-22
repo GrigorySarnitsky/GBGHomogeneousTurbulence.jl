@@ -85,7 +85,7 @@ could enter only by making the iteration compute it, which the choice forbids. T
 component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
 wants one computes it at an observation (§2.4).
 
-One case looks like a counterexample and is worth stating. Under the `BandRescaling(over = :total)`
+One case looks like a counterexample and is worth stating. Under the `VarianceRescaling(over = :total)`
 the front door builds, the forcing *does* form the whole-field ``k`` every step, to size its own
 rescale. That value is the **pre-rescale** energy, taken mid-step and discarded — not the
 observable at the iteration's end, which is what a slot must hold — so it fails the surviving test
@@ -225,7 +225,7 @@ every class.
 ## 2. The system
 
 One configuration fixes the system: a mask dealiasing rule (`TwoThirds` or `HouLi`, each removing the
-aliased wavenumbers by a per-wavenumber multiplication), a three-stage scheme, the default rescaling
+aliased wavenumbers by a per-wavenumber multiplication), a three-stage scheme, the default controller
 velocity forcing, an adaptive timestep. Those axes fix the whole of an iteration's work — stopping belongs
 to the observation (§1.3), and nothing a reader does changes what an iteration computes.
 
@@ -272,9 +272,10 @@ transforms below.
   rate, and ``\tau`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A field-proportional one folds its rate into that
   exponential; the rate array exists, the product ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` never
-  does. An additive source enters the right-hand side at each stage. A rescaling applies to the
-  completed step as a map on the state, with no forcing field at all; the default velocity forcing is
-  of this kind.
+  does. An additive source enters the right-hand side at each stage. An additive source is what a
+  state-dependent rate takes, the default velocity forcing among them, because a rate frozen for the
+  whole step would cost the scheme its order. A rescaling applies to the completed step as a map on
+  the state, with no forcing field at all.
 
 ### 2.3 Transforms and arrays
 

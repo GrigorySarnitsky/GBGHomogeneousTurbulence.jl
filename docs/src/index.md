@@ -38,8 +38,8 @@ using GBGIsotropicTurbulence
 sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
                                               # ν is set so the grid captures the dissipation scale
 warmup!(sim)                                  # spin up to statistical stationarity
-                                              # (the default forcing is a deterministic clamp on k —
-                                              #  see BandRescaling before measuring k itself)
+                                              # (the default forcing holds k at that value —
+                                              #  see VarianceController before measuring k itself)
 
 t_end = current_time(sim) + 5.0               # observe and advance: the callback reads the run,
 run!(sim) do s                                # records what it wants, and decides continuation
@@ -81,8 +81,8 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) and
-    [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `BandRescaling`, `Linear`, and
-    `ConstantPower`, and Lagrangian particle
+    [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `Linear`, `ConstantPower`,
+    `VarianceController` (the default), and `VarianceRescaling`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     provide usable model spectra, structure-function laws, and scaling constants. Accumulating
     statistics over the fields and the sampled trajectories is the caller's own analysis:

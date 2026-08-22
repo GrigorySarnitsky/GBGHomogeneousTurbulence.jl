@@ -6,13 +6,13 @@
 # equation is EXACTLY LINEAR in φ, so φ → s·φ together with ε_φ → s²·ε_φ is an exact symmetry of
 # the forced problem. Under it
 #   * `ConstantPower`'s rate  A = ε_φ / (2·variance_band)  is exactly invariant, and
-#   * `BandRescaling(over = :band)` with target → s²·target must reach the scaled target.
+#   * `VarianceRescaling(over = :band)` with target → s²·target must reach the scaled target.
 # Both must therefore be independent of the arbitrary amplitude s. They are not: below s ≈ 1e-6 the
 # fixed floor fires and the forcing silently switches off, even though the band observable is still
 # reproduced to ~15 significant digits (asserted below), i.e. is nowhere near numerically empty.
 using Test
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data, weighted_inner, spectral_band
+using GBGPeriodicFields: field_data, weighted_inner, spectral_band, inner
 using Random
 
 @testset "the empty-band floor must be a numerical test, not an amplitude test" begin
@@ -40,19 +40,23 @@ using Random
   @test isapprox(scaled_band / s^2, reference_band; rtol = 1e-13)
 
   # (2) ConstantPower's rate is invariant under the exact scaling symmetry of the linear scalar.
+  # UPDATED 2026-08-22: `ConstantPower` no longer supplies a rate to the integrating factor — its A
+  # tracks the band variance and is not steady in time, so it goes through the per-stage source. The
+  # amplitude is recovered from the source it adds: N̂ = A·𝟙_band·φ, hence A = ⟨φ,N̂⟩ / ⟨φ,𝟙_band φ⟩.
   rate_amplitude(φ, injection_rate) = begin
     forcing = ConstantPower(domain; injection_rate = injection_rate)
-    r = new_scalar_field_spectral(domain)
-    set_forcing_rate!(forcing, r, φ, domain)
-    maximum(real.(field_data(r)))
+    N̂ = new_scalar_field_spectral(domain)
+    field_data(N̂) .= 0
+    add_forcing_source!(forcing, N̂, φ, domain, 0.05)     # ConstantPower ignores the diffusivity
+    real(inner(φ, N̂)) / weighted_inner(φ, band)
   end
   A_reference = rate_amplitude(φ0, 0.1)
   A_scaled    = rate_amplitude(scaled(s), 0.1 * s^2)
   @test A_reference > 0                                   # the reference case forces at all
   @test isapprox(A_scaled, A_reference; rtol = 1e-10)      # the rate must not depend on the amplitude
 
-  # (3) BandRescaling must reach its target at any amplitude, not silently return the field.
-  held(φ, target) = (apply_forcing!(BandRescaling(domain; target = target, over = :band), φ, domain);
+  # (3) VarianceRescaling must reach its target at any amplitude, not silently return the field.
+  held(φ, target) = (project_forcing!(VarianceRescaling(domain; target = target, over = :band), φ, domain);
                      weighted_inner(φ, band))
   @test isapprox(held(scaled(1.0), 2.0), 2.0; rtol = 1e-10)
   @test isapprox(held(scaled(s), 2.0 * s^2) / s^2, 2.0; rtol = 1e-10)

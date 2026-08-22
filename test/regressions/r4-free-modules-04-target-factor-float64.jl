@@ -3,7 +3,7 @@
 #
 # The `Observables` module docstring states the contract explicitly: "Each returns the field's own
 # real element type rather than a fixed `Float64`, so a `Float32` run measures in `Float32`."
-# `BandRescaling`'s docstring names `kinetic_energy` / `scalar_variance` as the observable it holds,
+# `VarianceRescaling`'s docstring names `kinetic_energy` / `scalar_variance` as the observable it holds,
 # and the `#` comment above `_target_factor` says the ½ / 1 factor exists "matching
 # `Observables.kinetic_energy` / `Observables.scalar_variance`".  A `Float64` literal breaks that
 # match on a `Float32` run: every band observable in `Forcing` is promoted to `Float64`, so the
@@ -49,9 +49,9 @@ const O  = GBGIsotropicTurbulence.Observables
   @test typeof(F._target_factor(û) * weighted_inner(û, band)) === Float32
   @test typeof(F._target_factor(φ̂) * weighted_inner(φ̂, band)) === Float32
 
-  # (2) the band observable `BandRescaling.apply_forcing!` / `ConstantPower.set_forcing_rate!`
+  # (2) the band observable `VarianceRescaling.project_forcing!` / `ConstantPower.set_forcing_rate!`
   #     compute must be the same kind of number as the diagnostic they are documented to match.
-  forcing = F.BandRescaling(domain; target = 1.0f0, over = :band)
+  forcing = F.VarianceRescaling(domain; target = 1.0f0, over = :band)
   band_observable = F._target_factor(û) * weighted_inner(û, forcing.band)
   @test typeof(band_observable) === typeof(O.kinetic_energy(û))
 

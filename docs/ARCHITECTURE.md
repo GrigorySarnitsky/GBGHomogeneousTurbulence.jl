@@ -350,19 +350,33 @@ step through a small interface whose four methods each default to doing nothing:
 - `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
-- `apply_forcing!` — apply a post-step projection or rescale.
+- `project_forcing!` — apply a post-step projection or rescale.
 
 The four hooks form one per-step lifecycle with a fixed order — `prepare_forcing!` and
-`set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `apply_forcing!` after the
+`set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `project_forcing!` after the
 completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
 hooks need; none receives the scheme's buffers (§11 decision 32).
 
-`NoForcing` (free decay), `BandRescaling` (hold a band's *or* the total energy fixed — a deterministic
-clamp, fit for spin-up and amplitude-holding but not a faithful stationary sampler; its docstring
-carries the Berendsen-class caveat, Bussi, Donadio & Parrinello 2007), `Linear`
-(fixed-rate negative damping, Lundgren 2003), and `ConstantPower` (its rate reset each step to hold the
-injection rate) — the two linear forcings folded into ``\mathcal{E}`` — are provided; a stochastic Eswaran–Pope
+Which hook a strategy uses is not an implementation detail: it decides whether the strategy preserves
+the scheme's order in time. A rate folded into ``\mathcal{E}`` is integrated **exactly**, but only a
+*steady* rate can be — freezing a state-dependent one at the step's start is the left-endpoint
+rectangle rule on ``\int A\,\mathrm dt``, which is first-order however good the scheme is, and a
+post-step projection is Lie–Trotter splitting, first-order by construction. So a state-dependent
+forcing belongs in the source, where the scheme's own stages integrate it. Measured on the
+third-order `IFLowStorageRK3`: every source-routed forcing converges at 3.01, the projection at 1.02.
+
+Four strategies are provided. `NoForcing` (free decay) and `Linear` (fixed-rate negative damping,
+Lundgren 2003) — the latter the one steady rate, folded into ``\mathcal{E}`` and therefore exact and
+free. `ConstantPower` (holding the injection rate) and `VarianceController` (holding the field's
+``L^2`` observable: the kinetic energy for the velocity, the scalar variance for the scalar; the
+constant-``k`` controller of Bassenne et al. 2016, Eq. 20) both carry state-dependent rates and enter
+through the source at every stage; the controller is the **default velocity forcing**, its
+proportional restoring term making the target a stable attractor rather than a clamp.
+`VarianceRescaling` (rescaling a band to hold the same observable — `over = :band | :total`) is the
+one post-step projection, kept as the reference implementation of a published method (Sullivan,
+Mahalingam & Kerr 1994) with its first-order caveat and its Berendsen-class caveat (Bussi, Donadio &
+Parrinello 2007) documented rather than hidden; a stochastic Eswaran–Pope
 Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
@@ -905,7 +919,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     exists. The operator-taking constructor is unchanged. *(Originally the keyword was `power` and the
     return type `ForcingSpec`; both since renamed — `power` → `target`, `ForcingSpec` → `DeferredForcing`
     — decision 25.)*
-15. **(2026-07) `BandRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
+15. **(2026-07) `VarianceRescaling` can hold the band *or* the total energy (`over = :band | :total`).**
     `:band` fixes the forced band's energy and lets the total float; `:total` rescales the band
     to pin the whole-field energy — hence the r.m.s. velocity ``u'``, setting the scale of
     ``\mathrm{Re}_\lambda`` (whose value still fluctuates with ``\varepsilon``) — the
@@ -963,9 +977,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
     validate them.
-    The run is forced-and-stationary by default (a `BandRescaling` holds the total energy at the value
+    The run is forced-and-stationary by default (a `VarianceRescaling` holds the total energy at the value
     given by the `kinetic_energy` keyword,
-    default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. It does **not**
+    default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. *(Superseded
+    in the holder, not in the substance: decision 58 made `VarianceController` the default. The
+    calibration constraint — the run must really hold ``k`` at the assumed value — is unchanged, and
+    the controller holds it to a tolerance rather than exactly.)* It does **not**
     breach the extraction boundary — `Li2008` stays a pure scalar law with no `GBGPeriodicFields` /
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
     sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
@@ -1014,7 +1031,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     lacks the initial condition and the domain — so a type named for the axis while holding less is ambiguous
     and imprecise) and over `GeneratorParameters` (relational, and imprecise once a coarser rung's generator
     gains closure coefficients). (b) The `AbstractForcing` protocol methods are made grammatically uniform,
-    verb-first: `set_forcing_rate!`, `add_forcing_source!`, `prepare_forcing!`, `apply_forcing!`. (c) The
+    verb-first: `set_forcing_rate!`, `add_forcing_source!`, `prepare_forcing!`, `project_forcing!`. (c) The
     open-systems / non-equilibrium reading is recorded as a **sub-lens under Mori–Zwanzig** (§8), not new
     state types: a six-tradition panel (unanimous) confirmed the system/environment split *is* the
     Mori–Zwanzig resolved/modeled cut, but that whatever a model retains of the environment is a finite
@@ -1194,7 +1211,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `StochasticOU`-forced case) against the pre-migration code.
 32. **(2026-07) Forcing hooks own their scratch; the lifecycle order is contract.** The four-hook
     interface no longer receives the scheme's buffer bundle ("for interface uniformity" — the
-    smell decision 26's discipline predicted): `set_forcing_rate!`, `apply_forcing!`,
+    smell decision 26's discipline predicted): `set_forcing_rate!`, `project_forcing!`,
     `prepare_forcing!`, and `add_forcing_source!` take only what they act on, and `StochasticOU` owns
     its noise scratch (one field in physical and one in spectral representation, allocated on first
     use like its ``\hat{\boldsymbol{f}}`` state) instead of reaching into `buffers.product_*` by
@@ -1206,7 +1223,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     with the rate and the source recorded as two channels of *one* forcing term (the exactly linear
     part in the factor, the remainder at stages). This stage deliberately ran *before* the generator
     reification, against the migration plan's original order: the borrow had to be severed before the
-    borrowed scratch could move homes. `BandRescaling` carries the Berendsen-class caveat — a
+    borrowed scratch could move homes. `VarianceRescaling` carries the Berendsen-class caveat — a
     deterministic clamp has no conserved quantity and no well-defined ensemble except in limiting
     cases (Bussi, Donadio & Parrinello 2007) — a spin-up and amplitude-holding tool, with stochastic
     rescaling the recorded upgrade path when faithful fluctuations of the held quantity matter.
@@ -1346,7 +1363,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     per-mode symbol apply would delete that class outright and do nothing for the other.
 
     On the synchronization axis the default configuration issues **three** blocking readbacks per
-    step — the CFL speed bound, and `BandRescaling`'s band and whole-field observables — against a
+    step — the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables — against a
     floor of **one**. Only the timestep's is irreducible; a forcing's scalar is consumed by the very
     next kernel and visits the host only because it is written as a Julia number.
 
@@ -1452,7 +1469,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     at ``256^3``/`Float64`, ``\lvert\boldsymbol{\kappa}\rvert^{2}`` no longer resident twice — and the optimality audit's
     reconstruction demonstration inverted into a correctness pin: the lazy symbols, materialized on
     demand, must equal the explicit axis-vector reconstruction. Knock-on residency wins recorded in
-    the same re-freeze: every band forcing's kernel is lazy (`BandRescaling` and `StochasticOU` store
+    the same re-freeze: every band forcing's kernel is lazy (`VarianceRescaling` and `StochasticOU` store
     none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill),
     and the seed/spectrum episodes shrank because `GBGPeriodicFields` delivered the guard-free aliased
     projection and fused its `radial_spectrum` staging. The bare `ScalarFieldSpectral` integrating
@@ -1634,7 +1651,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     lives upstream of `Generator` is **consumption inside `step!`** (the assembly's per-stage
     inputs), *not* a "measurement never feeds the dynamics" principle — that principle is false in
     mechanics (the Hamiltonian, an observable, generates the flow) and false in this package
-    (`max_speed` sets the adaptive ``\Delta t``; `BandRescaling` holds a measured band energy);
+    (`max_speed` sets the adaptive ``\Delta t``; `VarianceRescaling` holds a measured band energy);
     measured values steer the loop *between* steps, and nothing hard forbids this order — it is a
     design choice for a diagnostics module that stays optional per slot while its generics stand
     upstream.
@@ -1759,7 +1776,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     reads in the current vocabulary; this entry records that the older entries originally said
     "stamp".
 
-54. **(2026-08, user-directed) `BandRescaling`'s `over` is required, and the front door's `:total` is
+54. **(2026-08, user-directed) `VarianceRescaling`'s `over` is required, and the front door's `:total` is
     a calibration constraint rather than a preference.** *(The read-through pile recorded this as
     "not decided" and listed three options; the owner settled it in the review that followed, asking
     for the required form with the front door passing `:total`. The entry is written from that
@@ -1858,6 +1875,50 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``1.2\times10^{-11}``. At fixed degree 7, ``C^0`` and ``C^3`` gave identical time convergence, so
     smoothness caps nothing here — it earns its keep in readouts that *differentiate* the interpolant.
 
+58. **(2026-08, user-directed) A state-dependent forcing rate belongs in the source, not in the
+    integrating factor: `VarianceController` is the new default, and `VarianceRescaling` is kept as a
+    documented first-order reference.** The audit that followed the bug hunt found the default
+    `Simulation` integrating at **first order** on a third-order scheme, and the cause was routing
+    rather than any error in the schemes or the forcing protocol. Both are worth separating, because
+    only one of them was a defect.
+
+    The genuine defect: `ConstantPower` published a *rate* that it recomputed every step from the
+    current state. A rate folded into ``\mathcal{E}`` is integrated exactly — but exactness is a
+    statement about a *steady* ``A``. Freezing a state-dependent one at the step's start makes the
+    step a left-endpoint rectangle rule on ``\int A\,\mathrm dt``: local error ``O(\Delta t^2)``,
+    global order 1, and the collapse is silent because nothing about the code looks wrong. Moving it
+    to `add_forcing_source!`, where the scheme's own stages evaluate it, restored 3.01 from 1.02.
+    The protocol needed no change — the four hooks were already the right four. The fix was to stop
+    claiming exactness the strategy could not deliver, which is why `uses_linear_rate` is now
+    `uses_steady_linear_rate`: the old name asserted linearity in the *field*, and the load-bearing
+    property is steadiness in *time*.
+
+    Not a defect, and kept: `VarianceRescaling`'s first order. A post-step rescale is Lie–Trotter
+    operator splitting, so it is first-order by construction and no routing can save it. It is a
+    published method (Sullivan, Mahalingam & Kerr 1994) a reader may need to reproduce, and holding a
+    band's value *exactly* is occasionally what is wanted. It stays, with the caveat stated in its own
+    docstring rather than discovered by a convergence study, and a test pins its order below 1.5 so
+    the caveat cannot rot into a claim.
+
+    The replacement is `VarianceController`, the constant-``k`` controller of Bassenne, Urzay, Park &
+    Moin (2016, Eq. 20): ``A = [\varepsilon - G(k_f - k_\infty)/t_\ell]/(2k_f)``, whose marginal term
+    ``\varepsilon/2k_f`` reinjects exactly what dissipation removes and whose proportional term gives
+    ``\mathrm dk/\mathrm dt = -G(k - k_\infty)/t_\ell`` — exponential relaxation to a **stable
+    attractor**. That is the structural difference from the rescale, not a numerical refinement: the
+    clamp *imposes* the target and destroys the fluctuation of the quantity it holds, while the
+    controller *restores* toward it and leaves the fluctuation to the flow. Molecular dynamics settled
+    the same question the same way — naive velocity rescaling versus a thermostat that extends the
+    dynamics with feedback — and the analogy is recorded in the docstrings because a reader arriving
+    from that literature will recognize the pair immediately.
+
+    The naming is deliberate: `Variance`, not `Energy`, because one implementation serves both fields
+    and the held quantity is each field's ``L^2`` observable — the kinetic energy for the velocity,
+    the scalar variance for the scalar. Naming it for the velocity's case would have made the scalar's
+    the exception. Measured after the change: unforced, `Linear`, `ConstantPower`,
+    `VarianceController` and the default `Simulation` all converge at 3.01; `VarianceRescaling` at
+    1.02. The controller was verified to converge on its target from both sides (``k_0 = 0.4`` and
+    ``k_0 = 2.6`` toward ``1.5``), which a clamp cannot be said to do at all.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
@@ -1907,14 +1968,25 @@ cites.
   algorithm for large-scale parallel pseudo-spectral simulations of turbulence. *Comput. Phys.
   Commun.* **278**, 108406. <https://doi.org/10.1016/j.cpc.2022.108406> *(TurTLE; the
   Adams–Bashforth tracer integration `AdamsBashforth` follows, decision 57.)*
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). Deterministic forcing of homogeneous,
+  isotropic turbulence. *Phys. Fluids* **6**(4), 1612–1614.
+  <https://doi.org/10.1063/1.868274> *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
+  modes to a fixed band energy. Kept as the reference implementation, with its first-order
+  operator-splitting caveat documented rather than hidden.)*
+- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). Constant-energetics physical-space forcing
+  methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden
+  flows. *Phys. Fluids* **28**, 035114. <https://doi.org/10.1063/1.4944629>
+  *(`VarianceController`: the constant-``k`` controller of their Eq. 20, the marginal law
+  ``A = \varepsilon/2k`` plus a proportional restoring term, giving exponential relaxation to a stable
+  attractor. The smooth, gain-limited replacement for the discontinuous projection above.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
   Molecular dynamics with coupling to an external bath. *J. Chem. Phys.* **81**, 3684–3690.
   <https://doi.org/10.1063/1.448118> *(The thermostat whose deterministic-rescaling limit
-  `BandRescaling` is; named there and now cited.)*
+  `VarianceRescaling` is; named there and now cited.)*
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.
   *J. Chem. Phys.* **126**, 014101. <https://doi.org/10.1063/1.2408420> *(Stochastic velocity rescaling; its deterministic limit is the
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
-  the caveat `BandRescaling` carries.)*
+  the caveat `VarianceRescaling` carries.)*
 - Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. <https://doi.org/10.1016/0021-9991(80)90033-9> *(The
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry

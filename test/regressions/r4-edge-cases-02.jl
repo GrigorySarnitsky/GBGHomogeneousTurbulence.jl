@@ -1,10 +1,10 @@
-# Witness: a negative `target` handed to `BandRescaling` must be handled at the front door, not by an
+# Witness: a negative `target` handed to `VarianceRescaling` must be handled at the front door, not by an
 # internal `sqrt` of a negative ratio.
 #
 # `target` is a kinetic energy (velocity) or a scalar variance (scalar); both are non-negative by
 # definition, so a negative value is not a physical setting. The constructor
 # (src/Forcing.jl:311) validates `over in (:band, :total)` but stores `target` unchecked. In
-# `apply_forcing!` the `:total` branch clamps with `max(zero(band_value), …)` (src/Forcing.jl:326),
+# `project_forcing!` the `:total` branch clamps with `max(zero(band_value), …)` (src/Forcing.jl:326),
 # so it can never aim at a negative band value; the `:band` branch (line 328) passes `forcing.target`
 # through unclamped and `scale = sqrt(target_band / band_value)` (line 330) then takes the square
 # root of a negative number.
@@ -21,14 +21,14 @@ using GBGPeriodicFields: convolve!
 using Random
 
 
-# Run the whole `BandRescaling` episode and classify the outcome:
+# Run the whole `VarianceRescaling` episode and classify the outcome:
 #   :rejected  — refused at construction with an ArgumentError (a front-door rejection)
 #   :completed — the rescale ran to completion
 #   the exception itself — anything else escaped
 function band_rescaling_outcome(domain, û, target, over)
   try
-    forcing = BandRescaling(domain; target = target, over = over)
-    apply_forcing!(forcing, û, domain)
+    forcing = VarianceRescaling(domain; target = target, over = over)
+    project_forcing!(forcing, û, domain)
     return :completed
   catch err
     return err isa ArgumentError ? :rejected : err
@@ -36,7 +36,7 @@ function band_rescaling_outcome(domain, û, target, over)
 end
 
 
-@testset "BandRescaling rejects a negative `target` instead of taking sqrt of a negative ratio" begin
+@testset "VarianceRescaling rejects a negative `target` instead of taking sqrt of a negative ratio" begin
   N, L, T = 24, 2π, Float64
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_type = Array)
@@ -49,11 +49,11 @@ end
   end
 
   # Precondition: the default band (shells 1–2) really is seeded, so the empty-band early return of
-  # `apply_forcing!` does not fire and the `sqrt` line is genuinely reached.
+  # `project_forcing!` does not fire and the `sqrt` line is genuinely reached.
   @testset "the default band carries energy, so the rescale is not short-circuited" begin
     û = seeded_velocity()
     scratch = new_vector_field_spectral(domain)
-    band = BandRescaling(domain; target = 1.0, over = :band).band
+    band = VarianceRescaling(domain; target = 1.0, over = :band).band
     @test kinetic_energy(convolve!(scratch, û, band)) > 0
   end
 

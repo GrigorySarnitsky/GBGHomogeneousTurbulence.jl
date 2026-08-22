@@ -3,7 +3,7 @@
 # `prepare_forcing!` is reached once per timestep from `step!` via `Generator.prepare!`
 # (src/Generator.jl:267, called at src/Propagator.jl:268 and :374), i.e. it sits on the hot loop the
 # package declares in-place and allocation-free over preallocated buffers. Every other forcing hook
-# (Linear/ConstantPower `set_forcing_rate!`, BandRescaling `apply_forcing!`) meets that contract.
+# (Linear/ConstantPower `set_forcing_rate!`, VarianceRescaling `project_forcing!`) meets that contract.
 # `StochasticOU` owns preallocated noise scratch (`noise_physical`, `noise_spectral`) yet fills it
 # from a freshly allocated host `randn(ou.rng, T, dims...)` on EVERY call (src/Forcing.jl:505) —
 # a full physical-vector host array per step, and on a device backend an implicit host→device copy.

@@ -65,7 +65,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin
     conditions = FlowConditions(viscosity = ν,
-                      velocity_forcing = BandRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
+                      velocity_forcing = VarianceRescaling(domain; target = 0.5, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
     scheme = IFLowStorageRK3()
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)
@@ -101,5 +101,48 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     @test recommended_cfl(IFLowStorageRK3(), domain) > recommended_cfl(IFRK2(), domain)
     @test 0 < recommended_cfl(IFRK2(), domain) < 1
     @test 0 < recommended_cfl(IFLowStorageRK3(), domain) < 1
+  end
+end
+
+# The gap that let a first-order default ship undetected for as long as it did: every temporal
+# convergence test above uses `NoForcing()`, so the one configuration a user actually gets was the
+# only one never measured. A forcing whose rate depends on the state, folded into the integrating
+# factor, evaluates ∫A dt by a left-endpoint rectangle rule and collapses the scheme to first order —
+# and nothing here would have said so. Measured before the fix: ConstantPower 1.018, the front-door
+# default 1.023, against 2.995 unforced.
+#
+# `VarianceRescaling` is deliberately included AT first order. It is the reference implementation of
+# Sullivan-Mahalingam-Kerr (1994), a post-step projection, and Lie-Trotter splitting is first order by
+# construction — so the assertion pins the caveat rather than a defect. If someone routes it through
+# the rate or source hook, this test fails and asks them to update the documented caveat with it.
+@testset "the scheme keeps its order under forcing, and the one exception is pinned" begin
+  T = 0.2
+  function measured_order(forcing)
+    reference = nothing; errors = Float64[]
+    for n in (1024, 32, 64)
+      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scheme = IFLowStorageRK3(),
+                       velocity_forcing = forcing, rng = MersenneTwister(7))
+      for _ in 1:n; advance!(sim; dt = T / n); end
+      data = copy(field_data(sim.state.velocity_spectral))
+      n == 1024 ? (reference = data) : push!(errors, maximum(abs, data .- reference))
+    end
+    return log2(errors[1] / errors[2])
+  end
+
+  @testset "third order — the rate and source routes" begin
+    for (name, forcing) in (("unforced", NoForcing()),
+                            ("Linear (steady rate → integrating factor)", Linear(rate = 0.5)),
+                            ("ConstantPower (state-dependent → per-stage source)",
+                             ConstantPower(injection_rate = 0.2)),
+                            ("VarianceController (state-dependent → per-stage source)",
+                             VarianceController(target = 1.5)))
+      order = measured_order(forcing)
+      @info "temporal order" forcing = name order
+      @test order ≥ 2.5
+    end
+  end
+
+  @testset "first order — the projection route, as documented" begin
+    @test measured_order(VarianceRescaling(target = 1.5, over = :total)) < 1.5
   end
 end

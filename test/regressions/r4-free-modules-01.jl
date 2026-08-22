@@ -1,17 +1,17 @@
-# Witness: BandRescaling(:total) computes the whole-field observable `inner(field, field)` TWICE per
-# `apply_forcing!` call — once as the eager second argument of `_band_is_empty` (src/Forcing.jl:322)
+# Witness: VarianceRescaling(:total) computes the whole-field observable `inner(field, field)` TWICE per
+# `project_forcing!` call — once as the eager second argument of `_band_is_empty` (src/Forcing.jl:322)
 # and again at line 325 — with no mutation of `field` in between. Each is a field-scale quadratic
 # reduction whose scalar result crosses to the host (a blocking device-to-host transfer on a GPU),
 # in the hot loop of the DEFAULT run configuration.
 #
 # The correct behaviour asserted here: ONE whole-field reduction per call — which is also exactly
 # what `test/optimality_audit.jl`'s frozen SYNC_LEDGER prices for the default row
-# ("default (adaptive dt, BandRescaling :total)", achieved = 3 = 1 max-speed + band + total).
+# ("default (adaptive dt, VarianceRescaling :total)", achieved = 3 = 1 max-speed + band + total).
 
 using Test
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, new_scalar_field_spectral
-using GBGIsotropicTurbulence.Forcing: BandRescaling, ConstantPower, apply_forcing!, set_forcing_rate!
+using GBGIsotropicTurbulence.Forcing: VarianceRescaling, ConstantPower, project_forcing!, set_forcing_rate!
 using GBGIsotropicTurbulence.State: random_solenoidal_velocity_spectral!
 using GBGPeriodicFields
 using Random
@@ -56,15 +56,15 @@ function seeded_field()
 end
 
 # ── The ledger survey, printed (not asserted): the relative emptiness floor of `_band_is_empty`
-# makes EVERY BandRescaling and ConstantPower call reduce the WHOLE field, which neither
+# makes EVERY VarianceRescaling and ConstantPower call reduce the WHOLE field, which neither
 # `test/optimality_audit.jl`'s `_syncs` (:band → 1 crossing, :power → 1 crossing) nor
 # `test/compute_audit.jl`'s `_forcing_pass_delta` (:band → 3 field-scale passes, with no
 # :band / :total distinction) models. Printed rather than asserted because the right number for
 # these two rows depends on which way the divergence is closed — the guard's scale or the ledger.
 let cf = seeded_field()
   reset_counts!()
-  apply_forcing!(BandRescaling(domain; target = 1.5, over = :band), cf, domain)
-  @info "measured: BandRescaling(over = :band)" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1
+  project_forcing!(VarianceRescaling(domain; target = 1.5, over = :band), cf, domain)
+  @info "measured: VarianceRescaling(over = :band)" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1
 end
 let cf = seeded_field()
   rate = new_scalar_field_spectral(domain)
@@ -74,12 +74,12 @@ let cf = seeded_field()
 end
 
 
-@testset "BandRescaling(:total) reduces the whole field once per step, not twice" begin
+@testset "VarianceRescaling(:total) reduces the whole field once per step, not twice" begin
   cf = seeded_field()
-  forcing = BandRescaling(domain; target = 1.5, over = :total)
+  forcing = VarianceRescaling(domain; target = 1.5, over = :total)
 
   reset_counts!()
-  apply_forcing!(forcing, cf, domain)
+  project_forcing!(forcing, cf, domain)
 
   # The band observable — one fused weighted reduction over the field.
   @test COUNTS[:weighted_inner] == 1
