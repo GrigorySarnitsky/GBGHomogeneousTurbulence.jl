@@ -33,7 +33,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (21 hats)
+## The panel (23 hats)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -62,6 +62,25 @@ self-containedness and structure without the design docs as a crutch.
 | 19 | `quantifier-auditor` | every *every / all / none / only* checked member-by-member against its set | FULL |
 | 20 | `fossil-and-drift` | the ONLY hat with history — claims orphaned by a rename, twin copies that diverged | repo + git |
 | 21 | `pf-parity` | divergences from the sibling package PF that were never deliberately decided | FULL + PF clone |
+| 22 | `logician` | defective **inference and definition** — circularity, equivocation, non sequitur, **unfalsifiability** | FULL |
+| 23 | `conceptual-clarity` | identity & category confusions in the **non-physics** prose — two nouns for one thing, clock vs reading | FULL |
+
+**Why the logician is an anchor, and why there is no "philosopher".** `consistency-matrix` finds
+contradictions *between* statements; the logician finds defective inference and definition *inside*
+one — a different object. Its sharpest test is *what observation would refute this?*, and the package
+has already paid for a miss of exactly that kind: decision 37's liveness bound declared the
+observation charts live and therefore could not fail, and the suite asserted it as though it were a
+measurement, hiding two physical vectors. **A bound that cannot fail is not a bound.** That is subtle
+instinct with no downstream verifier, which is the anchor criterion.
+
+A broad *philosopher* hat was considered and **declined for this panel**. Its strongest question —
+is the Mori–Zwanzig framing load-bearing or ornamental? — is already answered in `ARCHITECTURE.md` §8
+("nothing in the numerics is load-bearing on the subordinate lenses"), and re-opening a recorded
+decision is against the discipline. What survived the narrowing is `conceptual-clarity`, scoped to the
+one uncovered residue: the physics hats own category errors in the *physics*, and nobody owned the
+same class in the machinery prose — where the owner's own read-through found *stamp* vs *epoch* (two
+names for one integer) and *epoch* vs *iteration*, neither of which any hat produced. The hat is named
+for the job rather than the discipline, so it is not invited to write essays.
 
 **The two free readers run FIRST, and that ordering is a measurement, not a preference.** Run order
 is priority order because a token-out truncates the tail. `/bug-hunt` ran eight class lanes and two
