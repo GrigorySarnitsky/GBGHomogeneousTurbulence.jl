@@ -134,9 +134,10 @@ dissipation rate ``\\varepsilon`` — nearly Reynolds-number-independent. The au
 handle names the dataset's source — Li et al. (2008) is the JHTDB paper — while the value is this
 package's own reduction of that database's forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``), consistent with higher-Reynolds-number
 periodic-box DNS. The calibration is that single point: a low-Reynolds-number box — the small grids
-a smoke test reaches — uses this constant as an **extrapolation**, and its `Reference` records no
-validity floor because none has been measured; the grid-mode ``\\nu`` solve that consumes the law
-inherits the same standing.
+a smoke test reaches — uses this constant as an **extrapolation**. Its `Reference` records a
+conservative validity floor of ``\\mathrm{Re}_\\lambda = 100`` below the calibration point;
+`Reference`'s advisory-only contract still applies, and the grid-mode ``\\nu`` solve that consumes
+the law inherits the same standing.
 
 The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)`
 returns it. Inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the

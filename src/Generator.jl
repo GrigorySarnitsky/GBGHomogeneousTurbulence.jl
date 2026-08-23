@@ -53,8 +53,8 @@ export FlowConditions, ResolvedGenerator,
 
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
 with the box in units where ``u' = L = 1`` this is ``\\mathrm{Re} = 1/\\nu``; on the shipped
-defaults (``u' = 1``, ``L = 2\\pi``) the box-scale value is ``2\\pi/\\nu``, and the integral-scale one
-smaller again), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
+defaults (``u' = 1``, ``L = 2\\pi``) the box-scale value is ``2\\pi/\\nu``, and the Reynolds number
+built on the integral scale is smaller still), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both
 [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing)).
@@ -306,7 +306,8 @@ you.
 !!! note "One optimization crosses two verbs"
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
     stage's `scalar_rhs!` to reuse, recorded as the identity of the `û` it was taken of rather than
-    either signature. It is opportunistic, never load-bearing: a `scalar_rhs!` handed a different `û`
+    either signature. The record half is opportunistic, never load-bearing — a false record can only
+    force a redundant rebuild, with the same value: a `scalar_rhs!` handed a different `û`
     than the recorded one rebuilds the displaced velocity itself, value-identically.
 
 # Fields

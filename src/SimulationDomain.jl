@@ -46,10 +46,9 @@ ceiling. They come in two families: a **mask** strategy
 acts on the assembled product alone, while a **shift** strategy also changes how that product is
 evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
-truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). Which one a run gets by
-default is decided by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
-constructor that builds a whole run from a few keywords — the **front door** — and not by this
-catalogue.
+truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The default is chosen
+by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
+constructor that builds a whole run from a few keywords — the **front door**.
 """
 abstract type DealiasingStrategy end
 

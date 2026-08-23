@@ -535,7 +535,8 @@ end
 
 Advance `sim` by one timestep in place and return it. Pass `dt` to force a fixed step; with
 `dt = nothing` the step is adaptive — the smallest of the advective-CFL value for the current
-velocity, the longest mode's diffusive-decay time (the box-and-diffusivity cap), and `max_dt`.
+velocity, the longest mode's diffusive-decay time (the same diffusive-decay bound the `Simulation`
+docstring states), and `max_dt`.
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
 is readable when it returns. Advects the tracers, if any, under the run's chosen trajectory

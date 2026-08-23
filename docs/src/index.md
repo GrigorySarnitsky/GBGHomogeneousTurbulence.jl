@@ -101,9 +101,10 @@ Listed in build order — each module uses the ones above it. The
   observable, the vorticity recovery.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
-- [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the run:
-  a step plus the deposit that closes it) leaves the observables it produced, read through checked
-  accessors that serve the deposited value or throw. Nothing is ever recomputed on a read.
+- [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the
+  run; the notation page's vocabulary gives its full anatomy) leaves the observables it produced,
+  read through checked reads that serve the deposited value or throw. Nothing is ever recomputed on
+  a read.
 - [`Forcing`](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`,
   chosen independently for the velocity and the scalar.
 - [`Generator`](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes

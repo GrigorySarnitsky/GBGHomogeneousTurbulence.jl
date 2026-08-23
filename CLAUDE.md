@@ -197,6 +197,10 @@ line rather than a clause:
 - A type gets a bulleted **`# Arguments`** section when its keywords are independent settings, and
   folds them into prose when they must be read together (one keyword conditioning what another
   *means*, or several jointly naming one object). Independence is the discriminator, not count.
+- A **function** docstring documenting three or more arguments, or any keyword argument, uses the
+  bulleted form led by "The arguments are:"; with fewer, the arguments are bound in running prose.
+  Never mix the two within one docstring. (PF's numeric rule, adopted 2026-08-24 — the corpus
+  already practiced it unwritten, which is exactly how a convention drifts.)
   An `# Arguments` lead-in qualifier ("All keyword, all required:") appears only where it carries
   information beyond the entries themselves; a bare "All keyword:" over entries that show their own
   defaults says nothing and is omitted.

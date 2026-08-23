@@ -40,7 +40,8 @@ measured (it normalizes the eddy-turnover clock) but never gated on.
 None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
 band (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
-and the cubic skewness carries the slight residual its own docstring prices.
+and the cubic skewness carries a slight aliasing residual — its docstring states the per-strategy
+standing (priced for the sharp truncations, unpriced for `HouLi`'s taper).
 """
 module Observables
 

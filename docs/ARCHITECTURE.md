@@ -660,8 +660,8 @@ generalization is built for them until a second concrete case forces the abstrac
 - **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
   added to the RHS. *Built and validated, then archived* from the public surface — un-exported, and
   absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
-  increment is the one allocation-free exception
-  (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
+  increment is the one exception to the allocation-free hot loop
+  (invariant 4) — it allocates — so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
 - **Checkpoint / exact restart to HDF5 — the scheduled next capability.** Four of the five
   reference-practice audit lanes independently converged on its absence (2026-08-23), and it is the
   one missing piece for long production runs: persist the spectral state, the clock and timestep,
