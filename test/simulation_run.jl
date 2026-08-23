@@ -10,6 +10,7 @@ using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
 using Random
+using Logging
 using Test
 
 
@@ -292,5 +293,27 @@ end
     @test kinetic_energy(û) < 0.6
     for _ in 1:600; advance!(sim); end
     @test isapprox(kinetic_energy(û), 1.5; rtol = 0.1)
+  end
+
+
+  @testset "the constructor warns when the scalar is clearly under-resolved, and only then" begin
+    # Grid mode resolves the VELOCITY at κ_max·η; a scalar at Sc > 1 lives down to η_B = η/√Sc, so
+    # the same grid resolves it worse by √Sc. The check fires when the run's actual κ_max·η_B falls
+    # below 1.5 — the same floor the docstring calls well-resolved for the velocity — which at the
+    # grid-mode default κ_max·η = 2 means Sc > (2/1.5)² ≈ 1.78. It must fire in BOTH ν modes, and
+    # never without a scalar: the defect it closes was a wrong `scalar_dissipation` with no signal.
+    fires(; kw...) = begin
+      buf = IOBuffer()
+      Logging.with_logger(Logging.SimpleLogger(buf, Logging.Warn)) do
+        Simulation(grid_points_per_axis = 16; kw...)
+      end
+      occursin("under-resolved", String(take!(buf)))
+    end
+    @test !fires(; scalar = true)                                       # Sc = 1: resolved
+    @test !fires(; scalar = true, schmidt = 1.5)                        # κ_max·η_B ≈ 1.63: above floor
+    @test fires(; scalar = true, schmidt = 2.0)                         # ≈ 1.41: below floor
+    @test fires(; scalar = true, schmidt = 7.0)                         # ≈ 0.76: clearly under-resolved
+    @test !fires(; schmidt = 7.0)                                       # no scalar, nothing to resolve
+    @test fires(; scalar = true, schmidt = 7.0, viscosity = 0.08)       # explicit ν is checked too
   end
 end

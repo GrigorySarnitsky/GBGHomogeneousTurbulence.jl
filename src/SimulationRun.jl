@@ -118,13 +118,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
-  ``\\varkappa = \\nu/\\mathrm{Sc}``). **Grid mode resolves the velocity, not the scalar.** It sets
-  ``\\nu`` from ``\\kappa_{\\max}\\eta``, and at ``\\mathrm{Sc} > 1`` the scalar's cutoff is the
-  finer Batchelor scale ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}``, so the scalar is under-resolved by
-  ``\\sqrt{\\mathrm{Sc}}`` on the same grid and `scalar_dissipation` then measures a truncated field.
-  This package targets ``\\mathrm{Sc} = O(1)`` and carries no Batchelor-range machinery; for
-  ``\\mathrm{Sc}`` appreciably above 1, raise `κ_max_η` by ``\\sqrt{\\mathrm{Sc}}`` or set `viscosity`
-  yourself. Nothing enforces this — the value is accepted as given.
+  ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
+  scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
+  ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
+  grid, with `scalar_dissipation` then measuring a truncated field. The package targets
+  ``\\mathrm{Sc} = O(1)``, with no Batchelor-range machinery. The constructor **warns** when the
+  run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — a warning, not an
+  error, so a deliberately under-resolved scalar stays reachable but not silent; the remedy is
+  `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `VarianceController` driving the
@@ -343,6 +344,32 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = _materialize_forcing(velocity_forcing, domain),
                     scalar_forcing = _materialize_forcing(scalar_forcing, domain))
+  # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
+  # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).
+  # The velocity's criterion does not cover it. ν was chosen (grid
+  # mode) or given (explicit mode) against the VELOCITY cutoff κ_max·η, but a scalar at Sc > 1 lives
+  # down to the finer Batchelor scale η_B = η/√Sc, so the same grid resolves it worse by √Sc and
+  # `scalar_dissipation` then measures a truncated field. Both modes know ν and the stationary ε
+  # estimate here, so the actual κ_max·η_B is computable and is CHECKED rather than left to a
+  # docstring bullet the reader may skip. The floor is the same 1.5 the docstring calls
+  # well-resolved for the velocity — below it the scalar is clearly under-resolved, and the warning
+  # carries the measured numbers and the remedies. A warning, never an error: the value stays legal
+  # (a deliberately under-resolved scalar is a legitimate experiment), it just cannot be silent.
+  if scalar
+    η = (ν^3 / ε)^(1//4)
+    κ_max_η_B = max_wavenumber(domain) * η / sqrt(schmidt)
+    if κ_max_η_B < 1.5
+      @warn "Simulation: the scalar is under-resolved — κ_max·η_B = $(round(κ_max_η_B, digits = 2)) " *
+            "against the well-resolved floor of 1.5. The grid resolves the velocity " *
+            "(κ_max·η = $(round(max_wavenumber(domain) * η, digits = 2))), but at Sc = $(schmidt) " *
+            "the scalar's Batchelor scale η_B = η/√Sc is finer by √Sc, and `scalar_dissipation` " *
+            "will measure a truncated field. Raise `κ_max_η` by √Sc, lower `schmidt`, or set " *
+            "`viscosity` yourself if the truncation is deliberate. (η here uses the stationary " *
+            "dissipation estimate at the requested `kinetic_energy`; a decaying run resolves " *
+            "better than this as it decays.)"
+    end
+  end
+
 
   state = ResolvedFields(domain; scalar)
   ic_spectrum = nothing
