@@ -265,6 +265,19 @@ end
 _cutoff_wavenumber(strategy, N, L, ::Type{T}) where {T} =
   T(_retained_nyquist_fraction(strategy)) * T(N / 2) * T(2π / L)
 
+# Both sharp masks keep the CLOSED ball — boundary shell included — and that is EXACT for this
+# formulation, not an oversight. The textbook worry: at cutoff N/3, a product of two boundary modes
+# can alias back into the ball (N/3 + N/3 → −N/3). Expanded for THIS discretization, the only pair
+# whose image lands inside the ball is the axis self-pair (N/3,0,0)+(N/3,0,0) — every other boundary
+# pair either does not wrap past Nyquist or lands outside the mask — and that image is a PURE
+# GRADIENT (the single-mode Lamb vector is ∇(|u|²/2), and its alias stays gradient-shaped), which
+# the Leray projection annihilates exactly; the scalar's aliased flux is transverse to its
+# wavevector, so the divergence kills it the same way. Demonstrated against a 2N zero-padded oracle
+# at N = 12 (3|N, every stored boundary mode populated): the closed ball matches to 1.5e-16 ON the
+# boundary shell — the regression test pins it. A strict edge (√(N²−1)/3, after TurTLE) was tried
+# 2026-08-23 and REVERTED: it buys no exactness here and shrinks the band; the references cut
+# strictly below for their own formulations. PhaseShift's closed ball at √2·N/3 is likewise
+# oracle-exact — the shift-average cancels the single-alias images outright.
 _build_dealias(strategy::Union{TwoThirds, PhaseShift}, reference, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(reference, multipliers, _cutoff_wavenumber(strategy, N, L, T))
 

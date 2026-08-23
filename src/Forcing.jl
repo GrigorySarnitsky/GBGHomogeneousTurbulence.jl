@@ -263,7 +263,17 @@ add_forcing_source!(::AbstractForcing, N̂, field, domain::FixedDomain, diffusiv
 
 
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
+# The shell arguments are validated HERE, once for all four band forcings, so the thrown message
+# names the argument the caller typed — the backend's own guard fires on the padded band edges
+# ("band edges must satisfy 0 <= low", with our −0.5 padding visible), which reads as internals.
 function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
+  lowest >= 1 ||
+    throw(ArgumentError("`lowest_shell` must be at least 1, got $lowest: shell 0 is the mean " *
+                        "(κ = 0) mode, which a band forcing cannot legitimately drive — it carries " *
+                        "the box's total momentum (or the scalar's mean), not turbulence"))
+  highest >= lowest ||
+    throw(ArgumentError("`highest_shell` must be at least `lowest_shell`, got $highest < $lowest: " *
+                        "the band would be empty and the forcing would silently do nothing"))
   k0 = 2π / domain.grid.domain_size[1]
   return spectral_band(new_scalar_field_spectral(domain), domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
 end
