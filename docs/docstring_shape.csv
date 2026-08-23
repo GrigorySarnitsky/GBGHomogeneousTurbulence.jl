@@ -1,6 +1,6 @@
 key,longest_paragraph_words,admonitions,total_words
 Cache.jl::Cache,116,0,317
-Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing),71,1,702
+Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing， history_depth = 1),71,1,705
 Cache.jl::deposit_sample!(cache),75,0,141
 Cache.jl::fields_modified!(cache),57,0,199
 Cache.jl::particle_velocities(cache),87,0,88
@@ -15,7 +15,7 @@ Forcing.jl::Forcing,77,0,305
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,171
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
-Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,81,1,468
+Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,81,1,471
 Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,674
 Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,212
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
@@ -80,7 +80,7 @@ Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,54,0,164
 Propagator.jl::deposit!(cache， state， domain， buffers),111,0,323
-Propagator.jl::recommended_cfl(scheme， domain),87,1,436
+Propagator.jl::recommended_cfl(scheme， domain),87,1,429
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,319
 Scalings.jl::Li2008(; dissipation_group = 0.9),67,0,246
 Scalings.jl::Phenomenology.Scalings,10,0,82
