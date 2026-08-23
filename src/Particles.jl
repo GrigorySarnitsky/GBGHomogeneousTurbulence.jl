@@ -291,9 +291,11 @@ restart!(::EndpointHeun, buffers::ParticleIntegratorBuffers) = buffers
 """
     AdamsBashforth(; order = 4)
 
-Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at its
-default order — buying accuracy in time at **no extra field evaluation and no extra interpolation**
-per step.
+Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
+its default order (Lalescu et al. 2022, *An efficient particle tracking algorithm for large-scale
+parallel pseudo-spectral simulations of turbulence*, *Comput. Phys. Commun.* **278**, 108406,
+[doi:10.1016/j.cpc.2022.108406](https://doi.org/10.1016/j.cpc.2022.108406)) — buying accuracy in
+time at **no extra field evaluation and no extra interpolation** per step.
 
 Use it in place of [`EndpointHeun`](@ref) when trajectory accuracy in time limits a measurement. Heun
 buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
@@ -331,12 +333,6 @@ produce.
     floor is what limits you; smoothness buys something different, namely readouts that
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
     [doi:10.1016/j.jcp.2010.04.006](https://doi.org/10.1016/j.jcp.2010.04.006)).
-
-Reference: TurTLE's tracer scheme (Lalescu et al. 2022,
-*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of
-turbulence*, *Comput. Phys. Commun.* **278**, 108406,
-[doi:10.1016/j.cpc.2022.108406](https://doi.org/10.1016/j.cpc.2022.108406)), whose default is the
-four-step method.
 
 # Fields
 The plain constructor `AdamsBashforth(order)` takes the one field directly:

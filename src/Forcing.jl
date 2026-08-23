@@ -31,23 +31,16 @@
 """
     Forcing
 
-The interchangeable energy-injection strategies:
-- [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle below.
+The interchangeable energy-injection strategies — one implementation each serving both the velocity
+and the scalar through tensor-order-generic field operators. A strategy acts on the step through up
+to four hook methods, each defaulting to doing nothing, called in the order listed:
 
-A strategy acts on the step through up to four methods, each defaulting to doing nothing, listed in
-the order the step calls them:
+- [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
 - [`prepare_forcing!`](@ref) — advance the forcing's own internal state, once per step.
 - [`set_forcing_rate!`](@ref) — supply a *steady* linear rate, folded into the integrating factor;
   [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
-
-[`DeferredForcing`](@ref) is the operator-free keyword form of a strategy, materialized once the
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain — a
-construction-time object, not a lifecycle hook.
-
-The strategies, one implementation each serving both the velocity and the scalar through
-tensor-order-generic field operators:
 - [`NoForcing`](@ref) — leave the field undriven.
 - [`Linear`](@ref) — a fixed linear rate on a **band**, an annulus of integer Fourier shells (the
   convention every strategy shares).
@@ -55,6 +48,9 @@ tensor-order-generic field operators:
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
 - [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
   deterministic rescaling, at first order.
+- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
+  [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain; a
+  construction-time object, not a lifecycle hook.
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
@@ -341,8 +337,9 @@ energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for 
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
 to the field being a vector.
 
-`over` selects *where* that target applies, and the two differ in which quantity a run may no longer
-measure:
+`over` selects *where* that target applies — it is required, since a deterministic clamp destroys
+the physical fluctuation of whatever it holds and no default is right for every run — and the two
+modes differ in which quantity a run may no longer measure:
 
   * `:band` holds the band's own value. The whole-field value then floats, oscillating about its mean
     as the band feeds the cascade. On the default shells 1–2 — the energy-containing range — most of
@@ -359,14 +356,6 @@ calibration stops holding. Where nothing calibrates against it, `:band` is the g
 
 Sizing the rescale reduces the field to a number, so each step blocks on a device-to-host transfer —
 two under `:total`, which measures the band and the whole field.
-
-# Arguments
-- `domain` — the `FixedDomain` the band is built on.
-- `target` — the value of the held observable, as selected by `over`.
-- `over` — `:band` or `:total`, the two modes contrasted above. Required: a deterministic clamp
-  destroys the physical fluctuation of whatever it holds, and no default is right for every run.
-- `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
-  box's fundamental ``2\\pi/L``.
 
 !!! warning "First order in time, and two extremes worth knowing"
     This is the one forcing that costs the scheme its order, by construction rather than by defect:

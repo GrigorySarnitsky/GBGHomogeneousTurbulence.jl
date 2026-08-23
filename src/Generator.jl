@@ -572,7 +572,7 @@ Since the multiplier is the exponential of a radial symbol plus the armed per-mo
 applies it through the backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
-The return is a named tuple `(; coefficient, offset_scale, offset)` — exactly the arguments that
+Returns a named tuple `(; coefficient, offset_scale, offset)` — exactly the arguments that
 fused exponential takes:
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
 ``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed

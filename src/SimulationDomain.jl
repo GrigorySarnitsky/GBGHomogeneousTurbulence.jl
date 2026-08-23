@@ -181,10 +181,11 @@ wide = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
                      dealiasing = HouLi(), element_type = Float64, array_type = Array)
 ```
 
-Nothing here defaults: the grid, the box, the aliasing control, the precision and the storage backend
-are each a decision about the run, and the
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
-convenience constructor supplies them for you when you do not want to.
+!!! note "Nothing here defaults"
+    The grid, the box, the aliasing control, the precision and the storage backend are each a
+    decision about the run; the
+    [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) convenience constructor
+    supplies them for you when you do not want to make them.
 
 # Fields
 The machinery types below are [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl)

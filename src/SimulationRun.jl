@@ -96,6 +96,48 @@ kinetic energy to the value given by the
 [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword and holds it
 there — and the viscosity is chosen from the grid rather than supplied:
 
+  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with
+    the resolution criterion `κ_max_η`, in two steps.
+
+    First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
+    `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
+    ``k``, `side_length` the side ``L``, and ``G \\approx 0.9`` a dimensionless constant. ``G``
+    carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a
+    run is forced — so the estimate assumes forcing in the same low shells as the runs it was
+    calibrated on, and a forcing moved higher invalidates it.
+
+    Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
+    ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) and ``\\eta`` the Kolmogorov microscale. Since
+    ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the retained-Nyquist fraction,
+    `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default ``2/3`` rule.
+
+    !!! note "The criterion is not equally strict across dealiasing strategies"
+        It treats the whole retained band as clean signal — exact for `TwoThirds` and
+        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
+        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
+        rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
+        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.96\\Delta x`` for ``2/3``,
+        and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
+        higher on the same grid. Raise `κ_max_η` when comparing across strategies.
+
+    The grid and `κ_max_η` together fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
+    `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
+    are logged.
+
+    One precondition: the choice is self-consistent only if the run holds ``k`` near
+    `kinetic_energy`. The default `VarianceController` does, to the tolerance its gain sets — its
+    restoring term measures the whole-field ``k``, which is the quantity assumed here. Give the
+    velocity a forcing that lets ``k`` float, or one holding some *other* quantity (a
+    `VarianceRescaling(over = :band)` holds the band instead), and the ``\\nu`` chosen here no
+    longer matches the run.
+
+  * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
+    passing both raises an `ArgumentError` rather than dropping one — for a decaying
+    run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
+    forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
+    ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
+    law assumes.
+
 # Arguments
 
 All keyword except `domain` (below). The ones marked *(front door only)* configure the `FixedDomain` and are consumed by the first form;
@@ -183,47 +225,6 @@ the rest are forwarded to the `Simulation(domain; …)` form.
     with the gain setting its amplitude. For the free fluctuation of ``k``, force with fixed
     injection ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead.
 
-  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with
-    the resolution criterion `κ_max_η`, in two steps.
-
-    First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
-    `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
-    ``k``, `side_length` the side ``L``, and ``G \\approx 0.9`` a dimensionless constant. ``G``
-    carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a
-    run is forced — so the estimate assumes forcing in the same low shells as the runs it was
-    calibrated on, and a forcing moved higher invalidates it.
-
-    Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
-    ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) and ``\\eta`` the Kolmogorov microscale. Since
-    ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the retained-Nyquist fraction,
-    `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default ``2/3`` rule.
-
-    !!! note "The criterion is not equally strict across dealiasing strategies"
-        It treats the whole retained band as clean signal — exact for `TwoThirds` and
-        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
-        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
-        rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
-        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.96\\Delta x`` for ``2/3``,
-        and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
-        higher on the same grid. Raise `κ_max_η` when comparing across strategies.
-
-    The grid and `κ_max_η` together fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
-    `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
-    are logged.
-
-    One precondition: the choice is self-consistent only if the run holds ``k`` near
-    `kinetic_energy`. The default `VarianceController` does, to the tolerance its gain sets — its
-    restoring term measures the whole-field ``k``, which is the quantity assumed here. Give the
-    velocity a forcing that lets ``k`` float, or one holding some *other* quantity (a
-    `VarianceRescaling(over = :band)` holds the band instead), and the ``\\nu`` chosen here no
-    longer matches the run.
-
-  * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
-    passing both raises an `ArgumentError` rather than dropping one — for a decaying
-    run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
-    forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
-    ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
-    law assumes.
 # Examples
 The two ways in, and the two ways to set the Reynolds number:
 
@@ -776,7 +777,6 @@ rescale, driven toward its target by the default controller, ringing under fixed
 flatness would certify the forcing, not the flow.
 
 # Arguments
-All keyword:
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).

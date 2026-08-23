@@ -197,6 +197,9 @@ line rather than a clause:
 - A type gets a bulleted **`# Arguments`** section when its keywords are independent settings, and
   folds them into prose when they must be read together (one keyword conditioning what another
   *means*, or several jointly naming one object). Independence is the discriminator, not count.
+  An `# Arguments` lead-in qualifier ("All keyword, all required:") appears only where it carries
+  information beyond the entries themselves; a bare "All keyword:" over entries that show their own
+  defaults says nothing and is omitted.
 - An **`# Examples`** section appears where construction is non-obvious, not on every type — hence
   none on the types a run builds for the user, and one on `FixedDomain`, `Simulation`, `Tracers`,
   `FlowParameters`.
@@ -206,7 +209,9 @@ line rather than a clause:
   arrow, and sits **before** any caveat admonition. A *pure* function needs none; the exception is a
   return whose **shape** is not evident from the name (a named tuple), where the shape is stated.
 - A signature carries a **`-> Type` arrow** only where the return type is fixed by the signature; a
-  reduction returning *the field's own* element type says so in prose instead.
+  reduction returning *the field's own* element type says so in prose instead. A **mutator** may
+  instead carry **`-> arg`**, naming the argument it returns — the corpus-wide idiom — and then
+  needs no `Returns` sentence; arrow and sentence never both appear.
 - A **module map is identity → contents list → optional trailing remark**, in that order, with no
   essay before the list.
 
