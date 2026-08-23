@@ -401,6 +401,23 @@ function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)
 end
 
 
+
+# The κ = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY. The continuous
+# law is momentum (and scalar-mean) conservation on a periodic box: ⟨u×ω⟩ = 0 since u×ω is a
+# gradient plus a divergence, and ⟨∇·(uφ)⟩ = 0 outright. Discretely the identity holds only to
+# roundoff, and the mode has no restoring term — the Leray projection legitimately keeps constants
+# (ℙ(0) = I) and the integrating factor is exp(0) = 1 there — so the residual is integrated
+# undamped and, the flow being chaotic, grows at the Lyapunov rate: measured 3% of u′ after 3000
+# Float32 steps. Every reference DNS pins this mode. The zeroing sits BETWEEN the nonlinear
+# assembly and the forcing source on purpose: the exact law covers the advective term alone, so a
+# forcing that deliberately drives a mean remains expressible and honest. An O(1) write (three
+# complex numbers), below field scale — outside the pass ledgers by the same rule as the tracers'
+# M×3 reads.
+_zero_mean_mode!(f) = (_zero_mean_mode_data!(field_data(f)); f)
+_zero_mean_mode_data!(data::AbstractArray{T, 3}) where {T} = fill!(view(data, 1:1, 1:1, 1:1), zero(T))
+_zero_mean_mode_data!(data::AbstractArray{T, 4}) where {T} = fill!(view(data, 1:1, 1:1, 1:1, :), zero(T))
+
+
 """
     velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)
 
@@ -452,9 +469,14 @@ Returns `N̂`.
     [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
     to infer it. Only the spectral product scratch remains on the generator, and the operation
     allocates nothing.
+
+The advective term's ``\\kappa = 0`` mode is zeroed exactly
+(``\\langle\\boldsymbol{u}\\times\\boldsymbol{\\omega}\\rangle = 0`` holds discretely only to
+roundoff, and the mean mode has no viscous damping); the forcing source, added after, may carry a mean.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
+   _zero_mean_mode!(N̂);
    add_forcing_source!(generator.conditions.velocity_forcing, N̂, û, domain,
                        generator.conditions.viscosity))
 
@@ -598,11 +620,16 @@ Returns `N̂`.
     is only read. As in `velocity_rhs!`, the consumed argument is fixed by the physics rather than
     by its position in the signature, and is named for it. Only the spectral product scratch remains
     on the generator, and the operation allocates nothing.
+
+The advective term's ``\\kappa = 0`` mode is zeroed exactly
+(``\\langle\\nabla\\cdot(\\boldsymbol{u}\\varphi)\\rangle = 0`` holds discretely only to roundoff,
+and the mean of ``\\varphi`` has no diffusive damping); the forcing source, added after, may carry a mean.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain;
             displaced_velocity_current::Bool = false) =
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain,
                       displaced_velocity_current);
+   _zero_mean_mode!(N̂);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, φ̂, domain,
                        generator.conditions.viscosity / generator.conditions.schmidt))
 

@@ -1976,6 +1976,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     a construction test: seeded at ``k = 0.5`` against ``target = 1.5``, the marginal law must stay at
     0.5 — conservation *and* the absence of restoration, which no drift could fake.
 
+60. **(2026-08) The advective term's ``\kappa = 0`` mode is pinned to zero exactly; the forcing
+    source is added after the pin.** Found by a `/bug-hunt` witness: the mean mode is exactly
+    conserved by the continuous equations (``\langle\boldsymbol{u}\times\boldsymbol{\omega}\rangle = 0``
+    on a periodic box; ``\langle\nabla\cdot(\boldsymbol{u}\varphi)\rangle = 0``), but discretely the
+    identity holds only to roundoff, the Leray projection legitimately keeps constants
+    (``\mathbb P(0) = I``), and the integrating factor is ``\exp(0) = 1`` there — so the FFT residual
+    at ``\kappa = 0`` was integrated with no restoring term and, the flow being chaotic, grew at the
+    Lyapunov rate: measured 3% of ``u'`` after 3000 Float32 steps, a phantom uniform wind under every
+    Lagrangian statistic. The pin is an O(1) masked write in `velocity_rhs!` / `scalar_rhs!`, placed
+    **between** the nonlinear assembly and the forcing source: the exact law covers the advective
+    term alone, so a forcing that deliberately drives a mean stays expressible. The zeroing is
+    physics (a conservation law), not field machinery, which is why it lives here and is not a
+    `GBGPeriodicFields` raise — defining ``\mathbb P(0) = 0`` at the backend would encode momentum
+    conservation into a linear-algebra operator whose constant component genuinely belongs to its
+    divergence-free subspace. After the pin the witness's Float32 forced run holds
+    ``\langle\boldsymbol{u}\rangle = 0`` exactly for 1000 steps.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

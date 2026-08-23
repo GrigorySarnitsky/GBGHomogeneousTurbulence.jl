@@ -29,9 +29,9 @@ Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,537
 Generator.jl::finalize!(generator， state， domain),77,0,80
 Generator.jl::prepare!(generator， state， domain， dt),84,0,88
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
-Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,80,1,405
+Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,80,1,441
 Generator.jl::velocity_integrating_factor(generator， τ),86,0,206
-Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,407
+Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,442
 Observables.jl::Observables,110,0,270
 Observables.jl::derivative_skewness(û， domain),81,1,363
 Observables.jl::dissipation(ω， viscosity),97,1,294

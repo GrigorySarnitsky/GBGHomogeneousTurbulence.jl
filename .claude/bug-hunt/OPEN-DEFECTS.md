@@ -9,11 +9,14 @@ measured, not remembered.
 `r5-free-hot-path-01` and `r4-free-hot-path-01` — both now PASS. The two "first order" entries below
 are historical.
 
-**STILL LIVE (5):** `02-r5-aliasing-and-mutation-02` (FlowConditions positional constructor bypasses
+**STILL LIVE (4):** `02-r5-aliasing-and-mutation-02` (FlowConditions positional constructor bypasses
 all three guards), `r5-gpu-and-hot-loop-01` (step! per-call host allocation, invariant 4),
-`01-r5-free-modules-01` (κ=0 mode neither conserved nor damped), `r5-aliasing-and-mutation-01`
-(shared mutable StochasticOU couples two Simulations), `03-r5-free-hot-path-03` (deposit!'s
-scalar-pairing guard is one-sided).
+`r5-aliasing-and-mutation-01` (shared mutable StochasticOU couples two Simulations),
+`03-r5-free-hot-path-03` (deposit!'s scalar-pairing guard is one-sided).
+
+**CLOSED 2026-08-23 (decision 60):** `01-r5-free-modules-01` — the κ=0 mode is pinned exactly in
+both RHS assemblies, between the nonlinear term and the source; witness 9/9, filed as
+`test/regressions/r5-free-modules-01-mean-mode.jl`.
 
 ---
 
