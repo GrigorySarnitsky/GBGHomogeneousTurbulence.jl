@@ -141,6 +141,7 @@ A deferred forcing. The operator-free keyword constructors
     Linear(; rate, lowest_shell = 1, highest_shell = 2)
     ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
+    VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is materialized into the concrete
@@ -159,7 +160,8 @@ sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
                  velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Or build it directly, once the domain is in hand:
-domain = FixedDomain(; grid_points_per_axis = 64)
+domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(),
+                     element_type = Float64, array_type = Array)
 forcing = ConstantPower(domain; injection_rate = 0.1)
 ```
 
@@ -256,9 +258,10 @@ The alternative costs accuracy: a state-dependent rate frozen once per step is t
 rectangle rule on ``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order however good it is.
 Only a steady rate may go through [`set_forcing_rate!`](@ref).
 
-Each reduction costs one blocking device-to-host transfer, **at every stage** — three per stage for
-[`VarianceController`](@ref), one for [`ConstantPower`](@ref), where [`Linear`](@ref) pays none.
-That is the price of the order this route preserves.
+Measuring the state costs one blocking device-to-host transfer **at every stage** — a single fused
+multi-weight reduction answers [`VarianceController`](@ref)'s three weighted sums together,
+[`ConstantPower`](@ref) reads its band (and the empty-band floor's scale) the same fused way, and
+[`Linear`](@ref) pays none. That is the price of the order this route preserves.
 
 !!! warning "The source is accumulated, never assigned"
     Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
@@ -360,12 +363,14 @@ Neither is a default, because the right answer depends on what the run is calibr
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
 calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
-Sizing the rescale reduces the field to a number, so each step blocks on a device-to-host transfer —
-two under `:total`, which measures the band and the whole field.
+Sizing the rescale reduces the field to a number, so each step blocks on one device-to-host
+transfer: the band and whole-field observables ride a single fused traversal, in either mode.
 
 !!! warning "First order in time, and two extremes worth knowing"
     This is the one forcing that costs the scheme its order, by construction rather than by defect:
-    the rescale is applied *after* the step, which is Lie–Trotter operator splitting, and Lie–Trotter
+    the rescale is applied *after* the step, which is Lie–Trotter operator splitting — the step's
+    map and the rescale's map composed one after the other, a composition whose error is
+    ``O(\\Delta t)`` regardless of how accurate either map is alone — so it
     is first-order however good the scheme is. Measured on the third-order `IFLowStorageRK3`: **1.02**
     here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
     (A stochastic forcing is outside that comparison — it has no classical order to lose.)
@@ -521,6 +526,8 @@ struct ConstantPower{K, T} <: AbstractForcing
 end
 
 """
+    VarianceController(domain; target, gain = 1, turnover_time = nothing,
+                       lowest_shell = 1, highest_shell = 2)
     VarianceController(; target, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
 
@@ -547,7 +554,8 @@ instantaneous ``\\varepsilon`` makes ``\\mathrm{d}k/\\mathrm{d}t = 0``, so ``k``
 its initial value* and `target` never enters the rate. Every level is then a **neutral** equilibrium
 — the reinjection cancels the cascade's own restoring response, which [`ConstantPower`](@ref)'s
 fixed injection retains — so discrete integration bias accumulates uncorrected (about 1% of ``k``
-per 1000 steps, measured at ``24^3``), and nothing ever restores it.
+per 1000 steps, measured at ``24^3`` in `Float64`; a `Float32` run's roundoff bias is larger and
+unmeasured), and nothing ever restores it.
 
 The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held;
 ``k_f`` the forced band's, dividing out because the forcing injects only there. An empty band is
@@ -569,9 +577,10 @@ and gain-limited relaxation toward a target is Berendsen weak coupling (Berendse
   ``O(1-10)``, and the default sits at that range's gentle end so the controller perturbs the
   dynamics least. `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
-  (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``),
-  with ``\\varepsilon_\\infty`` the stationary estimate for this box — the same estimate the
-  grid-mode viscosity solve uses.
+  (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
+  Left at `nothing` it is computed for you from that formula, with ``\\varepsilon_\\infty`` the
+  stationary estimate for this box — the same estimate the grid-mode viscosity solve uses, so a run
+  that sets ``\\nu`` explicitly against a very different regime should pass its own value.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
 
 !!! note "The settling time, not the gain, is the physical parameter"
@@ -580,13 +589,13 @@ and gain-limited relaxation toward a target is Berendsen weak coupling (Berendse
 
 # Fields
 - `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
-- `target`, `gain`, `relaxation_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
+- `target`, `gain`, `turnover_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
 """
 struct VarianceController{K, T} <: AbstractForcing
   band::K
   target::T
   gain::T
-  relaxation_time::T
+  turnover_time::T
 end
 
 
@@ -655,7 +664,7 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
   # ε = D⟨|∇f|²⟩ = D·⟨f, |κ|²f⟩, the field's own dissipation at this stage. The factor is the same
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * dirichlet
-  restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time
+  restoring = forcing.gain * (whole_variance - forcing.target) / forcing.turnover_time
   amplitude = _band_is_empty(band, whole) ? 0.0 :
               (dissipation - restoring) / (2 * band_variance)
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))

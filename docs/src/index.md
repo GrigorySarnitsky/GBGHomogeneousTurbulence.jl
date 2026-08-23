@@ -47,11 +47,8 @@ run!(sim) do s                                # records what it wants, and decid
     current_time(s) < t_end
 end
 
-# One ITERATION is one advance: a step, then the DEPOSIT that closes it. A deposit writes the
-# observables the iteration has just computed into the cache, each recorded against the EPOCH — the
-# cache's staleness counter, advanced by every step and every announced mutation — of the state it
-# came from. The state is always current; the cache holds what the last deposit left, so its
-# reads are valid between iterations.
+# The state is always current; the cache serves what the last iteration's closing deposit
+# recorded (the epoch — the cache's freshness counter — is what a read is checked against).
 kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
 velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
 flow_parameters(sim)                          # the run's measured flow state
@@ -125,4 +122,5 @@ Listed in build order — each module uses the ones above it. The
   `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
-  the umbrella), designed to be extractable into a standalone package.
+  the umbrella), designed to be extractable into a standalone package. In the actual include order
+  this dependency-light leaf comes *first*; it is listed last here because a reader meets it last.

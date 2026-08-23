@@ -269,7 +269,7 @@ end
     k_whole = 0.5 * inner(û, û)
     k_band = 0.5 * inner_band(û, forcing.band)
     ε = ν * inner_kappa2(û, domain)
-    expected = (ε - forcing.gain * (k_whole - target) / forcing.relaxation_time) / (2 * k_band)
+    expected = (ε - forcing.gain * (k_whole - target) / forcing.turnover_time) / (2 * k_band)
 
     # Recover the amplitude the hook applied: N̂ = A·𝟙_band·û, so compare against A·(band-projected û).
     probe = new_vector_field_spectral(domain); copyto!(field_data(probe), field_data(û))
@@ -278,7 +278,7 @@ end
     @test isapprox(applied, expected; rtol = 1e-10)
 
     # The discriminating half: with k_whole ≠ k_band the two models differ, and they do here.
-    wrong = (ε - forcing.gain * (k_band - target) / forcing.relaxation_time) / (2 * k_band)
+    wrong = (ε - forcing.gain * (k_band - target) / forcing.turnover_time) / (2 * k_band)
     @test !isapprox(applied, wrong; rtol = 1e-3)
   end
 

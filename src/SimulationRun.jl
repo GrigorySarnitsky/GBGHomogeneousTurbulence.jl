@@ -165,9 +165,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
   grid, with `scalar_dissipation` then measuring a truncated field. The package targets
   ``\\mathrm{Sc} = O(1)``, with no Batchelor-range machinery. The constructor **warns** when the
-  run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — a warning, not an
-  error, so a deliberately under-resolved scalar stays reachable but not silent; the remedy is
-  `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
+  run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — in **either**
+  viscosity mode, since the check reads the resolved ``\\nu`` however it was obtained — a warning,
+  not an error, so a deliberately under-resolved scalar stays reachable but not silent; the remedy
+  is `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` defaults to a `VarianceController` driving the
@@ -179,15 +180,20 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
-  sets the integral scale of the *assumed state* that model is evaluated at.
+  sets the integral scale of the *assumed state* that model is evaluated at. Keep ``\\kappa_p`` well
+  below the dealias cutoff: a value near or above it concentrates the pre-rescale seed in shells
+  the mask holds empty, and no guard checks this — unlike a forcing band, which warns.
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
-  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in state, not a measurement of the field about to be seeded, so its
-  integral scale is `1/envelope_wavenumber` rather than the ``L_{11}`` the seeded field will have:
-  ``\\varepsilon`` from the
+  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in, not a
+  measurement of the field about to be seeded. The assumed state reads: ``\\varepsilon`` from the
   `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
-  that same energy, ``\\nu`` as resolved above, and the integral scale as `1/envelope_wavenumber`.
+  that same energy, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
+  (rather than the ``L_{11}`` the seeded field will actually have). Note the ``\\varepsilon`` half:
+  it is the *stationary forced* estimate, so on a decaying run — where the explicit-``\\nu`` advice
+  above exists precisely because that balance does not hold — the model's dissipation-range
+  placement inherits the same mismatch.
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
@@ -197,12 +203,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
-  time ``1/(D\\kappa_{\\min}^{2})``, built from the run's own diffusivity and box, and this. The advective
+  time ``1/(D\\kappa_{\\min}^{2})`` — with ``D`` the **larger** of the run's diffusivities (``\\nu``,
+  and ``\\varkappa = \\nu/\\mathrm{Sc}`` when a scalar rides), since the faster-diffusing field
+  decays first — and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
   annihilates every mode and the clock advances by a number that means nothing — and it is the
-  resolution bound that stops that, needing no constant from the caller. `max_dt` is for a ceiling
-  only the caller knows, since any *default* constant would be a claim about the velocity scale they
-  happened to choose.
+  diffusive-decay bound that stops that, needing no constant from the caller. `max_dt` is for a
+  ceiling only the caller knows, since any *default* constant would be a claim about the velocity
+  scale they happened to choose.
 - `integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
@@ -809,8 +817,8 @@ flatness would certify the forcing, not the flow.
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).
 - `gate_skewness` — also require the velocity-derivative skewness to have plateaued **and** reached
-  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal (as strict as
-  its floor: the default is permissive; raise `skew_floor` toward ``0.4`` when the run must be): a
+  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal, exactly as
+  strict as its floor (see `skew_floor` below): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
   ``S \\approx -0.5``. The skewness costs transforms, so it is measured on the criterion's own
   sampling interval — one sample per `window_turnovers / 40` of turnover time, giving about forty

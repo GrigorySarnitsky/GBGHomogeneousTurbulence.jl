@@ -1,23 +1,23 @@
 key,longest_paragraph_words,admonitions,total_words
-Cache.jl::Cache,114,0,315
-Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing， history_depth = 1),71,1,690
+Cache.jl::Cache,115,0,328
+Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing， history_depth = 1),71,1,720
 Cache.jl::deposit_sample!(cache),75,0,141
 Cache.jl::fields_modified!(cache),70,1,248
-Cache.jl::particle_velocities(cache),87,0,88
-Cache.jl::particles_modified!(cache),65,0,243
+Cache.jl::particle_velocities(cache),109,0,110
+Cache.jl::particles_modified!(cache),65,0,247
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
 Forcing.jl::AbstractForcing,86,1,303
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,404
-Forcing.jl::DeferredForcing,54,0,180
+Forcing.jl::DeferredForcing,54,0,205
 Forcing.jl::Forcing,59,0,317
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,171
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
-Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,81,1,528
-Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,628
-Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,209
+Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,92,1,581
+Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,658
+Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,226
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,113,0,119
@@ -32,8 +32,8 @@ Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
 Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,104,1,474
 Generator.jl::velocity_integrating_factor(generator， τ),87,0,207
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,442
-Observables.jl::Observables,119,0,279
-Observables.jl::derivative_skewness(û， domain),81,1,362
+Observables.jl::Observables,119,0,282
+Observables.jl::derivative_skewness(û， domain),81,1,412
 Observables.jl::dissipation(ω， viscosity),97,1,294
 Observables.jl::energy_spectrum(û， domain),66,0,177
 Observables.jl::integral_scale(û， domain),65,0,229
@@ -44,7 +44,7 @@ Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,119
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
-Particles.jl::AdamsBashforth(; order = 4),100,1,490
+Particles.jl::AdamsBashforth(; order = 4),100,1,506
 Particles.jl::EndpointHeun(),53,1,249
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,43,0,169
@@ -81,9 +81,9 @@ Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,86,0,208
 Propagator.jl::deposit!(cache， state， domain， buffers),88,0,300
-Propagator.jl::recommended_cfl(scheme， domain),87,1,429
+Propagator.jl::recommended_cfl(scheme， domain),90,1,433
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,319
-Scalings.jl::Li2008(; dissipation_group = 0.9),67,0,260
+Scalings.jl::Li2008(; dissipation_group = 0.9),105,0,308
 Scalings.jl::Phenomenology.Scalings,10,0,82
 Scalings.jl::ScalingLaw <: TurbulenceLaw,60,0,63
 Scalings.jl::Sreenivasan1995(; C_K = 1.5),59,0,95
@@ -103,9 +103,9 @@ SimulationDomain.jl::new_tensor_field_spectral(domain),18,0,19
 SimulationDomain.jl::new_vector_field_physical(domain),17,0,18
 SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,1832
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,1936
 SimulationRun.jl::SimulationRun,89,0,121
-SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,98,0,580
+SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,98,0,571
 SimulationRun.jl::advance!(sim; dt = nothing),46,0,81
 SimulationRun.jl::current_step(sim),85,0,100
 SimulationRun.jl::current_time(sim),6,0,7
@@ -118,22 +118,22 @@ Spectra.jl::ExponentialDissipation(β),45,0,168
 Spectra.jl::LargeScaleFactor,61,0,62
 Spectra.jl::ModelSpectrum(C_K， large_scale， dissipation),102,0,208
 Spectra.jl::ObukhovCorrsin1949(; C_OC = 0.67),113,0,146
-Spectra.jl::Pao1965(; C_K = 1.5),64,0,109
+Spectra.jl::Pao1965(; C_K = 1.5),64,0,98
 Spectra.jl::PaoDissipation(α),30,0,51
-Spectra.jl::Phenomenology.Spectra,78,0,222
-Spectra.jl::Pope2000(; C_K = 1.5， c_L = 6.78， p₀ = 2.0， c_η = 0.40， β = 5.2),46,0,113
+Spectra.jl::Phenomenology.Spectra,71,0,215
+Spectra.jl::Pope2000(; C_K = 1.5， c_L = 6.78， p₀ = 2.0， c_η = 0.40， β = 5.2),91,0,138
 Spectra.jl::PopeDissipation(c_η， β),49,0,80
 Spectra.jl::PopeLargeScale(c_L， p₀),53,0,85
 Spectra.jl::SaffmanDissipation(),85,0,86
 Spectra.jl::ScalarSpectrum <: TurbulenceLaw,27,0,30
 Spectra.jl::UnitDissipation(),26,0,27
 Spectra.jl::UnitLargeScale(),25,0,26
-Spectra.jl::VonKarman1948(; C_K = 1.5， c_L = 1.0),85,0,135
+Spectra.jl::VonKarman1948(; C_K = 1.5， c_L = 1.0),85,0,124
 Spectra.jl::VonKarmanLarge(c_L),44,0,64
 Spectra.jl::dissipation_factor(f， κη) -> Float64,27,0,31
 Spectra.jl::large_scale_factor(f， κL) -> Float64,54,0,58
 Spectra.jl::large_scale_length(f， fp) -> Float64,65,0,144
-State.jl::ResolvedFields(domain; scalar = false),67,0,114
+State.jl::ResolvedFields(domain; scalar = false),78,0,125
 State.jl::State,77,0,143
 State.jl::random_scalar_spectral!(φ̂， domain; scalar_variance， envelope_wavenumber，,75,1,293
 State.jl::random_solenoidal_velocity_spectral!(û， domain; kinetic_energy， envelope_wavenumber，,96,1,308

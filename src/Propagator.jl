@@ -603,17 +603,18 @@ formula degenerate: its ``0.25`` is an empirical margin rather than a computed l
     This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the
     grid — but `IFRK2`'s margin is the one value that depends on a quantity it cannot see.
     The same `0.25` is returned at every Reynolds number while the viscous damping it rests on
-    weakens as ``\\nu`` falls, and there is no code-level guard for this, and adding one would mean
-    giving a grid-and-scheme property a physics argument; the practical course at high Reynolds
-    number is to prefer `IFLowStorageRK3`, whose ceiling has no such dependence, or to pass
-    an explicit `cfl` and verify it against a run that holds its energy.
+    weakens as ``\\nu`` falls. No code-level guard exists — adding one would give a grid-and-scheme
+    property a physics argument. The practical course at high Reynolds number is to prefer
+    `IFLowStorageRK3`, whose ceiling has no such dependence, or to pass an explicit `cfl` and
+    verify stability directly: the run's energy must stay bounded over a trial stretch.
 
 The base is then scaled by the domain's dealiasing: a strategy that keeps modes to a higher
 ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the
 Nyquist wavenumber) takes a proportionally smaller step,
 ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to both schemes' bases,
 `IFRK2`'s empirical one included — the dependence on how much of the band is kept is geometric,
-holding whether the base was computed or measured, though it inherits the base's standing. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
+holding whether the base was computed or measured — the scaled value is only as trustworthy as
+its base. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 """
 function recommended_cfl end

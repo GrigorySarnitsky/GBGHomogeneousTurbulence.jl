@@ -23,7 +23,7 @@ swappable — and [`ModelSpectrum`](@ref) owns the formula.
 
 Every preset is a type with a keyword constructor, invoked as `Name(; …)`; the roll-off **factor**
 pieces they compose (`PopeLargeScale`, `ExponentialDissipation`, …) are plain positional parameter
-records, per the constructor-first convention for small records. The velocity-spectrum
+records. The velocity-spectrum
 presets `Pope2000` / `VonKarman1948` / `Pao1965` name the `ModelSpectrum` specialization
 carrying their large-scale and dissipation factors, so a preset is the composition rather than a
 wrapper around one; the scalar preset `ObukhovCorrsin1949`, like the structure-function and scaling
@@ -356,11 +356,12 @@ formula) with [`PopeLargeScale`](@ref) supplying ``f_L`` and [`PopeDissipation`]
 
 `C_K` is the Kolmogorov constant; the defaults `c_L = 6.78`, `c_η = 0.40` are the high-Reynolds-number
 values Pope obtains from the energy and dissipation normalizations, with the shape exponents `p₀ = 2`
-and `β = 5.2`. Override any coefficient to re-fit. Evaluate with [`spectrum`](@ref)`(Pope2000(), κ, fp)`.
+and `β = 5.2`. Override any coefficient to re-fit — but the two kinds of coefficient differ: the
+shape exponents `p₀` and `β` are free axes, while `c_L` and `c_η` are the values *derived from* the
+energy and dissipation normalizations, so hand-setting either breaks the stated
+``\\int E = k`` / dissipation identities silently. Evaluate with [`spectrum`](@ref)`(Pope2000(), κ, fp)`.
 
-`Pope2000` is the `ModelSpectrum` carrying Pope's two roll-off factors, so
-`spec isa Pope2000` holds for a value this constructor returns, exactly as for the presets that are
-plain structs.
+`Pope2000` is the `ModelSpectrum` carrying Pope's two roll-off factors.
 """
 const Pope2000 = ModelSpectrum{PopeLargeScale, PopeDissipation}
 
@@ -385,7 +386,7 @@ this form rather than a normalization — unlike [`PopeLargeScale`](@ref)'s `c_L
 determines it, and the default `1.0` is the conventional choice.
 
 `VonKarman1948` is the `ModelSpectrum` carrying von Kármán's large-scale factor and no
-dissipation roll-off, so `spec isa VonKarman1948` holds for a value this constructor returns.
+dissipation roll-off.
 """
 const VonKarman1948 = ModelSpectrum{VonKarmanLarge, UnitDissipation}
 
@@ -409,7 +410,7 @@ constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carri
 [`VonKarman1948`](@ref) when the large scales matter.
 
 `Pao1965` is the `ModelSpectrum` carrying Pao's dissipation factor and no large-scale
-roll-off, so `spec isa Pao1965` holds for a value this constructor returns.
+roll-off.
 """
 const Pao1965 = ModelSpectrum{UnitLargeScale, PaoDissipation}
 

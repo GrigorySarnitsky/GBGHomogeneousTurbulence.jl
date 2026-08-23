@@ -24,8 +24,9 @@ The measured functions of the flow state:
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
-Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
-per-shell energy over wavenumber, and the vorticity recovery alone produces a field. Each returns
+Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to
+the spectral density sampled on the wavenumber shells, and the vorticity recovery alone produces a
+field. Each returns
 the field's own real element type rather than a fixed `Float64`, so a `Float32` run measures in
 `Float32`.
 
@@ -312,7 +313,10 @@ materializes no determinant field); `domain` also sizes the per-call tensor scra
     for the diagnostic rather than for the steady state.
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
-quadratic reductions, not exactly alias-free.
+quadratic reductions, not exactly alias-free. That pricing is the sharp-truncation one: the wider
+`PhaseShift` ball carries the same kind of residual over its larger retained band, and `HouLi`'s
+smooth taper leaves a residual of its own shape that no bound here prices — on either, treat the
+skewness as an indicator, not an alias-controlled measurement.
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
 (all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an
 empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the "real turbulence yet"

@@ -317,9 +317,10 @@ produce.
 
 # Arguments
 - `order = 4` — how many past samples are used. `1` is forward Euler, `2` the two-step method, `4`
-  TurTLE's default. Capped at `8`, which is where the four-point Gauss–Legendre rule that integrates
-  the interpolation weights stops being exact; the cap is far above any useful order, since an
-  Adams–Bashforth stability region shrinks with each step added.
+  TurTLE's default. Orders above `8` are refused with an `ArgumentError`: past it the four-point
+  Gauss–Legendre rule that integrates the interpolation weights stops being exact, and the refusal
+  is loud because the alternative is silently wrong weights. The cap is far above any useful order,
+  since an Adams–Bashforth stability region shrinks with each step added.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not

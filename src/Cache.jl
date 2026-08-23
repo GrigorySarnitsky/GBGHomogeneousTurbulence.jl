@@ -18,7 +18,8 @@ The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
-- [`deposit_sample!`](@ref) — records the particle velocities `record_particle_velocities!` wrote.
+- [`deposit_sample!`](@ref) — records the particle velocities
+  [`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!) wrote.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
@@ -31,7 +32,8 @@ The field slots are filled by [`deposit!`](@ref GBGIsotropicTurbulence.Propagato
 fields. Each slot carries the value **and** the epoch that value belongs to, so a read can be refused
 rather than served stale.
 
-The solver's side of the contract is that `deposit!` fills every slot at the iteration's end and sets
+The solver's side of the contract is that `deposit!` fills every field-derived slot at the
+iteration's end (the particle-velocities slot has its own pair of verbs, recorded below) and sets
 its epoch. A caller reads through the accessors and never deposits.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
@@ -84,8 +86,11 @@ and seeds one for you; a hand-assembled run constructs it here.
 - `domain` — the `FixedDomain` the run lives on; it sizes every slot.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
-  including the current one. A one-step scheme needs 1 and stores no history; an
-  `order`-step scheme needs `order`.
+  including the current one: the value of
+  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(trajectory_scheme)` for
+  the run's trajectory scheme, which is where a hand-assembled run gets the number. A one-step
+  scheme needs 1 and stores no history; an `order`-step scheme needs `order`, and the scheme's
+  register allocation refuses a cache built too shallow.
 - `particle_velocities = nothing` — the tracer set's own point-value storage, passed when the run
   advects tracers. Pass `tracers.particle_velocities`: the slot **is** that array, so the tracer
   advance writes the values and the cache only records which epochs they belong to.
@@ -250,7 +255,8 @@ end
 
 The particle velocities ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` at the current epoch — the
 ``(M, 3)`` array of the flow velocity sampled at the position each tracer occupies at that instant:
-the genuine Lagrangian velocity the statistics accumulate. The checked read of the
+the genuine Lagrangian velocity the statistics accumulate. Treat the returned array as read-only —
+it is the tracer set's own storage, and the tracer advance writes into it mid-iteration. The checked read of the
 [`ObservablesCache`](@ref) `cache`'s particle-velocities slot: it serves the deposited values or
 throws an `ErrorException`, like every cached read — the sample depends on the state **and** the
 positions, so it is
@@ -406,9 +412,9 @@ separate, history-keeping announcement — the advance *extends* the history thi
 
 A hand-run loop that repositions tracers itself calls this, then
 [`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!),
-then `deposit_sample!` (the write alone leaves the slot stale, and a read of it throws). Announcing
-to a bare cache rather than a `Simulation` also takes
-[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) for a scheme carrying its own
+then `deposit_sample!` (the write alone leaves the slot stale, and a read of it throws). A loop
+announcing to a bare cache rather than a `Simulation` must also call
+[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying its own
 registers: the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change

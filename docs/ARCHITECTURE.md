@@ -183,7 +183,9 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   velocity, the scalar, and the rank-2 strain tensor the skewness diagnostic needs. On top of those
   sit the per-mode symbols: the spectral multipliers;
   ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel, never materialized (in spectral
-  space ``-\nabla^{2}`` is multiplication by it, evaluated per mode — decision 38); and the dealias
+  space ``-\nabla^{2}`` is multiplication by it, evaluated per mode — decision 38); the constant-1
+  `unit_kernel` in the same lazy form, so a plain variance can join a fused multi-weight reduction
+  (decision 63); and the dealias
   kernel of the run's chosen strategy (the sharp ``2/3`` rule by default), likewise a compressed
   symbol. The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
@@ -382,9 +384,10 @@ Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
 velocity, and none of the built strategies needs it — each preserves a divergence-free velocity by
-construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form (`NoForcing`, taking no operators, has the one form)
-(`ConstantPower(injection_rate = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
-can name its forcing before the grid exists.
+construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
+taking no operators, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
+returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
+forcing before the grid exists.
 
 ### 4.5 `Propagator` — the map that advances the state in time
 
@@ -399,10 +402,13 @@ Method (§3).
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
-  three) but *dearer* in memory — three spectral registers per field against the low-storage
-  scheme's two — `IFLowStorageRK3` an accumulator plus the assembly register; `IFRK2` a predictor
-  plus two stage registers that double as its assemblies — and imaginary-axis unstable, leaning on
-  viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  three) but *dearer* in memory and imaginary-axis unstable, leaning on viscous damping. The memory
+  comparison counts the solver's scratch registers per field: `IFRK2` carries three (a predictor
+  plus two stage registers that double as its assemblies) against `IFLowStorageRK3`'s two (an
+  accumulator plus the assembly register). Williamson's own "2N" label counts differently — the
+  state's array plus the accumulator, the assembly excluded as the solver's, not the scheme's (the
+  `IFLowStorageRK3` docstring keeps that ledger); the two bookkeepings agree on the point that
+  matters, one register in `IFRK2`'s disfavor. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -423,11 +429,11 @@ probes (§7). `Tracers` holds positions and a chosen interpolation scheme — tr
 with the trajectory scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
-the velocity at the iteration's two endpoints: ``\boldsymbol{v}_1`` is the **trajectory
-sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` the previous closing deposit deposited — the genuine
+the velocity at the iteration's two endpoints. ``\boldsymbol{v}_1`` is the **trajectory
+sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
 Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the observables cache
-(against BOTH epochs, since it is a function of the state and the positions together; read through
-`particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
+against BOTH epochs, since it is a function of the state and the positions together (read through
+`particle_velocities`, §11 decision 42). ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, `record_particle_velocities!` writes the new sample at the new
 positions from the same deposited field and `deposit_sample!` records it at the current epochs (the
@@ -622,8 +628,8 @@ numerical counterpart of the charter that the tool investigates the physics rath
   parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
   commitment.) Field reductions do **not** break this: every observable returns the field's own element
   type, so a `Float32` run measures in `Float32` — the `Observables` module docstring states it and
-  `test/validation.jl` pins it over every exported observable. Accuracy is bought there by *summation
-order*, not by a wider accumulator: the backend's reductions sum pairwise, whose error grows as
+  `test/validation.jl` pins it over every exported observable. Accuracy is bought there by
+  *summation order*, not by a wider accumulator: the backend's reductions sum pairwise, whose error grows as
 ``O(\log n)`` against naive accumulation's ``O(n)``, so a reduction over an ``N^3`` grid stays
 faithful in the field's own precision and needs no `Float64` accumulator to rescue it. Whether the online statistics of a
   future `GBGStreamingStatistics` bridge should accumulate in `Float64` regardless is a question for
@@ -711,8 +717,10 @@ generalization is built for them until a second concrete case forces the abstrac
 - **The ``\nu = 0`` truncated-Euler experiment — a scheme and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
-  continuous time — so measured energy drift isolates the time scheme alone: a per-scheme
-  conservation and order-of-accuracy test (the drift must scale with the scheme's order), a second
+  continuous time — so measured energy drift isolates the time scheme alone: a
+  conservation and order-of-accuracy test on `IFLowStorageRK3` (the drift must scale with the
+  scheme's order; at ``\nu = 0`` `IFRK2` is excluded — its stability rests entirely on viscous
+  damping, which the oracle removes, so it would measure an instability, not an order), a second
   witness that the sharp strategies are exactly Galerkin (an alias residue breaks the detailed
   conservation of the retained triads), and a direct measurement of the Hou–Li filter's effective
   dissipation (the one deliberately non-conservative strategy). The long run is a validation target of
@@ -992,7 +1000,11 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     comparison must convert: `energy_spectrum` returns the per-shell energy ``E_n``, a model returns
     the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n) \Delta\kappa`` with
     ``\Delta\kappa = 2\pi/L``. The factor is invisible on the default ``L = 2\pi`` box, where it is
-    ``1``, and silently wrong on any other. This realizes the
+    ``1``, and silently wrong on any other. *(Superseded 2026-08-23, owner-directed:
+    `energy_spectrum` now returns the **density** — the shell energy over ``\Delta\kappa`` — so the
+    conversion seam this entry documents is gone; measured and modeled spectra are the same kind of
+    object and compare directly. The bin-sum convention had survived precisely because the factor
+    is 1 on the default box.)* This realizes the
     comparison-machine path of §3 for spectra — the measured half is a `GBGPeriodicFields` reduction, so
     no `GBGStreamingStatistics` bridge is needed for it. The structure-function and scaling-constant
     paths (via `radial_correlation` and the scalar diagnostics) share the shape and are deferred.
@@ -1313,10 +1325,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     typed-field reuse model; the byte-level refinement (a spectral and a physical field have equal
     byte size under the rfft padding) is recorded as a `GBGPeriodicFields`-level question, not chased
     here. The op lists are re-derived whenever a `step!` body or the generator protocol changes — the
-    ledger failing is the reminder. *(Superseded 2026-08-23, owner-directed: `energy_spectrum` now returns the
-    **density** — the shell energy over ``\Delta\kappa`` — so the seam this entry documents is
-    gone; measured and modeled spectra are the same kind of object and compare directly. The
-    bin-sum convention had survived precisely because the factor is 1 on the default box.)*
+    ledger failing is the reminder.
 
 34. **(2026-07) The compute audit: frozen transform and pass ledgers with fusion bounds, in the
     standard suite.** The compute twin of decision 33 (`test/compute_audit.jl`): the same
@@ -1810,8 +1819,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
     The merge creates one hazard, so the `Cache` docstring now states it outright: **an epoch counts
     changes to the state, not advances of the run.** A completed `step!` advances the fields epoch,
-    but so does any announced out-of-band mutation, so the two counts diverge: after two steps and one
-    announced mutation the clock reads step 2 and the fields epoch reads 4 — measured, not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
+    but so does any announced out-of-band mutation, so the two counts diverge: the constructor's
+    seeding deposit leaves the fields epoch at 1, so after two steps and one announced mutation the
+    clock reads step 2 and the fields epoch reads 4 — measured, not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
     far has the run gone?". As with decision 48, the sweep covered the decision log too, so the log
     reads in the current vocabulary; this entry records that the older entries originally said
     "stamp".

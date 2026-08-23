@@ -27,11 +27,11 @@ callback, a statistics accumulator — reads through the same door, but the cach
 own components, not for the consumer.
 
 An **iteration** is everything a run does to advance from ``t_n`` to ``t_{n+1}``: the timestep
-choice, the step, the particle push, and the deposits at its end. It strictly
+choice, the step, the closing deposits, and the particle push that ends on them. It strictly
 contains the **step**, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
 divided into the **stages** of the time scheme; the particle push and the deposits sit in the
-iteration but outside the step. At each instant ``t_n`` between iterations, before any iteration
-runs, sits the **observation**: the caller's callback reads the state and the cache, records what it wants, and
+iteration but outside the step. At each instant ``t_n`` between iterations, before the next one
+begins, sits the **observation**: the caller's callback reads the state and the cache, records what it wants, and
 decides whether the run continues. Every rule of the cache architecture below
 follows from one design choice, stated here rather than derived:
 
@@ -97,7 +97,8 @@ that exists only piecewise inside one traversal costs a pass the iteration does 
 The [`max_speed`](@ref) reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once and keeps
 only the largest speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` — the advective-CFL
 bound — so the *maximum* is materialized — one number — while the per-point
-speed field is never whole anywhere; there is nothing to cache.
+speed field is never whole anywhere — no field exists to cache; the number itself is what the
+cache holds.
 
 **Surviving — the schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
@@ -152,8 +153,8 @@ interpolation.
 That is the cache's *added* cost. The reduction inside every other closing deposit recurs per
 iteration, and is work the following first stage would have done anyway (§1.4).
 
-**A slot's epoch says what it holds**, and takes three values: the observable at a
-named ``t_n``, or the producer's scratch, or nothing yet deposited. (In the code the named time is
+**A slot's epoch says which of three states the slot is in**: holding the observable at a
+named ``t_n``, holding the producer's scratch, or holding nothing yet deposited. (In the code the named time is
 an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
 every step or announced mutation, the particles' with every push, and a slot's epoch is current when
 it equals its factor's epoch. An epoch is therefore **not** an iteration number: it counts changes to
@@ -171,8 +172,8 @@ transform, since the owner deposits at the iteration's end from the state it has
 recover anyway. What it costs is reads: a slot taken before the last reader of that observable makes
 that read throw, so the schedule must order the two.
 
-**Every slot is deposited on every iteration**, and the completeness check throws if a slot is still
-with its epoch cleared. Through today's API no caller can cause this — a slot exists only because the schedule fills it
+**Every slot is deposited on every iteration**, and the completeness check throws if any slot's
+epoch is still at the cleared sentinel — an un-redeposited slot. Through today's API no caller can cause this — a slot exists only because the schedule fills it
 — so the check guards the solver against its own future edits: a slot nobody refilled would hold scratch for the
 rest of the run and throw on every later read, and the completeness check names the fault where it
 happened.
@@ -275,8 +276,8 @@ transforms below.
   rate, and ``\tau`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A field-proportional one folds its rate into that
   exponential; the rate array exists, the product ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` never
-  does. An additive source enters the right-hand side at each stage. An additive source is what a
-  state-dependent rate takes, the default velocity forcing among them, because a rate frozen for the
+  does. An additive source enters the right-hand side at each stage; a state-dependent rate — the
+  default velocity forcing's among them — must take this route, because a rate frozen for the
   whole step would cost the scheme its order. A rescaling applies to the completed step as a map on
   the state, with no forcing field at all.
 
@@ -343,7 +344,8 @@ between iterations; *depends*, the observable survives in some configurations an
 genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
 observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —
 there is no moment to date it to, so no act at an observation builds it either. Its **Built** column says
-whether the package holds the observable today, and reads `—` wherever *Cached* is not *yes*.
+whether the package holds the observable today, and reads `—` wherever *Cached* is *no* or
+*never* (a *depends* row is built whenever its configuration asks for it).
 
 | Observable | Where it lives | Cached | Built | Producer, or reason |
 |:---|:---|:---|:---|:---|
@@ -357,7 +359,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
-| ``E_n``, the per-shell energy | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
+| ``E(\kappa_n)``, the spectral density | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | — | not computed: no iteration forms it |
 | ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
 | the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
