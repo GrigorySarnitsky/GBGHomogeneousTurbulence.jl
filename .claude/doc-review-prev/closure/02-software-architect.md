@@ -1,111 +1,78 @@
-# Closure — Software-architect review (02-software-architect)
+# Closure — Software-architect hat (02-software-architect.md)
 
-## 1. `Cache` module page misattributes `deposit!` to its own module
-
-**VERDICT: ABSENT**
-
-`src/Cache.jl`'s module docstring (lines 17–24) lists `deposit_sample!` as "the one writer this
-module owns" and explicitly links `deposit!` to
-`` [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) ``, stating it "`Propagator` owns
-because it needs the scheme's scratch to recover the fields." No trace of the contradicting phrase
-"That verb lives in `Propagator` rather than here" remains (`rg` for it across the corpus, excluding
-`.claude/`, returns nothing). The bullet list and the later prose now agree.
-
----
-
-## 2. `displaced_velocity_fresh` reintroduces the cross-verb ordering coupling
-
+## Finding 1 — Particle-velocities slot needs a hand-run two-call, cross-module protocol
 **VERDICT: PRESENT**
+Evidence: `src/Particles.jl` `record_particle_velocities!` (line ~236-243) still states "This call
+is that slot's only producer of values, but it writes values only: the slot stays stale ... until
+`deposit_sample!` records them as current." `src/Cache.jl` `particles_modified!` docstring
+(line ~341-345) still instructs a hand-run loop to call `particles_modified!`, then
+`record_particle_velocities!`, then `deposit_sample!`, "the write alone leaves the slot stale."
+Contrast `deposit!` in `src/Propagator.jl` (line 508) still fills the other four slots atomically
+in one call. Architecture unchanged; asymmetry intact.
 
-`src/Generator.jl:209-213` still carries the identical "One optimization crosses two verbs" note:
-`velocity_rhs!` leaves `phase_shift.u_shifted` fresh via the `displaced_velocity_fresh::Bool` field
-(line 242) for the same stage's `scalar_rhs!` to consume, described as "opportunistic, never
-load-bearing." `docs/ARCHITECTURE.md:299-312` still states the reified generator means "it can never
-assemble the right-hand side from a mismatched intermediate." Decision 45 (`docs/ARCHITECTURE.md:1600-1615`)
-documents and justifies the same-stage freshness contract but does not reconcile the "unrepresentable"
-claim with this hidden-boolean ordering dependency — the tension the finding describes is unchanged.
-
----
-
-## 3. `step!`/`deposit!` "same argument order" conflates dispatch tag with mutated object
-
-**VERDICT: ABSENT**
-
-`src/Propagator.jl:197-200` now states explicitly: "The leading argument differs from `deposit!`'s in
-kind, and it is worth knowing which: `scheme` here is a stateless dispatch tag, and what this call
-mutates is `state`, the second argument; `deposit!` leads with `cache`, the object it mutates." This
-directly names the two different roles the finding says were conflated.
-
----
-
-## 4. Grid-mode viscosity precondition undocumented on `Simulation`'s own docstring
-
+## Finding 2 — Cache's checked-read guarantee is convention-only (struct fields share accessor names)
 **VERDICT: PRESENT**
+Evidence: `src/Cache.jl` `ObservablesCache` struct (line 124-138) still has public `const` fields
+`velocity_physical`, `vorticity_physical`, `scalar_physical`, `particle_velocities` — identical
+names to the checked accessor functions defined below them (lines 175, 191, 205, 234). No guard
+against `cache.velocity_physical` bypassing `_checked`. `docs/src/observables_cache.md` §1.3
+(line 117-118) still states "There is no path — internal or on request — by which reading causes a
+computation," with no caveat about direct field access anywhere in `Cache.jl` or the design page
+(grepped for "dot", "bypass", "field access", "private" — no hits on this topic).
 
-`docs/ARCHITECTURE.md:1756-1783` (decision 54) documents the load-bearing precondition — grid-mode
-``\nu`` is self-consistent only under `:total`-holding forcing — but `src/SimulationRun.jl`'s
-`Simulation` docstring (Grid-mode prose at lines 101-126, `velocity_forcing` argument entry at
-150-155) still contains no cross-reference or warning that swapping `velocity_forcing` away from a
-``k``-pinning strategy invalidates grid mode's ``\nu``. Searched for "assum", "precondition",
-"unsound", "miscalibrat", ":total" in `SimulationRun.jl` — no such statement found there.
-
----
-
-## 5. `recommended_cfl` admits unsoundness for `IFRK2` with no way to detect it
-
+## Finding 3 — FlowParameters.scalar_dissipation uses NaN sentinel, unlike every sibling "no scalar" case
 **VERDICT: PRESENT**
+Evidence: `src/Phenomenology.jl` line 117-124: `struct FlowParameters ... scalar_dissipation::Float64
+end` — still concrete `Float64`, default `NaN` (line 127), with the same "keeps the bundle a plain,
+type-stable set of `Float64`s" rationale (line 92) the finding disputes. Contrast confirmed still
+true: `src/State.jl` line 53/58 (`scalar_spectral`, `nothing`), `src/Propagator.jl` (`nothing` for
+absent buffers), `src/Cache.jl` line 109/111 (`scalar_physical`, `particle_velocities`, both
+`nothing`-typed).
 
-`src/Propagator.jl:547-554`, the `!!! warning "The IFRK2 margin does not know the viscosity"` block,
-still reads: "There is no code-level guard for this, and adding one would mean giving a
-grid-and-scheme property a physics argument; the practical course at high Reynolds number is to
-prefer `IFLowStorageRK3` ... or to pass an explicit `cfl` and verify it against a run that holds its
-energy." The documented failure mode and the absence of any code-level guard are unchanged from the
-finding's description.
-
----
-
-## 6. `deposit_sample!` documents its return value twice, in two different words
-
-**VERDICT: ABSENT**
-
-`src/Cache.jl:265-286`: the synopsis is now the bare `deposit_sample!(cache)` with no `-> particle
-velocities` arrow; the only return description left is the closing sentence "Returns the
-particle-velocities slot." One description, one wording — the arrow/sentence duplication and the
-vocabulary drift the finding flagged are both gone.
-
----
-
-## 7. `velocity_rhs!`/`scalar_rhs!` mutate a second, non-leading argument the `!` convention doesn't flag
-
+## Finding 4 — deposit! mutates ObservablesCache but is owned by Propagator, not Cache
 **VERDICT: PRESENT**
+Evidence: `src/Cache.jl` module docstring (line 29-30) still reads "The field slots are filled by
+`deposit!`, which `Propagator` owns rather than this module because it needs the scheme's scratch
+to recover the fields." `src/Propagator.jl` line 508 still defines
+`function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedDomain,
+buffers::IntegratorBuffers)` in `Propagator`, not `Cache`. Cross-module verb ownership unchanged.
 
-`src/Generator.jl:301-352` (`velocity_rhs!`) and `:450-489` (`scalar_rhs!`) still name the destructively
-consumed second physical argument `ω_consumed` / `u_consumed`, with the docstring stating "the
-`_consumed` suffix marks it, since Julia's `!` convention flags only the first." This remains a
-naming-level mitigation only — no signature-level change distinguishes the consumed argument from an
-ordinary read-only one, exactly as the finding describes.
-
----
-
-## 8. `particle_velocities` aliasing between `Tracers` and `ObservablesCache` has no documented failure behavior
-
+## Finding 5 — AbstractForcing protocol states a return-value rule then documents an exception with no rationale
 **VERDICT: PRESENT**
+Evidence: `src/Forcing.jl` `AbstractForcing` docstring (lines 81-83) is byte-identical to the
+quoted text: "Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
+`add_forcing_source!` the right-hand side, `apply_forcing!` the field); `prepare_forcing!` returns
+`nothing`." No rationale sentence added anywhere in the surrounding docstring (lines 62-92) or in
+`prepare_forcing!`'s own docstring (line 184-191) for why it alone returns `nothing` despite
+mutating the forcing's own state.
 
-`src/Cache.jl:86-88` instructs "Pass `tracers.particle_velocities`: the slot **is** that array, so
-the tracer advance writes the values and the cache only records which epochs they belong to," but
-neither this docstring nor `docs/src/observables_cache.md` states what happens if a caller passes a
-different array (a copy) instead — searched both files for "diverge", "silently", "copy rather",
-"aliasing"/"alias": no hit describing the failure mode. The aliasing contract is asserted, not
-guarded or its violation documented.
+## Finding 6 — FlowConditions/FlowParameters near-homonyms flagged in-doc rather than differentiated
+**VERDICT: PRESENT**
+Evidence: `src/Generator.jl` line 62-63 still reads "Not to be confused with `Phenomenology`'s
+`FlowParameters`, which shares two field names: this type holds what a run is **configured with**,
+that one holds what a run has been **measured to have**." Names unchanged (`FlowConditions`,
+`FlowParameters`, both still carry `viscosity`/`schmidt` fields per `src/Generator.jl` line 84 and
+`src/Phenomenology.jl` line 117-124). The disclaimer stands in place of differentiated names.
 
----
+## Finding 7 — Glossary's one-sentence "deposit" definition doesn't cover deposit_sample!'s actual behavior
+**VERDICT: PRESENT**
+Evidence: `docs/src/notation.md` line 121 still defines "deposit | to write an observable into the
+cache and mark the moment it belongs to" as one atomic act. `src/Cache.jl` `deposit_sample!`
+docstring (line 264-282) still states it only marks: "Record the particle velocities already
+written into `cache` ... as current" — the writing is a separate call,
+`record_particle_velocities!` in `Particles.jl`. No exception noted in the glossary entry.
 
-## 9. "Chart" absent from the `notation.md` Vocabulary glossary
+## Finding 8 — StationarityCriterion's keywords don't map onto its # Fields, unlike sibling types
+**VERDICT: PRESENT**
+Evidence: `src/SimulationRun.jl` line 614-617, `# Fields` section still reads "The fields are not
+the keywords: `gate_skew`, `min_turnovers`, `window_turnovers`, `tol` and `skew_floor` all live
+inside `monitor`" — same structural deviation, same explicit callout, no stated design rationale
+beyond the description itself. `StationarityMonitor` struct (line 489-506) confirms the fields
+genuinely live inside the sub-bundle.
 
-**VERDICT: ABSENT**
-
-`docs/src/notation.md:126` now carries the entry: "**chart** | a physical-representation view of the
-spectral state — the velocity, vorticity or scalar recovered from it. The cache's field slots are the
-run's charts; the *chart map* is the recovery itself." — in the same Vocabulary table as `iteration`,
-`deposit`, `slot`, `epoch`, `register`, `front door`, `observation`, `resolved`, right where the
-finding says it was missing.
+## Finding 9 — step! and deposit!, always called back to back, lead with differently-typed first arguments
+**VERDICT: PRESENT**
+Evidence: `src/Propagator.jl` line 197-199, `step!`'s docstring, is essentially unchanged: "The
+leading argument differs from `deposit!`'s in kind, and it is worth knowing which: `scheme` here is
+a stateless dispatch tag, and what this call mutates is `state`, the second argument; `deposit!`
+leads with `cache`, the object it mutates." The asymmetry and its self-acknowledgment both remain.

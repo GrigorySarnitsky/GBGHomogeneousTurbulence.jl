@@ -1,138 +1,134 @@
-# Panel review — hat: DNS practitioner (performance-focused)
+# Fresh-eyed review — hat: performance-focused DNS practitioner
 
-Scope: numerical methods and performance claims across the rendered manuscript — rotational form,
-integrating factor, dealiasing bands and transform counts, IF-RK2/RK3, the deposit-driven cache
-schedule, particle interpolation, forcing. Cross-checked the dealias-band numbers (2/3, √2/3·N,
-2√2/3·κ_Ny) and the transform/pass ledgers across every page that states them; both are internally
-consistent everywhere they appear (the observables_cache design page's §2.3 table derives cleanly
-from its own per-evaluation breakdown, and reproduces the "PhaseShift = exactly 2× a mask cell,
-velocity and scalar alike" claim made on three separate pages). Register counts, CFL calibration
-arithmetic (κ_maxΔx = 2π/3 ≈ 2.09, C_CFL ≲ 0.83 → 0.5), the N³-byte-size figures (384 MiB per
-vector field at 256³/Float64, 2.3 GiB for six vector-shaped fields), and the Re_λ ∼ N^{2/3}
-resolution-scaling claim all check out by direct derivation. Findings below are the residue.
+Scope: numerical methods (rotational form, integrating factor, dealiasing bands, IF-RK2/RK3,
+deposit-driven cache schedule, particle Heun push, forcing) and performance claims (allocation-free
+hot loop, GPU-agnostic storage, per-scheme exact allocation, CFL scaling, PhaseShift "exactly 2×
+transforms" claim). Read the full consolidated manuscript (ARCHITECTURE, notation, observables_cache
+design page, and every rendered API page).
 
----
-
-## Finding 1 — StationarityCriterion's skewness "sampling interval" is referenced but never specified
-
-**Type:** api-gap
-**Severity:** major
-**Confidence:** medium
-
-**Locations:**
-- PAGE: api / SimulationRun, `StationarityCriterion`'s `gate_skewness` argument: "The skewness costs
-  transforms, so it is measured on the criterion's own sampling interval rather than every
-  iteration."
-- Same page, `StationarityCriterion(...)` signature and `# Arguments` list (`gate_scalar`,
-  `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol`, `skew_floor`, `max_turnovers`) — no
-  keyword named for an interval, cadence, or sampling stride.
-- PAGE: architecture, decision log 2026-08 entry: "the `every` cadence... leaves `run!` entirely: ...
-  a cadence is the callback's own business."
-
-**Description:** For a performance-focused reader this is exactly the number that matters: the
-skewness diagnostic is priced elsewhere in the doc at ≈19.6 units of N³ transient allocation — "the
-dominant episode, about half again the default resident set" — so how often `warmup!` pays that cost
-is a first-order cost question. The docstring asserts a "sampling interval" exists and is
-criterion-owned, but no keyword, default value, or even a qualitative description ("every k
-turnovers", "every k iterations") is given anywhere in the rendered surface. A reader cannot size
-the warm-up cost from what is documented. This also sits oddly against the decision-log's own claim
-that cadence vocabulary was deliberately removed from the package and pushed to "the callback's own
-business" — `StationarityCriterion` is a packaged callback, so if it has an internal cadence, that
-cadence is exactly the kind of thing the same decision says the package no longer owns.
+**Overall finding**: this corpus is unusually self-consistent on the performance/numerics axis. I
+cross-checked every dealiasing-band number (2/3, HouLi-to-Nyquist, PhaseShift's √2/3·N ≡ (2√2/3)κ_Ny
+≈0.94κ_Ny ≈2.8× the modes), every transform count in the observables_cache page's table against the
+decision log's compute-audit figures (RK3 mask 18/9, with-scalar 21/18; PhaseShift exactly 2× in both
+cases, RK3 42 c2r / RK2 28 c2r), the CFL-ceiling arithmetic (y_s/(κ_maxΔx) = √3/2.094 ≈ 0.827, rounded
+to "≲0.83"), the resolution-criterion algebra (κ_maxη = fπη/Δx), and the Re_λ ~ N^(2/3) scaling — all
+of it checks out arithmetically. The findings below are the residue: places where two passages use
+different accounting bases for the same headline number, and one methodological transparency gap.
 
 ---
 
-## Finding 2 — Worked example of fields-epoch vs current_step does not add up under the stated definition
+## Finding 1 — "IFLowStorageRK3's two registers" is defined two different ways across the corpus
 
-**Type:** contradiction
-**Severity:** minor
-**Confidence:** medium
+**Type**: contradiction
+**Severity**: minor
+**Confidence**: medium
 
-**Locations:**
-- PAGE: api / SimulationRun, `current_step`: "after two steps and one announced mutation the clock
-  reads step 2 and the fields epoch reads 4."
-- PAGE: api / Cache, `ObservablesCache` Fields: "`fields_epoch` — the resolved fields' counter:
-  advanced by every completed step and by `fields_modified!`... it counts changes to the state."
+**Locations**:
+- ARCHITECTURE.md §4.5: "`IFRK2` (Heun) is a two-stage option... three spectral registers per field
+  against the low-storage scheme's two, counting the same way on both sides: **the scheme's own
+  registers plus the dealiasing seam's assembly register**."
+- `Propagator.IFLowStorageRK3` docstring: "in Williamson's 2N-storage count... **two field registers
+  per field: the state's own array plus one accumulator (stage1)**. The `IntegratorBuffers` a run
+  allocates can hold more than that count — for this scheme it adds `nonlinear`..."
 
-**Description:** By the stated rule ("counts changes to the state"), two completed steps plus one
-announced mutation is three state-changing events. Starting from a natural zero baseline ("no
-changes yet ⇒ epoch 0"), the epoch after these three events is 3, not 4 — the example only resolves
-if the initial seeding deposit at construction is silently counted as a fourth, unstated
-epoch-advancing event, which no page states explicitly (the construction deposit is elsewhere
-described only as recording the *initial* state, never as itself "a change"). As written, the
-worked example contradicts its own counting rule by one.
+**Contradicts**: ARCHITECTURE's "two" is explicitly `{stage1, nonlinear}` — the `IntegratorBuffers`
+content alone, excluding the state array (this reading is independently confirmed by the
+`observables_cache` design page's own tally: "a velocity-only run under `TwoThirds` or `HouLi` carries
+six vector-shaped fields — four in spectral representation" = state + stage1 + nonlinear +
+`product_spectral`, i.e. `IntegratorBuffers` contributes exactly 2). Propagator's own docstring instead
+defines its "two" as `{state, stage1}`, explicitly *not* including `nonlinear` in that count. The two
+"twos" are different pairs of arrays (only `stage1` is common to both) that happen to share a
+cardinality by coincidence.
 
-**Resolution hint:** either state explicitly that the seeding deposit sets the initial epoch to 1
-(so "0 further changes" reads as epoch 1), or correct the example to "reads 3".
-
----
-
-## Finding 3 — IFRK2's register count is framed with a different accounting convention than IFLowStorageRK3's own docstring uses
-
-**Type:** clarity
-**Severity:** minor
-**Confidence:** low
-
-**Locations:**
-- PAGE: architecture §4.5: "`IFRK2`... dearer in memory — three spectral registers per field against
-  the low-storage scheme's two."
-- PAGE: api / Propagator, `IFLowStorageRK3`: "two field registers per field: the state's own array
-  plus one accumulator (`stage1`)... The `IntegratorBuffers` a run allocates can hold more than that
-  count — for this scheme it adds `nonlinear`... because the count measures the scheme, not the
-  solver it is embedded in."
-- Same page, `IntegratorBuffers` Fields: IFRK2 allocates `stage1`, `stage2`,
-  `velocity_predictor_spectral` — three buffers, none flagged as excluded from the count the way
-  `nonlinear` is for RK3.
-
-**Description:** IFLowStorageRK3's own docstring is explicit that its "two" is the textbook
-Williamson count (state + one accumulator), and separately warns that the real allocated working set
-is larger (`nonlinear` is extra). IFRK2 gets no equivalent caveat, and its Fields list shows three
-buffers besides the state array, not two — so a reader who takes the Architecture page's "three
-registers... against two" as directly comparable absolute totals (the natural reading, since RK3's
-own docstring uses "state + accumulator" as the yardstick for its "two") will size IFRK2 as one
-buffer short of what `IntegratorBuffers` actually allocates for it. The *difference* between the
-schemes (one extra register) is recoverable and correct under several countings I checked, but the
-absolute "three" is not self-evidently the same kind of count as the "two" it is compared against,
-and nothing on the page says so.
+**Description**: A reader trying to reconcile "IFRK2 costs one more register than RK3" (architecture)
+against "RK3's two registers are the state plus the accumulator" (Propagator) will not find the same
+two arrays in both accounts. Neither individual sentence is wrong, but placed side by side under the
+same headline number they teach two incompatible countings.
 
 ---
 
-## Finding 4 — `deposit_sample!`'s two-hop staleness window is not cross-referenced from the page most likely to need it
+## Finding 2 — The quickstart's default forcing is a deterministic clamp, undisclosed at first contact
 
-**Type:** clarity
-**Severity:** nit
-**Confidence:** low
+**Type**: clarity
+**Severity**: minor
+**Confidence**: medium
 
-**Locations:**
-- PAGE: api / Cache, `deposit_sample!`: "the write alone leaves the slot stale, and a read of it
-  throws" — and `particles_modified!`: "A hand-run loop that repositions tracers itself must call
-  this, then `record_particle_velocities!` to write the new values, and finally `deposit_sample!`."
-- PAGE: api / Particles, `record_particle_velocities!`: describes writing the slot but does not mention
-  that a caller driving the loop by hand must additionally call `deposit_sample!` before
-  `particle_velocities` becomes readable — that three-call sequence is stated only on the Cache page.
+**Locations**:
+- Home page: "`sim = Simulation(grid_points_per_axis = 64)`   # a 64³ forced-stationary run; ... ν is set
+  so the grid resolves the dissipation scale" — no mention of what forcing is used or its statistical
+  character.
+- `SimulationRun.Simulation` docstring, elsewhere in the same corpus: "**a deterministic clamp**: it
+  rescales the band every step to hold the kinetic energy at the target value... and **suppresses the
+  physical fluctuation of the quantity it holds**."
+- `BandRescaling` docstring: "**A deterministic clamp, not a stationary sampler**... Such a scheme has
+  no conserved quantity, is not associated with a well-defined ensemble except in limiting cases."
 
-**Description:** A hand-run particle loop that follows only the Particles page's own worked examples
-(which never call `deposit_sample!` directly, since `advance!` does it internally) would plausibly
-call `record_particle_velocities!` and then read `particle_velocities` and hit a throw, with the fix
-documented on a different page than the one describing the write. Not a factual error, just a
-one-hop-away caveat that would help where it is used, on `record_particle_velocities!` itself.
+**Description**: The flagship one-line quickstart example silently produces a flow whose kinetic
+energy — and hence whose Re_λ — is pinned by a deterministic rescale with suppressed physical
+fluctuations (extensively and honestly caveated three modules away). A practitioner copying the
+quickstart to gather amplitude-fluctuation statistics would get contaminated results with no signal at
+the point of first contact that anything unusual is happening. The caveat exists; it just never
+reaches the page that most needs it.
 
 ---
 
-## Notes on claims verified and found consistent (no finding)
+## Finding 3 — PhaseShift's per-term scratch-buffer count is stated only vaguely
 
-- Dealiasing bands: 2/3 vs √2/3·N vs 2√2/3·κ_Ny all agree across Home, architecture, notation,
-  SimulationDomain, and the observables_cache design pages, including the "≈2.8×" mode-count and
-  "≈0.94κ_Ny" numerics (both verified by direct computation).
-- Transform ledger (§2.3 of observables_cache): the stated per-evaluation breakdown (3 inverse + 3
-  inverse + 3 forward per mask evaluation) reproduces the table's "18 inverse, 9 forward" (velocity,
-  3-stage RK3) and the scalar-augmented and PhaseShift-doubled cells exactly by arithmetic.
-- CFL calibration: κ_maxΔx = 2π/3 ≈ 2.09 and C_CFL ≲ 0.83 → 0.5 for IFLowStorageRK3 both check out
-  from y_s = √3.
-- ConstantPower's shared "injection = 2A·E_band" formula is correct for both the velocity (with the
-  ½ in kinetic energy) and the scalar (full-variance, no ½) — verified by differentiating the
-  quadratic observable under linear growth; the shared coefficient is not a copy-paste bug.
-- Re_λ ∼ N^{2/3} resolution-scaling claim (SimulationRun, grid mode) verified by chaining
-  ε(k,L)-only ⇒ η∝ν^{3/4} ⇒ κ_maxη fixed ⇒ ν∝N^{-4/3} ⇒ Re_λ∝ν^{-1/2}∝N^{2/3}.
-- Memory figures: 384 MiB per vector field and 2.3 GiB for six vector-shaped fields at 256³/Float64
-  both reproduce from 3N³ reals × 8 bytes.
+**Type**: clarity
+**Severity**: nit
+**Confidence**: low
+
+**Locations**:
+- `SimulationDomain.PhaseShift` docstring: "a second nonlinear-term transform per stage (2× the
+  transforms) and **the displaced-evaluation scratch** (a field-scale spectral-representation buffer
+  **per phase-shifted term**)."
+- `Generator.ResolvedGenerator` Fields: "`phase_shift` — **the displaced-evaluation scratch** and
+  translation kernels (`PhaseShift` dealiasing only), else `nothing`."
+
+**Description**: "Per phase-shifted term" (velocity/Lamb, scalar/flux) implies at least two, plausibly
+three, buffers (u_shifted, ω_shifted, and — when scalar is carried — φ_shifted), consistent with the
+same-stage `u_shifted` reuse contract described in the decision log. But no page states the count
+explicitly, so a reader pricing PhaseShift's memory delta against a mask strategy has to infer the
+buffer count rather than read it. Low confidence because this may simply be a level-of-detail choice
+(the `# Fields` entry names the bundle, not its cardinality) rather than an omission.
+
+---
+
+## Finding 4 — "Setting the Reynolds number" doesn't state what happens if `κ_max_η` is passed together with an explicit dealiasing strategy whose `f` changes the achievable Re at fixed N
+
+**Type**: clarity
+**Severity**: nit
+**Confidence**: low
+
+**Locations**:
+- `SimulationRun.Simulation` docstring: "a wider-band strategy (larger f) resolves a finer dissipation
+  scale η on the same grid at the same `κ_max_η`... The `kinetic_energy` and `side_length` fix the
+  units; the grid and `κ_max_η` fix Re_λ ~ N^(2/3)."
+
+**Description**: The scaling law Re_λ ~ N^(2/3) is stated as though it depends only on N and
+`κ_max_η`, immediately after establishing that the achievable η (and hence ν and Re) also depends on
+the dealiasing strategy's retained-Nyquist fraction f (HouLi's f=1 vs TwoThirds' f=2/3 vs PhaseShift's
+f=2√2/3 ≈0.943). The N^(2/3) proportionality's hidden constant therefore itself depends on which
+`dealiasing` strategy is chosen — true and derivable from the surrounding prose, but the headline
+scaling-law sentence reads as strategy-independent when it isn't. A worked comparison (e.g. "HouLi
+buys ~1.5× the Re_λ of TwoThirds at fixed N and κ_max_η") would close the gap; this is a nit since the
+information to derive it is present two sentences earlier.
+
+---
+
+## Notes on what I verified and did *not* flag (for the record)
+
+- PhaseShift band/transform-cost consistency (√2/3·N, 2√2/3·κ_Ny, ≈2.8× modes, exactly 2× transforms
+  for velocity *and* scalar, RK3 42 c2r / RK2 28 c2r) is internally consistent across ARCHITECTURE,
+  the decision log, `SimulationDomain.PhaseShift`, and the `observables_cache` transform table — no
+  contradiction found despite dedicated adversarial cross-checking, which is the item my brief
+  specifically asked me to hunt hardest for.
+- The IFLowStorageRK3 stability limit y_s=√3 and the IFRK2 instability proof
+  (|R(iy)|² = 1+y⁴/4 > 1) are both textbook-correct.
+- The CFL-ceiling arithmetic (0.827 rounded to "≲0.83", scaled to 0.5) and the resolution-criterion
+  algebra (κ_maxη = fπη/Δx) both check out by direct computation.
+- The quadratic-reduction alias-freedom condition (2κ_max < N) and its HouLi exception (κ_max = N/2,
+  exactly at the boundary, machine-precision-damped rather than exactly zero) is stated correctly and
+  consistently.
+- Memory figures (384 MiB / 768 MiB / 2.3 GiB at 256³/Float64, and the 322.5 MiB → 2.52 GiB frame
+  scaling from 256³ to 512³) all reproduce exactly under direct calculation.

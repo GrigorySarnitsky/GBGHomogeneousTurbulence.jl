@@ -1,57 +1,69 @@
 # Closure — 14-doc-policy
 
-## Finding 1 — Repeated `@ref` to the same target within one docstring (11 instances, 4 files)
-
-**VERDICT: PARTIAL**
-
-Evidence: Fixed at every location the finding named in `src/Forcing.jl` (`BandRescaling`, `Linear`,
-`ConstantPower`, `StochasticOU` — `# Arguments` bullet now bare `` `FixedDomain` ``, no second
-`@ref`), `src/Cache.jl` (`ObservablesCache` `# Arguments` bullet bare; module docstring's second
-`deposit!` mention now bare backtick at line 35; `particles_modified!`'s second
-`record_particle_velocities!` mention bare at line 344), `src/Propagator.jl` (`recommended_cfl`'s
-`!!! warning` re-mentions of `IFLowStorageRK3`/`IFRK2` now bare), and `src/Generator.jl`
-(`ResolvedGenerator`'s `# Arguments`/`# Fields` `conditions` bullets bare).
-
-Surviving class: `src/phenomenology/Spectra.jl` still double-links `` [`ModelSpectrum`](@ref) ``
-within one docstring, in both `VonKarman1948` (lines 351 and 354) and `Pao1965` (lines 376 and
-379) — the exact pattern the finding flagged and contrasted against the compliant `Pope2000`
-(line 328, single link folded into a parenthetical). `Pope2000` itself remains correctly
-single-linked.
-
----
-
-## Finding 2 — `advance!`, `run!`, `warmup!` omit the required `Returns` sentence
-
-**VERDICT: ABSENT**
-
-Evidence: `src/SimulationRun.jl` — `advance!` docstring now closes "Returns `sim`." (line 392);
-`run!` closes "Returns `sim`." (line 459); `warmup!` closes "Returns `sim`." (line 680, just before
-the binding). All three in-place mutators with no `->` arrow now carry the mandated closing
-sentence, matching the rest of the corpus (`prepare!`, `finalize!`, `deposit!`, etc.).
-
----
-
-## Finding 3 — `ResolvedFields` names its plain positional constructor despite taking preallocated state internals
-
-**VERDICT: ABSENT**
-
-Evidence: `src/State.jl`, `ResolvedFields` docstring (lines 39–59) no longer contains the sentence
-naming the plain positional constructor; the `# Fields` section (lines 51–54) states only the field
-meanings, and the identity paragraph says "Build it on a `FixedDomain`" instead. A repo-wide grep
-(`rg "plain constructor" src/*.jl src/phenomenology/*.jl`) confirms `ResolvedFields` is absent from
-the list of types that name their positional form — only small parameter records remain
-(`FlowConditions`, `HouLi`, `Reference`, `Phenomenology` laws, etc.), consistent with the rule.
-
----
-
-## Finding 4 — `Cache` module docstring's operations list includes a function it does not own
+## Finding 1 — `Phenomenology` module docstring inserts an essay paragraph before the contents list
 
 **VERDICT: PRESENT**
 
-Evidence: `src/Cache.jl` module docstring (lines 17–24), under "The cache's operations:", still
-lists `` [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) `` as a bullet, immediately
-followed by "which `Propagator` owns because it needs the scheme's scratch to recover the fields."
-The double-link into this same passage was fixed (Finding 1), but the underlying scope defect —
-a module-docstring "operations" list including a function this module does not itself define —
-is unchanged; `deposit!` remains listed as one of "the cache's operations" while the text itself
-attributes it to `Propagator`.
+Evidence: `src/Phenomenology.jl` lines ~9–24. Between the identity paragraph and "The module's
+contents:" there is still a full paragraph ("A law family is an abstract subtype of `TurbulenceLaw`
+… Choosing a law is choosing the preset … a name is disambiguated by its **submodule** …") — the
+exact essay-before-the-list the finding quoted, unchanged.
+
+---
+
+## Finding 2 — Caveat admonitions are not positioned as the docstring's last substantive block (class, 4 instances)
+
+**VERDICT: PRESENT**
+
+Evidence:
+- `BandRescaling` (`src/Forcing.jl` ~260–311): `!!! note "Which one a run wants depends on what else
+  reads the kinetic energy"` still sits before `# Arguments`; `!!! note "A band with nothing in it is
+  left alone"` and `!!! note "A deterministic clamp, not a stationary sampler"` still sit after
+  `# Fields`.
+- `ConstantPower` (`src/Forcing.jl` ~411–430): `!!! note "An empty band is left alone, not driven
+  infinitely hard"` still sits before `# Arguments`.
+- `ObservablesCache` (`src/Cache.jl` ~95–104): `!!! note "A cached array is the next iteration's
+  scratch"` is still followed by the "The word *epoch* names two things here…" paragraph before
+  `# Fields`.
+- `recommended_cfl` (`src/Propagator.jl` ~550–562): `!!! warning "The IFRK2 margin does not know the
+  viscosity"` is still followed by "It scales that base by the domain's dealiasing…", which ends the
+  docstring.
+
+All four sites are byte-for-byte the same shape the finding quoted; none were moved.
+
+surviving_class: same four sites named in the finding — no new instances found, but none of the
+originals were fixed either.
+
+---
+
+## Finding 3 — The umbrella `GBGIsotropicTurbulence` module docstring is not a map: no linked one-liner per submodule
+
+**VERDICT: PRESENT**
+
+Evidence: `src/GBGIsotropicTurbulence.jl` lines ~31–48 (the `"""..."""` docstring on `module
+GBGIsotropicTurbulence`) still has no bulleted, `@ref`-linked per-submodule list — only identity
+prose, the sibling-package pointer, and the Göteborg trivia. The bulleted submodule list that exists
+(lines 11–26) is a `#` comment above the docstring, not part of it, exactly as the finding noted.
+
+---
+
+## Finding 4 — `Cache.vorticity_physical` restates the formula its `!` home already owns
+
+**VERDICT: PRESENT**
+
+Evidence: `src/Cache.jl` `vorticity_physical` (~182–190) still opens "The vorticity
+``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` in physical representation at the current
+epoch…", duplicating the formula also given in the home `vorticity_physical!`
+(`src/Observables.jl` ~168). Contrast `velocity_physical`/`scalar_physical` in the same file, which
+still carry no formula.
+
+---
+
+## Finding 5 — Three `Phenomenology` submodule "References" sections cite the bare `ARCHITECTURE.md` filename on the rendered page
+
+**VERDICT: PRESENT**
+
+Evidence: identical sentence "A few works are cited in `ARCHITECTURE.md` as well, where the DNS side
+needs them — the leaf's independence means it does not *rely* on that list…" still present verbatim
+in `docs/src/api/phenomenology/Scalings.md:33`, `Spectra.md:67`, and `StructureFunctions.md:27`. No
+file was edited.

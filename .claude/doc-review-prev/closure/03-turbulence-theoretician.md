@@ -1,92 +1,113 @@
-# Closure audit — hat 03: turbulence theoretician
+# Closure — hat 03: TURBULENCE THEORETICIAN
 
-## 1. `SaffmanDissipation` — unpublished coefficient, not overridable
+## 1. `Li2008` attributes this package's own fit to Li et al. (2008)
+
+**VERDICT: ABSENT**
+
+`src/phenomenology/Scalings.jl:132` now reads: "The value is this package's own reduction of the
+Johns Hopkins Turbulence Database (JHTDB) forced-isotropic dataset (Re_λ ≈ 433) and consistent with
+higher-Reynolds-number periodic-box DNS." This directly disambiguates data source (Li et al. 2008,
+the JHTDB paper) from the fit (ours). `SimulationRun.jl:103` links `Li2008` (`@ref`) before citing
+"≈ 0.9; Li et al. 2008" at line 106, so a reader following the link sees the true provenance. Searched
+for `own reduction|own fit|package's own` across `src/`, `docs/src/`, `ARCHITECTURE.md` — only the one
+instance, no other misattributed own-fit found. `ARCHITECTURE.md:1871`'s `§References` entry still
+labels it "the box-normalized dissipation law `Li2008`" but is consistent with the now-clarified
+docstring, not contradicting it.
+
+---
+
+## 2. Grid mode's `κ_max_η` treats `HouLi`'s merely-damped band as clean signal
+
+**VERDICT: ABSENT**
+
+`SimulationRun.jl:116-121` now quotes the exact numbers the finding asked for: "The gap is not
+cosmetic: f = 1 puts η ≈ 0.64 Δx at κ_max_η = 2 (against 0.96 Δx for 2/3), and since ν ∝ f^{-4/3},
+`HouLi` is handed a Re_λ about 31% higher on the same grid at the same nominal criterion — raise
+`κ_max_η` when comparing across strategies." This is exactly the resolution_hint ("quote η/Δx per
+strategy"), landed verbatim with both numbers.
+
+---
+
+## 3. Grid mode is self-consistent only under a k-clamping forcing, and only `BandRescaling` says so
+
+**VERDICT: ABSENT**
+
+`SimulationRun.jl:122-125` (the grid-mode paragraph itself, not only the `BandRescaling` docstring)
+now states: "The choice is self-consistent only if the run actually holds k at `kinetic_energy`, which
+the front door's `BandRescaling(over = :total)` guarantees and `:band` does not — override
+`velocity_forcing` with a forcing that lets k float and the ν grid mode picked no longer matches the
+run." The trap is now named at the site the finding flagged as silent.
+
+---
+
+## 4. `VonKarman1948` does not integrate to k, and the page does not say so
+
 **VERDICT: PRESENT**
-`src/phenomenology/Spectra.jl:262-275`: `struct SaffmanDissipation <: DissipationFactor end` — still
-zero fields, so `SaffmanDissipation()` cannot be given a coefficient; `dissipation_factor` still hard-codes
-`exp(-2*κη^2)`. Docstring still states the published coefficient is 2.6–3.3 and "is simplified downward to
-`2` here". `docs/src/phenomenology.md:14` still claims "any coefficient can be overridden to re-fit" for
-every preset. Same class confirmed alive in `Lundgren2002` (`src/phenomenology/StructureFunctions.jl:198-202`,
-hard-coded `8.45`, zero-field struct).
-**surviving_class**: `Lundgren2002`'s hard-coded `8.45` (StructureFunctions.jl:179-202) — identical
-unoverridable-coefficient pattern.
 
-## 2. `ExponentialDissipation` enrolled among "inertial-normalized cutoffs"
+`src/phenomenology/Spectra.jl:362-364` (the `VonKarman1948` docstring) is unchanged in substance:
+"`c_L` fixes where the spectrum peaks and is a shape parameter of this form rather than a
+normalization — unlike `PopeLargeScale`'s `c_L`, no energy condition determines it, and the default
+`1.0` is the conventional choice." No offset number (the ≈0.65k–0.88k claimed by the finding) is
+given anywhere for `VonKarman1948`. The only quantified offset in the file (`large_scale_length`,
+lines 105-108: 0.42k / 0.57k) is Pope's cross-length-substitution error, a different scenario, not
+`VonKarman1948`'s intrinsic non-normalization at its own correct length `L₁₁`.
+
+---
+
+## 5. The assumed integral scale `1/envelope_wavenumber` is not the seeded field's `L₁₁`
+
 **VERDICT: PRESENT**
-`src/phenomenology/Spectra.jl:68-69`: `DissipationFactor`'s note still reads "These factors are
-inertial-normalized cutoffs" verbatim. `ExponentialDissipation`'s docstring (lines 230-256) still gives no
-restriction against composing it into a `ModelSpectrum`, and `ModelSpectrum`'s own docstring (line 289)
-still invites "Build one directly to mix roll-off forms". `dissipation_factor(::ExponentialDissipation, κη)
-= exp(-f.β*κη)` unchanged — no offset, so at `β≈6.7` it is still 0.51 at `κη=0.1`.
 
-## 3. `Simulation`'s `G`–`C_ε` relation vs `Li2008`'s exact identity
-**VERDICT: ABSENT**
-`src/SimulationRun.jl:107-109` now reads "since `G` carries `C_ε^{-2/3}` and the ratio `L₁₁/L`" — the
-inverse-2/3 dependence, matching `Li2008`'s identity. No "rescaled by" / linear-proportionality phrasing
-found (`rg "rescaled by" src/SimulationRun.jl` empty). Rendered `docs/build/api/SimulationRun/index.html`
-confirms the same wording is what ships.
+`SimulationRun.jl:173` still asserts "the integral scale as `1/envelope_wavenumber`" and
+`SimulationRun.jl:285` still computes `integral_scale = inv(envelope_wavenumber)`. The Gaussian
+envelope in `State.jl:74-79` is unchanged (`exp(-|κ|²/κ_p²)` on amplitudes, shell-summed spectrum
+`∝ κ²exp(-2κ²/κ_p²)`), whose true `L₁₁ = 3.76/κ_p` per the package's own `integral_scale` formula —
+not `1/κ_p`. No reconciling text or renormalization was added.
 
-## 4. `L₁₁` vs `k^{3/2}/ε` factor and "well under half"
-**VERDICT: ABSENT**
-`src/phenomenology/Spectra.jl:100-106` (`large_scale_length`) now gives the correct numbers: "at
-`C_ε=0.5` the length is 3.7 times smaller and the spectrum integrates to `0.42k`, and at Pope's
-high-Reynolds-number `L₁₁=0.43L₀` it is 2.3 times smaller and integrates to `0.57k`". `rg "order three|well
-under half"` over `src/` and `docs/src/` returns nothing. Rendered build
-(`docs/build/api/phenomenology/Spectra/index.html`) contains `0.42k` and `0.57k`, not the old numbers.
+---
 
-## 5. Scalar's held observable called *energy* (`E_band`, `injection_rate`)
-**VERDICT: PARTIAL**
-`BandRescaling`'s docstring (`src/Forcing.jl:230-236`) now correctly separates kinetic energy (velocity)
-from scalar variance and explicitly states "the `½` belongs to the kinetic energy's own definition, not to
-the field being a vector" — the quoted contradiction there is gone. `ConstantPower`'s empty-band note
-(lines 391-396) now also correctly types it: "its energy for the velocity, its variance for the scalar".
-But the `# Arguments` entry at `src/Forcing.jl:400` is unchanged: `` `injection_rate` — the
-energy-injection rate to hold: the value ``\varepsilon`` relaxes to…`` — still typed as an energy-injection
-rate with no scalar (`ε_φ`, variance-destruction) qualification, the exact defect the finding named.
-**surviving_class**: `src/Forcing.jl:400` (`ConstantPower` Arguments entry for `injection_rate`).
+## 6. `envelope_wavenumber` is said both to feed and not to feed the `initial_spectrum` branch
 
-## 6. Scalar right-hand side written as a bold (vector) symbol
 **VERDICT: PRESENT**
-`docs/src/notation.md:65` now disambiguates the table entry (`\widehat{N}` generic, `\widehat{\boldsymbol
-N}` for velocity only) — but the actual formula displays are unchanged: `src/Propagator.jl:225-236`
-(`IFLowStorageRK3`) still reads "and `\widehat{\boldsymbol{N}}` each field's right-hand side" (explicitly
-covering the scalar) while writing `\boldsymbol{h} \leftarrow A_i\boldsymbol{h} +
-\Delta t\widehat{\boldsymbol{N}}(\hat q)` — bold `N̂`/`ĥ` against non-bold `q̂`. Same pattern repeats in
-`IFRK2` at lines 338-350 ("`\widehat{\boldsymbol{N}}` each field's right-hand side" then bold `N̂₁`, `N̂₂`
-against non-bold `q̂`).
-**surviving_class**: identical construction in `IFRK2`'s docstring (`src/Propagator.jl:338-350`).
 
-## 7. `Li2008` attributes reference law to a database paper
-**VERDICT: ABSENT**
-`src/phenomenology/Scalings.jl:132-134`: the docstring now explicitly reads "The value is this package's
-own reduction of the Johns Hopkins Turbulence Database (JHTDB) forced-isotropic dataset … and consistent
-with higher-Reynolds-number periodic-box DNS" — no longer implies Li et al. published `G≈0.9` themselves;
-the self-fit is now stated outright, one of the finding's two acceptable resolutions.
+Both sentences stand verbatim. `SimulationRun.jl:166-167`: "it also sets the integral scale in the
+assumed state `initial_spectrum` reads." `State.jl:79` (and the identical text in `random_scalar_spectral!`,
+`State.jl:160`): "The `envelope_wavenumber` setting has no effect in the `initial_spectrum` branch
+below." Neither sentence was qualified with the resolution_hint's suggested "no effect *on this
+call*; the front door uses it to build the spectrum function" or any equivalent cross-layer pointer.
 
-## 8. "Stamp" retired by decision 53/54 yet used in `ObservablesCache`'s own docstring
-**VERDICT: ABSENT**
-`rg -i "stamp" src/ docs/src/ docs/ARCHITECTURE.md` (excluding `.claude/`) returns zero hits in `src/Cache.jl`
-or `docs/src/notation.md`; the only remaining occurrences are in `docs/ARCHITECTURE.md`'s decision-log entry
-53 itself, which historically quotes the retired word ("this entry records that the older entries
-originally said 'stamp'") — the intended historical record, not live vocabulary. The class is fully swept.
+---
 
-## 9. "IFRK2's two predictor registers" — only one predictor exists
-**VERDICT: ABSENT**
-`docs/ARCHITECTURE.md:774-776` (§9 invariant 4) now reads "an `IFLowStorageRK3` run carries neither of the
-two registers `IFRK2` adds — its corrector stage and its velocity predictor" — matches the finding's own
-`resolution_hint` almost verbatim and is accurate against `src/Propagator.jl:158`
-(`IFRK2` allocates `stage1`, `stage2`, and `velocity_predictor_spectral`).
+## 7. The resolution criterion is silent about the scalar's Batchelor scale
 
-## 10. `VonKarman1948`'s default `c_L = 1.0` presented as a published fit
-**VERDICT: ABSENT**
-`src/phenomenology/Spectra.jl:358-360`: the docstring now explicitly states `c_L` "is a shape parameter of
-this form rather than a normalization — unlike `PopeLargeScale`'s `c_L`, no energy condition determines
-it, and the default `1.0` is the conventional choice" — no longer presented as von Kármán's own published
-fit.
+**VERDICT: PRESENT**
 
-## 11. Sreenivasan-named preset's default credited to a different source
-**VERDICT: ABSENT**
-`src/phenomenology/Scalings.jl:100-102`: the docstring now explicitly discloses "The default `C_K = 1.5 ±
-0.1` used here is the consensus value as quoted by Sagaut & Cambon (2018), **not a figure read off the
-1995 paper**" — the finding's second acceptable resolution ("the default is not the named paper's") is now
-stated outright rather than left implicit/contradictory.
+Searched `Batchelor` across `src/SimulationRun.jl`, `src/Generator.jl`, `src/Observables.jl` — no
+hits. `SimulationRun.jl:155` (`schmidt = 1.0`) and `Generator.jl:52-82` (`FlowConditions`) still give
+no bound or caveat on `schmidt`, and the grid-mode `κ_max_η` paragraph (`SimulationRun.jl:101-126`)
+still says nothing about the scalar's Batchelor scale `η_B = η/√Sc` or that the criterion covers the
+velocity field only.
+
+---
+
+## 8. Under `over = :band` the claim "k still measures the flow" overstates what is left free
+
+**VERDICT: PRESENT**
+
+`Forcing.jl:246-248` is unchanged: "The band's energy is then set by the forcing rather than by the
+flow, while k still measures the flow itself." Default `lowest_shell = 1`, `highest_shell = 2`
+unchanged (`Forcing.jl:100-102`, `273`, `319`). `ARCHITECTURE.md:1772` still reads "under `:band` the
+band is the artifact and k is a measurable of the flow." The suggested softening ("k retains its
+out-of-band fluctuation") was not applied anywhere.
+
+---
+
+## 9. The glossary binds ω to a producer verb, and leaves Re_λ the one scale without its formula
+
+**VERDICT: PRESENT**
+
+`docs/src/notation.md:31` still lists ω's Code column as `` [`vorticity_physical!`](@ref …) `` (the
+verb), not `Cache.vorticity_physical` (the storage), unlike the neighboring rows' pattern. Line 89
+still gives Re_λ's Meaning column as "Taylor-microscale Reynolds number, measured from the flow
+state," with no defining expression, while every other row in the Derived-scales table (u', L₁₁, η,
+τ_η, λ) carries its formula inline (lines 84-88, 90).

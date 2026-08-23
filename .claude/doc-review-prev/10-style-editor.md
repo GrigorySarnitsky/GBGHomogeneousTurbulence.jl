@@ -1,186 +1,180 @@
-# Style / Copy-Editor hat — findings
+# Style / Copy-Edit Panel — Technical Copy-Editor Hat
 
-Reviewed: the full manuscript consolidation (Home, api overview, architecture, notation,
-observables_cache, phenomenology, every `api/*` page, every `api/phenomenology/*` page) plus the
-raw built HTML under `docs/build/` (checked for silent rendering failures: table fallback,
-dead cross-references, unrendered math, admonition breakage). Adjudicated items from
-`.claude/doc-review-adjudicated.md` are excluded throughout.
+Findings from a fresh-eyed pass over the rendered manuscript and the raw built HTML, checking
+internal uniformity of notation, docstring skeleton, headings, citation format, register, and
+grammar. Ranked most-severe first.
 
 ---
 
-## Finding 1 — "Stamp" was declared retired corpus-wide, but survives on the Home page, the
-Notation glossary, and the Cache API page
+## Finding 1 — Hyphenated compound splits into two words in rendered HTML ("deposit- completeness")
 
-**Type:** contradiction
-**Severity:** major
-**Confidence:** high
-
-**Locations:**
-- ARCHITECTURE.md decision log (2026-08, user-directed): *""Stamp" is retired... The `*_stamp`
-  fields become `*_epoch`, and the verb goes with the noun — a deposit fills a slot and sets its
-  epoch rather than "stamping" it."* — and later in the same entry: *"the sweep covered the
-  decision log too, so the log reads in the current vocabulary."*
-- **Home page**, Quick start comment: *"each stamped with the epoch of the state they were
-  computed from"*
-- **Notation page**, Vocabulary table, `epoch` entry: *"the value of that counter stamped on it
-  when it was filled. A slot is readable exactly when the stamp it carries still equals the
-  counter it depends on."*
-- **Cache API page**, `ObservablesCache` docstring: *"each slot carries a stamp, the counter's
-  value at the moment that slot was filled. A slot is readable exactly when its stamp still
-  equals the counter it depends on"*; Fields list: *"each slot's stamp, or a sentinel"*; *"the
-  particle velocities' two stamps"*; `deposit_sample!` docstring: *"this call stamps both from
-  the cache's current counters."*
-
-**Contradicts:** the decision-48 claim that the rename swept "every surface, prose and code
-alike" and that the noun "stamp" no longer describes what a slot carries.
-
-**Description:** The decision log explicitly retires "stamp"/"stamped" in favor of "epoch" and
-records that the sweep covered even the decision log's own historical prose. Yet the word
-survives, unretired, in the three most user-facing surfaces of the site: the landing-page quick
-start, the canonical glossary's own `epoch` entry, and the primary `ObservablesCache` type
-docstring (used four separate times there, plus once more in `deposit_sample!`). A reader who
-learns the vocabulary from the glossary or the Home page comes away calling the same thing by
-the retired name. This is exactly the "sweep that skips its own surfaces" failure pattern the
-project's own CLAUDE.md names as a live risk.
-
-**Resolution hint:** replace "stamp"/"stamped"/"stamps" with "epoch" (or "recorded at [the]
-epoch") in the four locations above.
+- **Type:** typesetting
+- **Severity:** major
+- **Confidence:** high
+- **Locations:**
+  - PAGE: observables_cache, §3.2 "What is not built" — rendered text reads "the seeding deposit
+    at construction, the deposit- completeness check, and the slot=register merge."
+  - PAGE: architecture, §4.7 "SimulationRun" — rendered text reads "the new sample, and the
+    deposit- completeness check."
+  - Contrast: the same page's own §11 decision log renders the term correctly twice as
+    "deposit-completeness check" (no stray space).
+- **Description:** In both `docs/src/observables_cache.md` (line 418) and `docs/src/architecture.md`
+  (line 457), the compound word "deposit-completeness" is broken across a source line right after
+  the hyphen: `...the deposit-\ncompleteness check...`. Markdown joins the wrapped line with a
+  space, so the *rendered* HTML literally shows "deposit- completeness" — a hyphen dangling before
+  a space, reading as two separate words. Confirmed in the built HTML
+  (`docs/build/observables_cache/index.html`, `docs/build/architecture/index.html`): grepping the
+  phrase in `architecture/index.html` finds it broken once and correctly hyphenated twice elsewhere
+  on the same page, so the same term renders two different ways within one document.
+- **Resolution hint:** rejoin the hyphen and the following word onto one source line (or write the
+  whole compound after the wrap point) in both files.
 
 ---
 
-## Finding 2 — Grammar: "an scheme"
+## Finding 2 — Citation punctuation split: "Year, Title" vs "Year — Title"
 
-**Type:** language-tone (grammar)
-**Severity:** nit
-**Confidence:** high
-
-**Locations:**
-- ARCHITECTURE.md §7: *"The $\nu = 0$ truncated-Euler experiment — an scheme and dealiasing
-  oracle."*
-
-**Description:** "an" before a consonant-initial word ("scheme"); should be "a scheme". Isolated
-typo — the rest of the manuscript's a/an usage is clean (checked systematically).
-
----
-
-## Finding 3 — Citation format: em-dash vs comma splits the three sibling dealiasing-strategy
-docstrings
-
-**Type:** format (citation)
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- **SimulationDomain API**, `TwoThirds`: *"The sharp isotropic $2/3$-rule truncation of Orszag
-  (1971) — On the elimination of aliasing..."* (em dash after the year)
-- Same page, `HouLi`: *"The smooth spectral filter of Hou & Li (2007) — Computing nearly
-  singular solutions..."* (em dash)
-- Same page, `PhaseShift`: *"Patterson & Orszag (1971), Spectral calculations of isotropic
-  turbulence..."* and *"...of Rogallo (1981), Numerical experiments in homogeneous
-  turbulence..."* (comma, not em dash, for both citations)
-
-**Contradicts:** `TwoThirds` and `HouLi`, its immediate siblings in the same "Dealiasing
-strategies" section, doing the identical job (an inline citation opening/embedded in the
-identity sentence, per CLAUDE.md's named-method convention).
-
-**Description:** All three dealiasing-strategy docstrings inline a full bibliographic citation
-(author-year, title, journal, DOI) in the same rhetorical slot. Two use "Author (Year) — Title…"
-(em dash); `PhaseShift`, citing two works, uses "Author (Year), Title…" (comma) for both. This
-may be a deliberate choice to avoid stacking three em dashes in one already-compound sentence,
-which is why confidence is medium rather than high, but the corpus gives no stated rule for the
-switch, so a reader sees two visually different citation styles within one API section.
+- **Type:** citation
+- **Severity:** major
+- **Confidence:** high
+- **Locations:**
+  - PAGE: api / Observables, `derivative_skewness`: "(Betchov 1956 — An inequality concerning the
+    production of vorticity in isotropic turbulence, J. Fluid Mech. 1(5), 497–504, doi:...)"
+  - PAGE: api / Forcing, `Linear`: "a band-limited variant of Lundgren 2003 — CTR Annual Research
+    Briefs, which carries no DOI"
+  - PAGE: api / Forcing, `BandRescaling`: "(Bussi, Donadio & Parrinello 2007 — Canonical sampling
+    through velocity rescaling, J. Chem. Phys. 126, 014101, doi:...)"
+  - Contrasts with the corpus majority, e.g. same page: "(Berendsen, Postma, van Gunsteren, DiNola
+    & Haak 1984, Molecular dynamics with coupling to an external bath, J. Chem. Phys. 81, 3684,
+    doi:...)" — comma, not em dash, before the title.
+- **Contradicts:** the majority pattern across the corpus is "Author Year, *Title*, Journal …" —
+  confirmed also for Cambon 2018, Taylor 1935, Sreenivasan 1996/1998/2018, Qian 1984, Patterson
+  1972, Orszag 1971, Kraichnan 1959 (all comma-joined). Only the three citations above use
+  "Author Year — *Title*, …" instead.
+- **Description:** Within the very same `BandRescaling` docstring, two adjacent full inline
+  citations use two different punctuation marks between the year and the title (comma for
+  Berendsen 1984, em dash for Bussi 2007) with no evident reason for the difference. The same
+  em-dash variant recurs for Betchov 1956 and Lundgren 2003 elsewhere, against a clear
+  comma-joined majority everywhere else.
+- **Resolution hint:** normalize all three em-dash citations to the comma-joined house form.
 
 ---
 
-## Finding 4 — "the default `BandRescaling(over = :total)`" reads as if `over` had a default,
-contradicting the decision that made it required
+## Finding 3 — Redundant, near-verbatim repeated sentence in the same admonition
 
-**Type:** clarity
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- **observables_cache page**, §1.2: *"Under the default `BandRescaling(over = :total)` the
-  forcing does form the whole-field $k$ every step..."*
-- **Forcing API**, `BandRescaling` signature: `BandRescaling(domain; target, over,
-  lowest_shell = 1, highest_shell = 2)` — no default shown for `over`; its own prose: *"The
-  `over` keyword... **is required**: a deterministic clamp destroys the physical fluctuation..."*
-- ARCHITECTURE.md decision log (2026-08): *"`BandRescaling`'s `over` is **required**... Decision
-  15 called `over` "a modeling choice with two defensible answers"... and then defaulted it to
-  `:band`, **contradicting itself inside one sentence**. It is now required..."*
-
-**Contradicts:** the decision log's own point that `over` must never look like it carries a
-house default, since exactly that ambiguity was the earlier design's flaw and the reason `over`
-became a required, undefaulted keyword.
-
-**Description:** The observables_cache.md phrase "the default `BandRescaling(over = :total)`"
-is defensible as shorthand for "the `Simulation` front door's default forcing, which happens to
-be a `BandRescaling` called with `over = :total`" — but read literally it presents `over = :total`
-as if it were `BandRescaling`'s own default, which the constructor signature and its own
-docstring explicitly deny (`over` has no default and is required precisely so no such reading is
-possible). Given the decision log spends a full paragraph on why a default here was the wrong
-call, this phrasing in a different page undoes the clarity that decision bought.
-
-**Resolution hint:** reword to "Under the `Simulation` front door's default forcing,
-`BandRescaling(over = :total)`, …" or similar.
+- **Type:** clarity
+- **Severity:** minor
+- **Confidence:** high
+- **Locations:** PAGE: api / Propagator, `recommended_cfl`, admonition "The IFRK2 margin does not
+  know the viscosity": "...the practical course at high Reynolds number is to prefer
+  `IFLowStorageRK3`, whose ceiling has no such dependence, or to pass an explicit `cfl` and verify
+  it against a run that holds its energy. `IFLowStorageRK3`'s ceiling carries no such dependence."
+- **Description:** The same claim — that `IFLowStorageRK3`'s CFL ceiling has no viscosity
+  dependence — is made twice in immediate succession, once inside the "prefer `IFLowStorageRK3`"
+  clause and again as a trailing standalone sentence restating it almost word for word. Reads as
+  an editing leftover (two drafts of the closing line merged) rather than a deliberate emphasis.
+  Confirmed verbatim in `src/Propagator.jl` lines 555–556.
+- **Resolution hint:** drop the trailing repeated sentence.
 
 ---
 
-## Finding 5 — Inconsistent spacing around `\times` for the same `M × 3` quantity
+## Finding 4 — Missing subsection heading breaks the page's one-heading-per-group pattern
 
-**Type:** typesetting
-**Severity:** nit
-**Confidence:** medium
-
-**Locations:**
-- **Particles API**, `record_particle_velocities!`: *"Storing them costs $M \times 3$ values for
-  $M$ tracers"* (spaced)
-- **ARCHITECTURE.md** §4.6, §9(memory audit), and **observables_cache page** §1.2/§2.3 (three
-  separate occurrences): *"$M\times3$ arrays"* / *"an $M\times3\times$..."* (unspaced)
-
-**Description:** The same dimensional quantity, the tracer point-value array shape, is
-typeset with a space around `\times` in one docstring and without a space everywhere else it
-appears (five other occurrences checked). Minor, but a copy-editor-visible inconsistency in a
-symbol used repeatedly across the corpus.
-
----
-
-## Finding 6 — "checked accessor" vs "checked read" used for the same concept without a
-stated distinction
-
-**Type:** language-tone
-**Severity:** nit
-**Confidence:** low
-
-**Locations:**
-- **Cache API** section header: *"## The checked reads"* and prose *"the checked reads of the
-  cached fields"*
-- **Home page** / module map: *"read through checked accessors that serve the deposited value or
-  throw"*
-
-**Description:** "Checked accessor" and "checked read" name the same mechanism (an accessor that
-serves the deposited value or throws) in different pages. This may be intentional register
-variation (accessor = the function, read = the act of calling it), which is why confidence is
-low, but the corpus's own glossary (`notation.md`'s Vocabulary section) does not carry either
-term, so a reader has no anchor confirming they are synonyms rather than two different things.
+- **Type:** organization
+- **Severity:** minor
+- **Confidence:** high
+- **Locations:** PAGE: api / SimulationDomain, between the `PhaseShift` docstring and the
+  `max_wavenumber` docstring: "The dealiasing cutoff it sets — the dealiasing cutoff — the highest
+  wavenumber the run treats as resolved signal, and the resolution criterion κ_max η a run is
+  built to meet." followed directly by the `max_wavenumber` `@docs` block, with no `##` heading
+  above it.
+- **Contradicts:** every other docstring group on the same page opens with its own `##` heading
+  ("The discretized box", "Dealiasing strategies", "Scratch-field allocators", "Band truncation")
+  and a one- or two-sentence blurb before the `@docs` block; `max_wavenumber` is the only group on
+  the page (and one of very few across the whole API section) with a blurb but no heading, so it
+  renders folded into "Dealiasing strategies" and is absent from that page's own contents list.
+- **Description:** `docs/src/api/SimulationDomain.md` line 30 also duplicates the phrase "the
+  dealiasing cutoff" back-to-back ("The dealiasing cutoff it sets — the dealiasing cutoff — the
+  highest wavenumber…"), reading like a heading ("## The dealiasing cutoff") that was deleted and
+  left its own wording stranded in the blurb.
+- **Resolution hint:** add a `## Dealiasing cutoff` (or similar) heading above this blurb, and
+  trim the doubled phrase.
 
 ---
 
-## Notes on what was checked and found clean
+## Finding 5 — Two distinct citations merged into one bulleted reference line
 
-- All Markdown tables in `notation.md` and `observables_cache.md` render as real `<table>`
-  elements in the built HTML (9 and 2 respectively) — no literal-pipe fallback.
-- No `katex-error` class anywhere in the built site; no dead (`href="#"`-only) cross-references
-  found in the pages spot-checked.
-- The retired terms "tail" (for the closing deposit) and "boundary" (for the instant between
-  iterations) do not leak outside the decision-log entry that retires them; every other
-  occurrence is a different, exempted sense (spectral tail, extraction boundary, ownership
-  boundary, consumer boundary, `max_speed`'s "boundary case").
-- Other previously-retired names (`resolved_fields_modified!`, `ForcingSpec`, `scalar_type`,
-  `physical_velocity`/`physical_vorticity`, `tracer_velocities`/`tracer_positions`/
-  `number_of_tracers`, `X_to_physical!`) do not leak outside decision-log history either.
-- "Front door" capitalization, bold-italic vector notation, `\varkappa`/`\kappa`/`k` glyph
-  separation, and the constructor-first / plain-constructor-naming convention (present exactly
-  where CLAUDE.md's own example list says it should be, absent exactly where it says it should
-  be omitted) were all sampled across many type docstrings and found uniform.
-- No stray "knob"/"tweak" register violations found.
+- **Type:** citation
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:** PAGE: api / phenomenology / Spectra, "## References": "Obukhov (1949), Izv. Akad.
+  Nauk SSSR, Ser. Geogr. Geofiz. 13, 58 (no DOI) / Corrsin (1951), J. Appl. Phys. 22, 469.
+  doi:10.1063/1.1699986" — one bullet, two full author/year/journal/doi citations joined by "/".
+- **Contradicts:** `CLAUDE.md`'s house rule, "A reference block of two or more citations is a
+  bullet list — one citation per line — never a semicolon-joined paragraph"; and the corpus's own
+  practice elsewhere of giving co-cited twin papers separate bullets, e.g. `architecture.md`'s
+  `## References` lists "Mori, H. (1965)…" and "Zwanzig, R. (1973)…" — the equally paired
+  foundational Mori–Zwanzig papers — as two separate bullets, not one joined line.
+- **Description:** The dual-eponym Obukhov–Corrsin law is one `Reference` value whose `citation`
+  string (`src/phenomenology/Spectra.jl` line 407) concatenates both papers with `" / "`; this
+  string is reused verbatim in the page's generated bibliography, so the bibliography ends up with
+  one bullet holding two independent, fully-cited works, unlike every other bullet on the three
+  Phenomenology reference pages (Scalings, Spectra, StructureFunctions), which hold exactly one
+  citation each.
+- **Resolution hint:** if the `Reference` type is to stay one-citation-per-law, consider whether
+  the joined string is acceptable as an exception for genuinely joint attributions (the docstring
+  itself already treats the "1949" handle as one law with two independent discoverers), or split
+  the bibliography rendering to break `" / "`-joined citations onto separate bullet lines.
+
+---
+
+## Finding 6 — Phenomenology "## References" bibliography uses the labelled DOI-link form, not the bare-autolink form the corpus's other bibliography section uses
+
+- **Type:** citation
+- **Severity:** minor
+- **Confidence:** medium
+- **Locations:**
+  - PAGE: architecture, "## References": "...*J. Fluid Mech.* **1**(5), 497–504.
+    <https://doi.org/10.1017/S0022112056000317>" (bare autolink).
+  - PAGE: api / phenomenology / Scalings, "## References": "Sreenivasan (1998), Phys. Fluids 10,
+    528. doi:10.1063/1.869575" — rendered in the built HTML as
+    `<a href="https://doi.org/10.1063/1.869575">doi:10.1063/1.869575</a>` (labelled link, the
+    inline-citation form).
+  - Same pattern in the Spectra and StructureFunctions "## References" sections.
+- **Contradicts:** the already-adjudicated ruling that "a `§References` entry ends in a bare
+  autolink (bibliography style); an inline docstring cite uses the labelled `doi:10.…` format. One
+  form per surface." The three Phenomenology "## References" pages are structurally the same kind
+  of end-of-page bibliography as `ARCHITECTURE.md`'s `§References`, yet render with the *inline*
+  labelled-link form throughout, because their bullet text is generated verbatim from the same
+  `Reference.citation` string used inline.
+- **Description:** This is a distinct case from the already-settled "two DOI link formats" finding
+  (which contrasted `ARCHITECTURE.md`'s bibliography against inline docstring citations): here, two
+  bibliography-role sections in the same corpus — one in the DNS core, three in the extraction-bound
+  leaf — disagree on which of the two sanctioned forms a bibliography entry uses.
+- **Resolution hint:** low priority — may be an accepted consequence of the leaf's
+  reuse-the-citation-string design; worth a decision either way rather than leaving it unremarked.
+
+---
+
+## Finding 7 — Admonition title runs directly into its own body when read as flat text (extraction artifact, verified benign)
+
+- **Type:** typesetting
+- **Severity:** nit
+- **Confidence:** high
+- **Locations:** e.g. PAGE: Home, "Work in progressThe package is being built…"; PAGE: api / Cache,
+  "A cached array is the next iteration's scratchA slot is also the array…".
+- **Description:** Checked directly against the built HTML (`docs/build/index.html`,
+  `docs/build/api/Cache/index.html`): each of these renders correctly as a proper `admonition-header`
+  followed by a separate `admonition-body` — the manuscript's flat-text extraction simply drops the
+  whitespace between the two. **Not a rendering defect**; recorded here only so a later pass does
+  not re-flag the pattern. No fix needed.
+
+---
+
+## Notes on what did *not* turn up defects
+
+Checked and found uniform across the corpus: bold-italic vector notation (no stray `\mathbf`),
+upright imaginary unit, subscripted partials (no bare `\partial_i`), `\varphi` (never `\theta`),
+constructor-first type docstrings, the `Arguments`/`Fields` skeleton, the `!!! warning`/custom-title
+admonition convention, register (no "knob"/"tweak"/informal tone found), Markdown table rendering
+(all render as proper `<table>` elements, no literal-pipe fallback), and KaTeX math spans (all
+render as `<span>$…$</span>`, none literal).

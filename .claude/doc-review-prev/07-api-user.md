@@ -1,114 +1,84 @@
-# Panel review — hat: physicist-programmer / API user
+# Doc-review — Hat: physicist-programmer / API user
 
-Scope: assemble a `Simulation`, spin it up, observe with `run!`, read cached observables, sample
-tracers — from the rendered docs alone. Checked: constructor arguments and defaults, argument
-documentation completeness, return-shape clarity, the checked-read (throw) contract, example
-correctness, and exported-vs-documented parity.
+Scope: assembling a `Simulation`, warming it up, driving it with `run!`, reading the
+`ObservablesCache`, and sampling along `Tracers` — using only the rendered docs.
 
-Overall: the exported-surface-vs-documented-surface check came back **clean** — every name in the
-`GBGIsotropicTurbulence` API index has a matching docstring, and every constructor follows one
-stated positional/keyword convention (source object positional, settings keyword) without
-exception across all ~20 constructors inspected. The findings below are the residue: one
-corpus-wide terminology leftover, and several smaller signature/contract asymmetries.
+Overall impression: the public surface is unusually complete for this pass — every constructor's
+keywords are enumerated, every checked-read's throw condition is stated, and the exported Index
+matches what each page documents. The findings below are the residue: two real ordering/attribution
+contradictions in the tracer-cache handoff (the one area where the checked-read contract is genuinely
+subtle), plus two low-stakes editorial nits.
 
 ---
 
-## Finding 1 — "Stamp" vocabulary survives in live prose after its own retirement
+## Finding 1 — `particles_epoch`'s producer is attributed two different ways, and `advect!`'s own signature rules out one of them
 
 **Type:** contradiction
 **Severity:** major
-**Confidence:** high
+**Confidence:** medium-high
 
 **Locations:**
-- PAGE: Home, Quick start comment: "each stamped with the epoch of the state they were computed from"
-- PAGE: notation, Vocabulary/`epoch` entry: "the stamp it carries still equals the counter it depends on"
-- PAGE: api / Cache, `ObservablesCache` Fields: "each slot carries a stamp, the counter's value at the moment that slot was filled... its stamp still equals the counter"; "each slot's stamp"; "the particle velocities' two stamps"
-- PAGE: api / Cache, `deposit_sample!`: "this call stamps both from the cache's current counters"
+- PAGE: api / Cache, `ObservablesCache` Fields: "`particles_epoch` — the tracer positions' counter, **advanced when `advect!` moves them**."
+- PAGE: api / Cache, `particles_modified!`: "The sanctioned mutator calls it for you: **the run layer announces its own tracer advance** (`advect!` followed by `record_particle_velocities!`, both inside `advance!`), and the run layer then refills the slot for you."
+- PAGE: api / Particles, `advect!` signature: `advect!(scheme, tracers, velocity_end, domain, buffers, dt) -> tracers` — no `cache` argument anywhere.
 
-**Contradicts:** PAGE: architecture, decision log (2026-08, "'Stamp' is retired"): "The `*_stamp` fields become `*_epoch`, and the verb goes with the noun — a deposit fills a slot and sets its epoch rather than 'stamping' it" — axis: the very vocabulary the decision retired.
+**Contradicts:** the `ObservablesCache` Fields entry names `advect!` as the direct actor that advances `particles_epoch`; the `particles_modified!` docstring instead names *the run layer* (`advance!`) as what announces the change, with `advect!` merely one of the two calls it wraps. The two cannot both be literally true: `advect!`'s documented signature carries no `cache` parameter, so `advect!` itself cannot touch `particles_epoch` — only code holding the cache (i.e. `advance!`, or a hand-written caller) can. Contrast the fields' side, which is unambiguous both places: `fields_epoch`'s Fields entry says "advanced by every completed step **and by `fields_modified!`**," and `fields_modified!`'s own docstring confirms "`step!` advances the epoch itself when it completes" — `step!` *does* receive `cache` as an argument, so that attribution is structurally consistent. The particles side has no such consistent story.
 
-**Description:** The decision log records that "stamp" was swept everywhere in favor of "epoch" (the field names are indeed `velocity_epoch`, `fields_epoch`, etc. throughout). Yet the word survives as live, current-state prose on four separate user-facing surfaces, including the very first page a new user reads (Home's quick-start walkthrough) and the glossary entry that is supposed to be the single canonical definition of "epoch." A reader is left holding two words for one concept exactly where the decision log says that confusion was fixed.
+**Description:** A reader building a hand-run particle loop (which the Particles page explicitly invites, via its "Building a set directly" example) is left unable to determine from the docs alone whether calling the sanctioned `advect!` is itself sufficient to keep `particles_epoch` correct, or whether a `particles_modified!`-equivalent call is additionally required whenever a cache is in play — the two passages point in different directions on exactly this question.
 
 ---
 
-## Finding 2 — `deposit_sample!`'s return-type arrow names neither a type nor an argument
+## Finding 2 — `deposit!(sim)` is credited with filling the particle-velocities slot, which the documented iteration order and the Cache module's own verbs both rule out
 
-**Type:** format
-**Severity:** minor
-**Confidence:** high
-
-**Locations:**
-- PAGE: api / Cache: `deposit_sample!(cache) -> particle velocities`
-- Contrast, same page/corpus: `advect!(...) -> tracers`, `interpolate_at_particles!(...) -> out`, `allocate_buffers(...) -> IntegratorBuffers`, `kolmogorov_length(fp) -> Float64`
-
-**Description:** Every other `-> X` signature in the corpus names either a concrete Julia type (`Float64`, `Bool`, `IntegratorBuffers`) or the literal identifier of the returned/mutated argument (`-> rate`, `-> tracers`, `-> out`). `deposit_sample!(cache) -> particle velocities` does neither: the sole argument is `cache`, and "particle velocities" is a two-word English phrase, not backticked, not a type, not an identifier in scope. The body separately says "Returns the slot's array," so the arrow is redundant as well as off-convention — the one signature line in the corpus that breaks the pattern.
-
----
-
-## Finding 3 — `velocity_rhs!` / `scalar_rhs!` order the consumed operand inconsistently
-
-**Type:** clarity
-**Severity:** minor
+**Type:** contradiction
+**Severity:** major
 **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Generator: `velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)` — consumed arg (`ω_consumed`) last before `domain`
-- PAGE: api / Generator: `scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain)` — consumed arg (`u_consumed`) comes *before* the non-consumed physical field (`φ`)
+- PAGE: notation, Vocabulary: "iteration | one advance of the run, in this order: choose the timestep, **`step!` the fields, `deposit!` to close them, then advance any tracers** and record their sample."
+- PAGE: api / Propagator, `deposit!`: "The particle-velocities slot is not among them: it depends on the tracer positions as well as the state, so it is filled by `record_particle_velocities!` wherever the positions move — **which `advance!` and the `deposit!(sim)` form above both do for you**."
+- PAGE: api / Cache, `deposit_sample!`: "Record the particle velocities already written into `cache`... Use it after writing new values along the trajectories — `record_particle_velocities!` writes, **this call records**." (i.e. the slot is only made readable by `deposit_sample!`, a `Cache`-module verb `deposit!`'s own docstring never names.)
 
-**Description:** The two sibling right-hand-side assemblers place the destructively-consumed physical argument in opposite relative positions with respect to the read-only physical argument: `velocity_rhs!` reads non-consumed-then-consumed, `scalar_rhs!` reads consumed-then-non-consumed. Both docstrings note "the consumed argument is fixed by the physics, not by its position," which explains *which* argument is consumed but not why the pair does not share one positional convention the way `step!`/`deposit!` are explicitly documented to ("Call it with the same arguments in the same order as `deposit!`"). A caller who has memorized one signature has no positional cue for the other.
+**Contradicts:** the canonical iteration order fixes `deposit!` (fields) strictly *before* the tracer advance — tracers "come last because their second velocity sample is interpolated from the field the deposit just made current" (same Vocabulary entry). If that order holds, `deposit!(sim)` runs *before* any tracer has moved, so it cannot itself be what "fills" `record_particle_velocities!`'s output "wherever the positions move," since the positions have not yet moved at that point in the sequence. The `deposit!` docstring's claim that `deposit!(sim)` does the particle-velocities work "for you" also never names `deposit_sample!`, the verb the Cache page identifies as the actual slot-finalizer.
+
+**Description:** A user closing a hand-run iteration with `deposit!(sim)` cannot tell from this page alone: (a) whether that call also advances/records the tracers (contradicting the stated step!→deposit!→advect! order), or (b) if it doesn't, why its docstring says it does the particle-velocities filling "for you." Either the order or this claim is imprecise; the docs should say which, since this is exactly the checked-read boundary (`particle_velocities` throwing on a stale slot) a user is most likely to hit by copying the wrong closing call.
 
 ---
 
-## Finding 4 — `stationary_dissipation` is the one `Scalings` evaluator without a return-type arrow
+## Finding 3 — `step!` and `deposit!`'s argument order is claimed to "line up," but `step!` interposes `generator` between `state` and `domain`
+
+**Type:** clarity
+**Severity:** minor
+**Confidence:** low-medium
+
+**Locations:**
+- PAGE: api / Propagator, `step!`: "After the leader both take `state`, `domain`, `buffers` in that order, so **a hand-run loop's two calls still line up**."
+- Signatures on the same page: `step!(scheme, state, generator, domain, buffers, cache, dt)` vs. `deposit!(cache, state, domain, buffers)`.
+
+**Description:** `deposit!`'s tail is exactly `state, domain, buffers` (positions 2–4), but `step!`'s tail is `state, generator, domain, buffers, cache, dt` (positions 2, 4, 5 for the same three names, with `generator` inserted between `state` and `domain`, and `cache`/`dt` following `buffers`). The relative order of the three shared names is indeed preserved, but "still line up" overstates it for a reader expecting the two calls to read positionally parallel when placed one above the other; the extra interposed arguments are the point most likely to trip a copy-paste hand-run loop.
+
+---
+
+## Finding 4 — Duplicated sentence in `recommended_cfl`'s IFRK2 caveat
 
 **Type:** format
 **Severity:** nit
-**Confidence:** medium
+**Confidence:** high
 
 **Locations:**
-- PAGE: api / phenomenology / Scalings: `stationary_dissipation(law, kinetic_energy, side_length)` — no `-> Type`
-- Contrast, same page/module family: `scaling(law, fp) -> Float64`, and elsewhere `spectrum(...) -> Float64`, `structure_function(...) -> Float64`, `scaling_exponent(...) -> Float64`, `kolmogorov_length(fp) -> Float64`
+- PAGE: api / Propagator, `recommended_cfl`: "...the practical course at high Reynolds number is to prefer `IFLowStorageRK3`, **whose ceiling has no such dependence**, or to pass an explicit `cfl` and verify it against a run that holds its energy. **`IFLowStorageRK3`'s ceiling carries no such dependence.**"
 
-**Description:** Every other pure evaluator in the `Phenomenology` submodules — including `Li2008`'s own `scaling` sibling on the very same page — carries a `-> Float64` signature annotation. `stationary_dissipation`, the seam the run layer actually calls to set viscosity, is the lone silent one, with no prose "Returns …" sentence to compensate.
+**Description:** The same claim — that `IFLowStorageRK3`'s CFL ceiling carries no dependence on viscosity — is stated twice back to back, the second time as a standalone trailing sentence that adds nothing beyond what the clause just before it already said. Reads as leftover text from an edit rather than a second, distinct point.
 
 ---
 
-## Finding 5 — `particle_velocities` breaks the tracer-accessor naming pattern it sits beside
+## Summary
 
-**Type:** clarity
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE: api / Particles: "Read the particle state with `particle_positions` and `number_of_particles`; the trajectory velocities are read from the run's observables cache, through `particle_velocities`"
-- PAGE: api / Particles, `Tracers` Fields: "`particle_velocities` — the interpolated velocity at the positions the tracers occupy... the observables cache's particle-velocities slot"
-
-**Description:** `particle_positions(tracers)` and `number_of_particles(tracers)` both take the tracer set, establishing a "call the accessor on `tracers`" pattern for particle state. `particle_velocities`, despite naming the same conceptual quantity and existing as `tracers.particle_velocities` (a genuine field on the same struct), is exposed as a function only over `particle_velocities(cache)` — the cache, not the tracer set. The docs do call this out in prose, so it is not silently wrong, but the surface itself is the odd one out among three sibling "read the particle state" accessors, and a reader pattern-matching from the first two will reach for `particle_velocities(tracers)`, which does not exist.
-
----
-
-## Finding 6 — the front door's spectrum-matched IC option covers velocity only, with no documented scalar path or explanation
-
-**Type:** api-gap
-**Severity:** minor
-**Confidence:** medium
-
-**Locations:**
-- PAGE: api / SimulationRun, `Simulation` Arguments: "`initial_spectrum = nothing` — draw the initial velocity from a `Phenomenology` `EnergySpectrum`..."; the scalar-related keywords are only "`scalar = false`, `scalar_variance = 1.0`"
-- PAGE: api / State, `random_scalar_spectral!`: "Pass `spectrum`, a function κ ↦ E_φ(κ)... e.g. an Obukhov–Corrsin form from `Phenomenology`"
-
-**Description:** The underlying primitive `random_scalar_spectral!` already supports spectrum-matched scalar initial conditions (mirroring the velocity seeder, per the docs' own cross-reference). The `Simulation` front door exposes this for the velocity (`initial_spectrum`) but has no equivalent keyword for the scalar, and nothing in the `Simulation` docstring says why, or shows the workaround (build via `Simulation(domain; ...)`, then call `random_scalar_spectral!` plus `fields_modified!`/`deposit!` by hand). This is not one of the recorded §7 deferrals, so a user wanting faster scalar warm-up via an Obukhov–Corrsin IC has no documented route from the front door.
-
----
-
-## Finding 7 — `scalar_physical`'s "exactly `velocity_physical`'s contract" is immediately contradicted by an extra throw case
-
-**Type:** clarity
-**Severity:** nit
-**Confidence:** low
-
-**Locations:**
-- PAGE: api / Cache: `scalar_physical` — "with exactly `velocity_physical`'s contract (the deposited field or a throw; never a recomputation; read-only). Throws an `ArgumentError` when the run carries no scalar."
-- Same pattern: `particle_velocities` — "it serves the deposited values or throws an `ErrorException`, like every cached read... Throws an `ArgumentError` when the run advects no tracers."
-
-**Description:** "Exactly" oversells the parity: `velocity_physical` has one failure mode (stale/scratch/never-deposited → `ErrorException`), while `scalar_physical` has that mode *plus* a second, structurally different one (no scalar in the run → `ArgumentError`) that `velocity_physical` cannot hit (a velocity slot always exists). The information given is correct and complete: the word "exactly" is simply stronger than the two sentences that follow it support.
+Findings 1 and 2 are the substantive ones: they sit precisely at the checked-read contract's most
+delicate seam (the two-epoch particle-velocities slot), which is the one place in an otherwise very
+thorough API surface where the "who does this and when" story does not stay internally consistent
+across the pages a user is directed to (`notation.md`'s Vocabulary, the `Cache` module page, and the
+`Propagator` module page). Everything else audited — every public constructor's keyword completeness,
+every checked accessor's throw condition, the exported Index against each page's own docstrings, and
+the cross-page formula consistency (`Li2008`'s `G = (3/2)C_ε^{-2/3}` identity, the per-step transform
+counts, the CFL constant derivation) — checked out clean.

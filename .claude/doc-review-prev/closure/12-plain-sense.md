@@ -1,210 +1,108 @@
-# Closure audit — Hat 12: plain-sense
-
-Adjudicated against the current corpus only (src/, docs/src/, docs/ARCHITECTURE.md). 16 findings enumerated.
-
----
-
-## Finding 1 — quick-start "deposit" circular gloss
-
-**VERDICT: ABSENT**
-
-`docs/src/index.md` (Quick start code comment, ~line 47) now reads: "One ITERATION is one
-advance: a step, then the DEPOSIT that closes it. A deposit writes the observables the iteration
-has just computed into the cache, each recorded against the epoch of the state it came from." The
-circular appositive ("the write in which the closing deposit writes … into the cache") is gone;
-searched `docs/src/index.md` in full for "deposit" — no remaining self-referential definition.
-
----
-
-## Finding 2 — "Two kinds of field share the word"
-
-**VERDICT: ABSENT**
-
-`src/Cache.jl` (`ObservablesCache` `# Fields`, ~line 108) now reads: "The word *epoch* names two
-things here, and the fields below are of both kinds. The two **counters** tick as the state
-changes; every other `*_epoch` field records the counter's value at the moment its slot was
-filled." The word is now named explicitly ("epoch"), resolving the unreconstructable-subject
-defect. Grepped repo for "share the word" — zero hits outside `.claude/`.
-
----
-
-## Finding 3 — max_speed admonition triple-restates its rule
-
-**VERDICT: ABSENT**
-
-`src/Observables.jl` (`max_speed`, admonition "Why this observable alone has a cached form", line
-149) now reads as one clause: "The cache holds exactly what the iteration already computes and
-leaves alive at its end; its contents follow from the run's fixed computation schedule rather than
-from anything a caller declares." No nested nested-dash nested restatement remains; "never
-declared" is folded into the one clause rather than hanging as a fragment.
-
----
-
-## Finding 4 — 40+-word sentences with buried verb spine (3 samples)
-
-**VERDICT: PRESENT**
-
-Two of the three flagged sites are unchanged in the defect's substance:
-- `src/SimulationRun.jl` lines 103–120 (Grid mode bullet): still one sentence from "It reads the
-  dissipation…" through "…then sets `ν`…", carrying the same ~180-word, multi-clause parenthetical
-  about `G`/`C_ε`/`L₁₁/L` between the two verbs.
-- `docs/ARCHITECTURE.md` lines 179–192 (§4.1 `FixedDomain` sentence): still one ~100-word sentence
-  with three nested parentheticals ("(one for the velocity, …)", "(in spectral space …)", "(the
-  sharp 2/3 rule …)").
-`src/Propagator.jl` `step!` (lines 189–195) was reworded but remains one long em-dash-laden
-sentence. The class survives at the two clearest sites; verdict PRESENT.
-
----
-
-## Finding 5 — StationarityCriterion trailing forward-reference sentence
-
-**VERDICT: ABSENT**
-
-`src/SimulationRun.jl` `StationarityCriterion` identity paragraph (lines 568–573) ends at "…give a
-decaying run a fixed-length loop instead, which is a three-line callback (see `run!`)." The
-sentence "The same argument the scalar gate makes for an unforced scalar applies to the velocity."
-is gone. Grepped `src/SimulationRun.jl` for "scalar gate makes" — no hits.
-
----
-
-## Finding 6 — step!/deposit! order mnemonic asserted then withdrawn
-
-**VERDICT: ABSENT**
-
-Both docstrings were rewritten to a checkable, mutually consistent claim. `src/Propagator.jl`
-`step!` (lines 197–200): "The leading argument differs from `deposit!`'s in kind … `scheme` here is
-a stateless dispatch tag … `deposit!` leads with `cache`, the object it mutates. After the leader
-both take `state`, `domain`, `buffers` in that order." `deposit!` (lines 498–500): "The argument
-order is shared with `step!` — the mutated dispatch object (here the cache) leads, and `state`,
-`domain`, `buffers` follow in the same fixed order as there." No contradiction between the two;
-the strong-claim-then-qualify shape is gone.
-
----
-
-## Finding 7 — "so the arrows stay primary" unglossed jargon
-
-**VERDICT: PARTIAL**
-
-The flagged §4.1 instance is fixed: `docs/ARCHITECTURE.md` line 198–199 now reads "kept a bare
-carrier so the operations acting on it, not the record itself, carry the design (§11 decision 26)"
-— the jargon "arrows" is gone from the cited sentence. But the class survives in the same document:
-decision-log entry 26 itself (`docs/ARCHITECTURE.md` line 1052) still reads "adopts the category
-lens's guardrail (**arrows primary**, no methods on the carrier)" — the identical undefined
-category-theory shorthand, unglossed, inside the same self-contained document.
-
-**surviving_class**: `docs/ARCHITECTURE.md` line 1052, decision-log entry 26 — "arrows primary, no
-methods on the carrier," unglossed.
-
----
-
-## Finding 8 — "output cursors" names a nonexistent component
-
-**VERDICT: ABSENT**
-
-`docs/ARCHITECTURE.md` §8 (line 751) now reads: "…the clock and what a run records are the
-experimenter's logbook rather than physics." "output cursors" is gone. Grepped
-`docs/ARCHITECTURE.md` for "cursors" — zero hits.
-
----
-
-## Finding 9 — §1.4 states its two costs twice
-
-**VERDICT: PRESENT**
-
-`docs/src/observables_cache.md` §1.4 is essentially unchanged. Line 195: "It costs nothing on the
-memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic
-axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration…".
-Line 198: "Those are two different costs and it is worth keeping them apart: the maximum-speed
-reduction above recurs every iteration, while the only work the cache *adds*… is §1.3's final
-closing deposit…". Both sentences persist near-verbatim; the antecedent problem for "Those" (nearest
-plural is the three axes, not "two costs") is unchanged.
-
----
-
-## Finding 10 — `*_rhs!` docstrings state the consumed-operand fact 3×
-
-**VERDICT: PRESENT**
-
-`src/Generator.jl` `velocity_rhs!` still carries three statements of the same fact: body (line
-307, "`ω_consumed` is consumed in place"), admonition first paragraph (lines 339–344, "`ω_consumed`
-must hold the vorticity on entry and no longer does on return"), and admonition second paragraph
-(lines 346–350, "Which operand is consumed follows the **physics**, not the argument position").
-`scalar_rhs!`'s admonition (lines 480–487) still repeats the "physics not position" point, now via
-"As in `velocity_rhs!`, the consumed argument is fixed by the physics rather than by its position in
-the signature" — shortened but the same duplicated defence of an unproposed convention survives.
-
----
-
-## Finding 11 — "deliberately deferred" ×3 in `DissipationFactor`
-
-**VERDICT: ABSENT**
-
-`src/phenomenology/Spectra.jl` `DissipationFactor` (lines 61–77): the title ("Bottleneck models are
-deliberately deferred") and the closing clause ("…they are deliberately deferred") remain, but the
-middle sentence that verbatim-repeated the title ("These factors are inertial-normalized cutoffs;
-bottleneck models are deliberately deferred.") is gone, replaced by "These factors are
-inertial-normalized cutoffs." — a plain statement carrying no repetition. Only the bookend
-title/closing pattern remains, which is not the flagged triple-restatement defect.
-
----
-
-## Finding 12 — argument entries explain implementation, not meaning (2 samples)
-
-**VERDICT: PRESENT**
-
-Both instances persist, reworded but substantively unchanged:
-- `src/Phenomenology.jl` `FlowParameters` → `scalar_dissipation` (lines 93–97): "It is a
-  **sentinel, not a value that propagates** … Arithmetic a caller does on the field itself is not
-  covered — there `NaN` propagates as it always does." Still restates Julia's default `NaN`
-  arithmetic behavior to a Julia user.
-- `src/SimulationRun.jl` `Simulation` → `κ_max_η` (lines 137–140): "the sentinel is what lets the
-  constructor tell an omitted keyword from an explicit one, so that giving both it and `viscosity`
-  is an error rather than a silent drop" — unchanged, still explains the internal sentinel
-  mechanism ahead of/instead of purely the user-facing meaning.
-
----
-
-## Finding 13 — observation before/after iteration, framed two ways
-
-**VERDICT: ABSENT**
-
-`docs/src/observables_cache.md` §1.3 (line 139) now reads: "**The loop observes, then advances.**
-… Read from the callback's side it runs *after* each iteration, which is how [`run!`](@ref)
-describes it — the same loop, named from the two ends." The two framings are now explicitly
-reconciled as the same event seen from two sides, rather than left to collide. §3.2 (line 422) and
-`run!`'s docstring both consistently use "after every iteration … and once before/at the seeded
-`t_0`."
-
----
-
-## Finding 14 — "the thing that reads the run each iteration"
-
-**VERDICT: ABSENT**
-
-`src/SimulationRun.jl` module map (lines 22–24) now reads: "the callback *is* the observation — the
-**function** the loop calls to read the run each iteration — and its return decides continuation."
-The placeholder noun "the thing" is gone, replaced by "the function," naming the object as every
-other gloss on the page does.
-
----
-
-## Finding 15 — "It is never the cache" unprovoked denial
-
-**VERDICT: ABSENT**
-
-`docs/src/notation.md` Vocabulary table, *observation* entry (line 125): "the callback a run is
-driven by: it reads the run once per iteration and its return decides whether to continue. By
-extension the *occasion* — 'computed at an observation' means computed in that callback, between
-iterations, from what the run already holds." The denial sentence ("It is never the cache, which is
-the storage the callback reads.") is gone.
-
----
-
-## Finding 16 — "and that is the module owning the iteration it closes"
-
-**VERDICT: ABSENT**
-
-`src/Cache.jl` module docstring (lines 21–24) now reads: "The field slots are filled by
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which `Propagator` owns because it
-needs the scheme's scratch to recover the fields." The grafted second clause with the ambiguous
-"that" pronoun is gone; one clean reason remains.
+# Closure — Hat 12: plain-sense
+
+## 1. `max_wavenumber`: "the dealiasing cutoff" said four times
+**PRESENT** — `docs/src/api/SimulationDomain.md:54`: "The dealiasing cutoff it sets — the dealiasing
+cutoff — the highest wavenumber the run treats as resolved signal…" is unchanged verbatim (self-apposition
+intact). The docstring copy in `src/SimulationDomain.jl` (`max_wavenumber`) was reworded and no longer
+repeats the phrase three times — but the finding names two locations, and the header is one of them and
+is still broken.
+
+## 2. `Simulation` grid mode: ~120-word sentence, garbled coordination
+**PRESENT** — `src/SimulationRun.jl:104-111`: "since ``G`` carries ``C_\varepsilon^{-2/3}`` and the ratio
+``L_{11}/L`` and that ratio is fixed by where the run is driven" is unchanged verbatim, still inside one
+run-on sentence whose "then sets ``\nu``" resumption sits ~70 words from its subject.
+
+## 3. `FlowParameters.scalar_dissipation`: bullet denies what it asserts
+**ABSENT** — `src/Phenomenology.jl:87-91`: the "sentinel, not a value that propagates" claim is gone
+(`grep -n "sentinel" src/Phenomenology.jl docs/src/api/phenomenology/*.md` returns nothing). Current text:
+"That guard covers the laws, not arithmetic a caller does on the field itself, where `NaN` propagates as
+it always does" — states the checked-laws claim without the retracted categorical claim; no longer
+self-contradictory.
+
+## 4. `step!` / `deposit!`: opposite rules for the same argument order
+**ABSENT** — `src/Propagator.jl:197-199` (`step!`) and `:499-501` (`deposit!`) now agree: `deposit!`
+explicitly says "unlike `step!`, whose leading `scheme` is a dispatch tag" and both state the shared tail
+is `state, domain, buffers`. No contradiction remains on the flagged axis (whether the leading argument is
+the mutated object); both docstrings are consistent.
+
+## 5. `recommended_cfl` admonition ends by repeating its own sentence
+**ABSENT** — `src/Propagator.jl:556`: admonition now ends "…prefer `IFLowStorageRK3`, whose ceiling has
+no such dependence, or to pass an explicit `cfl` and verify it against a run that holds its energy." The
+verbatim closing-sentence restatement ("`IFLowStorageRK3`'s ceiling carries no such dependence.") is gone;
+`grep -c "no such dependence" src/Propagator.jl` = 1.
+
+## 6. `Simulation` fields: naming defence against an unintroduced confusion
+**PRESENT** — `src/SimulationRun.jl:220-222`: "The two roots are not interchangeable: *trajectory* names
+the path through time the scheme integrates, *particle* the objects whose storage the buffers hold." is
+unchanged verbatim.
+
+## 7. `DealiasingStrategy`: two clauses about the documentation, not the object
+**PRESENT** — `src/SimulationDomain.jl:45` ("They come in two families, and the rest of the corpus uses
+these names") and `:50-52` ("…the front door — and not by this catalogue.") both unchanged verbatim.
+
+## 8. `truncate_to_band!`: PhaseShift half-dealiasing fact stated three times
+**PRESENT** — all three restatements survive: `docs/src/api/SimulationDomain.md:54-55` (section header),
+`src/SimulationDomain.jl:370` (admonition title "…under PhaseShift that is half the dealiasing"), and
+`:372` (admonition body "Under `PhaseShift` it is only the second half…"). None cut.
+
+## 9. `envelope_wavenumber`: "forms its own" has no object
+**ABSENT** — `rg "forms its own|roll-off whose coefficient" .` (scoped outside `.claude/`) returns no
+hits anywhere in `src/` or `docs/src/`. `src/SimulationRun.jl:164-167`'s `envelope_wavenumber` bullet no
+longer contains the dangling clause or the `large_scale_length` cross-reference; rewritten to state
+plainly that it does not shape the profile under `initial_spectrum` but still sets the assumed state's
+scale.
+
+## 10. `ExponentialDissipation`: closing sentence restates the one before it
+**PRESENT** — `src/phenomenology/Spectra.jl:246-248`: "…while the values here are fitted to the far
+range alone. The two are the same symbol for the same decay, calibrated on different intervals." both
+sentences present unchanged, second still a restatement of the first with the explanation removed.
+
+## 11. `max_speed`: cache-policy essay lodged in a reduction's docstring
+**PRESENT** — `src/Observables.jl:149-158`, the `!!! note "Why this observable alone has a cached form"`
+admonition is unchanged: five sentences of cache-contents policy (why `kinetic_energy`/`dissipation` are
+not cached, the fixed-``\Delta t`` case) still sit inside `max_speed`'s docstring rather than being cut to
+one clause and linked.
+
+## 12. `velocity_rhs!` / `scalar_rhs!`: caveat closes with duplicated non-sequitur
+**PRESENT** — `src/Generator.jl:349-350` and `:486-487`: both admonitions still end with the identical
+sentence "Only the spectral product scratch remains on the generator, and the operation allocates
+nothing." — verbatim duplicate across the pair, unchanged.
+
+## 13. `current_step`: same distinction, three times, in four sentences
+**PRESENT** — `src/SimulationRun.jl:368` ("The number of steps `sim` has taken — how far the run has
+gone.") and `:374` ("Use this to ask how far the run has gone, and the epoch to ask whether a cached value
+is still the right one.") still open and close on the same gloss; `src/Cache.jl:42-45` still restates the
+identical epoch-vs-step contrast verbatim. Unchanged.
+
+## 14. Architecture §4.5: 55-word IFRK2 sentence with defensive parenthetical
+**PRESENT** — `docs/ARCHITECTURE.md:386-389`: "cheaper in transforms… counting the same way on both
+sides: the scheme's own registers plus the dealiasing seam's assembly register — and imaginary-axis
+unstable" — still one sentence, still the pre-emptive "counting the same way" defence, still the stranded
+final predicate. Unchanged.
+
+## 15. Architecture §4.7: verb elided across a long parenthesis
+**PRESENT** — `docs/ARCHITECTURE.md:471-473`: "`current_time(sim)` and `current_step(sim)` report the
+clock, and the observables applied to `sim.state` (e.g. …) the current-state diagnostics, for a callback
+to read." Unchanged verbatim; the second-clause verb is still gapped across the parenthetical.
+
+## 16. Decision-log entry 30: sentence resumes lower-case after a closing parenthesis
+**PRESENT** — `docs/ARCHITECTURE.md:1144-1145`: "…have to reason about.)* the sanctioned mutators call it
+themselves, and the seeders' docstrings direct hand-run loops to it." Unchanged; still resumes mid-sentence
+in lower case with no grammatical link to what precedes.
+
+## 17. observables_cache §1.2: `max_speed` boundary case under four dashes
+**PRESENT** — `docs/src/observables_cache.md:95-98`: "…so the *maximum* is materialized — one number —
+while no per-point field is ever whole anywhere and none can be cached." — identical sentence (four
+dash-delimited asides total, counting the earlier "— the advective-CFL bound —"), unchanged from the
+finding's quote.
+
+## 18. `Li2008`: author-year name asserts a provenance the docstring withdraws
+**PRESENT** — `src/phenomenology/Scalings.jl:132-133`: "The value is this package's own reduction of the
+Johns Hopkins Turbulence Database (JHTDB) forced-isotropic dataset…" unchanged; no clause added
+distinguishing the handle-names-a-dataset case from the naming convention in `docs/ARCHITECTURE.md:504`
+("the paper is the author-year handle"), which is also unchanged.
+
+## 19. Home page: "the protocol's functions, `prepare!`, `velocity_rhs!` and the rest"
+**PRESENT** — `docs/src/index.md:111-113`: "…through a fixed set of **verbs** — the protocol's functions,
+`prepare!`, `velocity_rhs!` and the rest — rather than assembling the physics itself." Aside unchanged,
+still present on the Home page.

@@ -1,63 +1,57 @@
-# Closure — Hat 10: Style / Copy-Editor
+# Closure audit — Style / Copy-Edit Panel (10-style-editor)
 
-## Finding 1 — "Stamp" retired but surviving on Home/Notation/Cache API
+## Finding 1 — Hyphenated compound splits into two words ("deposit- completeness")
 **VERDICT: ABSENT**
+Evidence: `rg "deposit-" docs/src/observables_cache.md docs/src/architecture.md` shows
+`deposit-completeness` joined on a single source line at observables_cache.md:419 and
+architecture.md:458/1497/1675 (also 1486 heading, 72 deposit-driven — different compound, fine).
+Built HTML confirms: `grep -o "deposit-[ ]*completeness" docs/build/{observables_cache,architecture}/index.html`
+returns 4 hits, all `deposit-completeness` with no stray space. No split instance found anywhere.
 
-Evidence: `rg -i stamp` across `src/`, `docs/src/`, `docs/ARCHITECTURE.md`, `CLAUDE.md`, and
-`docs/build/` returns zero hits outside `docs/ARCHITECTURE.md` decision-log entries 53–54, which are
-the exempted historical record (explicitly narrating that older entries "originally said 'stamp'").
-`src/Cache.jl` now uses `epoch`/`*_epoch` throughout (`velocity_epoch`, `fields_epoch`, "the checked
-read shared by every accessor... epoch"), and `docs/src/index.md` / `docs/src/notation.md` carry no
-"stamp" occurrence. Full sweep confirmed.
-
----
-
-## Finding 2 — Grammar: "an scheme"
+## Finding 2 — Citation punctuation split: "Year, Title" vs "Year — Title"
 **VERDICT: ABSENT**
+Evidence: `rg "Betchov 1956|Lundgren 2003|Bussi.*2007" src/` shows all three now comma-joined:
+`src/Observables.jl:246` "(Betchov 1956, *An inequality...*", `src/Forcing.jl:307` "(Bussi, Donadio &
+Parrinello 2007, *Canonical sampling...*", `src/Forcing.jl:350` "Lundgren 2003, *CTR Annual Research
+Briefs*". Swept `src/Observables.jl` and `src/Forcing.jl` for stray " — " near a year; only hit
+(Forcing.jl:460, Eswaran & Pope) is a label dash before the author, not a year-title separator —
+consistent with house form elsewhere.
 
-Evidence: `docs/ARCHITECTURE.md:678` now reads "The ``\nu = 0`` truncated-Euler experiment — **a**
-scheme and dealiasing oracle." — corrected from "an scheme" to "a scheme".
-
----
-
-## Finding 3 — Citation format: em-dash vs comma splits the three dealiasing-strategy docstrings
+## Finding 3 — Redundant, near-verbatim repeated sentence in the same admonition
 **VERDICT: PRESENT**
+Evidence: `src/Propagator.jl:556-557`, `recommended_cfl`'s "IFRK2 margin" admonition: "...the
+practical course at high Reynolds number is to prefer `IFLowStorageRK3`, whose ceiling has no such
+dependence, or to pass an explicit `cfl` and verify it against a run that holds its energy.
+`IFLowStorageRK3`'s ceiling carries no such dependence." — the trailing sentence is still there,
+verbatim as quoted in the finding.
 
-Evidence: `src/SimulationDomain.jl`. `TwoThirds` (line ~59): "Orszag (1971) — *On the elimination of
-aliasing...*" (em dash). `HouLi` (line ~73): "Hou & Li (2007) — *Computing nearly singular
-solutions...*" (em dash). `PhaseShift` (line ~102): "Patterson & Orszag (1971), *Spectral
-calculations...*" and "Rogallo (1981), *Numerical experiments...*" (comma, both citations). The
-three-way split is unchanged.
-
----
-
-## Finding 4 — "the default `BandRescaling(over = :total)`" implying `over` has a default
-**VERDICT: ABSENT**
-
-Evidence: `docs/src/observables_cache.md:87` now reads "Under the `BandRescaling(over = :total)` the
-front door builds, the forcing *does* form the whole-field ``k``..." — the word "default" preceding
-the constructor call is gone, and the phrasing now reads as a relative clause ("the ... that the
-front door builds") rather than presenting `over = :total` as `BandRescaling`'s own default.
-`BandRescaling`'s signature (`src/Forcing.jl:223,303`) still shows `over` with no default, required.
-
----
-
-## Finding 5 — Inconsistent spacing around `\times` for the same `M × 3` quantity
+## Finding 4 — Missing subsection heading breaks the page's one-heading-per-group pattern
 **VERDICT: PRESENT**
+Evidence: `docs/src/api/SimulationDomain.md:30-35` — the `max_wavenumber` blurb "The dealiasing
+cutoff it sets — the dealiasing cutoff — the highest wavenumber the run treats as resolved signal,
+and the resolution criterion κ_max η a run is built to meet." still has no `##` heading above it
+(directly follows the "Dealiasing strategies" `@docs` block) and still doubles the phrase "the
+dealiasing cutoff" back-to-back, exactly as quoted.
 
-Evidence: `src/Particles.jl:248` now reads ``M\times 3`` (no space before `\times`, one space after)
-— changed from the fully-spaced form the finding quoted, but still inconsistent with the five other
-occurrences, all fully unspaced ``M\times3``: `docs/ARCHITECTURE.md:422,1349` and
-`docs/src/observables_cache.md:324,343,358`. The class (inconsistent `\times` spacing for this
-quantity) survives at the same site, in a new form.
-
----
-
-## Finding 6 — "checked accessor" vs "checked read" for the same concept
+## Finding 5 — Two distinct citations merged into one bulleted reference line
 **VERDICT: PRESENT**
+Evidence: `src/phenomenology/Spectra.jl:407-408` — `_OBUKHOVCORRSIN` is still one `Reference` whose
+`citation` string joins Obukhov (1949) and Corrsin (1951) with `" / "`. `docs/src/api/phenomenology/Spectra.md`'s
+`## References` `@eval` block (lines 73-79) emits one bullet per unique citation string with no
+splitting on `" / "`, so the generated bibliography still renders both papers on one bullet line.
 
-Evidence: `docs/src/index.md:100-101` (Home page module map) still reads "read through checked
-**accessors** that serve the deposited value or throw." Meanwhile `src/Cache.jl` (module docstring,
-lines 24-25) and `docs/src/api/Cache.md:20` ("## The checked **reads**") both consistently use
-"checked read(s)." `docs/src/notation.md` still carries no glossary entry for either term. The
-two-term split across pages is unchanged.
+## Finding 6 — Phenomenology References use labelled DOI-link form, not the bare-autolink form
+**VERDICT: PRESENT**
+Evidence: `docs/ARCHITECTURE.md:1834-1848` `## References` still uses bare autolinks
+(`<https://doi.org/...>`, confirmed rendering as plain URL text, not a labelled anchor). The three
+Phenomenology reference pages still render the labelled inline form: `grep -o '<a href="https://doi.org[^"]*">[^<]*</a>'`
+on `docs/build/api/phenomenology/{Scalings,Spectra,StructureFunctions}/index.html` returns
+`<a href="...">doi:10....</a>` anchors throughout — the two-form disagreement is unchanged.
+
+## Finding 7 — Admonition title runs directly into its own body (extraction artifact, verified benign)
+**VERDICT: NOT-A-DEFECT**
+Evidence: Original finding already established this is not a rendering defect. Re-confirmed:
+`docs/build/index.html` shows `admonition-header">Work in progress<a class="admonition-anchor"...`
+— a proper `admonition-header` element distinct from the following `admonition-body`; the "header
+runs into body" reading is an artifact of flat-text extraction only, not of the actual HTML/DOM
+structure. No fix was ever needed.

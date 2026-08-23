@@ -1,111 +1,87 @@
 # Closure — Hat 08 (Dimensional analysis & normalization)
 
-## Finding 1 — Seeded model spectrum's large scale: `Simulation` promises `1/envelope_wavenumber`, `large_scale_length` overrides it
+Adjudicated against the current corpus only (`src/`, `docs/src/`, `docs/ARCHITECTURE.md`). No prior
+closure round, fix-pass report, or other hat file was read.
 
-**VERDICT: PRESENT**
+## Finding 1 — assumed-state ε (Li2008) vs assumed L₁₁ (1/envelope_wavenumber) mismatch
 
-Evidence: `src/SimulationRun.jl` line 158–160 (the `envelope_wavenumber` bullet), rendered
-identically in `docs/build/api/SimulationRun/index.html`: "it also sets the integral scale
-`initial_spectrum` is evaluated at" — an unconditional claim. `src/phenomenology/Spectra.jl`
-lines 99–106 (`large_scale_length`) still documents that `PopeLargeScale` (used by the flagship
-`Pope2000` preset) overrides with ``L_0 = k^{3/2}/\varepsilon``, "3.7 times smaller" at
-``C_\varepsilon = 0.5``. `SimulationRun.jl` contains no mention of "Pope" or "override" anywhere
-(`grep -n "Pope\|override" src/SimulationRun.jl` returns nothing), so the front-door promise is
-still unqualified against the one preset that breaks it.
+**PRESENT**. `src/SimulationRun.jl:173` still reads "...and the integral scale as
+`1/envelope_wavenumber`", verbatim as quoted, with no note that this is a nominal length rather than
+`L₁₁`, and no cross-derivation against `Li2008`'s own `L/L₁₁ ≈ 5`. `Li2008`'s docstring
+(`src/phenomenology/Scalings.jl:140-145`) does caveat its own `G`-vs-`C_ε` discrepancy, but that
+caveat is never connected to the `envelope_wavenumber`-as-`integral_scale` construction the finding
+targets — `FlowParameters(...; integral_scale = inv(envelope_wavenumber), ...)` at
+`src/SimulationRun.jl:285` still uses the default `κ_p = 2 ⇒ L₁₁ = 0.5`, unreconciled with the
+`ε`-implied `L₁₁ ≈ L/5 ≈ 1.26`.
 
----
+## Finding 2 — E(κ) half-energy vs E_φ(κ) full-variance asymmetry, no notation.md row
 
-## Finding 2 — `ε_target` bound to "energy-injection rate" but also carries a scalar-variance rate
+**PRESENT**. `docs/src/notation.md` has an `E(\kappa)` row (line 73) but no `E_\varphi(\kappa)` row
+anywhere in the file (grep for `Ny}`, `varphi`-spectrum patterns returns nothing). `ScalarSpectrum`'s
+docstring (`src/phenomenology/Spectra.jl:401-403`) still reads "the density in wavenumber of the
+scalar variance ⟨φ²⟩", unchanged, so the ×2 convention asymmetry the finding flags remains unpinned
+on the one page that is "the single reference."
 
-**VERDICT: PARTIAL**
+## Finding 3 — IFRK2's CFL dealiasing scaling applied to a relation the same docstring calls degenerate
 
-Evidence: `docs/src/notation.md` line 109 now reads "the injection rate a `ConstantPower` holds:
-energy for the velocity, scalar variance for the scalar" — the glossary's dimensional binding is
-fixed. `src/Forcing.jl` `ConstantPower` docstring (lines 381–386) likewise now distinguishes
-``\varepsilon`` (velocity) from ``\varepsilon_\varphi`` (scalar) explicitly.
+**PRESENT**. `src/Propagator.jl`'s `recommended_cfl` docstring still states, two paragraphs apart,
+that `IFRK2`'s `0.25` is "an empirical margin, not a computed limit" (because `y_s = 0` makes the
+`C_CFL = y_s/(κ_maxΔx)` relation degenerate for it), then applies the same dealiasing scaling
+`C_CFL ∝ 1/κ_max` to both schemes with no statement that, for `IFRK2`, the scaling is a
+heuristic riding on the empirical number rather than inherited from the derived relation. The
+`_base_cfl`/`recommended_cfl` code (lines ~569-577) confirms both schemes get the identical
+`(2//3)/f` multiplier.
 
-surviving_class: the same file's own `# Arguments` entry, line 400, still reads "`injection_rate` —
-the energy-injection rate to hold" unqualified (self-contradicting the paragraph six lines above
-it); the module docstring (`Forcing.jl` line 20, "The interchangeable energy-injection
-strategies") and `AbstractForcing`'s docstring (line 61, "Supertype of the energy-injection
-strategies") still name the whole family "energy-injection" although one implementation serves
-scalar variance too.
+## Finding 4 — `envelope_wavenumber`: "no effect" (State.jl) vs "sets the integral scale" (SimulationRun.jl)
 
----
+**PRESENT**. Both quotes still stand unqualified: `src/State.jl:79` — "The `envelope_wavenumber`
+setting has no effect in the `initial_spectrum` branch below" (verbatim, both
+`random_solenoidal_velocity_spectral!` and `random_scalar_spectral!` copies at lines 79 and 160) —
+and `src/SimulationRun.jl:166` — "it also sets the integral scale in the assumed state
+`initial_spectrum` reads." Neither has been qualified with the front-door/seeder distinction the
+resolution hint proposed.
 
-## Finding 3 — "Two registers per field" names two different sets on two pages
+## Finding 5 — `PhaseShift` scratch cost: "one spectral buffer per term" vs the actual register set
 
-**VERDICT: ABSENT**
+**PRESENT**. `src/SimulationDomain.jl`'s `PhaseShift` docstring still says "the displaced-evaluation
+scratch (a field-scale spectral-representation buffer per phase-shifted term)" (unchanged). The
+actual generator registers (`src/Generator.jl:111-119`) hold, per velocity term alone,
+`velocity_shifted` (spectral) **and** `u_shifted` / `omega_shifted` (both explicitly "recovered on
+the displaced grid" — physical representation), plus `scalar_shifted` (spectral) / `phi_shifted`
+(physical) for the scalar term — understating both count and representation exactly as the finding
+describes. Decision-log text at `docs/ARCHITECTURE.md:1606-1610` still names `u_shifted` /
+`ω_shifted` the same way.
 
-Evidence: `docs/ARCHITECTURE.md` §4.5 (lines 385–389) now states its counting convention
-explicitly — "three spectral registers per field against the low-storage scheme's two, counting
-the same way on both sides: the scheme's own registers plus the dealiasing seam's assembly
-register" — which reproduces `allocate_buffers`' actual totals (`src/Propagator.jl` lines
-157–158: `IFLowStorageRK3` → `stage1`+`nonlinear` = 2; `IFRK2` → `stage1`+`stage2`+
-`velocity_predictor_spectral` = 3). `IFLowStorageRK3`'s own docstring (lines 244–249) now
-explicitly separates Williamson's classical 2N count ("the state's own array plus one accumulator
-(`stage1`)") from the `IntegratorBuffers` total and warns "the count measures the scheme, not the
-solver it is embedded in" — the collision is flagged, not silent, and the numbers reconcile.
+## Finding 6 — module docstring "distribution over wavenumber" vs the per-shell-energy discipline
 
----
+**PRESENT**. `src/Observables.jl:27-28` still reads "...the energy spectrum reduces to a
+distribution over wavenumber..." verbatim. `energy_spectrum`'s own docstring (lines 285-320) still
+insists on the per-shell energy `E_n` vs the density `E(κ)` distinction. Grep for "distribution over
+wavenumber" / "energy spectrum reduces" across `src/` and `docs/` returns only this one module-map
+sentence — no other surviving instance of the same phrase, but the flagged sentence itself is
+unswept.
 
-## Finding 4 — `max_wavenumber` calls κ_max "the highest wavenumber magnitude that `domain` actually evolves" — false for `HouLi`
+## Finding 7 — notation.md ("the single reference") omits `κ_Ny` and `κ_p`, both defined inline repeatedly
 
-**VERDICT: PARTIAL**
+**PRESENT**. `docs/src/notation.md` has no `\kappa_{\mathrm{Ny}}` row and no `\kappa_p` row (only
+`\kappa_{\max}` at line 100). `κ_Ny = (N/2)(2π/L)` is still spelled out verbatim in
+`src/SimulationDomain.jl` at lines 64, 77, and 113 (`TwoThirds`, `HouLi`, `PhaseShift` respectively) —
+still three inline restatements of the same definition, exactly the repetition the page's "single
+reference, no repeat" convention (its own opening line) exists to prevent.
 
-Evidence: `src/SimulationDomain.jl` lines 281–283 now reads "the highest wavenumber magnitude the
-run treats as resolved signal, and for a truncating strategy the highest it evolves at all (under
-`HouLi` the modes above it are damped rather than removed)" — the docstring itself is fixed,
-matching the finding's own resolution hint almost verbatim.
+## Finding 8 — `DissipationFactor` bottleneck note's γ<0 vs the cited fits' positive exponent
 
-surviving_class: `docs/src/api/SimulationDomain.md` line 30 still reads "The dealiasing cutoff it
-sets — the highest wavenumber the domain evolves" (unconditional, no `HouLi` caveat), rendered
-verbatim in `docs/build/api/SimulationDomain/index.html`. `docs/src/api.md` line 13 likewise
-still calls `max_wavenumber` "the highest wavenumber magnitude the run evolves."
+**PRESENT**. `src/phenomenology/Spectra.jl:76` still reads "...`A(κη)^γ exp(−βκη)` with `γ < 0`..." in
+the bottleneck-deferral admonition, unchanged. `ExponentialDissipation`'s docstring two structs later
+still cites Chen et al. 1993 (`β ≈ 7.1`) alongside Khurshid et al. 2018 (`β ≈ 6.7`) for the pure
+exponential far-dissipation form — the same family the finding says carries a positive power-law
+prefactor exponent in the cited literature. No re-derivation or sign clarification has been added.
 
----
+## Finding 9 — grid-mode `HouLi` caveat did not say which way the resolution estimate errs
 
-## Finding 5 — `Sreenivasan1995`'s default C_K = 1.5 is not Sreenivasan's own value
-
-**VERDICT: ABSENT**
-
-Evidence: `src/phenomenology/Scalings.jl` lines 100–102 now reads "The default ``C_K = 1.5 \pm
-0.1`` used here is the consensus value as quoted by Sagaut & Cambon (2018), **not a figure read
-off the 1995 paper**, with no significant Reynolds-number trend" — the misattribution the finding
-flagged (reading as Sreenivasan's own finding) is explicitly disclaimed.
-
----
-
-## Finding 6 — `initial_spectrum` "evaluated at the run's state" at t = 0, where ε and η do not yet exist
-
-**VERDICT: ABSENT**
-
-Evidence: `src/SimulationRun.jl` lines 163–167 now states exactly which assumed values are used:
-"``\varepsilon`` from the `Li2008` stationary-dissipation law at the requested `kinetic_energy` and
-box side, ``u'`` from that same energy, ``\nu`` as resolved above, and the integral scale as
-`1/envelope_wavenumber`." This answers the finding's open question ("Which ε the seeder uses…is
-not stated anywhere on the page") directly; ``\eta`` follows from the now-stated ``\nu,\varepsilon``
-via `kolmogorov_length`, needing no separate statement.
-
----
-
-## Finding 7 — "Carrying the ½ only for the vector" attributes an energy-vs-variance convention to tensor rank
-
-**VERDICT: ABSENT**
-
-Evidence: `src/Forcing.jl` `BandRescaling` docstring, lines 230–237: "the field's ``L^{2}``
-observable — the ``\tfrac{1}{2}`` belongs to the kinetic energy's own definition, not to the field
-being a vector" — states exactly the correction the finding's description called for.
-
----
-
-## Finding 8 — The notation glossary writes κ_max in two algebraic shapes and omits `HouLi`
-
-**VERDICT: PRESENT**
-
-Evidence: `docs/src/notation.md` line 99 is unchanged from the finding's quote — still
-``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for `TwoThirds` against
-``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift` (different algebraic shapes, one
-with ``N/2`` factored out and one without), and still names no `HouLi` value at all — while
-`src/SimulationDomain.jl`'s `max_wavenumber` docstring uses the uniform ``f\frac{N}{2}\frac{2\pi}{L}``
-form with all three strategies' `f` given, including `HouLi`'s `1`.
+**ABSENT**. `src/SimulationRun.jl:117-121` now reads, immediately after the "approximate for `HouLi`"
+sentence: "The gap is not cosmetic: f = 1 puts η ≈ 0.64 Δx at `κ_max_η = 2` (against 0.96 Δx for
+2/3), and since ν ∝ f^(−4/3), `HouLi` is handed a Re_λ about 31% higher on the same grid at the same
+nominal criterion — raise `κ_max_η` when comparing across strategies." This states exactly the
+missing sign: grid mode over-credits `HouLi`'s effective resolution and hands it a smaller ν / higher
+Re_λ than the criterion intends — precisely the clause the finding's resolution hint asked for.

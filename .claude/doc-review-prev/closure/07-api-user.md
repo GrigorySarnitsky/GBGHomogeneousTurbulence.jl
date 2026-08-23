@@ -1,55 +1,62 @@
-# Closure — hat 07: physicist-programmer / API user
+# Closure — Hat 07: physicist-programmer / API user
 
-## Finding 1 — "Stamp" vocabulary survives in live prose after its own retirement
-**VERDICT: ABSENT**
-Evidence: `rg -i 'stamp' src/ docs/src/ CLAUDE.md` returns zero hits. Rendered pages checked directly
-(`docs/build/index.html`, `docs/build/notation/index.html`, `docs/build/api/Cache/index.html`,
-`docs/build/observables_cache/index.html`) — no "stamp" occurrences. The only surviving mentions are
-in `docs/ARCHITECTURE.md`'s decision log (§53, "'Stamp' is retired…"), which is historical record of
-the retirement itself, not live prose using the retired word.
-
-## Finding 2 — `deposit_sample!`'s return-type arrow names neither a type nor an argument
-**VERDICT: ABSENT**
-Evidence: current docstring/signature at `src/Cache.jl:266` is `deposit_sample!(cache)` — no `->`
-arrow at all. Rendered at `docs/build/api/Cache/index.html`: `deposit_sample!(cache)` confirmed. The
-malformed `-> particle velocities` arrow the finding quoted is gone; body still says "Returns the
-particle-velocities slot" in prose.
-
-## Finding 3 — `velocity_rhs!` / `scalar_rhs!` order the consumed operand inconsistently
+## Finding 1 — `particles_epoch`'s producer attributed two different ways
 **VERDICT: PRESENT**
-Evidence: `src/Generator.jl:301` `velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)` (consumed
-last); `src/Generator.jl:450` `scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain)` (consumed
-before non-consumed `φ`). The note "Which operand is consumed follows the physics, not the argument
-position" (Generator.jl:346-350) still explains but does not resolve the asymmetry. Unchanged from
-the finding.
 
-## Finding 4 — `stationary_dissipation` is the one `Scalings` evaluator without a return-type arrow
-**VERDICT: ABSENT**
-Evidence: `src/phenomenology/Scalings.jl:38` now reads
-`stationary_dissipation(law, kinetic_energy, side_length) -> Float64` — the arrow is present,
-matching the sibling evaluators (`scaling(law, fp) -> Float64`, etc.).
+Evidence: `src/Cache.jl:121-122` (`ObservablesCache` Fields) still reads "`particles_epoch` — the
+tracer positions' counter, advanced when [`advect!`](@ref ...) moves them." `src/Cache.jl:337-340`
+(`particles_modified!` docstring) still attributes the advance to "the run layer" — "`advect!`
+followed by `record_particle_velocities!`, both inside `advance!`" — and `particles_modified!` itself
+is the function that increments `cache.particles_epoch` (`src/Cache.jl:349`). `src/Particles.jl:292-293`
+confirms `advect!`'s concrete method carries no `cache` argument
+(`advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDomain, buffers::ParticleIntegratorBuffers, dt::Real)`).
+Checked `docs/src/observables_cache.md`, `docs/src/api/*.md`, `docs/ARCHITECTURE.md` for
+`particles_epoch` / "advect! moves" — no other mention; the two contradictory attributions stand
+exactly where the finding located them, text unchanged.
 
-## Finding 5 — `particle_velocities` breaks the tracer-accessor naming pattern it sits beside
+---
+
+## Finding 2 — `deposit!(sim)` credited with the particle-velocities slot
 **VERDICT: PRESENT**
-Evidence: `src/Particles.jl:334` `particle_positions(tracers::Tracers) = tracers.positions`;
-`src/Particles.jl:342` `number_of_particles(tracers::Tracers) = ...`; but
-`src/Cache.jl:235` `particle_velocities(cache::ObservablesCache)` — still keyed on `cache`, not
-`tracers`, despite `tracers.particle_velocities` existing as a genuine field
-(`src/Particles.jl:133`). `docs/src/api/Particles.md:77-78` shows the same asymmetric pair
-(`particle_positions(sim.tracers)` vs `particle_velocities(sim.cache)`). Unchanged from the finding.
 
-## Finding 6 — the front door's spectrum-matched IC option covers velocity only, with no documented scalar path or explanation
-**VERDICT: ABSENT**
-Evidence: `src/SimulationRun.jl:168-171` now states explicitly: "This shapes the **velocity** only; a
-scalar is always seeded from the default Gaussian envelope, and a scalar-spectrum initial condition
-is reached by calling [`random_scalar_spectral!`](@ref ...) on the built run and announcing the
-change." Both the "why" (mirrors the velocity limitation) and the workaround route the finding said
-were missing are now present in the `Simulation` docstring itself.
+Evidence: `src/Propagator.jl:489-492`, the `deposit!` docstring, is unchanged: "The particle-velocities
+slot is not among them... filled by `record_particle_velocities!` wherever the positions move — which
+`advance!` and the `deposit!(sim)` form above both do for you" — still never names `deposit_sample!`.
+`docs/src/notation.md:120` still fixes the order "`step!` the fields, `deposit!` to close them, then
+advance any tracers and record their sample." `src/Cache.jl:266-276`, `deposit_sample!`'s docstring, is
+unchanged: "`record_particle_velocities!` writes, this call records." Runtime confirms `deposit!(sim)`
+(`src/SimulationRun.jl:321-329`) does not move tracer positions (comment: "the positions are unchanged")
+while `advance!` (`src/SimulationRun.jl:415-421`) does — the docstring's "wherever the positions move"
+clause still glosses over that the two callees it names are not both instances of positions moving.
 
-## Finding 7 — `scalar_physical`'s "exactly `velocity_physical`'s contract" is immediately contradicted by an extra throw case
-**VERDICT: ABSENT**
-Evidence: `src/Cache.jl:202-204`, `scalar_physical`'s docstring now reads "on
-[`velocity_physical`](@ref)'s terms (the deposited field or a throw; never a recomputation;
-read-only) **plus one of its own**: it throws an `ArgumentError`..." — the overclaiming word "exactly"
-no longer appears on `scalar_physical`; it now only appears on `vorticity_physical` (Cache.jl:187),
-which genuinely has no extra throw case, so the claim there is accurate.
+---
+
+## Finding 3 — `step!`/`deposit!` argument order "still line up"
+**VERDICT: PRESENT**
+
+Evidence: `src/Propagator.jl:199-200` unchanged: "After the leader both take `state`, `domain`,
+`buffers` in that order, so a hand-run loop's two calls still line up." Signatures unchanged:
+`step!(scheme, state, generator, domain, buffers, cache, dt)` (`src/Propagator.jl:172`) vs.
+`deposit!(cache, state, domain, buffers)` (`src/Propagator.jl:470`) — `generator` still interposed
+between `state` and `domain` in `step!`, so the claim still overstates positional alignment for a
+reader lining the two calls up visually.
+
+---
+
+## Finding 4 — Duplicated sentence in `recommended_cfl`'s IFRK2 caveat
+**VERDICT: PRESENT**
+
+Evidence: `src/Propagator.jl:556-557`, the `!!! warning "The IFRK2 margin does not know the
+viscosity"` block, still ends "...prefer `IFLowStorageRK3`, whose ceiling has no such dependence, or
+to pass an explicit `cfl` and verify it against a run that holds its energy. `IFLowStorageRK3`'s
+ceiling carries no such dependence." — the same claim stated twice back to back, verbatim as the
+finding quoted it.
+
+---
+
+## Summary
+
+All four findings from this hat are still present in the corpus, verbatim or effectively unchanged
+from the quoted text. No evidence of any fix landing for this hat's findings; the particle-epoch /
+deposit-sample attribution contradictions (Findings 1–2) and the two editorial nits (Findings 3–4)
+all reproduce exactly at the cited locations.

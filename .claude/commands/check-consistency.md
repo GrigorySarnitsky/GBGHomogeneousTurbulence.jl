@@ -33,7 +33,7 @@ comes closest: it reads the authored **source** against the `CLAUDE.md` rulebook
 judgment-level backstop — but `/check-docs` stays the enforcement, and the hat is told to spend its
 effort on the context calls a grep cannot make.)
 
-## The panel (23 hats)
+## The panel (24 defined; 10 run by default)
 
 Substrate **FULL** = every rendered page incl. the design docs; **SITEONLY** = the design docs — the
 Architecture page and the observables-cache page — withheld, so the two no-design-doc hats judge
@@ -98,13 +98,30 @@ same class in the machinery prose — where the owner's own read-through found *
 names for one integer) and *epoch* vs *iteration*, neither of which any hat produced. The hat is named
 for the job rather than the discipline, so it is not invited to write essays.
 
-**The two free readers run FIRST, and that ordering is a measurement, not a preference.** Run order
-is priority order because a token-out truncates the tail. `/bug-hunt` ran eight class lanes and two
-unconstrained ones over the same tree: the class lanes reported `complete: true` over their own blind
-spot, and the free lanes found nine defects at a third the cost — four of them regressions from the
-preceding 48 hours. A class list is a *hypothesis* about where defects live, and the panel's measured
-failure was the rubric rather than the reading. Hats 16–17 carry no rubric on purpose; there are two
-because their value is independent sampling, and the overlap between them is itself signal.
+**`core` is the DEFAULT profile, and it was measured, not chosen.** On 2026-08-22 the full panel and
+a six-hat subset ran on the *identical* manuscript. The full panel cost **5.94 M tokens against
+1.64 M** and returned **184 findings against 58** — but the seventeen extra hats bought only **14
+unique blocker-or-major findings** for their extra 4.3 M tokens, about **307 k each against the small
+panel's 57 k**, and **eight of the seventeen produced no unique significant finding at all**.
+
+So the panel is built **upwards from the small set, never cut down from the large one.** Cutting means
+defending each incumbent, which is how it reached 23 hats. A hat enters `core` only by producing
+unique significant findings in a measured run: `cold-reader` (3 unique majors), `pf-parity` (3) and
+`logician` (2) were admitted on that evidence, on top of the six-hat baseline and a third free reader.
+
+**Admission needs more than one run.** The same six hats reproduced only **72%** of their own findings
+across the two arms, so a single run's "uniqueness" is inside the noise. The other fourteen hats stay
+defined and runnable — `profile: "full"`, or name them in `hats` — they just do not run by default,
+and they re-enter by repeating rather than by argument.
+
+**Three free readers, not two.** That 28% variance is an argument for more samples of the
+unconstrained read — the highest-yield lane — not for another rubric. `/bug-hunt` had already measured
+the same thing from the other side: eight class lanes reported `complete: true` over their own blind
+spot while two free lanes found nine defects at a third the cost.
+
+**Hats run CONCURRENTLY** (2026-08-23). They are independent by construction, so nothing ordered them;
+the sequential loop was a rate-limit accommodation, and it cost 3h33m for the 23-hat run. Array order
+is still priority order — the subset selection and the banked `NN-` numbering follow it.
 
 **Hats 18–21 each came from a finding the owner produced that no hat produced** (the 2026-08-15
 read-through, § END-OF-ROUND TASK). Each got its own lane rather than a duty appended to a
@@ -143,9 +160,9 @@ for a quick check, run a subset.
 
 ## Cost modes (mirrors `/check-docs` — ported from PF 2026-08-06)
 
-**Economy is the DEFAULT.** Twelve of the fifteen hats run on the cheap scan model (Sonnet); three are
-**anchors** that always run at the session's full-strength model — the two physics hats,
-`turbulence-theoretician` and `dimensional`, and **`plain-sense`**. The asymmetry is deliberate: a cheap hat's *false positive* is caught
+**Economy is the DEFAULT.** Most hats run on the cheap scan model (Sonnet); four are **anchors** that
+always run at the session's full-strength model — the two physics hats, `turbulence-theoretician` and
+`dimensional`, plus **`plain-sense`** and **`logician`**. The asymmetry is deliberate: a cheap hat's *false positive* is caught
 downstream (the discipline already verifies every Tier-1/2 finding against `src/` and the built HTML in
 the main thread, at full strength), but a *false negative* — a subtle category error or a
 plausible-but-wrong factor read past — has no downstream verifier, and those two hats exist precisely

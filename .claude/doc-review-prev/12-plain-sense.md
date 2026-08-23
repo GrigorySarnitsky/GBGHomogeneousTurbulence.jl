@@ -1,320 +1,275 @@
 # Plain-sense editor — findings
 
-Hat: **plain-sense**. The question asked of every clause: *does this sentence mean anything, and
-does it earn its place?* Tests applied in order — paraphrase, non-vacuity, unprovoked defence,
-the delete test, load-bearing subject. Style, notation, formatting, terminology and factual
-defects are other hats' business and are not reported here.
+Hat: **plain-sense**. The question asked of every clause: *does it mean anything, and does it earn
+its place?* Tests applied in order — paraphrase, non-vacuity, unprovoked defence, the delete test,
+load-bearing subject — plus over-long multi-clause sentences, ambiguous pronouns, anthropomorphism,
+and how-instead-of-what.
 
 ---
 
-## 1. The quick-start gloss defines "deposit" as "the write in which the deposit writes"
+## 1. `max_wavenumber`: "the dealiasing cutoff" said four times in two sentences
 
-- **type**: clarity
-- **severity**: major
-- **confidence**: high
+- **type**: clarity · **severity**: major · **confidence**: high
 - **locations**:
-  - PAGE: Home, "Quick start" code block comment — "One ITERATION is one advance: a step, then the
-    DEPOSIT that closes it — **the write in which the closing deposit writes the observables the
-    iteration has just computed into the cache**, each stamped with the epoch of the state they were
-    computed from."
-- **test failed**: PARAPHRASE + NON-VACUITY (the appositive restates its own head noun)
-- **description**: The em-dash appositive is supposed to explain "the DEPOSIT that closes it"; it
-  explains it as "the write in which the closing deposit writes … into the cache", i.e. by using the
-  word being defined. Strip the circular half and the sentence loses nothing: "a step, then the
-  closing deposit, which writes the iteration's observables into the cache". The clause is also the
-  reason this comment runs to 43 words across three clauses in a code block, where a reader is
-  skimming.
-- **fix**: REWRITE (drop the appositive; keep "each dated to the state's epoch").
+  - PAGE: api / SimulationDomain, section header above `max_wavenumber`: "The dealiasing cutoff it
+    sets — the dealiasing cutoff — the highest wavenumber the run treats as resolved signal"
+  - same page, `max_wavenumber` docstring: "The dealiasing cutoff of `domain` … — the dealiasing
+    cutoff" (then "It is the cutoff the dealiasing sets")
+- **description**: The section header contains a self-apposition — the phrase interrupts itself with
+  a verbatim copy of itself — and the docstring's opening sentence repeats the same phrase across a
+  parenthetical before restating it a third time. Fails the paraphrase test: a reader cannot tell
+  whether the second "the dealiasing cutoff" was meant to introduce something new. Reads as a
+  merge artifact left in a rendered heading.
+- **fix**: CUT the interrupting apposition in the header and the trailing repetition in the
+  docstring; one naming is enough.
 
----
+## 2. `Simulation` grid mode: one ~120-word sentence whose main verb is lost, with a garbled coordination
 
-## 2. "Two kinds of field share the word" — a sentence with no reconstructible subject
-
-- **type**: clarity
-- **severity**: major
-- **confidence**: high
+- **type**: clarity · **severity**: major · **confidence**: high
 - **locations**:
-  - PAGE: api / Cache, `ObservablesCache` → `# Fields` — "**Two kinds of field share the word**: the
-    two counters below tick as the state changes, and each slot carries a stamp, the counter's value
-    at the moment that slot was filled."
-- **test failed**: PARAPHRASE (which word? which two kinds?)
-- **description**: Nothing in the sentence names the shared word. If "field" is meant (struct field
-  vs flow field), the colon-clause that follows does not discuss fields at all — it discusses
-  counters and slot epochs. If "epoch" is meant, the sentence says "field". A reader cannot restate
-  it. What the paragraph actually needs to say is that the entries below come in two kinds — the
-  slots and their epoch counters — which the bullets then show.
-- **fix**: REWRITE (state the two kinds outright), or CUT and let the bullets speak.
+  - PAGE: api / SimulationRun, `Simulation` → "Setting the Reynolds number", Grid-mode bullet: "since
+    $G$ carries $C_\varepsilon^{-2/3}$ and the ratio $L_{11}/L$ and that ratio is fixed by where the
+    run is driven"
+  - same bullet, the resumption: "invalidates the estimate and with it the $\nu$ grid mode chooses —
+    then sets $\nu$ so that $\kappa_{\max}\eta$ equals `κ_max_η`"
+- **description**: One sentence carries five clauses: it reads the law, states $G$'s value, defends
+  the value's band assumption, warns about moved forcing, and only then resumes "then sets $\nu$" —
+  whose subject ("It reads") is ~70 words upstream. The inner "and … and that ratio" coordination has
+  no readable grammar (two `and`s, one referent). This is the constructor's decisive paragraph;
+  a reader cannot extract the two-step recipe from it.
+- **fix**: REWRITE as three sentences: read $\varepsilon$ from the law; set $\nu$ from
+  $\kappa_{\max}\eta$; then the band caveat as its own sentence or `!!! note`.
 
----
+## 3. `FlowParameters.scalar_dissipation`: the bullet denies, three clauses later, what it asserts
 
-## 3. The max_speed admonition explains its rule three times inside one sentence
-
-- **type**: clarity
-- **severity**: major
-- **confidence**: high
+- **type**: contradiction · **severity**: major · **confidence**: high
 - **locations**:
-  - PAGE: api / Observables, `max_speed`, admonition "Why this observable alone has a cached form" —
-    "The cache holds exactly what the iteration already computes and leaves alive at its end — **its
-    contents are derived from the run's fixed computation schedule — what each iteration computes,
-    settled when the cache is built** — never declared."
-- **test failed**: DELETE TEST (two nested appositives restate the main clause)
-- **description**: The main clause already says the cache holds what the iteration computes and
-  leaves alive. The first dash-clause restates it as "derived from the fixed computation schedule";
-  the second restates *that* as "what each iteration computes"; a third fragment, "never declared",
-  hangs 20 words from the noun it modifies. Two nested dashes inside one 39-word sentence make the
-  reader hold three parses at once for one idea.
-- **fix**: REWRITE to one clause.
+  - PAGE: api / phenomenology / Phenomenology, `FlowParameters` Arguments: "It is a sentinel, not a
+    value that propagates"
+  - same bullet, closing clause: "there `NaN` propagates as it always does"
+- **contradicts**: itself — the axis is whether the stored `NaN` propagates.
+- **description**: The bullet runs ~120 words and turns on itself: the categorical claim ("not a
+  value that propagates") is retracted by the final clause, which says it propagates whenever a
+  caller touches it. The true content is narrower — *laws check it and throw* — so the categorical
+  form is unearned and the retraction exists only to repair it. Also the longest entry in an
+  argument list otherwise averaging one line.
+- **fix**: REWRITE to the checked claim ("every law that reads it throws when it is `NaN`") and cut
+  the sentinel/propagation pair.
 
----
+## 4. `step!` and `deposit!` state opposite rules for the same argument order
 
-## 4. Sentences past 40 words carrying four or more clauses, with the load-bearing verb buried
-
-- **type**: clarity
-- **severity**: major
-- **confidence**: high
+- **type**: contradiction · **severity**: major · **confidence**: medium
 - **locations**:
-  - PAGE: api / SimulationRun, `Simulation`, "Grid mode" bullet (~180 words, ~6 clauses) — the verb
-    pair is "**It reads** the dissipation … **then sets** $\nu$", separated by roughly sixty words of
-    nested parenthetical ("— a value that assumes forcing confined to the same low-wavenumber band
-    as the calibrating runs, since $G$ is $C_\varepsilon$ rescaled by $L_{11}/L$ …").
-  - PAGE: architecture, §4.1 (~100 words, 5 clauses, three nested parentheticals) — "Its concrete
-    type is the `FixedDomain`, the fixed, unsheared cube, realized by the grid, the real–Fourier
-    layout, the real-to-complex transform plans (one for the velocity, …)".
-  - PAGE: api / Propagator, `step!` (~70 words) — "The first stage reads the deposited velocity,
-    vorticity, and scalar in physical representation from `cache` — the values of the instant between
-    iterations, … — and the later stages compute their recoveries into those same slots".
-- **test failed**: LOAD-BEARING SUBJECT / clause count
-- **description**: One class, three samples. In each, the sentence's actual claim is a two-verb
-  spine, and everything between the verbs is qualification. The grid-mode bullet is the worst: a
-  reader who wants to know *what grid mode does* has to carry a caveat about forcing bands and an
-  identity between $G$ and $C_\varepsilon$ before reaching "then sets $\nu$". Splitting at the
-  qualification costs nothing.
-- **fix**: REWRITE (split the spine from the caveats; the caveat can be its own sentence).
+  - PAGE: api / Propagator, `deposit!`: "The argument order is shared with `step!` — the mutated
+    dispatch object (here the cache) leads"
+  - same page, `step!`: "The leading argument differs from `deposit!`'s in kind … `scheme` here is a
+    stateless dispatch tag, and what this call mutates is `state`"
+- **contradicts**: the two docstrings — axis: whether the leading argument is the mutated object.
+- **description**: `deposit!` generalizes a rule ("the mutated dispatch object leads") that `step!`
+  explicitly does not follow and says so. Beyond the clash, both paragraphs are unprovoked defence:
+  they answer a question about calling convention that neither signature raises, and each teaches the
+  other's signature rather than its own. The `step!` opener ("it is worth knowing which") announces
+  importance instead of stating content.
+- **fix**: CUT both meta-paragraphs; if a shared shape is worth stating, state it once, accurately
+  ("both take `state`, `domain`, `buffers` after the first argument").
 
----
+## 5. `recommended_cfl` admonition ends by repeating its own sentence
 
-## 5. A trailing sentence in `StationarityCriterion` that points at an argument the reader has not met
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: high
+- **type**: clarity · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: api / SimulationRun, `StationarityCriterion`, identity paragraph — "**The same argument the
-    scalar gate makes for an unforced scalar applies to the velocity.**"
-- **test failed**: DELETE TEST + PARAPHRASE
-- **description**: The paragraph has just said, in full, that a decaying run has no stationary state
-  to detect and that its $\varepsilon$ never plateaus. This sentence then asks the reader to fetch
-  an argument from `gate_scalar`, which appears further down the page, and to transpose it back onto
-  the case already stated. It adds no fact, and its referent is below it.
-- **fix**: CUT.
+  - PAGE: api / Propagator, `recommended_cfl`, admonition: "prefer `IFLowStorageRK3`, whose ceiling
+    has no such dependence"
+  - same admonition, final sentence: "`IFLowStorageRK3`'s ceiling carries no such dependence."
+- **description**: The closing sentence is the same claim as a clause fourteen words earlier, in the
+  same admonition, with only the wording changed. Delete test: nothing is lost.
+- **fix**: CUT the final sentence.
 
----
+## 6. `Simulation` fields: a naming defence against a confusion the list never creates
 
-## 6. "The same arguments in the same order" — a promise the next clause withdraws
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: medium
+- **type**: language-tone · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: api / Propagator, `step!` — "**Call it with the same arguments in the same order as
-    `deposit!`** … **Only the extras differ** — `generator` sits directly after `state` here, and
-    `cache` and `dt` come last".
-  - PAGE: api / Propagator, `deposit!` — "The argument order is shared with `step!` — the mutated
-    dispatch object (here the cache) leads".
-- **test failed**: PARAPHRASE (the claim is asserted and then qualified out of shape)
-- **description**: The signatures are `step!(scheme, state, generator, domain, buffers, cache, dt)`
-  and `deposit!(cache, state, domain, buffers)`: three arguments are common, one is interleaved, two
-  are appended, and the leading argument is mutated in one and not in the other (`deposit!` says
-  "the mutated dispatch object", `step!`'s `scheme` mutates nothing). The mnemonic makes the reader
-  verify it against both signatures — which is more work than reading the signatures.
-- **fix**: REWRITE to the checkable claim ("`state`, `domain`, `buffers` keep their order in both"),
-  or CUT from one of the two.
+  - PAGE: api / SimulationRun, `Simulation` → Fields, `tracers, trajectory_scheme, particle_buffers`
+    entry: "The two roots are not interchangeable: trajectory names the path through time the scheme
+    integrates, particle the objects whose storage the buffers hold."
+- **description**: A field list says what each field holds; this sentence instead defends a
+  vocabulary choice against a reader who has not yet been given the chance to conflate the two roots
+  — and by denying it, introduces the reading. It is design rationale, and the decision log already
+  carries it. Delete test: the entry still names all three fields and their contents.
+- **fix**: CUT (the rationale belongs in `ARCHITECTURE.md`).
 
----
+## 7. `DealiasingStrategy`: two clauses about the documentation rather than the object
 
-## 7. "so the arrows stay primary" — unglossed jargon in a document that promises to gloss everything
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: high
+- **type**: clarity · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: architecture, §4.1 — "the reification the Mori–Zwanzig lens demands, **kept a bare carrier
-    so the arrows stay primary** (§11 decision 26)".
-  - PAGE: architecture, preamble (the promise) — "The document is self-contained — every symbol,
-    mathematical or `code`, is introduced in plain language at first use".
-- **test failed**: PARAPHRASE
-- **description**: "The arrows" is category-theory shorthand for morphisms/functions-over-objects. It
-  appears once, undefined, and the decision-log entry it cites uses the same phrase without
-  defining it either. The plain claim underneath is stated three words earlier ("every operation
-  external"), so the clause is jargon on top of an already-made point.
-- **fix**: CUT, or REWRITE as "so the operations stay external to the record".
+  - PAGE: api / SimulationDomain, `DealiasingStrategy`: "They come in two families, and the rest of
+    the corpus uses these names"
+  - same docstring: "is decided by the `Simulation` constructor … — the front door — and not by this
+    catalogue"
+- **description**: Neither clause tells a user anything about dealiasing. The first is a claim about
+  vocabulary used elsewhere in the docs; the second denies that a type docstring sets a default —
+  a confusion nothing here invites, and one the denial itself plants. Both survive the delete test
+  with no loss.
+- **fix**: CUT both; keep "a mask strategy acts on the assembled product, a shift strategy also
+  changes how it is evaluated."
 
----
+## 8. `truncate_to_band!`: the PhaseShift half-dealiasing fact stated three times in ten lines
 
-## 8. "output cursors" names a component the documented package does not have
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: medium
+- **type**: organization · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: architecture, §8, the skew-product tower — "and **the clock and output cursors** are the
-    experimenter's logbook".
-- **test failed**: PARAPHRASE (no referent anywhere in the corpus)
-- **description**: The package has a clock (`current_time` / `current_step`) and no output or I/O
-  layer at all — writing is explicitly the caller's business in the observation-first design. "Output
-  cursors" appears once, in a sentence that is otherwise a precise litmus for what belongs in a
-  restart record, and a reader who takes the litmus seriously will hunt for the cursors.
-- **fix**: CUT the two words (the clock alone carries the point).
+  - PAGE: api / SimulationDomain, section header: "Under `PhaseShift` this is only part of the
+    dealiasing — the averaging of two displaced evaluations is the other half"
+  - admonition title: "This verb truncates; under PhaseShift that is half the dealiasing"
+  - admonition body: "Under `PhaseShift` it is only the second half"
+- **description**: One fact, three consecutive statements, each in a different register (section
+  prose, admonition title, admonition body). By the third the reader has stopped reading. The
+  admonition body earns its place only for the consequence it adds ("a hand-built assembly must do
+  the same"); the header and title are pure restatement.
+- **fix**: CUT the section-header clause and compress the title to the consequence.
 
----
+## 9. `envelope_wavenumber`: "forms its own" has no object
 
-## 9. §1.4 states its two costs, then states them again as though for the first time
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: medium
+- **type**: clarity · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: observables_cache, §1.4 — "It costs nothing on the memory axis, nothing on the transform
-    axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed
-    reduction is one physical-vector pass every iteration…"
-  - same section, three sentences later — "**Those are two different costs and it is worth keeping
-    them apart**: the maximum-speed reduction above recurs every iteration, while the only work the
-    cache adds over a cacheless solver is §1.3's final closing deposit…"
-- **test failed**: DELETE TEST
-- **description**: The second sentence presents as a distinction the reader has yet to draw, but the
-  per-iteration reduction was the opening sentence's "one exception" and the once-per-run deposit was
-  fully derived in §1.3. "Those are two different costs" also has an antecedent problem: the nearest
-  plural is the three axes, not the two costs.
-- **fix**: REWRITE (name the two costs once, in one sentence).
+  - PAGE: api / SimulationRun, `Simulation` Arguments: "though a roll-off whose coefficient belongs to
+    a different length forms its own (see `large_scale_length`)"
+- **description**: Its own *what*? The nearest candidate noun is "the integral scale", but "forms its
+  own integral scale" is not what `large_scale_length` describes (it *reads* a different length).
+  The clause cannot be paraphrased without opening the linked docstring, which is the definition of a
+  clause that has not been written.
+- **fix**: REWRITE: "a roll-off fitted against a different length uses that length instead."
 
----
+## 10. `ExponentialDissipation`: the closing sentence restates the one before it
 
-## 10. Each `*_rhs!` docstring states the consumed-operand fact three times
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: high
+- **type**: clarity · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: api / Generator, `velocity_rhs!` — body: "The vorticity argument is named `ω_consumed`
-    because the assembly overwrites it: on return it no longer holds the vorticity."; admonition: "so
-    `ω_consumed` must hold the vorticity on entry and no longer does on return"; then "**Which operand
-    is consumed follows the physics, not the argument position**".
-  - PAGE: api / Generator, `scalar_rhs!` — the same three, with `u_consumed`.
-- **test failed**: DELETE TEST
-- **description**: One fact — this argument is destroyed — carried by three separate sentences per
-  docstring, and the third ("follows the physics, not the argument position") is itself repeated
-  almost verbatim in the sibling docstring, where it defends a positional convention neither
-  docstring proposes. The admonition is the right home; the body sentence and the position defence
-  can go.
-- **fix**: CUT the duplicate body sentence and the position defence; keep the warning admonition.
+  - PAGE: api / phenomenology / Spectra, `ExponentialDissipation`: "because Pope fits his $\beta$
+    across the whole dissipation range … while the values here are fitted to the far range alone"
+  - next sentence: "The two are the same symbol for the same decay, calibrated on different
+    intervals."
+- **description**: The second sentence is the first with the explanation removed. Delete test:
+  nothing is lost — the preceding clause already says both the shared symbol and the differing
+  calibration intervals.
+- **fix**: CUT the closing sentence.
 
----
+## 11. `max_speed`: a cache-policy essay lodged in a reduction's docstring
 
-## 11. "deliberately deferred" three times in a four-sentence admonition
-
-- **type**: clarity
-- **severity**: nit
-- **confidence**: high
+- **type**: organization · **severity**: minor · **confidence**: medium
 - **locations**:
-  - PAGE: api / phenomenology / Spectra, `DissipationFactor` — title: "Bottleneck models are
-    **deliberately deferred**"; first sentence: "These factors are inertial-normalized cutoffs;
-    bottleneck models are **deliberately deferred**."; last clause: "…need a richer spectrum
-    structure; **they are deliberately deferred**."
-- **test failed**: DELETE TEST
-- **description**: The title makes the claim, the opening sentence repeats it verbatim, and the
-  closing clause repeats it a third time after the reason has been given. Only the middle sentence
-  (the models, their form, why $f_\eta \to 1$ fails) carries information.
-- **fix**: CUT the first and third instances.
+  - PAGE: api / Observables, `max_speed`, admonition "Why this observable alone has a cached form":
+    "The cache holds exactly what the iteration already computes and leaves alive at its end"
+  - PAGE: observables_cache §1.4: "every slot is a register the iteration fills anyway"
+- **description**: Five sentences of cache-contents policy — why $k$ and $\varepsilon$ are not
+  cached, what happens under a fixed $\Delta t$ — sit inside the docstring of a reduction. At-home
+  test: every sentence would sit equally well in `ObservablesCache`'s docstring, where the design
+  page already says it. What the reader of `max_speed` needs is one clause: the run computes this
+  every iteration, so the cached form costs nothing.
+- **fix**: CUT to one sentence and link.
 
----
+## 12. `velocity_rhs!` / `scalar_rhs!`: the caveat closes with a non-sequitur, duplicated across the pair
 
-## 12. Argument entries that explain the implementation instead of the meaning
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: medium
+- **type**: clarity · **severity**: minor · **confidence**: medium
 - **locations**:
-  - PAGE: api / phenomenology / Phenomenology, `FlowParameters` → `scalar_dissipation` — "That check
-    is what makes the sentinel safe, so it covers the laws here and not arithmetic a caller does on
-    the field itself, **which propagates `NaN` as `NaN` always does**."
-  - PAGE: api / SimulationRun, `Simulation` → `κ_max_η` — "**the sentinel is what lets the
-    constructor tell an omitted keyword from an explicit one**, so that giving both it and
-    `viscosity` is an error rather than a silent drop".
-- **test failed**: NON-VACUITY (the first restates the language's default) + HOW-not-WHAT
-- **description**: One class, two samples. "propagates `NaN` as `NaN` always does" tells a Julia user
-  nothing they do not know and is the tail of an already 120-word argument entry. The `κ_max_η`
-  clause explains the constructor's internal sentinel trick where the reader is asking what the
-  keyword means; the user-facing fact — passing both `κ_max_η` and `viscosity` is an error — is the
-  clause after it and stands alone.
-- **fix**: CUT both clauses.
+  - PAGE: api / Generator, `velocity_rhs!` admonition: "Only the spectral product scratch remains on
+    the generator, and the operation allocates nothing."
+  - `scalar_rhs!` admonition: the identical sentence, verbatim.
+- **description**: The admonition's subject is *which argument is destroyed*; residency of the
+  generator's scratch is a different subject, and "allocates nothing" is a third. Neither follows
+  from the consumed-operand warning, and both are already stated in `ResolvedGenerator`. The
+  duplication across the `f`/`f!`-style pair means the same non-sequitur is read twice.
+- **fix**: CUT from both; keep the consumption warning alone.
 
----
+## 13. `current_step`: the same distinction, three times, in four sentences
 
-## 13. The observation is placed before the iteration in one document and after it in every other
-
-- **type**: clarity
-- **severity**: minor
-- **confidence**: medium
+- **type**: clarity · **severity**: minor · **confidence**: high
 - **locations**:
-  - PAGE: observables_cache, §1.3 — "**The observation comes before the iteration.** Between
-    iterations the callback reads what it wants…"
-  - PAGE: api / SimulationRun, `run!` — "**After every iteration** — and once at the seeded initial
-    state, before any advance — the `callback` observes the run".
-- **contradicts**: same event, opposite framing (before-the-next vs after-the-last)
-- **test failed**: PARAPHRASE (a reader building a mental loop order gets two answers)
-- **description**: Both descriptions are of the same $n+1$ observations, but a reader meeting §1.3
-  first will encode "observe, then iterate" and then read "after every iteration" as a different
-  schedule. The design page's own §3.2 uses the other framing ("observes the run after every
-  iteration and once before the first"), so the collision is inside one document as well.
-- **fix**: REWRITE §1.3's topic sentence to the corpus framing.
+  - PAGE: api / SimulationRun, `current_step`: "The number of steps `sim` has taken — how far the run
+    has gone."
+  - same docstring, last sentence: "Use this to ask how far the run has gone, and the epoch to ask
+    whether a cached value is still the right one."
+  - PAGE: api / Cache, module docstring: "The epoch answers 'is this value still the right one?'; the
+    clock's `current_step` answers 'how far has the run gone?'."
+- **description**: A four-sentence docstring opens and closes with the same gloss ("how far the run
+  has gone"), and the whole epoch-versus-step contrast is already delivered verbatim on the `Cache`
+  page and again in `ObservablesCache`'s `fields_epoch` field. The middle of the docstring — the
+  worked "step 2, fields epoch 4" example — is the only sentence that earns its place.
+- **fix**: CUT the closing sentence; keep the example.
 
----
+## 14. Architecture §4.5: a 55-word IFRK2 sentence with a defensive parenthetical
 
-## 14. "the thing that reads the run each iteration"
-
-- **type**: clarity
-- **severity**: nit
-- **confidence**: high
+- **type**: clarity · **severity**: minor · **confidence**: medium
 - **locations**:
-  - PAGE: api / SimulationRun, module map — "(the callback is the observation — **the thing that
-    reads the run each iteration** — and its return decides continuation)".
-- **test failed**: DELETE TEST
-- **description**: The gloss defines "observation" as "the thing that reads the run", which is what
-  the same sentence has already said by naming the callback. "The thing" is also the only such
-  placeholder noun on the page; every other definition names its object.
-- **fix**: CUT the dash-clause.
+  - PAGE: architecture, §4.5: "cheaper in transforms (two nonlinear evaluations against three) but
+    dearer in memory — three spectral registers per field against the low-storage scheme's two,
+    counting the same way on both sides: the scheme's own registers plus the dealiasing seam's
+    assembly register — and imaginary-axis unstable"
+- **description**: Four coordinated predicates split by a 25-word dash aside, inside which
+  "counting the same way on both sides" pre-emptively defends the comparison against a challenge no
+  reader has made. The final predicate ("and imaginary-axis unstable") is stranded so far from its
+  subject that it reads as a new sentence fragment.
+- **fix**: REWRITE as two sentences; cut the counting defence or demote it to a footnote clause.
 
----
+## 15. Architecture §4.7: a verb elided across a long parenthesis
 
-## 15. "It is never the cache" — a denial of a reading the text never invites
-
-- **type**: clarity
-- **severity**: nit
-- **confidence**: medium
+- **type**: clarity · **severity**: minor · **confidence**: medium
 - **locations**:
-  - PAGE: notation, "Vocabulary" table, entry *observation* — "By extension the occasion … from what
-    the run already holds. **It is never the cache, which is the storage the callback reads.**"
-- **test failed**: UNPROVOKED DEFENCE
-- **description**: The entry has just defined the observation as the callback and as the occasion of
-  calling it; no reader arrives thinking it might be a storage array. The denial introduces the
-  confusion it forecloses — the classic fossil left by a rename — and the useful half of it (the
-  cache is what the callback reads) is already the *cache* entry's job two rows up.
-- **fix**: CUT.
+  - PAGE: architecture, §4.7: "`current_time(sim)` and `current_step(sim)` report the clock, and the
+    observables applied to `sim.state` (e.g. …) the current-state diagnostics, for a callback to
+    read."
+- **description**: The second half gaps its verb ("[report] the current-state diagnostics") across a
+  parenthetical of two examples, so the sentence has no readable predicate at the point the reader
+  needs one. The trailing "for a callback to read" then attaches to nothing definite.
+- **fix**: REWRITE with the verb restored: "…and the observables, applied to `sim.state`, report the
+  current-state diagnostics."
 
----
+## 16. Decision-log entry 30: a sentence resumes in lower case after a closing parenthesis
 
-## 16. "and that is the module owning the iteration it closes" — a reason that does not attach
-
-- **type**: clarity
-- **severity**: nit
-- **confidence**: medium
+- **type**: format · **severity**: minor · **confidence**: medium
 - **locations**:
-  - PAGE: api / Cache, module docstring — "That verb lives in `Propagator` rather than here because it
-    needs the scheme's own scratch to recover the fields, **and that is the module owning the
-    iteration it closes**."
-- **test failed**: PARAPHRASE (the pronoun "that", and a second reason grafted onto the first)
-- **description**: "That" has three candidate antecedents in the preceding clause (the verb, the
-  scratch, `Propagator`), and the appended clause is a second, independent justification presented
-  as a continuation of the first. Two reasons stated as one leave a reader unsure which is
-  load-bearing.
-- **fix**: REWRITE as two sentences, or keep the scratch reason alone.
+  - PAGE: architecture, §11 (the `ObservablesCache` entry): "…a downstream consequence the caller
+    would have to reason about.) the sanctioned mutators call it themselves, and the seeders'
+    docstrings direct hand-run loops to it."
+- **description**: The text after the parenthetical begins mid-sentence with a lower-case "the" and
+  no grammatical connection to what precedes it — a fragment left where an earlier clause was cut.
+  The log is append-only history, but this is a broken sentence in rendered prose, not a superseded
+  claim.
+- **fix**: REWRITE the resumption as its own sentence.
+
+## 17. observables_cache §1.2: the `max_speed` boundary case buried under four dashes
+
+- **type**: clarity · **severity**: minor · **confidence**: medium
+- **locations**:
+  - PAGE: observables_cache, §1.2: "so the maximum is materialized — one number — while no per-point
+    field is ever whole anywhere and none can be cached"
+- **description**: Four dash-delimited asides in one sentence, and the final "none can be cached"
+  has an ambiguous subject — no per-point field? no speed field? the maximum? The paragraph is
+  making the design's sharpest distinction (a number is materialized, a field is not), and the
+  punctuation hides it.
+- **fix**: REWRITE as two sentences, one per side of the distinction.
+
+## 18. `Li2008`: the author-year name asserts a provenance the docstring withdraws
+
+- **type**: clarity · **severity**: minor · **confidence**: low
+- **locations**:
+  - PAGE: api / phenomenology / Scalings, `Li2008`: "The value is this package's own reduction of the
+    Johns Hopkins Turbulence Database (JHTDB) forced-isotropic dataset"
+  - PAGE: architecture, §4.8: "the paper is the author-year handle (`Pope2000`, first author's
+    surname …)"
+- **description**: The naming convention states that an author-year handle names *the paper the
+  parametrization comes from*. Here the number is the package's own reduction of a dataset the paper
+  describes, so the handle names a data source rather than a published fit. A reader who trusts the
+  stated convention will cite Li et al. for a value they did not publish.
+- **fix**: advisory — either name the law for what it is or state in one clause that the handle names
+  the dataset, not a published fit.
+
+## 19. Home page: "the protocol's functions, `prepare!`, `velocity_rhs!` and the rest"
+
+- **type**: clarity · **severity**: nit · **confidence**: medium
+- **locations**:
+  - PAGE: Home, Components → `Generator`: "through a fixed set of verbs — the protocol's functions,
+    `prepare!`, `velocity_rhs!` and the rest — rather than assembling the physics itself"
+  - PAGE: api, overview: "which a scheme consumes through a fixed set of verbs." (same sentence, aside
+    removed)
+- **description**: "and the rest" names nothing; a partial enumeration on a landing page buys neither
+  completeness nor precision, and the API overview shows the sentence reads better without it. The
+  aside also pushes the bullet past 50 words.
+- **fix**: CUT the aside on the Home page.

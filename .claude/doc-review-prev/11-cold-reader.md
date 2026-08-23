@@ -1,184 +1,147 @@
-# Cold-reader panel — first-year turbulence grad student, top-to-bottom pass
+# Cold-reader hat — first-year turbulence grad student, top-to-bottom read
 
-Hat: a first-year turbulence grad student, comfortable with Fourier methods and Julia, new to this
-package. Findings below are ordered most-severe first. Each names the PAGE (banner) and, where useful,
-the point in my top-to-bottom read where I first met the term.
+Reading order followed: Home → api (overview) → notation → phenomenology (index) → api/Cache →
+api/Forcing → api/GBGIsotropicTurbulence → api/Generator → api/Observables → api/Particles →
+api/Propagator → api/SimulationDomain → api/SimulationRun → api/State → api/phenomenology/*.
+Findings below are ordered most-severe first; each names the page where I, reading in that order,
+first hit the problem.
 
 ---
 
-## Finding 1 — `epoch` used with zero gloss on the very first page
+## 1. The symbol `L` means two different physical lengths, and the corpus's own "single reference" page doesn't say so
 
-**Type:** clarity · **Severity:** major · **Confidence:** high
+**Type:** contradiction (notation) **Severity:** blocker **Confidence:** high
 
 **Locations:**
-- PAGE: Home, Quick start comment (first page, first code block): "each stamped with the epoch of the
-  state they were computed from"
-- PAGE: notation, Vocabulary (where it is actually defined, many screens later): "epoch | a counter of
-  changes to the state, one per dynamical factor"
+- PAGE: notation, Numerics table: "`L` | box side (`Ω = [0,L)³`) | `side_length`"
+- PAGE: api / phenomenology / Spectra, `ModelSpectrum`: "`E(κ) = C_K ε^{2/3} κ^{-5/3} f_L(κL) f_η(κη)`" and "reads ε and the roll-off's own length `L` (see `large_scale_length` — `L₁₁` for most forms, `k^{3/2}/ε` for Pope's)"
 
-**Description:** The very first code example on the Home page uses "epoch" as if the reader already
-knows the term — no gloss, no apposition, nothing. The word is not defined anywhere until the
-Vocabulary table on the `notation` page, several pages later. A first-time reader has no way to know
-whether "epoch" means a wall-clock time, an iteration count, or (the actual meaning) a per-slot
-freshness counter that is *not* the same as the step count. This is exactly the class the Vocabulary
-page itself warns about ("Not an iteration number") — but the warning arrives too late for the reader
-who met the word on page one.
+**Contradicts:** The Notation page states, as its own governing claim, "This page is the single reference — a docstring introduces a symbol on first use and need not repeat the convention," then binds `L` exclusively to `side_length` (the numerical box size). The `ModelSpectrum` formula reuses the bare glyph `L` for `large_scale_length` — physically `L₁₁` (the measured integral scale) or `k^{3/2}/ε` (Pope's `L₀`) — a turbulence quantity independent of the box geometry.
+
+**Description:** I read the Notation page first and filed `L` ≡ box side. Two pages later `ModelSpectrum`'s formula `f_L(κL)` reads, at face value, as "wavenumber times box side" — but the prose two sentences later reveals `L` there actually means `L₁₁` or `k^{3/2}/ε`. Since the box side and the integral scale are two different quantities that need not be proportional (a large box with weakly energetic large scales, say), this is a load-bearing symbol reuse the Notation page's own promise says should not happen. A reader who trusts the glossary as instructed will mis-parse the formula.
 
 ---
 
-## Finding 2 — the same cache-slot state is given three different names
+## 2. `epoch` is used, unglossed, in the very first code example — two pages before its definition
 
-**Type:** contradiction · **Severity:** major · **Confidence:** high
+**Type:** clarity **Severity:** major **Confidence:** high
 
 **Locations:**
-- PAGE: api / Cache, `ObservablesCache`: "a read that finds a stale, taken, or never-deposited slot"
-- PAGE: api / Cache, `velocity_physical`: "the slot is mid-iteration scratch, stale, or was never
-  deposited"
-- PAGE: api / Cache, `ObservablesCache` Fields list: "a sentinel (never deposited / in use as scratch)"
+- PAGE: Home, Quick start code comment: "each recorded against the epoch of the state it came from"
+- PAGE: notation, Vocabulary: "epoch | a counter of changes to the state..."
 
-**Contradicts:** all three passages describe the identical three-way state a slot can be in (fresh /
-being-used-as-scratch-mid-iteration / never-filled), on the same page, within ~50 rendered lines of
-each other — but the middle state is named "taken" once, "mid-iteration scratch" once, and "in use as
-scratch" once, with no sentence ever stating these are the same thing.
-
-**Description:** This matters specifically because the doc says the thrown `ErrorException` "names...
-which of the three states it is in" — i.e. this taxonomy is meant to be a fixed, learnable vocabulary a
-reader will see in an actual error message. Three unlinked synonyms for one state undermines exactly
-the "the message names the slot and which of the three states it is in" promise.
+**Description:** `epoch` is an ordinary English word (a period of time / a moment), and the running mental model I formed from the Quick-start prose two lines earlier ("the state came from") reinforced the wrong reading — "the epoch" sounds like it means "the timestamp `t_n`." It is not: it's a monotonic per-dynamical-factor counter that also advances on out-of-band mutations that don't move the clock at all. This is exactly the flagged word-with-package-meaning case: I could not have derived the real (surprising) semantics from the first-use context, and the definition doesn't arrive until the Notation Vocabulary two pages later, then the full Cache-page treatment three pages after that.
 
 ---
 
-## Finding 3 — tracer / particle / trajectory: three overlapping words, never disambiguated
+## 3. `out-of-band` is used for two unrelated things across the same short vocabulary word
 
-**Type:** clarity · **Severity:** major · **Confidence:** medium-high
+**Type:** clarity **Severity:** major **Confidence:** high
 
 **Locations:**
-- PAGE: notation: "$\boldsymbol{X}(t)$ | the position of a tracer particle"
-- PAGE: api / Particles, module doc: "`Tracers` — the tracer set", "`AbstractParticleIntegrator`,
-  `EndpointHeun` — the trajectory time-integration schemes"
-- PAGE: api / Particles, `AbstractParticleIntegrator`: "the Lagrangian counterpart of the field side's
-  `AbstractIntegrator`"
+- PAGE: notation / api Cache: "an announced out-of-band mutation advances an epoch without advancing the clock" (a hand-made state change made outside the iteration cycle)
+- PAGE: api / Forcing, `BandRescaling`: "If the out-of-band value alone exceeds `target`, the band is zeroed" (the energy in wavenumber shells outside the forced band)
 
-**Description:** The module is `Particles`, its one concrete type is `Tracers`, the notation table
-calls the same object a "tracer particle", the accessors are `particle_positions` /
-`particle_velocities` / `number_of_particles`, the integrator family is `AbstractParticleIntegrator`
-but is introduced in prose as "the trajectory time-integration schemes," and the buffer type is
-`ParticleIntegratorBuffers` holding a "predictor" read via `particle_velocities`. A cold reader cannot
-tell whether "tracer," "particle," and "trajectory" are three synonyms, or whether "particle" is meant
-to be the forward-looking general term (for a not-yet-built inertial-particle family) and "tracer" the
-concrete massless case — the site never states this distinction anywhere, so the naming just reads as
-inconsistent.
+**Contradicts:** Same two-word phrase, two disjoint referents — a software-control-flow sense (page 3/5) versus a spectral-shell sense (page 6) — with no signal at either site that the phrase is being repurposed.
+
+**Description:** By the time I reached the Forcing page I had "out-of-band = an unsanctioned hand-made mutation" cached from the Cache/Notation pages. Reading "the out-of-band value alone exceeds `target`," I first parsed it as "some value computed outside the normal update path," which is wrong — it means the field's energy in the un-forced wavenumber shells. This is the classic ordinary-phrase-carries-package-meaning trap, doubled: it carries *two* different package meanings.
 
 ---
 
-## Finding 4 — "seam" is used as settled jargon but is never introduced anywhere
+## 4. `ResolvedFields` / `ResolvedGenerator` collide with the numerical sense of "resolve" used on the very same page
 
-**Type:** clarity · **Severity:** minor · **Confidence:** medium
+**Type:** clarity **Severity:** major **Confidence:** medium-high
 
 **Locations:**
-- PAGE: api / Propagator, `IFLowStorageRK3`: "it adds `nonlinear`, the dealiasing seam's assembly
-  register"
-- PAGE: api / phenomenology / Phenomenology: "`fit` is the (future) seam for fitting a parametrization
-  to measured data"
-- PAGE: api / phenomenology / Scalings, `Li2008`: "the seam the run layer uses to set the viscosity
-  from the grid and target energy"
+- PAGE: Home, Quick start comment: "ν is set so the grid resolves the dissipation scale" (numerical sense)
+- PAGE: Home, Components: "`ResolvedFields`, the single source of truth" and "gathered into one object, the `ResolvedGenerator`" (no gloss given)
+- PAGE: notation, Vocabulary (two pages later): "resolved | in `ResolvedFields` and `ResolvedGenerator`, made concrete as one value. The numerical sense — a scale the grid resolves... is the other reading"
 
-**Description:** Unlike "deposit," "slot," "epoch," "register," and "observation" — each given a
-Vocabulary entry — "seam" is never defined anywhere on the site, yet is reused across two unrelated
-modules (Propagator, Phenomenology) as if it were an established term of art. "The dealiasing seam's
-assembly register" is particularly opaque on first encounter: nothing on the Propagator page says what
-a "seam" is or why dealiasing has one.
+**Description:** The Home page uses "resolve" in its ordinary numerical-turbulence sense (line 31) a few lines before introducing two capitalized type names built on the *other* sense of the same word ("made concrete as one value" — closer to "resolved" as in "resolved dependencies"). Nothing on Home page flags that these are different senses; I only learned there even *was* a collision when I reached the Notation Vocabulary's own admission of it, two pages later, and by then I had already silently misread `ResolvedFields` as "the fields the grid resolves."
 
 ---
 
-## Finding 5 — "the resolution criterion" is used, unglossed, in the very first Quick Start
+## 5. The module is `Particles`, everything in it is `particle_*`-named, but the only concrete type is `Tracers` — and the corpus never says why
 
-**Type:** clarity · **Severity:** minor · **Confidence:** medium
+**Type:** clarity **Severity:** major **Confidence:** high
 
 **Locations:**
-- PAGE: Home, Quick start comment: "a 64³ forced-stationary run; ν is chosen from the resolution
-  criterion"
-- PAGE: api / SimulationRun, `Simulation` (many pages later): the actual definition, $\kappa_{\max}\eta$
-  set via `κ_max_η`
+- PAGE: Home, Components: "`Particles`: Lagrangian tracer tracking..."
+- PAGE: api / Particles, module docstring: "`Tracers` — the tracer set..."; "`AbstractParticleIntegrator`, `EndpointHeun` — the trajectory time-integration schemes"; accessors `particle_positions`, `particle_velocities`, `number_of_particles`
 
-**Description:** The very first runnable example tells the reader that ν is "chosen from the resolution
-criterion" with no forward pointer and no inline gloss — a reader has to already know DNS resolution
-practice ($\kappa_{\max}\eta$) or keep reading for many more pages before the phrase cashes out into a
-concrete quantity.
+**Description:** Every public name in this module is prefixed or rooted `particle_` / `Particle` (the module, `AbstractParticleIntegrator`, `ParticleIntegratorBuffers`, `particle_positions`, `particle_velocities`, `number_of_particles`), but the one concrete state type is called `Tracers`, not `Particles`. Nowhere on any page I read is it said whether "tracer" is simply a synonym for "particle" here, or a specific (massless) case implying other particle kinds exist or are planned. A newcomer is left to guess whether `Tracers` is *the* particle type or *a* particle type.
 
 ---
 
-## Finding 6 — a circular definition: "a budget is a callback that accumulates what it budgets"
+## 6. The bare symbol `A` is used for two unrelated quantities in adjacent API pages
 
-**Type:** clarity · **Severity:** minor · **Confidence:** medium
+**Type:** contradiction (notation) **Severity:** moderate **Confidence:** medium-high
 
 **Locations:**
-- PAGE: api / SimulationRun, `run!`: "Stopping is the observation's decision on observables, never a
-  run option: a budget is a callback that accumulates what it budgets."
+- PAGE: api / Propagator, `IFLowStorageRK3`: "with `A = (0, -5/9, -153/128)`, `B = (1/3, 15/16, 8/15)`..." (the RK stage-coefficient tuple)
+- PAGE: api / Generator, `velocity_integrating_factor`: "with `A = 0` when no linear forcing is active" (the per-mode forcing rate)
 
-**Description:** The noun "budget" is defined using its own verb form ("what it budgets"), which is not
-actually informative on first read — the reader only understands the concept from the three examples
-that follow (time span, step count, eddy-turnover count), not from the definition sentence itself.
+**Description:** The Notation page keeps these apart by subscript/argument (`A_i` vs `A(κ)`), but both docstrings drop to the bare glyph `A` for a "the value is trivially ..." aside, and at that point the two meanings (a fixed 3-tuple of RK coefficients vs. a per-mode forcing-rate field, possibly `nothing`) are indistinguishable from the glyph alone. A reader skimming just the formulas, as the house style encourages, can momentarily attach the wrong value to `A`.
 
 ---
 
-## Finding 7 — "sugar" used as a bare technical noun at its first appearance
+## 7. "mode" quietly switches from "Fourier mode" to "code branch" mid-corpus
 
-**Type:** clarity · **Severity:** nit · **Confidence:** low-medium
+**Type:** clarity **Severity:** moderate **Confidence:** medium
 
 **Locations:**
-- PAGE: api / SimulationRun, module doc: "`StationarityCriterion`, `warmup!` — the packaged
-  spin-up-to-stationarity observation, and its one-line sugar."
+- PAGE: api / SimulationRun, `Simulation`: "Grid mode (no `viscosity`): ..." / "Explicit mode: pass `viscosity`..."
+- PAGE: api / State, `random_solenoidal_velocity_spectral!`: "the two modes do not seed the same large scale at the same nominal setting"
+- (pervasive prior sense) PAGE: notation and many pages: "per-mode multiplier," "the zero mode," "Nyquist mode"
 
-**Description:** "Sugar" (syntactic sugar) is common programmer shorthand, but is never spelled out on
-this user-facing site and is used here as a load-bearing noun ("its one-line sugar," later "its
-sugar") before the reader has seen `warmup!`'s own docstring, which does explain the relationship. A
-first-year physicist reader (not necessarily a seasoned Julia programmer) may stumble on the word.
+**Description:** By the time I reach `Simulation`'s constructor, "mode" has meant "a single Fourier coefficient" dozens of times. "Grid mode" / "Explicit mode" as labels for two *configuration branches* of the same constructor, and later "the two modes" for the default-envelope-vs-`initial_spectrum` branches of a seeding function, reuse the word for "a way of operating" — a completely different sense, in a document that is otherwise scrupulously spectral. It reads naturally as English but costs a re-parse in a document this saturated with the other sense.
 
 ---
 
-## Finding 8 — `PointSet` / `VectorPointValues` / `ScalarPointValues` given no provenance note
+## 8. The tracking-loop intro states an order, then its own next sentence reverses it
 
-**Type:** clarity · **Severity:** nit · **Confidence:** low
+**Type:** contradiction (organization) **Severity:** moderate **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Particles, `Tracers` Fields: "`position_points` — a `PointSet` wrapping `positions`"
-- PAGE: api / Particles, `interpolate_at_particles!`: "a `VectorPointValues` for the velocity, a
-  `ScalarPointValues` for the scalar"
+- PAGE: api / Particles, "The tracking loop": "record the flow velocity where each tracer currently sits, advance the tracers once the fields have moved, then read any physical field..."
+- Same paragraph, next sentence: "the run records the sample at the iteration's end, off the just-deposited velocity, and the next iteration's `advect!` reads it back"
 
-**Description:** `FixedDomain`'s Fields section explicitly flags its `GBGPeriodicFields`-sourced types
-("The machinery types below are `GBGPeriodicFields` objects, each linked to its own documentation") so
-the reader knows not to expect a local definition. `PointSet`, `VectorPointValues`, and
-`ScalarPointValues` on the Particles page get no equivalent flag (only an indirect mention that
-`PointSet` is "the form `GBGPeriodicFields`' interpolation takes"), so a reader has to infer rather than
-be told that these three types are external and out of scope for this site.
+**Contradicts:** record → advance → read (first sentence) vs. advance (using last iteration's record) → record (this iteration's end) (second sentence).
+
+**Description:** Read as a literal ordered list — which "the steps of Lagrangian tracking:" strongly invites — the first sentence has recording happen *before* advection within an iteration. The second sentence, and the worked example on the same page (`record_particle_velocities!` called first, annotated "do this first," before `advect!`), together establish that the *effective* per-iteration order is advect-then-record (the record just made is consumed by *next* iteration's advect). The opening sentence is best read as listing the three available verbs, not a per-iteration sequence, but nothing marks that distinction, and a first read gets the wrong mental model.
 
 ---
 
-## Finding 9 — "artifact" used as the mirror-opposite of "measurable" without being anchored as a pair
+## 9. `taken` is used as an enumerated cache-slot state with no gloss at its first appearance
 
-**Type:** clarity · **Severity:** nit · **Confidence:** low
+**Type:** clarity **Severity:** minor **Confidence:** medium
 
 **Locations:**
-- PAGE: api / Forcing, `BandRescaling`: "The band's energy is then an artifact of the forcing, while
-  $k$ remains a measurable of the flow." … "Here $k$ is the artifact and the band is free."
+- PAGE: api / Cache, `ObservablesCache`: "a read that finds a stale, taken, or never-deposited slot reports a scheduling error"
 
-**Description:** "Artifact" (a forcing-induced value, not a genuine physical quantity) versus
-"measurable" (a legitimately physical quantity) is a real and useful distinction that recurs through
-the whole `BandRescaling` docstring, but it is never named as a pair anywhere on the site — the reader
-has to reconstruct the opposition purely from these two sentences, on first encounter, with no
-signpost that this vocabulary will matter for the rest of the docstring (and again on the `Simulation`
-default-forcing caveat).
+**Description:** "Stale" and "never-deposited" are self-explanatory; "taken" is not glossed anywhere as one of the three named failure states, and the fact that it means "currently in use as the step's own mid-iteration scratch" only becomes clear from later, differently-worded passages (`IntegratorBuffers`: "There are deliberately no physical-representation registers here... taken as scratch mid-iteration"). At first encounter it reads like an ordinary adjective ("occupied") whose precise package meaning I had to reconstruct from unrelated text several sections later.
 
 ---
 
-## Summary
+## 10. Four different names for the same quantity — `u(t_n, X(t_n))`
 
-Strongest, most actionable items: **Finding 1** (`epoch` on the front page with no gloss) and
-**Finding 2** (three names for one cache-slot state) — the latter is a genuine same-page internal
-inconsistency, not just a pacing issue. **Finding 3** (tracer/particle/trajectory) is the broadest: it
-touches an entire module's naming and is never resolved anywhere a user can read. The rest are smaller
-clarity nits consistent with an otherwise unusually well cross-referenced and self-aware set of docs —
-most other candidate terms I traced ("deposit," "slot," "register," "observation," "resolved," "front
-door") *are* properly glossed in the `notation` page's Vocabulary before or reasonably close to their
-first real use.
+**Type:** clarity **Severity:** minor **Confidence:** medium
+
+**Locations:**
+- PAGE: notation: "particle velocities" (table entry)
+- PAGE: api / Particles, module docstring: "the trajectory velocities are read from the run's observables cache through `particle_velocities`"
+- PAGE: api / Particles, `record_particle_velocities!`: "the genuine Lagrangian velocity" / "the Lagrangian sample"
+
+**Description:** The same physical quantity is named "particle velocities" (Notation, and the code symbol), "trajectory velocities" (Particles module docstring's own first sentence about it), and "the Lagrangian velocity" / "the Lagrangian sample" (used repeatedly thereafter). Each occurrence is locally clear from context, but a first-time reader collecting vocabulary has to independently verify these four phrases denote one thing rather than three, in a corpus that otherwise (per its own Vocabulary page) insists on one term per concept.
+
+---
+
+## 11. "checked accessors" (Home) vs. "The checked reads" (Cache page heading) — one concept, two names
+
+**Type:** format **Severity:** nit **Confidence:** medium
+
+**Locations:**
+- PAGE: Home, Components: "read through checked accessors that serve the deposited value or throw"
+- PAGE: api / Cache, section heading: "## The checked reads"
+
+**Description:** Minor, but the corpus is explicit elsewhere about picking one term per concept (the Notation Vocabulary page). "Checked accessor" and "checked read" refer to the identical thing (`velocity_physical`, `vorticity_physical`, etc.) and are never explicitly equated.

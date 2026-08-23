@@ -14,11 +14,11 @@
 // rendered output: latex-typesetter (source markup + the rulebook), the three rulebook hats
 // (CLAUDE.md outranks the corpus), fossil-and-drift (git history — the one hat that is not
 // fresh-eyed, by design), and pf-parity (the sibling package as a comparison substrate).
-// REPO (derived from rawhtml) gives those hats the repo root. Sequential: a
-// token-out loses at most the current hat, so hats are in PRIORITY order.
+// REPO (derived from rawhtml) gives those hats the repo root. The array order is still
+// PRIORITY order: it is what a subset selection and the banked NN- numbering follow.
 export const meta = {
   name: 'check-consistency-panel',
-  description: 'Fresh-eyed 23-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure, design, existence, quantifiers, history & cross-package parity (sequential, collect-only)',
+  description: 'Fresh-eyed 23-expert panel auditing the RENDERED docs for consistency, physics, typesetting, structure, design, existence, quantifiers, history & cross-package parity (concurrent, collect-only)',
   phases: [ { title: 'Panel' } ],
 }
 
@@ -91,13 +91,16 @@ const hats = [
   // They stay on the economy model: the anchor criterion is about a RUBRIC whose false negatives
   // have no downstream verifier, and a free reader has no rubric to fail — the bug-hunt measurement
   // is precisely that cheap free lanes outperformed expensive class ones.
-  { key: 'free-reader-a', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'free-reader-a', core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are an EXPERT READER with NO CHECKLIST. Every other hat here has been given a lens — physics, notation, structure, citations, naming. You have been given none, deliberately, because the lenses are a guess about where the defects are and this panel has measured that guess wrong. Read the documentation the way a sharp, sceptical colleague reads a manuscript they have been asked to sign their name to: front to back, following your own nose, stopping wherever something is wrong, confusing, missing, redundant, over-claimed, under-explained, contradictory, or simply odd. Do NOT try to be systematic and do NOT try to cover everything. Chase what actually catches your attention, and dig until you can say precisely what is wrong and why. You may report ANY kind of defect — nothing is out of your scope and nothing is another hat's exclusive property; if you and another hat both find it, that agreement is useful evidence. The one thing you must not do is pad: report only what genuinely bothered you on the read, with the exact quote and the reason.` },
 
-  { key: 'free-reader-b', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'free-reader-b', core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are an EXPERT READER with NO CHECKLIST, reading independently of every other reviewer. You have been given no lens on purpose: a checklist tells you where to look, and this panel has measured that the defects it misses are exactly the ones no checklist named. Read as a demanding physicist-programmer evaluating whether this package is worth adopting — you are deciding whether to trust it with your own research. Go where your suspicion takes you. Flag anything that would make you hesitate: a claim you do not believe, an explanation that does not explain, a gap between what is promised and what is described, an interface that looks wrong for the job, a passage you had to read three times. No category is off-limits and no category is required. Quote exactly what you saw and say precisely what is wrong with it. Report only genuine reactions from the read — never invent findings to fill a quota.` },
 
-  { key: 'consistency-matrix', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'free-reader-c', core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+    persona: `You are an EXPERT READER with NO CHECKLIST — the third of three, each reading independently, because a measured 28% of this panel's findings do not reproduce between runs and the cure for sampling noise is more samples of the same unconstrained read, not another rubric. Your standpoint: you have to TEACH this package to a competent colleague next week, from the documentation alone. Read it the way you would prepare to be asked questions you cannot dodge. Flag every place you would have to say "ignore what it says here", "that's not quite what it does", "you'll have to read the source for this", or "I don't actually know why it's like that". Those are the defects. Chase whatever catches you; do not try to be systematic and do not try to cover everything. No category is off-limits and none is required — another hat finding the same thing is useful corroboration, not duplication. Quote exactly what you saw and say precisely what is wrong. Report only what genuinely tripped you on the read; never pad to fill a quota.` },
+
+  { key: 'consistency-matrix', core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a systematic CONSISTENCY AUDITOR — the spine of this panel. Build a MATRIX of every recurring entity and diff it across ALL pages: each physical quantity (symbol, defining formula, normalization, units, code name), each notation convention, each numerical method / constant / claim, and the docstring structure itself. For EACH entity, collect every page's version, then flag divergences. Be exhaustive about "the same thing, stated differently in two places", including user-site<->design-doc disagreements (the index/API pages versus the Architecture and observables-cache pages).` },
 
   { key: 'software-architect', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
@@ -105,7 +108,7 @@ const hats = [
 
   // anchor: this hat's value is subtle physical instinct — a cheap miss is invisible and
   // uncompensated (a false negative has no downstream verifier), so it never runs economized.
-  { key: 'turbulence-theoretician', anchor: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'turbulence-theoretician', anchor: true, core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a TURBULENCE THEORETICIAN. Check every physical definition, conservation law, scaling law, dimensionless constant, and relation against established theory AND against itself across pages: kinetic energy (1/2)<|u|^2>, dissipation eps = nu<|omega|^2> (and its strain-rate twin 2 nu <S:S> — equal in the mean, not pointwise), scalar variance and scalar dissipation, energy vs spectrum split E(kappa), Re = 1/nu vs measured Re_lambda, derivative skewness S ~ -0.5 and its coordinate-free strain-invariant form, the Kolmogorov constant, the integral scales L11/L22/L_E, and the derived scales (eta, tau_eta, lambda).
 
 Your quarry ALSO includes the CATEGORY/TYPE ERROR — the class invisible to a value-check because a sentence can read true yet conflate two KINDS of object: a FIELD conflated with its REPRESENTATION (the physical object vs its spectral coefficients — "field in spectral representation", never "spectral field"); a DIAGNOSTIC SCALAR with the FIELD it reduces (the rate eps = nu<|omega|^2>, a number, vs a local dissipation field; k vs E(kappa)); an OPERATOR with its PARAMETER (the integrating factor vs nu; the Leray projection vs a Mori-Zwanzig projection); a RATE with its TIME-INTEGRAL; a per-wavenumber SPECTRAL DENSITY with an ENERGY; a stage value or a predictor-position sample presented as a physical observable; and a dimensionally-incomplete reference law (a bare kappa^{-5/3} slope vs C_K eps^{2/3} kappa^{-5/3}). Type every object from what the page states and expand the claim; flag fishy physics and any quantity defined or valued two ways.` },
@@ -129,7 +132,7 @@ Your quarry ALSO includes the CATEGORY/TYPE ERROR — the class invisible to a v
   // paid for a miss of exactly that kind (decision 37: a liveness bound that declared the charts
   // live and so could not fail, which the suite then asserted as if it were a measurement, hiding
   // two physical vectors). A cheap hat reading past an unfalsifiable claim has no verifier behind it.
-  { key: 'logician', anchor: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'logician', anchor: true, core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a LOGICIAN auditing the documentation's DEFINITIONS and ARGUMENTS as formal objects. You do not care whether a claim is physically right — other hats own that. You care whether it is well-formed, whether it follows, and whether it could be false. Apply, and report the specific defect name: (a) CIRCULARITY — a term defined using a second term that is itself defined by the first; write the chain out and quote both definitions. (b) EQUIVOCATION — one word carrying two distinct senses across a passage or between neighbouring docstrings, with the shift unmarked, so an argument silently trades on both ("state" as a strategy's internal state and as the simulation's state; two nouns for one object, or one noun for two). (c) NON SEQUITUR — a stated justification whose conclusion does not follow from its premise; quote the "because"/"so"/"therefore"/"which means" sentence and say what is missing. (d) UNFALSIFIABILITY — the sharpest test: for each claim asserting a guarantee, bound, floor, invariant, or optimality, ask WHAT OBSERVATION WOULD REFUTE IT. If the answer is "none, by construction" — the claim is true because of how it is defined rather than because of how the system behaves — that is a finding even when the claim is comforting and everything around it is correct. A bound that cannot fail is not a bound. (e) INCONSISTENT RULE PAIR — two rules both stated as binding that cannot both be obeyed; quote both and construct the case that violates one. (f) VACUOUS DISCRIMINATION — a definition, condition or guard that does not exclude anything, so it discriminates nothing. Do NOT report quantifier scope errors (the quantifier-auditor owns those), physical or dimensional errors, or matters of style.` },
 
   { key: 'conceptual-clarity', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
@@ -155,7 +158,7 @@ NOTE: several of these are ALSO caught deterministically by /check-docs and the 
 
   // anchor: the normalization instinct — a plausible-but-wrong factor read past by a cheap hat has
   // no downstream verifier; the physics twin of the theoretician anchor.
-  { key: 'dimensional', anchor: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'dimensional', anchor: true, core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a DIMENSIONAL-ANALYSIS & NORMALIZATION specialist. Mechanically verify every formula is dimensionally consistent and every normalization factor is correct AND identical across pages: the 1/2 in kinetic energy, the 2*varkappa in scalar dissipation, transform 1/N factors, Parseval / spectral factors, the per-shell spectrum vs spectral density distinction (and any shell-width 2*pi/L conversion), the L11/L22/L_E relations and their pi factors, the integrating-factor exponent (the sign, the |kappa|^2, the substep), the CFL constants, and the phase-shift cutoff sqrt(2)N/3 vs (2 sqrt(2)/3) kappa_Ny (these must be the SAME number wherever stated). For EACH factor, confirm it is dimensionally right and that two different pages state it the SAME way. Flag any slip or cross-page disagreement.` },
 
   { key: 'citations-integrity', substrate: `The whole rendered site incl. the design docs: ${FULL}`,
@@ -164,11 +167,11 @@ NOTE: several of these are ALSO caught deterministically by /check-docs and the 
   { key: 'style-editor', substrate: `The whole rendered site incl. the design docs: ${FULL}\n\nAlso inspect the RAW built HTML under: ${RAWHTML}`,
     persona: `You are a TECHNICAL COPY-EDITOR enforcing INTERNAL uniformity — derive the norm from the corpus itself (majority style), not an external guide. Check uniform notation rendering (bold-italic vectors, upright imaginary unit, subscripted partials, varphi for the scalar), ONE docstring skeleton, constructor-first type docstrings, uniform heading levels / tables / citation format, one neutral register and voice (an option/setting/axis/choice, never a "knob" or "tweak"), grammatical prose (every sentence a subject and a verb; no verbless fragments or comma splices; no sentence opening with a lowercase code identifier). You ALSO have the raw built HTML: inspect it for SILENT rendering failures — math that rendered wrong (a formula shown as literal TeX, a code identifier rendered as a product of italics inside a math span), a cross-reference that rendered as dead/plain text, formulas split across spans, a Markdown table that fell back to literal pipes, horizontal-scroll or layout breakage. Flag anything where one part looks or reads differently from a similar part.` },
 
-  { key: 'cold-reader', substrate: `The rendered user-facing site, the design docs EXCLUDED on purpose: ${SITEONLY}`,
+  { key: 'cold-reader', core: true, substrate: `The rendered user-facing site, the design docs EXCLUDED on purpose: ${SITEONLY}`,
     persona: `You are a FIRST-YEAR TURBULENCE GRAD STUDENT (comfortable with Fourier methods and Julia, but NEW to this package) reading these user docs top-to-bottom for the first time. You do NOT know the codebase and cannot see the design docs. Flag every symbol, term of art, or package concept used before it is defined (or never defined anywhere on the user-facing site) — a boundary, a deposit, a stamp, an epoch, a slot, an observation, an iteration vs a step vs a stage, a chart, a strategy, a rate; every argument mentioned only inside a formula; every leap that assumes insider knowledge. A term used consistently but never introduced is STILL a defect.
 
 TWO SHARPENINGS, both from misses this hat made on a real corpus. (1) HUNT ORDINARY ENGLISH WORDS CARRYING PACKAGE-SPECIFIC MEANINGS — a *register*, a *push*, a *record*, a *chart*, something *armed*, something *reified*, a value *put on record*. These are the hardest class precisely because they read as plain prose and never trip an "undefined symbol" check: you understand the English and silently supply the wrong referent. For each, ask what a newcomer would take the word to mean, and whether the text ever says otherwise. (2) A GLOSS AT THE DEFINITION SITE DOES NOT CLOSE THE DEFECT IF THE READER REACHES ANOTHER SITE FIRST. Your read is ORDERED: report where in your top-to-bottom pass you first met the term, and judge it there — a term glossed on page 9 and used bare on page 2 is still a finding, and naming the page-2 site is what makes the finding actionable. The acceptance test is the COLD READ: parse each docstring and page with the module source and the design docs withheld; a noun that silently assumes you already hold the package's context is the defect. Judge self-containedness.` },
-  { key: 'plain-sense', anchor: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
+  { key: 'plain-sense', anchor: true, core: true, substrate: `The whole rendered site incl. the design docs: ${FULL}`,
     persona: `You are a PLAIN-SENSE EDITOR. Every other hat on this panel asks whether the text is CORRECT, CONSISTENT, COMPLETE, or WELL-FORMED — each presumes the sentence belongs and judges it against something else (its siblings, the code, the literature, a template). You ask the one question none of them asks: DOES THIS SENTENCE MEAN ANYTHING, AND DOES IT EARN ITS PLACE? Read as an intelligent, impatient reader who will not pretend to understand. For each clause apply, in order: (1) PARAPHRASE — restate it in your own words; if you cannot, that is the finding, and quote the clause. (2) NON-VACUITY — does it assert something that could be false? A clause restating the language's defaults ("a struct holding data, with operations external"), or a truism, is padding. (3) UNPROVOKED DEFENCE — does it deny, disambiguate, or contrast against a confusion THIS text never creates ("an instant of the run's clock, not a face of the periodic box")? Such clauses are usually FOSSILS left by an earlier rename and now INTRODUCE the reading they deny. (4) THE DELETE TEST, the decisive one — strike the clause and re-read: if nothing is lost, the finding is "cut it", not "reword it". (5) LOAD-BEARING SUBJECT — is what the sentence is ABOUT stated up front, or demoted into a trailing parenthesis while instructions or mechanism lead? Also flag: sentences past ~40 words carrying three or more clauses (count and report the number); a pronoun ("it", "its", "their") whose antecedent is genuinely ambiguous; anthropomorphism that hides a missing subject ("the run stands at t_n"); prose that explains HOW something is obtained where the reader asked WHAT it is. Do NOT report style, notation, formatting, factual, or terminology defects — other hats own those; if a sentence is merely inconsistent or unidiomatic but meaningful and earned, it is NOT your finding. Report the clause verbatim, the test it failed, and whether the fix is CUT or REWRITE.` },
 
   // ── NOT A HAT: the docs-versus-code correspondence check. `attack-design.js` found, fatally and
@@ -212,7 +215,7 @@ Then check the decision log against the code and docs BOTH WAYS: a decision the 
   { key: 'fossil-and-drift', substrate: `The repo ${REPO} — use Bash with git (log, diff, show, grep) plus Read. Start from the rendered site ${FULL} for context, then interrogate HISTORY.`,
     persona: `You are a FOSSIL HUNTER, and you are the ONLY reviewer on this panel with access to history. Every other hat is deliberately fresh-eyed, which makes them blind to one whole class by construction: text that was TRUE when written, was orphaned by a later rename or redesign, and now reads as a confident statement about something that no longer exists. Fresh eyes cannot see this — the sentence is self-consistent; only the past shows it is a fossil. METHOD: (1) Run \`git log --oneline -40\` and identify the renames, signature changes, retirements and default changes of recent history — the commit messages name them. (2) For EACH such change, \`git grep\` the OLD name, the OLD signature and the OLD behaviour across src/, docs/, test/, CLAUDE.md, README.md and docs/ARCHITECTURE.md. A surviving mention is a finding. (3) Then the sharper half: \`git log -p\` the sentences AROUND each change site. A rename sweep updates the identifier and leaves the CLAIM — a caveat about a cost that moved elsewhere, a "this is the only X" that stopped being true, an anecdote retold with the old name, a justification for a design that was replaced. Report the sentence, the commit that orphaned it, and what it now falsely implies. (4) Check the twin-copy class specifically: text duplicated across CLAUDE.md, ARCHITECTURE.md, README.md and docs/make.jl comments, where one copy was updated and the other was not — quote BOTH copies. Historical decision-log entries recording what was decided THEN are NOT fossils; a current-state claim is.` },
 
-  { key: 'pf-parity', substrate: `IT's rendered site ${FULL} and IT's rulebook ${REPO}/CLAUDE.md, AND — as the comparison substrate — the sibling package GBGPeriodicFields at ${REPO}/inspiration/GBGPeriodicFields (its CLAUDE.md, docs/ARCHITECTURE.md, docs/src/ and src/ docstrings). Read PF's rulebook and a representative sample of its docstrings.`,
+  { key: 'pf-parity', core: true, substrate: `IT's rendered site ${FULL} and IT's rulebook ${REPO}/CLAUDE.md, AND — as the comparison substrate — the sibling package GBGPeriodicFields at ${REPO}/inspiration/GBGPeriodicFields (its CLAUDE.md, docs/ARCHITECTURE.md, docs/src/ and src/ docstrings). Read PF's rulebook and a representative sample of its docstrings.`,
     persona: `You are a CROSS-PACKAGE PARITY REVIEWER. Every other hat reads only GBGIsotropicTurbulence and therefore cannot see an entire defect class: where IT DIVERGES from its sibling GBGPeriodicFields (PF) without having decided to. The two packages share one documentation discipline by explicit policy, PF is the leading edge of it, and a divergence is either a defect in IT or a deliberate adaptation — your job is to find the divergence and say which you think it is, with the reason. Compare, concretely: (1) CITATION ARCHITECTURE — how each package cites a named method, whether DOIs appear, where a bibliography lives, whether an inline cite is verbatim-consistent with its entry. (2) DOCSTRING TEMPLATE — the section order, what a type docstring leads with, whether the constructor or the fields come first, how an f/f! pair splits its home. (3) NOTATION AND TeX IDIOM — the house glyphs and the braced-group rules, as each rulebook states them AND as each corpus practises them. (4) MODULE MAP SHAPE. (5) RULEBOOK TEXT ITSELF — where CLAUDE.md and PF's CLAUDE.md state the same rule in different words, or where one carries a rule the other lacks; a rule PF has and IT lacks is a candidate reverse-transfer, and a rule IT has and PF lacks is worth naming too. IT is the physics package and PF is physics-free, so adapt rather than transcribe: an adaptation is NOT a divergence. Quote both sides of every divergence.` },
 
 ]
@@ -222,6 +225,19 @@ Then check the decision log against the code and docs BOTH WAYS: a decision the 
 // filename is derived from the hat's index in the FULL panel, never in the filtered list: numbering
 // by position within a subset would file a re-run `dimensional` as `01-dimensional.md` and orphan
 // the `08-` slot the pile and the closure verifier both expect.
+// PROFILE. `core` is the MEASURED set, not a taste: on 2026-08-22 the full panel and a six-hat
+// subset were run on the identical manuscript. The full panel cost 5.94M tokens against 1.64M and
+// returned 184 findings against 58 — but the seventeen extra hats bought only 14 unique
+// blocker-or-major findings for their extra 4.3M tokens, ~307k each against the small panel's 57k,
+// and EIGHT of the seventeen produced no unique significant finding at all. `core` is therefore
+// built UPWARDS from the small panel rather than cut down from the large one: a hat is in it only
+// if it produced unique significant findings in a measured run. Admitted on that evidence:
+// cold-reader (3 unique majors), pf-parity (3), logician (2), on top of the six-hat baseline.
+// The rest are still defined and still runnable — `profile: 'full'`, or name them in `hats` — they
+// simply no longer run by default. A hat re-earns `core` by producing unique significant findings
+// across MORE THAN ONE run: the same six hats reproduced only 72% of their own findings between the
+// two arms, so a single run's uniqueness is within noise and is not admission evidence.
+const PROFILE = A.profile === 'full' ? 'full' : (A.profile === 'core' ? 'core' : (A.hats ? 'explicit' : 'core'))
 const SELECT = Array.isArray(A.hats) && A.hats.length ? A.hats.map(String) : null
 if (SELECT) {
   const unmatched = SELECT.filter(x => !hats.some((h, i) =>
@@ -232,7 +248,10 @@ if (SELECT) {
 }
 const selected = hats
   .map((h, i) => ({ h, nn: String(i + 1).padStart(2, '0') }))
-  .filter(({ h, nn }) => !SELECT || SELECT.some(x => h.key === x || nn === x.padStart(2, '0')))
+  .filter(({ h, nn }) => SELECT ? SELECT.some(x => h.key === x || nn === x.padStart(2, '0'))
+                                : (PROFILE === 'full' || h.core))
+if (!selected.length) throw new Error('no hats selected')
+log(`profile: ${PROFILE} — ${selected.length} of ${hats.length} hats: ${selected.map(s => s.h.key).join(', ')}`)
 if (SELECT) log(`subset run: ${selected.map(s => `${s.nn}-${s.h.key}`).join(', ')}`)
 
 // THE HAT MANIFEST. `verify.js` used to carry its own hand-written copy of this roster, and by the
@@ -244,13 +263,13 @@ if (SELECT) log(`subset run: ${selected.map(s => `${s.nn}-${s.h.key}`).join(', '
 phase('Panel')
 await agent(`Write EXACTLY this JSON to ${PILE}/hats.json using the Write tool, and return the single word done. No other text, no commentary.\n\n${JSON.stringify({ hats: selected.map(s => `${s.nn}-${s.h.key}`) }, null, 2)}`,
             { label: 'hat-manifest', phase: 'Panel', model: 'sonnet' })
-const results = []
-const dead = []
-const empty = []
-for (let i = 0; i < selected.length; i++) {
-  const h = selected[i].h
-  const nn = selected[i].nn
-  const prompt = `${PREAMBLE}
+// CONCURRENT since 2026-08-23. The panel was sequential on the reasoning that "a token-out loses at
+// most the current hat", which was a rate-limit accommodation rather than a design property — the
+// hats are independent by construction, each reading its own substrate and banking its own file, so
+// nothing orders them. Sequentially the 23-hat run took 3h33m; concurrently the whole panel is one
+// round trip. The dead/empty bookkeeping below is unchanged and matters MORE now, since a failure no
+// longer stops the run: `parallel` resolves a thrown or dead agent to null rather than rejecting.
+const prompt = (h, nn) => `${PREAMBLE}
 
 YOUR HAT:
 ${h.persona}
@@ -261,20 +280,29 @@ ${h.substrate}
 When your review is complete, FIRST use the Write tool to save your findings as readable markdown to:
   ${PILE}/${nn}-${h.key}.md
 (a title line naming your hat, then one clearly-formatted section per finding: type / severity / confidence / locations-with-quotes / contradicts / description). THEN return the structured object with hat="${h.key}".`
+
+const outcomes = await parallel(selected.map(({ h, nn }) => () => {
   const economized = STRENGTH === 'economy' && !h.anchor
-  const r = await agent(prompt, { label: h.key, phase: 'Panel', schema: SCHEMA, agentType: 'general-purpose',
-                                  ...(economized ? { model: 'sonnet' } : {}) })
+  return agent(prompt(h, nn), { label: h.key, phase: 'Panel', schema: SCHEMA, agentType: 'general-purpose',
+                                ...(economized ? { model: 'sonnet' } : {}) })
+}))
+
+const results = []
+const dead = []
+const empty = []
+outcomes.forEach((r, i) => {
+  const { h, nn } = selected[i]
   // A hat that dies, or comes back with nothing, must not read as a clean hat — the panel's own
   // stopping rule depends on telling those apart, and `0 findings` looks identical to both.
   if (!r) {
     dead.push(h.key)
-    log(`[${i + 1}/${selected.length}] ${h.key}: DEAD — no result (re-run this hat standalone to fill ${nn}-${h.key}.md)`)
-    continue
+    log(`${h.key}: DEAD — no result (re-run this hat standalone to fill ${nn}-${h.key}.md)`)
+    return
   }
   if (!r.findings || !r.findings.length) empty.push(h.key)
   results.push(r)
-  log(`[${i + 1}/${selected.length}] ${h.key}${economized ? ' (economy)' : ' (anchor/full)'}: ${r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
-}
+  log(`${h.key}${STRENGTH === 'economy' && !h.anchor ? ' (economy)' : ' (anchor/full)'}: ${r.findings ? r.findings.length : 0} findings -> ${nn}-${h.key}.md`)
+})
 if (dead.length) log(`!! ${dead.length} HAT(S) DEAD — the panel is INCOMPLETE: ${dead.join(', ')}`)
 if (empty.length) log(`!! ${empty.length} hat(s) returned zero findings — verify each wrote its file before reading this as clean: ${empty.join(', ')}`)
 return { results, dead, empty, complete: dead.length === 0, hats_run: selected.map(s => `${s.nn}-${s.h.key}`) }

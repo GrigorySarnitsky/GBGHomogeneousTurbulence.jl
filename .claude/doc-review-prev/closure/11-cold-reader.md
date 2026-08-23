@@ -1,39 +1,149 @@
-# Closure — Hat 11: cold-reader (first-year grad student)
+# Closure audit — Hat 11: cold-reader
 
-## Finding 1 — `epoch` used with zero gloss on the very first page
-**Verdict:** PRESENT
-**Evidence:** docs/src/index.md:48 ("each recorded against the epoch of the state it came from") still uses "epoch" with no inline gloss and no `@ref`/link to notation.md, whose Vocabulary entry (notation.md:122, "a counter of changes to the state...") remains the only definition, many screens later.
+Blind adjudication against the current corpus only (`src/`, `docs/src/`, `docs/ARCHITECTURE.md`,
+`docs/build/`). No `.claude/` file other than the banked hat file, no git history, was consulted.
 
-## Finding 2 — the same cache-slot state is given three different names
-**Verdict:** PRESENT
-**Evidence:** src/Cache.jl still uses three unlinked synonyms for the mid-iteration-scratch state on the same page: "taken" (line 92, "a read that finds a stale, taken, or never-deposited slot"), "in use as scratch" (line 114, Fields doc), "mid-iteration scratch" (line 171, `velocity_physical` docstring). No sentence states they are the same state; only the thrown error text (lines 154-156) is internally consistent.
+---
 
-## Finding 3 — tracer / particle / trajectory: three overlapping words, never disambiguated
-**Verdict:** PRESENT
-**Evidence:** src/Particles.jl module doc still mixes "tracer set" (line 20), "trajectory time-integration schemes" (line 25), `AbstractParticleIntegrator`/`particle_positions`/`particle_velocities"`; notation.md:37-39 still calls the object a "tracer particle". No sentence anywhere states whether tracer/particle/trajectory are synonyms or a general/concrete pair (decision 51's rule is in CLAUDE.md only, not surfaced to the reader).
+## Finding 1 — `L` means two different physical lengths
 
-## Finding 4 — "seam" is used as settled jargon but is never introduced anywhere
-**Verdict:** PRESENT
-**Evidence:** Still unglossed at src/Propagator.jl:248 ("the dealiasing seam's assembly register"), src/Phenomenology.jl:31 ("the (future) seam for fitting..."), src/phenomenology/Scalings.jl:43,149. notation.md has no "seam" entry. ARCHITECTURE.md:243 does define a "metriplectic seam" (reversible/irreversible split), but that is a different sense of the word than the three usages above, so it does not resolve them.
+**VERDICT: PARTIAL**
 
-## Finding 5 — "the resolution criterion" is used, unglossed, in the very first Quick Start
-**Verdict:** REGRESSED
-**Evidence:** The unglossed-term defect is gone — docs/src/index.md:39 now names the quantity inline: "ν is set so the grid resolves the dissipation scale (the κ_max·η criterion". But the edit introduced a new defect: the parenthesis is never closed and the sentence is truncated mid-clause, both in source and in docs/build/index.html:7 — the very first Quick Start code comment now renders a broken sentence.
+**Evidence:** The formula itself is fixed: `src/phenomenology/Spectra.jl` `ModelSpectrum` now reads
+`E(\kappa) = C_K \varepsilon^{2/3} \kappa^{-5/3} f_L(\kappa \ell) f_\eta(\kappa\eta)` (ℓ, not L), and
+`docs/src/notation.md:86` adds a dedicated `ℓ` row: "never the box side `L`." But two sentences later
+in the *same* `ModelSpectrum` docstring: "reads ``\varepsilon`` and the roll-off's own length ``L``"
+(src/phenomenology/Spectra.jl, the sentence right after the formula) — reintroduces bare `L` for
+`large_scale_length`, contradicting notation.md's own new rule in the same breath.
 
-## Finding 6 — a circular definition: "a budget is a callback that accumulates what it budgets"
-**Verdict:** PRESENT
-**Evidence:** src/SimulationRun.jl:437-438 now reads "a fixed-length run is a callback that accumulates what it budgets" — the subject noun changed ("budget"→"fixed-length run") but the defining verb "budgets" is still self-referential; not glossed in notation.md. Same circularity, reworded.
+**Surviving class:** Also a new rendering defect at the fix site: `docs/src/notation.md:86` has a
+literal double backslash, `` ``\\ell`` `` / `` ``\\ell_{11}`` `` / `` ``\\ell_0 = ...`` ``. Confirmed
+in `docs/build/notation/index.html`: renders as literal `<span>$\\ell$</span>` — KaTeX sees `\\` (a
+line-break command) followed by `ell`, not the symbol ℓ. The single-source-of-truth notation table
+itself fails to render the very symbol it introduces to fix this finding.
 
-## Finding 7 — "sugar" used as a bare technical noun at its first appearance
-**Verdict:** PARTIAL
-**Evidence:** The flagged module-doc instance is fixed: src/SimulationRun.jl:25 now reads "the packaged spin-up-to-stationarity observation, and `warmup!`, the one-line shorthand that runs it" (sugar→shorthand).
-**Surviving class:** docs/src/api/SimulationRun.md:22 ("its sugar spin a fresh run up to measurement readiness") and warmup!'s own docstring, src/SimulationRun.jl:658, which now *opens* with "Sugar, and nothing more:" — unglossed, and reached before any explanation.
+---
 
-## Finding 8 — `PointSet` / `VectorPointValues` / `ScalarPointValues` given no provenance note
-**Verdict:** PRESENT
-**Evidence:** src/Particles.jl:121,207,316-317,348,357 now link these via `@extref GBGPeriodicFields …` (rendering as external grigorysarnitsky.github.io URLs), but there is no explicit flag sentence. src/SimulationDomain.jl:181-182 carries the sentence Particles.jl lacks: "The machinery types below are [`GBGPeriodicFields`](...) objects, each linked to its own documentation." The asymmetry the finding named persists.
+## Finding 2 — `epoch` unglossed at first use
 
-## Finding 9 — "artifact" used as the mirror-opposite of "measurable" without being anchored as a pair
-**Verdict:** PARTIAL
-**Evidence:** The flagged docstring is fixed — src/Forcing.jl's `BandRescaling` (lines ~239-249) no longer uses either word; it now says "The band's energy is then set by the forcing rather than by the flow, while k still measures the flow itself" / "Here it is k that the forcing sets, and the band is free."
-**Surviving class:** docs/src/architecture.md:1768-1769 (decision 54) still runs the identical unglossed opposition: "the kinetic energy is an artifact of the forcing and the band is free; under `:band` the band is the artifact and k is a measurable of the flow."
+**VERDICT: PRESENT**
+
+**Evidence:** `docs/src/index.md` Quick start comment is unchanged: "each recorded against the epoch
+of the state it came from" (inside a Julia comment, no forward link possible). `docs/src/notation.md:126`
+Vocabulary still carries the real definition ("a counter of *changes to the state*... Not an iteration
+number...") two pages later, in the section order the hat's stated reading path follows.
+
+---
+
+## Finding 3 — `out-of-band` used for two unrelated things
+
+**VERDICT: PRESENT**
+
+**Evidence:** Control-flow sense unchanged: `src/Cache.jl:42` "announced out-of-band mutation...";
+`src/SimulationRun.jl:371` same. Spectral-shell sense unchanged and un-cross-referenced:
+`src/Forcing.jl:253` `BandRescaling`, "If the out-of-band value alone exceeds `target`, the band is
+zeroed." No gloss or disambiguating note at either site distinguishing the two senses of the phrase.
+
+---
+
+## Finding 4 — `ResolvedFields`/`ResolvedGenerator` collide with numerical "resolve"
+
+**VERDICT: PRESENT**
+
+**Evidence:** `docs/src/index.md:39` still uses the numerical sense ("ν is set so the grid resolves
+the dissipation scale") a few lines before `ResolvedFields`/`ResolvedGenerator` are introduced
+(lines 99, 111) with no flag of the collision. `docs/src/notation.md:131` Vocabulary entry admits the
+collision explicitly, but only two pages later — the exact structure the finding complains about is
+unchanged: nothing on Home signals the reader should expect two senses.
+
+---
+
+## Finding 5 — `Particles` module, only concrete type `Tracers`, no stated relationship
+
+**VERDICT: PARTIAL**
+
+**Evidence:** `docs/src/api/Particles.md` / `src/Particles.jl` module docstring and `Tracers`
+docstring still never say whether `Tracers` is *the* particle type or *a* (massless) kind among
+others — no "massless", "inertial", or "deferred ladder" language anywhere in `src/Particles.jl`.
+`docs/ARCHITECTURE.md:403-404` (§4.6) does now explain it explicitly: "a particle is a state-carrying
+trajectory object: today a tracer (position x); the deferred ladder is inertial (x,v) and oriented
+(x,v,L) probes."
+
+**Surviving class:** The explanation lives only in `ARCHITECTURE.md`, not on the `Particles` API page
+or in the module/type docstrings a reader following the API surface would hit, and neither
+`docs/src/api/Particles.md` nor `src/Particles.jl` links to it.
+
+---
+
+## Finding 6 — bare `A` collision (RK coefficients vs. forcing rate)
+
+**VERDICT: ABSENT**
+
+**Evidence:** `src/Propagator.jl:240-241`, `IFLowStorageRK3` docstring, now reads: "with the stage
+coefficients ``A_i = (0, -5/9, -153/128)`` — unrelated to the forcing rate ``A(\boldsymbol{\kappa})``
+of the `Forcing` page —, ``B = (1/3, 15/16, 8/15)``..." — explicit disambiguating clause naming both
+symbols and their sources. Checked `IFRK2` (`src/Propagator.jl:331-357`) and `velocity_integrating_factor`
+(`src/Generator.jl:402-427`) for residual bare, unlabeled `A`: none found; both consistently write
+``A(\boldsymbol{\kappa})``.
+
+---
+
+## Finding 7 — "mode" switches from Fourier mode to code branch
+
+**VERDICT: PRESENT**
+
+**Evidence:** `src/SimulationRun.jl:101,127` still label the two `Simulation` constructor branches
+"Grid mode" / "Explicit mode," unchanged. `src/State.jl:79` still reads "...the two modes do not seed
+the same large scale..." in the same sentence whose parenthetical reads "the shell's mode count" (the
+Fourier sense) — the identical juxtaposition the finding flagged, though the same paragraph elsewhere
+now says "the `initial_spectrum` branch below" (branch, not mode) one clause earlier, showing the
+inconsistency was not resolved uniformly.
+
+---
+
+## Finding 8 — tracking-loop order stated, then reversed
+
+**VERDICT: PRESENT**
+
+**Evidence:** `docs/src/api/Particles.md` "## The tracking loop" opens "record the flow velocity where
+each tracer currently sits, advance the tracers once the fields have moved, then read any physical
+field..." (record→advance→read), then next sentence: "the run records the sample at the iteration's
+end, off the just-deposited velocity, and the next iteration's `advect!` reads it back" — the
+worked example (`src/Particles.jl:103-104`) still calls `record_particle_velocities!` before
+`advect!` with the comment "do this first." No note marks the first sentence as a verb list rather
+than a per-iteration sequence.
+
+---
+
+## Finding 9 — `taken` unglossed at first appearance
+
+**VERDICT: PRESENT**
+
+**Evidence:** `src/Cache.jl:91` (rendered `ObservablesCache` docstring): "a read that finds a stale,
+taken, or never-deposited slot reports a scheduling error" — still unglossed at this, its first
+appearance in the docstring. The only definition ("taken as a producer's mid-iteration scratch") is a
+plain `#` comment at `src/Cache.jl:58`, which per house style is never rendered. The clarifying prose
+lives in `IntegratorBuffers`/`step!` (`src/Propagator.jl:93,205`), reached later.
+
+---
+
+## Finding 10 — four names for `u(t_n, X(t_n))`
+
+**VERDICT: PRESENT**
+
+**Evidence:** Still four terms, unreconciled: "particle velocities" (`docs/src/notation.md:38`,
+code name), "trajectory velocities" (`src/Particles.jl:22`, module docstring's own first mention),
+"Lagrangian velocity" / "Lagrangian sample" (`src/Particles.jl:28,82,90,124,133,232,245`). Searched
+`docs/src/notation.md` for "trajectory velocit" / "Lagrangian sample" / "Lagrangian velocity": zero
+matches — the Vocabulary page never equates the four phrases.
+
+---
+
+## Finding 11 — "checked accessors" vs. "The checked reads"
+
+**VERDICT: PRESENT**
+
+**Evidence:** `docs/src/index.md:105-106` (Home, Components list) still reads "read through checked
+accessors that serve the deposited value or throw." `docs/src/api/Cache.md:20` heading is still
+"## The checked reads," and `src/Cache.jl` uses "checked read" throughout (lines 27, 149, 186, 201,
+227). The two phrases for one concept are never equated anywhere searched.

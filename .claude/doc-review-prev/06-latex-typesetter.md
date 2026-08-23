@@ -1,116 +1,113 @@
-# LaTeX / Typesetting Panel — Findings
+# Hat: LaTeX / Mathematical-Typesetting Reviewer
 
-Hat: **latex-typesetter** (house math-authoring-style enforcer + general LaTeX/KaTeX professional review)
-
-Substrate read in full: the rendered manuscript (`manuscript-full.md`), the authored TeX in every
-`src/*.jl` and `src/phenomenology/*.jl` docstring, every `docs/src/*.md` page, and
-`docs/ARCHITECTURE.md`; the house rulebook is `CLAUDE.md`'s "Documentation policy" (Notation +
-Silent-rendering micro-rules blocks).
-
-## Summary
-
-This corpus is unusually disciplined. Systematic sweeps for every build-enforced and judgment-level
-house-style violation came back clean:
-
-- `\mathbf` — zero hits (build-enforced, confirmed).
-- Bare-index `\partial_i` — zero hits (build-enforced, confirmed).
-- Unbraced `\boldsymbol X` (no braces) — zero hits.
-- `\mathbb` on a digit — zero hits.
-- Bare `\phi` (should be `\varphi`) — zero hits; `\theta` appears only in the two places that name it
-  as the *forbidden* symbol.
-- `\mathrm{i}` for the imaginary unit — used consistently everywhere it denotes
-  ``\sqrt{-1}`` (Generator.jl:464, Observables.jl:171, Propagator.jl:355,
-  observables_cache.md:294); never left bare italic.
-- `\mathrm{Re}`, `\mathrm{Sc}`, and every multi-letter subscript label (`\kappa_{\mathrm{Ny}}`,
-  `C_{\mathrm{CFL}}`, `y_{\mathrm{s}}`, `E_{\mathrm{band}}`) — upright and consistent throughout;
-  every genuine index product (`S_{ij}`, `R_{ii}`, the literature-standard `D_{LL}`/`D_{LLL}`) is
-  correctly left italic.
-- `\lvert…\rvert` delimiter counts balance in every file; `\bigl`/`\bigr` and `\Bigl`/`\Bigr` counts
-  balance in every file; overall brace balance is clean file-by-file.
-- `\left`/`\right` auto-sizing delimiters — **zero** uses anywhere in the corpus; every sized
-  delimiter uses the house `\bigl`/`\Bigl` idiom by hand, and the arrow-command exemption
-  (`\leftarrow`) is the only "left/right" text that appears.
-- `\,` (thin space) — every occurrence in the corpus precedes a `\mathrm{d}` differential; none is
-  gratuitous.
-- `\!` (negative thin space) — every occurrence is the standard `\exp\!\bigl(` idiom (cancelling the
-  TeX-inserted space between an `Op`-class function and a following opening delimiter), applied
-  consistently everywhere `\exp` is followed by a sized parenthesis.
-- Code identifiers inside a formula are `\texttt{}`-wrapped everywhere (`\texttt{coefficient}`,
-  `\texttt{kinetic\_energy}`, `f = A\texttt{field}`, …), never bare.
-
-Given that baseline, the two findings below are genuine but low-severity: one internal
-delimiter-sizing inconsistency, and one cosmetic source-formatting slip between two copies of an
-identical formula.
+Scope: house-style enforcement (`CLAUDE.md`'s Notation + Silent-rendering micro-rules) and
+professional typesetting judgment, cross-checked against the AUTHORED source (`src/*.jl`,
+`docs/src/*.md`, `docs/ARCHITECTURE.md`) and the rendered manuscript. Build-enforced items
+(`\mathbf`, bare-index `\partial_i`, inline-math-on-one-line) were swept and found clean —
+not reported here, since a grep-level lint already guards them. The corpus is, overall,
+**very disciplined**: `\boldsymbol{}` is universally braced, `\lvert…\rvert` is used
+consistently (never bare `|…|` except the one instance below), delimiter-sizing hierarchies
+(`\Bigl(\bigl[…\bigr]\Bigr)`) are correctly graduated, and every multi-letter subscript label
+is `\mathrm`-wrapped. The findings below are the exceptions to that otherwise-clean pattern.
 
 ---
 
-## Finding 1 — Nested delimiters left unsized where the corpus's own convention sizes them
+## Finding 1 — bare `|\kappa|^2` breaks the house `\lvert\boldsymbol{\kappa}\rvert^2` convention, self-contradicting within the same decision-log passage
+
+- **Type:** typesetting
+- **Severity:** major
+- **Confidence:** high
+- **Locations:**
+  - `docs/ARCHITECTURE.md:1444` — `` the stored real ``|\kappa|^2`` array is gone ``
+  - `docs/ARCHITECTURE.md:1449` — `` at ``256^3``/`Float64`, ``|\kappa|^2`` no longer resident twice ``
+  - (identical text in `docs/src/architecture.md` at the same line numbers — a byte-identical copy)
+- **Contradicts:** the same decision-log entry's own immediate neighbors, describing the *identical*
+  quantity (`domain.squared_wavenumber_kernel`), all nine lines earlier in decision 36/37:
+  `docs/ARCHITECTURE.md:1367` — `` It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}`` `` ,
+  `:1368`, `:1374`, `:1390`, `:1392`, `:1397`, `:1402` — seven more instances, all
+  `\lvert\boldsymbol{\kappa}\rvert^{2}`. Also `docs/src/notation.md:59` (the glossary's own canonical
+  form): `` ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber ``. Axis: bare pipes `|…|` vs.
+  the house `\lvert…\rvert` pair, and non-bold `\kappa` vs. the vector `\boldsymbol{\kappa}` the
+  squared-magnitude is built from.
+- **Description:** Every other occurrence of the squared-wavenumber quantity in the corpus (at least
+  a dozen, across `Observables.jl`, `SimulationDomain.jl`, `notation.md`, and seven lines of this
+  same ARCHITECTURE.md decision-log passage) writes it `\lvert\boldsymbol{\kappa}\rvert^{2}`. Decision
+  38's two instances alone drop to bare, non-stretchy `|\kappa|^2` — both a delimiter regression
+  (`\lvert/\rvert` render as proper math-open/close atoms with correct spacing; a bare `|` does not)
+  and a bolding regression (the vector glyph collapses to the scalar one for the same object). Since
+  this sits four lines below decision 37's own correct usage of the phrase, it reads as a copy/paste
+  slip rather than a deliberate choice.
+
+## Finding 2 — `\mathcal F` is the corpus's only unbraced `\mathcal` argument
 
 - **Type:** typesetting
 - **Severity:** minor
-- **Confidence:** medium
+- **Confidence:** high
+- **Locations:** `docs/src/notation.md:60` — `` ``\mathcal F``, ``\mathcal F^{-1}`` | forward / inverse real transform ``
+- **Contradicts:** every other `\mathcal` invocation in the corpus (64 counted: 51×`\mathcal{E}`,
+  7×`\mathcal{O}`, 6×`\mathcal{P}`) braces its argument even though it is always a single letter —
+  e.g. `docs/ARCHITECTURE.md:706` `` \mathcal{P} `` splits the full state…``, `src/Generator.jl:411`
+  `` \\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp… ``. Axis: braced vs. unbraced single-letter macro
+  argument for the same command family.
+- **Description:** `\mathcal F` (no braces) is harmless in isolation — a single token needs no
+  grouping — but it is the lone holdout against a corpus that otherwise always writes
+  `\mathcal{<letter>}`, including for the sibling operators `\mathcal{E}`/`\mathcal{O}`/`\mathcal{P}`
+  on the very same notation.md page. Bracing it would cost nothing and would make the glossary
+  internally uniform on its own house convention.
+
+## Finding 3 — the von Kármán roll-off formula is set at two different delimiter sizes across its two docstrings
+
+- **Type:** typesetting
+- **Severity:** minor
+- **Confidence:** high
 - **Locations:**
-  - `src/phenomenology/Spectra.jl:149` (docstring of `PopeDissipation`):
-    `` f_\eta(\kappa\eta) = \exp\!\bigl(-\beta\{[(\kappa\eta)^4 + c_\eta^4]^{1/4} - c_\eta\}\bigr) ``
-  - Contrast: `src/phenomenology/StructureFunctions.jl:90` (docstring of `SheLeveque1994`):
-    `` \zeta_p = \frac{p}{9} + 2\Bigl[1 - \bigl(\tfrac{2}{3}\bigr)^{p/3}\Bigr] ``
-- **Description:** `PopeDissipation`'s formula nests four delimiter levels — outer `\exp\!\bigl(
-  \bigr)`, then a literal (unsized) `\{ \}`, then a literal (unsized) `[ ]`, then a literal
-  (unsized) `( )` around `\kappa\eta` — so only the outermost pair is manually sized while the three
-  levels immediately inside it are left at default size. The corpus's own better practice sits two
-  files away: `SheLeveque1994`'s formula tiers a two-level nest correctly, `\Bigl[ \dots \bigl(
-  \dots \bigr) \dots \Bigr]`, the outer bracket visibly larger than the inner parenthesis. The
-  `PopeDissipation` formula is the one nested construction in the corpus that does not tier its
-  delimiter sizes at all beyond the outermost pair, which reads as an inconsistency in an otherwise
-  careful, hand-sized-delimiter corpus rather than a deliberate choice.
-- **Contradicts:** the same "size by hand, tier by nesting depth" idiom, correctly applied at
-  `StructureFunctions.jl:90` (`\Bigl[ \bigl( \bigr) \Bigr]`) and used single-level correctly
-  everywhere else (`PopeLargeScale`, `VonKarmanLarge`, `Sreenivasan1998`, `Lundgren2002`, all using
-  one `\Bigl(\Bigr)` or `\bigl(\bigr)` sized to their content).
-- **Resolution hint:** tier the three inner levels, e.g.
-  `\exp\!\Bigl(-\beta\bigl\{[(\kappa\eta)^4 + c_\eta^4]^{1/4} - c_\eta\bigr\}\Bigr)`, or accept the
-  current form as intentional and note the exception (this is a taste call, not a build break).
+  - `src/phenomenology/Spectra.jl:175` (`VonKarmanLarge` docstring) —
+    `` f_L(\\kappa L) = \\Bigl(\\frac{(\\kappa L)^2}{(\\kappa L)^2 + c_L}\\Bigr)^{17/6} ``
+  - `src/phenomenology/Spectra.jl:358` (`VonKarman1948` docstring) —
+    `` \\bigl((\\kappa L)^{2}/((\\kappa L)^{2} + c_L)\\bigr)^{17/6} ``
+- **Contradicts:** each other — same formula (von Kármán's large-scale roll-off factor, same
+  fraction, same `17/6` exponent), same enclosing parenthesis height, but sized `\Bigl(…\Bigr)` in
+  one docstring and `\bigl(…\bigr)` in the other. Axis: `\Bigl`/`\Bigr` vs. `\bigl`/`\bigr` for an
+  identical parenthesized fraction.
+- **Description:** The house rubric asks for fixed-size delimiters sized by hand rather than
+  `\left`/`\right` auto-sizing — which this corpus otherwise does very well (graduated
+  `\Bigl(\bigl[…\bigr]\Bigr)` nesting appears correctly elsewhere, e.g. `SheLeveque1994` at
+  `StructureFunctions.jl:89`). Here the *same* enclosed fraction earns two different hand-picked
+  sizes depending on which docstring quotes it — a minor visual mismatch a reader who looks at both
+  pages back to back would notice (one parenthesis pair visibly taller than the other around an
+  identical fraction).
 
----
-
-## Finding 2 — Duplicate formula disagrees on a stray space before its terminal period
+## Finding 4 — kerning idiom `\exp\!\bigl(…\bigr)`, `\!` around a function name (advisory only, not filed as a defect)
 
 - **Type:** typesetting
 - **Severity:** nit
-- **Confidence:** high
-- **Locations:**
-  - `docs/ARCHITECTURE.md:252` (identically duplicated at `docs/src/architecture.md:252`, the
-    generated build copy):
-    `` \partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f} . ``
-  - `src/Generator.jl:319` (docstring of `velocity_rhs!`):
-    `` \partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}. ``
-- **Contradicts:** the two spans are the *same* momentum-equation display, restated once in the
-  architecture narrative and once in the `velocity_rhs!` docstring; the `ARCHITECTURE.md` copy has a
-  literal space between `\boldsymbol{f}` and the closing `.`, the `Generator.jl` copy does not.
-- **Description:** a source-level inconsistency between two copies of an identical formula. Because
-  TeX/KaTeX math mode discards raw literal whitespace between tokens (spacing is governed entirely by
-  atom-class rules and explicit spacing commands, never by a bare space character in the source), this
-  particular slip renders pixel-identically either way — it is invisible in the built HTML. It is
-  worth recording only as a source-hygiene inconsistency between the two copies of the formula, not as
-  a visible defect.
-- **Resolution hint:** drop the stray space in `docs/ARCHITECTURE.md:252` for source-level
-  consistency with `Generator.jl:319`; no visible change results.
+- **Confidence:** low
+- **Locations:** `src/State.jl:75,78,156,159`, `src/SimulationDomain.jl:76`, `src/Generator.jl:412`,
+  `docs/src/notation.md:63`, `docs/ARCHITECTURE.md:269` — all `\exp\!\bigl(…\bigr)`.
+- **Contradicts:** nothing — this is internally uniform (every `\exp` before a `\bigl(` gets the same
+  `\!`) and is a standard italic-correction kern, not a spacing-around-a-relation violation.
+- **Description:** Recorded only because the rubric singles out manual spacing commands for
+  scrutiny. On inspection this is the professional idiom (tightening the gap `\exp`'s slight italic
+  overhang leaves before an opening delimiter), applied consistently corpus-wide. Not a defect — no
+  action suggested; kept here only so the panel can see it was checked rather than missed.
 
 ---
 
-## Not flagged (checked and clean)
+## Swept clean (no findings)
 
-- The two- and four-column `aligned` blocks (`Particles.jl:267-273`'s Heun update, the coupled
-  Navier–Stokes/scalar/tracer system in `observables_cache.md:246-255` and its `ARCHITECTURE.md`
-  twin) use uneven ampersand counts per row (one row pairs two side-by-side equations, later rows
-  give one each). This is valid `aligned`/`amsmath` usage — rows do not need matching column counts —
-  and is not a break.
-- Several formulas carry a single literal space between a control sequence and the following token
-  (`f\pi \eta/\Delta x` in `SimulationRun.jl:112`, `- \texttt{strength}` in `SimulationDomain.jl:76`
-  and the identical span in `notation.md`/manuscript). These are inert: math-mode whitespace is
-  discarded by TeX/KaTeX regardless of the source, so there is no rendering difference and no fix is
-  needed.
-- `\exp\!\bigl(` appears as a fixed idiom at every site where `\exp` is followed by a sized
-  parenthesis (`Generator.jl`, `SimulationDomain.jl`, `State.jl` ×4, `observables_cache.md`,
-  `notation.md`, `ARCHITECTURE.md`) — this cancels the TeX-inserted `Op`-class spacing before an
-  opening delimiter, a standard, deliberate typesetting trick, applied uniformly. Not a defect.
+For the record, the following classes were checked exhaustively across every `src/*.jl` docstring,
+`docs/ARCHITECTURE.md`, and every `docs/src/*.md` page, and found with **zero** violations:
+`\mathbf` (build-enforced, confirmed absent); bare-index `\partial_i` vs. `\partial_{x_i}`
+(build-enforced, confirmed — the only bare `\partial_t` instances are the *time* derivative, which
+the house rule does not require subscript-braced since `t` is not a spatial coordinate); unbraced
+`\boldsymbol` argument; unbraced `\tfrac`; `\mathbb` on a digit; the imaginary unit (always
+`\mathrm{i}`, never bare `i` or `\imath`); named operators (`\det`, `\operatorname{tr}`,
+`\operatorname{sym}`, `\max`, `\sup`, `\log`, `\cos`, `\exp` — all upright, never italic
+letter-products); `\texttt{}`-wrapping of every code identifier that appears inside a formula (30
+instances, all correctly wrapped); `\lvert`/`\rvert` pairing balance (matched count in every file);
+`` `` `` math-span balance (even count in every file); stray `$`-delimited math (none — the corpus
+uses ```` ```math ```` / ` `` ` exclusively); `\left`/`\right` (not used anywhere in the corpus —
+`\bigl`/`\Bigl` used instead, correctly paired throughout); a `\begin{cases}` / `\left\{…\right.`
+system block (none present, so the sanctioned exception was never needed nor abused); multi-line
+`\begin{aligned}` blocks (all six checked — `Propagator.jl:229,342`, `Observables.jl:78,101,233,330`
+— align correctly at `&` before `=`/`\leftarrow`).

@@ -1,208 +1,257 @@
 # Doc-review panel — hat 03: TURBULENCE THEORETICIAN
 
-Substrate: the consolidated rendered site (`manuscript-full.md`). Collect-only; no edits applied.
+Rendered-docs audit of physical definitions, conservation laws, scaling laws, dimensionless
+constants, derived scales, and category/type errors. Findings ranked most-severe first.
 
-**Verified clean** (expanded against theory, no defect found — recorded so a later round need not
-re-derive): the Betchov skewness constant `C_S = (4/7)√(15/2) ≈ 1.5649` (from
-`⟨tr S³⟩ = (105/8)⟨(∂₁u₁)³⟩` and `⟨S:S⟩ = (15/2)⟨(∂₁u₁)²⟩`, signs included, and `tr S³ = 3 det S`
-for a traceless symmetric tensor); `ε = ν⟨|ω|²⟩ = 2ν⟨S:S⟩` and its "differ by a divergence" caveat;
-the Dirichlet route `⟨|ω|²⟩ = ⟨û,|κ|²û⟩` and its solenoidal condition; `ε_φ = 2ϰ⟨|∇φ|²⟩` as the
-full-variance rate and the resulting Yaglom `-2/3 ε_φ r`; `L₁₁ = (3π/4)∫(E/κ)/∫E`, `L₂₂ = L₁₁/2`,
-`L_E = (π/2)∫(E/κ)/∫E = (2/3)L₁₁`; `λ`, `η`, `τ_η`, `Re_λ = u'²√(15/(νε))`; `G = (3/2)C_ε^{-2/3}` and
-the `L/L₁₁ ≈ 5 ⇒ G ≈ 0.81` arithmetic; `ε = (k/G)^{3/2}/L`; `Re_λ ~ N^{2/3}`; `κ_max η = fπη/Δx` and
-`κ_max_η = 2 ⇒ Δx ≈ η` at `f = 2/3`; the PhaseShift band `√2N/3 = (2√2/3)κ_Ny ≈ 0.94 κ_Ny`, `≈2.8×`
-the modes, and the odd-axis/two-axis image argument; the alias-free condition `2κ_max < N`; RKW3
-coefficients `A,B,d` and abscissae `c = (0,1/3,3/4)`; `y_s = √3 ⇒ C_CFL ≲ 0.83`; `|R(iy)|² = 1+y⁴/4`;
-`ζ_p` for K62 and She–Lévêque; Lundgren's zero at `Re_λ ≈ 34` and the ~50 % coefficient loss at 100;
-`C₂ ≈ 2.0` consistent with `C_K = 1.5`; the Gaussian-envelope peak at `κ_p/√2`; `√E(κ)/κ` mode
-scaling; the ConstantPower rate `A = injection_rate/(2E_band)`; the transform ledgers (18/9, 21/18,
-2× for PhaseShift).
+Verified-clean (checked and correct, recorded so a later round need not redo them): the
+derivative-skewness constant `C_S = (4/7)√(15/2) ≈ 1.5649` together with both Betchov bridges
+`⟨tr S³⟩ = (105/8)⟨(∂ₓ₁u₁)³⟩` and `⟨S:S⟩ = (15/2)⟨(∂ₓ₁u₁)²⟩`; `ε = ν⟨|ω|²⟩ = 2ν⟨SᵢⱼSᵢⱼ⟩` and its
+`2⟨(∇·u)²⟩` difference; the Dirichlet route `⟨|ω|²⟩ = ⟨û,|κ|²û⟩`; the Yaglom half/full-variance
+factor (`−4/3 → −2/3 ε_φ`); Obukhov–Corrsin 0.67 as the 3-D partner of Sreenivasan's 1-D 0.4;
+`C₂ ≈ 2.0` against `C_K = 1.5`; `G = (3/2)C_ε^{−2/3}` and the `G ≈ 0.81 vs 0.9` reconciliation at
+`L/L₁₁ ≈ 5`; `L₁₁/L₀ = C_ε(2/3)^{3/2}` with the 0.42k / 0.57k numbers; `L_E = (2/3)L₁₁ =
+(1/3)(L₁₁+2L₂₂)`; the alias-free condition `2κ_max < N`; `κ_max Δx = 2π/3`, `C_CFL ≲ 0.83`,
+`|R(iy)|² = 1 + y⁴/4`; the RKW3 coefficients and their `c = (0,1/3,3/4)` consistency; the
+Williamson/IF-Heun linear exactness; the phase-shift `√2` band and `2.83×` mode count; the
+`κ_p/√2` envelope peak; the Lundgren `Re_λ ≈ 34` sign flip and the "half the coefficient at 100";
+She–Lévêque and K62 at `ζ₃ = 1`; `Re_λ ~ N^{2/3}`; the transform ledgers (18/9, 21/18, and their
+exact doubling).
 
 ---
 
-## 1. `SaffmanDissipation` carries a published attribution but a deliberately unpublished coefficient, and cannot be overridden
-- **type**: citation / physics
+## 1. `Li2008` attributes this package's own fit to Li et al. (2008)
+
+- **type**: citation
 - **severity**: major
 - **confidence**: high
-- **locations**:
-  - PAGE `api / phenomenology / Spectra`, `SaffmanDissipation`: signature `SaffmanDissipation()`;
-    "whose coefficient varies with the derivative skewness $S$ — about $2.6$ to $3.3$ … and is
-    simplified downward to $2$ here"; "retains more near-cutoff energy than a measured spectrum shows".
-  - PAGE `phenomenology` (overview): "the published fit is the default, and any coefficient can be
-    overridden to re-fit".
-- **contradicts**: PAGE `phenomenology`, "any coefficient can be overridden to re-fit" — axis: whether a
-  preset's fitted coefficient is (a) the published value and (b) user-overridable.
-- **description**: The preset is named for Saffman and reports his provenance, yet its cutoff
-  coefficient is neither his (2.6–3.3) nor any published value, and the zero-field constructor gives no
-  way to restore one. In a library whose stated purpose is validating a run against the literature, a
-  reference curve that is admittedly softer than measurement will report a spurious near-cutoff
-  discrepancy that a user cannot dial away. Same class: `Lundgren2002`'s hard-coded `8.45`.
-- **resolution_hint**: `SaffmanDissipation(; coefficient = 2.6)` (published default), and make
-  Lundgren's coefficient a field.
 
-## 2. `ExponentialDissipation` is a far-dissipation asymptote enrolled among "inertial-normalized cutoffs"
+**Locations**
+
+- PAGE: api / phenomenology / Scalings, `Li2008`: "The value is this package's **own reduction** of
+  the Johns Hopkins Turbulence Database (JHTDB) forced-isotropic dataset"
+- PAGE: api / SimulationRun, `Simulation` → Grid mode: "a dimensionless constant calibrated on
+  box-confined DNS (**≈ 0.9; Li et al. 2008**)"
+- PAGE: api / phenomenology / Phenomenology (naming rule): "its **author-year** (the paper)"
+
+**Contradicts**: the `Li2008` docstring says the number is ours; the `Simulation` grid-mode
+paragraph cites it to Li et al. (2008), and the author-year handle asserts the same.
+
+**Description**
+
+Li et al. (2008) is a database-description paper; it does not publish `G = k/(Lε)^{2/3} ≈ 0.9`.
+The preset's own docstring concedes the value is the package's reduction of their *data*, yet the
+name and the run-layer citation both present it as a published fit. `Phenomenology`'s charter says
+our own fits sit beside the literature as equals — which requires they not borrow a literature
+handle. This is the one law the run layer *acts* on (it sets ν), so the provenance matters.
+
+**resolution_hint**: rename to our own author-year handle (with the JHTDB dataset cited as the
+calibration source inside `provenance`), or keep `Li2008` only if a Li-et-al. figure is quoted.
+
+---
+
+## 2. Grid mode's `κ_max_η` treats `HouLi`'s merely-damped band as clean signal
+
 - **type**: physics
 - **severity**: major
 - **confidence**: medium
-- **locations**:
-  - PAGE `api / phenomenology / Spectra`, `DissipationFactor`: "These factors are inertial-normalized
-    cutoffs"; "with $f_\eta \to 1$ as $\kappa\eta \to 0$".
-  - Same page, `ExponentialDissipation`: "It is the far-dissipation form ($\kappa\eta \gg 1$), where
-    DNS resolving that range fit $\beta \approx 6.7$"; "the factor tends to `1` in the inertial range".
-- **contradicts**: `DissipationFactor`, "inertial-normalized cutoffs" — axis: whether the factor is ≈1
-  across the inertial range or only in the limit.
-- **description**: `exp(-βκη)` has no `c_η`-style offset, so at `β ≈ 6.7` it is 0.51 at `κη = 0.1` and
-  0.07 at `κη = 0.4` — precisely where `PopeDissipation` is still ≈1. Composed into a `ModelSpectrum`
-  (which the module invites: "Build one directly to mix roll-off forms") it multiplies the whole
-  inertial range by a large exponential, so the composite is not a `κ^{-5/3}` law with a cutoff. The
-  limit statement is true and the practical claim is not.
-- **resolution_hint**: State the restriction (valid only as a far-range asymptote / not composable with
-  an inertial core), or give it an offset form.
 
-## 3. `Simulation` states the `G`–`C_ε` relation as a linear rescale; the `Scalings` page gives the exact inverse-2/3 identity
-- **type**: contradiction
-- **severity**: minor
-- **confidence**: high
-- **locations**:
-  - PAGE `api / SimulationRun`, `Simulation`, Grid mode: "since $G$ is $C_\varepsilon$ rescaled by
-    $L_{11}/L$".
-  - PAGE `api / phenomenology / Scalings`, `Li2008`: "Formed on a common length the two are exactly
-    related by $G = \tfrac{3}{2} C_\varepsilon^{-2/3}$".
-- **contradicts**: `Li2008` as quoted — axis: the functional form relating the two dimensionless groups.
-- **description**: `G = (3/2)(L₁₁/L)^{2/3} C_ε^{-2/3}` — the dependence on `C_ε` is *inverse* and to the
-  2/3 power, and the length ratio also enters to the 2/3 power. "`G` is `C_ε` rescaled by `L₁₁/L`" reads
-  as a linear proportionality in both, and gets the direction of the `C_ε` dependence wrong (a larger
-  `C_ε` gives a *smaller* `G`). The `Li2008` page even warns against substituting the two directly.
-- **resolution_hint**: "since `G` is fixed by `C_ε` and the ratio `L₁₁/L` together (both to the 2/3
-  power)".
+**Locations**
 
-## 4. The `L₁₁` vs `k^{3/2}/ε` factor and the "well under half" consequence disagree with Pope's own ratio
+- PAGE: api / SimulationRun, `Simulation`: "That criterion treats the whole retained band as clean
+  signal — exact for `TwoThirds` and `PhaseShift`, **approximate for `HouLi`**"
+- PAGE: api / SimulationDomain, `max_wavenumber`: "$f$ the retained-Nyquist fraction … **$1$ for
+  `HouLi`**"
+- PAGE: api / Observables, `kinetic_energy`: "`HouLi` … **alias-free in practice, not exactly**"
+
+**Description**
+
+With `f = 1`, `κ_max η = f π η/Δx = 2` gives **η ≈ 0.64 Δx** — the dissipation scale falls below the
+grid spacing — and ν ∝ f^{−4/3} makes grid mode hand `HouLi` a ~31 % higher Re_λ than `TwoThirds` on
+the same N. The page states `Δx ≈ η` for `f = 2/3` but gives no number for `HouLi`, so "the highest
+Reynolds number consistent with the resolution criterion" reads as comparable across strategies when
+it is not. The word "approximate" understates a band that is damped rather than dealiased.
+
+**resolution_hint**: quote `η/Δx` per strategy, or exclude `HouLi` from grid mode's default
+criterion.
+
+---
+
+## 3. Grid mode is self-consistent only under a k-clamping forcing, and only `BandRescaling` says so
+
+- **type**: physics
+- **severity**: major
+- **confidence**: medium
+
+**Locations**
+
+- PAGE: api / SimulationRun, `Simulation` → Grid mode: "$\varepsilon = (k/G)^{3/2}/L$ **with
+  `kinetic_energy` the kinetic energy $k$**"
+- PAGE: api / Forcing, `BandRescaling`: "the resolution criterion $\kappa_{\max}\eta$ is **only
+  self-consistent if the run really holds $k$ there**"
+
+**Description**
+
+The constraint lives in the `BandRescaling` docstring, not where the trap is. `Simulation(;
+grid_points_per_axis = 128, velocity_forcing = ConstantPower(injection_rate = 0.1))` is legal, stays
+in grid mode, and silently violates it: `ConstantPower` lets k find its own level, so the assumed k
+— and with it ε, η and the chosen ν — is wrong, and the run is resolved to a criterion it never
+meets. The grid-mode paragraph names only the *band* assumption, not the *amplitude* one.
+
+**resolution_hint**: state the constraint (or warn/error) at the grid-mode branch when a
+non-k-clamping `velocity_forcing` is supplied.
+
+---
+
+## 4. `VonKarman1948` does not integrate to k, and the page does not say so
+
 - **type**: physics
 - **severity**: minor
 - **confidence**: medium
-- **locations**:
-  - PAGE `api / phenomenology / Spectra`, `large_scale_length`: "feeding the same coefficient $L_{11}$
-    instead — smaller by a factor of order three — leaves the model spectrum holding well under half the
-    kinetic energy".
-- **description**: Pope's own high-Reynolds-number result is `L₁₁ = 0.43 L₀` — a factor 2.3, not "of
-  order three". Since `∫E dκ ∝ L^{2/3}` at fixed `C_K, ε`, substituting `L₁₁` leaves
-  `0.43^{2/3} ≈ 0.57` of the energy — a bit *over* half, not "well under". The number quoted is only
-  reached if the ratio really is ≈3.5, which is the package's box value rather than Pope's model value.
-- **resolution_hint**: Quote Pope's `L₁₁ ≈ 0.43 k^{3/2}/ε` and say "roughly 40 % of the energy lost"
-  (`1 − 0.57`), or state which ratio is meant.
 
-## 5. For the scalar, `E_band` and `injection_rate` are called *energy* where the quantity is a variance
-- **type**: dimensional / category
-- **severity**: minor
-- **confidence**: high
-- **locations**:
-  - PAGE `api / Forcing`, `ConstantPower`: "The rate $A$ diverges as the band's own energy goes to zero,
-    which is reachable — a scalar seeded with nothing in the forced shells".
-  - Same docstring, Arguments: "`injection_rate` — the energy-injection rate to hold".
-  - Same page, `BandRescaling`: "the field's $L^{2}$ observable, carrying the $\tfrac{1}{2}$ only for
-    the vector".
-- **description**: One implementation serves both fields, and the docstrings say so correctly elsewhere
-  ("the rate $\varepsilon$ for the velocity … and $\varepsilon_\varphi$ for the scalar"). But the
-  empty-band caveat and the `injection_rate` gloss both type the held quantity as an *energy*, which for
-  the scalar is `⟨φ²⟩` — a variance — and the injected rate is `ε_φ`, a variance-destruction rate. The
-  symbol `E_band` compounds it: `E` is glossed on the notation page as an energy/spectral density.
-- **resolution_hint**: "the band's own held observable" / "the injection rate to hold (`ε` for the
-  velocity, `ε_φ` for the scalar)".
+**Locations**
 
-## 6. The scalar's right-hand side is written as a bold (vector) symbol
-- **type**: typesetting / category
-- **severity**: minor
-- **confidence**: high
-- **locations**:
-  - PAGE `notation`, Spectral representation and operators: "$\widehat{\boldsymbol{N}}$ | a field's
-    assembled explicit right-hand side … | velocity_rhs!, scalar_rhs!".
-  - PAGE `api / Propagator`, `IFLowStorageRK3`: "$\boldsymbol{h} \leftarrow A_i \boldsymbol{h} +
-    \Delta t \widehat{\boldsymbol{N}}(\hat q)$" — with the state written non-bold as `\hat q`.
-- **description**: The house rule reserves bold italic for vectors and tensors. `scalar_rhs!` assembles
-  a *scalar* field, and the low-storage formula is written generically over `q̂` (non-bold) while its own
-  increment and right-hand side are bold — so within one display the same generic field is both bold and
-  not. A reader types `N̂` as a vector and then meets it as the scalar's tendency.
-- **resolution_hint**: Use non-bold `\widehat N` for the generic/scalar right-hand side (and `\hat h`),
-  reserving the bold form for the velocity instance.
+- PAGE: api / phenomenology / Spectra, `VonKarman1948`: "`c_L` … is a **shape parameter** of this
+  form rather than a normalization — **no energy condition determines it**, and the default `1.0` is
+  the conventional choice"
+- PAGE: api / phenomenology / Spectra, `large_scale_length`: "the spectrum integrates to **$0.42k$**"
 
-## 7. `Li2008` attributes a reference law to a database paper
-- **type**: citation
+**Description**
+
+The sibling normalization breakage is quantified for Pope's form; the same defect in
+`VonKarman1948` is only hinted at. Integrating `E = C_K ε^{2/3}κ^{−5/3}((κL)²/((κL)²+1))^{17/6}`
+gives `∫E dκ = 1.55 (εL₁₁)^{2/3}` against `k = (3/2)C_ε^{−2/3}(εL₁₁)^{2/3}` — **≈ 0.65 k at
+C_ε = 0.5**, 0.88 k at 0.79. Harmless as an IC (the field is renormalized), but a systematic
+amplitude offset in any relative-L² comparison of a measured spectrum against this preset.
+
+**resolution_hint**: state the offset (as `large_scale_length` does), or make `c_L` normalization-
+determined for this form too.
+
+---
+
+## 5. The assumed integral scale `1/envelope_wavenumber` is not the seeded field's `L₁₁`
+
+- **type**: dimensional
 - **severity**: minor
 - **confidence**: medium
-- **locations**:
-  - PAGE `api / phenomenology / Scalings`, `Li2008`: "nearly Reynolds-number-independent from the Johns
-    Hopkins Turbulence Database (JHTDB) forced-isotropic dataset".
-  - PAGE `phenomenology`: "the paper is the author-year type (`Pope2000`)"; "our own fits sit beside the
-    literature on equal footing".
-- **description**: Li et al. (2008) is the JHTDB database paper; it does not publish a box-normalized
-  dissipation group. The value `G ≈ 0.9` is the package's own reduction of that dataset, so the
-  author-year handle asserts a provenance the source does not carry — exactly the case the module says
-  it handles by letting our own fits stand as our own. This matters because the run layer's default `ν`
-  rests on it.
-- **resolution_hint**: Keep the name if the `Reference` string says "fitted here to the Li et al. (2008)
-  JHTDB dataset"; otherwise name it as an own fit.
 
-## 8. "Stamp" is retired by decision 54 yet is the ObservablesCache docstring's own vocabulary
+**Locations**
+
+- PAGE: api / SimulationRun, `Simulation`, `initial_spectrum`: "and the integral scale as
+  **`1/envelope_wavenumber`**"
+- PAGE: api / Observables, `integral_scale`: "$L_{11} = \frac{3\pi}{4}\frac{\int E/\kappa}{\int E}$"
+
+**Description**
+
+Applying the package's own `integral_scale` definition to the default envelope
+`E ∝ κ²exp(−2κ²/κ_p²)` gives `L₁₁ = (3/4)√(8π)/κ_p = 3.76/κ_p` — **1.88 at the default κ_p = 2**,
+not 0.5. Using 0.5 to position a model spectrum pushes its energy-containing peak up by a factor
+≈ 2 (VonKarman1948 with c_L = 1 peaks at κ ≈ 3.1 against the Gaussian branch's 1.41), so the two IC
+branches seed visibly different large scales at the same nominal setting.
+
+**resolution_hint**: either derive the assumed `L₁₁` from the envelope (≈ 3.76/κ_p) or expose it as
+its own keyword.
+
+---
+
+## 6. `envelope_wavenumber` is said both to feed and not to feed the `initial_spectrum` branch
+
 - **type**: contradiction
 - **severity**: minor
-- **confidence**: high
-- **locations**:
-  - PAGE `architecture`, §11: "**'Stamp' is retired; a slot carries an epoch** … The `*_stamp` fields
-    become `*_epoch`, and the verb goes with the noun — a deposit fills a slot and sets its epoch rather
-    than 'stamping' it."
-  - PAGE `api / Cache`, `ObservablesCache` Fields: "each slot carries a stamp, the counter's value at the
-    moment that slot was filled"; "`velocity_epoch`, … — each slot's stamp"; "the particle velocities'
-    two stamps".
-  - Same page, `deposit_sample!`: "this call stamps both from the cache's current counters".
-- **contradicts**: the §11 entry as quoted — axis: the retired noun/verb.
-- **description**: The decision that renamed the fields also retired the word and its verb; the type's
-  own docstring reintroduces both four times, including in the sentence that defines the concept. A
-  reader meets "stamp" as the primary noun exactly where the glossary says "epoch".
-- **resolution_hint**: Sweep `stamp` → `epoch` on the `Cache` surface; check the `Vocabulary` entry on
-  the notation page too, which also says "the value of that counter stamped on it".
-
-## 9. "IFRK2's two predictor registers" names one register that exists
-- **type**: contradiction
-- **severity**: nit
 - **confidence**: medium
-- **locations**:
-  - PAGE `architecture`, §9 invariants: "an `IFLowStorageRK3` run does not carry `IFRK2`'s two predictor
-    registers".
-  - PAGE `api / Propagator`, `allocate_buffers`: "`IFRK2` allocates `stage1`, `stage2`, and
-    `velocity_predictor_spectral`".
-- **description**: `IFRK2` carries exactly one predictor register; the second register `IFLowStorageRK3`
-  lacks is `stage2`, a corrector stage. The invariant's phrasing invites a reader to look for two
-  predictors and find one.
-- **resolution_hint**: "does not carry `IFRK2`'s second stage and predictor registers".
 
-## 10. `VonKarman1948`'s default `c_L = 1.0` is presented as a published fit
+**Locations**
+
+- PAGE: api / SimulationRun, `Simulation`: "it **also sets the integral scale in the assumed state
+  `initial_spectrum` reads**"
+- PAGE: api / State, `random_solenoidal_velocity_spectral!`: "The `envelope_wavenumber` setting has
+  **no effect in the `initial_spectrum` branch**"
+
+**Contradicts**: the two sentences make opposite claims about whether `envelope_wavenumber`
+influences a run seeded from a model spectrum; the axis is which layer is meant (front door vs
+seeder), which neither sentence names.
+
+**Description**
+
+Both are true at their own layer — the seeder receives an already-evaluated `κ ↦ E(κ)`, while the
+front door builds that closure from an assumed state whose integral scale is `1/envelope_wavenumber`
+— but a reader meeting the two sentences has no way to see that, and the seeder's flat "no effect"
+is the one they will believe. The identical text appears in `random_scalar_spectral!`.
+
+**resolution_hint**: qualify the seeder sentence ("no effect *on this call*; the front door uses it
+to build the spectrum function").
+
+---
+
+## 7. The resolution criterion is silent about the scalar's Batchelor scale
+
 - **type**: physics
 - **severity**: minor
-- **confidence**: low
-- **locations**:
-  - PAGE `api / phenomenology / Spectra`, `VonKarman1948`: signature `VonKarman1948(; C_K = 1.5,
-    c_L = 1.0)`; "`c_L` fixes the peak scale".
-  - PAGE `phenomenology`: "the published fit is the default".
-- **description**: Unlike `PopeLargeScale`, whose `c_L = 6.78` is stated to come from the energy
-  normalization, `VonKarmanLarge`'s `c_L = 1.0` looks like a placeholder: with the length taken as
-  `L₁₁` the composed spectrum then peaks at `κL₁₁ ≈ 1.55`, whereas the classical von Kármán form with
-  its own `κ_e`–`L₁₁` relation peaks nearer `κL₁₁ ≈ 1.2`. Nothing ties `c_L = 1` to von Kármán (1948),
-  and no normalization condition is stated for it as one is for Pope's.
-- **resolution_hint**: Either state the condition `c_L` satisfies (peak location or energy
-  normalization) or mark it explicitly as a convenience value, not the published fit.
+- **confidence**: high
 
-## 11. A Sreenivasan-named preset takes its default from a different source
-- **type**: citation
-- **severity**: nit
+**Locations**
+
+- PAGE: api / SimulationRun, `Simulation`: "sets $\nu$ so that $\kappa_{\max}\eta$ equals
+  `κ_max_η` — the resolution criterion"
+- PAGE: api / SimulationRun, `Simulation`: "`schmidt = 1.0` — the Schmidt number $\mathrm{Sc}$"
+
+**Description**
+
+`κ_max η` is a velocity criterion. `schmidt` is a free keyword with no stated bound, and at Sc > 1
+the scalar's smallest scale is `η_B = η/√Sc`, so `Simulation(; grid_points_per_axis = N,
+schmidt = 4)` reports a well-resolved run whose scalar is resolved only to `κ_max η_B = 1`. No page —
+grid mode, `FlowConditions`, `scalar_dissipation` — records that the criterion covers one field
+only. (Not a request for high-Sc machinery; a request for the caveat.)
+
+**resolution_hint**: one sentence in the grid-mode paragraph: the criterion is set on η, so scale
+`κ_max_η` by √Sc when Sc > 1.
+
+---
+
+## 8. Under `over = :band` the claim "k still measures the flow" overstates what is left free
+
+- **type**: physics
+- **severity**: minor
 - **confidence**: medium
-- **locations**:
-  - PAGE `api / phenomenology / Scalings`, `Sreenivasan1995`: "a reliable estimate being $C_K = 1.5 \pm
-    0.1$ (the default; Sagaut & Cambon 2018)".
-  - PAGE `api / phenomenology / Phenomenology`, `provenance`: "it is the single source of the law's
-    attribution".
-- **description**: The preset's `provenance` will report Sreenivasan (1995) while its default value is
-  credited in the same sentence to Sagaut & Cambon (2018). Either the two agree (in which case say so —
-  Sreenivasan's 1-D 0.5 maps to a 3-D 1.5) or the default is not the named paper's, and `provenance`
-  stops being the single source of attribution.
-- **resolution_hint**: "Sreenivasan's one-dimensional 0.5 ± 0.05 corresponds to the three-dimensional
-  1.5 (×55/18), the value Sagaut & Cambon also tabulate."
+
+**Locations**
+
+- PAGE: api / Forcing, `BandRescaling`: "The band's energy is then set by the forcing rather than by
+  the flow, **while $k$ still measures the flow itself**"
+- PAGE: architecture, §11 decision (`over` required): "under `:band` the band is the artifact and
+  **$k$ is a measurable of the flow**"
+
+**Description**
+
+The clamped band is `lowest_shell = 1` to `highest_shell = 2` — the energy-containing range, which
+in a 2π box carries the large majority of k. A deterministic clamp on it therefore suppresses most
+of k's physical fluctuation too; what remains free is the out-of-band remainder, a small fraction.
+The docstring's own framing ("`over` decides which quantity your run may no longer measure") is
+right, but the `:band` bullet then promises more freedom for k than the shell choice delivers.
+
+**resolution_hint**: soften to "k retains its out-of-band fluctuation" rather than "measures the
+flow itself".
+
+---
+
+## 9. The glossary binds ω to a producer verb, and leaves Re_λ the one scale without its formula
+
+- **type**: typesetting
+- **severity**: nit
+- **confidence**: high
+
+**Locations**
+
+- PAGE: notation, Physical variables: "$\boldsymbol{\omega}$ | the vorticity $\nabla\times
+  \boldsymbol{u}$ | **vorticity_physical!**"
+- PAGE: notation, Derived scales: "$\mathrm{Re}_\lambda$ | Taylor-microscale Reynolds number,
+  **measured from the flow state** | taylor_reynolds"
+
+**Description**
+
+Two small breaks in the glossary's own pattern. The Code column elsewhere names the storage a symbol
+denotes ("the velocity state", "the scalar state", `particle_positions`); ω is given the recovery
+*verb* instead, though `cache.vorticity_physical` is exactly its storage. And every neighbouring
+derived scale carries its defining expression (η, τ_η, λ, u', L₁₁) while Re_λ alone carries a
+description — the reader must leave for `taylor_reynolds` to learn it is `u'λ/ν`.
+
+**resolution_hint**: `Cache.vorticity_physical` in the Code column; add `= u'\lambda/\nu`.
