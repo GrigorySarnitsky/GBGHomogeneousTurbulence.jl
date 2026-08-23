@@ -529,8 +529,8 @@ Hold the field's variance at `target` by feedback — the kinetic energy ``k`` f
 Urzay, Park & Moin (2016, [doi:10.1063/1.4944629](https://doi.org/10.1063/1.4944629)).
 
 Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, which is nearly always:
-it enters the right-hand side as a smooth rate the scheme integrates, keeping the order the scheme
-advertises, where a rescaling is a post-step projection that caps the iteration at first order.
+it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
+rescaling is a post-step projection capping the iteration at first order.
 
 The rate is the marginal law ``A = \\varepsilon/2k`` plus a proportional restoring term:
 
