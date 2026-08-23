@@ -172,8 +172,8 @@ recover anyway. What it costs is reads: a slot taken before the last reader of t
 that read throw, so the schedule must order the two.
 
 **Every slot is deposited on every iteration**, and the completeness check throws if a slot is still
-with its epoch cleared. No caller can cause this — a slot exists only because the schedule fills it
-— so the check guards the solver against itself: a slot nobody refilled would hold scratch for the
+with its epoch cleared. Through today's API no caller can cause this — a slot exists only because the schedule fills it
+— so the check guards the solver against its own future edits: a slot nobody refilled would hold scratch for the
 rest of the run and throw on every later read, and the completeness check names the fault where it
 happened.
 
@@ -198,8 +198,9 @@ It costs nothing on the memory axis, nothing on the transform axis, and — with
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
 read computes. The cache is otherwise a naming-and-dating layer over storage the run already owns:
-removing it would free no array, and the only work it *adds* over a cacheless solver is §1.3's final
-closing deposit, paid once per run.
+removing it would free no array, and the work it *adds* over a cacheless solver is §1.3's final
+closing deposit, once per run — plus, under a hand-fixed ``\Delta t``, the recurring maximum-speed
+reduction named above, the one standing exception.
 
 What the design pays instead is control over the contents. Since nothing may be added, what the cache
 holds is decided by the solver's minimal-memory schedule, and it changes when the solver's storage
@@ -242,7 +243,7 @@ passive scalar and tracer particles. The convective term is written through
 ```
 
 and the Leray–Helmholtz projection ``\mathbb{P}`` onto divergence-free fields absorbs both the pressure
-and the gradient ``\nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2})``; the system then reads
+and the gradient ``\nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr)``; the system then reads
 
 ```math
 \begin{aligned}

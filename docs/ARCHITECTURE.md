@@ -1281,7 +1281,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the physics — the rotational generator's declared working set requires both charts — and becomes
     a live run axis when per-component chart declarations or further charts land. Adding or removing
     a buffer anywhere fails the suite, so a footprint change must be a conscious, recorded decision.
-    The particle-scheme axis has one point today (the Heun scheme), entering as on/off with the
+    The particle-scheme axis has one point today (the Heun scheme) *(two since decision 57 —
+    `AdamsBashforth` joined, its registers audited the same way)*, entering as on/off with the
     per-tracer ``(M, 3)`` arrays audited in their own units; precision, backend, and the
     interpolation scheme change bytes, never counts, so they are outside a count ledger. Two scope
     boundaries are deliberate: the ledger audits the **resident** working set — construction-time
@@ -1401,14 +1402,14 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\lvert\boldsymbol{\kappa}\rvert^{2}`` swept once per integrating-factor build), so a lazy
     per-mode symbol apply would delete that class outright and do nothing for the other.
 
-    On the synchronization axis the default configuration issues **ten** blocking readbacks per step
-    against a floor of **one** — the CFL speed bound, plus `VarianceController`'s three reductions at
-    each of the three stages. Only the timestep's is irreducible; a forcing's scalar is consumed by
-    the very next kernel and visits the host only because it is written as a Julia number. *(Three
-    when this was written, under the `VarianceRescaling` default; decision 58 changed the default,
-    and the count with it. That decision bought temporal order at this axis's expense, and the gap
-    is held rather than accepted — the three per-stage reductions differ only in their weight, so one
-    fused multi-weight reduction collapses them.)*
+    On the synchronization axis the default configuration issued **three** blocking readbacks per
+    step against a floor of **one** — the CFL speed bound plus `VarianceRescaling`'s two observables.
+    Only the timestep's is irreducible; a forcing's scalar is consumed by the very next kernel and
+    visits the host only because it is written as a Julia number. *(Superseded by decision 58, which
+    made `VarianceController` the default and the count **ten** — the speed bound plus three
+    reductions at each of three stages. That decision bought temporal order at this axis's expense;
+    the gap is held, not accepted — the three per-stage reductions differ only in their weight, and
+    one fused multi-weight reduction collapses them.)*
 
     First fruits, each verified and each retiring its holder rather than recording it: the tracer
     push no longer retains a start-of-step velocity **field** (§4.6) — an ``N^{3}\times3`` resident

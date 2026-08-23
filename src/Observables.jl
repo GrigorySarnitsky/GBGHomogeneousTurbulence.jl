@@ -283,7 +283,7 @@ residual aliasing on a ``2/3``-truncated field — negligible for a well-resolve
 quadratic reductions, not exactly alias-free.
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
 (all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an
-empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the strict "real turbulence yet"
+empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the "real turbulence yet"
 gate of the warm-up detector.
 """
 function derivative_skewness(û, domain::FixedDomain)

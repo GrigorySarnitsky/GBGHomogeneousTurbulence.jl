@@ -771,8 +771,9 @@ At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic e
 the eddy-turnover clock ``\\Delta t \\varepsilon/k``, and tests ``\\varepsilon`` for flatness over a
 trailing window; it stops the run when every gate holds, or gives up with a warning at
 `max_turnovers`. The gate reads ``\\varepsilon`` alone: the small scales settle last, so a flat
-``\\varepsilon`` is the strict indicator — where ``k`` is whatever the forcing makes it, clamped
-flat by a constant-energy strategy or ringing under fixed injection.
+``\\varepsilon`` is the strict indicator — where ``k`` is whatever the forcing shapes: clamped by a
+rescale, driven toward its target by the default controller, ringing under fixed injection — so its
+flatness would certify the forcing, not the flow.
 
 # Arguments
 All keyword:
@@ -780,7 +781,8 @@ All keyword:
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).
 - `gate_skewness` — also require the velocity-derivative skewness to have plateaued **and** reached
-  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the decisive "real turbulence yet" signal: a
+  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal (as strict as
+  its floor: the default is permissive; raise `skew_floor` toward ``0.4`` when the run must be): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
   ``S \\approx -0.5``. The skewness costs transforms, so it is measured on the criterion's own
   sampling interval — one sample per `window_turnovers / 40` of turnover time, giving about forty

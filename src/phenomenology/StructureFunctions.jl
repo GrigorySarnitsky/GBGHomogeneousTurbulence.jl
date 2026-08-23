@@ -118,7 +118,8 @@ by Obukhov (1962, *J. Fluid Mech.* **13**, 77) in the same issue. Its
 
 with `μ` the intermittency exponent (``\\approx 0.25``). Like [`SheLeveque1994`](@ref) it is exact at
 ``\\zeta_3 = 1`` and bends below the self-similar ``p/3`` for ``p > 3``, but as a quadratic in ``p`` (the
-log-normal ansatz) rather than She–Lévêque's log-Poisson form.
+log-normal ansatz) rather than She–Lévêque's log-Poisson form. Like it, this law predicts exponents,
+not amplitudes: it implements `scaling_exponent` but not [`structure_function`](@ref).
 
 # Fields
 The plain constructor `Kolmogorov1962(μ)` takes the field directly:

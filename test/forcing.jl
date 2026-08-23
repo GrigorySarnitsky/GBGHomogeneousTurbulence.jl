@@ -53,6 +53,11 @@ GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, dom
 struct LyingRateForcing{K} <: AbstractForcing
   band::K
 end
+
+
+# Declares the steady rate and never implements the hook — the run would be silently unforced.
+struct DeclaredNotImplementedForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate(::DeclaredNotImplementedForcing) = true
 GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate(::LyingRateForcing) = true
 function GBGIsotropicTurbulence.Forcing.set_forcing_rate!(forcing::LyingRateForcing, rate, field,
                                                           domain::FixedDomain)
@@ -237,6 +242,10 @@ end
     # `uses_steady_linear_rate` carries a semantic conjunct the arity guards cannot see, so it is
     # measured: the hook is armed from two different states and must give the same rate.
     @test_throws ArgumentError generator(LyingRateForcing(_probe_band(domain)))
+
+    # …and the mirror: DECLARING the rate without IMPLEMENTING the hook leaves the do-nothing
+    # default, whose zeroed rate is trivially steady — absence must be refused before steadiness.
+    @test_throws ArgumentError generator(DeclaredNotImplementedForcing())
     for f in (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
               ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
               Linear(domain; rate = 0.1), StochasticOU(domain; variance = 0.1, correlation_time = 0.5))

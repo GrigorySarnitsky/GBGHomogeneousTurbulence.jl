@@ -199,7 +199,7 @@ declare it `true`.
 
 *Steady*, not merely linear, is the load-bearing word: a per-mode rate re-solved from the state each
 step must **not** declare this. Freezing it would be the left-endpoint rectangle rule on
-``\\int A\\,\\mathrm dt``, dropping the scheme to first order; such a forcing goes through
+``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order; such a forcing goes through
 [`add_forcing_source!`](@ref) instead.
 
 The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only for a forcing that
@@ -251,7 +251,7 @@ whose amplitude depends on the current state can therefore measure that state ex
 scheme will integrate the result.
 
 The alternative costs accuracy: a state-dependent rate frozen once per step is the left-endpoint
-rectangle rule on ``\\int A\\,\\mathrm dt``, dropping the scheme to first order however good it is.
+rectangle rule on ``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order however good it is.
 Only a steady rate may go through [`set_forcing_rate!`](@ref).
 
 Each reduction costs one blocking device-to-host transfer, **at every stage** — three per stage for
@@ -550,7 +550,9 @@ fixed injection retains — so discrete integration bias accumulates uncorrected
 per 1000 steps, measured at ``24^3``), and nothing ever restores it.
 
 The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held;
-``k_f`` the forced band's, dividing out because the forcing injects only there.
+``k_f`` the forced band's, dividing out because the forcing injects only there. An empty band is
+left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documents), so seed content
+in the band if the run depends on the controller taking hold.
 
 The mechanism is the one molecular dynamics settled on for the same problem: holding a quantity by
 per-step rescaling is the naive thermostat, feedback inside the equations is the Nosé–Hoover move

@@ -543,8 +543,9 @@ end
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
 below), in place, under the trajectory scheme `scheme` (an
-[`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (a
-[`ParticleIntegratorBuffers`](@ref) built for that scheme). The `domain` (a [`FixedDomain`](@ref))
+[`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (the
+registers [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
+that scheme — `ParticleIntegratorBuffers` or [`MultistepBuffers`](@ref)). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
 
 Under [`EndpointHeun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the

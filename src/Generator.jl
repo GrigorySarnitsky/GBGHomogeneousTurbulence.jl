@@ -176,6 +176,14 @@ function _forcing_rate(domain::FixedDomain, forcing, allocate_probe = new_vector
                           "would be given no rate array to fill and would never be applied"))
     return nothing
   end
+  # The mirror of the guard below: a forcing DECLARING the rate without IMPLEMENTING the hook
+  # inherits the do-nothing default, whose untouched (zeroed) rate is trivially steady — the probe
+  # cannot see the difference between "steady" and "absent", so absence is checked first.
+  _overrides_rate_hook(forcing) ||
+    throw(ArgumentError("$(nameof(typeof(forcing))) declares uses_steady_linear_rate = true but " *
+                        "does not implement set_forcing_rate!, so its rate array would stay zero " *
+                        "and the forcing would silently never act. Implement the hook, or declare " *
+                        "false."))
   _check_rate_is_steady(domain, forcing, allocate_probe)
   # A scalar field in spectral representation holding REAL values (the complex container is what the
   # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
