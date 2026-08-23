@@ -91,3 +91,26 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
   read is `consolidate.py`'s plain-text manuscript, which drops `<ol>` numbering. Verified in
   `docs/build/architecture/index.html`. Any hat re-flagging this is reading the manuscript, not the
   site — check the built page before acting.
+
+## Adjudicated 2026-08-23 (the B fix pass over the 2026-08-22 round)
+
+- **Manuscript page order** (the "decision log precedes the glossary" finding): an extraction
+  artifact — `consolidate.py` orders pages by depth-then-name, so `decisions` precedes `notation`
+  in the manuscript; the SITE nav has Notation second. Do not re-flag reading-order findings that
+  depend on the manuscript's page sequence.
+- **The charts inside `DYNAMICS_LIVE`** (the "decision 40 re-admits decision 37's tautology"
+  finding): NOT a re-admission. The extension is grounded in the op list falsifiably — the next
+  iteration's stage 1 reads the deposited slots as its registers — given the user-adopted
+  no-recompute design (decision 40). The retired tautology was charts surviving UNTOUCHED beside
+  separate registers; the slot=register merge dissolved that. The audit_ops comment states this.
+- **Mutator-return conventions**: the house rule sanctions arrow-XOR-sentence (CLAUDE.md template
+  conventions); the two forms coexisting across modules is not a defect. Only a mutator carrying
+  BOTH, or NEITHER, is.
+- **PF-parity divergences, dispositioned as deliberate** (do not re-flag as IT defects):
+  the conditional admonition-title rule (IT's refinement — title only for one load-bearing claim);
+  the economy-default/full-on-request cost modes (IT's consent mechanism for expensive lanes); and
+  IT's richer type-docstring template (constructor-first, Examples policy) — the last two are
+  candidate REVERSE-transfers to PF, recorded in the cross-package parity memory, not IT work.
+- **`ConstantPower`'s band storage** — settled by decision 38's supersession note (decision 58 moved
+  it off the rate route; only `Linear` keeps an indicator). Do not re-flag the decision-log history
+  against the current struct.
