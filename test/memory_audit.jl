@@ -307,7 +307,7 @@ const EPISODE_UNITS = [
     for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
-                       velocity_forcing = NoForcing(), scheme = _scheme(scheme),
+                       velocity_forcing = NoForcing(), integration_scheme = _scheme(scheme),
                        number_of_particles = tracers, rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
             _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
@@ -493,7 +493,7 @@ const EPISODE_UNITS = [
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFRK2()),
         scalar in (false, true)
       sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
-                       scheme = scheme, rng = MersenneTwister(1))
+                       integration_scheme = scheme, rng = MersenneTwister(1))
       advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
       @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * unit
     end

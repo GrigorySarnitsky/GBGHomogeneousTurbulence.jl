@@ -16,11 +16,11 @@ using GBGIsotropicTurbulence
 
   # IFLowStorageRK3, scalar-free — the default scheme.
   s3 = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                  scheme = IFLowStorageRK3(), rng = MersenneTwister(1))
-  @test step!(s3.scheme, s3.state, s3.generator, s3.domain, s3.buffers, s3.cache, 1e-3) === s3.state
+                  integration_scheme = IFLowStorageRK3(), rng = MersenneTwister(1))
+  @test step!(s3.integration_scheme, s3.state, s3.generator, s3.domain, s3.buffers, s3.cache, 1e-3) === s3.state
 
   # IFRK2, with the passive scalar — the second in-tree method, same promise.
   s2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
-                  scheme = IFRK2(), rng = MersenneTwister(1))
-  @test step!(s2.scheme, s2.state, s2.generator, s2.domain, s2.buffers, s2.cache, 1e-3) === s2.state
+                  integration_scheme = IFRK2(), rng = MersenneTwister(1))
+  @test step!(s2.integration_scheme, s2.state, s2.generator, s2.domain, s2.buffers, s2.cache, 1e-3) === s2.state
 end

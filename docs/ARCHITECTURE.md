@@ -1874,7 +1874,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     consequence had to be settled first: `Tracers` used `scheme` for its *interpolation* scheme, so
     two constructors would have taken one keyword for two concepts; it is now
     `interpolation_scheme`, which is the more precise name regardless. The parameter `pusher` becomes `scheme` too,
-    so one word names the same role on both sides of the run.
+    so one word names the same role on both sides of the run. *(Refined 2026-08-23, decision 62:
+    the `Simulation` keyword and field are now the qualified `integration_scheme`; bare `scheme`
+    survives as the positional-argument name inside the protocol.)*
 
     **The presets.** `Pope2000`, `VonKarman1948` and `Pao1965` were PascalCase *functions* returning
     a `ModelSpectrum`, so `spec isa Pope2000` failed and the phenomenology page carried a standing
@@ -2035,6 +2037,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     The compute ledger re-froze at +2 `spectral_vector` per cell in the same commit; the witness
     injects an O(1) pure-gradient corruption through the `fields_modified!` escape hatch and
     requires one step to scrub it to ``10^{-12}``, which no viscous decay could fake.
+
+62. **(2026-08, user-directed) The `Simulation` keyword and field `scheme` → `integration_scheme`.**
+    A refinement of decision 55, proposed by the user from the parallel with `interpolation_scheme`.
+    Bare `scheme` underdetermined its role on the run's front door, where it sat beside the other
+    pluggable strategies (`dealiasing`, `velocity_forcing`, `interpolation_scheme`,
+    `trajectory_scheme`) — "scheme of *what*?" is a fair question there. The keyword family is now
+    uniformly `<role>_scheme`: `integration_scheme` (the fields in time), `trajectory_scheme` (the
+    particles in time), `interpolation_scheme` (space) — each self-describing under one pattern. The
+    noun form is deliberate: English compounds these with a noun attribute (an *integration* scheme,
+    like an *interpolation* scheme), and the participle alternative `integrating_scheme` would sit
+    one word from the *integrating factor* ``\mathcal{E}`` and invite conflating the discrete scheme
+    with the exact operator. The qualified name also narrows decision 55's binding-vs-type residue
+    without renaming any exported type: `integration_scheme::AbstractIntegrator` shares its morpheme
+    with the family. Scope: the `Simulation` keyword and struct field only — bare `scheme` remains
+    the positional-argument name in the protocol (`step!`, `allocate_buffers`, `recommended_cfl`),
+    where dispatch already types it.
 
 ## References
 

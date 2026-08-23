@@ -49,7 +49,7 @@ end
   advance!(manual; dt = dt)                     # same genuine sample
 
   # The claim's own sequence: step + deposit, then read the slot directly through `advect!`.
-  step!(manual.scheme, manual.state, manual.generator, manual.domain, manual.buffers, manual.cache, dt)
+  step!(manual.integration_scheme, manual.state, manual.generator, manual.domain, manual.buffers, manual.cache, dt)
   deposit!(manual.cache, manual.state, manual.domain, manual.buffers)
 
   # The cache reports the sample stale here — this is the window `advance!` also advects in.

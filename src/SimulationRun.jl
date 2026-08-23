@@ -203,7 +203,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   resolution bound that stops that, needing no constant from the caller. `max_dt` is for a ceiling
   only the caller knows, since any *default* constant would be a claim about the velocity scale they
   happened to choose.
-- `scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(scheme, domain)` — the
+- `integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
   the **spatial** scheme that evaluates a field at their positions, forwarded to the `Tracers`
@@ -249,7 +249,7 @@ their contents as the scheme's business rather than the run's state.
 
 - `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
 - `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
-- `domain`, `buffers`, `generator`, `scheme` — the `FixedDomain`, `IntegratorBuffers`,
+- `domain`, `buffers`, `generator`, `integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
 - `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along with the
@@ -260,7 +260,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
-  scheme::IG
+  integration_scheme::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   cache::DF                # ObservablesCache: what the last iteration deposited, for an observation to read
   tracers::TR              # Tracers, or nothing — trajectory STATE only
@@ -284,8 +284,8 @@ function Simulation(domain::FixedDomain;
                     schmidt::Real = 1.0,
                     velocity_forcing = d -> VarianceController(d; target = kinetic_energy),
                     scalar_forcing = NoForcing(),
-                    scheme::AbstractIntegrator = IFLowStorageRK3(),
-                    cfl::Real = recommended_cfl(scheme, domain), max_dt::Real = Inf,
+                    integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
+                    cfl::Real = recommended_cfl(integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
@@ -341,7 +341,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     ν = Float64(viscosity)
   end
 
-  buffers = allocate_buffers(scheme, domain; scalar)
+  buffers = allocate_buffers(integration_scheme, domain; scalar)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = _materialize_forcing(velocity_forcing, domain),
                     scalar_forcing = _materialize_forcing(scalar_forcing, domain))
@@ -396,7 +396,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     (record_particle_velocities!(tracers, velocity_physical(cache)); deposit_sample!(cache))
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), scheme, state, cache,
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integration_scheme, state, cache,
                     tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
@@ -554,7 +554,7 @@ function advance!(sim::Simulation; dt = nothing)
   # the epoch is verified here, at tₙ, where they are the current-epoch observable.
   sim.tracers === nothing || particle_velocities(sim.cache)
 
-  step!(sim.scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
+  step!(sim.integration_scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
   # The closing deposit: fill every slot, at the new epoch, from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)

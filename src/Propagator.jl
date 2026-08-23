@@ -22,11 +22,11 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
+the `integration_scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
-- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `scheme` is chosen from.
+- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integration_scheme` is chosen from.
 - [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
   two-stage alternative — cheaper in transforms, dearer by one register per field, and
   imaginary-axis unstable).
