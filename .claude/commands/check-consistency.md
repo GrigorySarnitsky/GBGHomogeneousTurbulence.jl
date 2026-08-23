@@ -114,6 +114,14 @@ across the two arms, so a single run's "uniqueness" is inside the noise. The oth
 defined and runnable — `profile: "full"`, or name them in `hats` — they just do not run by default,
 and they re-enter by repeating rather than by argument.
 
+**The dormant fourteen are settled by passive accumulation** (owner, 2026-08-23): no dedicated
+paired run, and no deletion on single-run evidence — the latter would be the admission rule's own
+mistake mirrored, and unique-yield ranking structurally penalizes a narrow-class hat whose defect
+may genuinely appear one round in three. Instead, whenever a doc round is due anyway, run
+`profile: "full"` once; the comparison against `core` comes free from the banked per-hat files. A
+hat that repeats as a unique producer is promoted to `core`; a persistent zero across runs becomes
+a deletion candidate on real evidence. Dormancy reads "insufficient evidence", never "condemned".
+
 **Three free readers, not two.** That 28% variance is an argument for more samples of the
 unconstrained read — the highest-yield lane — not for another rubric. `/bug-hunt` had already measured
 the same thing from the other side: eight class lanes reported `complete: true` over their own blind
