@@ -18,21 +18,21 @@ integrating factor.
 Its contents (each formula lives in the operation's own docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
-- [`ResolvedGenerator`](@ref) — the generator as one value: the conditions bundled with the assembly
-  scratch its evaluations write through, consumed by a scheme through the protocol below.
+- [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch, consumed
+  through the protocol below.
 - [`prepare!`](@ref) — open a step: advance the forcings' internal state and fill the linear rate
-  arrays the integrating factor will consume.
-- [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (the
-  dealiased, Leray-projected momentum term and the scalar advection, each plus its additive forcing
-  source) at a stage state.
-- [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's exact linear subflow (the
-  viscous/diffusive integrating factor, with any linear forcing rate folded in).
+  arrays the integrating factors consume.
+- [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (each
+  dealiased term plus its additive forcing source) at a stage state.
+- [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's
+  viscous/diffusive integrating factor, with any linear forcing rate folded in.
 - [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
 
 The assemblies recover displaced fields in physical representation with the four-argument,
-source-preserving form (the extra argument is a scratch field the transform consumes in the source's
-place) of [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!)
-and with [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!).
+source-preserving form of
+[`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the extra
+argument is a scratch field the transform consumes in the source's place — and with
+[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!).
 """
 module Generator
 
@@ -508,8 +508,11 @@ end
     velocity_integrating_factor(generator, τ)
 
 The velocity's exact linear subflow over a substep ``\\tau`` (`τ`), as the **parameters of its
-exponential** rather than a materialized kernel. The linear part of the momentum equation — the
-diffusion ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
+exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
+supplies the viscosity ``\\nu`` and the armed rate; `τ` is the sub-interval the stage advances.
+
+The linear part of the momentum equation — the diffusion
+``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
 ``A(\\boldsymbol{\\kappa})`` that [`prepare!`](@ref) armed — is solved exactly in spectral
 representation by the per-mode multiplier
 
@@ -517,20 +520,18 @@ representation by the per-mode multiplier
 \\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\bigr),
 ```
 
-with ``A = 0`` when no linear forcing is active, so multiplying a field by ``\\mathcal{E}`` advances its
+with ``A = 0`` when no linear forcing is active. Multiplying a field by ``\\mathcal{E}`` advances its
 viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
-scheme's explicit stage combination carries truncation error. Since the multiplier is the exponential
-of a radial symbol (plus the armed per-mode rate), a scheme applies it through the backend's fused
-exponential convolution
-([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
-which evaluates it per mode from the wavenumber arrays: nothing is built,
-stored, or swept for it. Accordingly this verb returns the exponential's parameters as a named tuple —
-``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-``\\texttt{offset\\_scale} = \\tau`` and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed rate field, or `nothing` when no
-linear forcing is active) — exactly the arguments the fused exponential takes.
+scheme's explicit stage combination carries truncation error.
 
-The `generator` (a [`ResolvedGenerator`](@ref)) supplies ``\\nu`` and the armed rate; `τ` is the
-sub-interval the stage advances.
+Since the multiplier is the exponential of a radial symbol plus the armed per-mode rate, a scheme
+applies it through the backend's fused exponential convolution
+([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
+which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
+The return is a named tuple of exactly the arguments that fused exponential takes —
+``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
+``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed
+rate field, or `nothing` when no linear forcing is active).
 """
 velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
@@ -563,42 +564,40 @@ written, not one: `N̂` receives the result, and `u_consumed` is consumed in pla
 suffix marks it, since Julia's `!` convention flags only the first.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
-``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``); the conservative form
-conserves the scalar mean exactly — the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``
-component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that mode
-untouched.
+``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``). The conservative
+form conserves the scalar mean exactly: the divergence has no ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``
+component, and the dealias kernel `domain.dealias` (the sharp ``2/3`` rule by default) leaves that
+mode untouched.
 
-It is computed pseudospectrally as
+The term is computed pseudospectrally as
 ``- \\operatorname{dealias}\\bigl(\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\widehat{\\boldsymbol{u}\\varphi}\\bigr)``,
 plus the per-stage additive source of the generator's scalar forcing (its
 [`add_forcing_source!`](@ref GBGIsotropicTurbulence.Forcing.add_forcing_source!) hook).
-The dealiasing strategy controls the aliasing of the quadratic product: a **mask** strategy
-([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and `φ̂` unused;
-[`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced half a cell —
-using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced velocity the
-same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no preceding
-velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.
+
+The dealiasing strategy controls the aliasing of the quadratic product. A **mask** strategy
+([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and
+`φ̂` unused. [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced
+half a cell — using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced
+velocity the same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no
+preceding velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.
+
 The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
 Pass `displaced_velocity_current = true` only if nothing has changed since this generator's
-`velocity_rhs!` was called on the same `û` — which a time-stepping scheme knows because it evaluates
-both right-hand sides at one stage before updating either field, and a hand-written caller generally
-does not. It permits the displaced-velocity reuse above; the default rebuilds instead, at the cost of one
-shift and three inverse transforms, and is what makes an unpaired call correct rather than quietly
-wrong.
+`velocity_rhs!` was called on the same `û` — a time-stepping scheme knows this because it evaluates
+both right-hand sides at one stage before updating either field; a hand-written caller generally
+does not. The setting permits the displaced-velocity reuse above; the default rebuilds instead, at
+the cost of one shift and three inverse transforms, which keeps an unpaired call correct.
 
 Returns `N̂`.
 
 !!! note "The assembly consumes the velocity argument"
-    The assembly **consumes `u_consumed`**: the flux ``\\boldsymbol{u}\\varphi`` is formed
-    in place over the velocity's array (a pointwise product may write into an operand), so on return
-    `u_consumed` no longer holds the velocity; `φ` is only read. As in `velocity_rhs!`, the
-    consumed argument is fixed by the physics rather than by its position in the signature, and is
-    named for it. Only the spectral
-    product scratch remains on
-    the generator, and the operation allocates nothing.
-
+    The flux ``\\boldsymbol{u}\\varphi`` is formed in place over the velocity's array (a pointwise
+    product may write into an operand), so on return `u_consumed` no longer holds the velocity; `φ`
+    is only read. As in `velocity_rhs!`, the consumed argument is fixed by the physics rather than
+    by its position in the signature, and is named for it. Only the spectral product scratch remains
+    on the generator, and the operation allocates nothing.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain;
             displaced_velocity_current::Bool = false) =

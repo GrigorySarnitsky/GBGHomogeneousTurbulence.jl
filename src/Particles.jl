@@ -17,17 +17,19 @@
     Particles
 
 Lagrangian tracer tracking:
-- [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`).
-- [`particle_positions`](@ref), [`number_of_particles`](@ref) — the particle-state readouts (the
-  trajectory velocities are read from the run's observables cache through
-  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities) — the same quantity
-  the docs also call the Lagrangian velocity or the trajectory velocity — where the closing
-  deposit leaves them).
-- [`AbstractParticleIntegrator`](@ref), [`EndpointHeun`](@ref) — the trajectory time-integration
-  schemes, and [`ParticleIntegratorBuffers`](@ref) the per-step storage each one needs.
+
+- [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`);
+  [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory
+  velocities are read from the run's observables cache through
+  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities).
+- [`AbstractParticleIntegrator`](@ref) — the trajectory time-integration schemes,
+  [`EndpointHeun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) and
+  [`MultistepBuffers`](@ref) the per-step storage each needs, and [`history_depth`](@ref) the
+  sample-history length a scheme requires.
 - [`record_particle_velocities!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
-- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme.
+- [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
+  [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate its `out` buffers.
 """
@@ -233,15 +235,14 @@ scratch.
 Call it whenever the tracer positions are changed from outside the iteration — a reseed, a
 hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
-trajectory that has just been abandoned, and integrating over those would blend the old path with
-the new one. The `Simulation` form of
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
-after announcing the reposition to the observables cache. Its bare-cache form clears the sample
-history the cache itself holds, but cannot dispatch here — so a hand-run loop that announces to the
-cache alone must call this as well, and a scheme carrying registers beyond that history is reached
-only this way.
+trajectory just abandoned, and integrating over those would blend the old path with the new one.
 
-Returns `buffers`.
+The `Simulation` form of
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
+after announcing the reposition to the observables cache. Its bare-cache form clears only the
+sample history the cache itself holds and cannot dispatch here — so a hand-run loop that announces
+to the cache alone must also call this; a scheme's registers beyond that history are reached only
+this way.
 """
 function restart! end
 

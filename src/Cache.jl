@@ -68,13 +68,14 @@ The observables cache of a run — the storage where each iteration deposits, at
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
 representation when the run carries one, the fastest flow speed on the grid (the
-[`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) number
-the next timestep choice reads), and — when the run advects tracers — the particle velocities
-``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``. The contents are automatic — derived from the
-configuration, never declared: the cache holds exactly what the iteration computes, materializes,
-and leaves alive at the iteration's end, and nothing is added that the iteration would not otherwise compute, materialize, or hold. The cache
-allocates and owns every slot but one: the particle velocities are the tracer set's own storage,
-which the cache borrows and records epochs for rather than filling itself.
+[`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) number the next timestep choice
+reads), and — when the run advects tracers — the particle velocities
+``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
+
+The contents are automatic — derived from the configuration, never declared: the cache holds
+exactly what the iteration computes, materializes, and leaves alive at its end, and nothing more.
+The cache allocates and owns every slot but one: the particle velocities are the tracer set's own
+storage, which the cache borrows and records epochs for rather than filling itself.
 
 Build it on a [`FixedDomain`](@ref) `domain`. The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds, wires,
 and seeds one for you; a hand-assembled run constructs it here.
@@ -91,9 +92,10 @@ and seeds one for you; a hand-assembled run constructs it here.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
-Nothing in the cache is ever recomputed: a read that finds a slot stale, **taken** (in use as the step's own scratch mid-iteration), or never deposited
-reports a scheduling error — it throws an `ErrorException` whose message names the slot and which
-of the three states it is in — and the only repair is to fix the schedule that failed to deposit.
+Nothing in the cache is ever recomputed: a read that finds a slot stale, **taken** (in use as the
+step's own scratch mid-iteration), or never deposited throws an `ErrorException` naming the slot
+and its state — a scheduling error whose only repair is to fix the schedule that failed to
+deposit.
 
 !!! note "A cached array is the next iteration's scratch"
     A slot is also the array its producer computes in: between deposits the step writes its own
@@ -114,18 +116,16 @@ depends on.
 - `particle_velocities` — the particle-velocities slot, or `nothing` for a tracer-free run.
 - `particle_velocity_history` — the earlier Lagrangian samples, most recent first, and
   `sample_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
-  multistep trajectory scheme integrates over these, which is why they are deposited observables
-  here rather than private scheme scratch: they are measurements of the state along the trajectory,
-  and an announced reposition must invalidate them the same way it invalidates the current sample.
+  multistep trajectory scheme integrates over these; an announced reposition invalidates them
+  together with the current sample.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two epochs, against
   **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
-  [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run and
-  will run ahead of
-  [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A field-derived slot is
-  readable exactly when its epoch equals this.
+  [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run
+  and runs ahead of [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A
+  field-derived slot is readable exactly when its epoch equals this.
 - `particles_epoch` — the tracer positions' counter. The run layer advances it as part of the tracer
   advance; a hand-run loop that moves tracers itself announces the change with
   [`particles_modified!`](@ref), which is what advances it.

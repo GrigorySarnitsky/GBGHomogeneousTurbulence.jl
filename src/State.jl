@@ -70,22 +70,26 @@ ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
-``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals the requested `kinetic_energy`. The Leray–Helmholtz
-projection ``\\mathbb{P}`` enforces ``\\nabla\\cdot\\boldsymbol{u} = 0``.
+``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` equals the requested
+`kinetic_energy`. The Leray–Helmholtz projection ``\\mathbb{P}`` enforces
+``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
-By default (`initial_spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian envelope
-``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode amplitudes (zeroed
-at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so the mean mode stays empty), whose
-characteristic wavenumber is ``\\kappa_p`` (`envelope_wavenumber`). Because the envelope multiplies the
-amplitudes, the shell-summed energy spectrum ``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
-peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count). The `envelope_wavenumber` setting has no effect in the `initial_spectrum` branch below, which carries its own large scale and will not generally peak there — the two modes do not seed the same large scale at the same nominal setting.
-Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy spectrum (the
-front door forwards its `initial_spectrum` keyword here), to
-seed that shape instead: each mode is scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed
-spectrum is ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` (the ``\\kappa^{2}`` is the
-shell's mode count) and the overall amplitude is fixed by the `kinetic_energy` rescaling — e.g. a von Kármán or
-Pope form from the [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model
-spectra, which the run layer can wire in for you.
+By default (`initial_spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian
+envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
+amplitudes, zeroed at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` so the mean mode stays empty; its
+characteristic wavenumber ``\\kappa_p`` is `envelope_wavenumber`. Because the envelope multiplies the
+amplitudes, the shell-summed energy spectrum
+``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)`` peaks at
+``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
+
+Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy
+spectrum, to seed that shape instead — e.g. a von Kármán or Pope form from the
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model spectra, which the run
+layer can wire in for you (the front door forwards its `initial_spectrum` keyword here). Each mode is
+scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed spectrum is
+``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` and the overall amplitude is fixed by
+the `kinetic_energy` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
+carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}``.
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).
@@ -157,24 +161,26 @@ end
                    initial_spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
-chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals
-the requested `scalar_variance`. The
-mean vanishes by
-construction: the envelope is zeroed at
+chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals the
+requested `scalar_variance`. The mean vanishes by construction: the envelope is zeroed at
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 
-By default (`initial_spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian envelope
-``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode amplitudes — zeroed,
-as above, at the origin — whose
-characteristic wavenumber is ``\\kappa_p`` (`envelope_wavenumber`). Because the envelope multiplies the
-amplitudes, the shell-summed scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
-peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count). The `envelope_wavenumber` setting has no effect in the `initial_spectrum` branch below, which carries its own large scale and will not generally peak there — the two modes do not seed the same large scale at the same nominal setting.
+By default (`initial_spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian
+envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
+amplitudes — zeroed, as above, at the origin — whose characteristic wavenumber ``\\kappa_p`` is
+`envelope_wavenumber`. Because the envelope multiplies the amplitudes, the shell-summed
+scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
+peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's
+mode count).
+
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
-scalar-variance spectrum, to seed that shape instead: each mode is scaled by
-``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the shell-summed
-spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the `scalar_variance` rescaling —
-e.g. an Obukhov–Corrsin form from [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology).
+scalar-variance spectrum, to seed that shape instead — e.g. an Obukhov–Corrsin form from
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology). Each mode is scaled by
+``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the
+shell-summed spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the
+`scalar_variance` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
+carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}``.
 
 The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
 stream (defaults to `Random.default_rng()`).

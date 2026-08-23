@@ -72,21 +72,25 @@ struct TwoThirds <: DealiasingStrategy end
 
 The smooth spectral filter of Hou & Li (2007) — *Computing nearly singular solutions using
 pseudo-spectral methods*, *J. Comput. Phys.* **226**, 379–397,
-[doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014). Transfer function
+[doi:10.1016/j.jcp.2007.04.014](https://doi.org/10.1016/j.jcp.2007.04.014). Each mode is multiplied
+by the transfer function
 ``\\exp\\!\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
-with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. The `order`
-sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff); the `strength` sets the
-damping at the Nyquist mode, which is multiplied by ``\\mathrm{e}^{-\\texttt{strength}}``. By default
-(`strength = nothing`) `strength` is chosen for the domain's element type as ``-\\log`` of its machine
-epsilon — ``\\approx 36`` for [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
-[`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps
-to that precision's machine epsilon; pass an explicit `strength` to override. (That `Float64` value
-lands on ``36``, which the default `order` also is: Hou & Li's own filter takes both as ``36``, and
-the coincidence is theirs rather than a transcription slip.) It keeps more modes
-than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a stabilization.
-Applied isotropically in ``\\kappa``. Because it retains energy out to
-the Nyquist wavenumber it takes a proportionally smaller CFL step than the ``2/3`` rule — handled
-automatically by [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
+applied isotropically in ``\\kappa``, with
+``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. It keeps more
+modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
+stabilization.
+
+The `order` sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff). The
+`strength` sets the damping at the Nyquist mode, which is multiplied by
+``\\mathrm{e}^{-\\texttt{strength}}``. By default (`strength = nothing`) `strength` is chosen for the
+domain's element type as ``-\\log`` of its machine epsilon — ``\\approx 36`` for
+[`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
+[`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps to that
+precision's machine epsilon; pass an explicit `strength` to override.
+
+Because the filter retains energy out to the Nyquist wavenumber it takes a proportionally smaller
+CFL step than the ``2/3`` rule — handled automatically by
+[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
 # Fields
 The plain constructor `HouLi(order, strength)` takes the two fields directly:
@@ -107,22 +111,26 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 Phase-shift dealiasing — Patterson & Orszag (1971) — *Spectral calculations of isotropic turbulence:
 efficient removal of aliasing interactions*, *Phys. Fluids* **14**, 2538–2541,
 [doi:10.1063/1.1693365](https://doi.org/10.1063/1.1693365), combined with the spherical truncation of
-Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble each quadratic nonlinear term on the grid **and** on a grid displaced
-by half a cell, average the two, and truncate spherically at
+Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble
+each quadratic nonlinear term on the grid **and** on a grid displaced by half a cell, average the
+two, and truncate spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
-(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber). The half-cell
-average cancels the aliasing images that wrap in an odd number of axes — the aliasing images being the
-spurious spectral replicas that the under-resolved quadratic product folds back into the resolved
-band — while the spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while keeping the resolved band out to
-``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt{2}``
-further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` (``\\approx 2.8\\times`` the
-modes in the retained sphere).
+(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber).
 
-Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform per
-stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale spectral-representation
-buffer per phase-shifted term). Because it retains energy out to
-``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step than the
-``2/3`` rule — handled automatically by [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
+The half-cell average cancels the aliasing images that wrap in an odd number of axes — the spurious
+spectral replicas the under-resolved quadratic product folds back into the resolved band — and the
+spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while
+keeping the resolved band out to
+``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt{2}``
+further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}``
+(``\\approx 2.8\\times`` the modes in the retained sphere).
+
+Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform
+per stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale
+spectral-representation buffer per phase-shifted term). Because it retains energy out to
+``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step
+than the ``2/3`` rule — handled automatically by
+[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
 !!! note "A half-cell shift attenuates the Nyquist mode"
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by

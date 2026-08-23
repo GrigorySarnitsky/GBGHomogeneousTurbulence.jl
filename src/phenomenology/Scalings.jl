@@ -128,26 +128,32 @@ The box-normalized dissipation group
 G = \\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
 ```
 
-relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the dissipation
-rate ``\\varepsilon`` — nearly Reynolds-number-independent. The value is this package's own reduction of the Johns Hopkins Turbulence Database
-(JHTDB) forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``) and consistent with
-higher-Reynolds-number periodic-box DNS. It is a distinct group from the classical
-dissipation anomaly ``C_\\varepsilon = \\varepsilon L_{11}/u'^3``
-(Taylor 1935, *Proc. R. Soc. A* **151**, 421–444,
+relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the
+dissipation rate ``\\varepsilon`` — nearly Reynolds-number-independent. The value is this
+package's own reduction of the Johns Hopkins Turbulence Database (JHTDB) forced-isotropic
+dataset (``\\mathrm{Re}_\\lambda \\approx 433``), consistent with higher-Reynolds-number
+periodic-box DNS.
+
+The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)`
+returns it. Inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the
+dissipation a stationary run of energy ``k`` in a box ``L`` sustains,
+``\\varepsilon = (k/G)^{3/2}/L`` — the seam the run layer uses to set the viscosity from the
+grid and target energy.
+
+``G`` is a distinct group from the classical dissipation anomaly
+``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` (Taylor 1935, *Proc. R. Soc. A* **151**, 421–444,
 [doi:10.1098/rspa.1935.0158](https://doi.org/10.1098/rspa.1935.0158); Sreenivasan 1998,
 [doi:10.1063/1.869575](https://doi.org/10.1063/1.869575); Kaneda et al. 2003,
-[doi:10.1063/1.1539855](https://doi.org/10.1063/1.1539855), for the periodic box), whose high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is
-normalized on the **integral** scale ``L_{11}``, not the box side ``L``. Formed on a common length the two
-are exactly related by ``G = \\tfrac{3}{2} C_\\varepsilon^{-2/3}`` (using ``u'^2 = 2k/3``); but the quoted
-``G \\approx 0.9`` (box side) and ``C_\\varepsilon \\approx 0.5`` (integral scale) sit at *different*
-lengths (``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly — and,
-being fits to different datasets, they are not expected to close exactly: carrying
-``C_\\varepsilon \\approx 0.5`` across at that ratio gives ``G \\approx 0.81`` against the quoted ``0.9``.
+[doi:10.1063/1.1539855](https://doi.org/10.1063/1.1539855), for the periodic box), whose
+high-Reynolds-number plateau ``C_\\varepsilon \\approx 0.5`` is normalized on the **integral**
+scale ``L_{11}``, not the box side ``L``.
 
-The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)` returns it;
-inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the dissipation a
-stationary run of energy ``k`` in a box ``L`` sustains, ``\\varepsilon = (k/G)^{3/2}/L`` — the seam the
-run layer uses to set the viscosity from the grid and target energy.
+On a common length the two are exactly related by ``G = \\tfrac{3}{2} C_\\varepsilon^{-2/3}``
+(using ``u'^2 = 2k/3``). The quoted values, however, sit at *different* lengths
+(``L/L_{11} \\approx 5``), so they must not be substituted into that identity directly — and,
+as fits to different datasets, they need not close exactly: carrying
+``C_\\varepsilon \\approx 0.5`` across at that ratio gives ``G \\approx 0.81`` against the
+quoted ``0.9``.
 
 # Fields
 The plain constructor `Li2008(dissipation_group)` takes the field directly:

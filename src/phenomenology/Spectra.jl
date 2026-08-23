@@ -97,16 +97,18 @@ function large_scale_factor end
 The length scale the large-scale roll-off `f` is evaluated against, read from the flow state `fp`
 (a [`FlowParameters`](@ref)).
 
-This exists because a fitted coefficient belongs to a particular length, and the two published forms
-here do not use the same one. The default is the longitudinal integral scale ``L_{11}``, which
+A fitted coefficient belongs to a particular length, and the two published forms here do not use
+the same one. The default is the longitudinal integral scale ``L_{11}``, which
 [`VonKarmanLarge`](@ref) uses. [`PopeLargeScale`](@ref) overrides it with
 ``\\ell_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
 ``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
-same coefficient ``L_{11}`` instead breaks that normalization. The two lengths are related by
-``\\ell_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is set by the normalized dissipation
-constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is 3.7 times smaller and the spectrum
-integrates to ``0.42k``, and at Pope's high-Reynolds-number ``\\ell_{11} = 0.43\\,\\ell_{0}`` it is 2.3 times
-smaller and integrates to ``0.57k`` (``\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}``).
+same coefficient ``L_{11}`` instead breaks that normalization.
+
+The two lengths are related by ``\\ell_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is
+set by the normalized dissipation constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is
+3.7 times smaller and the spectrum integrates to ``0.42k``; at Pope's high-Reynolds-number
+``\\ell_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to ``0.57k``
+(``\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}``).
 """
 function large_scale_length end
 
@@ -234,21 +236,23 @@ dissipation_factor(f::PaoDissipation, κη) = exp(-1.5 * f.α * κη^(4//3))
     ExponentialDissipation(β)
 
 The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(-\\beta \\kappa\\eta)``
-— the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the triadic
-spectral closures — eddy-damped quasi-normal Markovian, direct-interaction approximation, Lagrangian
-renormalized approximation — consistently predict (Sagaut & Cambon 2018, whose review is the
-source used here; the closure result is originally Kaneda's). It is the
-*far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
+— the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the
+triadic spectral closures (eddy-damped quasi-normal Markovian, direct-interaction approximation,
+Lagrangian renormalized approximation) consistently predict (Sagaut & Cambon 2018, the source used
+here; the closure result is originally Kaneda's).
+
+It is the *far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
 ``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018,
 [doi:10.1103/PhysRevFluids.3.082601](https://doi.org/10.1103/PhysRevFluids.3.082601); consistent with
 Chen et al. 1993, [doi:10.1103/PhysRevLett.70.3051](https://doi.org/10.1103/PhysRevLett.70.3051),
-``\\beta \\approx 7.1``); the factor tends to `1` in the inertial range (``\\kappa\\eta \\to 0``).
-[`PopeDissipation`](@ref) is asymptotically ``\\exp(-\\beta\\kappa\\eta)`` too, and carries
-``\\beta = 5.2`` — a lower rate, because Pope fits his ``\\beta`` across the whole dissipation range
-including the near-dissipation bend, while the values here are fitted to the far range alone. The two
-are the same symbol for the same decay, calibrated on different intervals. The
-near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara et al.
-2005), a different form this factor does not model.
+``\\beta \\approx 7.1``). The factor tends to ``1`` in the inertial range (``\\kappa\\eta \\to 0``).
+
+[`PopeDissipation`](@ref) is asymptotically ``\\exp(-\\beta\\kappa\\eta)`` too, with ``\\beta = 5.2``
+— a lower rate, because Pope fits his ``\\beta`` across the whole dissipation range including the
+near-dissipation bend, while the values here are fitted to the far range alone.
+
+The near-dissipation range is instead a stretched exponential (exponent ``\\approx 2/3``; Ishihara
+et al. 2005), a different form this factor does not model.
 
 # Fields
 The plain constructor `ExponentialDissipation(β)` takes the field directly:

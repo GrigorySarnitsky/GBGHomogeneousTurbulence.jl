@@ -171,33 +171,36 @@ function allocate_buffers end
 """
     step!(scheme, state, generator, domain, buffers, cache, dt)
 
-Advance the `state` (a [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holding the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar
-``\\hat\\varphi`` in spectral representation) by one timestep `dt` in place, using the `scheme`, the
-`generator` (a
-[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) —
-the equations of motion, their conditions, and their assembly scratch), the `domain` (a
-[`FixedDomain`](@ref)), the scheme's `buffers` (an [`IntegratorBuffers`](@ref)), and the run's
-observables cache `cache` (an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)). Dispatches on the
-concrete
-`scheme` type (see `IFRK2`, `IFLowStorageRK3`).
+Advance the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` held in `state`
+by one timestep `dt` in place. Dispatches on the concrete `scheme` type (see `IFRK2`,
+`IFLowStorageRK3`).
+
+- `scheme` — the stateless dispatch tag naming the scheme.
+- `state` — the [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) this call
+  mutates: the fields in spectral representation.
+- `generator` — the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator):
+  the equations of motion, their conditions, and their assembly scratch.
+- `domain` — the [`FixedDomain`](@ref).
+- `buffers` — the scheme's [`IntegratorBuffers`](@ref).
+- `cache` — the run's [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+- `dt` — the timestep.
 
 A scheme does only stage arithmetic: it opens the step with the generator's
-[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!), evaluates the
-right-hand sides and exact linear factors through the generator protocol at each stage, and closes
-with the generator's [`finalize!`](@ref GBGIsotropicTurbulence.Generator.finalize!) — it never
-assembles the physics itself. The first stage reads the
-deposited velocity, vorticity, and scalar in physical representation from `cache` — the values of
-the instant between iterations, where the cache's deposits are current, deposited there
-by the previous iteration's [`deposit!`](@ref); nothing is recomputed on a read — and the later
-stages compute their recoveries into those same slots, so the step allocates nothing and occupies
-no storage beyond its own spectral stage registers. The cache's fields epoch — the freshness counter every new
-deposit is recorded at — is advanced when the step completes.
+[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!), evaluates the right-hand sides and
+exact linear factors through the generator protocol at each stage, and closes with the generator's
+[`finalize!`](@ref GBGIsotropicTurbulence.Generator.finalize!) — it never assembles the physics
+itself.
 
-The leading argument differs from `deposit!`'s in kind, and it is worth knowing which: `scheme` here
-is a stateless dispatch tag, and what this call mutates is `state`, the second argument; `deposit!`
-leads with `cache`, the object it mutates. After the leader both take `state`, `domain`, `buffers` in
-that order, so a hand-run loop's two calls still line up.
+The first stage reads the deposited velocity, vorticity, and scalar in physical representation from
+`cache` — the values of the instant between iterations, deposited by the previous iteration's
+[`deposit!`](@ref); nothing is recomputed on a read. The later stages compute their recoveries into
+those same slots, so the step allocates nothing and occupies no storage beyond its own spectral
+stage registers. The cache's fields epoch — the freshness counter every new deposit is recorded
+at — is advanced when the step completes.
+
+The two calls of a hand-run loop align: `step!` leads with the dispatch tag and mutates its second
+argument, while `deposit!` leads with `cache`, the object it mutates; after the leader both take
+`state`, `domain`, `buffers` in the same order.
 
 Returns `state`.
 
@@ -212,19 +215,20 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta, 2N-storage — of the Williamson (1980)
-low-storage family,
+Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980) 2N-storage family —
 *Low-storage Runge–Kutta schemes*, *J. Comput. Phys.* **35**, 48–56,
-[doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9). With the diffusive
-integrating factor ``\\mathcal{E}_D(\\tau)`` — its parameters supplied by the generator's
+[doi:10.1016/0021-9991(80)90033-9](https://doi.org/10.1016/0021-9991%2880%2990033-9). The
+general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
+unlike [`IFRK2`](@ref).
+
+The diffusive integrating factor ``\\mathcal{E}_D(\\tau)`` over a substep interval ``\\tau``
+(``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) takes its
+parameters from the generator's
 [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
-[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) over
-a substep
-interval ``\\tau`` (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) and
-applied per mode by the backend's fused exponential convolution, never built as a field —
-and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state
-``\\hat q`` and a single accumulator
-``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
+[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) and
+is applied per mode by the backend's fused exponential convolution, never built as a field. With
+``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state ``\\hat q``
+and a single accumulator ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
 ```math
 \\begin{aligned}
@@ -237,18 +241,16 @@ and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carrie
 
 (the accumulator's rotation is skipped at the last stage, where nothing reads it again),
 
-with the stage coefficients ``A_i = (0, -5/9, -153/128)`` — unrelated to the forcing rate
-``A(\\boldsymbol{\\kappa})`` of the `Forcing` page —, ``B = (1/3, 15/16, 8/15)``, and node increments
-``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are advanced in
-lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing is applied after
-the third stage.
-Three nonlinear evaluations per step, and — in Williamson's 2N-storage count, whose ``N`` counts
-evolved field registers, not the grid points ``N`` of the rest of the documentation — two field registers
-per field: the state's own array plus one accumulator (`stage1`). The
-[`IntegratorBuffers`](@ref) a run allocates can hold more than that count — for this scheme it adds
-`nonlinear`, the register the right-hand-side assembly and its dealiasing pass write through — because the count measures the scheme, not
-the solver it is embedded in. The general-purpose workhorse:
-third-order and stable on the imaginary axis (limit ``\\sqrt{3}``), unlike [`IFRK2`](@ref).
+with stage coefficients ``A_i = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node
+increments ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are
+advanced in lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing
+is applied after the third stage.
+
+The cost is three nonlinear evaluations per step and — in Williamson's 2N count, where ``N`` counts
+evolved field registers — two registers per field: the state's own array plus one accumulator
+(`stage1`). The [`IntegratorBuffers`](@ref) a run allocates also holds `nonlinear`, the register the
+right-hand-side assembly and its dealiasing pass write through: the 2N count measures the scheme,
+not the solver it is embedded in.
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
 

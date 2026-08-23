@@ -617,21 +617,24 @@ fields_modified!(sim::Simulation) = (fields_modified!(sim.cache); sim)
     run!(callback, sim)
     run!(sim) do sim … end
 
-Observe and advance `sim` until the observation stops it, and return it. After every iteration —
-and once at the seeded initial state, before any advance —
-the `callback` **observes** the run as `callback(sim)`: it reads the
-state and the cached observables, records what it wants, and returns `true` to continue or `false`
-to stop (any other return throws an `ArgumentError` — the decision may not be left implicit). Only then does the next
-iteration run: the timestep from the cached maximum speed, the step, the tracer advance, and the closing
-deposits. A run of ``n`` iterations therefore observes ``n + 1`` instants — the first before any
-step, the last after the final one, with statistics recorded before the stop.
+Observe and advance `sim` until the observation stops it.
 
-Stopping is the observation's decision on observables, never a run option: a fixed-length run is a callback
-that accumulates elapsed turnovers and stops at a chosen total. A span of simulation time compares [`current_time`](@ref) against
-a target; a step budget compares [`current_step`](@ref); an eddy-turnover budget accumulates
-``\\Delta t \\varepsilon/k`` from the observables it computes; spin-up to stationarity is the
-packaged [`StationarityCriterion`](@ref). Whatever the callback needs beyond the cached observables
-it computes itself, at its own cadence, with the exported reductions and recoveries.
+After every iteration — and once at the seeded initial state, before any advance — the `callback`
+**observes** the run as `callback(sim)`: it reads the state and the cached observables, records
+what it wants, and returns `true` to continue or `false` to stop. Any other return throws an
+`ArgumentError`.
+
+Only then does the next iteration run: the timestep from the cached maximum speed, the step, the
+tracer advance, and the closing deposits. A run of ``n`` iterations therefore observes ``n + 1``
+instants — the first before any step, the last after the final one, with statistics recorded
+before the stop.
+
+Stopping is the observation's decision on observables, never a run option. A span of simulation
+time compares [`current_time`](@ref) against a target; a step budget compares
+[`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` from the
+observables it computes; spin-up to stationarity is the packaged [`StationarityCriterion`](@ref).
+Whatever the callback needs beyond the cached observables it computes itself, at its own cadence,
+with the exported reductions and recoveries.
 
 # Examples
 ```julia

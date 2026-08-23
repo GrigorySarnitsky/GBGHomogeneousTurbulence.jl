@@ -23,18 +23,22 @@ The measured functions of the flow state:
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
 
-Each returns the field's own real element type rather than a fixed `Float64`, so a `Float32` run
-measures in `Float32`. Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
-per-shell energy over wavenumber, and the vorticity recovery alone produces a field. Three of them gate the automatic warm-up
+Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to a
+per-shell energy over wavenumber, and the vorticity recovery alone produces a field. Each returns
+the field's own real element type rather than a fixed `Float64`, so a `Float32` run measures in
+`Float32`.
+
+Three observables gate the automatic warm-up
 ([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
-the scalar is forced — the scalar variance settles too. The kinetic energy is deliberately **not**
-among them: a constant-energy forcing clamps it flat and a fixed-injection forcing makes it ring, so
-it is measured (it normalizes the eddy-turnover clock) but never gated on. None dealiases first — the quadratic reductions are exactly
-alias-free under a truncating dealiasing band (see `kinetic_energy` for the condition;
-[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets
-it only to machine precision), and the cubic skewness carries the slight residual its own docstring
-prices.
+the scalar is forced — the scalar variance settles too. The kinetic energy is **not** among them: a
+constant-energy forcing clamps it flat and a fixed-injection forcing makes it ring, so it is
+measured (it normalizes the eddy-turnover clock) but never gated on.
+
+None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
+band (see `kinetic_energy` for the condition;
+[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
+and the cubic skewness carries the slight residual its own docstring prices.
 """
 module Observables
 
@@ -53,17 +57,21 @@ export kinetic_energy, dissipation, max_speed, vorticity_physical!,
 
 The turbulent kinetic energy
 ``\\texttt{kinetic\\_energy} \\equiv k = \\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle``
-of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as ``\\tfrac{1}{2} \\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with
-the normalized inner product, so by Parseval's theorem it accepts the velocity in either
-representation — the physical field ``\\boldsymbol{u}`` or its spectral coefficients
-``\\hat{\\boldsymbol{u}}``, to the same value. Like every quadratic reduction here (`dissipation`, `scalar_variance`,
-`scalar_dissipation`), it needs no dealiasing of its own: the sum over spectral coefficients is
-exact, and the equivalent physical-space mean picks up no aliasing either, because a quadratic's
-zero mode folds in nothing when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` —
-satisfied by the ``2/3`` rule, by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift)'s wider ``\\sqrt{2}N/3`` band, and by every narrower
-band. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) keeps the full band ``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero
-are Nyquist modes its taper has already damped to machine precision — alias-free in practice, not
-exactly.
+of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as
+``\\tfrac{1}{2}\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with the normalized inner product,
+so by Parseval's theorem it accepts the velocity in either representation — the physical field
+``\\boldsymbol{u}`` or its spectral coefficients ``\\hat{\\boldsymbol{u}}`` — to the same value.
+
+Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_dissipation`), it
+needs no dealiasing of its own: the sum over spectral coefficients is exact, and the equivalent
+physical-space mean picks up no aliasing either, because a quadratic's zero mode folds in nothing
+when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` — satisfied by the ``2/3``
+rule, by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift)'s wider
+``\\sqrt{2}N/3`` band, and by every narrower band.
+
+[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) keeps the full band
+``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero are Nyquist modes its taper has
+already damped to machine precision — alias-free in practice, not exactly.
 """
 kinetic_energy(u) = inner(u, u) / 2
 
@@ -206,19 +214,21 @@ scalar_variance(φ) = inner(φ, φ)
     scalar_dissipation(φ̂, domain, diffusivity)
 
 The mean scalar-variance dissipation rate
-``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the scalar field
-in spectral representation ``\\hat\\varphi`` (the `φ̂` argument), the [`FixedDomain`](@ref) bundle `domain`, and the
-scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` (the `diffusivity` argument).
+``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the
+scalar field in spectral representation ``\\hat\\varphi`` (the `φ̂` argument), the
+[`FixedDomain`](@ref) bundle `domain`, and the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``
+(the `diffusivity` argument).
+
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
 scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals
 ``\\langle\\hat\\varphi,\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat\\varphi\\rangle``: a
 ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral inner product against the
-`domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with no
-physical gradient ``\\nabla\\varphi`` materialized. It is the scalar twin of
-[`dissipation`](@ref)'s spectral route, and unconditional where that one needs a divergence-free
-velocity. There is only this one route: `dissipation`'s second form exists because the vorticity is a
-cached field a run already holds, while ``\\nabla\\varphi`` is never recovered or cached, so a
-field-argument twin would have nothing to consume.
+`domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with
+no physical gradient ``\\nabla\\varphi`` materialized.
+
+It is the scalar twin of [`dissipation`](@ref)'s spectral route, and unconditional where that one
+needs a divergence-free velocity. This spectral route is the only form: ``\\nabla\\varphi`` is never
+recovered or cached, so there is no field-argument twin.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
   (v = weighted_inner(φ̂, domain.squared_wavenumber_kernel); 2 * oftype(v, diffusivity) * v)
@@ -295,20 +305,24 @@ end
     energy_spectrum(û, domain)
 
 The measured kinetic-energy spectrum of the velocity field `û` (in spectral representation) — the
-turbulent kinetic energy resolved over wavenumber-magnitude shells. What is returned is a **per-shell
-energy** ``E_n``, summing to the kinetic energy, ``k = \\sum_n E_n``; a model spectrum ``E(\\kappa)``
-from [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) is instead a **density** per unit
-wavenumber, with ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``, so the two differ by the
-shell width ``\\Delta\\kappa = 2\\pi/L`` and are not interchangeable. Returns a named tuple `(; wavenumbers, energy)`: the shell-center
-wavenumber magnitudes ``\\kappa`` and the energy ``E_n`` in each shell (positional destructuring
-`κ, E = energy_spectrum(û, domain)` also works). Both come back as host `Vector`s whatever backend
-`û` lives on: the shell accumulators are ``O(N)`` and the reduction brings them back, so a plotting
-or fitting caller needs no transfer of its own. It is the `GBGPeriodicFields` radial
-spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
-kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
-multipliers. This is the measured counterpart of a
-`Phenomenology` model
-spectrum, for validation.
+turbulent kinetic energy resolved over wavenumber-magnitude shells. The `domain` (a
+[`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+
+Returns a named tuple `(; wavenumbers, energy)`: the shell-center wavenumber magnitudes ``\\kappa``
+and the energy ``E_n`` in each shell (positional destructuring `κ, E = energy_spectrum(û, domain)`
+also works). Both come back as host `Vector`s whatever backend `û` lives on: the shell accumulators
+are ``O(N)`` and the reduction brings them back, so a plotting or fitting caller needs no transfer
+of its own.
+
+It is the `GBGPeriodicFields` radial spectrum of `û` halved — the field reduction sums
+``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the kinetic energy carries the ``\\tfrac{1}{2}``.
+
+What is returned is a **per-shell energy** ``E_n``, summing to the kinetic energy,
+``k = \\sum_n E_n``. A model spectrum ``E(\\kappa)`` from
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) — whose measured counterpart this is,
+for validation — is instead a **density** per unit wavenumber, with
+``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``, so the two differ by the shell width
+``\\Delta\\kappa = 2\\pi/L`` and are not interchangeable.
 """
 function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
@@ -319,27 +333,32 @@ end
 """
     integral_scale(û, domain)
 
-The longitudinal integral length scale of the velocity field `û`, measured from its
-per-shell energies ``E_n`` (from [`energy_spectrum`](@ref)),
+The longitudinal integral length scale of the velocity field `û`, measured from its per-shell
+energies ``E_n`` (from [`energy_spectrum`](@ref)),
 
 ```math
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
 ```
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
-small scales do not fix. The integrals above are the idealized continuous definition written with the spectral density
-``E(\\kappa)``; they are evaluated as sums over the measured per-shell energies ``E_n``, whose common
-shell width cancels in the ratio, so no conversion between the two is needed here. The cancellation
-is exact; what is approximate is the *shell* itself — ``E_n`` is the exact sum over a shell's lattice
-modes, and identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint quadrature whose error is
-largest at the low shells, where the mode count departs most from the continuum ``4\\pi\\kappa^2``.
-Those are also the shells this ratio weights most, so read ``L_{11}`` as resolution-limited at coarse
-grids. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the small
+scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
-For reference, two related scales follow from the same spectrum. The **transverse** integral scale is
-``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full trace**
-velocity correlation ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\boldsymbol{e})\\rangle`` (``\\boldsymbol{e}`` a unit vector) — with no directional projection — is
+The integrals above are the idealized continuous definition, written with the spectral density
+``E(\\kappa)``; they are evaluated as sums over the measured per-shell energies ``E_n``, whose
+common shell width cancels in the ratio, so no conversion between the two is needed.
+
+The cancellation is exact; what is approximate is the *shell* itself: ``E_n`` is the exact sum over
+a shell's lattice modes, and identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint
+quadrature whose error is largest at the low shells, where the mode count departs most from the
+continuum ``4\\pi\\kappa^2``. Those are also the shells this ratio weights most, so read ``L_{11}``
+as resolution-limited at coarse grids.
+
+For reference, two related scales follow from the same spectrum. The **transverse** integral scale
+is ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full
+trace** velocity correlation
+``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\boldsymbol{e})\\rangle``
+(``\\boldsymbol{e}`` a unit vector) — with no directional projection — is
 
 ```math
 \\begin{aligned}
