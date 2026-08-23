@@ -303,37 +303,45 @@ end
 """
     energy_spectrum(û, domain)
 
-The measured kinetic-energy spectrum of the velocity field `û` (in spectral representation) — the
-turbulent kinetic energy resolved over wavenumber-magnitude shells. The `domain` (a
-[`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+The measured kinetic-energy **spectral density** ``E(\\kappa)`` of the velocity field `û` (in
+spectral representation): ``E(\\kappa)\\,\\mathrm{d}\\kappa`` is the turbulent kinetic energy
+carried by wavenumber magnitudes in ``[\\kappa, \\kappa + \\mathrm{d}\\kappa]``, so
+``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa`` — the object the reference laws are stated
+about, directly comparable to a
+[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum with no conversion. The
+`domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers and the shell width.
 
 Returns a named tuple `(; wavenumbers, energy)`: the shell-center wavenumber magnitudes ``\\kappa``
-and the energy ``E_n`` in each shell (positional destructuring `κ, E = energy_spectrum(û, domain)`
-also works). Both come back as host `Vector`s whatever backend `û` lives on: the shell accumulators
-are ``O(N)`` and the reduction brings them back, so a plotting or fitting caller needs no transfer
-of its own.
+and the density estimate at each (positional destructuring `κ, E = energy_spectrum(û, domain)` also
+works). Both come back as host `Vector`s whatever backend `û` lives on — the ``O(N)`` shell accumulators
+return with the reduction, so a caller needs no transfer of its own.
 
-It is the `GBGPeriodicFields` radial spectrum of `û` halved — the field reduction sums
-``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the kinetic energy carries the ``\\tfrac{1}{2}``.
-
-What is returned is a **per-shell energy** ``E_n``, summing to the kinetic energy,
-``k = \\sum_n E_n``. A model spectrum ``E(\\kappa)`` from
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) — whose measured counterpart this is,
-for validation — is instead a **density** per unit wavenumber, with
-``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``, so the two differ by the shell width
-``\\Delta\\kappa = 2\\pi/L`` and are not interchangeable.
+Each value is the shell's energy — half the `GBGPeriodicFields` radial spectrum, which sums
+``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` — divided by the shell width
+``\\Delta\\kappa = 2\\pi/L``, making Parseval the quadrature
+``k = \\sum_n E(\\kappa_n)\\,\\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
+integer shells hold few lattice modes, so the density estimate is correspondingly lumpy there.
 """
 function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
-  return (; wavenumbers = shells, energy = spec ./ 2)
+  # The DENSITY, not the bin sum: each shell's energy over the shell width Δκ = 2π/L, so the return
+  # is the object the theory states laws about (E(κ) = C_K ε^{2/3} κ^{-5/3} is a density) and is
+  # directly comparable to a Phenomenology model. On the default 2π box Δκ = 1 and the two
+  # conventions coincide numerically — which is exactly how the bin-sum convention survived as long
+  # as it did (owner-directed cutover, 2026-08-23).
+  # In the spectrum's own element type: a bare `2π` is a Float64 and would promote a Float32 run —
+  # the same leak class the element-type invariant test exists to catch (and did).
+  T = eltype(spec)
+  Δκ = T(2π) / domain.grid.domain_size[1]
+  return (; wavenumbers = shells, energy = spec ./ (2 * Δκ))
 end
 
 
 """
     integral_scale(û, domain)
 
-The longitudinal integral length scale of the velocity field `û`, measured from its per-shell
-energies ``E_n`` (from [`energy_spectrum`](@ref)),
+The longitudinal integral length scale of the velocity field `û`, measured from its
+spectral density (from [`energy_spectrum`](@ref)),
 
 ```math
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
@@ -344,8 +352,8 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 The integrals above are the idealized continuous definition, written with the spectral density
-``E(\\kappa)``; they are evaluated as sums over the measured per-shell energies ``E_n``, whose
-common shell width cancels in the ratio, so no conversion between the two is needed.
+``E(\\kappa)`` that [`energy_spectrum`](@ref) measures; they are evaluated as quadrature sums over
+the shells, the common shell width canceling in the ratio.
 
 The cancellation is exact; what is approximate is the *shell* itself: ``E_n`` is the exact sum over
 a shell's lattice modes, and identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint

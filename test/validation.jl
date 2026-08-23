@@ -16,7 +16,8 @@ end
   κ, E = energy_spectrum(SIM.state.velocity_spectral, SIM.domain)
   @test length(κ) == length(E)
   @test all(≥(0), E)                                          # a power spectrum is non-negative
-  @test isapprox(sum(E), kinetic_energy(SIM.state.velocity_spectral); rtol = 1e-5)    # Σ E(κ) = k
+  Δκ = 2π / SIM.domain.grid.domain_size[1]
+  @test isapprox(sum(E) * Δκ, kinetic_energy(SIM.state.velocity_spectral); rtol = 1e-5)   # Σ E(κ)·Δκ = k
   @test integral_scale(SIM.state.velocity_spectral, SIM.domain) > 0
 end
 

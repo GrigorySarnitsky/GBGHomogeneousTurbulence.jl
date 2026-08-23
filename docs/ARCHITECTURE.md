@@ -333,8 +333,8 @@ states the physical quantity first, then the reduction that computes it:
   ``3C_S\langle\det\boldsymbol{S}\rangle/\langle\boldsymbol{S}:\boldsymbol{S}\rangle^{3/2}`` with the exact
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
-- ``\texttt{energy\_spectrum} \equiv E_n``, the halved `GBGPeriodicFields` radial spectrum (a
-  per-shell energy, not the density ``E(\kappa)`` a model law gives), and `integral_scale`
+- ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum
+  over the shell width — the **density**, the same object a model law gives — and `integral_scale`
   derived from it.
 
 These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
@@ -1325,7 +1325,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     typed-field reuse model; the byte-level refinement (a spectral and a physical field have equal
     byte size under the rfft padding) is recorded as a `GBGPeriodicFields`-level question, not chased
     here. The op lists are re-derived whenever a `step!` body or the generator protocol changes — the
-    ledger failing is the reminder.
+    ledger failing is the reminder. *(Superseded 2026-08-23, owner-directed: `energy_spectrum` now returns the
+    **density** — the shell energy over ``\Delta\kappa`` — so the seam this entry documents is
+    gone; measured and modeled spectra are the same kind of object and compare directly. The
+    bin-sum convention had survived precisely because the factor is 1 on the default box.)*
 
 34. **(2026-07) The compute audit: frozen transform and pass ledgers with fusion bounds, in the
     standard suite.** The compute twin of decision 33 (`test/compute_audit.jl`): the same

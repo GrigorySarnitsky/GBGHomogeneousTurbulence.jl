@@ -94,7 +94,7 @@ using Test
     sim2 = Simulation(grid_points_per_axis = 32, viscosity = 0.02,
                       initial_spectrum = κ -> κ^4 * exp(-κ), rng = MersenneTwister(4))
     @test kinetic_energy(sim2.state.velocity_spectral) > 0
-    @test isapprox(sum(last(energy_spectrum(sim2.state.velocity_spectral, sim2.domain))), kinetic_energy(sim2.state.velocity_spectral); rtol = 1e-5)
+    @test isapprox(sum(last(energy_spectrum(sim2.state.velocity_spectral, sim2.domain))) * (2π / sim2.domain.grid.domain_size[1]), kinetic_energy(sim2.state.velocity_spectral); rtol = 1e-5)
   end
 
   @testset "the observation fires after every iteration — n iterations, n+1 observations" begin

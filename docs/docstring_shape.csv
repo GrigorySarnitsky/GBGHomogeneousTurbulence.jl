@@ -35,8 +35,8 @@ Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain
 Observables.jl::Observables,110,0,270
 Observables.jl::derivative_skewness(û， domain),81,1,362
 Observables.jl::dissipation(ω， viscosity),97,1,294
-Observables.jl::energy_spectrum(û， domain),62,0,175
-Observables.jl::integral_scale(û， domain),65,0,237
+Observables.jl::energy_spectrum(û， domain),66,0,177
+Observables.jl::integral_scale(û， domain),65,0,229
 Observables.jl::kinetic_energy(u),67,0,154
 Observables.jl::max_speed(u),47,2,305
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,119
