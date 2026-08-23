@@ -150,10 +150,9 @@ end
 # translates a vector or scalar field alike.
 function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
   δ = 0.5 .* domain.grid.grid_spacing
-  reference = new_scalar_field_spectral(domain)
-  back = translation_kernel(reference, domain.multipliers, δ)
+  back = translation_kernel(domain.multipliers, δ)
   return PhaseShiftBuffers(
-    translation_kernel(reference, domain.multipliers, .-δ),   # sample on the +½-cell grid (negated offset)
+    translation_kernel(domain.multipliers, .-δ),              # sample on the +½-cell grid (negated offset)
     back,
     convolve(domain.dealias, back),                           # 𝔻 ∘ back — kilobytes, never a field
     new_vector_field_spectral(domain),

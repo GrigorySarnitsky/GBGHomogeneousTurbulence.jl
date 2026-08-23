@@ -291,7 +291,7 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
           "(shell ≈ $(round(κ_max / k0, digits = 1))): the shells above it are held empty by the " *
           "mask and contribute nothing — the forcing acts only on the retained part of the band."
   end
-  return spectral_band(new_scalar_field_spectral(domain), domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
+  return spectral_band(domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
 end
 
 
@@ -400,14 +400,18 @@ end
 
 function project_forcing!(forcing::VarianceRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
-  band_value = factor * weighted_inner(field, forcing.band)  # the band observable (fused; no band-pass copy)
-  _band_is_empty(band_value) && return field           # nothing in the band yet
   # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
-  target_band = if forcing.over === :total
-    total_value = factor * inner(field, field)         # the observable over the whole field
-    max(zero(band_value), forcing.target - total_value + band_value)
+  # — the :total pair rides one fused traversal (one readback), the :band form needs only the band.
+  if forcing.over === :total
+    band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
+    band_value = factor * band_raw                     # the band observable (fused; no band-pass copy)
+    _band_is_empty(band_value) && return field         # nothing in the band yet
+    total_value = factor * whole_raw                   # the observable over the whole field
+    target_band = max(zero(band_value), forcing.target - total_value + band_value)
   else
-    forcing.target
+    band_value = factor * weighted_inner(field, forcing.band)
+    _band_is_empty(band_value) && return field
+    target_band = forcing.target
   end
   scale = sqrt(target_band / band_value)
   convolve!(field, field, forcing.band, scale - 1, 1)  # rescale in-band modes (α/β accumulate)
@@ -629,16 +633,21 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
                              diffusivity::Real)
   T = field_scalar_type(N̂)
   factor = _target_factor(field)
-  # Two DIFFERENT reductions, and which one goes where is the whole content of Bassenne's Eq. 20.
+  # Two DIFFERENT weights, and which one goes where is the whole content of Bassenne's Eq. 20.
   # The forcing acts on the band alone, so it injects 2·A·k_f and the amplitude must be normalized by
   # the BAND's variance; the quantity being held is the field's whole-field variance, so the restoring
   # term must measure THAT. Using k_f in both places holds the band at `target` instead, which is a
   # different physical model and leaves the whole field wherever the cascade puts it.
-  whole_variance = factor * inner(field, field)                          # k, the quantity held
-  band_variance = factor * weighted_inner(field, forcing.band)           # k_f, the forced band
+  # One traversal, one readback: the three weighted sums share a single fused reduction (PF
+  # decision 72) where three separate calls would read the field three times and block on the
+  # device three times per stage. Bitwise identical to the separate calls.
+  whole, band, dirichlet =
+    weighted_inner(field, (domain.unit_kernel, forcing.band, domain.squared_wavenumber_kernel))
+  whole_variance = factor * whole                                        # k, the quantity held
+  band_variance = factor * band                                          # k_f, the forced band
   # ε = D⟨|∇f|²⟩ = D·⟨f, |κ|²f⟩, the field's own dissipation at this stage. The factor is the same
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
-  dissipation = 2 * factor * diffusivity * weighted_inner(field, domain.squared_wavenumber_kernel)
+  dissipation = 2 * factor * diffusivity * dirichlet
   restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time
   amplitude = _band_is_empty(band_variance) ? 0.0 :
               (dissipation - restoring) / (2 * band_variance)

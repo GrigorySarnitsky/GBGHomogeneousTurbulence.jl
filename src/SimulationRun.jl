@@ -41,8 +41,8 @@ import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_particles_epoch!,
                advance_fields_epoch!,
                velocity_physical, max_speed, particle_velocities
-using ..Observables: kinetic_energy, dissipation, scalar_variance, scalar_dissipation, energy_spectrum,
-                     integral_scale, derivative_skewness
+using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
+                     scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController
 using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
@@ -610,7 +610,35 @@ end
 # and the cache form is what discards it. Added because the particle form was and this one was not —
 # a caller holding a run should not have to know which of the two verbs happens to have the
 # convenience method.
-fields_modified!(sim::Simulation) = (fields_modified!(sim.cache); sim)
+#
+# This form also SEES the state, so it is where the conjugate-symmetry contract is enforced (the
+# cache form cannot check what it cannot reach). The tolerance is scale-aware: hand-written partners
+# computed through different operation orders may disagree at roundoff, which is not a violation;
+# an O(1) inconsistency is. `reality_residual` sweeps only the folded axis's self-mirrored planes —
+# O(N²), and this verb is out-of-band, never the hot loop.
+function fields_modified!(sim::Simulation)
+  _check_reality(sim.state.velocity_spectral, "velocity")
+  sim.state.scalar_spectral === nothing || _check_reality(sim.state.scalar_spectral, "scalar")
+  fields_modified!(sim.cache)
+  return sim
+end
+
+function _check_reality(field, name)
+  residual = reality_residual(field)
+  scale = maximum(abs, field.fourier_coefficients)
+  T = real(eltype(field.fourier_coefficients))
+  residual <= sqrt(eps(T)) * scale ||
+    throw(ArgumentError("fields_modified!: the $name coefficients are not the spectrum of a real " *
+                        "field — the conjugate-symmetry residual is $residual against a field scale " *
+                        "of $scale. On the real-to-complex layout the folded axis's zero plane (and " *
+                        "its Nyquist plane, for an even grid) stores both members of each " *
+                        "conjugate pair, so hand-written coefficients must satisfy " *
+                        "f̂(-κ) = conj(f̂(κ)) there; a violation makes every spectral diagnostic " *
+                        "silently disagree with the physical field. Repair by a physical round " *
+                        "trip — `to_physical` then `to_spectral` projects onto the nearest real " *
+                        "field's spectrum — or fix the write."))
+  return nothing
+end
 
 
 
@@ -838,11 +866,13 @@ function (criterion::StationarityCriterion)(sim::Simulation)
     criterion.last_time = current_time(sim)
     criterion.started = true
   end
-  ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
+  # The clock's pair (k, ε) rides ONE fused traversal — one device readback per iteration, not two.
+  k, ε = kinetic_energy_and_dissipation(sim.state.velocity_spectral, sim.domain,
+                                        sim.generator.conditions.viscosity)
   Δt = current_time(sim) - criterion.last_time
   criterion.last_time = current_time(sim)
   if ε > 0
-    criterion.elapsed_turn += Δt * ε / Float64(kinetic_energy(sim.state.velocity_spectral))
+    criterion.elapsed_turn += Δt * ε / Float64(k)
   else
     # No dissipation means no eddy-turnover clock, and `max_turnovers` is denominated in exactly the
     # units that have stopped advancing — so the give-up cap below could never be reached and the

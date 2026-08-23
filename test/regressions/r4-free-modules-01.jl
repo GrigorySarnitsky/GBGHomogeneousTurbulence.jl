@@ -81,15 +81,15 @@ end
   reset_counts!()
   project_forcing!(forcing, cf, domain)
 
-  # The band observable — one fused weighted reduction over the field.
+  # The band AND whole-field observables — ONE fused multi-weight reduction over the field since
+  # PF decision 72 (wired 2026-08-23): `weighted_inner(field, (band, unit))`, one traversal.
   @test COUNTS[:weighted_inner] == 1
-  # The whole-field observable — needed once (for the `:total` deficit), and the emptiness guard
-  # should be handed that same number rather than recomputing it.
-  @test COUNTS[:inner] == 1
+  # The separate whole-field `inner` is gone — the fusion subsumed it.
+  @test COUNTS[:inner] == 0
   # And the rescale actually happened, so the count above is not from an early return.
   @test COUNTS[:convolve] == 1
 
   # The total host-crossing reductions the forcing hook issues, which the frozen SYNC_LEDGER's
-  # default row prices at 2 (band observable + total observable).
-  @test COUNTS[:inner] + COUNTS[:weighted_inner] == 2
+  # `:band_total` row prices at 1 (the fused band+total observable).
+  @test COUNTS[:inner] + COUNTS[:weighted_inner] == 1
 end

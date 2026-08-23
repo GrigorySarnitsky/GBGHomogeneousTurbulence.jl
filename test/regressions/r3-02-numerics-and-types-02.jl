@@ -20,7 +20,7 @@ using Random
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_type = Array)
   k0 = 2π / L
-  band = spectral_band(new_scalar_field_spectral(domain), domain.multipliers, 0.5 * k0, 2.5 * k0)
+  band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)
 
   φ0 = new_scalar_field_spectral(domain)
   random_scalar_spectral!(φ0, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0,

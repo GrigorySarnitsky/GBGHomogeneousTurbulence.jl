@@ -656,18 +656,6 @@ generalization is built for them until a second concrete case forces the abstrac
   absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
   increment is the one allocation-free exception
   (invariant 4), so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
-- **A fused multi-weight spectral reduction, raised to `GBGPeriodicFields`.** The default run reduces
-  the same field three times at every stage — ``\langle f, f\rangle`` for the variance the controller
-  holds, ``\langle f, b\,f\rangle`` for the band it normalizes by, and
-  ``\langle f, \lvert\boldsymbol{\kappa}\rvert^{2} f\rangle`` for the dissipation it replaces —
-  nine of its ten blocking host readbacks per step (§6). Expanded against PF's current method set
-  rather than assumed: `weighted_inner` and `inner` carry single-weight forms only, and
-  ``\langle f, f\rangle`` equals `weighted_inner` against a unit `radial_kernel` (verified
-  numerically), so the three are **one** operation ``\langle f, w f\rangle`` at three weights. The
-  request is correspondingly exact — one field, ``n`` kernels, ``n`` scalars, one traversal — and
-  would take the default from ten crossings to four. It is a *request*, not a local workaround
-  (invariant 2): reimplementing a fused reduction here would be field machinery in a physics package.
-  Held open by the optimality audit's `UNFUSED QUADRATIC REDUCTIONS`, whose shape it now dominates.
 - **Checkpoint / exact restart to HDF5 — the scheduled next capability.** Four of the five
   reference-practice audit lanes independently converged on its absence (2026-08-23), and it is the
   one missing piece for long production runs: persist the spectral state, the clock and timestep,
@@ -2053,6 +2041,40 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     with the family. Scope: the `Simulation` keyword and struct field only — bare `scheme` remains
     the positional-argument name in the protocol (`step!`, `allocate_buffers`, `recommended_cfl`),
     where dispatch already types it.
+
+63. **(2026-08) The three-item PF request of 2026-08-23 was delivered in full and is wired in.**
+    Raised under invariant 2 (field machinery is requested, never reimplemented here), shipped by
+    PF the same day (their decisions 71–72 and the radial-symbol allocation fix), integrated here:
+
+    - **Allocation-free radial symbols** (item 1). The 144-byte-per-call reshape wrappers behind
+      every ``\lvert\boldsymbol{\kappa}\rvert^{2}`` evaluation are gone; the acceptance
+      reproduction prints `0` for both `exponential_convolve!` and `laplacian!`, and IT's side
+      needed no change — the hot loop's last external allocation closed from the backend.
+    - **The multi-weight fused reduction** (item 2, PF decision 72; their measurement on this
+      host's card: 2.14× at ``128^3`` over three separate passes, before counting the retired
+      synchronizations). `weighted_inner(f, (w_1, \ldots, w_n))` answers ``n`` weighted sums from
+      one traversal and one readback, bitwise identical to the separate calls. Wired at every
+      same-field multi-reduction site: `VarianceController` (three weights per stage — the unit,
+      the band, ``\lvert\boldsymbol{\kappa}\rvert^{2}``), `VarianceRescaling`'s `:total` pair,
+      and the new public observable `kinetic_energy_and_dissipation` — the eddy-turnover clock's
+      ``(k, \varepsilon)`` pair, used by `StationarityCriterion` every iteration. The `FixedDomain`
+      gained `unit_kernel` (the constant-``1`` weight in the same lazy form, so a plain variance can
+      join a fused traversal). The synchronization ledger re-froze: the default row fell **10 → 4**
+      crossings (one fused reduction per stage plus the ``\Delta t`` choice), the
+      `VarianceRescaling` and warm-up rows each by their fused share; the compute ledger's
+      controller delta fell 6 → 4 passes per evaluation. `UNFUSED QUADRATIC REDUCTIONS` was
+      rewritten down to its residue — the stationarity gate's scalar variance sweeps ``\hat\varphi``
+      where the pair sweeps ``\hat{\boldsymbol{u}}``, and fusing across *fields* is a further,
+      smaller ask, deliberately not yet raised. The witness pins the wiring bitwise: swapping the
+      tuple's weights would exchange ``k``'s and ``\varepsilon``'s operands, which only an exact
+      comparison catches.
+    - **`reality_residual`** (item 3, PF decision 71 — a checker by their design: report, never
+      repair; Nyquist content named, never zeroed). Wired at the escape hatch: `fields_modified!` on
+      a run now measures the conjugate-symmetry residual of the announced state and throws beyond a
+      scale-aware roundoff tolerance, closing the documented "it is not checked" hole; the `cache`
+      form cannot see the fields and still trusts the caller. The witness hand-corrupts one member
+      of a stored conjugate pair and requires the violation named, then repairs it by the physical
+      round trip and requires acceptance.
 
 ## References
 

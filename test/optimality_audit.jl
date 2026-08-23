@@ -94,18 +94,17 @@ const HOST_SIDE_FORCING_SCALARS = Holder(
 
 const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "UNFUSED QUADRATIC REDUCTIONS", :PF_RAISE,
-  "The quadratic diagnostics a budgeted or warming run needs on the host — k and ε for the turnover " *
-  "clock, the scalar variance for the stationarity detector — are independent sweeps of the same " *
-  "state, one barrier each, where a single multi-output reduction would cost one barrier for all of " *
-  "them. The derivative skewness does not join them: it is a cubic reduction over a different " *
-  "operand and needs its own pass. " *
-  "THE DOMINANT INSTANCE since decision 58 is the default forcing: VarianceController reduces the " *
-  "SAME field three times at EVERY stage — nine of the default run's ten crossings — and the three " *
-  "differ only in their weight. Expanded and verified against GBGPeriodicFields' current method " *
-  "set: inner(f, f) == weighted_inner(f, unit) for a unit radial_kernel, so all three are one op, " *
-  "⟨f, w·f⟩ with w in {1, band, |κ|²}. The request is therefore exact and uniform — one field, n " *
-  "kernels, n scalars, one traversal — and would take the default from ten crossings to four. " *
-  "Recorded on the roadmap 2026-08-22 at the user's direction; the code is left as it stands.")
+  "WHAT REMAINS after the multi-weight fused reduction shipped (PF decision 72, requested " *
+  "2026-08-23, wired the same day): the scalar variance the stationarity gate samples is a " *
+  "traversal of a DIFFERENT operand — φ̂ where the turnover pair sweeps û — and the delivered " *
+  "reduction fuses n weights over ONE field, so the φ² crossing cannot join the pair's barrier. " *
+  "Closing it needs a cross-FIELD fused reduction (one barrier answering weighted sums over " *
+  "several fields at once), a further and much smaller backend ask, deliberately not yet raised. " *
+  "The derivative skewness never joins: a cubic reduction over a different operand, its own pass. " *
+  "THE FORMER DOMINANT INSTANCE — VarianceController's three same-field reductions per stage, " *
+  "nine of the default run's ten crossings — is CLOSED: one fused weighted_inner(f, (1, band, " *
+  "|κ|²)) per stage took the default row from ten crossings to four, and the turnover clock's " *
+  "(k, ε) pair fused the same way in kinetic_energy_and_dissipation.")
 
 # CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the closing refresh its text
 # prescribed: the iteration now deposits the charts at its end and the step takes the same slots as
@@ -177,10 +176,9 @@ function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::S
   push!(syncs, Sync("closing max-speed deposit", adaptive_dt ? 1 : 0,
                     adaptive_dt ? nothing : UNIFORM_DEPOSIT_SCHEDULE))
   if turnover_budget || monitor !== :none
-    # One barrier serves the whole quadratic family if the reduction is fused; the first carries the
-    # floor, the rest are the unfused remainder.
-    push!(syncs, Sync("turnover ε", 1, nothing))
-    push!(syncs, Sync("turnover k", 0, UNFUSED_QUADRATIC_REDUCTIONS))
+    # The clock's pair (k, ε) is ONE fused crossing — `kinetic_energy_and_dissipation` reads the
+    # field once and blocks once (PF decision 72) — and that barrier is the quadratic family's floor.
+    push!(syncs, Sync("turnover ε and k (fused pair)", 1, nothing))
   end
   if monitor !== :none
     # The skewness is a cubic reduction over the strain tensor — its own operand, its own barrier.
@@ -192,20 +190,20 @@ function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::S
     if tag === :band
       push!(syncs, Sync("VarianceRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
     elseif tag === :band_total
-      push!(syncs, Sync("VarianceRescaling band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
-      push!(syncs, Sync("VarianceRescaling total observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      # The band and whole-field observables ride one fused traversal since the multi-weight
+      # reduction landed; the crossing that remains is the host-side scalar round trip.
+      push!(syncs, Sync("VarianceRescaling band+total observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
     elseif tag === :power
       for _ in 1:stages   # per STAGE: the rate tracks the band observable, so it cannot be frozen
         push!(syncs, Sync("ConstantPower band observable ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
       end
     elseif tag === :controller
-      # THREE reductions of the same field per stage, each against a different weight: the whole-field
-      # variance it holds, the band variance it normalizes by, and the dissipation it replaces. They
-      # are the multi-weight shape the fused-reduction holder describes, not three separate needs.
+      # ONE fused reduction of the field per stage, against three weights at once — the whole-field
+      # variance it holds, the band variance it normalizes by, and the dissipation it replaces
+      # (PF decision 72, wired 2026-08-23). What remains per stage is the host-side round trip of
+      # the resulting scalars, which the stronger device-resident form would close.
       for _ in 1:stages
-        push!(syncs, Sync("VarianceController whole variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
-        push!(syncs, Sync("VarianceController band variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
-        push!(syncs, Sync("VarianceController dissipation ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+        push!(syncs, Sync("VarianceController fused observables ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
       end
     elseif tag === :ou
       push!(syncs, Sync("OU noise variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
@@ -219,19 +217,21 @@ _floor_syncs(syncs) = sum(s -> s.floor, syncs; init = 0)
 
 # The frozen synchronization ledger: (achieved, floor) per step. The default run configuration is
 # the first row — an adaptive timestep and a VarianceController on the three-stage scheme — and it
-# issues ten blocking readbacks per step where one is irreducible. The count rose from three when
+# issues four blocking readbacks per step where one is irreducible. The count rose from three when
 # decision 58 moved the state-dependent forcings onto the per-stage source to recover the scheme's
-# order; the gap is held by HOST_SIDE_FORCING_SCALARS, not accepted.
+# order, peaked at ten, and fell to four when the multi-weight fused reduction shipped (PF
+# decision 72) — the remaining gap is the host-side scalar round trip, held by
+# HOST_SIDE_FORCING_SCALARS, not accepted.
 const SYNC_LEDGER = (
   # The DEFAULT run: VarianceController on the three-stage IFLowStorageRK3. `stages` is not optional
   # here — a state-dependent forcing is evaluated at every stage, and a row that omits it silently
   # prices the forcing as if it were armed once per step, which is the arrangement this whole round
-  # replaced. Ten crossings against a floor of one is the largest gap in this ledger, and it is held,
-  # not accepted: the three per-stage reductions are one fused multi-weight reduction away.
+  # replaced. One fused reduction per stage plus the Δt choice; each stage's crossing is held by the
+  # host-side-scalars holder, whose stronger device-resident form is the remaining ask.
   (name = "default (adaptive dt, VarianceController, 3-stage)",
-   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),
+   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 4, floor = 1),
   (name = "adaptive dt, VarianceRescaling :total",
-   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),
+   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 2, floor = 1),
   (name = "adaptive dt, VarianceRescaling :band",
    cfg = (; adaptive_dt = true, velocity_forcing = :band),                       achieved = 2, floor = 1),
   (name = "fixed dt, unforced",
@@ -244,17 +244,17 @@ const SYNC_LEDGER = (
    cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 3, floor = 1),
   (name = "turnover-budgeted, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total,
-            turnover_budget = true),                                             achieved = 5, floor = 2),
+            turnover_budget = true),                                             achieved = 3, floor = 2),
   (name = "turnover-budgeted, fixed dt, unforced",
-   cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 3, floor = 1),
+   cfg = (; adaptive_dt = false, velocity_forcing = :none, turnover_budget = true), achieved = 2, floor = 1),
   # The warm-up surface — past step!, where the stationarity detector samples. ε is measured once
   # per iteration and shared with the turnover clock, so it appears here once, not twice.
   (name = "warm-up sample, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total, monitor = :skew),
-   achieved = 6, floor = 3),
+   achieved = 4, floor = 3),
   (name = "warm-up sample, scalar gate, unforced",
    cfg = (; adaptive_dt = true, velocity_forcing = :none, monitor = :skew_scalar),
-   achieved = 5, floor = 3),
+   achieved = 4, floor = 3),
 )
 
 
@@ -418,11 +418,12 @@ const SYNC_LEDGER = (
       @test _achieved_syncs(_syncs(; adaptive_dt = false, velocity_forcing = tag)) > 0
     end
 
-    # The default configuration pays ten crossings for one — the headline of this axis. It must be
-    # the DEFAULT that is asserted here, not a configuration that merely used to be: this line read
-    # `:band_total` for a commit after the default changed, and so measured a run nobody gets.
+    # The default configuration pays four crossings for one — down from ten when the multi-weight
+    # fused reduction shipped. It must be the DEFAULT that is asserted here, not a configuration
+    # that merely used to be: this line read `:band_total` for a commit after the default changed,
+    # and so measured a run nobody gets.
     default = _syncs(; adaptive_dt = true, velocity_forcing = :controller, stages = 3)
-    @test _achieved_syncs(default) == 10 && _floor_syncs(default) == 1
+    @test _achieved_syncs(default) == 4 && _floor_syncs(default) == 1
   end
 
   @testset "every holder is dispositioned and described" begin

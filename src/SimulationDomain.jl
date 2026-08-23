@@ -204,11 +204,14 @@ objects, each linked to its own documentation.
   representation ``-\\nabla^{2}`` acts as multiplication by it) — the weight that turns a Parseval sum into a mean-square-gradient
   (Dirichlet-energy) sum, which the weighted spectral reductions take; never materialized — evaluated per mode from the multipliers,
   with no array allocated.
+- `unit_kernel` — the constant weight ``1``, the same lazy form: the identity weight that lets a plain
+  variance join a multi-weight fused reduction (one traversal answering several weighted sums at
+  once), since ``\\langle f, 1\\cdot f\\rangle`` is the variance itself.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
   mode) and the [`DealiasingStrategy`](@ref) that built it.
 """
-struct FixedDomain{G, L, VP, SP, TP, M, SK, D, DS}
+struct FixedDomain{G, L, VP, SP, TP, M, SK, UK, D, DS}
   grid::G
   layout::L
   velocity_plans::VP
@@ -216,12 +219,16 @@ struct FixedDomain{G, L, VP, SP, TP, M, SK, D, DS}
   tensor_plans::TP                 # rank-2 transform plans (the strain-tensor diagnostic)
   multipliers::M
   squared_wavenumber_kernel::SK    # |k|² as a lazy RadialKernel — the Dirichlet-energy weight for `weighted_inner`
+  unit_kernel::UK                  # the constant-1 weight, same lazy form — lets a variance join a fused multi-weight reduction
   dealias::D                       # isotropic low-pass kernel (compressed, per-mode), built by `dealiasing`
   dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi / PhaseShift)
 end
 
 
 _zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef, dims...), zero(S))
+
+
+_unit_symbol(κ²) = one(κ²)
 
 
 function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
@@ -246,10 +253,15 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   multipliers = FieldSpectralMultipliers(velocity_spectral)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
-  squared_wavenumber_kernel = radial_kernel(identity, scalar_spectral_storage, multipliers)
+  squared_wavenumber_kernel = radial_kernel(identity, multipliers)
+  # The constant-1 symbol under the same lazy form, so a whole-field variance can ride the SAME
+  # fused traversal as its weighted siblings (inner(f, f) == weighted_inner(f, unit), verified
+  # against the backend). A named function, not a closure: the kernel's type is then a constant
+  # across constructions, which keeps every downstream specialization stable.
+  unit_kernel = radial_kernel(_unit_symbol, multipliers)
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, N, L, T)
 
-  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber_kernel, dealias, dealiasing)
+  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing)
 end
 
 
@@ -280,7 +292,7 @@ _cutoff_wavenumber(strategy, N, L, ::Type{T}) where {T} =
 # strictly below for their own formulations. PhaseShift's closed ball at √2·N/3 is likewise
 # oracle-exact — the shift-average cancels the single-alias images outright.
 _build_dealias(strategy::Union{TwoThirds, PhaseShift}, reference, multipliers, N, L, ::Type{T}) where {T} =
-  spectral_cutoff(reference, multipliers, _cutoff_wavenumber(strategy, N, L, T))
+  spectral_cutoff(multipliers, _cutoff_wavenumber(strategy, N, L, T))
 
 function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}) where {T}
   # The smooth filter is a closed-form radial symbol; the closure captures VALUES only (a captured
@@ -288,8 +300,7 @@ function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}
   inverse_nyquist = one(T) / T((N / 2) * (2π / L))
   strength = T(isnothing(strategy.strength) ? -log(eps(T)) : strategy.strength)
   order = strategy.order
-  return radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order),
-                       reference, multipliers)
+  return radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order), multipliers)
 end
 
 

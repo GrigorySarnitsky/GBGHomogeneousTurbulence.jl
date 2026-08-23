@@ -93,7 +93,7 @@ end
   end
 
   k0 = 2π / L
-  band = spectral_band(new_scalar_field_spectral(domain), domain.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
+  band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
   band_energy(field) = (tmp = new_vector_field_spectral(domain); convolve!(tmp, field, band); 0.5 * inner(tmp, tmp))
 
   @testset "Linear rate amplitude" begin

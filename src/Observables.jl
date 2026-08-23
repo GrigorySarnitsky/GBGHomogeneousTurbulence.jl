@@ -12,6 +12,7 @@ The measured functions of the flow state:
 - [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
   variance.
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
+- [`kinetic_energy_and_dissipation`](@ref) — ``(k, \\varepsilon)`` in one fused traversal.
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
   developed cascade.
 - [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
@@ -46,7 +47,7 @@ using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
 using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 
-export kinetic_energy, dissipation, max_speed, vorticity_physical!,
+export kinetic_energy, dissipation, kinetic_energy_and_dissipation, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
        energy_spectrum, integral_scale
 
@@ -131,6 +132,37 @@ dissipation(ω, viscosity::Real) = (v = inner(ω, ω); oftype(v, viscosity) * v)
 
 dissipation(û, domain::FixedDomain, viscosity::Real) =
   (v = weighted_inner(û, domain.squared_wavenumber_kernel); oftype(v, viscosity) * v)
+
+
+"""
+    kinetic_energy_and_dissipation(û, domain, viscosity)
+
+Measure the turbulent kinetic energy ``k`` and the viscous dissipation rate ``\\varepsilon``
+together, from one fused traversal of the velocity in spectral representation.
+
+The two values are [`kinetic_energy`](@ref)`(û)` and [`dissipation`](@ref)`(û, domain,
+viscosity)` — each formula at its own home; the dissipation is bitwise identical to its single
+call, the kinetic energy equal to within summation-order roundoff (a few ulp: the single reduces
+on a threaded tree, the fused pass serially) — but the pair costs one read of the coefficients and
+one blocking device-to-host readback instead of two. Reach for it wherever both are
+wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t\\,\\varepsilon/k``
+of a spin-up or budget loop, which is how
+[`StationarityCriterion`](@ref GBGIsotropicTurbulence.SimulationRun.StationarityCriterion) measures it.
+
+The arguments are:
+- `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
+  velocity route of `dissipation`, exact only for a solenoidal field (its docstring carries the
+  condition).
+- `domain` — the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain) whose lazy
+  reduction weights the traversal evaluates.
+- `viscosity` — the kinematic viscosity ``\\nu`` scaling the dissipation.
+
+Returns a named tuple `(kinetic_energy, dissipation)`, each in the field's own real element type.
+"""
+function kinetic_energy_and_dissipation(û, domain::FixedDomain, viscosity::Real)
+  whole, dirichlet = weighted_inner(û, (domain.unit_kernel, domain.squared_wavenumber_kernel))
+  return (kinetic_energy = whole / 2, dissipation = oftype(dirichlet, viscosity) * dirichlet)
+end
 
 
 """

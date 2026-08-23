@@ -34,7 +34,7 @@ end
 struct ProbePad <: DealiasingStrategy end
 GBGIsotropicTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
 GBGIsotropicTurbulence.SimulationDomain._build_dealias(::ProbePad, reference, multipliers, N, L, ::Type{T}) where {T} =
-  spectral_cutoff(reference, multipliers, T(2 // 3) * (N / 2) * (2π / L))
+  spectral_cutoff(multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
 println()
 println("=== a run on the undeclared strategy, with only the two refusing hooks supplied ===")

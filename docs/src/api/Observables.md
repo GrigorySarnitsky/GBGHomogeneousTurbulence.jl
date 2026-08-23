@@ -23,6 +23,14 @@ dissipation
 scalar_dissipation
 ```
 
+## The fused energy–dissipation pair
+
+Both quadratic reductions of the velocity from one traversal — the eddy-turnover clock's pair.
+
+```@docs
+kinetic_energy_and_dissipation
+```
+
 ## Derivative skewness
 
 The velocity-derivative skewness — the developed-turbulence marker that gates warm-up.

@@ -125,14 +125,14 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
     # CFL speed, and sweeps every tracer. The `initial_spectrum` branch below and the scalar twin both guard.
     inverse_peak_squared = one(T) / T(envelope_wavenumber)^2
     radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
-                  û, domain.multipliers)
+                  domain.multipliers)
   else
     # Match a target radial spectrum E(κ): a per-mode amplitude √(E(κ))/κ yields a shell-summed
     # spectrum ∝ κ²·(√E/κ)² = E(κ) (the κ² is the shell's mode count); the DC mode stays at 0.
     radial_kernel(k2 -> k2 > 0 ?
                     oftype(zero_value, sqrt(max(initial_spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) :
                     zero_value,
-                  û, domain.multipliers)
+                  domain.multipliers)
   end
   # The truncation rides in the envelope rather than as a second sweep of the field: both are
   # per-mode scalar multipliers, and a scalar commutes through the (per-mode) Leray projection, so
@@ -212,13 +212,13 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
     # reduction one would need to measure the mean. The `initial_spectrum` branch below vanishes there too.
     inverse_peak_squared = one(T) / T(envelope_wavenumber)^2
     radial_kernel(k2 -> ifelse(k2 > zero_value, exp(-inverse_peak_squared * k2), zero_value),
-                  φ̂, domain.multipliers)
+                  domain.multipliers)
   else
     # Match a target radial scalar spectrum E_φ(κ): amplitude √(E_φ(κ))/κ ⇒ shell sum ∝ E_φ(κ).
     radial_kernel(k2 -> k2 > 0 ?
                     oftype(zero_value, sqrt(max(initial_spectrum(sqrt(k2)), zero(k2))) / sqrt(k2)) :
                     zero_value,
-                  φ̂, domain.multipliers)
+                  domain.multipliers)
   end
   convolve!(φ̂, φ̂, convolve(envelope, domain.dealias))   # truncation folded in, as for the velocity
 

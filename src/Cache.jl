@@ -355,9 +355,11 @@ re-deposit with the
 run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 
-Coefficients written by hand must respect the real-field layout's conjugate symmetry — it is **not
-checked**, and a violation makes spectral diagnostics silently disagree with the physical images;
-the package's own seeders satisfy it by construction.
+Coefficients written by hand must respect the real-field layout's conjugate symmetry — a violation
+makes spectral diagnostics silently disagree with the physical images. The `sim` form **checks**
+this: it measures the conjugate-symmetry residual on the planes that store both members of a pair
+and throws on an inconsistency beyond roundoff. The `cache` form cannot see the fields and trusts
+the caller; the package's own seeders satisfy the constraint by construction.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form mirroring `particles_modified!`'s two.

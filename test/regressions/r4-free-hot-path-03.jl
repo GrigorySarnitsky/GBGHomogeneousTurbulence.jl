@@ -78,13 +78,15 @@ end
   @test NWEIGHTED[] == 1                      # the band observable
   @test NINNER[] == 0                         # and no whole-field reduction at all
 
-  # --- the claim: `over = :total` needs the SAME whole-field value, so still exactly one ---------
+  # --- the claim: `over = :total` needs the whole-field value too, and since the multi-weight
+  #     fusion (PF decision 72, wired 2026-08-23) the band and whole-field observables ride ONE
+  #     `weighted_inner(field, (band, unit))` traversal — no separate `inner` at all ---------------
   û_total = forced_velocity(domain, rng)
   total_forcing = F.VarianceRescaling(domain; target = 1.0, over = :total)
   NINNER[] = 0; NWEIGHTED[] = 0
   F.project_forcing!(total_forcing, CountingField(û_total), domain)
-  @test NWEIGHTED[] == 1                      # the band observable
-  @test NINNER[] == 1                         # the whole-field observable, once — not twice
+  @test NWEIGHTED[] == 1                      # the fused pair: band + whole-field, one traversal
+  @test NINNER[] == 0                         # the separate whole-field reduction is gone
 
   # --- and the duplicate is provably redundant: the two calls cannot disagree, because nothing
   #     writes the field between them. Re-reducing an untouched field returns the identical value.

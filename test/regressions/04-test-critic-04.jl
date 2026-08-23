@@ -24,7 +24,7 @@ using Test
                        dealiasing = TwoThirds(), array_type = Array)
 
   k0 = 2π / L
-  band = spectral_band(new_scalar_field_spectral(domain), domain.multipliers, 0.5 * k0, 2.5 * k0)  # shells 1–2
+  band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)  # shells 1–2
   # ⟨φ²⟩ restricted to the band: the band indicator is idempotent, so ⟨bφ̂, bφ̂⟩ = ⟨φ̂, b φ̂⟩.
   band_variance(φ̂) = (tmp = new_scalar_field_spectral(domain); convolve!(tmp, φ̂, band); inner(tmp, tmp))
 

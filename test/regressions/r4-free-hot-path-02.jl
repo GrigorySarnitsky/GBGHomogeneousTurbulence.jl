@@ -114,7 +114,11 @@ const EVALS_RK3 = 3
     @test BAND.field.convolve > 0
     @test POWER.out.convolve > 0
     @test CONTROLLER.out.convolve > 0
-    @test readbacks(CONTROLLER) > readbacks(POWER)   # it holds k AND normalizes by k_f
+    # Since the multi-weight fusion (PF decision 72, wired 2026-08-23) the controller answers its
+    # three observables — k, k_f, and the dissipation — in ONE fused readback, the same crossing
+    # count as `power`'s single band observable: the distinction moved into the weights. The guard
+    # that this hook still reduces at all is the equality itself against the non-zero count.
+    @test readbacks(CONTROLLER) == 1 && readbacks(POWER) == 1
   end
   @testset "synchronization ledger (test/optimality_audit.jl `_syncs`)" begin
     @test model_syncs(:band)       == readbacks(BAND)
