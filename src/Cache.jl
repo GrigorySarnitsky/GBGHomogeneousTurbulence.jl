@@ -354,10 +354,9 @@ the iteration's closing deposit then restores the cache. After a hand-made mutat
 run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 
-Coefficients written by hand must respect the conjugate symmetry of the real-field layout (the
-``k_x = 0`` plane's paired entries are complex conjugates); it is **not checked**, and a violation
-makes the spectral diagnostics silently disagree with the physical images. Seeding through the
-package's own seeders, or any r2c transform of a real field, satisfies it by construction.
+Coefficients written by hand must respect the real-field layout's conjugate symmetry — it is **not
+checked**, and a violation makes spectral diagnostics silently disagree with the physical images;
+the package's own seeders satisfy it by construction.
 
 It also discards the Lagrangian **sample history** this cache carries. Those samples are the velocity
 measured along the trajectory *through the state being replaced*, so a multistep trajectory scheme
