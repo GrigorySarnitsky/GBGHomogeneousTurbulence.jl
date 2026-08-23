@@ -313,9 +313,9 @@ dealiasing cutoff
 \\kappa_{\\max} = f \\frac{N}{2} \\frac{2\\pi}{L},
 ```
 
-with ``N`` the grid points per side, ``L`` the box side, and ``f`` the retained-Nyquist fraction of the
+with ``N`` the grid points per side, ``L`` the box side, ``f`` the retained-Nyquist fraction of the
 [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`).
-For the two sharp strategies sits strictly **below** the grid Nyquist
+For the sharp strategies the cutoff sits strictly **below** the grid Nyquist
 ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each step. `HouLi` is the exception
 its ``f = 1`` implies: its cutoff *is* the Nyquist, so there is no band above to zero, and it instead
 damps modes as they approach it (to machine epsilon at Nyquist). It fixes both the advective-CFL step

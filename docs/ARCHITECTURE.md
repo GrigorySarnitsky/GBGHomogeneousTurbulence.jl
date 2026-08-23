@@ -366,7 +366,7 @@ post-step projection is Lie–Trotter splitting, first-order by construction. So
 forcing belongs in the source, where the scheme's own stages integrate it. Measured on the
 third-order `IFLowStorageRK3`: every source-routed forcing converges at 3.01, the projection at 1.02.
 
-Four strategies are provided. `NoForcing` (free decay) and `Linear` (fixed-rate negative damping,
+Five strategies are provided. `NoForcing` (free decay) and `Linear` (fixed-rate negative damping,
 Lundgren 2003) — the latter the one steady rate, folded into ``\mathcal{E}`` and therefore exact and
 free. `ConstantPower` (holding the injection rate) and `VarianceController` (holding the field's
 ``L^2`` observable: the kinetic energy for the velocity, the scalar variance for the scalar; the
@@ -443,10 +443,12 @@ the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers)` builds its
-registers. Two axes matter: the
-trajectory scheme — today the single second-order `EndpointHeun`, with higher-order schemes the
-studied future axis — and the sampling-consistency axis, the interpolation scheme's order relative to the field's
-spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` / `LagrangeSpline` available).
+registers. Two axes matter: the trajectory scheme — the default second-order `EndpointHeun`, and the
+variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
+and its own registers in `MultistepBuffers`; decision 57) for a run whose trajectory accuracy in
+time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
+relative to the field's spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` /
+`LagrangeSpline` available).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same
 linear-exact move), while **orientation dynamics on the rotation group is a distinct geometric
@@ -1501,7 +1503,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     reconstruction demonstration inverted into a correctness pin: the lazy symbols, materialized on
     demand, must equal the explicit axis-vector reconstruction. Knock-on residency wins recorded in
     the same re-freeze: every band forcing's kernel is lazy (`VarianceRescaling` and `StochasticOU` store
-    none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill),
+    none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill
+    — *superseded for `ConstantPower` by decision 58, which moved it off the rate route: its band is
+    lazy now and only `Linear`, the one remaining rate-route strategy, keeps an indicator*),
     and the seed/spectrum episodes shrank because `GBGPeriodicFields` delivered the guard-free aliased
     projection and fused its `radial_spectrum` staging. The bare `ScalarFieldSpectral` integrating
     factor is wrapped in `StoredKernel` at its apply sites — a transitional form; the fused

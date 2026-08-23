@@ -604,13 +604,12 @@ formula degenerate: its ``0.25`` is an empirical margin rather than a computed l
     number is to prefer `IFLowStorageRK3`, whose ceiling has no such dependence, or to pass
     an explicit `cfl` and verify it against a run that holds its energy.
 
-The same ``1/\\kappa_{\\max}`` scaling is applied to both schemes' bases, including `IFRK2`'s
-empirical one — the dependence on how much of the band is kept is geometric and holds whether the
-base was computed or measured, but it inherits that base's standing rather than justifying it.
-
-It scales that base by the domain's dealiasing: a strategy that keeps modes
-to a higher ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the Nyquist wavenumber) takes a
-proportionally smaller step, ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
+The base is then scaled by the domain's dealiasing: a strategy that keeps modes to a higher
+``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the
+Nyquist wavenumber) takes a proportionally smaller step,
+``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to both schemes' bases,
+`IFRK2`'s empirical one included — the dependence on how much of the band is kept is geometric,
+holding whether the base was computed or measured, though it inherits the base's standing. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 """
 function recommended_cfl end

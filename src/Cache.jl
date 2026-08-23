@@ -62,7 +62,7 @@ const SCRATCH = -1
 
 
 """
-    ObservablesCache(domain; scalar = false, particle_velocities = nothing)
+    ObservablesCache(domain; scalar = false, particle_velocities = nothing, history_depth = 1)
 
 The observables cache of a run — the storage where each iteration deposits, at its end, the
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
@@ -394,15 +394,16 @@ scheme starts over from the new positions rather than integrating across the aba
 why the history lives here and not in the scheme's own registers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
-The sanctioned mutator calls it for you: the run layer announces its own tracer advance
-([`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) followed by
+The run layer never calls this verb: its own tracer advance inside
+[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) moves the particles epoch through a
+separate, history-keeping announcement — the advance *extends* the history this verb discards.
+
+A hand-run loop that repositions tracers itself calls this, then
 [`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!),
-both inside [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!)), and
-the run layer then refills the slot for you. A hand-run loop that repositions tracers itself must call
-this, then
-`record_particle_velocities!` to
-write the new values, and finally `deposit_sample!` to record them at the current epochs — the write
-alone leaves the slot stale, and a read of it throws.
+then `deposit_sample!` (the write alone leaves the slot stale, and a read of it throws). Announcing
+to a bare cache rather than a `Simulation` also takes
+[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) for a scheme carrying its own
+registers: the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form to reach for when a run is what you are holding, mirroring

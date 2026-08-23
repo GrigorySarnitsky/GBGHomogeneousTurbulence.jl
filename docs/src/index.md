@@ -38,7 +38,8 @@ using GBGIsotropicTurbulence
 sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
                                               # ν is set so the grid captures the dissipation scale
 warmup!(sim)                                  # spin up to statistical stationarity
-                                              # (the default forcing drives k to that value —
+                                              # (the default forcing holds the kinetic energy at
+                                              #  the `kinetic_energy` keyword's value, 1.5 —
                                               #  see VarianceController before measuring k itself)
 
 t_end = current_time(sim) + 5.0               # observe and advance: the callback reads the run,
@@ -47,8 +48,8 @@ run!(sim) do s                                # records what it wants, and decid
 end
 
 # One ITERATION is one advance: a step, then the DEPOSIT that closes it. A deposit writes the
-# observables the iteration has just computed into the cache, each recorded against the epoch of the
-# state it came from. The state is always current; the cache holds what the last deposit left, so its
+# observables the iteration has just computed into the cache, each recorded against the EPOCH — the
+# cache's count of completed iterations — of the state it came from. The state is always current; the cache holds what the last deposit left, so its
 # reads are valid between iterations.
 kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
 velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
@@ -96,11 +97,11 @@ Listed in build order — each module uses the ones above it. The
 
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
-- [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
-  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
   diagnostics of the flow and the scalar, the developed-turbulence marker (`derivative_skewness`), the spectrum-derived
   scales, and the one field-valued observable, the vorticity recovery.
+- [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
+  advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the run:
   a step plus the deposit that closes it) leaves the observables it produced, read through checked
   accessors that serve the deposited value or throw. Nothing is ever recomputed on a read.

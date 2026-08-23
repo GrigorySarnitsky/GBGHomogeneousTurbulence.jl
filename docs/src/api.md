@@ -1,8 +1,8 @@
 # API overview
 
 The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules. Its
-**re-exported** submodules build on one another in the order `SimulationDomain` → `State` →
-`Observables` → `Cache` → `Forcing` → `Generator` → `Propagator` → `Particles` → `SimulationRun`; the
+**re-exported** submodules build on one another in the order `SimulationDomain` → `Observables` →
+`State` → `Cache` → `Forcing` → `Generator` → `Propagator` → `Particles` → `SimulationRun`; the
 extraction-bound `Phenomenology` leaf leads the include order but is **not** re-exported (reach it
 opt-in). **The pages below are ordered for reading, not by that dependency**: `SimulationRun` comes
 first because a run is what a user builds first, and the pieces it composes follow. The umbrella re-exports the public
