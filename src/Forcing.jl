@@ -52,7 +52,8 @@ tensor-order-generic field operators:
 - [`Linear`](@ref) — a fixed linear rate on a band.
 - [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate.
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
-- [`VarianceRescaling`](@ref) — hold a band's amplitude by deterministic rescaling, at first order.
+- [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
+  deterministic rescaling, at first order.
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
@@ -147,8 +148,7 @@ therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taki
 `DeferredForcing`.
 
 # Examples
-The two-form construction is the non-obvious part of this module, so the example lives here; the
-strategies themselves are built by the forms shown below.
+Name a forcing before any grid exists, or build it directly once the domain is in hand:
 
 ```julia
 # Name the forcing before any grid exists — the front door supplies the domain:
@@ -174,7 +174,8 @@ end
 """
     set_forcing_rate!(forcing, rate, field, domain) -> rate
 
-For a strategy `forcing` linear in the field, fill the per-mode rate `rate` — a scalar field in spectral
+For a strategy `forcing` whose rate is linear in the field **and constant in time** (the
+[`uses_steady_linear_rate`](@ref) declaration), fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
 integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
@@ -361,8 +362,8 @@ two under `:total`, which measures the band and the whole field.
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `target` — the value of the held observable, as selected by `over`.
-- `over` — `:band` or `:total`. Required: a deterministic clamp destroys the physical fluctuation of
-  whatever it holds, and no default is right for every run.
+- `over` — `:band` or `:total`, the two modes contrasted above. Required: a deterministic clamp
+  destroys the physical fluctuation of whatever it holds, and no default is right for every run.
 - `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the
   box's fundamental ``2\\pi/L``.
 
@@ -551,7 +552,9 @@ The two variances there are **not interchangeable**: ``k`` is the whole field's,
 ``k_f`` the forced band's, dividing out because the forcing injects only there.
 
 The mechanism is the one molecular dynamics settled on for the same problem: holding a quantity by
-per-step rescaling is the naive thermostat, feedback inside the equations is the Nosé–Hoover move,
+per-step rescaling is the naive thermostat, feedback inside the equations is the Nosé–Hoover move
+(Nosé 1984, [doi:10.1063/1.447334](https://doi.org/10.1063/1.447334); Hoover 1985,
+[doi:10.1103/PhysRevA.31.1695](https://doi.org/10.1103/PhysRevA.31.1695)),
 and gain-limited relaxation toward a target is Berendsen weak coupling (Berendsen et al. 1984,
 [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deterministic-rescaling limit is
 [`VarianceRescaling`](@ref).
@@ -559,7 +562,7 @@ and gain-limited relaxation toward a target is Berendsen weak coupling (Berendse
 # Arguments
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
-- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster (Bassenne report ``O(1-10)``);
+- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster (Bassenne et al. report ``O(1-10)``);
   `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``),

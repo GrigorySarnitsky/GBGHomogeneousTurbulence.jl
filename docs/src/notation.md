@@ -70,7 +70,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) |
-| ``E_\varphi(\kappa)`` | the scalar-variance spectrum, summing to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | — |
+| ``E_\varphi(\kappa)`` | the scalar-variance spectrum, summing to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.spectrum) on a [`ScalarSpectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.ScalarSpectrum) |
 | ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber, the `Phenomenology` model form: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.spectrum) |
 | ``E_n`` | the **measured** spectrum: the energy in wavenumber-magnitude shell ``n`` — a set of Fourier modes one shell width ``\Delta\kappa = 2\pi/L`` thick — so ``k = \sum_n E_n`` (dimensions ``L^2T^{-2}``, a density times ``\Delta\kappa``) | [`energy_spectrum`](@ref GBGIsotropicTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
@@ -83,7 +83,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGIsotropicTurbulence.SimulationRun.flow_parameters) |
-| ``\ell`` | the length a large-scale roll-off is evaluated against (``\ell_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.large_scale_length) |
+| ``\ell`` | the length a large-scale roll-off is evaluated against (``L_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.large_scale_length) |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |

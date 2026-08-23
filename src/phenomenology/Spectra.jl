@@ -106,11 +106,11 @@ the same one. The default is the longitudinal integral scale ``L_{11}``, which
 ``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
 same coefficient ``L_{11}`` instead breaks that normalization.
 
-The two lengths are related by ``\\ell_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is
+The two lengths are related by ``L_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is
 set by the normalized dissipation constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is
 3.7 times smaller and the spectrum integrates to ``0.42k``; at Pope's high-Reynolds-number
-``\\ell_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to ``0.57k``
-(``\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}``).
+``L_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to ``0.57k``
+(``\\int E\\,\\mathrm d\\kappa \\propto \\ell^{2/3}``).
 """
 function large_scale_length end
 
@@ -241,7 +241,7 @@ The pure-exponential dissipation-range roll-off ``f_\\eta(\\kappa\\eta) = \\exp(
 — the ``n = 1`` case of the general ``\\exp(-\\beta(\\kappa\\eta)^n)`` family, and the form the
 triadic spectral closures (eddy-damped quasi-normal Markovian, direct-interaction approximation,
 Lagrangian renormalized approximation) consistently predict (Sagaut & Cambon 2018, the source used
-here; the closure result is originally Kaneda's).
+here).
 
 It is the *far*-dissipation form (``\\kappa\\eta \\gg 1``), where DNS resolving that range fit
 ``\\beta \\approx 6.7`` (Khurshid, Donzis & Sreenivasan 2018,
@@ -315,8 +315,7 @@ spectrum, the [`PopeLargeScale`](@ref) default) or ``\\sigma = 4`` (the Batchelo
 [`VonKarmanLarge`](@ref)).
 
 # Fields
-The plain constructor `ModelSpectrum(C_K, large_scale, dissipation)` takes the three fields
-directly, in the order shown:
+The (sole, positional) constructor above takes the three fields directly:
 - `C_K` — the Kolmogorov constant of the inertial-range core.
 - `large_scale` — the `LargeScaleFactor` giving ``f_L``.
 - `dissipation` — the `DissipationFactor` giving ``f_\\eta``.
@@ -425,7 +424,7 @@ density in wavenumber of the scalar variance ``\\langle\\varphi^2\\rangle``, eva
 abstract type ScalarSpectrum <: TurbulenceLaw end
 
 
-const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. Geogr. Geofiz.* **13**, 58 (no DOI) / " *
+const _OBUKHOVCORRSIN = Reference("Obukhov (1949), *Izv. Akad. Nauk SSSR, Ser. Geogr. Geofiz.* **13**, 58 (no DOI: a 1949 Soviet-journal article) / " *
                                   "Corrsin (1951), *J. Appl. Phys.* **22**, 469. [doi:10.1063/1.1699986](https://doi.org/10.1063/1.1699986)"; valid_Reλ = (50.0, Inf))
 
 """

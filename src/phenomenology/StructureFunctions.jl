@@ -35,8 +35,8 @@ abstract type StructureFunction <: TurbulenceLaw end
 
 
 const _K41 = Reference("Kolmogorov (1941), *Dokl. Akad. Nauk SSSR* **30**, 301–305 (the 2/3 law) " *
-                       "and **32**, 16–18 (the exact 4/5 law); no DOI, the 1941 Doklady notes " *
-                       "predate the system"; valid_Reλ = (100.0, Inf))
+                       "and **32**, 16–18 (the exact 4/5 law) (no DOI: the 1941 Doklady notes " *
+                       "predate the system)"; valid_Reλ = (100.0, Inf))
 
 """
     Kolmogorov1941(; C₂ = 2.0)
@@ -51,8 +51,8 @@ The Kolmogorov (1941) inertial-range structure-function laws for the longitudina
     free constant.
 
 Both hold in the inertial range ``\\eta \\ll r \\ll L``. The state `fp` (a [`FlowParameters`](@ref))
-supplies the dissipation rate ``\\varepsilon``; any other `order` throws an `ArgumentError` (K41 fixes only these two
-longitudinal moments universally). Its [`scaling_exponent`](@ref)`(law; order)` gives the self-similar
+supplies the dissipation rate ``\\varepsilon``; any other `order` throws an `ArgumentError` — the law carries constants for these two
+longitudinal moments only (``C_2`` empirical, the ``-\\tfrac{4}{5}`` exact). Its [`scaling_exponent`](@ref)`(law; order)` gives the self-similar
 K41 exponent ``\\zeta_p = p/3``.
 
 # Fields
@@ -102,7 +102,8 @@ scaling_exponent(::SheLeveque1994; order::Real) = order / 9 + 2 * (1 - (2 / 3)^(
 provenance(::SheLeveque1994) = _SHELEVEQUE
 
 
-const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82. [doi:10.1017/S0022112062000518](https://doi.org/10.1017/S0022112062000518)"; valid_Reλ = (200.0, Inf))
+const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82. [doi:10.1017/S0022112062000518](https://doi.org/10.1017/S0022112062000518); " *
+                       "proposed independently by Obukhov (1962), *J. Fluid Mech.* **13**, 77–81. [doi:10.1017/S0022112062000506](https://doi.org/10.1017/S0022112062000506)"; valid_Reλ = (200.0, Inf))
 
 """
     Kolmogorov1962(; μ = 0.25)

@@ -129,9 +129,9 @@ G = \\frac{k}{(L\\varepsilon)^{2/3}} \\approx 0.9,
 ```
 
 relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``, and the
-dissipation rate ``\\varepsilon`` — nearly Reynolds-number-independent. The value is this
-package's own reduction of the Johns Hopkins Turbulence Database (JHTDB) forced-isotropic
-dataset (``\\mathrm{Re}_\\lambda \\approx 433``), consistent with higher-Reynolds-number
+dissipation rate ``\\varepsilon`` — nearly Reynolds-number-independent. The author–year
+handle names the dataset's source — Li et al. (2008) is the JHTDB paper — while the value is this
+package's own reduction of that database's forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``), consistent with higher-Reynolds-number
 periodic-box DNS.
 
 The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)`

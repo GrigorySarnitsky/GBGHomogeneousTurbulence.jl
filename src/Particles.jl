@@ -201,7 +201,7 @@ It needs one set of predicted positions and the velocity interpolated there
     the floor therefore falls *faster* than the time error, and the two cross over: measured on a
     band-limited field, interpolation dominates at ``N = 16{-}32`` and the time error dominates from
     ``N \\approx 64`` on (at ``N = 128``, floor ``1\\times10^{-5}`` against time error
-    ``6\\times10^{-5}``). So at production resolutions `CatmullRom` is not what limits a Heun
+    ``6\\times10^{-5}`` — setup-specific numbers; only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is not what limits a Heun
     trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
     below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
     more than an order of magnitude. What governs this in a run is how well the grid resolves the
@@ -321,9 +321,9 @@ produce.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
-    shrink with ``\\Delta t``: for a perturbation ``\\epsilon`` and Lipschitz constant ``L``, Grönwall
-    bounds the trajectory error by ``\\epsilon(\\mathrm{e}^{LT} - 1)/L`` however the time integration
-    is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
+    shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
+    constant ``K`` over a span ``t``, Grönwall bounds the trajectory error by
+    ``\\delta(\\mathrm{e}^{Kt} - 1)/K`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
 
     The floor is set by the interpolant's **polynomial reproduction degree**, not its smoothness
     class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying
@@ -337,6 +337,10 @@ Reference: TurTLE's tracer scheme (Lalescu et al. 2022,
 turbulence*, *Comput. Phys. Commun.* **278**, 108406,
 [doi:10.1016/j.cpc.2022.108406](https://doi.org/10.1016/j.cpc.2022.108406)), whose default is the
 four-step method.
+
+# Fields
+The plain constructor `AdamsBashforth(order)` takes the one field directly:
+- `order` — the target method order; the scheme ramps to it as the sample history fills.
 """
 struct AdamsBashforth{K} <: AbstractParticleIntegrator end
 

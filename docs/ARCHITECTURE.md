@@ -125,7 +125,8 @@ On this foundation, a run is fixed by a **specification** — the continuous pro
 **realization** — the numerics. The specification has two parts:
 
 - The **System**: the flow scenario — forced homogeneous isotropic turbulence, freely decaying
-  turbulence, uniform-mean-gradient scalar mixing, and (a deferred frame, §7) homogeneous shear. A System
+  turbulence, and — each deferred, §7 — uniform-mean-gradient scalar mixing (its source term is not
+  yet built) and homogeneous shear (its frame is not). A System
   is a choice of forcing, initial condition, and the dimensionless parameters ``\mathrm{Re}`` and
   ``\mathrm{Sc}``.
 - The **Model**: the level of description — a *rung on the ladder of projections*. DNS resolves every
@@ -177,14 +178,14 @@ structure is legible at a glance, and no piece of plain machinery is dressed in 
 Two modules separate *what evolves* from the *frame it evolves on*.
 
 - **`SimulationDomain`** provides the discretized periodic box the run lives on — the reusable,
-  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube, realized by
-  the grid, the real–Fourier layout, the real-to-complex transform plans (one for the
-  velocity, one for the scalar, one for the rank-2 strain tensor the skewness diagnostic needs), the
-  spectral multipliers, ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel (in spectral
-  space, ``-\nabla^{2}`` acts as multiplication by it; never materialized — evaluated per mode from
-  the multipliers, with no array allocated — decision 38), and the dealias
-  kernel from the run's chosen dealiasing strategy (the sharp ``2/3`` rule by default; every
-  strategy's kernel is likewise a compressed per-mode symbol). The name marks what can vary: a `FixedDomain` has time-independent,
+  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube. It bundles the
+  grid, the real–Fourier layout, and the real-to-complex transform plans — one each for the
+  velocity, the scalar, and the rank-2 strain tensor the skewness diagnostic needs. On top of those
+  sit the per-mode symbols: the spectral multipliers;
+  ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel, never materialized (in spectral
+  space ``-\nabla^{2}`` is multiplication by it, evaluated per mode — decision 38); and the dealias
+  kernel of the run's chosen strategy (the sharp ``2/3`` rule by default), likewise a compressed
+  symbol. The name marks what can vary: a `FixedDomain` has time-independent,
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `element_type` fixes the real element type
   ([`Float32`](@extref Julia Core.Float32) or `Float64`)
@@ -399,8 +400,9 @@ Method (§3).
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFRK2`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
   three) but *dearer* in memory — three spectral registers per field against the low-storage
-  scheme's two, counting the same way on both sides: the scheme's own registers plus the dealiasing
-  seam's assembly register — and imaginary-axis unstable, leaning on viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  scheme's two — `IFLowStorageRK3` an accumulator plus the assembly register; `IFRK2` a predictor
+  plus two stage registers that double as its assemblies — and imaginary-axis unstable, leaning on
+  viscous damping. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -647,6 +649,9 @@ working point on a studied axis, not a universal law.
 These are **named so they are not precluded, and deliberately left un-abstracted**: no extension point or
 generalization is built for them until a second concrete case forces the abstraction. None is a gap.
 
+- **The uniform-mean-gradient scalar source** — the standard scalar-injection route
+  (``-u_i \partial_{x_i}\bar\varphi`` with an imposed mean gradient), the missing piece of the
+  mean-gradient mixing System named in §3. A forcing-strategy slice, not a frame change.
 - **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
   added to the RHS. *Built and validated, then archived* from the public surface — un-exported, and
   absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
@@ -836,6 +841,10 @@ one usually encodes a decision.
 7. **A library, not a framework.** The run layer is a convenience over exposed pieces (§2, §4.7), never a
    mandatory shell.
 8. **The scalar is denoted ``\varphi``**, never ``\theta`` — in code, mathematics, and prose.
+   And it is an **``\mathrm{Sc} = O(1)`` scalar**: no Batchelor-range machinery exists, the grid
+   mode resolves the velocity's cutoff rather than ``\eta_B = \eta/\sqrt{\mathrm{Sc}}``, and the
+   constructor warns — never refuses — when the scalar is clearly under-resolved. High-Schmidt
+   support is a deliberate absence, not an oversight.
 9. **Deferred futures are accounted for, not owed** (§7); no speculative extension points.
 
 ---
@@ -2078,6 +2087,12 @@ cites.
   <https://doi.org/10.1063/1.868274> *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
   modes to a fixed band energy. Kept as the reference implementation, with its first-order
   operator-splitting caveat documented rather than hidden.)*
+- Nosé, S. (1984). A unified formulation of the constant temperature molecular dynamics methods.
+  *J. Chem. Phys.* **81**(1), 511–519. <https://doi.org/10.1063/1.447334> *(the thermostat analogy
+  `VarianceController` cites: feedback inside the equations rather than per-step rescaling.)*
+- Hoover, W. G. (1985). Canonical dynamics: Equilibrium phase-space distributions. *Phys. Rev. A*
+  **31**(3), 1695–1697. <https://doi.org/10.1103/PhysRevA.31.1695> *(the companion half of the
+  Nosé–Hoover move.)*
 - Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). Constant-energetics physical-space forcing
   methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden
   flows. *Phys. Fluids* **28**, 035114. <https://doi.org/10.1063/1.4944629>

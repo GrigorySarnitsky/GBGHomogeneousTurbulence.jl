@@ -183,7 +183,8 @@ scalar_diffusivity(fp::FlowParameters) = fp.viscosity / fp.schmidt
 
 The provenance of a law: a `citation` string (a full author–year reference) and the
 Taylor-scale-Reynolds-number range `valid_Reλ = (lo, hi)` over which the fit is
-meant to hold. A comparison reads `valid_Reλ` so a law is not judged outside its stated domain.
+meant to hold. The default `(0.0, Inf)` is *unrestricted* — the range discriminates only where a
+law states one, and it is advisory: a comparison that opts in reads it, nothing enforces it.
 
 # Fields
 The plain constructor `Reference(citation, valid_Reλ)` takes the two fields directly:
@@ -261,8 +262,8 @@ function scaling end
     fit(::Type{L}, ...) -> L
 
 Fit a parametrization of law family `L` to measured data — the seam by which a run's own measurements
-become a parametrization sitting beside the literature. No methods are defined yet; it is the recorded
-extension point for fitting a run's own measurements to a parametrization.
+become a parametrization sitting beside the literature. No methods are defined yet; the binding is
+the recorded extension point.
 """
 function fit end
 

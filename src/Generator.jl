@@ -26,7 +26,7 @@ Its contents (each formula lives in the operation's own docstring):
   dealiased term plus its additive forcing source) at a stage state.
 - [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's
   viscous/diffusive integrating factor, with any linear forcing rate folded in.
-- [`finalize!`](@ref) — close a step: apply the post-step forcing projections to the advanced state.
+- [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, at the deposit.
 
 The assemblies recover displaced fields in physical representation with the four-argument,
 source-preserving form of
@@ -564,7 +564,8 @@ Since the multiplier is the exponential of a radial symbol plus the armed per-mo
 applies it through the backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
-The return is a named tuple of exactly the arguments that fused exponential takes —
+The return is a named tuple `(; coefficient, offset_scale, offset)` — exactly the arguments that
+fused exponential takes:
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
 ``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed
 rate field, or `nothing` when no linear forcing is active).

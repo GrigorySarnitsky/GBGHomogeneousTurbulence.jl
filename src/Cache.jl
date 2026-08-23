@@ -358,12 +358,12 @@ Coefficients written by hand must respect the real-field layout's conjugate symm
 checked**, and a violation makes spectral diagnostics silently disagree with the physical images;
 the package's own seeders satisfy it by construction.
 
-It also discards the Lagrangian **sample history** this cache carries. Those samples are the velocity
-measured along the trajectory *through the state being replaced*, so a multistep trajectory scheme
-integrating over them would blend the old field into the new one. The run's own field advance is not
-such a change and keeps its history.
-
 Returns `cache`.
+
+!!! warning "It also discards the Lagrangian sample history"
+    Those samples are the velocity measured along the trajectory *through the state being
+    replaced*, so a multistep trajectory scheme integrating over them would blend the old field
+    into the new one. The run's own field advance is not such a change and keeps its history.
 """
 fields_modified!(cache::ObservablesCache) =
   (advance_fields_epoch!(cache); cache.history_filled = 0; cache)
