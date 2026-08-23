@@ -545,6 +545,14 @@ function deposit!(cache::ObservablesCache, state::ResolvedFields, domain::FixedD
     throw(ArgumentError("this state carries a passive scalar but the cache has no scalar slot to " *
                         "receive it, so the scalar would be evolved and never observed. Build the " *
                         "cache with `scalar = true`."))
+  # …and the same mispairing on the buffers leg: `allocate_buffers` defaults to `scalar = false`,
+  # so the hand-assembled route reaches the scalar recovery with no scalar scratch and used to die
+  # as a MethodError inside a private helper, naming nothing the caller typed.
+  state.scalar_spectral === nothing || cache.scalar_physical === nothing || buffers.scalar !== nothing ||
+    throw(ArgumentError("this state and cache carry a passive scalar but the `IntegratorBuffers` " *
+                        "were built without one, so the scalar cannot be recovered for the " *
+                        "deposit. Build the buffers with `allocate_buffers(scheme, domain; " *
+                        "scalar = true)`."))
   u = take_velocity!(cache)
   to_physical!(u, state.velocity_spectral, domain.velocity_plans, _recovery_scratch(buffers))
   deposit_velocity!(cache)

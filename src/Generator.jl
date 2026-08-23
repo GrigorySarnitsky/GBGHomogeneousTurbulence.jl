@@ -86,33 +86,47 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   schmidt::Float64
   velocity_forcing::VF
   scalar_forcing::SF
+
+  # The guards live in the INNER constructor so that no construction path skips them — the docstring
+  # advertises the plain positional form alongside the keyword one, and both must honour the same
+  # contract (the auto-generated positional form once bypassed all three; a run built through it
+  # could carry ν ≤ 0, Sc ≤ 0, or one mutable forcing driving both fields, and each failed far from
+  # the call that caused it).
+  function FlowConditions(viscosity::Float64, schmidt::Float64, velocity_forcing::VF,
+                          scalar_forcing::SF) where {VF<:AbstractForcing, SF<:AbstractForcing}
+    # Both set a diffusivity, and a non-positive one is not a physical regime: ν is the inverse
+    # Reynolds number, and the scalar diffusivity is ν/Sc, so Sc = 0 divides by zero and NaNs the
+    # scalar on the first step. Nothing downstream notices — the run's blow-up guard reads the
+    # velocity, which stays perfectly finite while the scalar is entirely NaN — so the check belongs
+    # here, where the value arrives.
+    viscosity > 0 ||
+      throw(ArgumentError("`viscosity` must be positive, got $viscosity: it sets the Reynolds number " *
+                          "through Re = 1/ν, and a non-positive value has no dissipation scale"))
+    schmidt > 0 ||
+      throw(ArgumentError("`schmidt` must be positive, got $schmidt: the scalar diffusivity is ν/Sc, " *
+                          "so a non-positive Schmidt number makes it infinite or negative"))
+    # One instance driving both fields conflates their bookkeeping — but only for a strategy that HAS
+    # per-field state to conflate. An immutable forcing (`VarianceRescaling`, `Linear`, `ConstantPower`)
+    # carries only its band and its target, so sharing one is harmless; `===` would not even
+    # distinguish two separately-built copies of it, since Julia compares immutables by value. The
+    # hazard is exactly the mutable strategies, whose scratch and random stream are per-field. Caught
+    # here rather than left to a docstring warning, matching how the sibling misconfiguration (a
+    # forcing that fills a rate without declaring it) is handled.
+    ismutable(velocity_forcing) && velocity_forcing === scalar_forcing &&
+      throw(ArgumentError("the same $(nameof(typeof(velocity_forcing))) instance was given as both " *
+                          "`velocity_forcing` and `scalar_forcing`; that strategy carries per-field " *
+                          "state, so construct one instance per forced field"))
+    return new{VF, SF}(viscosity, schmidt, velocity_forcing, scalar_forcing)
+  end
 end
 
-function FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
-  # Both set a diffusivity, and a non-positive one is not a physical regime: ν is the inverse Reynolds
-  # number, and the scalar diffusivity is ν/Sc, so Sc = 0 divides by zero and NaNs the scalar on the
-  # first step. Nothing downstream notices — the run's blow-up guard reads the velocity, which stays
-  # perfectly finite while the scalar is entirely NaN — so the check belongs here, where the value
-  # arrives.
-  viscosity > 0 ||
-    throw(ArgumentError("`viscosity` must be positive, got $viscosity: it sets the Reynolds number " *
-                        "through Re = 1/ν, and a non-positive value has no dissipation scale"))
-  schmidt > 0 ||
-    throw(ArgumentError("`schmidt` must be positive, got $schmidt: the scalar diffusivity is ν/Sc, " *
-                        "so a non-positive Schmidt number makes it infinite or negative"))
-  # One instance driving both fields conflates their bookkeeping — but only for a strategy that HAS
-  # per-field state to conflate. An immutable forcing (`VarianceRescaling`, `Linear`, `ConstantPower`)
-  # carries only its band and its target, so sharing one is harmless; `===` would not even
-  # distinguish two separately-built copies of it, since Julia compares immutables by value. The
-  # hazard is exactly the mutable strategies, whose scratch and random stream are per-field. Caught
-  # here rather than left to a docstring warning, matching how the sibling misconfiguration (a
-  # forcing that fills a rate without declaring it) is handled.
-  ismutable(velocity_forcing) && velocity_forcing === scalar_forcing &&
-    throw(ArgumentError("the same $(nameof(typeof(velocity_forcing))) instance was given as both " *
-                        "`velocity_forcing` and `scalar_forcing`; that strategy carries per-field " *
-                        "state, so construct one instance per forced field"))
-  return FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
-end
+# The positional form with non-Float64 diffusivities promotes, then runs the same inner guards.
+FlowConditions(viscosity::Real, schmidt::Real, velocity_forcing::AbstractForcing,
+               scalar_forcing::AbstractForcing) =
+  FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
+
+FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
+  FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
 
 # Phase-shift dealiasing scratch + the two translation kernels (present only when `dealiasing isa

@@ -9,10 +9,26 @@ measured, not remembered.
 `r5-free-hot-path-01` and `r4-free-hot-path-01` — both now PASS. The two "first order" entries below
 are historical.
 
-**STILL LIVE (4):** `02-r5-aliasing-and-mutation-02` (FlowConditions positional constructor bypasses
-all three guards), `r5-gpu-and-hot-loop-01` (step! per-call host allocation, invariant 4),
-`r5-aliasing-and-mutation-01` (shared mutable StochasticOU couples two Simulations),
-`03-r5-free-hot-path-03` (deposit!'s scalar-pairing guard is one-sided).
+**STILL LIVE (1, attributed to PF):** `r5-gpu-and-hot-loop-01` — step!'s 1152 B/720 B per-call
+allocation is fully diagnosed (2026-08-23): exactly 8×144 B (RK3) / 5×144 B (RK2), one 144 B per
+PF call that evaluates the |κ|² radial symbol per mode — `exponential_convolve!` and the
+kernel-composed `helmholtz_projection!` — and the 144 B is three reshape wrappers built per call by
+PF's `_squared_wavenumber_broadcast` (Fields.jl:1532–1537). Our step code measures ZERO (the ℰ
+tuple, both branches, plain projection, transforms, recovery). Fix = PF raise (pre-reshape the axis
+vectors in `FieldSpectralMultipliers` at construction); recorded in the PF request memory. The
+witness stays here until PF ships — it cannot pass from this repo.
+
+**PARKED, not to be repaired (owner, 2026-08-23):** `r5-aliasing-and-mutation-01` — a mutable
+`StochasticOU` shared by two `Simulation`s couples their forcing state. The strategy is archived
+and the owner does not care about this defect; if a repair were ever to require architecture
+changes, the owner would rather DELETE StochasticOU than re-architect for it. Do not fix; do not
+count as open work.
+
+**CLOSED 2026-08-23:** `02-r5-aliasing-and-mutation-02` — FlowConditions guards moved into an
+inner constructor, every construction path validated; witness 7/7, filed as
+`test/regressions/r5-flowconditions-positional-guards.jl`. And `03-r5-free-hot-path-03` —
+deposit!'s scalar-pairing guard now covers the buffers leg with a named ArgumentError; witness
+4/4, filed as `test/regressions/r5-deposit-buffers-mispairing.jl`.
 
 **CLOSED 2026-08-23 (decision 60):** `01-r5-free-modules-01` — the κ=0 mode is pinned exactly in
 both RHS assemblies, between the nonlinear term and the source; witness 9/9, filed as
