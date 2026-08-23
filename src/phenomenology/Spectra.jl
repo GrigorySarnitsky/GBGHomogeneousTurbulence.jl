@@ -21,7 +21,9 @@ swappable — and [`ModelSpectrum`](@ref) owns the formula.
 - [`ScalarSpectrum`](@ref) — the passive-scalar spectra; [`ObukhovCorrsin1949`](@ref) is the
   inertial-convective range.
 
-Every preset is a type with a keyword constructor, invoked as `Name(; …)`. The velocity-spectrum
+Every preset is a type with a keyword constructor, invoked as `Name(; …)`; the roll-off **factor**
+pieces they compose (`PopeLargeScale`, `ExponentialDissipation`, …) are plain positional parameter
+records, per the constructor-first convention for small records. The velocity-spectrum
 presets `Pope2000` / `VonKarman1948` / `Pao1965` name the `ModelSpectrum` specialization
 carrying their large-scale and dissipation factors, so a preset is the composition rather than a
 wrapper around one; the scalar preset `ObukhovCorrsin1949`, like the structure-function and scaling

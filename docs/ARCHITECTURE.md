@@ -734,8 +734,9 @@ generalization is built for them until a second concrete case forces the abstrac
 
 ## 8. Lenses and prior art
 
-**One piece of prior art is excluded by name.** The previous generation of this work — kept privately,
-outside the package — is *not* among the lenses below and is not a source of design. It is retained
+**One piece of prior art is excluded outright: the previous generation of this work** (the private
+`OldCode` archive among the study-only clones). It is *not* among the lenses below and is not a
+source of design. It is retained
 only as a record to interrogate: what was done before, and what came of it. The direction of the GBG
 packages is to replace it entirely, because it was problematic, and this architecture is the
 replacement rather than a refinement of it. It follows that nothing here is justified by continuity
@@ -1705,7 +1706,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     load-bearing: the displaced velocity in spectral representation is read twice (velocity, then vorticity). The
     supersession also retires decision 28's `X_to_physical!` naming convention and narrows
     decision 30's "chart map homed in `State`" — the chart map is PF's operation; `State` keeps only
-    the state and its seeders. What remains a package verb is the one recovery that is *not* a chart:
+    the state and its seeders. What remains a package verb is the one recovery that is *not* a bare chart map (its slot is still a
+    chart — a physical-representation view — but its recovery computes an observable, the curl):
     **`vorticity_physical!`** — curl in scratch, then transform; no preservation copy, since the curl
     only reads its source — homed in `Observables` as the field-valued observable whose cached read
     is `Cache.vorticity_physical` — an f/`f!` **pair**, not decision 46's single dispatched generic, and

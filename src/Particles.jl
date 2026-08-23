@@ -332,8 +332,9 @@ produce.
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
     [doi:10.1016/j.jcp.2010.04.006](https://doi.org/10.1016/j.jcp.2010.04.006)).
 
-Reference: Adams–Bashforth applied to Lagrangian tracers as in TurTLE (Lalescu et al. 2022,
-*TurTLE: a fast and scalable code for turbulence*, *Comput. Phys. Commun.* **278**, 108406,
+Reference: TurTLE's tracer scheme (Lalescu et al. 2022,
+*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of
+turbulence*, *Comput. Phys. Commun.* **278**, 108406,
 [doi:10.1016/j.cpc.2022.108406](https://doi.org/10.1016/j.cpc.2022.108406)), whose default is the
 four-step method.
 """

@@ -146,6 +146,7 @@ end
 """
     allocate_buffers(scheme, domain; scalar = false) -> IntegratorBuffers
     allocate_buffers(scheme, tracers) -> ParticleIntegratorBuffers
+    allocate_buffers(scheme, tracers, cache) -> MultistepBuffers
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
@@ -158,12 +159,16 @@ backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `no
 [`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
 adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
-The second serves the trajectory schemes: it builds the
-[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) the
-`scheme` (an
+The second and third serve the trajectory schemes: each builds the registers the `scheme` (an
 [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
-needs, sized to the tracer set `tracers`. One generic covers both because it is one concept, and
-because both sides keep the same separation: the evolving state holds no scheme's scratch.
+needs, sized to the tracer set `tracers` — the two-argument form the
+[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) of a
+one-step scheme, and the three-argument form the
+[`MultistepBuffers`](@ref GBGIsotropicTurbulence.Particles.MultistepBuffers) of a multistep one,
+whose `cache` argument is the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)
+holding the sample history the scheme integrates over. One generic covers all three because it is
+one concept, and because every side keeps the same separation: the evolving state holds no scheme's
+scratch.
 """
 function allocate_buffers end
 

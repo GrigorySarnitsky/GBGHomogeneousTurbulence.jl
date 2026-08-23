@@ -43,7 +43,7 @@ Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,119
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
-Particles.jl::AdamsBashforth(; order = 4),100,1,464
+Particles.jl::AdamsBashforth(; order = 4),100,1,463
 Particles.jl::EndpointHeun(),53,1,240
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,43,0,169
@@ -78,7 +78,7 @@ Propagator.jl::IFLowStorageRK3(),73,0,276
 Propagator.jl::IFRK2(),54,1,186
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
-Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,54,0,164
+Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,86,0,208
 Propagator.jl::deposit!(cache， state， domain， buffers),111,0,323
 Propagator.jl::recommended_cfl(scheme， domain),87,1,429
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,319
@@ -119,7 +119,7 @@ Spectra.jl::ModelSpectrum(C_K， large_scale， dissipation),74,0,185
 Spectra.jl::ObukhovCorrsin1949(; C_OC = 0.67),113,0,146
 Spectra.jl::Pao1965(; C_K = 1.5),64,0,109
 Spectra.jl::PaoDissipation(α),30,0,51
-Spectra.jl::Phenomenology.Spectra,57,0,201
+Spectra.jl::Phenomenology.Spectra,78,0,222
 Spectra.jl::Pope2000(; C_K = 1.5， c_L = 6.78， p₀ = 2.0， c_η = 0.40， β = 5.2),46,0,113
 Spectra.jl::PopeDissipation(c_η， β),49,0,80
 Spectra.jl::PopeLargeScale(c_L， p₀),53,0,85

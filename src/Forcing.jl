@@ -473,7 +473,7 @@ end
 Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a banded linear
 forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
-whose rate ``A`` is set each step so the field's injection rate holds the `injection_rate`. A
+whose rate ``A`` is re-solved at every stage so the injection rate holds the `injection_rate`. A
 linear rate injects at ``2 A E_{\\mathrm{band}}``, with ``E_{\\mathrm{band}}`` the band's own
 observable, so the rate that holds it is
 
