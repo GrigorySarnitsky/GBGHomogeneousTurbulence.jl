@@ -9,6 +9,7 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); k
 using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type
 using GBGIsotropicTurbulence.Forcing: add_forcing_source!
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+using Logging
 
 
 # The two weighted reductions the controller's own kernel performs, written out here rather than
@@ -316,5 +317,24 @@ end
     # The guard's new boundary: zero in, negative and non-finite out.
     @test_throws ArgumentError VarianceController(domain; target = 1.5, gain = -1)
     @test_throws ArgumentError VarianceController(domain; target = 1.5, gain = Inf)
+  end
+
+
+  @testset "a band above the dealias cutoff warns: inert is legal but never silent" begin
+    # The mask holds super-cutoff modes empty and every band forcing is field-proportional, so a
+    # band up there multiplies zero forever — measured as exactly 0.0 injected over 100 steps. The
+    # construction warns (entirely above: "will do NOTHING"; partially: "retained part"), and the
+    # default band stays silent. N = 16 under TwoThirds puts the cutoff at shell ≈ 5.3.
+    d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                      dealiasing = TwoThirds(), array_type = Array)
+    warns(f) = begin
+      buf = IOBuffer()
+      Logging.with_logger(Logging.SimpleLogger(buf, Logging.Warn)) do; f(); end
+      String(take!(buf))
+    end
+    @test occursin("will do NOTHING", warns(() -> Linear(d16; rate = 0.1, lowest_shell = 6, highest_shell = 7)))
+    @test occursin("retained part", warns(() -> Linear(d16; rate = 0.1, lowest_shell = 5, highest_shell = 6)))
+    @test isempty(warns(() -> Linear(d16; rate = 0.1)))                          # the default band
+    @test isempty(warns(() -> VarianceController(d16; target = 1.5)))            # every strategy routes through _shell_band
   end
 end

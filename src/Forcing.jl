@@ -57,7 +57,10 @@ tensor-order-generic field operators:
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed — `target`, `rate`, `over` — has no canonical value and is required. A default
-here never hides a choice you needed to make.
+never hides a choice you needed to make.
+
+A band reaching above the dealias cutoff is inert there — the mask holds those modes empty, and a
+band forcing multiplies the field — so construction warns about it.
 
 The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
@@ -68,7 +71,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical
+using ..SimulationDomain: FixedDomain, max_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower,
@@ -275,6 +278,23 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
     throw(ArgumentError("`highest_shell` must be at least `lowest_shell`, got $highest < $lowest: " *
                         "the band would be empty and the forcing would silently do nothing"))
   k0 = 2π / domain.grid.domain_size[1]
+  # A band above the dealias cutoff is INERT, not harmful: the mask keeps those modes empty, and
+  # every band forcing is field-proportional, so it multiplies zero forever. Measured: a Linear on
+  # shells 6–7 at N = 16 (cutoff shell ≈ 5.3) injected exactly nothing over 100 steps. Legal — a
+  # marginal band is a legitimate choice — but it cannot be silent, or a run decays with its forcing
+  # apparently on. (An ADDITIVE forcing would genuinely inject there; re-adding `StochasticOU` must
+  # keep this warning in front of it.)
+  κ_max = max_wavenumber(domain)
+  if (lowest - 0.5) * k0 > κ_max
+    @warn "the forcing band (shells $(lowest)–$(highest)) lies entirely above the dealias cutoff " *
+          "(shell ≈ $(round(κ_max / k0, digits = 1))): those modes are held empty by the mask and " *
+          "a band forcing multiplies the field, so this forcing will do NOTHING. Lower the shells, " *
+          "or enlarge the grid."
+  elseif (highest + 0.5) * k0 > κ_max
+    @warn "the forcing band (shells $(lowest)–$(highest)) reaches above the dealias cutoff " *
+          "(shell ≈ $(round(κ_max / k0, digits = 1))): the shells above it are held empty by the " *
+          "mask and contribute nothing — the forcing acts only on the retained part of the band."
+  end
   return spectral_band(new_scalar_field_spectral(domain), domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
 end
 

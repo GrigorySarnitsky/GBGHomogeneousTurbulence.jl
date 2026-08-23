@@ -11,7 +11,7 @@ Cache.jl::vorticity_physical(cache),50,0,51
 Forcing.jl::AbstractForcing,86,1,303
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,382
 Forcing.jl::DeferredForcing,54,0,188
-Forcing.jl::Forcing,77,0,276
+Forcing.jl::Forcing,77,0,305
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,171
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
