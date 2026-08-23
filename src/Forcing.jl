@@ -563,9 +563,10 @@ and gain-limited relaxation toward a target is Berendsen weak coupling (Berendse
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
 - `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster (Bassenne report ``O(1-10)``);
   `0` is the bare marginal law above.
-- `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell``. When omitted it is taken as
-  ``2k_\\infty/3\\varepsilon_\\infty`` with ``\\varepsilon_\\infty`` the stationary estimate for
-  this box, the same estimate the grid-mode viscosity solve uses.
+- `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
+  (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``),
+  with ``\\varepsilon_\\infty`` the stationary estimate for this box — the same estimate the
+  grid-mode viscosity solve uses.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
 
 !!! note "The settling time, not the gain, is the physical parameter"

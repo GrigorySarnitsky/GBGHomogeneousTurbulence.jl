@@ -87,6 +87,8 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the lateral is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |
+| ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the run layer's unit of progress (warm-up budgets and stationarity windows accumulate ``\Delta t\,\varepsilon/k``) | [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) |
+| ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = \tfrac{2}{3}\tau``, a different quantity from ``\tau`` despite the shared name in the literature | [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) |
 | ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu``, measured from the flow state | [`taylor_reynolds`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_reynolds) |
 | ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_microscale) |
 
