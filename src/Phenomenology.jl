@@ -203,8 +203,9 @@ Reference(citation; valid_Reλ = (0.0, Inf)) = Reference(citation, (Float64(vali
     provenance(law) -> Reference
 
 The [`Reference`](@ref) of a `law` (a [`TurbulenceLaw`](@ref)) — its citation and stated
-Reynolds-number validity range. Every parametrization implements it; it is the single source of the
-law's attribution.
+Reynolds-number validity range. Every named parametrization carries one; it is the single source of
+the law's attribution. The one principled exception: an ad-hoc `ModelSpectrum` mix of roll-off
+factors is not a published model, and `provenance` throws for it rather than inventing a source.
 """
 function provenance end
 

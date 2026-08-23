@@ -16,14 +16,23 @@ corpus breaks everywhere is invisible to a hat that infers norms from the corpus
 `latex-typesetter` hat reads the authored **source** (`src/`, `docs/`) and the
 **`CLAUDE.md`** house rulebook — typesetting idiom lives in the source markup, not the rendered output,
 and the house style it enforces is defined there. The panel is **collect-only**: it never edits `src/`
-or `docs/`; you act only when the user says fix. It runs **sequentially**, so a token-out loses at most
-the current hat; the hat order is **priority** (most critical first).
+or `docs/`; you act only when the user says fix. Hats run **concurrently** (2026-08-23); the array
+order is still **priority** (it drives subset selection and the banked `NN-` numbering).
 
 ## What it catches — and what it does not
 
 Catches: cross-page contradictions, physics/dimensional/category errors, method disagreements, design and
 API smells in the *documented* interface, structure non-uniformity, citation gaps/overclaims, and
 self-containedness ("cold read") failures. These need judgment and cross-referencing.
+
+Routed to the **other instruments**, on the 2026-08-23 attack round's findings (each looked like a
+panel gap and is deliberately not a lane): the *docstring-versus-body* predicate — does the body do
+only and exactly what the text says — lives in `/check-docs` (its checks 1 and 5 verify claims
+against `src/`, both directions); *signature fidelity* — the displayed signature vs the defined
+method table — is mechanical and lives in `/check-docs`' deterministic block
+(`signature_fidelity.jl`); a *composed identity* spanning several docstrings (two documented
+formulas jointly implying a third claim) is executable, not readable, and belongs in the audit
+suite (`test/optimality_audit.jl` / `test/validation.jl`), which already pins numeric identities.
 
 Does **not** reliably catch: mechanical, pattern-matchable idioms — `\mathbf`, bare-index `\partial_i`,
 formula-in-backticks, an unbraced `\boldsymbol u`. A hat that *reads* the TeX may not *flag* these (a
@@ -131,6 +140,18 @@ spot while two free lanes found nine defects at a third the cost.
 the sequential loop was a rate-limit accommodation, and it cost 3h33m for the 23-hat run. Array order
 is still priority order — the subset selection and the banked `NN-` numbering follow it.
 
+**The 2026-08-23 attack round added three dormant lanes and one binding rule.** `attack-design.js`
+turned on the panel itself returned thirteen findings; the lane-shaped ones became
+`external-standard` (the domain's required-content checklist — the one lens whose norm is external
+to the corpus, so an absence can be a finding), `conjunction-coverage` (each caveat crossed against
+the option space that can reach it), and `reader-standpoint` (what a reader could set or read that
+yields a wrong number silently — a recorded decision explicitly does not immunize). All three enter
+dormant, admitted to `core` only by the standing evidence rule. The binding rule went to the two
+majority-as-norm hats (`structure-consistency`, `style-editor`): the corpus majority is a detector,
+never a verdict — a split is reported as a split, and which side wins belongs to the rulebook lanes
+and the owner. Each hat also now reports `candidates_considered`, the truncation signal the
+25-finding cap previously swallowed.
+
 **Hats 18–21 each came from a finding the owner produced that no hat produced** (the 2026-08-15
 read-through, § END-OF-ROUND TASK). Each got its own lane rather than a duty appended to a
 neighbouring persona — appending is exactly the failure mode measured above, a class lane reporting
@@ -214,7 +235,7 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    fi
    mkdir -p .claude/doc-review
    ```
-4. **Run the panel** — a background `Workflow` on the companion script, sequential, collect-only. Pass
+4. **Run the panel** — a background `Workflow` on the companion script, concurrent, collect-only. Pass
    **absolute** paths (each hat `Read`s them):
    ```
    Workflow({ scriptPath: ".claude/commands/check-consistency/panel.js",
@@ -234,10 +255,33 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    material, including one hat's **top-ranked** finding.
    Each hat banks `.claude/doc-review/NN-<key>.md` and returns a structured findings object; you are
    notified when the workflow completes.
+4b. **Seeded-defect calibration (run it every round — the panel's only recall measurement).**
+   After consolidating and BEFORE launching the panel, plant the labeled defects and keep the
+   ground truth out of every hat's reach:
+   ```bash
+   python3 .claude/commands/check-consistency/seed_defects.py \
+       "$SCRATCH/manuscript-full.md" "$SCRATCH/manuscript-siteonly.md" "$SCRATCH/seed-truth.json"
+   ```
+   The manuscripts are mutated in place (they are disposable extracts, never the corpus); the
+   catalog plants one defect per class a hat exists to catch. After the panel completes:
+   ```bash
+   python3 .claude/commands/check-consistency/recall.py "$SCRATCH/seed-truth.json" .claude/doc-review
+   ```
+   reports per-class and per-hat recall and lists every banked finding that matches a seed. The
+   consolidation MUST subtract the seeded hits before writing `00-SUMMARY.md` (a planted defect
+   must never drive a real fix), and the summary reports the recall table alongside the findings:
+   a class at 0/k seeded recall is **unmeasured coverage**, and that round's "clean" verdict for
+   the class is inadmissible — the denominator the panel never had (attack round C7/C13).
+
 5. **Consolidate the findings** into `.claude/doc-review/00-SUMMARY.md` **and an Artifact dashboard**:
-   read every `NN-*.md`, **dedup** (cluster cross-hat — a defect found by many hats is a strong signal),
-   **rank** by severity × corroboration, and record which batteries came back **clean** and which are
-   confirmed **false positives**.
+   read every `NN-*.md`, **dedup** (cluster cross-hat), **rank** by severity × corroboration, and
+   record which batteries came back **clean** and which are confirmed **false positives**.
+   **Corroboration carries a denominator** (attack round C12): count it as *k of the n hats whose
+   substrate could plausibly expose the class*, never k of the whole panel — a source-grounded defect
+   visible to two hats at 2/2 outranks a rendered-text quibble at 4/24, and the raw count silently
+   inverts that. **A capped hat is not a complete hat** (C11): every hat reports
+   `candidates_considered`; where it exceeds the 25-finding cap, the summary must say the tail was
+   truncated and the hat is a candidate for a narrowed re-run — silence reads as coverage.
 
    **The summary MUST NOT contain an unenumerated bucket.** A tier tail written as prose
    ("Tier 3 — ≈67 remaining, structure and style nits") is how a ranking silently becomes a *scoping

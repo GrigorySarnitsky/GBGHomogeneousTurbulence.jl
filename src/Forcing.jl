@@ -83,11 +83,17 @@ export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceC
 #
 # Positivity is the whole test, and it needs no second reduction. An earlier attempt normalized the
 # band observable by the WHOLE-FIELD observable, which was scale-free but bought it with an extra
-# `inner(field, field)` every step — a full vector pass and a device-to-host readback, computed twice
-# over on the `:total` branch where the rescale needs the same number again, and unaccounted for in
-# both frozen audit ledgers. Multiplying by s² cannot change a sign, so the sign alone already has
-# the invariance; the reduction was paying for nothing.
-_band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_value))
+# `inner(field, field)` every step. The bare-positivity form that then stood here was itself wrong
+# the other way (caught by the 2026-08-23 dismissal audit): a band emptied by a mask or a rescale
+# retains ROUNDOFF-level content, which is positive, so the amplitude ~ ε/2k_f took the unbounded
+# kick the docstrings promise it never takes — A ≈ 1e58 from a 1e-60 band, Inf in one stage. The
+# floor is back, but RELATIVE now: measured against the whole field's observable, it is invariant
+# under φ → sφ (both scale by s²), which is the invariance the positivity form was keeping — and
+# since the multi-weight fused reduction (PF decision 72), the whole-field value shares the band's
+# traversal, so the scale costs no extra pass and no extra readback. The 10·eps echoes TurTLE's
+# guard on the same division.
+_band_is_empty(band_value, whole_value) =
+  !(isfinite(band_value) && band_value > 10 * eps(one(band_value)) * whole_value)
 
 
 """
@@ -400,18 +406,17 @@ end
 
 function project_forcing!(forcing::VarianceRescaling, field, domain::FixedDomain)
   factor = _target_factor(field)                       # ½ for the velocity (KE), 1 for the scalar (variance)
-  # aim the band at: the target itself (:band), or what makes the *whole field* hit the target (:total)
-  # — the :total pair rides one fused traversal (one readback), the :band form needs only the band.
-  if forcing.over === :total
-    band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
-    band_value = factor * band_raw                     # the band observable (fused; no band-pass copy)
-    _band_is_empty(band_value) && return field         # nothing in the band yet
+  # Both modes ride ONE fused traversal (one readback): the whole-field value serves the relative
+  # empty-band floor in either mode, and the :total deficit on top.
+  band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
+  band_value = factor * band_raw                       # the band observable (fused; no band-pass copy)
+  _band_is_empty(band_raw, whole_raw) && return field  # roundoff-level band: leave it alone
+  # aim the band at: the target itself (:band), or what makes the *whole field* hit the target
+  target_band = if forcing.over === :total
     total_value = factor * whole_raw                   # the observable over the whole field
-    target_band = max(zero(band_value), forcing.target - total_value + band_value)
+    max(zero(band_value), forcing.target - total_value + band_value)
   else
-    band_value = factor * weighted_inner(field, forcing.band)
-    _band_is_empty(band_value) && return field
-    target_band = forcing.target
+    forcing.target
   end
   scale = sqrt(target_band / band_value)
   convolve!(field, field, forcing.band, scale - 1, 1)  # rescale in-band modes (α/β accumulate)
@@ -499,9 +504,11 @@ rather than the integrating factor, where freezing it would cost the scheme its 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
     variance for the scalar — which is reachable: a scalar seeded with nothing in the forced shells,
-    or the step after a `VarianceRescaling(over = :total)` zeroed the band. Below a small floor on
-    ``E_{\\mathrm{band}}`` the amplitude is set to zero, so an empty band stays empty rather than
-    taking an unbounded kick; seed content in the band if a run needs the forcing to take hold.
+    or the step after a `VarianceRescaling(over = :total)` zeroed the band. Below a
+    machine-roundoff floor on the band's observable — measured relative to the whole field's, so
+    the test is invariant under a uniform rescaling of the field — the amplitude is set to zero,
+    and an empty band stays empty rather than taking an unbounded kick; seed content in the band
+    if a run needs the forcing to take hold.
 
 # Fields
 - `band` — the band-pass kernel, lazy: the per-stage source both weights the band observable with it
@@ -649,7 +656,7 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * dirichlet
   restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time
-  amplitude = _band_is_empty(band_variance) ? 0.0 :
+  amplitude = _band_is_empty(band, whole) ? 0.0 :
               (dissipation - restoring) / (2 * band_variance)
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))
   return N̂
@@ -673,18 +680,22 @@ uses_steady_linear_rate(::ConstantPower) = false
 
 # The amplitude A that injects `injection_rate` into the band, evaluated AT THE FIELD IT IS GIVEN.
 # Shared by `ConstantPower` and `VarianceController`, which differ only in what A is asked to hold.
-function _injection_amplitude(injection_rate, band_observable)
+function _injection_amplitude(injection_rate, band_observable, whole_observable)
   # TurTLE guards the same division with `if (energy_in_shell < 10*eps) energy_in_shell = 1`, a
   # machine-epsilon-relative floor substituting a benign denominator rather than skipping the step.
-  return _band_is_empty(band_observable) ? 0.0 : injection_rate / (2 * band_observable)
+  return _band_is_empty(band_observable, whole_observable) ? 0.0 :
+         injection_rate / (2 * band_observable)
 end
 
 
 function add_forcing_source!(forcing::ConstantPower, N̂, field, domain::FixedDomain,
                              diffusivity::Real)
   T = field_scalar_type(N̂)
-  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)   # at the STAGE state
-  amplitude = _injection_amplitude(forcing.injection_rate, band_observable)
+  # One fused traversal answers the band observable AND the whole-field scale the relative
+  # empty-band floor divides against — same crossing count as the bare band read.
+  band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
+  band_observable = _target_factor(field) * band_raw                              # at the STAGE state
+  amplitude = _injection_amplitude(forcing.injection_rate, band_observable, _target_factor(field) * whole_raw)
   # N̂ ← N̂ + A·𝟙_band·field, the band-limited linear forcing as an explicit source. `convolve!`'s
   # α/β form accumulates in place, so this costs one fused pass and no scratch.
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))

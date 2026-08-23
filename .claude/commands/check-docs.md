@@ -181,6 +181,7 @@ julia --startup-file=no .claude/commands/check-docs/argcov.jl
 python3 .claude/commands/check-docs/abutting_spans.py    # (a) `code` next to ``math``
 julia --project --startup-file=no .claude/commands/check-docs/xlink.jl   # (b) unlinked cross-module names
 python3 .claude/commands/check-docs/doi_crosscheck.py    # (c) docstring DOIs vs §References
+julia --project --startup-file=no .claude/commands/check-docs/signature_fidelity.jl  # (d) displayed vs defined signatures
 ```
 
 **(a) A code span abutting a math span.** The house rule is that a binding is ONE LaTeX span
@@ -196,6 +197,15 @@ fails. Measured at 56 sites on first run. `APPLY=1` rewrites; the default is a d
 scope: it flags a name whose DEFINING module differs from the docstring's, at its FIRST mention,
 never linked anywhere in that docstring — not every backticked identifier, since the policy caps a
 target at one link per docstring.
+
+**(d) Signature fidelity — the displayed signature vs the defined method table** (added from the
+2026-08-23 panel attack round, C4/C8: every prior check walked one direction — signature args
+mentioned in the body — so a stale keyword in a displayed signature, or a method keyword no
+signature shows, had no check). It parses each docstring's signature lines, reflects on the actual
+methods, and reports the symmetric difference per exported binding. TRIAGE: a `kwargs...`-elided
+display suppresses the hidden-keyword direction (the `# Arguments` bullets carry those, audited by
+the argument-coverage sweep); a dispatch-tag method with an unnamed slot suppresses the positional
+direction; the spectral-pair forms (`f(u)` / `f(û)`) are accent-normalized rather than flagged.
 
 **(c) The DOI cross-check, format-aware.** `ARCHITECTURE.md` uses autolinks `<…>`, which cannot
 contain `>`; a docstring uses `[text](…)`, which cannot contain unescaped parens. An AMS DOI contains

@@ -88,6 +88,7 @@ const BAND       = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :band)
 const TOTAL      = measure(VarianceRescaling(DOMAIN; target = 1.0, over = :total), :apply)
 const POWER      = measure(ConstantPower(DOMAIN; injection_rate = 1.0),            :source)
 const CONTROLLER = measure(VarianceController(DOMAIN; target = 1.0),               :source)
+const LINEAR     = measure(F.Linear(DOMAIN; rate = 0.5),                           :rate)
 
 # every reduction below returns a Julia scalar ⇒ one blocking device→host readback on a GPU
 readbacks(m) = m.field.inner + m.field.weighted_inner
@@ -131,5 +132,17 @@ const EVALS_RK3 = 3
     @test model_vector_passes(:band) == rescale_passes(BAND)
     @test model_vector_passes(:power)      == EVALS_RK3 * source_passes(POWER)
     @test model_vector_passes(:controller) == EVALS_RK3 * source_passes(CONTROLLER)
+  end
+  # D1 residue (audit-changes round 2): the tag-modelled guard in compute_audit is satisfiable by
+  # any wrong number — it proves a tag is PRICED, not that its price is right. The measurement above
+  # is what proves the price; `:linear` was the one hook tag still modelled-but-unmeasured. Its hook
+  # arms a rate array and reduces NOTHING — zero crossings, zero field passes — and both models must
+  # say so (the armed exponential's per-application read is priced inside the step, not the hook,
+  # and is cross-checked by the op-list tests in compute_audit).
+  @testset "the :linear tag is measured, not merely modelled" begin
+    @test readbacks(LINEAR) == 0
+    @test LINEAR.field.convolve == 0 && LINEAR.out.convolve == 0
+    @test model_syncs(:linear) == 0
+    @test model_vector_passes(:linear) == 0
   end
 end

@@ -301,8 +301,10 @@ E(\\kappa) = C_K \\varepsilon^{2/3} \\kappa^{-5/3} f_L(\\kappa \\ell) f_\\eta(\\
 
 an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-off `large_scale` (a
 [`LargeScaleFactor`](@ref), giving ``f_L``) and a dissipation-range roll-off `dissipation` (a
-[`DissipationFactor`](@ref), giving ``f_\\eta``); `ref` is its [`Reference`](@ref). Build one directly to
-mix roll-off forms, or use a preset such as [`Pope2000`](@ref). Evaluated by
+[`DissipationFactor`](@ref), giving ``f_\\eta``). Build one directly to
+mix roll-off forms, or use a preset such as [`Pope2000`](@ref) — a preset's pairing carries its
+published [`provenance`](@ref); an ad-hoc mix evaluates like any other, but it is not a published
+model, so `provenance` throws for it rather than inventing a source. Evaluated by
 [`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the roll-off's own length ``L``
 (see [`large_scale_length`](@ref) — ``L_{11}`` for most forms, ``k^{3/2}/\\varepsilon`` for Pope's) from
 `fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).

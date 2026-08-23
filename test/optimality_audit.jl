@@ -95,7 +95,8 @@ const HOST_SIDE_FORCING_SCALARS = Holder(
 const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
   "UNFUSED QUADRATIC REDUCTIONS", :PF_RAISE,
   "WHAT REMAINS after the multi-weight fused reduction shipped (PF decision 72, requested " *
-  "2026-08-23, wired the same day): the scalar variance the stationarity gate samples is a " *
+  "2026-08-23, wired the same day): the scalar variance the stationarity gate samples, and the " *
+  "advance! NaN-guard's per-iteration scalar variance, are each a " *
   "traversal of a DIFFERENT operand — φ̂ where the turnover pair sweeps û — and the delivered " *
   "reduction fuses n weights over ONE field, so the φ² crossing cannot join the pair's barrier. " *
   "Closing it needs a cross-FIELD fused reduction (one barrier answering weighted sums over " *
@@ -168,13 +169,20 @@ end
 # left-endpoint rectangle rule — measured collapsing IFLowStorageRK3 from 2.995 to 1.018. A
 # steady-rate forcing (`Linear`) is unaffected: it is still armed once and costs no readback here.
 function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,
-                  turnover_budget::Bool = false, monitor::Symbol = :none, stages::Int = 1)
+                  turnover_budget::Bool = false, monitor::Symbol = :none, stages::Int = 1,
+                  scalar_field::Bool = scalar_forcing !== :none || monitor === :skew_scalar)
   syncs = Sync[]
   # The closing deposit reduces the maximum speed on EVERY iteration (the uniform schedule): with an
   # adaptive timestep the crossing is the irreducible Δt choice; with a hand-fixed Δt its floor is
   # zero and the design holder claims it.
   push!(syncs, Sync("closing max-speed deposit", adaptive_dt ? 1 : 0,
                     adaptive_dt ? nothing : UNIFORM_DEPOSIT_SCHEDULE))
+  # The blow-up guards. The velocity's rides the max-speed value already deposited (no crossing of
+  # its own), but a scalar-carrying run pays one more: advance!'s NaN-guard reduces the scalar's
+  # variance every iteration, and φ̂ is a DIFFERENT operand from everything else this table
+  # crosses for — the fused (k, ε) pair sweeps û — so only a cross-field fused reduction could
+  # absorb it. Missed by the 2026-08-23 re-freeze; caught by the dismissal audit the same day.
+  scalar_field && push!(syncs, Sync("advance! scalar NaN-guard", 0, UNFUSED_QUADRATIC_REDUCTIONS))
   if turnover_budget || monitor !== :none
     # The clock's pair (k, ε) is ONE fused crossing — `kinetic_energy_and_dissipation` reads the
     # field once and blocks once (PF decision 72) — and that barrier is the quadratic family's floor.
@@ -241,7 +249,7 @@ const SYNC_LEDGER = (
   (name = "adaptive dt, ConstantPower, 3-stage",
    cfg = (; adaptive_dt = true, velocity_forcing = :power, stages = 3),          achieved = 4, floor = 1),
   (name = "adaptive dt, stochastic velocity + scalar",
-   cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 3, floor = 1),
+   cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 4, floor = 1),
   (name = "turnover-budgeted, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total,
             turnover_budget = true),                                             achieved = 3, floor = 2),
@@ -254,7 +262,7 @@ const SYNC_LEDGER = (
    achieved = 4, floor = 3),
   (name = "warm-up sample, scalar gate, unforced",
    cfg = (; adaptive_dt = true, velocity_forcing = :none, monitor = :skew_scalar),
-   achieved = 4, floor = 3),
+   achieved = 5, floor = 3),
 )
 
 

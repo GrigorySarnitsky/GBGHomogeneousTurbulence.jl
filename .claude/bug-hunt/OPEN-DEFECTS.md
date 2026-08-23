@@ -9,14 +9,11 @@ measured, not remembered.
 `r5-free-hot-path-01` and `r4-free-hot-path-01` — both now PASS. The two "first order" entries below
 are historical.
 
-**STILL LIVE (1, attributed to PF):** `r5-gpu-and-hot-loop-01` — step!'s 1152 B/720 B per-call
-allocation is fully diagnosed (2026-08-23): exactly 8×144 B (RK3) / 5×144 B (RK2), one 144 B per
-PF call that evaluates the |κ|² radial symbol per mode — `exponential_convolve!` and the
-kernel-composed `helmholtz_projection!` — and the 144 B is three reshape wrappers built per call by
-PF's `_squared_wavenumber_broadcast` (Fields.jl:1532–1537). Our step code measures ZERO (the ℰ
-tuple, both branches, plain projection, transforms, recovery). Fix = PF raise (pre-reshape the axis
-vectors in `FieldSpectralMultipliers` at construction); recorded in the PF request memory. The
-witness stays here until PF ships — it cannot pass from this repo.
+**CLOSED 2026-08-23, from the backend (decision 63):** `r5-gpu-and-hot-loop-01` — PF shipped the
+requested fix the same day (pre-reshaped axis views held on `FieldSpectralMultipliers`), and the
+witness flipped exactly as the request's acceptance predicted: 6/6, `bytes == 0` for both schemes
+at N = 8/16/32, with no IT code change. Promoted into `test/regressions/` — step! is now
+allocation-free in the strict `== 0` sense, not merely under the audit's ceiling.
 
 **PARKED, not to be repaired (owner, 2026-08-23):** `r5-aliasing-and-mutation-01` — a mutable
 `StochasticOU` shared by two `Simulation`s couples their forcing state. The strategy is archived
