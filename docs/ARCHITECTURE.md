@@ -1962,6 +1962,20 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the point of use, and a witness compares the applied amplitude against both candidate formulas,
     asserting it matches one and not the other — a steady state cannot satisfy it by luck.
 
+59. **(2026-08, user-directed) `gain = 0` is admitted: the bare marginal law is a valid forcing,
+    and its physics is now stated correctly.** The constructor had refused it while the docstring
+    described exactly that limit — and described it wrongly: "the variance random-walks" is false.
+    Expanded and then measured: with ``A = \varepsilon/2k_f`` the injection equals the instantaneous
+    dissipation identically, so ``\mathrm dk/\mathrm dt = 0`` and ``k`` is *conserved at its initial
+    value* (`target` never enters the rate). The subtlety is stability, not conservation: the exact
+    reinjection cancels the cascade's own restoring response — the physical feedback `ConstantPower`'s
+    *fixed* injection retains — so every level is a **neutral** equilibrium, and discrete integration
+    bias accumulates uncorrected (measured: ``k`` drifting monotonically ~1% per 1000 steps at
+    ``24^3``, against a G = 1 controller holding 1.498 flat). The guard is now finite-and-non-negative;
+    a negative gain stays refused (anti-restoring). The witness is the discriminating experiment, not
+    a construction test: seeded at ``k = 0.5`` against ``target = 1.5``, the marginal law must stay at
+    0.5 — conservation *and* the absence of restoration, which no drift could fake.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

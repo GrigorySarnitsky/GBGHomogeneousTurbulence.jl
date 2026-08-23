@@ -510,25 +510,29 @@ A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\e
 ```
 
 so that ``\\mathrm{d}k/\\mathrm{d}t = -G(k - k_\\infty)/t_\\ell`` exactly: the variance relaxes
-exponentially to a **stable attractor** with settling time ``t_\\ell/G``. Without the restoring term
-the marginal law makes every ``k`` an equilibrium and the variance random-walks with nothing to
-return it — which is what the rate-clamping forcings do.
+exponentially to a **stable attractor** with settling time ``t_\\ell/G``.
 
-The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held, and
-``k_f`` the forced band's, dividing out because the forcing injects only there. Restoring toward
-``k_f`` would hold the *band* and let ``k`` settle wherever the cascade puts it.
+The limit `gain = 0` is the bare **marginal law**, and it is allowed: exact reinjection of the
+instantaneous ``\\varepsilon`` makes ``\\mathrm{d}k/\\mathrm{d}t = 0``, so ``k`` is *conserved at
+its initial value* and `target` never enters the rate. Every level is then a **neutral** equilibrium
+— the reinjection cancels the cascade's own restoring response, which [`ConstantPower`](@ref)'s
+fixed injection retains — so discrete integration bias accumulates uncorrected (about 1% of ``k``
+per 1000 steps, measured at ``24^3``), and nothing ever restores it.
 
-The mechanism is the one molecular dynamics settled on for the same problem. Holding a quantity fixed
-by rescaling the field every step is naive velocity rescaling; extending the dynamics with a feedback
-term, so the constraint rides inside the equations rather than being imposed after them, is the
-Nosé–Hoover move. A gain-limited relaxation toward a target is Berendsen weak coupling (Berendsen et
-al. 1984, [doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deterministic-rescaling
-limit is [`VarianceRescaling`](@ref).
+The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held;
+``k_f`` the forced band's, dividing out because the forcing injects only there.
+
+The mechanism is the one molecular dynamics settled on for the same problem: holding a quantity by
+per-step rescaling is the naive thermostat, feedback inside the equations is the Nosé–Hoover move,
+and gain-limited relaxation toward a target is Berendsen weak coupling (Berendsen et al. 1984,
+[doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deterministic-rescaling limit is
+[`VarianceRescaling`](@ref).
 
 # Arguments
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
-- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster; Bassenne report ``O(1-10)``.
+- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster (Bassenne report ``O(1-10)``);
+  `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell``. When omitted it is taken as
   ``2k_\\infty/3\\varepsilon_\\infty`` with ``\\varepsilon_\\infty`` the stationary estimate for
   this box, the same estimate the grid-mode viscosity solve uses.
@@ -559,9 +563,10 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
   (isfinite(target) && target > 0) ||
     throw(ArgumentError("`target` must be finite and positive, got $target: it is the variance the " *
                         "controller holds, and the rate divides by the band's own variance"))
-  (isfinite(gain) && gain > 0) ||
-    throw(ArgumentError("`gain` must be finite and positive, got $gain: a non-positive gain makes " *
-                        "the restoring term push the variance AWAY from the target"))
+  (isfinite(gain) && gain >= 0) ||
+    throw(ArgumentError("`gain` must be finite and non-negative, got $gain: a negative gain makes " *
+                        "the restoring term push the variance AWAY from the target. `gain = 0` is " *
+                        "the bare marginal law — no restoring at all — and is allowed."))
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
   # the same estimate the grid-mode viscosity solve uses, so the two agree on what "stationary" means.

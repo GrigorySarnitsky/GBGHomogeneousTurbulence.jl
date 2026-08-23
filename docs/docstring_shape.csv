@@ -15,7 +15,7 @@ Forcing.jl::Forcing,77,0,276
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,171
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
-Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,71,1,446
+Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,81,1,468
 Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,674
 Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,212
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46

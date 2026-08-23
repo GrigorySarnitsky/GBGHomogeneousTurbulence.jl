@@ -297,4 +297,24 @@ end
       @test typeof(VarianceController(d; target = T(1.5), gain = 2, turnover_time = 3)).parameters[2] === T
     end
   end
+
+
+  @testset "gain = 0 is the marginal law: k conserved, and NEVER restored" begin
+    # The discriminating property, not just "it constructs": with the restoring term gone the rate
+    # reinjects exactly the instantaneous dissipation, so k is conserved at its INITIAL value and
+    # `target` never enters. A controller restores toward target; the marginal law must not. Seeding
+    # k = 0.5 against target = 1.5 separates the two models by 3x — a drift could not fake it.
+    marginal = VarianceController(domain; target = 1.5, gain = 0)
+    sim = Simulation(domain; viscosity = 0.05, velocity_forcing = marginal,
+                     kinetic_energy = 0.5, rng = MersenneTwister(3))
+    k0 = kinetic_energy(sim.state.velocity_spectral)
+    for _ in 1:150; advance!(sim); end
+    k = kinetic_energy(sim.state.velocity_spectral)
+    @test isapprox(k, k0; rtol = 0.05)          # conserved (up to the uncorrected discrete bias)
+    @test abs(k - 1.5) > 0.8                    # and nowhere near target: nothing restores
+
+    # The guard's new boundary: zero in, negative and non-finite out.
+    @test_throws ArgumentError VarianceController(domain; target = 1.5, gain = -1)
+    @test_throws ArgumentError VarianceController(domain; target = 1.5, gain = Inf)
+  end
 end
