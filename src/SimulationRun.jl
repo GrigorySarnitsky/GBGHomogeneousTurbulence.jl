@@ -153,7 +153,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
-  and off unless set. It is a *third* bound, not the only one: the adaptive step is the smallest of
+  and off unless set. The adaptive step is the smallest of three bounds:
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
   time ``1/(D\\kappa_{\\min}^{2})``, built from the run's own diffusivity and box, and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
@@ -529,8 +529,8 @@ Advance `sim` by one timestep in place and return it. Pass `dt` to force a fixed
 velocity, the longest mode's diffusive-decay time (the box-and-diffusivity cap), and `max_dt`.
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
-is readable when it returns. Advects the tracers, if any, by Heun-in-time on the start- and
-end-of-step velocities, and updates the clock.
+is readable when it returns. Advects the tracers, if any, under the run's chosen trajectory
+scheme, and updates the clock.
 
 Returns `sim`.
 """
@@ -767,12 +767,12 @@ seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary s
 ``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
 decaying run a fixed-length loop instead, which is a three-line callback (see `run!`).
 
-At each iteration it measures the dissipation ``\\varepsilon`` — the small scales
-settle last, so a flat ``\\varepsilon`` is the strict indicator, where a constant-energy forcing
-clamps ``k`` flat and a fixed-injection forcing makes it ring, which is why ``k`` is kept out of the
-**gate** — and the kinetic energy ``k``, which normalizes the eddy-turnover clock
-``\\Delta t \\varepsilon/k`` it accumulates, and tests flatness over a trailing window; it stops the run when
-every gate holds, or gives up with a warning at `max_turnovers`.
+At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic energy ``k``, accumulates
+the eddy-turnover clock ``\\Delta t \\varepsilon/k``, and tests ``\\varepsilon`` for flatness over a
+trailing window; it stops the run when every gate holds, or gives up with a warning at
+`max_turnovers`. The gate reads ``\\varepsilon`` alone: the small scales settle last, so a flat
+``\\varepsilon`` is the strict indicator — where ``k`` is whatever the forcing makes it, clamped
+flat by a constant-energy strategy or ringing under fixed injection.
 
 # Arguments
 All keyword:

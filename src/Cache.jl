@@ -72,7 +72,7 @@ representation when the run carries one, the fastest flow speed on the grid (the
 reads), and — when the run advects tracers — the particle velocities
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
 
-The contents are automatic — derived from the configuration, never declared: the cache holds
+The contents are automatic, derived from the configuration: the cache holds
 exactly what the iteration computes, materializes, and leaves alive at its end, and nothing more.
 The cache allocates and owns every slot but one: the particle velocities are the tracer set's own
 storage, which the cache borrows and records epochs for rather than filling itself.
@@ -123,8 +123,8 @@ depends on.
 - `sample_fields_epoch`, `sample_particles_epoch` — the particle velocities' two epochs, against
   **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
-  [`fields_modified!`](@ref), so it counts *changes to the state* rather than advances of the run
-  and runs ahead of [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A
+  [`fields_modified!`](@ref), so it runs ahead of
+  [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A
   field-derived slot is readable exactly when its epoch equals this.
 - `particles_epoch` — the tracer positions' counter. The run layer advances it as part of the tracer
   advance; a hand-run loop that moves tracers itself announces the change with
@@ -349,9 +349,9 @@ were changed outside the iteration (a re-seeded velocity, any direct write to th
 Advances the fields epoch of `cache` (an [`ObservablesCache`](@ref)), so every cached observable is stale and reads throw until
 the next deposit; that interval belongs to whoever made the change.
 
-The sanctioned mutators call this for you: [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
-advances the epoch itself when it completes, and
-the iteration's closing deposit then restores the cache. After a hand-made mutation, re-deposit with the
+This verb is only for out-of-band changes — [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
+advances the epoch itself, and the closing deposit restores the cache. After a hand-made mutation,
+re-deposit with the
 run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 

@@ -96,8 +96,8 @@ per step and is the same story, its value taken before the rescale it sizes.
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.
 The [`max_speed`](@ref) reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once and keeps
 only the largest speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` — the advective-CFL
-bound — so the *maximum* is materialized — one number — while no
-per-point field is ever whole anywhere and none can be cached.
+bound — so the *maximum* is materialized — one number — while the per-point
+speed field is never whole anywhere; there is nothing to cache.
 
 **Surviving — the schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
@@ -145,9 +145,10 @@ instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy
 reaches is observed exactly once: the first because a deposit seeding the initial state is made when
 the cache is built, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
-closing deposit has no following iteration to fold into — it serves the final observation instead — so, relative
-to a cacheless solver serving only its own dynamics, the run pays **one** extra closing deposit — the
-state-only share of one first-stage evaluation, one reduction, and one interpolation — once per run.
+closing deposit has no following iteration to fold into; it serves the final observation instead.
+Relative to a cacheless solver serving only its own dynamics, the run therefore pays **one** extra
+closing deposit per run: the state-only share of one first-stage evaluation, one reduction, and one
+interpolation.
 That is the cache's *added* cost. The reduction inside every other closing deposit recurs per
 iteration, and is work the following first stage would have done anyway (§1.4).
 
@@ -387,7 +388,7 @@ either form precisely because they agree in the mean.
 ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` give the velocity at each particle's own position and
 moment, and are what a Lagrangian statistic accumulates. The second, at a predicted position differing
 from the endpoint by ``\mathcal{O}(\Delta t^{2})``, exists only to give the position update its
-second-order accuracy; it belongs to no instant along the trajectory and is not exposed.
+second-order accuracy; it belongs to no instant along the trajectory.
 
 ---
 
@@ -413,7 +414,7 @@ particle positions.
 
 ```julia
 domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
-cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration — nothing is declared
+cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration
 
 # With tracers, the particle-velocities slot is the tracer set's own storage, passed in.
 # The interpolation scheme comes from the field library, not from this package:
@@ -422,7 +423,7 @@ tracers = Tracers(domain; number_of_particles = 1024, interpolation_scheme = Cat
 cache   = ObservablesCache(domain; scalar = true, particle_velocities = tracers.particle_velocities)
 ```
 
-### 3.2 What is not built
+### 3.2 Coverage — the page against the code
 
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
 epoch — the particle velocities included, against both epochs — three-valued slot epochs that
@@ -432,5 +433,5 @@ deposit-completeness check, and the slot=register merge. The loop is the observa
 observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
 stopping is the caller's decision on observables and the budget vocabulary is gone. What §1.3
 records as the storage decision — the nonlinear terms stay in the first stage because the in-place
-products would otherwise destroy the deposited fields — closes the list: the page and the code
-agree. The decision record is in the [architecture notes](architecture.md).
+products would otherwise destroy the deposited fields — closes the list: every mechanism this page describes exists in the code, and none exists that this
+page omits. The decision record is in the [architecture notes](architecture.md).

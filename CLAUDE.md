@@ -50,7 +50,7 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `Propagator` — pluggable integrating-factor schemes (`AbstractIntegrator`) and the per-step scratch
   (`IntegratorBuffers`).
 - `Particles` — Lagrangian particle tracking: the trajectory state (`Tracers`) held apart from the
-  pluggable trajectory integrator (`AbstractParticleIntegrator`, `EndpointHeun`) and its per-scheme
+  pluggable trajectory integrator (`AbstractParticleIntegrator`: `EndpointHeun`, `AdamsBashforth`) and its per-scheme
   registers (`ParticleIntegratorBuffers`) — decision 50. *Particle* names anything true of the whole
   deferred ladder, *tracer* only the massless kind (decision 51).
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).

@@ -382,7 +382,7 @@ Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both
 field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
 operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
 velocity, and none of the built strategies needs it — each preserves a divergence-free velocity by
-construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form
+construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form (`NoForcing`, taking no operators, has the one form)
 (`ConstantPower(injection_rate = 0.1)`, a `DeferredForcing`) materialized when `Simulation` builds the frame, so a case
 can name its forcing before the grid exists.
 
@@ -429,8 +429,7 @@ Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the o
 (against BOTH epochs, since it is a function of the state and the positions together; read through
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme, never a sample of
-the flow, and nothing offers it as one. After the push, `record_particle_velocities!` writes the new sample at the new
+`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, `record_particle_velocities!` writes the new sample at the new
 positions from the same deposited field and `deposit_sample!` records it at the current epochs (the
 write alone leaves the slot stale), completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.

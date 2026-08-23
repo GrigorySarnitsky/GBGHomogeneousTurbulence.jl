@@ -121,8 +121,7 @@ Listed in build order — each module uses the ones above it. The
   advection along trajectories and field sampling there, with selectable interpolation and
   trajectory schemes.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
-  Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. A `Simulation` is a container,
-  not a reading surface: the state is read through `sim.state`, the deposited observables through
+  Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by

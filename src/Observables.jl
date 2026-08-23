@@ -156,8 +156,7 @@ device readback); it throws an `ErrorException` when no deposit is current, like
 
 !!! note "Why this observable alone has a cached form"
     The cache holds exactly what the iteration already computes and leaves alive at its end; its
-    contents follow from the run's fixed computation schedule rather than from anything a caller
-    declares. The maximum speed qualifies because the
+    contents follow from the run's fixed computation schedule. The maximum speed qualifies because the
     run itself needs it: on the adaptive-CFL path the next timestep is chosen from it, so the
     reduction happens whether or not anyone reads the value. Under a hand-fixed ``\\Delta t`` nothing
     consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
