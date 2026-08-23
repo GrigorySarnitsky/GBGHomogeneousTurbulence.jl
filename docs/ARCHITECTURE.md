@@ -661,6 +661,12 @@ generalization is built for them until a second concrete case forces the abstrac
   would take the default from ten crossings to four. It is a *request*, not a local workaround
   (invariant 2): reimplementing a fused reduction here would be field machinery in a physics package.
   Held open by the optimality audit's `UNFUSED QUADRATIC REDUCTIONS`, whose shape it now dominates.
+- **Checkpoint / exact restart to HDF5 — the scheduled next capability.** Four of the five
+  reference-practice audit lanes independently converged on its absence (2026-08-23), and it is the
+  one missing piece for long production runs: persist the spectral state, the clock and timestep,
+  and the stochastic forcing's RNG state (Fluidsim stores its seeds and last-change time so a
+  restarted force history continues bit-exactly — the reference bar), and reload to a run that
+  continues as the same realization. Owner-directed to-do, not a passive deferral.
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
@@ -1992,6 +1998,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     conservation into a linear-algebra operator whose constant component genuinely belongs to its
     divergence-free subspace. After the pin the witness's Float32 forced run holds
     ``\langle\boldsymbol{u}\rangle = 0`` exactly for 1000 steps.
+
+61. **(2026-08, user-directed) The advanced state is re-projected every step, unconditionally.**
+    From the reference-practice audit (five lanes over TurTLE / GHOST / hit3d / Fluidsim / the
+    textbooks): every stage *tendency* is Leray-projected, but nothing projected the advanced
+    *state*, whose divergence — injected at roundoff by the stage combinations — is damped only by
+    ``\exp(-\nu\kappa^{2}\Delta t)``, nearly nothing at the largest scales. Measured in Float32 at
+    ``32^3``: ``\lvert\nabla\cdot\boldsymbol{u}\rvert`` grew ×120 per 1500 steps, reaching
+    ``800\,\varepsilon_{\mathrm{mach}}`` by step 2000 and compounding; Float64 sat harmlessly at
+    ``\sim 10\,\varepsilon_{\mathrm{mach}}``. Since precision is a studied fitness axis, the Float32
+    behaviour is a defect, not a curiosity. The pin is one in-place pointwise pass
+    (`helmholtz_projection!(û, û, …)` — the backend's projection may alias destination and source)
+    at the END of `step!`, after `finalize!`, so a post-step forcing's writes are covered too.
+    Measured after: Float32 divergence flat at ``0.3\,\varepsilon_{\mathrm{mach}}`` over 2000 steps.
+    The compute ledger re-froze at +2 `spectral_vector` per cell in the same commit; the witness
+    injects an O(1) pure-gradient corruption through the `fields_modified!` escape hatch and
+    requires one step to scrub it to ``10^{-12}``, which no viscous decay could fake.
 
 ## References
 

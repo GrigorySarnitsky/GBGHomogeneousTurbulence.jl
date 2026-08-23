@@ -106,18 +106,20 @@ const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, String}()
 # every cell. Transforms froze IDENTICAL: the closing deposits are the former first-stage recoveries
 # relocated, never added.
 const PASSES_BASE = Dict(
-  (:RK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :TwoThirds,  true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK3, :PhaseShift, true)  => (spectral_vector = 78, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :TwoThirds,  true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      false) => (spectral_vector = 25, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :HouLi,      true)  => (spectral_vector = 27, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, false) => (spectral_vector = 47, physical_vector = 13, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
-  (:RK2, :PhaseShift, true)  => (spectral_vector = 51, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
+  # Re-frozen 2026-08-23 (+2 spectral_vector everywhere): decision 61's state re-projection — one
+  # in-place pointwise pass per step pinning the advanced state's divergence at roundoff.
+  (:RK3, :TwoThirds,  false) => (spectral_vector = 41, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :TwoThirds,  true)  => (spectral_vector = 44, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      false) => (spectral_vector = 41, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :HouLi,      true)  => (spectral_vector = 44, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, false) => (spectral_vector = 74, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK3, :PhaseShift, true)  => (spectral_vector = 80, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  false) => (spectral_vector = 27, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :TwoThirds,  true)  => (spectral_vector = 29, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      false) => (spectral_vector = 27, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :HouLi,      true)  => (spectral_vector = 29, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, false) => (spectral_vector = 49, physical_vector = 13, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK2, :PhaseShift, true)  => (spectral_vector = 53, physical_vector = 21, spectral_scalar = 35, physical_scalar = 4, real_spectral_scalar = 0),
 )
 
 # Named holders for the fusion gaps, by shape class (the causes are configuration-independent).

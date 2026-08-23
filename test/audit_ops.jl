@@ -277,6 +277,10 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
     scalar && append!(ops, _scalar_update(; last = i == 3))
   end
   push!(ops, Op("finalize", [:û], [:û]))
+  # The advanced state's re-projection (decision 61): one in-place pointwise pass pinning the
+  # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
+  # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
+  push!(ops, Op("state re-projection", [:û], [:û]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
@@ -313,6 +317,10 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)
     Op("φ̂ corrector 2",  [:φ̂, :sb_stage2],  [:φ̂]),
   ])
   push!(ops, Op("finalize", [:û], [:û]))
+  # The advanced state's re-projection (decision 61): one in-place pointwise pass pinning the
+  # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
+  # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
+  push!(ops, Op("state re-projection", [:û], [:û]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :stage2, sscratch = :sb_stage2))
   return ops
 end
@@ -386,6 +394,7 @@ const OP_COST = Dict(
   # the `extra` column of this table is empty: the pass ledger IS the physical floor.
   # the unforced finalize is a no-op (the forcing deltas price the real hooks)
   "finalize"           => _cost(:noop),
+  "state re-projection" => _cost(:pointwise),
 )
 # Plain pointwise ops — passes are their symbolic reads and writes alone. ("project noise" prices
 # the aliased-projection CONTRACT; that the aliased path allocates today is the episode ledger's

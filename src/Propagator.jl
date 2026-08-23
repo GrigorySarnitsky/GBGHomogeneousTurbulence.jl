@@ -326,6 +326,13 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. VarianceRescaling)
+  # Re-project the advanced STATE. Every stage's tendency is projected, but the state's own
+  # divergence — injected at roundoff by the stage combinations — is damped only by exp(−νκ²Δt),
+  # nearly nothing at the largest scales, and it compounds: measured in Float32 at 32³, |∇·u| grew
+  # ×120 per 1500 steps, reaching 800×eps by step 2000. One in-place pointwise pass (the backend's
+  # projection may alias destination and source) pins it at roundoff every step. Placed AFTER
+  # finalize! so whatever a post-step forcing did to the state is covered too.
+  helmholtz_projection!(û, û, domain.multipliers)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
@@ -433,6 +440,13 @@ function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
   end
 
   finalize!(generator, state, domain)             # post-step forcing projections (e.g. VarianceRescaling)
+  # Re-project the advanced STATE. Every stage's tendency is projected, but the state's own
+  # divergence — injected at roundoff by the stage combinations — is damped only by exp(−νκ²Δt),
+  # nearly nothing at the largest scales, and it compounds: measured in Float32 at 32³, |∇·u| grew
+  # ×120 per 1500 steps, reaching 800×eps by step 2000. One in-place pointwise pass (the backend's
+  # projection may alias destination and source) pins it at roundoff every step. Placed AFTER
+  # finalize! so whatever a post-step forcing did to the state is covered too.
+  helmholtz_projection!(û, û, domain.multipliers)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
