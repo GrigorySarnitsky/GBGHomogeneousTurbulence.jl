@@ -148,7 +148,7 @@ using Test
     @test D._is_flat(turn, fill(2.0, length(turn)) .+ 0.001 .* sin.(turn), 10.0, 4.0, 0.05)  # flat
     @test !D._is_flat(turn, 1.0 .+ 0.1 .* turn, 10.0, 4.0, 0.05)                              # drifting
     mon(; gk = false) = D.StationarityMonitor(; min_turnovers = 3, window_turnovers = 3, tol = 0.05,
-                                              gate_scalar = false, gate_skew = gk, skew_floor = 0.1)
+                                              gate_scalar = false, gate_skewness = gk, skew_floor = 0.1)
     # flat ε converges; drifting ε does not
     mflat = mon()
     for et in 0.0:0.05:12.0; D._push_and_test!(mflat, et, 2.0 + 0.001 * sin(et), 0.0, 0.0); end

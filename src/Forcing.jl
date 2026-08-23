@@ -532,7 +532,7 @@ Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, whic
 it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
 rescaling is a post-step projection capping the iteration at first order.
 
-The rate is the marginal law ``A = \\varepsilon/2k`` plus a proportional restoring term:
+The rate is the marginal law ``A = \\varepsilon/2k_f`` plus a proportional restoring term:
 
 ```math
 A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\ell}{2k_f(t)}

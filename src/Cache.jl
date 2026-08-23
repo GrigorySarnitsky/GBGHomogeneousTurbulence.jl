@@ -18,7 +18,7 @@ The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
-- [`deposit_sample!`](@ref) — records the particle velocities the tracer advance wrote.
+- [`deposit_sample!`](@ref) — records the particle velocities `record_particle_velocities!` wrote.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
@@ -341,6 +341,7 @@ end
 
 """
     fields_modified!(cache)
+    fields_modified!(sim)
 
 Announce that the resolved fields — ``\\hat{\\boldsymbol{u}}`` and ``\\hat\\varphi``, in spectral
 representation —
@@ -358,7 +359,10 @@ Coefficients written by hand must respect the real-field layout's conjugate symm
 checked**, and a violation makes spectral diagnostics silently disagree with the physical images;
 the package's own seeders satisfy it by construction.
 
-Returns `cache`.
+Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
+to that run's cache — the form mirroring `particles_modified!`'s two.
+
+Returns its argument.
 
 !!! warning "It also discards the Lagrangian sample history"
     Those samples are the velocity measured along the trajectory *through the state being

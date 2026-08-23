@@ -2097,7 +2097,7 @@ cites.
   methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden
   flows. *Phys. Fluids* **28**, 035114. <https://doi.org/10.1063/1.4944629>
   *(`VarianceController`: the constant-``k`` controller of their Eq. 20, the marginal law
-  ``A = \varepsilon/2k`` plus a proportional restoring term, giving exponential relaxation to a stable
+  ``A = \varepsilon/2k_f`` plus a proportional restoring term measuring the whole-field ``k``, giving exponential relaxation to a stable
   attractor. The smooth, gain-limited replacement for the discontinuous projection above.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
   Molecular dynamics with coupling to an external bath. *J. Chem. Phys.* **81**, 3684–3690.

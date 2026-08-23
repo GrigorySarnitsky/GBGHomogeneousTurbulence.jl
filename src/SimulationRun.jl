@@ -679,7 +679,7 @@ mutable struct StationarityMonitor
   window_turnovers::Float64     # trailing window for the flatness test
   tol::Float64                  # relative-drift threshold
   gate_scalar::Bool             # also require ⟨φ²⟩ to be flat
-  gate_skew::Bool               # also require S to have plateaued (and |S| ≥ skew_floor)
+  gate_skewness::Bool               # also require S to have plateaued (and |S| ≥ skew_floor)
   skew_floor::Float64           # minimum |S| for a plateau to count as developed turbulence
   sample_gap::Float64           # min turnover spacing between stored samples
   turn::Vector{Float64}
@@ -689,9 +689,9 @@ mutable struct StationarityMonitor
   converged::Bool
 end
 
-StationarityMonitor(; min_turnovers, window_turnovers, tol, gate_scalar, gate_skew, skew_floor) =
+StationarityMonitor(; min_turnovers, window_turnovers, tol, gate_scalar, gate_skewness, skew_floor) =
   StationarityMonitor(Float64(min_turnovers), Float64(window_turnovers), Float64(tol),
-                      gate_scalar, gate_skew, Float64(skew_floor), Float64(window_turnovers) / 40,
+                      gate_scalar, gate_skewness, Float64(skew_floor), Float64(window_turnovers) / 40,
                       Float64[], Float64[], Float64[], Float64[], false)
 
 # No net drift of the series y(turn) across the trailing window [now−W, now]:
@@ -736,7 +736,7 @@ function _push_and_test!(m::StationarityMonitor, elapsed_turn, ε, φ2, S)
   m.turn[1] ≤ elapsed_turn - m.window_turnovers || return false
   flat_v = _is_flat(m.turn, m.eps, elapsed_turn, m.window_turnovers, m.tol)
   flat_s = !m.gate_scalar || _is_flat(m.turn, m.phi2, elapsed_turn, m.window_turnovers, m.tol)
-  flat_k = !m.gate_skew ||
+  flat_k = !m.gate_skewness ||
            (_is_flat(m.turn, m.skew, elapsed_turn, m.window_turnovers, m.tol) &&
             abs(_window_mean(m.turn, m.skew, elapsed_turn, m.window_turnovers)) ≥ m.skew_floor)
   m.converged = flat_v && flat_s && flat_k
@@ -748,7 +748,7 @@ end
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   φ2 = m.gate_scalar ? (sim.state.scalar_spectral === nothing ? NaN : scalar_variance(sim.state.scalar_spectral)) : 0.0
-  S = m.gate_skew ? derivative_skewness(sim.state.velocity_spectral, sim.domain) : 0.0
+  S = m.gate_skewness ? derivative_skewness(sim.state.velocity_spectral, sim.domain) : 0.0
   return _push_and_test!(m, elapsed_turn, ε, φ2, S)
 end
 
@@ -800,7 +800,7 @@ The criterion carries its own observation state (the sampled signals and the tur
 build a fresh one per run.
 
 # Fields
-The fields are not the keywords: `gate_skew`, `min_turnovers`, `window_turnovers`, `tol` and
+The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
 `skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
 that judge them. Build one through the keyword constructor above.
 - `monitor` — the sampled signals (the turnover clock, ``\\varepsilon``, the scalar variance, the
@@ -824,7 +824,7 @@ function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool =
                                tol::Real = 0.05, skew_floor::Real = 0.1,
                                max_turnovers::Real = 60)
   monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
-                                gate_scalar, gate_skew = gate_skewness, skew_floor)
+                                gate_scalar, gate_skewness = gate_skewness, skew_floor)
   return StationarityCriterion(monitor, Float64(max_turnovers), gate_scalar, 0.0, NaN, false)
 end
 

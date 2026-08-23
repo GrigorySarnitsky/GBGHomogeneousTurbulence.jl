@@ -49,7 +49,8 @@ end
 
 # One ITERATION is one advance: a step, then the DEPOSIT that closes it. A deposit writes the
 # observables the iteration has just computed into the cache, each recorded against the EPOCH — the
-# cache's count of completed iterations — of the state it came from. The state is always current; the cache holds what the last deposit left, so its
+# cache's staleness counter, advanced by every step and every announced mutation — of the state it
+# came from. The state is always current; the cache holds what the last deposit left, so its
 # reads are valid between iterations.
 kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
 velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
