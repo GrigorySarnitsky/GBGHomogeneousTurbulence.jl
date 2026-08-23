@@ -260,7 +260,7 @@ group arguments — ``\tfrac{1}{2}``, ``\boldsymbol{u}``, never `\tfrac12` / `\b
 ``\mathbb`` on a digit; the thin space ``\,`` reserved for the differential ``\,\mathrm dx``, never
 between plain factors; no manual ``\;`` / ``\:`` spacing around relations; no ``\left``/``\right``
 auto-sizing (size by hand with ``\bigl``/``\Bigl``; the ``\left\{ \dots \right.`` system idiom and
-the arrow commands are exempt); a conditional bar is ``\mid``.
+the arrow commands are exempt); a conditional bar is ``\mid`` (IT's own addition to the adopted set).
 
 **Correctness is verified, not asserted.** Check every formula, normalization (the ``1/N``, the
 ``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval / spectral factors), and every "X is just Y"

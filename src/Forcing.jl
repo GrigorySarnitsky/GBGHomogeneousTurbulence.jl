@@ -49,7 +49,8 @@ construction-time object, not a lifecycle hook.
 The strategies, one implementation each serving both the velocity and the scalar through
 tensor-order-generic field operators:
 - [`NoForcing`](@ref) — leave the field undriven.
-- [`Linear`](@ref) — a fixed linear rate on a band.
+- [`Linear`](@ref) — a fixed linear rate on a **band**, an annulus of integer Fourier shells (the
+  convention every strategy shares).
 - [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate.
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
 - [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
@@ -562,8 +563,9 @@ and gain-limited relaxation toward a target is Berendsen weak coupling (Berendse
 # Arguments
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
-- `gain = 1` — the dimensionless gain ``G``. Larger relaxes faster (Bassenne et al. report ``O(1-10)``);
-  `0` is the bare marginal law above.
+- `gain = 1` — the dimensionless gain ``G``. A larger gain relaxes faster; Bassenne et al. report
+  ``O(1-10)``, and the default sits at that range's gentle end so the controller perturbs the
+  dynamics least. `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``),
   with ``\\varepsilon_\\infty`` the stationary estimate for this box — the same estimate the

@@ -449,7 +449,7 @@ In physical space the rotational form writes the convective term as the Lamb vec
 ```
 
 so that, with the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbing the
-pressure and the ``\\nabla(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient, the momentum equation
+pressure and the ``\\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\bigr)`` gradient, the momentum equation
 becomes
 
 ```math

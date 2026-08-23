@@ -103,14 +103,14 @@ A fitted coefficient belongs to a particular length, and the two published forms
 the same one. The default is the longitudinal integral scale ``L_{11}``, which
 [`VonKarmanLarge`](@ref) uses. [`PopeLargeScale`](@ref) overrides it with
 ``\\ell_{0} = k^{3/2}/\\varepsilon``: Pope's ``c_L = 6.78`` is the value that makes
-``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` hold with *that* length, and feeding the
+``\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa = k`` hold with *that* length, and feeding the
 same coefficient ``L_{11}`` instead breaks that normalization.
 
 The two lengths are related by ``L_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is
 set by the normalized dissipation constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is
 3.7 times smaller and the spectrum integrates to ``0.42k``; at Pope's high-Reynolds-number
 ``L_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to ``0.57k``
-(``\\int E\\,\\mathrm d\\kappa \\propto \\ell^{2/3}``).
+(``\\int E\\,\\mathrm{d}\\kappa \\propto \\ell^{2/3}``).
 """
 function large_scale_length end
 

@@ -154,8 +154,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. It is a *third* bound, not the only one: the adaptive step is the smallest of
-  the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, a resolution bound
-  ``1/(D\\kappa_{\\min}^{2})`` built from the run's own diffusivity and box, and this. The advective
+  the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
+  time ``1/(D\\kappa_{\\min}^{2})``, built from the run's own diffusivity and box, and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
   annihilates every mode and the clock advances by a number that means nothing — and it is the
   resolution bound that stops that, needing no constant from the caller. `max_dt` is for a ceiling
@@ -526,7 +526,7 @@ end
 
 Advance `sim` by one timestep in place and return it. Pass `dt` to force a fixed step; with
 `dt = nothing` the step is adaptive — the smallest of the advective-CFL value for the current
-velocity, the resolution bound the box and its diffusivity impose, and `max_dt`.
+velocity, the longest mode's diffusive-decay time (the box-and-diffusivity cap), and `max_dt`.
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
 is readable when it returns. Advects the tracers, if any, by Heun-in-time on the start- and
