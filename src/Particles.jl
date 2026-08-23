@@ -16,7 +16,7 @@
 """
     Particles
 
-Lagrangian tracer tracking:
+Lagrangian particle tracking — today the massless tracer:
 
 - [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`);
   [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory

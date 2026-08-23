@@ -256,8 +256,6 @@ Each reduction costs one blocking device-to-host transfer, **at every stage** �
 [`VarianceController`](@ref), one for [`ConstantPower`](@ref), where [`Linear`](@ref) pays none.
 That is the price of the order this route preserves.
 
-Returns `N̂`.
-
 !!! warning "The source is accumulated, never assigned"
     Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
     implementation must **add** its contribution and must not overwrite the buffer.

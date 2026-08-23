@@ -318,10 +318,10 @@ you.
   [`uses_steady_linear_rate`](@ref GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate), so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
-- `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds
-  displaced velocity, left fresh by `velocity_rhs!` for the same stage's
-  `scalar_rhs!` to consume (`PhaseShift` only; a bare `scalar_rhs!` finding it stale
-  rebuilds the recovery itself).
+- `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds,
+  left fresh by `velocity_rhs!` for the same stage's `scalar_rhs!` (`PhaseShift` only). Half of a
+  conjunctive contract — reuse needs this record to match **and** the caller's
+  `displaced_velocity_current` promise; the record alone can only force a rebuild.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
@@ -623,8 +623,10 @@ The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a
 Pass `displaced_velocity_current = true` only if nothing has changed since this generator's
 `velocity_rhs!` was called on the same `û` — a time-stepping scheme knows this because it evaluates
 both right-hand sides at one stage before updating either field; a hand-written caller generally
-does not. The setting permits the displaced-velocity reuse above; the default rebuilds instead, at
-the cost of one shift and three inverse transforms, which keeps an unpaired call correct.
+does not. Reuse needs **both** the keyword and the generator's recorded source matching `û`. The
+record alone can only force a rebuild, never a wrong reuse; the keyword is the load-bearing half —
+containers are rewritten in place, so a false promise over the *same* container is quietly wrong,
+where the default merely rebuilds (one shift, three inverse transforms) and stays correct.
 
 Returns `N̂`.
 

@@ -115,8 +115,9 @@ Listed in build order — each module uses the ones above it. The
   rather than assembling the physics itself.
 - [`Propagator`](api/Propagator.md): the interchangeable integrating-factor schemes under
   `AbstractIntegrator`.
-- [`Particles`](api/Particles.md): Lagrangian tracer tracking — second-order advection and field
-  sampling along trajectories, with a selectable interpolation scheme.
+- [`Particles`](api/Particles.md): Lagrangian particle tracking — today the massless tracer —
+  advection along trajectories and field sampling there, with selectable interpolation and
+  trajectory schemes.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
   Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. A `Simulation` is a container,
   not a reading surface: the state is read through `sim.state`, the deposited observables through

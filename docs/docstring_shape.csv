@@ -17,7 +17,7 @@ Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,356
 Forcing.jl::VarianceController(; target， gain = 1， turnover_time = nothing，,81,1,471
 Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,674
-Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,212
+Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,210
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,103,0,109
@@ -25,11 +25,11 @@ Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,166
 GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,99
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),75,1,243
 Generator.jl::Generator,118,0,184
-Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,537
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,548
 Generator.jl::finalize!(generator， state， domain),77,0,80
 Generator.jl::prepare!(generator， state， domain， dt),84,0,88
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
-Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,80,1,441
+Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,104,1,474
 Generator.jl::velocity_integrating_factor(generator， τ),86,0,206
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,442
 Observables.jl::Observables,110,0,270
@@ -47,7 +47,7 @@ Particles.jl::AdamsBashforth(; order = 4),100,1,464
 Particles.jl::EndpointHeun(),53,1,240
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,43,0,169
-Particles.jl::Particles,3,0,124
+Particles.jl::Particles,8,0,129
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， rng = default_rng()),86,0,597
 Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,51,1,209
 Particles.jl::history_depth(scheme) -> Int,28,0,47

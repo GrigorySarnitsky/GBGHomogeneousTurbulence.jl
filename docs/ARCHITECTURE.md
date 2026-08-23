@@ -428,8 +428,9 @@ Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the o
 `particle_velocities`, §11 decision 42) — and ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme, never a sample of
-the flow, and nothing offers it as one. After the push, `record_particle_velocities!` records the new sample at the new
-positions from the same deposited field, completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
+the flow, and nothing offers it as one. After the push, `record_particle_velocities!` writes the new sample at the new
+positions from the same deposited field and `deposit_sample!` records it at the current epochs (the
+write alone leaves the slot stale), completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 
 The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
@@ -1672,7 +1673,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     dealiasing axis's memory↔compute pricing: a mask spends a per-mode multiplication, `PhaseShift`
     spends exactly one extra evaluation of each term, and nothing else.
 46. **(2026-08, user-directed) `Observables` precedes `Cache`: the measurement functions are the
-    generics the cached reads extend.** The include order becomes `State → Observables → Cache`, and
+    generics the cached reads extend.** The include order becomes `State → Observables → Cache` *(misrecorded here: the order has been
+    `Observables → State` since the module split — the entry's substance, `Observables` before
+    `Cache`, is unaffected)*, and
     an observable with both a measurement and a cached value is **one generic with two method
     families** — the field-argument reduction computes ("measure now"), the `ObservablesCache`
     method serves the deposited value or throws — with the bare binding and the docstring homed in

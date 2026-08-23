@@ -324,6 +324,14 @@ second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
+A multistep trajectory scheme looks further back, and the cache is where that history lives: built
+with `history_depth` ``> 1`` it keeps a bounded ring of **past** particle-velocity samples —
+`history_depth` ``- 1`` further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
+integrates over and an out-of-band reposition discards (`particles_modified!`). The history rides
+the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
+latest deposit, and it exists here rather than in the scheme's registers because the object that
+owns the epoch owns the invalidation.
+
 ### 2.4 What it caches
 
 Both states are always present — the fluid's and the probes'. Tracers consume a field and produce
@@ -341,6 +349,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the closing recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the particle velocities | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
+| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | yes | kept only when a multistep trajectory scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
