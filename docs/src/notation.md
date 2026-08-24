@@ -36,7 +36,7 @@ The **Code** column gives the name each symbol carries in the package.
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`velocity_at_particles`](@ref) |
-| ``M`` | the number of tracer particles | [`number_of_particles`](@ref) |
+| ``M`` | the number of tracer particles | `npoints(tracers.positions)` |
 
 ## Parameters
 
