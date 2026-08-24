@@ -206,11 +206,14 @@ objects, each linked to its own documentation.
 - `unit_kernel` — the constant weight ``1``, the same lazy form: the identity weight that lets a plain
   variance join a multi-weight fused reduction (one traversal answering several weighted sums at
   once), since ``\\langle f, 1\\cdot f\\rangle`` is the variance itself.
+- `storage_family` — the storage family (`Array` /
+  [`CuArray`](https://cuda.juliagpu.org/stable/) / `ROCArray`) the run's arrays live in — a type,
+  not an array; the allocators hand it to `GBGPeriodicFields`' family-taking field constructors.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
   mode) and the [`DealiasingStrategy`](@ref) that built it.
 """
-struct FixedDomain{G, L, VP, SP, TP, M, SK, UK, D, DS}
+struct FixedDomain{G, L, VP, SP, TP, M, SK, UK, D, DS, SF}
   grid::G
   layout::L
   velocity_plans::VP
@@ -221,6 +224,8 @@ struct FixedDomain{G, L, VP, SP, TP, M, SK, UK, D, DS}
   unit_kernel::UK                  # the constant-1 weight, same lazy form — lets a variance join a fused multi-weight reduction
   dealias::D                       # isotropic low-pass kernel (compressed, per-mode), built by `dealiasing`
   dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi / PhaseShift)
+  storage_family::SF               # the storage family (`Array`, `CuArray`, `ROCArray`) — a TYPE, not an array:
+                                   # what the allocators hand PF's family-taking constructors (PF decision 74)
 end
 
 
@@ -260,7 +265,7 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   unit_kernel = radial_kernel(_unit_symbol, multipliers)
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, N, L, T)
 
-  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing)
+  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
 end
 
 
@@ -305,12 +310,11 @@ end
 
 # Internal: the array type and element type are read off the multipliers' axis arrays — O(N) vectors
 # that live on the domain's backend — so every scratch buffer lands on the same backend (CPU/GPU), the
-# GBGPeriodicFields `similar(reference, …)` allocation discipline (its invariant 6). The dealias
-# kernel no longer serves as the template: a compressed kernel stores no field-sized array.
-_reference(domain::FixedDomain) = domain.multipliers.squared_wavenumber_1
-_real_type(domain::FixedDomain) = eltype(_reference(domain))
-_complex_type(domain::FixedDomain) = complex(_real_type(domain))
-_blank(domain::FixedDomain, ::Type{S}, dims) where {S} = fill!(similar(_reference(domain), S, dims), zero(S))
+# The element type is the grid's own — PF's family-taking constructors state that contract — and
+# the backend is the stored family, so no borrowed array stands witness for either (the
+# `_reference`/`_blank` composition this replaces read a multipliers axis vector off-label; PF
+# decision 74 closed it at the source).
+_real_type(domain::FixedDomain) = eltype(domain.grid.domain_size)
 
 
 
@@ -350,7 +354,8 @@ end
 Allocate a single zeroed vector field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_spectral(domain::FixedDomain) =
-  VectorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(1))), domain.grid, domain.layout)
+  (f = VectorFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """
@@ -359,7 +364,8 @@ new_vector_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed vector field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_physical(domain::FixedDomain) =
-  VectorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(1))), domain.grid, domain.layout)
+  (f = VectorFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """
@@ -368,7 +374,8 @@ new_vector_field_physical(domain::FixedDomain) =
 Allocate a single zeroed scalar field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_spectral(domain::FixedDomain) =
-  ScalarFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(0))), domain.grid, domain.layout)
+  (f = ScalarFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """
@@ -377,7 +384,8 @@ new_scalar_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed scalar field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_physical(domain::FixedDomain) =
-  ScalarFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(0))), domain.grid, domain.layout)
+  (f = ScalarFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """
@@ -386,7 +394,8 @@ new_scalar_field_physical(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_spectral(domain::FixedDomain) =
-  TensorFieldSpectral(_blank(domain, _complex_type(domain), spectral_field_shape(domain.grid, domain.layout, Val(2))), domain.grid, domain.layout)
+  (f = TensorFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """
@@ -395,7 +404,8 @@ new_tensor_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_physical(domain::FixedDomain) =
-  TensorFieldPhysical(_blank(domain, _real_type(domain), physical_field_shape(domain.grid, Val(2))), domain.grid, domain.layout)
+  (f = TensorFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+   fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
 """

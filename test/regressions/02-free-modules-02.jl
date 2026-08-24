@@ -1,30 +1,30 @@
-# Witness: `_wrap!` must not fabricate a finite coordinate out of a non-finite one.
+# Witness: the periodic wrap must not fabricate a finite coordinate out of a non-finite one.
 #
-# `_wrap!(X, L)` is `X .= mod.(X, L)` then `X .= ifelse.(X .< L, X, zero(eltype(X)))`. The second
-# pass exists to fold the excluded endpoint `L` back to `0`. But `mod(NaN, L) === NaN`,
-# `mod(Inf, L) === NaN`, and `NaN < L` is `false` — so every non-finite coordinate takes the
-# `zero(eltype(X))` branch and a blown-up trajectory is silently relocated to the box corner with a
-# finite, in-range, entirely fabricated position. The intended fold survives NaN when written the
-# other way round: `ifelse.(X .>= L, zero(eltype(X)), X)`, since `NaN >= L` is also `false`.
-#
-# Correct behaviour asserted here: a non-finite coordinate stays non-finite through `_wrap!` and
-# through `advect!` (or the call throws), while the endpoint fold `L -> 0` and ordinary wrapping
-# keep working.
+# The contract was IT's `_wrap!` and is now PF's (`wrap!` and the grid form of `displace!`, their
+# decision 73, adopted verbatim from this witness's findings): the excluded endpoint `L` folds to
+# `0` (floating-point `mod` can return exactly `L` for a hair-below-zero coordinate), and the fold
+# tests equality — an order test is false for NaN/Inf and would silently relocate a blown-up
+# trajectory to a tidy in-box position, destroying the one signal a run has diverged. This witness
+# pins that contract AT IT'S BOUNDARY — the surface `advect!` actually calls — so a PF regression
+# on either half fails here, not just in PF's own suite.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values,
+                         PointSet, wrap!, point_coordinates
 using Test
-
-const _wrap! = GBGIsotropicTurbulence.Particles._wrap!
 
 @testset "a non-finite tracer coordinate is never turned into a healthy 0.0" begin
   L = 2π
+  T = Float64
+  N = 16
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
+                       dealiasing = TwoThirds(), array_type = Array)
 
-  @testset "_wrap! preserves non-finiteness" begin
+  @testset "wrap! preserves non-finiteness" begin
     X = [NaN 1.0 1.0
          Inf 2.0 2.0
          -Inf 3.0 3.0]
-    _wrap!(X, L)
+    wrap!(PointSet(X), domain.grid)
     @test !isfinite(X[1, 1])          # NaN in -> non-finite out
     @test !isfinite(X[2, 1])          # +Inf in -> non-finite out
     @test !isfinite(X[3, 1])          # -Inf in -> non-finite out
@@ -32,9 +32,9 @@ const _wrap! = GBGIsotropicTurbulence.Particles._wrap!
     @test X[1, 2] ≈ 1.0 && X[2, 2] ≈ 2.0 && X[3, 2] ≈ 3.0
   end
 
-  @testset "_wrap! still folds the excluded endpoint and wraps normally" begin
+  @testset "wrap! still folds the excluded endpoint and wraps normally" begin
     Y = [0.0 L 1.5L; -1e-20 -0.5 L + 0.25]
-    _wrap!(Y, L)
+    wrap!(PointSet(Y), domain.grid)
     @test all(0 .<= Y .< L)           # half-open box [0, L)
     @test Y[1, 1] == 0.0
     @test Y[1, 2] == 0.0              # the endpoint L folds to 0
@@ -45,10 +45,6 @@ const _wrap! = GBGIsotropicTurbulence.Particles._wrap!
   end
 
   @testset "advect! does not launder a blown-up velocity into finite positions" begin
-    T = Float64
-    N = 16
-    domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                         dealiasing = TwoThirds(), array_type = Array)
     u = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0]

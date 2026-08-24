@@ -2086,6 +2086,29 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       of a stored conjugate pair and requires the violation named, then repairs it by the physical
       round trip and requires acceptance.
 
+64. **(2026-08) The Points-layer requests of 2026-08-24 were delivered and are wired in.** Raised
+    under invariant 2 after the owner's particles review; shipped by PF as their decisions 73–74:
+
+    - **Base-space motion** (`displace!` — "the exp map of the flat torus" — and `wrap!`). Every
+      trajectory update now crosses the package boundary as a *named PF operation*: the Heun push
+      is two fused displacements (predictor and corrector), the Adams–Bashforth push is **one**
+      fused ``K``-term displacement where a loop once made ``K`` broadcast passes over the
+      positions, and the periodic wrap rides the same traversal via the `grid` form. IT's
+      `advect!` bodies contain no `point_values` unwraps and no raw-array arithmetic on positions.
+      `_wrap!` is **deleted**: its hard-won contract — the excluded-endpoint fold (floating-point
+      ``\operatorname{mod}`` can return exactly ``L``) and non-finite transparency (an order test
+      would launder a diverged trajectory into a tidy in-box position) — was adopted verbatim into
+      PF's `wrap!`, and IT's witness now pins that contract at the boundary `advect!` actually
+      calls, so a PF regression on either half fails here too.
+    - **Allocation from context** (the six field constructors accept a storage *family* —
+      `Array` / `CuArray` / `ROCArray` — and produce the storage themselves, element type from the
+      grid). `_reference`/`_blank` are **deleted**: the frame no longer borrows a multipliers axis
+      vector as a backend-and-element-type witness for raw `Base.similar`. `FixedDomain` now
+      stores the constructor's own `storage_family` (a type, zero array bytes — the frame ledger
+      is untouched), the six `new_<Type>` allocators are thin wrappers over the family
+      constructors (the zero-fill contract stays IT's), and tracer position storage comes off the
+      same family. No IT code reads a multipliers field for any purpose other than wavenumbers.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

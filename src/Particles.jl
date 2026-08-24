@@ -37,7 +37,7 @@ module Particles
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, _reference, _real_type
+using ..SimulationDomain: FixedDomain, _real_type
 # One generic builds the per-scheme registers on both sides of the run — the field scheme's and
 # the trajectory scheme's — because it is one concept: allocate exactly what this scheme needs.
 import ..Propagator: allocate_buffers
@@ -151,13 +151,13 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
   T = _real_type(domain)
   if isnothing(positions)
     M = Int(number_of_particles)
-    positions = similar(_reference(domain), T, (M, 3))
+    positions = domain.storage_family{T}(undef, M, 3)
     copyto!(positions, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))
     pos = positions
   else
     size(positions, 2) == 3 ||
       throw(DimensionMismatch("tracer positions must have shape (M, 3); got $(size(positions))"))
-    pos = similar(_reference(domain), T, size(positions))   # the domain's backend + element type
+    pos = domain.storage_family{T}(undef, size(positions)...)   # the domain's backend + element type
     copyto!(pos, positions)
   end
   return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme)
@@ -210,20 +210,6 @@ It needs one set of predicted positions and the velocity interpolated there
 struct EndpointHeun <: AbstractParticleIntegrator end
 
 
-# Periodic wrap into the half-open box [0, L). `mod` alone does NOT deliver that in floating point:
-# for a position a hair below zero the exact quotient rounds to give back exactly `L` (measured:
-# `mod(-1e-20, 2π) === 2π`), so a tracer that drifts marginally out of the box lands on the excluded
-# endpoint and any consumer that buckets by `floor(x/Δx)` indexes one past the last cell. The second
-# pass folds that endpoint back to 0, which is the same point of the periodic box.
-function _wrap!(X, L)
-  X .= mod.(X, L)
-  # Fold ONLY the excluded endpoint. An `X .< L` test would also catch NaN and Inf — for which `<` is
-  # false — and quietly rewrite them to 0.0, turning a diverged trajectory into tidy in-box positions
-  # and destroying the one signal that a run has blown up. `mod` cannot return anything above `L`, so
-  # equality is the whole of the correction.
-  X .= ifelse.(X .== L, zero(eltype(X)), X)
-  return X
-end
 
 
 """
@@ -462,9 +448,6 @@ end
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::MultistepBuffers, dt::Real) where {K}
   T = real(eltype(tracers.positions))
-  L = T(domain.grid.domain_size[1])
-  X = tracers.positions
-  f0 = point_values(tracers.particle_velocities)
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
   # basis divides by the node differences — so the next warmed-up step divides by zero and returns
@@ -491,11 +474,11 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
     advect!(EndpointHeun(), tracers, velocity_end, domain, buffers.startup, dt)
   else
     b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
-    X .= X .+ T(b[1]) .* f0
-    for j in 2:K
-      X .= X .+ T(b[j]) .* point_values(past[j-1])
-    end
-    _wrap!(X, L)
+    # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
+    # loop once made over the positions collapse into a single traversal.
+    displace!(tracers.position_points, domain.grid,
+              (T(b[1]), tracers.particle_velocities),
+              ntuple(j -> (T(b[j + 1]), past[j]), K - 1)...)
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -507,7 +490,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
     steps[j] = steps[j-1]
   end
   if K > 1
-    copyto!(point_values(past[1]), f0)
+    copyto!(point_values(past[1]), point_values(tracers.particle_velocities))
     steps[1] = Float64(dt)
     cache.history_filled = min(cache.history_filled + 1, K - 1)
   end
@@ -584,22 +567,18 @@ function advect! end
 
 function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real)
-  L = real(eltype(tracers.positions))(domain.grid.domain_size[1])
   Δt = real(eltype(tracers.positions))(dt)
-  X = tracers.positions
-  Xstar = buffers.predictor
-
-  v1 = point_values(tracers.particle_velocities)
-  Xstar .= X .+ Δt .* v1
-  _wrap!(Xstar, L)
+  # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
+  displace!(buffers.predictor_points, tracers.position_points, domain.grid,
+            (Δt, tracers.particle_velocities))
   # v₂ is evaluated at the PREDICTOR positions and is a stage register, never deposited particle velocities —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
   # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
   # the thing you measure).
   interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points, tracers.interpolation_scheme)
-  v2 = point_values(buffers.velocity_predictor)
-  X .= X .+ (Δt / 2) .* (v1 .+ v2)
-  _wrap!(X, L)
+  # The corrector: one fused two-term displacement, wrap included.
+  displace!(tracers.position_points, domain.grid,
+            (Δt / 2, tracers.particle_velocities), (Δt / 2, buffers.velocity_predictor))
   return tracers
 end
 
