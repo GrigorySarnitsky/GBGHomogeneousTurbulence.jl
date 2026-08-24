@@ -2,14 +2,14 @@
 #
 # Claim: the per-step tracer advance under `AdamsBashforth` allocates on the host, because
 # `_adams_bashforth_weights` builds two fresh `Vector{Float64}`s (`τ` at Particles.jl:343 and `b`
-# at Particles.jl:347) on every call, while `MultistepBuffers` carries no scratch for them.
+# at Particles.jl:347) on every call, while the buffers carried no scratch for them.
 #
 # Scope note, measured here and NOT part of the claim: the tracer path is not allocation-free as a
 # whole — `GBGPeriodicFields`' `interpolate!` allocates 912 bytes per call, so `Heun`'s
 # `advect!` and `record_velocity_at_particles!` each cost that much per step whatever the scheme.
 # That is a backend cost, outside this package. The multistep branch of `advect!(::AdamsBashforth, …)`
 # interpolates nothing, so its correct allocation count is exactly zero: the assertions below are
-# achievable by giving `MultistepBuffers` the two weight registers (or by a stack-allocated solve).
+# achievable by giving the buffers the two weight registers (or by a stack-allocated solve).
 
 using Test, Random, GBGIsotropicTurbulence
 

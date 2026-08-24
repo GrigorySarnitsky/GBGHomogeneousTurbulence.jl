@@ -160,7 +160,7 @@ end
                      particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
     # The sample history is the cache's: it holds earlier values of a deposited observable, so an
     # announced reposition invalidates it where the epoch lives rather than in the scheme's registers.
-    @test sim.particle_buffers isa MultistepBuffers
+    @test sim.particle_buffers isa ParticleIntegratorBuffers
     @test sim.cache.history_filled == 0               # nothing recorded before the first step
     advance!(sim)
     @test sim.cache.history_filled == 1               # still starting up

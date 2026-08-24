@@ -1,7 +1,7 @@
 # Witness: allocate_buffers(::AdamsBashforth{K}, tracers, cache) must not accept a cache whose
 # Lagrangian sample history is shallower than the scheme needs (K-1 past samples).
 #
-# The hand-assembled route both `MultistepBuffers`' and `Tracers`' docstrings show builds the cache
+# The hand-assembled route both `ParticleIntegratorBuffers`' and `Tracers`' docstrings show builds the cache
 # separately from the scheme; `ObservablesCache`'s `history_depth` defaults to 1, so a depth-1 cache
 # handed to `AdamsBashforth(order = 4)` is a construction-time mismatch that nothing rejects. The
 # right behaviour is a named `ArgumentError` at `allocate_buffers` (the shape every neighbouring

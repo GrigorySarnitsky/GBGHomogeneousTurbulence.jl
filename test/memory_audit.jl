@@ -365,7 +365,7 @@ const EPISODE_UNITS = [
       # The scheme's OWN registers are the bootstrap pair and nothing else. Walked from `buffers`
       # the count would be one higher, because the buffers now reach the cache holding the history —
       # which is the point of the refactor, and is priced on the line above, not here.
-      startup_own = [a for a in m_arrays(buffers.startup)
+      startup_own = [a for a in m_arrays(buffers)
                      if !(objectid(a) in Set(objectid.(m_arrays(cache))))]
       @test length(startup_own) == 2
       @test length(cache.sample_steps) == K - 1                  # host scalars, one per past sample

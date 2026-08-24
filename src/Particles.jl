@@ -24,8 +24,8 @@ Lagrangian particle tracking — today the massless tracer:
   at the particles is read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
-  [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) and
-  [`MultistepBuffers`](@ref) the per-step storage each needs, and [`history_depth`](@ref) the
+  [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
+  per-step storage a scheme needs, and [`history_depth`](@ref) the
   sample-history length a scheme requires.
 - [`record_velocity_at_particles!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
@@ -45,7 +45,7 @@ using ..Cache: ObservablesCache
 import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
-       ParticleIntegratorBuffers, MultistepBuffers,
+       ParticleIntegratorBuffers,
        record_velocity_at_particles!, advect!, restart!, history_depth, interpolate_at_particles!,
        particle_positions, unwrapped_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
@@ -111,9 +111,11 @@ by hand — takes the `positions` form, and then the scheme's per-step storage i
 ```julia
 tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
                   interpolation_scheme = CatmullRom)
-buffers = allocate_buffers(Heun(), tracers)
+cache   = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+buffers = allocate_buffers(Heun(), tracers, cache)
 
-record_velocity_at_particles!(tracers, u)     # u(tₙ) at the current positions — do this first
+record_velocity_at_particles!(cache, tracers, u)   # u(tₙ) at the current positions — do this first
+deposit_sample!(cache)                             # and mark it current
 advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
@@ -248,14 +250,22 @@ function restart! end
 """
     ParticleIntegratorBuffers
 
-The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated once,
-so advancing the tracers allocates nothing. Build it with
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme, tracers)`,
+The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated
+once, so advancing the tracers allocates nothing. Build it with
+[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme, tracers, cache)`,
 which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
 
-This storage belongs to the scheme, not to the trajectory: a different scheme wants a different
-set — a multistep scheme wants a velocity history and no predicted positions at all — which is why it
-lives here rather than in [`Tracers`](@ref).
+This storage belongs to the scheme, not to the trajectory — which is why it lives here rather than
+in [`Tracers`](@ref). One type serves every scheme, because the register sets nest: a multistep
+scheme uses the predictor registers for its [`Heun`](@ref) starting steps only, and adds two
+`order`-element host vectors for its weight solve.
+
+The past Lagrangian samples a multistep scheme integrates over are **not** held here. They are
+deposited observables — measurements of the velocity along the trajectory — so they live in the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) beside the current sample
+they extend, which is what lets
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) invalidate the whole
+history when the tracers are repositioned.
 
 # Fields
 - `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
@@ -267,24 +277,37 @@ lives here rather than in [`Tracers`](@ref).
   instant, so nothing in the package offers it as one: read
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles) for the Lagrangian
   sample.
+- `cache` — the run's `ObservablesCache`: the start-of-step sample and any multistep history are
+  its slots.
+- `weights`, `nodes` — the `order`-element host scratch of a multistep weight solve; empty for a
+  one-step scheme.
 """
 struct ParticleIntegratorBuffers{P, PS, VV, C}
   predictor::P
   predictor_points::PS
   velocity_predictor::VV
   cache::C                  # the run's ObservablesCache: the v₁ sample is ITS slot (decision 67)
+  # Host scratch for the multistep weight solve, allocated once (the solve runs every warmed-up
+  # step, and the hot loop is allocation-free over preallocated buffers). Empty for a one-step scheme.
+  weights::Vector{Float64}
+  nodes::Vector{Float64}
 end
 
 
-function allocate_buffers(::Heun, tracers::Tracers, cache::ObservablesCache)
+function _allocate_particle_buffers(tracers::Tracers, cache::ObservablesCache, order::Int)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set — the sample the push " *
                         "consumes is the cache's observable, not tracer state"))
   predictor = similar(point_coordinates(tracers.position_points))
   return ParticleIntegratorBuffers(predictor, PointSet(predictor),
-                                   VectorPointValues(similar(predictor)), cache)
+                                   VectorPointValues(similar(predictor)), cache,
+                                   zeros(Float64, order), zeros(Float64, order))
 end
+
+
+allocate_buffers(::Heun, tracers::Tracers, cache::ObservablesCache) =
+  _allocate_particle_buffers(tracers, cache, 0)
 
 
 # A one-step scheme is memoryless: every register it owns is overwritten before it is read.
@@ -368,53 +391,15 @@ AdamsBashforth(; order::Integer = 4) =
    AdamsBashforth{Int(order)}())
 
 
-"""
-    MultistepBuffers
-
-The per-scheme registers of an [`AdamsBashforth`](@ref) trajectory integrator: the startup scheme's
-registers, the host scratch its weight solve works in, and the cache it reads its past Lagrangian
-samples from.
-
-Build it with [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme,
-tracers, cache)`; a run builds it for you.
-
-The past samples themselves are **not** held here. They are deposited observables — measurements of
-the velocity along the trajectory — so they live in the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) beside the current sample
-they extend, which is what lets
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) invalidate the whole
-history when the tracers are repositioned.
-
-# Fields
-- `cache` — the `ObservablesCache` holding the sample history this scheme integrates over.
-- `startup` — the [`ParticleIntegratorBuffers`](@ref) the bootstrap `Heun` steps use.
-- `weights`, `nodes` — the `order`-element host scratch the per-step weight solve works in.
-"""
-struct MultistepBuffers{C, S}
-  cache::C
-  startup::S
-  # Host scratch for the weight solve. Two `order`-element vectors, allocated once: the solve runs
-  # every warmed-up step, and the hot loop is allocation-free over preallocated buffers.
-  weights::Vector{Float64}
-  nodes::Vector{Float64}
-end
-
-
-function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache) where {K}
+function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache::ObservablesCache) where {K}
   # The history is the cache's, so a cache built for a shallower scheme would leave this one reading
   # fewer past samples than its order claims — a silently lower-order integration.
   length(cache.velocity_at_particles_history) >= K - 1 ||
     throw(ArgumentError("this cache carries $(length(cache.velocity_at_particles_history)) past " *
                         "sample(s), but `AdamsBashforth(order = $K)` integrates over $(K - 1); " *
                         "build the cache with `history_depth = $K`"))
-  return MultistepBuffers(cache, allocate_buffers(Heun(), tracers, cache),
-                          zeros(Float64, K), zeros(Float64, K))
+  return _allocate_particle_buffers(tracers, cache, K)
 end
-
-
-# A one-step scheme carries no history and ignores the cache; the three-argument form exists so a run
-# can allocate either scheme's registers through one call.
-allocate_buffers(scheme::Heun, tracers::Tracers, cache) = allocate_buffers(scheme, tracers)
 
 
 """
@@ -463,7 +448,7 @@ end
 
 
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
-                 buffers::MultistepBuffers, dt::Real) where {K}
+                 buffers::ParticleIntegratorBuffers, dt::Real) where {K}
   T = real(eltype(point_coordinates(tracers.position_points)))
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
@@ -486,9 +471,15 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
                         "different order. Equality, not sufficiency — the shared history's fill " *
                         "level is capped against the order of whichever call last advanced it, so " *
                         "mixing two orders over one history corrupts the bookkeeping in both."))
+  # The weight scratch is sized at allocation; a mismatch means the buffers were built for another
+  # scheme, and the solve below would read past their end.
+  length(buffers.weights) == K ||
+    throw(ArgumentError("these buffers carry weight scratch for order $(length(buffers.weights)), " *
+                        "not $K: they were built for a different scheme; allocate with " *
+                        "`allocate_buffers(AdamsBashforth(order = $K), tracers, cache)`"))
 
   if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
-    advect!(Heun(), tracers, velocity_end, domain, buffers.startup, dt)
+    advect!(Heun(), tracers, velocity_end, domain, buffers, dt)
   else
     b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
     # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
@@ -502,9 +493,8 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
-  # what keeps the deposited observable intact — the current slot is the tracer set's own storage and
-  # is rewritten every iteration, so a multistep method that aliased it would integrate over values
-  # that have since been overwritten.
+  # what keeps the deposited observable intact — the current slot is rewritten every iteration, so a
+  # multistep method that aliased it would integrate over values that have since been overwritten.
   for j in min(cache.history_filled + 1, K - 1):-1:2
     copyto!(point_values(past[j]), point_values(past[j-1]))
     steps[j] = steps[j-1]
@@ -518,7 +508,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
 end
 
 
-restart!(::AdamsBashforth, buffers::MultistepBuffers) = (buffers.cache.history_filled = 0; buffers)
+restart!(::AdamsBashforth, buffers::ParticleIntegratorBuffers) = (buffers.cache.history_filled = 0; buffers)
 
 
 """
@@ -565,8 +555,9 @@ end
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
 below), in place, under the particle integration scheme `scheme` (an
 [`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (the
-registers [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
-that scheme — `ParticleIntegratorBuffers` or [`MultistepBuffers`](@ref)). The `domain` (a [`FixedDomain`](@ref))
+[`ParticleIntegratorBuffers`](@ref) that
+[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
+that scheme). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
 
 Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the

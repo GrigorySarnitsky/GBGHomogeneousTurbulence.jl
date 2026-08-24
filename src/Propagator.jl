@@ -145,8 +145,7 @@ end
 
 """
     allocate_buffers(scheme, domain; scalar = false) -> IntegratorBuffers
-    allocate_buffers(scheme, tracers) -> ParticleIntegratorBuffers
-    allocate_buffers(scheme, tracers, cache) -> MultistepBuffers
+    allocate_buffers(scheme, tracers, cache) -> ParticleIntegratorBuffers
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
@@ -159,14 +158,14 @@ backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `no
 [`IFHeun`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
 adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
-The second and third serve the particle integration schemes: each builds the registers the `scheme` (an
+The second form serves the particle integration schemes: it builds the
+[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) the
+`scheme` (an
 [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
-needs, sized to the tracer set `tracers` — the two-argument form the
-[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) of a
-one-step scheme, and the three-argument form the
-[`MultistepBuffers`](@ref GBGIsotropicTurbulence.Particles.MultistepBuffers) of a multistep one,
-whose `cache` argument is the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)
-holding the sample history the scheme integrates over. One generic covers all three because it is
+needs, sized to the tracer set `tracers`; the `cache` argument is the
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) whose
+velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample history
+it integrates over. One generic covers all three because it is
 one concept, and because every side keeps the same separation: the evolving state holds no scheme's
 scratch.
 """

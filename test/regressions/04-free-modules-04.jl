@@ -20,7 +20,7 @@ using GBGPeriodicFields: field_data, CatmullRom
   @test_throws ArgumentError allocate_buffers(scheme, tracers, cache)
 end
 
-# Measured on the tree at 9b3ecdd: `allocate_buffers` returns a `MultistepBuffers` silently, and the
+# Measured on the tree at 9b3ecdd: `allocate_buffers` returned the multistep buffers silently, and the
 # first `advect!` (after `record_velocity_at_particles!`) then throws
 #   BoundsError: attempt to access 0-element Vector{VectorPointValues{Float64, Matrix{Float64}}} at index [1]
 # from Particles.jl:474, `copyto!(point_values(past[1]), f0)` — naming neither the cache nor the scheme.

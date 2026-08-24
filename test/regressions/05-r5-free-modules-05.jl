@@ -1,12 +1,12 @@
 # Witness: `advect!` must refuse a scheme whose order disagrees with the one its
-# `MultistepBuffers` were allocated for, with a named `ArgumentError` naming the argument pair —
+# buffers were allocated for, with a named `ArgumentError` naming the argument pair —
 # not a raw `BoundsError` from the cache's history vector, and not a silent wrong-order run.
 
 using Test, Random
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data, CatmullRom, point_values
 
-@testset "advect! refuses a scheme order that its MultistepBuffers were not built for" begin
+@testset "advect! refuses a scheme order that its buffers were not built for" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
                        element_type = Float64, array_type = Array)
   u = new_vector_field_physical(domain)

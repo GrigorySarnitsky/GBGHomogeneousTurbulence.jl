@@ -453,7 +453,7 @@ Their **numerics are first-class**, on the same footing as the field schemes —
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
 registers. Two axes matter: the particle integration scheme — the default second-order `Heun`, and the
 variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
-and its own registers in `MultistepBuffers`; decision 57) for a run whose trajectory accuracy in
+and its weight scratch in the shared `ParticleIntegratorBuffers`; decisions 57 and 70) for a run whose trajectory accuracy in
 time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
 relative to the field's spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` /
 `LagrangeSpline` available).
@@ -2194,6 +2194,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (decision 68). The field member gains the same method-first courtesy: `IFRK2` — verified to be
     exactly integrating-factor Heun (full Euler predictor, trapezoidal corrector, both stages on
     the endpoint nodes) — is renamed `IFHeun`, naming the method rather than its stage count.
+
+70. **(2026-08, user-directed) One particle buffers type: `MultistepBuffers` is folded into
+    `ParticleIntegratorBuffers`.** The two-type split had a real reason once — `MultistepBuffers`
+    owned the multistep sample history, a genuinely different register set — but decision 67 moved
+    the history into the observables cache, and what remained was a wrapper: a `cache` reference
+    duplicating `startup.cache`, the one-step registers wrapped as `startup`, and two
+    ``\mathcal{O}(\texttt{order})`` host vectors for the variable-step weight solve. The register
+    sets now nest — a multistep scheme uses the predictor registers for its `Heun` starting steps
+    only, and adds the two host vectors (empty for a one-step scheme) — so one type serves every
+    scheme with **zero** dead device storage for either, which is tighter than the field side's
+    `IntegratorBuffers` manages with its `nothing` slots. This mirrors the field side's one-type
+    pattern: `advect!` and `restart!` keep dispatching on the scheme, exactly as `step!` does, and
+    `allocate_buffers(scheme, tracers, cache)` is the one particle form (the two-argument form died
+    with decision 67, which every scheme's registers now reference the cache through). The fold
+    deletes one public type, the doubled cache reference, and the order-mismatch hazard of handing
+    one scheme another's wrapper — `advect!` now checks the weight scratch's length against the
+    scheme's order outright.
 
 ## References
 
