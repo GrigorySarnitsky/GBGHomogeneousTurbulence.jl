@@ -292,7 +292,7 @@ it can never assemble the right-hand side from a mismatched intermediate state.
 - `scalar = false` — pass `true` when the run carries a passive scalar; it allocates the scalar's
   forcing-rate array, required for a scalar-forced run.
 
-The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds one for
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) builds one for
 you.
 
 !!! warning "The constructor rejects a misdeclared forcing"

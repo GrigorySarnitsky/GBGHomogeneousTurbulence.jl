@@ -79,7 +79,7 @@ exactly what the iteration computes, materializes, and leaves alive at its end, 
 The cache allocates and owns every slot but one: the particle velocities are the tracer set's own
 storage, which the cache borrows and records epochs for rather than filling itself.
 
-Build it on a [`FixedDomain`](@ref) `domain`. The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) front door builds, wires,
+Build it on a [`FixedDomain`](@ref) `domain`. [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) builds, wires,
 and seeds one for you; a hand-assembled run constructs it here.
 
 # Arguments

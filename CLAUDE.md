@@ -298,7 +298,12 @@ the capitalization, so lead with a capitalized word ("The `dissipation` reductio
 
 **Neutral reference register.** A tunable is an *option* / *setting* / *axis* / post-hoc *choice*,
 never a "knob"; keep a neutral tone across every authored surface — docstrings, `ARCHITECTURE.md`, the
-doc pages, and `@testset` names.
+doc pages, and `@testset` names. **No invented aliases for API objects** (owner-ruled 2026-08-24):
+`Simulation` may be called *the front door* only in its own description — its docstring and its own
+api-page/§4.7 sections, where the term is introduced — and every other surface names `Simulation`
+explicitly. The same rule covers any future metaphor: an alias lives where it is defined, nowhere
+else. (The glossary keeps its *front door* row: the decision log's history uses the term, and the
+row is where a reader resolves it.)
 
 ## Doc-edit checklist — run all on every documentation change (most strictly on `ARCHITECTURE.md`)
 

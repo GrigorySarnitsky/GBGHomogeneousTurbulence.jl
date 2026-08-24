@@ -70,7 +70,7 @@ back extracts it with that package's accessors.
 The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
 sampled field — at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1``
-choice and the front door's default; it is a ready-made value rather than a type, so it is passed
+choice and `Simulation`'s default; it is a ready-made value rather than a type, so it is passed
 bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
 and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
 offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
@@ -90,7 +90,7 @@ smoothness parameters.
 
 # Examples
 
-A run carries tracers when the front door is given a count;
+A run carries tracers when `Simulation` is given a count;
 [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) then advances them with the
 fields and records the Lagrangian velocity each iteration, so both reads below are current between
 iterations:

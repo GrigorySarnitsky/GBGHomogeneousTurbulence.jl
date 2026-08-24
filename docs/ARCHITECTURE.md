@@ -619,7 +619,7 @@ Precision and the memory-footprint/accuracy trade-off are **objects of study**, 
 numerical counterpart of the charter that the tool investigates the physics rather than assuming it (§8).
 
 - **Both precisions are supported equally, and no kernel privileges either.** (The `Simulation`
-  front door must start somewhere and starts at `Float64` / `Array`; that is a convenience
+  `Simulation` must start somewhere and starts at `Float64` / `Array`; that is a convenience
   constructor's choice, not a property of the library, and `FixedDomain` takes both from the caller.) `Float32` buys twice the
   grid per byte and roughly twice the throughput on a consumer GPU; `Float64` buys the accuracy
   margin a long integration or a sensitive diagnostic may need. Which one a run wants is a fitness
@@ -713,7 +713,7 @@ generalization is built for them until a second concrete case forces the abstrac
   is a genuine performance lever beside the precision and footprint axes (§5) — but that search is an
   FFTW planning concept that pays off on the **CPU** path, IT's development-and-small-run platform, not
   the GPU-primary production target (invariant 4), where the plan is effectively fixed. It is wired when a
-  long CPU campaign makes the search worth the added front-door surface.
+  long CPU campaign makes the search worth the added `Simulation`-constructor surface.
 - **The ``\nu = 0`` truncated-Euler experiment — a scheme and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in

@@ -155,7 +155,7 @@ therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taki
 Name a forcing before any grid exists, or build it directly once the domain is in hand:
 
 ```julia
-# Name the forcing before any grid exists — the front door supplies the domain:
+# Name the forcing before any grid exists — `Simulation` supplies the domain:
 sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
                  velocity_forcing = ConstantPower(injection_rate = 0.1))
 

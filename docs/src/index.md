@@ -29,7 +29,7 @@ using GBGIsotropicTurbulence
 
 ## Quick start
 
-Build a case at the **front door** — the `Simulation` constructor that builds every component for
+Build a case with the `Simulation` constructor, which builds every component for
 you — spin it up to stationarity, and advance it:
 
 ```julia

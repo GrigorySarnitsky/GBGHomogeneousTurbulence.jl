@@ -102,7 +102,7 @@ pre-rescale seed into shells the mask holds empty, and no guard checks this.
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy
 spectrum, to seed that shape instead — e.g. a von Kármán or Pope form from the
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model spectra, which the run
-layer can wire in for you (the front door forwards its `initial_spectrum` keyword here). Each mode is
+layer can wire in for you (`Simulation` forwards its `initial_spectrum` keyword here). Each mode is
 scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed spectrum is
 ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` and the overall amplitude is fixed by
 the `kinetic_energy` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum

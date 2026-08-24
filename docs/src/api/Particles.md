@@ -72,7 +72,7 @@ new_scalar_point_values
 
 ## Wiring tracers into a run
 
-Pass `number_of_particles` to the front door and the run carries a tracer set: `advance!` pushes it
+Pass `number_of_particles` to `Simulation` and the run carries a tracer set: `advance!` pushes it
 every iteration and records the Lagrangian sample, so the reads below are always current between
 iterations.
 
