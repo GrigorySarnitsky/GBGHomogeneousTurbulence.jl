@@ -18,9 +18,11 @@
     SimulationRun
 
 The run layer:
-- [`Simulation`](@ref) — one run, fully assembled: the domain, the evolving fields, the
-  observables cache, the equations of motion with their forcing, the integration schemes with
-  their scratch, any tracers, and the clock — built with defaults from a few numbers.
+- [`Simulation`](@ref) — everything the next iteration needs, in one value: the domain, the
+  fields at the current instant, the observables cache, the equations of motion with their
+  forcing, the integration schemes with their scratch, any tracers, and the clock — built with
+  defaults from a few numbers. It holds the present instant only; past instants exist only in
+  what an observation recorded as the run advanced.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
   iteration — and its return decides continuation).
@@ -72,7 +74,7 @@ end
                  dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; κ_max_η = nothing, kinetic_energy = 1.5, kwargs...)
 
-Everything one run needs, bundled: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
+Everything the next iteration needs, bundled: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and the
 assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the

@@ -465,7 +465,7 @@ scheme** — the reversible generator of §8 again — so the split does not nai
 
 ### 4.7 `SimulationRun` — the front door
 
-A `Simulation` value bundles what a case advances: the `FixedDomain`, the `ResolvedFields` state (the
+A `Simulation` value bundles what one iteration advances and reads — the present instant, no history: the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
