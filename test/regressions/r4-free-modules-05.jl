@@ -5,7 +5,7 @@
 # Measured 2026-08-21 by temporarily renaming `history_filled` -> `history_valid_count` in
 # src/Cache.jl ONLY (Particles.jl untouched), then reverting:
 #   julia --project -e 'using GBGIsotropicTurbulence'   ->  precompiled + loaded CLEAN
-#   EndpointHeun run, two advance! steps                ->  OK, no error
+#   Heun run, two advance! steps                ->  OK, no error
 #   AdamsBashforth(order = 2) run, one advance! step    ->  FieldError: type ObservablesCache has no
 #                                                           field `history_filled`
 # So load, precompile and the docs build are all blind to the rename; the test suite is NOT

@@ -6,7 +6,7 @@
 # Trajectory time integration is pluggable, exactly as the field side is: the scheme is an
 # `AbstractParticleIntegrator` and its per-step registers are allocated per scheme by
 # `allocate_buffers`, so the tracer set holds only trajectory STATE and never one scheme's scratch.
-# `EndpointHeun` is the one scheme today — second-order, on the velocity at the start and end of the
+# `Heun` is the one scheme today — second-order, on the velocity at the start and end of the
 # step (tₙ and tₙ₊₁), unlike advecting on the frozen start-of-step velocity (effectively first
 # order). Its two velocity fields are exactly what the field solver already produces each step, so
 # the tracer advance stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
@@ -20,11 +20,11 @@ Lagrangian particle tracking — today the massless tracer:
 
 - [`Tracers`](@ref) — the tracer set (positions, a selectable `interpolation_scheme`, and an
   opt-in unwrapped positions read by [`unwrapped_positions`](@ref));
-  [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory
-  velocities are read from the run's observables cache through
+  [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The velocity
+  at the particles is read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
-  [`EndpointHeun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) and
+  [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) and
   [`MultistepBuffers`](@ref) the per-step storage each needs, and [`history_depth`](@ref) the
   sample-history length a scheme requires.
 - [`record_velocity_at_particles!`](@ref) — store the flow velocity at the tracers' current positions,
@@ -44,7 +44,7 @@ using ..Cache: ObservablesCache
 # the particle integration scheme's — because it is one concept: allocate exactly what this scheme needs.
 import ..Propagator: allocate_buffers
 
-export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
+export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
        ParticleIntegratorBuffers, MultistepBuffers,
        record_velocity_at_particles!, advect!, restart!, history_depth, interpolate_at_particles!,
        particle_positions, unwrapped_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
@@ -111,10 +111,10 @@ by hand — takes the `positions` form, and then the scheme's per-step storage i
 ```julia
 tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
                   interpolation_scheme = CatmullRom)
-buffers = allocate_buffers(EndpointHeun(), tracers)
+buffers = allocate_buffers(Heun(), tracers)
 
 record_velocity_at_particles!(tracers, u)     # u(tₙ) at the current positions — do this first
-advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
+advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
@@ -182,11 +182,11 @@ end
 The supertype of the particle integration schemes — how the tracer positions are advanced
 over one step, the Lagrangian counterpart of the field side's
 [`AbstractIntegrator`](@ref GBGIsotropicTurbulence.Propagator.AbstractIntegrator). A scheme is a
-value (`EndpointHeun()`), passed to [`advect!`](@ref) and to
+value (`Heun()`), passed to [`advect!`](@ref) and to
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which builds exactly
 the working storage that scheme needs.
 
-Two members today: [`EndpointHeun`](@ref), a one-step method that buys second order with a second
+Two members today: [`Heun`](@ref), a one-step method that buys second order with a second
 interpolation, and [`AdamsBashforth`](@ref), a multistep method that buys more by reusing the
 Lagrangian samples the run already deposits. Which trade a run wants is a fitness question — one
 interpolation per step against one stored array per extra order.
@@ -195,10 +195,10 @@ abstract type AbstractParticleIntegrator end
 
 
 """
-    EndpointHeun()
+    Heun()
 
-Second-order Heun-in-time on the velocity at the two **ends** of the step — the trajectory
-scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
+Second-order Heun-in-time on the velocity at the two **ends** of the step — the particle
+integration scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
 velocity that [`record_velocity_at_particles!`](@ref) stored and the end-of-step velocity field
 the solver has just produced, so it needs nothing from inside the field scheme's stages.
 
@@ -219,7 +219,7 @@ It needs one set of predicted positions and the velocity interpolated there
     more than an order of magnitude. What governs this in a run is how well the grid resolves the
     dissipation scale, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``.
 """
-struct EndpointHeun <: AbstractParticleIntegrator end
+struct Heun <: AbstractParticleIntegrator end
 
 
 
@@ -276,7 +276,7 @@ struct ParticleIntegratorBuffers{P, PS, VV, C}
 end
 
 
-function allocate_buffers(::EndpointHeun, tracers::Tracers, cache::ObservablesCache)
+function allocate_buffers(::Heun, tracers::Tracers, cache::ObservablesCache)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set — the sample the push " *
@@ -288,7 +288,7 @@ end
 
 
 # A one-step scheme is memoryless: every register it owns is overwritten before it is read.
-restart!(::EndpointHeun, buffers::ParticleIntegratorBuffers) = buffers
+restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
 
 
 """
@@ -300,7 +300,7 @@ parallel pseudo-spectral simulations of turbulence*, *Comput. Phys. Commun.* **2
 [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406)) — buying accuracy in
 time at **no extra field evaluation and no extra interpolation** per step.
 
-Use it in place of [`EndpointHeun`](@ref) when trajectory accuracy in time limits a measurement. Heun
+Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
 buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
 reuses the Lagrangian samples the run has already deposited at earlier instants. The trade is one
 stored array per extra order against one interpolation per step.
@@ -311,7 +311,7 @@ step from the actual step history. That is ``\\mathcal{O}(\\texttt{order}^2)`` h
 step, independent of the tracer count.
 
 A multistep method has no history at ``t_0``, so the first `order - 1` steps are taken with
-`EndpointHeun` and the scheme then switches over; the same restart happens if the tracers are
+`Heun` and the scheme then switches over; the same restart happens if the tracers are
 reseeded. Those second-order starting steps leave a fixed error behind, so over a fixed window
 `order = 4` converges at about third order rather than fourth — on a smooth test problem, ``3.0``
 against ``2.0`` for the two-step method, with an error some fifty times smaller at equal step count.
@@ -326,7 +326,7 @@ produce.
   since an Adams–Bashforth stability region shrinks with each step added — and the bootstrap makes
   high orders *worse*, not just useless: over a fixed window, `order = 6` and `order = 8` measure
   the same third-order convergence as `order = 4` with **larger** errors (measured ``1.0`` and
-  ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `EndpointHeun` bootstrap
+  ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `Heun` bootstrap
   costs more than the extra history returns). `order = 4` is the practical ceiling.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
@@ -334,7 +334,7 @@ produce.
     shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
     constant ``K`` over a span ``t``, Grönwall bounds the trajectory error by
     ``\\delta(\\mathrm{e}^{Kt} - 1)/K`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
-    Where `EndpointHeun`'s docstring reports a crossover in resolution, this scheme has **none**:
+    Where `Heun`'s docstring reports a crossover in resolution, this scheme has **none**:
     at third order under the advective-CFL loop the time error falls as ``\\Delta x^{3}`` — the
     same rate as the default `CatmullRom` floor's ``\\Delta x^{d+1}`` — so their ratio is set by
     prefactors alone, and measured on a band-limited field at ``N = 32``–``128`` the floor stays
@@ -387,7 +387,7 @@ history when the tracers are repositioned.
 
 # Fields
 - `cache` — the `ObservablesCache` holding the sample history this scheme integrates over.
-- `startup` — the [`ParticleIntegratorBuffers`](@ref) the bootstrap `EndpointHeun` steps use.
+- `startup` — the [`ParticleIntegratorBuffers`](@ref) the bootstrap `Heun` steps use.
 - `weights`, `nodes` — the `order`-element host scratch the per-step weight solve works in.
 """
 struct MultistepBuffers{C, S}
@@ -407,14 +407,14 @@ function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache) where {K
     throw(ArgumentError("this cache carries $(length(cache.velocity_at_particles_history)) past " *
                         "sample(s), but `AdamsBashforth(order = $K)` integrates over $(K - 1); " *
                         "build the cache with `history_depth = $K`"))
-  return MultistepBuffers(cache, allocate_buffers(EndpointHeun(), tracers, cache),
+  return MultistepBuffers(cache, allocate_buffers(Heun(), tracers, cache),
                           zeros(Float64, K), zeros(Float64, K))
 end
 
 
 # A one-step scheme carries no history and ignores the cache; the three-argument form exists so a run
 # can allocate either scheme's registers through one call.
-allocate_buffers(scheme::EndpointHeun, tracers::Tracers, cache) = allocate_buffers(scheme, tracers)
+allocate_buffers(scheme::Heun, tracers::Tracers, cache) = allocate_buffers(scheme, tracers)
 
 
 """
@@ -488,7 +488,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
                         "mixing two orders over one history corrupts the bookkeeping in both."))
 
   if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
-    advect!(EndpointHeun(), tracers, velocity_end, domain, buffers.startup, dt)
+    advect!(Heun(), tracers, velocity_end, domain, buffers.startup, dt)
   else
     b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
     # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
@@ -546,7 +546,7 @@ first throws.
 
 The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
 are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
-an [`EndpointHeun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
+an [`Heun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
 ``M\\times3`` values for ``M`` tracers, where keeping the velocity field would cost
 ``N^{3} \\times 3``.
 """
@@ -569,7 +569,7 @@ registers [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_b
 that scheme — `ParticleIntegratorBuffers` or [`MultistepBuffers`](@ref)). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
 
-Under [`EndpointHeun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
+Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
 step — the start-of-step values that [`record_velocity_at_particles!`](@ref) stored, and
 `velocity_end`, the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical
 representation:
@@ -595,7 +595,7 @@ frozen start-of-step velocity alone would be first order.
 """
 function advect! end
 
-function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDomain,
+function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real)
   Δt = real(eltype(point_coordinates(tracers.position_points)))(dt)
   # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.

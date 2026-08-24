@@ -162,7 +162,7 @@ end
 # anything launches. A fixed timestep needs none. Every other scalar here is consumed by a following
 # device kernel and only visits the host because it is written as a Julia number.
 # `stages` is the number of right-hand-side evaluations a step makes (3 for IFLowStorageRK3, 2 for
-# IFRK2). It multiplies the readbacks of a STATE-DEPENDENT forcing, because such a forcing is
+# IFHeun). It multiplies the readbacks of a STATE-DEPENDENT forcing, because such a forcing is
 # evaluated at every stage rather than armed once per step. That is a deliberate cost, taken in
 # exchange for the scheme's order: `ConstantPower` and `VarianceController` have rates that track the
 # band observable, and folding a varying rate into the integrating factor integrates ∫A dt by a

@@ -1,7 +1,7 @@
 # Witness: the `AdamsBashforth` docstring promises "the same restart happens if the tracers are
 # reseeded" — after a hand-written reseed of `particle_positions(tracers)` (the pattern `particles_modified!`
 # sanctions: "a reseed, a hand-written correction, any direct write to the tracer storage"), the
-# scheme must fall back to the `EndpointHeun` startup instead of blending Lagrangian samples taken
+# scheme must fall back to the `Heun` startup instead of blending Lagrangian samples taken
 # along the *old*, pre-reseed trajectory into the *new* one.
 
 using Test
@@ -63,12 +63,12 @@ end
   advect!(scheme, tracers, u1, domain, buffers, dt)
   reseeded = copy(particle_positions(tracers))
 
-  # The behaviour the docstring promises: an `EndpointHeun` startup step from the new positions.
+  # The behaviour the docstring promises: an `Heun` startup step from the new positions.
   reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
   reference_cache = ObservablesCache(domain; number_of_particles = number_of_particles(reference))
-  heun = allocate_buffers(EndpointHeun(), reference, reference_cache)
+  heun = allocate_buffers(Heun(), reference, reference_cache)
   record_velocity_at_particles!(reference_cache, reference, u0)
-  advect!(EndpointHeun(), reference, u1, domain, heun, dt)
+  advect!(Heun(), reference, u1, domain, heun, dt)
 
   @test reseeded ≈ particle_positions(reference)
 end

@@ -17,7 +17,7 @@ using Test, Random, GBGIsotropicTurbulence
 
   # The claim: the same call, same physics, default one-step particle integration scheme.
   b = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 4,
-                 particle_integration_scheme = EndpointHeun(), rng = MersenneTwister(1))
+                 particle_integration_scheme = Heun(), rng = MersenneTwister(1))
   @test_throws ArgumentError advance!(b; dt = -2e-3)
   @test current_step(b) == 0            # a refused call must not have advanced the run
   @test current_time(b) ≥ 0             # the clock must never run backwards

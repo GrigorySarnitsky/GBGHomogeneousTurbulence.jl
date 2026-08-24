@@ -3,7 +3,7 @@ Cache.jl::Cache,115,0,328
 Cache.jl::ObservablesCache(domain; scalar = false， number_of_particles = 0， history_depth = 1),80,1,739
 Cache.jl::deposit_sample!(cache),73,0,139
 Cache.jl::fields_modified!(cache),70,1,249
-Cache.jl::particles_modified!(cache),65,0,247
+Cache.jl::particles_modified!(cache),66,0,248
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_at_particles(cache),111,0,112
 Cache.jl::velocity_physical(cache),83,0,84
@@ -45,10 +45,10 @@ Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
 Particles.jl::AdamsBashforth(; order = 4),100,1,692
-Particles.jl::EndpointHeun(),53,1,249
+Particles.jl::Heun(),54,1,250
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,44,0,170
-Particles.jl::Particles,8,0,137
+Particles.jl::Particles,8,0,139
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,84,0,617
 Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,58,1,216
 Particles.jl::history_depth(scheme) -> Int,28,0,47
@@ -76,8 +76,8 @@ Phenomenology.jl::structure_function(law， r， fp; order) -> Float64,69,0,75
 Phenomenology.jl::taylor_microscale(fp) -> Float64,28,0,31
 Phenomenology.jl::taylor_reynolds(fp) -> Float64,35,0,38
 Propagator.jl::AbstractIntegrator,36,0,37
+Propagator.jl::IFHeun(),57,1,189
 Propagator.jl::IFLowStorageRK3(),73,0,278
-Propagator.jl::IFRK2(),54,1,186
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,87,0,209
@@ -107,7 +107,7 @@ SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2006
 SimulationRun.jl::SimulationRun,89,0,121
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,98,0,571
-SimulationRun.jl::advance!(sim; dt = nothing),51,0,86
+SimulationRun.jl::advance!(sim; dt = nothing),51,0,87
 SimulationRun.jl::current_step(sim),85,0,100
 SimulationRun.jl::current_time(sim),6,0,7
 SimulationRun.jl::flow_parameters(sim),96,0,97

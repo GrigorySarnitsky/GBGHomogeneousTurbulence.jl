@@ -155,7 +155,7 @@ using Test
     rk3_velocity, rk3_scalar = ratios(IFLowStorageRK3())
     @test 5.0 < rk3_velocity < 12.0        # third order ⇒ ≈ 8
     @test 5.0 < rk3_scalar < 12.0          # the scalar must match — the stage-ordering guard
-    rk2_velocity, rk2_scalar = ratios(IFRK2())
+    rk2_velocity, rk2_scalar = ratios(IFHeun())
     @test 3.0 < rk2_velocity < 6.0         # second order ⇒ ≈ 4
     @test 3.0 < rk2_scalar < 6.0
   end

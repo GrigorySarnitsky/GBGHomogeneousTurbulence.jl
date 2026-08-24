@@ -25,7 +25,7 @@ number_of_particles
 ## The particle integration scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes.
-`EndpointHeun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches
+`Heun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches
 further by reusing the Lagrangian samples already deposited, at no extra interpolation. Each
 scheme's storage is allocated by
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
@@ -33,7 +33,7 @@ you.
 
 ```@docs
 AbstractParticleIntegrator
-EndpointHeun
+Heun
 AdamsBashforth
 ```
 
@@ -46,7 +46,7 @@ MultistepBuffers
 
 The steps of Lagrangian tracking: record the flow velocity where each tracer currently sits, advance
 the tracers once the fields have moved, then read any physical field at the particle positions for
-the Lagrangian statistics. Recording and pushing are two verbs because `EndpointHeun` needs the velocity
+the Lagrangian statistics. Recording and pushing are two verbs because `Heun` needs the velocity
 at both ends of the step: the run records the sample at the iteration's end, off the just-deposited
 velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 

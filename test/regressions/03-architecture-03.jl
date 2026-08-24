@@ -6,7 +6,7 @@
 # nor pass after one, so it proves nothing in either direction and the runner correctly called it
 # BROKEN. The finding it was gathering evidence for was real: `allocate_buffers` had no
 # `::AbstractIntegrator` fallback and hard-errored, while `_base_cfl` returned 0.3 — a constant
-# appearing in no docstring, and ABOVE `IFRK2`'s 0.25, so a new scheme with a tighter stability limit
+# appearing in no docstring, and ABOVE `IFHeun`'s 0.25, so a new scheme with a tighter stability limit
 # was silently handed too large a timestep.
 
 using Test
@@ -27,7 +27,7 @@ struct ProbeScheme <: AbstractIntegrator end
 
   # The declared schemes are unaffected, and their limits remain distinct — which is why no single
   # fallback value could have been right for an undeclared one.
-  cfl2 = recommended_cfl(IFRK2(), domain)
+  cfl2 = recommended_cfl(IFHeun(), domain)
   cfl3 = recommended_cfl(IFLowStorageRK3(), domain)
   @test cfl2 > 0 && cfl3 > 0
   @test cfl2 < cfl3            # 0.25 against 0.5: any fixed guess is wrong for one of them

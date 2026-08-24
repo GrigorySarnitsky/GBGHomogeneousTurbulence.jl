@@ -1,5 +1,5 @@
 # Integrator tests — the decisive check is temporal convergence order: IFLowStorageRK3 must be
-# third-order and IFRK2 second-order in Δt. Measured by self-convergence (Cauchy): integrating the
+# third-order and IFHeun second-order in Δt. Measured by self-convergence (Cauchy): integrating the
 # same unforced decay to a fixed time with steps Δt, Δt/2, Δt/4, the ratio ‖u(Δt)−u(Δt/2)‖ /
 # ‖u(Δt/2)−u(Δt/4)‖ ≈ 2^p for order p (≈8 for RK3, ≈4 for RK2). Plus RK3 forced-HIT invariants and
 # the per-scheme CFL. (Velocity-only: the scalar is carried inert at zero.)
@@ -52,7 +52,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     u4 = integrate_fixed(rk3, domain, û0, unforced, Tfinal / (4n), 4n)
     rk3_ratio = diffnorm(u1, u2) / diffnorm(u2, u4)
 
-    rk2 = IFRK2()
+    rk2 = IFHeun()
     v1 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / n, n)
     v2 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (2n), 2n)
     v4 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (4n), 4n)
@@ -98,8 +98,8 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   end
 
   @testset "recommended_cfl" begin
-    @test recommended_cfl(IFLowStorageRK3(), domain) > recommended_cfl(IFRK2(), domain)
-    @test 0 < recommended_cfl(IFRK2(), domain) < 1
+    @test recommended_cfl(IFLowStorageRK3(), domain) > recommended_cfl(IFHeun(), domain)
+    @test 0 < recommended_cfl(IFHeun(), domain) < 1
     @test 0 < recommended_cfl(IFLowStorageRK3(), domain) < 1
   end
 end

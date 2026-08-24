@@ -11,7 +11,7 @@
 # diffusive one E_κ (κ = ν/Sc), both reaching the same lab time each substep. Advancing velocity
 # fully and then the scalar would drop the substage velocities and degrade the coupling to first order.
 #
-# IFLowStorageRK3 (Williamson 2N) is the general-purpose workhorse; IFRK2 (Heun) trades a register
+# IFLowStorageRK3 (Williamson 2N) is the general-purpose workhorse; IFHeun trades a register
 # for a transform (cheaper in transforms, dearer in memory) and is an option that is
 # imaginary-axis unstable for advection (see its docstring). Each `step!` reads the deposited velocity
 # and vorticity from the `ObservablesCache` (deposited by the previous iteration's closing `deposit!`,
@@ -27,8 +27,8 @@ are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `field_integration_scheme` is chosen from.
-- [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
-  two-stage alternative — cheaper in transforms, dearer by one register per field, and
+- [`IFLowStorageRK3`](@ref), [`IFHeun`](@ref) — the schemes (RK3 low-storage; IFHeun a
+  two-stage Heun — cheaper in transforms, dearer by one register per field, and
   imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
@@ -49,7 +49,7 @@ using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_p
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
 
-export AbstractIntegrator, IFRK2, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
+export AbstractIntegrator, IFHeun, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
        deposit!, recommended_cfl
 
 
@@ -69,9 +69,9 @@ abstract type AbstractIntegrator end
 # `nothing` otherwise (so a velocity-only run allocates none of them).
 struct ScalarBuffers{SS, ST2, SST, NL}
   stage1::SS
-  stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
-  predictor_spectral::SST             # IFRK2 only
-  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
+  stage2::ST2                    # IFHeun only (nothing for IFLowStorageRK3)
+  predictor_spectral::SST             # IFHeun only
+  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFHeun)
 end
 
 
@@ -104,22 +104,22 @@ only the scheme's own spectral stage registers.
 
 # Fields
 - `stage1` — the first Runge–Kutta stage register, allocated by every scheme (the accumulator for
-  [`IFLowStorageRK3`](@ref), the first stage for [`IFRK2`](@ref)).
+  [`IFLowStorageRK3`](@ref), the first stage for [`IFHeun`](@ref)).
 - `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
 - `stage2`, `velocity_predictor_spectral` — the second stage register and the substage velocity predictor
-  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFRK2` only, else `nothing`.
+  ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFHeun` only, else `nothing`.
 - `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
   fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
-  `stage2` and `predictor_spectral` (`IFRK2`'s corrector register and predictor state ``\\hat\\varphi^*``),
+  `stage2` and `predictor_spectral` (`IFHeun`'s corrector register and predictor state ``\\hat\\varphi^*``),
   and `nonlinear` (`IFLowStorageRK3` only).
 
 """
 struct IntegratorBuffers{VS, ST2, VSS, NL, SB}
   stage1::VS
-  stage2::ST2                    # IFRK2 only (nothing for IFLowStorageRK3)
-  velocity_predictor_spectral::VSS    # IFRK2 only
-  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFRK2)
+  stage2::ST2                    # IFHeun only (nothing for IFLowStorageRK3)
+  velocity_predictor_spectral::VSS    # IFHeun only
+  nonlinear::NL                  # IFLowStorageRK3 only (nothing for IFHeun)
   scalar::SB                     # ScalarBuffers, or nothing when no passive scalar is evolved
 end
 
@@ -156,7 +156,7 @@ a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
 The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `scheme`
 needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
 backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`;
-[`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
+[`IFHeun`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
 adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
 The second and third serve the particle integration schemes: each builds the registers the `scheme` (an
@@ -177,7 +177,7 @@ function allocate_buffers end
     step!(scheme, state, generator, domain, buffers, cache, dt)
 
 Advance the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` held in `state`
-by one timestep `dt` in place. Dispatches on the concrete `scheme` type (see `IFRK2`,
+by one timestep `dt` in place. Dispatches on the concrete `scheme` type (see `IFHeun`,
 `IFLowStorageRK3`).
 
 - `scheme` — the stateless dispatch tag naming the scheme.
@@ -224,7 +224,7 @@ Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980
 *Low-storage Runge–Kutta schemes*, *J. Comput. Phys.* **35**, 48–56,
 [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). The
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
-unlike [`IFRK2`](@ref).
+unlike [`IFHeun`](@ref).
 
 The diffusive integrating factor ``\\mathcal{E}_D(\\tau)`` over a substep interval ``\\tau``
 (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) takes its
@@ -348,9 +348,9 @@ end
 
 
 """
-    IFRK2()
+    IFHeun()
 
-Integrating-factor second-order Runge–Kutta (Heun). With the velocity and scalar integrating
+Integrating-factor Heun — the two-stage, second-order Runge–Kutta. With the velocity and scalar integrating
 factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the generator's
 [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
 [`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) at ``D = \\nu`` and
@@ -378,10 +378,10 @@ respectively, then the forcings are applied. Two nonlinear evaluations per step.
     for well-resolved, modest-Reynolds-number runs — prefer
     [`IFLowStorageRK3`](@ref) for high Reynolds number or marginal resolution.
 """
-struct IFRK2 <: AbstractIntegrator end
+struct IFHeun <: AbstractIntegrator end
 
 
-function step!(::IFRK2, state::ResolvedFields, generator::ResolvedGenerator,
+function step!(::IFHeun, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity_spectral, state.scalar_spectral
   T = real(eltype(field_data(û)))
@@ -463,34 +463,34 @@ end
 
 # Per-scheme scratch — each scheme allocates exactly its working set; there is no `::AbstractIntegrator`
 # fallback, so a scheme with no method here is a hard error (never a silent over-allocation).
-# IFLowStorageRK3 uses stage1 + nonlinear; IFRK2 uses stage1 + stage2 + velocity_predictor_spectral; each
+# IFLowStorageRK3 uses stage1 + nonlinear; IFHeun uses stage1 + stage2 + velocity_predictor_spectral; each
 # leaves the other scheme's registers `nothing`.
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
   new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
 )
-ScalarBuffers(::IFRK2, domain::FixedDomain) = ScalarBuffers(
+ScalarBuffers(::IFHeun, domain::FixedDomain) = ScalarBuffers(
   new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), new_scalar_field_spectral(domain), nothing,   # stage1, stage2, predictor_spectral, nonlinear
 )
 
 allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   new_vector_field_spectral(domain),                                # stage1
-  nothing,                                                # stage2 (IFRK2 only)
-  nothing,                                                # velocity_predictor_spectral (IFRK2 only)
+  nothing,                                                # stage2 (IFHeun only)
+  nothing,                                                # velocity_predictor_spectral (IFHeun only)
   new_vector_field_spectral(domain),                                # nonlinear
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
 )
 
-allocate_buffers(::IFRK2, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
+allocate_buffers(::IFHeun, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
   new_vector_field_spectral(domain),                                # stage1
   new_vector_field_spectral(domain),                                # stage2
   new_vector_field_spectral(domain),                                # velocity_predictor_spectral
   nothing,                                                # nonlinear (IFLowStorageRK3 only)
-  scalar ? ScalarBuffers(IFRK2(), domain) : nothing,
+  scalar ? ScalarBuffers(IFHeun(), domain) : nothing,
 )
 
 
 # The closing deposit's spectral working space is a stage register that is dead once the step closes
-# (and, before the first step, merely zeroed): `nonlinear` for IFLowStorageRK3, `stage2` for IFRK2 —
+# (and, before the first step, merely zeroed): `nonlinear` for IFLowStorageRK3, `stage2` for IFHeun —
 # each consumed into its update before `step!` returns.
 _recovery_scratch(buffers::IntegratorBuffers) =
   buffers.nonlinear === nothing ? buffers.stage2 : buffers.nonlinear
@@ -595,13 +595,13 @@ guaranteed to cover the first, which is why the base ceiling carries a margin.
 
 That base is calibrated for the ``2/3`` rule, where ``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``.
 For [`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives
-``C_{\\mathrm{CFL}} \\lesssim 0.83``, taken conservatively as ``0.5``. [`IFRK2`](@ref) is
+``C_{\\mathrm{CFL}} \\lesssim 0.83``, taken conservatively as ``0.5``. [`IFHeun`](@ref) is
 imaginary-axis unstable (``y_{\\mathrm{s}} = 0``, relying on viscous damping), which makes the
 formula degenerate: its ``0.25`` is an empirical margin rather than a computed limit.
 
-!!! warning "The IFRK2 margin does not know the viscosity"
+!!! warning "The IFHeun margin does not know the viscosity"
     This function takes no ``\\nu``, by design — a CFL ceiling is a property of the scheme and the
-    grid — but `IFRK2`'s margin is the one value that depends on a quantity it cannot see.
+    grid — but `IFHeun`'s margin is the one value that depends on a quantity it cannot see.
     The same `0.25` is returned at every Reynolds number while the viscous damping it rests on
     weakens as ``\\nu`` falls. No code-level guard exists — adding one would give a grid-and-scheme
     property a physics argument. The practical course at high Reynolds number is to prefer
@@ -612,7 +612,7 @@ The base is then scaled by the domain's dealiasing: a strategy that keeps modes 
 ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the
 Nyquist wavenumber) takes a proportionally smaller step,
 ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to both schemes' bases,
-`IFRK2`'s empirical one included — the dependence on how much of the band is kept is geometric,
+`IFHeun`'s empirical one included — the dependence on how much of the band is kept is geometric,
 holding whether the base was computed or measured — the scaled value is only as trustworthy as
 its base. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
@@ -624,11 +624,11 @@ function recommended_cfl end
 #
 # NO `::AbstractIntegrator` FALLBACK, matching `allocate_buffers` on the same supertype: a scheme
 # that has not declared its stability limit gets a hard error, not a number. The fallback that stood
-# here returned 0.3, which is not a conservative choice — it sits ABOVE `IFRK2`'s 0.25 — so a new
+# here returned 0.3, which is not a conservative choice — it sits ABOVE `IFHeun`'s 0.25 — so a new
 # scheme with a tighter limit would have been handed too large a timestep silently, and 0.3 appeared
 # in no docstring or doc page a reader could check it against. A stability limit is a property of the
 # scheme, so the scheme states it or the run refuses to guess.
-_base_cfl(::IFRK2) = 0.25
+_base_cfl(::IFHeun) = 0.25
 _base_cfl(::IFLowStorageRK3) = 0.5
 
 # Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction

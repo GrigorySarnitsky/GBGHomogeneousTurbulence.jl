@@ -80,7 +80,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
 !!! note "Work in progress"
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) and
-    [`IFRK2`](@ref)), with the forcing menu `NoForcing`, `Linear`, `ConstantPower`,
+    [`IFHeun`](@ref)), with the forcing menu `NoForcing`, `Linear`, `ConstantPower`,
     `VarianceController` (the default), and `VarianceRescaling`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     provide usable model spectra, structure-function laws, and scaling constants. Accumulating

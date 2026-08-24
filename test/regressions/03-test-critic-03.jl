@@ -3,7 +3,7 @@
 # `AdamsBashforth`'s docstring states that over a fixed window `order = 4` converges at about third
 # order rather than fourth — "3.0 against 2.0 for the two-step method, with an error some fifty times
 # smaller at equal step count" — because the `order - 1` bootstrap steps are taken with
-# `EndpointHeun`. Nothing in the suite advanced a trajectory and measured that ratio: the existing
+# `Heun`. Nothing in the suite advanced a trajectory and measured that ratio: the existing
 # checks pin `_adams_bashforth_weights` in isolation, or run `advect!` and only assert that the
 # positions moved and stayed in the box. The wiring between the weight vector `b[j]` and the rotated
 # history `past[j-1]` — a transposition, or an off-by-one in the shift-loop range for K > 2 — is

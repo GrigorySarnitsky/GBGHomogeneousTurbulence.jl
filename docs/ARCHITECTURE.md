@@ -401,14 +401,14 @@ Method (§3).
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
-  **`IFRK2`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
+  **`IFHeun`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
   three) but *dearer* in memory and imaginary-axis unstable, leaning on viscous damping. The memory
-  comparison counts the solver's scratch registers per field: `IFRK2` carries three (a predictor
+  comparison counts the solver's scratch registers per field: `IFHeun` carries three (a predictor
   plus two stage registers that double as its assemblies) against `IFLowStorageRK3`'s two (an
   accumulator plus the assembly register). Williamson's own "2N" label counts differently — the
   state's array plus the accumulator, the assembly excluded as the solver's, not the scheme's (the
   `IFLowStorageRK3` docstring keeps that ledger); the two bookkeepings agree on the point that
-  matters, one register in `IFRK2`'s disfavor. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  matters, one register in `IFHeun`'s disfavor. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -428,7 +428,7 @@ inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \b
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
 with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
-(decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
+(decision 50). The default scheme, `Heun`, is Heun-in-time on
 the velocity at the iteration's two endpoints. ``\boldsymbol{v}_1`` is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
 Lagrangian velocity, held in the observables cache's own `velocity_at_particles` slot and dated
@@ -451,7 +451,7 @@ the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
-registers. Two axes matter: the particle integration scheme — the default second-order `EndpointHeun`, and the
+registers. Two axes matter: the particle integration scheme — the default second-order `Heun`, and the
 variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
 and its own registers in `MultistepBuffers`; decision 57) for a run whose trajectory accuracy in
 time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
@@ -719,7 +719,7 @@ generalization is built for them until a second concrete case forces the abstrac
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
   continuous time — so measured energy drift isolates the time scheme alone: a
   conservation and order-of-accuracy test on `IFLowStorageRK3` (the drift must scale with the
-  scheme's order; at ``\nu = 0`` `IFRK2` is excluded — its stability rests entirely on viscous
+  scheme's order; at ``\nu = 0`` `IFHeun` is excluded — its stability rests entirely on viscous
   damping, which the oracle removes, so it would measure an instability, not an order), a second
   witness that the sharp strategies are exactly Galerkin (an alias residue breaks the detailed
   conservation of the retained triads), and a direct measurement of the Hou–Li filter's effective
@@ -826,7 +826,7 @@ one usually encodes a decision.
    runtime cost. **Each scheme allocates exactly its working set:** `allocate_buffers` dispatches on the
    concrete scheme and builds only the registers that scheme writes — there is no over-allocating
    `::AbstractIntegrator` fallback, so a scheme with no method is a hard error, never a silent superset
-   (an `IFLowStorageRK3` run carries neither of the two registers `IFRK2` adds — its corrector stage
+   (an `IFLowStorageRK3` run carries neither of the two registers `IFHeun` adds — its corrector stage
    and its velocity predictor).
 5. **GPU-first, single-node, backend-agnostic.** Shared-memory only; no distributed or multi-GPU scope
    (inherited from `GBGPeriodicFields`).
@@ -2179,6 +2179,21 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     follows the keywords: "the particle integration scheme", with "trajectory scheme" retired
     outside this log. Scope, as in decision 62: the `Simulation` keywords and struct fields only —
     bare `scheme` remains the protocol's positional name, where dispatch already types it.
+
+69. **(2026-08, user-directed) The scheme names keep the method, not the qualifier: `EndpointHeun`
+    → `Heun`, `IFRK2` → `IFHeun`.** The `Endpoint` qualifier stated an architecture invariant, not
+    a property of one scheme: the decoupled design deposits fields only at iteration ends, so
+    *every* particle integration scheme consumes endpoint data — `AdamsBashforth` was never
+    qualified, and mathematically Heun's method *is* the two-endpoint explicit trapezoidal RK2, so
+    the qualifier was redundant against the textbook as well. The invariant is stated once, in
+    §4.6 and the scheme docstrings. No cross-family prefix pair (`FieldHeun` / `ParticleHeun`) was
+    adopted: the field family's `IF` prefix already does that work by naming the property that
+    makes them field schemes — the exact integrating factor — so the families stay lexically
+    disjoint, and the particle side needs no prefix the keyword
+    `particle_integration_scheme` and the supertype `AbstractParticleIntegrator` already carry
+    (decision 68). The field member gains the same method-first courtesy: `IFRK2` — verified to be
+    exactly integrating-factor Heun (full Euler predictor, trapezoidal corrector, both stages on
+    the endpoint nodes) — is renamed `IFHeun`, naming the method rather than its stage count.
 
 ## References
 

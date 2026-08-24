@@ -5,7 +5,7 @@
 # at Particles.jl:347) on every call, while `MultistepBuffers` carries no scratch for them.
 #
 # Scope note, measured here and NOT part of the claim: the tracer path is not allocation-free as a
-# whole — `GBGPeriodicFields`' `interpolate!` allocates 912 bytes per call, so `EndpointHeun`'s
+# whole — `GBGPeriodicFields`' `interpolate!` allocates 912 bytes per call, so `Heun`'s
 # `advect!` and `record_velocity_at_particles!` each cost that much per step whatever the scheme.
 # That is a backend cost, outside this package. The multistep branch of `advect!(::AdamsBashforth, …)`
 # interpolates nothing, so its correct allocation count is exactly zero: the assertions below are
@@ -27,7 +27,7 @@ end
 
   # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not IT's.
   heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                    particle_integration_scheme = EndpointHeun(), rng = MersenneTwister(11))
+                    particle_integration_scheme = Heun(), rng = MersenneTwister(11))
   for _ in 1:3; advance!(heun); end
   heun_bytes = allocations_of(advect!, heun.particle_integration_scheme, heun.tracers,
                               velocity_physical(heun.cache), heun.domain,

@@ -6,7 +6,7 @@ using Test, Random, GBGIsotropicTurbulence
 
 @testset "advance! with a hand-fixed dt must not silently accept a blown-up (non-finite) state" begin
   make = () -> Simulation(grid_points_per_axis = 8, viscosity = 1e-6,
-                          velocity_forcing = Linear(rate = 50.0), field_integration_scheme = IFRK2(), rng = MersenneTwister(42))
+                          velocity_forcing = Linear(rate = 50.0), field_integration_scheme = IFHeun(), rng = MersenneTwister(42))
 
   # (1) A fixed-dt run must never return normally having deposited a non-finite maximum speed.
   sim = make()

@@ -48,7 +48,7 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_velocity_at_particles!, advect!,
+using ..Particles: Tracers, AbstractParticleIntegrator, Heun, record_velocity_at_particles!, advect!,
                    unwrapped_positions, particle_positions,
                    restart!, history_depth
 using ..Phenomenology: FlowParameters, taylor_reynolds
@@ -221,7 +221,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   whether to also track the winding-preserving unwrapped positions (read with
   [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
   mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
-- `particle_integration_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
+- `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
@@ -346,7 +346,7 @@ function Simulation(domain::FixedDomain;
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
                     unwrapped::Bool = false,
-                    particle_integration_scheme::AbstractParticleIntegrator = EndpointHeun(),
+                    particle_integration_scheme::AbstractParticleIntegrator = Heun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
@@ -598,8 +598,8 @@ velocity, the longest mode's diffusive-decay time (the same diffusive-decay boun
 docstring states), and `max_dt`.
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
-is readable when it returns. Advects the tracers, if any, under the run's chosen trajectory
-scheme, and updates the clock.
+is readable when it returns. Advects the tracers, if any, under the run's chosen particle
+integration scheme, and updates the clock.
 
 Returns `sim`.
 """

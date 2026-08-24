@@ -211,7 +211,7 @@ end
 
 # The substage recoveries (PF's preserving to_physical! arity / Observables.vorticity_physical!) from the
 # spectral stage state `src` — û itself for the in-place IFLowStorageRK3 stages, the spectral
-# predictor for IFRK2's stage 2 — into the cache slots taken as the stage registers, through the
+# predictor for IFHeun's stage 2 — into the cache slots taken as the stage registers, through the
 # scheme's dead spectral register `scratch` (`nl` for RK3, `stage2` for RK2). The plain recovery
 # copies first (the in-place inverse transform consumes its spectral source); the curl fuses that
 # copy into its derivative multiply.
@@ -286,7 +286,7 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
 end
 
 
-# IFRK2 (Heun) as one iteration: stage 1 through the deposited observables, the predictor
+# IFHeun (Heun) as one iteration: stage 1 through the deposited observables, the predictor
 # pair, the stage-2 assembly at the predictor state (recovered into the taken chart slots), the
 # corrector combinations, then the closing deposit.
 function rk2_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)

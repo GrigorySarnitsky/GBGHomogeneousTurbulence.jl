@@ -9,7 +9,7 @@
 #     plus a per-forcing DELTA table and a tracer DELTA, and an exhaustive sweep over the whole
 #     product (~360 combinations) asserts measured = base + deltas, cell by cell. Adding or removing
 #     a buffer anywhere fails the suite: a footprint change must be a conscious, recorded decision,
-#     never a drive-by. (The particle-scheme axis carries two points: `EndpointHeun`, which enters as
+#     never a drive-by. (The particle-scheme axis carries two points: `Heun`, which enters as
 #     on/off, and `AdamsBashforth{K}`, whose sample history adds K−1 (M, 3) arrays — priced below,
 #     since they scale with the ORDER and not with the grid; precision, backend, and the
 #     interpolation scheme change bytes, never counts.)
@@ -151,7 +151,7 @@ _build_forcing(tag, domain) =
   tag === :controller ? VarianceController(domain; target = 0.5) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
-_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFRK2()
+_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFHeun()
 const FORCING_TAGS = (:none, :band, :linear, :power, :controller, :ou)
 
 
@@ -329,7 +329,7 @@ const EPISODE_UNITS = [
     # changes that count and neither of the others.
     tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, interpolation_scheme = CatmullRom, rng = MersenneTwister(1))
     tcache = ObservablesCache(domains[:TwoThirds]; number_of_particles = 4)
-    buffers = allocate_buffers(EndpointHeun(), tracers, tcache)
+    buffers = allocate_buffers(Heun(), tracers, tcache)
     _m_arrays(owner) = (acc = AbstractArray[];
                         collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
                         [a for a in acc if size(a) == (4, 3)])
@@ -499,7 +499,7 @@ const EPISODE_UNITS = [
     # margin without being brittle about small run-layer bookkeeping.
     N = 16
     unit = 8 * N^3
-    for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFRK2()),
+    for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFHeun()),
         scalar in (false, true)
       sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
                        field_integration_scheme = scheme, rng = MersenneTwister(1))

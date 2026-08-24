@@ -25,12 +25,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom,
                     unwrapped = true)
   cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-  buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+  buffers = allocate_buffers(Heun(), tracers, cache)
   nsteps = 160
   dt = T(2.5) * L / nsteps                              # total drift 2.5 boxes in x
   for _ in 1:nsteps
     record_velocity_at_particles!(cache, tracers, u)
-    advect!(EndpointHeun(), tracers, u, domain, buffers, dt)
+    advect!(Heun(), tracers, u, domain, buffers, dt)
   end
   Xw = particle_positions(tracers)
   Xu = unwrapped_positions(tracers)

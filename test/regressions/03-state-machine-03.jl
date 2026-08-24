@@ -1,7 +1,7 @@
 # Witness: an announced tracer reposition must restart the Adams–Bashforth multistep history.
 #
 # `AdamsBashforth`'s own docstring promises: "the first `order - 1` steps are taken with
-# `EndpointHeun` and the scheme then switches over; the same restart happens if the tracers are
+# `Heun` and the scheme then switches over; the same restart happens if the tracers are
 # reseeded."  `MultistepBuffers.past` holds Lagrangian velocity samples measured along the OLD
 # trajectory; after a reposition announced through `particles_modified!` those samples belong to a
 # different trajectory and must not enter the next position update.

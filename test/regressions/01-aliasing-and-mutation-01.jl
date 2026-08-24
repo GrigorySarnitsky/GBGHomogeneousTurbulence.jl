@@ -1,7 +1,7 @@
 # Witness: AdamsBashforth must restart its history when the tracers are reseeded.
 #
 # `AdamsBashforth`'s own docstring promises: "the first `order - 1` steps are taken with
-# `EndpointHeun` and the scheme then switches over; the same restart happens if the tracers are
+# `Heun` and the scheme then switches over; the same restart happens if the tracers are
 # reseeded."  The invariant that promise encodes, stated without prescribing the mechanism:
 #
 #     after a reseed, the next tracer update may depend only on the POST-reseed trajectory —
@@ -13,7 +13,7 @@
 # positions through the sanctioned announcement (`particles_modified!` → `record_velocity_at_particles!`
 # → `deposit_sample!`, the recipe `particles_modified!`'s docstring prescribes) and each takes one
 # further step of the same size.  Their post-reseed state is identical, so the resulting positions
-# must be identical.  `EndpointHeun`, which keeps no history, is the control.
+# must be identical.  `Heun`, which keeps no history, is the control.
 
 using Test, Random, GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data
@@ -59,8 +59,8 @@ function positions_after_reseed(scheme)
   return Array(particle_positions(a.tracers)), Array(particle_positions(b.tracers))
 end
 
-@testset "control — EndpointHeun, which keeps no history, is unaffected by a reseed" begin
-  xa, xb = positions_after_reseed(EndpointHeun())
+@testset "control — Heun, which keeps no history, is unaffected by a reseed" begin
+  xa, xb = positions_after_reseed(Heun())
   @test xa ≈ xb atol = 1e-12
 end
 

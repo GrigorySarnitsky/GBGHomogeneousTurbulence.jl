@@ -16,10 +16,10 @@ using Test
   ν = 5.0e-2
 
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
-  buffers = allocate_buffers(IFRK2(), domain; scalar = true)
+  buffers = allocate_buffers(IFHeun(), domain; scalar = true)
   conditions = FlowConditions(viscosity = ν,
                     velocity_forcing = VarianceRescaling(domain; target = 0.6, over = :band, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, scalar_forcing = NoForcing())
-  scheme = IFRK2()
+  scheme = IFHeun()
   generator = ResolvedGenerator(domain, conditions; scalar = true)
 
   û = new_vector_field_spectral(domain)

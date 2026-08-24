@@ -1,6 +1,6 @@
 # Supporting measurement for the architecture finding "the memory/optimality audits enumerate one
 # particle integration scheme". Not a pass/fail regression test: it prints the per-particle residency the
-# audits pin (four (M, 3) arrays, EndpointHeun) beside what a front-door `AdamsBashforth` run
+# audits pin (four (M, 3) arrays, Heun) beside what a front-door `AdamsBashforth` run
 # actually holds, using the audits' own reflective walk.
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: CatmullRom
@@ -25,13 +25,13 @@ m_arrays(owner) = (acc = AbstractArray[];
 tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                   rng = MersenneTwister(1))
 cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-heun_buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+heun_buffers = allocate_buffers(Heun(), tracers, cache)
 println("audit-pinned:      tracers=", length(m_arrays(tracers)),
         " buffers=", length(m_arrays(heun_buffers)),
         " total=", length(m_arrays(tracers)) + length(m_arrays(heun_buffers)))
 
 # What a live front-door run holds on each point of the (unswept) trajectory-scheme axis.
-for scheme in (EndpointHeun(), AdamsBashforth(order = 2), AdamsBashforth(order = 4),
+for scheme in (Heun(), AdamsBashforth(order = 2), AdamsBashforth(order = 4),
                AdamsBashforth(order = 8))
   sim = Simulation(domain; viscosity = 0.1, number_of_particles = M,
                    particle_integration_scheme = scheme, rng = MersenneTwister(1))

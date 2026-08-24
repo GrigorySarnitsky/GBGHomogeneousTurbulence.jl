@@ -2,13 +2,13 @@
 #
 # `AdamsBashforth`'s docstring (src/Particles.jl:266-268) states:
 #   "A multistep method has no history at t₀, so the first `order - 1` steps are taken with
-#    `EndpointHeun` and the scheme then switches over; the same restart happens if the tracers are
+#    `Heun` and the scheme then switches over; the same restart happens if the tracers are
 #    reseeded."
 #
 # A reseed is announced with `particles_modified!` (the documented protocol: write the positions,
 # announce, `record_velocity_at_particles!`, `deposit_sample!`). After that protocol the AB scheme's
 # stored past samples are Lagrangian velocities of the abandoned trajectories, so the scheme must
-# restart: `filled == 0`, and the next advance must be the startup `EndpointHeun` step.
+# restart: `filled == 0`, and the next advance must be the startup `Heun` step.
 
 using Test, Random
 using GBGIsotropicTurbulence
@@ -23,7 +23,7 @@ end
 
 @testset "AdamsBashforth restarts its history when the tracers are reseeded" begin
   ab = build(AdamsBashforth(order = 4))
-  heun = build(EndpointHeun())
+  heun = build(Heun())
 
   # Fill AB4's history (order - 1 = 3 past samples).
   for _ in 1:4
@@ -48,7 +48,7 @@ end
   # The documented restart: the abandoned trajectories' samples are discarded.
   @test ab.cache.history_filled == 0
 
-  # ... and therefore the first post-reseed advance is a startup EndpointHeun step, so the two runs
+  # ... and therefore the first post-reseed advance is a startup Heun step, so the two runs
   # must still agree on the tracer positions.
   advance!(ab); advance!(heun)
   deviation = maximum(abs, particle_positions(ab.tracers) .- particle_positions(heun.tracers))

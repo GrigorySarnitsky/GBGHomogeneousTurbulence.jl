@@ -13,7 +13,7 @@ then the second-order Heun, imaginary-axis unstable and cheaper in transforms bu
 ```@docs
 AbstractIntegrator
 IFLowStorageRK3
-IFRK2
+IFHeun
 ```
 
 ## Step scratch

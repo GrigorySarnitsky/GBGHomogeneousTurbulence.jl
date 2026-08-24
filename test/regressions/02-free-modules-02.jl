@@ -50,7 +50,7 @@ using Test
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-    buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+    buffers = allocate_buffers(Heun(), tracers, cache)
 
     field_data(u) .= NaN                       # the ordinary blow-up mode of an over-stepped run
     record_velocity_at_particles!(cache, tracers, u)     # v1 <- u(t_n, X(t_n)), now non-finite
@@ -58,7 +58,7 @@ using Test
 
     threw = false
     try
-      advect!(EndpointHeun(), tracers, u, domain, buffers, 0.01)
+      advect!(Heun(), tracers, u, domain, buffers, 0.01)
     catch
       threw = true
     end

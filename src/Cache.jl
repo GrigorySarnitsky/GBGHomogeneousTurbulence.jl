@@ -404,8 +404,8 @@ correction, any direct write to the tracer storage) — the particle counterpart
 [`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
 trajectory-bound observable is stale and reads throw until the next deposit.
 
-It also discards the Lagrangian **sample history** this cache carries, so a multistep trajectory
-scheme starts over from the new positions rather than integrating across the abandoned path. That is
+It also discards the Lagrangian **sample history** this cache carries, so a multistep particle
+integration scheme starts over from the new positions rather than integrating across the abandoned path. That is
 why the history lives here and not in the scheme's own registers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 

@@ -1,6 +1,6 @@
-# Witness for candidate test-critic-05: "IFRK2's step! allocation-free guarantee is never measured
-# with @allocated". The claim is a coverage claim; the behaviour it worries about is that IFRK2's
-# stage-2 predictor path allocates. This asserts the CORRECT behaviour: one warmed IFRK2 step! plus
+# Witness for candidate test-critic-05: "IFHeun's step! allocation-free guarantee is never measured
+# with @allocated". The claim is a coverage claim; the behaviour it worries about is that IFHeun's
+# stage-2 predictor path allocates. This asserts the CORRECT behaviour: one warmed IFHeun step! plus
 # its closing deposit! allocate less than a single field's worth of bytes, on both the velocity-only
 # and the velocity+scalar path (the scalar branch carries the extra predictor/stage registers).
 
@@ -14,7 +14,7 @@ function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
                        dealiasing = TwoThirds(), array_type = Array)
-  scheme = IFRK2()
+  scheme = IFHeun()
   buffers = allocate_buffers(scheme, domain; scalar = scalar)
   conditions = FlowConditions(viscosity = 5.0e-2, schmidt = 1.0,
                               velocity_forcing = VarianceRescaling(domain; target = 0.6, over = :band,
@@ -49,15 +49,15 @@ function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
 end
 
 
-@testset "IFRK2's step! (and its closing deposit!) is allocation-free over the preallocated buffers" begin
+@testset "IFHeun's step! (and its closing deposit!) is allocation-free over the preallocated buffers" begin
   @testset "velocity only" begin
     bytes, field_bytes = step_deposit_bytes(scalar = false)
-    @info "IFRK2 velocity-only" bytes field_bytes
+    @info "IFHeun velocity-only" bytes field_bytes
     @test bytes < field_bytes
   end
   @testset "velocity + passive scalar" begin
     bytes, field_bytes = step_deposit_bytes(scalar = true)
-    @info "IFRK2 velocity+scalar" bytes field_bytes
+    @info "IFHeun velocity+scalar" bytes field_bytes
     @test bytes < field_bytes
   end
 end

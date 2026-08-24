@@ -26,10 +26,10 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     X0 = T[prevfloat(1.0e-3) 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-    buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+    buffers = allocate_buffers(Heun(), tracers, cache)
     set_uniform_x!(u, -1.0)
     record_velocity_at_particles!(cache, tracers, u)
-    advect!(EndpointHeun(), tracers, u, domain, buffers, dt)
+    advect!(Heun(), tracers, u, domain, buffers, dt)
     X = particle_positions(tracers)
     @test all(0 .<= X)
     @test all(X .< L)
@@ -40,10 +40,10 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     X0 = T[0.0 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-    buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+    buffers = allocate_buffers(Heun(), tracers, cache)
     set_uniform_x!(u, -1.0e-20)
     record_velocity_at_particles!(cache, tracers, u)
-    advect!(EndpointHeun(), tracers, u, domain, buffers, dt)
+    advect!(Heun(), tracers, u, domain, buffers, dt)
     X = particle_positions(tracers)
     @test all(X .< L)
   end

@@ -16,7 +16,7 @@
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Particles: EndpointHeun, advect!, record_velocity_at_particles!,
+using GBGIsotropicTurbulence.Particles: Heun, advect!, record_velocity_at_particles!,
                                         particle_positions
 using GBGIsotropicTurbulence.Propagator: allocate_buffers
 using GBGPeriodicFields: field_data, PointSet
@@ -33,10 +33,10 @@ function poisoned_step(poison)
   tracers = Tracers(domain; positions = PointSet([1.0 2.0 3.0; 0.5 0.5 0.5]),
                     interpolation_scheme = CatmullRom)
   cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-  buffers = allocate_buffers(EndpointHeun(), tracers, cache)
+  buffers = allocate_buffers(Heun(), tracers, cache)
   record_velocity_at_particles!(cache, tracers, u)
   try
-    advect!(EndpointHeun(), tracers, u, domain, buffers, 0.01)
+    advect!(Heun(), tracers, u, domain, buffers, 0.01)
   catch err
     return (:rejected, err)
   end

@@ -38,7 +38,7 @@ end
 
 
 @testset "step! is allocation-free over the preallocated buffers (invariant 4)" begin
-  for scheme in (IFLowStorageRK3(), IFRK2())
+  for scheme in (IFLowStorageRK3(), IFHeun())
     for N in (8, 16, 32)
       bytes = step_allocation(scheme, N)
       @info "step! allocation" scheme N bytes
