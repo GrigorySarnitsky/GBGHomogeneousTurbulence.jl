@@ -2109,6 +2109,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       constructors (the zero-fill contract stays IT's), and tracer position storage comes off the
       same family. No IT code reads a multipliers field for any purpose other than wavenumbers.
 
+65. **(2026-08, user-directed) Wrapped dynamics, plus an opt-in unwrapped record in the tracer
+    state.** A user wants both trajectories: wrapped for the dynamics, unwrapped — winding kept —
+    for the dispersion diagnostics. The accuracy analysis fixes which is which, not a flag: the
+    absolute floating-point resolution at a coordinate grows with the coordinate, so an unwrapped
+    position that winds ``n`` boxes is known ever more coarsely — feeding it back into
+    interpolation would degrade the dynamics, `Float32` fastest. The dynamics therefore **always**
+    advance wrapped. The unwrapped record only ever feeds *differences*
+    ``\boldsymbol{X}(t) - \boldsymbol{X}(0)`` — mean-square displacement, dispersion — whose
+    relative accuracy the coordinate growth does not touch, so it needs no wrap and must not have
+    one. Implementation: `Tracers(…; unwrapped = true)` (forwarded by `Simulation`) carries a
+    fourth state field, a `PointSet` starting equal to the seeded positions; every push applies
+    the **same displacement terms** to both records — the wrapped positions through `displace!`'s
+    grid form, the record through the grid-free universal-cover lift (the two cannot disagree on a
+    step, only on the winding the wrap discards). Read through `unwrapped_positions`; an untracked
+    set throws. `particles_modified!` on a run restarts the record at the new positions — winding
+    is a property of the trajectory just abandoned. Accumulating statistics over the record is the
+    caller's analysis, per the charter.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

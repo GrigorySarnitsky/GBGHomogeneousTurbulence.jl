@@ -49,6 +49,7 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!,
+                   unwrapped_positions, particle_positions,
                    restart!, history_depth
 using ..Phenomenology: FlowParameters, taylor_reynolds
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -215,9 +216,11 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   scale they happened to choose.
 - `integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
-- `number_of_particles = 0`, `interpolation_scheme = CatmullRom` — the number of Lagrangian `Tracers` and
-  the **spatial** scheme that evaluates a field at their positions, forwarded to the `Tracers`
-  constructor as its `interpolation_scheme`.
+- `number_of_particles = 0`, `interpolation_scheme = CatmullRom`, `unwrapped = false` — the number
+  of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions, and
+  whether to also track the winding-preserving unwrapped record (read with
+  [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
+  mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
 - `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
@@ -342,6 +345,7 @@ function Simulation(domain::FixedDomain;
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
+                    unwrapped::Bool = false,
                     trajectory_scheme::AbstractParticleIntegrator = EndpointHeun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
@@ -448,7 +452,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
 
   tracers = number_of_particles > 0 ?
-    Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, rng) : nothing
+    Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, unwrapped, rng) : nothing
   # The cache is built first: it carries the Lagrangian sample history a multistep trajectory scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
@@ -665,6 +669,10 @@ function particles_modified!(sim::Simulation)
   # today only because this scheme's history IS the cache's; a scheme carrying registers of its own
   # would need them cleared here, and `Cache` — included before `Particles` — can never reach it.
   sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
+  # The unwrapped record restarts at the new positions: winding is a property of the trajectory
+  # just abandoned, and a record continued across a reposition would splice two unrelated paths.
+  sim.tracers === nothing || sim.tracers.unwrapped_points === nothing ||
+    copyto!(unwrapped_positions(sim.tracers), particle_positions(sim.tracers))
   return sim
 end
 

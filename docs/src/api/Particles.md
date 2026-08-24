@@ -18,6 +18,7 @@ Tracers
 
 ```@docs
 particle_positions
+unwrapped_positions
 number_of_particles
 ```
 

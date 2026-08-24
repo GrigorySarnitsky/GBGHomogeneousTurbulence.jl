@@ -18,7 +18,8 @@
 
 Lagrangian particle tracking — today the massless tracer:
 
-- [`Tracers`](@ref) — the tracer set (positions and a selectable `interpolation_scheme`);
+- [`Tracers`](@ref) — the tracer set (positions, a selectable `interpolation_scheme`, and an
+  opt-in unwrapped record read by [`unwrapped_positions`](@ref));
   [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory
   velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities).
@@ -45,7 +46,7 @@ import ..Propagator: allocate_buffers
 export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
        ParticleIntegratorBuffers, MultistepBuffers,
        record_particle_velocities!, advect!, restart!, history_depth, interpolate_at_particles!,
-       particle_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
+       particle_positions, unwrapped_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
 """
@@ -110,7 +111,9 @@ advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 ```
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
-which read the tracer set directly. The velocities are the exception, and deliberately so: they are a
+which read the tracer set directly; `unwrapped = true` additionally tracks the winding-preserving
+record [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical state either
+way. The velocities are the exception, and deliberately so: they are a
 *deposited observable* rather than tracer state, so they are read from the run's observables cache
 through
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the
@@ -131,12 +134,16 @@ The trajectory scheme's own working storage is **not** here: it lives in a
   read it through
   `particle_velocities`, which serves it only when current, and treat it as read-only, since the tracer advance writes here mid-iteration.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
+- `unwrapped_points` — the opt-in unwrapped record (`unwrapped = true`) as a `PointSet`, advanced
+  by every push with the same displacement terms but never reduced to the box; `nothing` when
+  untracked. Read it through `unwrapped_positions`.
 """
-struct Tracers{P, PSX, VV, S}
-  positions::P              # (M, 3)
+struct Tracers{P, PSX, VV, S, UP}
+  positions::P              # (M, 3), always wrapped — the dynamical state
   position_points::PSX      # PointSet wrapping `positions`
   particle_velocities::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
   interpolation_scheme::S
+  unwrapped_points::UP      # PointSet (the opt-in unwrapped record, winding kept), or nothing
 end
 
 
@@ -144,7 +151,8 @@ end
 # Julia dispatches on positional arguments only. Hence the explicit either/or check, which also gives
 # a better error than a missing-keyword one would.
 function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
-                 number_of_particles = nothing, rng = Random.default_rng())
+                 number_of_particles = nothing, unwrapped::Bool = false,
+                 rng = Random.default_rng())
   count(!isnothing, (positions, number_of_particles)) == 1 ||
     throw(ArgumentError("give exactly one of `positions` (an (M, 3) array to wrap) or " *
                         "`number_of_particles` (a count to seed at random)"))
@@ -160,7 +168,11 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
     pos = domain.storage_family{T}(undef, size(positions)...)   # the domain's backend + element type
     copyto!(pos, positions)
   end
-  return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme)
+  # The unwrapped record starts equal to the wrapped positions and thereafter receives the same
+  # displacements WITHOUT the periodic reduction (the grid-free `displace!` — PF's universal-cover
+  # lift), so the two can never disagree on a step, only on the winding the wrap discards.
+  return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme,
+                 unwrapped ? PointSet(copy(pos)) : nothing)
 end
 
 
@@ -475,10 +487,13 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   else
     b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
     # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
-    # loop once made over the positions collapse into a single traversal.
-    displace!(tracers.position_points, domain.grid,
-              (T(b[1]), tracers.particle_velocities),
-              ntuple(j -> (T(b[j + 1]), past[j]), K - 1)...)
+    # loop once made over the positions collapse into a single traversal. The unwrapped record,
+    # when tracked, takes the identical terms through the grid-free form.
+    terms = ((T(b[1]), tracers.particle_velocities),
+             ntuple(j -> (T(b[j + 1]), past[j]), K - 1)...)
+    displace!(tracers.position_points, domain.grid, terms...)
+    tracers.unwrapped_points === nothing ||
+      displace!(tracers.unwrapped_points, terms...)
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -579,6 +594,11 @@ function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDo
   # The corrector: one fused two-term displacement, wrap included.
   displace!(tracers.position_points, domain.grid,
             (Δt / 2, tracers.particle_velocities), (Δt / 2, buffers.velocity_predictor))
+  # The unwrapped record takes the SAME terms through the grid-free form: winding kept, and the
+  # two records share the displacement by construction.
+  tracers.unwrapped_points === nothing ||
+    displace!(tracers.unwrapped_points,
+              (Δt / 2, tracers.particle_velocities), (Δt / 2, buffers.velocity_predictor))
   return tracers
 end
 
@@ -606,6 +626,32 @@ The `(M, 3)` array of current tracer positions — the probes' own state, read o
 `tracers`.
 """
 particle_positions(tracers::Tracers) = tracers.positions
+
+
+"""
+    unwrapped_positions(tracers)
+
+The `(M, 3)` array of **unwrapped** tracer positions — the trajectory with its winding kept, each
+coordinate the literal sum of every displacement since seeding, never reduced to the periodic box.
+This is the record a mean-square-displacement or dispersion diagnostic needs: those are functions
+of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped positions cannot supply across a
+crossing. Accumulating such statistics over the record is the caller's analysis.
+
+The record exists only when the tracer set was built with `unwrapped = true`; reading an untracked
+set throws an `ArgumentError`. The wrapped [`particle_positions`](@ref) remain the dynamical state
+either way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
+absolute floating-point resolution, while this record only ever feeds differences, whose *relative*
+accuracy the growth does not touch. An announced reposition
+([`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) on a run) restarts
+the record at the new positions: winding is a property of the trajectory just abandoned.
+"""
+function unwrapped_positions(tracers::Tracers)
+  tracers.unwrapped_points === nothing &&
+    throw(ArgumentError("this tracer set carries no unwrapped record: build it with " *
+                        "`unwrapped = true` (a `Tracers` keyword, forwarded by `Simulation`) " *
+                        "to track winding alongside the wrapped positions"))
+  return point_coordinates(tracers.unwrapped_points)
+end
 
 
 """
