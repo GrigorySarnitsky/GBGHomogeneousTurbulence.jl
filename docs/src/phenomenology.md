@@ -17,7 +17,8 @@ choosing the preset — the published fit is the default, and any coefficient ca
 using GBGIsotropicTurbulence.Phenomenology         # FlowParameters, spectrum, …
 using GBGIsotropicTurbulence.Phenomenology.Spectra  # the model presets (Pope2000, …)
 
-fp = FlowParameters(viscosity = 1e-3, dissipation = 0.5, rms_velocity = 1.0, integral_scale = 1.0)
+fp = FlowParameters(viscosity = 1e-3, dissipation = 0.5, rms_velocity = 1.0,
+                    integral_scale = 1.0)
 E  = spectrum(Pope2000(), 10.0, fp)          # Pope (2000) model spectrum at κ = 10
 ```
 

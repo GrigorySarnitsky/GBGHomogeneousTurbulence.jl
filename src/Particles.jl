@@ -363,8 +363,8 @@ produce.
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
     shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
-    constant ``K`` over a span ``t``, Grönwall bounds the trajectory error by
-    ``\\delta(\\mathrm{e}^{Kt} - 1)/K`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
+    constant ``\\Lambda`` over a span ``t``, Grönwall bounds the trajectory error by
+    ``\\delta(\\mathrm{e}^{\\Lambda t} - 1)/\\Lambda`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
     Where `Heun`'s docstring reports a crossover in resolution, this scheme has **none**:
     at third order under the advective-CFL loop the time error falls as ``\\Delta x^{3}`` — the
     same rate as the default `CatmullRom` floor's ``\\Delta x^{d+1}`` — so their ratio is set by

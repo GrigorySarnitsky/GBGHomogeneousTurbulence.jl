@@ -58,7 +58,8 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
 # (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).
 warmup!(sim)
 
-# Observe and advance. The callback fires after every iteration (and once at the start); it records
+# Observe and advance. The callback fires after every iteration (and once at the
+# start); it records
 # what it wants and its return decides continuation — stopping is the caller's decision.
 t_end = current_time(sim) + 20.0
 run!(sim) do s

@@ -78,7 +78,7 @@ warmup!(sim)
 advance!(sim)
 
 point_coordinates(sim.tracers.positions)     # (M, 3) positions, via the field library
-velocity_at_particles(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
+velocity_at_particles(sim.cache)  # u(tₙ, X(tₙ)) — the Lagrangian sample, checked
 out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
 interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```

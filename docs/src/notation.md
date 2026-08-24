@@ -35,7 +35,7 @@ The **Code** column gives the name each symbol carries in the package.
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`velocity_at_particles`](@ref) |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles) |
 | ``M`` | the number of tracer particles | `npoints(tracers.positions)` |
 
 ## Parameters
@@ -60,9 +60,9 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\mathcal{F}``, ``\mathcal{F}^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
 | ``\mathbb{P}`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
-| ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) |
+| ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor), [`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) |
 | ``\star`` | periodic convolution (the dealias/band/envelope kernels) | [`convolve`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.convolve) |
-| ``\widehat{N}`` (``\widehat{\boldsymbol{N}}`` for the velocity) | a field's assembled explicit right-hand side — the dealiased nonlinear term plus any additive forcing source — in spectral representation | [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) |
+| ``\widehat{N}`` (``\widehat{\boldsymbol{N}}`` for the velocity) | a field's assembled explicit right-hand side — the dealiased nonlinear term plus any additive forcing source — in spectral representation | [`velocity_rhs!`](@ref GBGIsotropicTurbulence.Generator.velocity_rhs!), [`scalar_rhs!`](@ref GBGIsotropicTurbulence.Generator.scalar_rhs!) |
 
 ## Diagnostics
 
@@ -75,7 +75,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``E(\kappa_n)`` | the **measured** spectral density at shell ``n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGIsotropicTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
 | ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) |
-| ``S`` | the velocity-derivative skewness — the developed-cascade marker, ``\approx -0.5`` for developed turbulence | [`derivative_skewness`](@ref) |
+| ``S`` | the velocity-derivative skewness — the developed-cascade marker, ``\approx -0.5`` for developed turbulence | [`derivative_skewness`](@ref GBGIsotropicTurbulence.Observables.derivative_skewness) |
 
 ## Derived scales
 

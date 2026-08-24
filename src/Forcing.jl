@@ -348,7 +348,7 @@ energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for 
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
 to the field being a vector.
 
-`over` selects *where* that target applies — it is required, since a deterministic clamp destroys
+The `over` keyword selects *where* that target applies — it is required, since a deterministic clamp destroys
 the physical fluctuation of whatever it holds and no default is right for every run — and the two
 modes differ in which quantity a run may no longer measure:
 
