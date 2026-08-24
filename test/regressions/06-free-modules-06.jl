@@ -1,5 +1,5 @@
 # Supporting measurement for the architecture finding "the memory/optimality audits enumerate one
-# trajectory scheme". Not a pass/fail regression test: it prints the per-particle residency the
+# particle integration scheme". Not a pass/fail regression test: it prints the per-particle residency the
 # audits pin (four (M, 3) arrays, EndpointHeun) beside what a front-door `AdamsBashforth` run
 # actually holds, using the audits' own reflective walk.
 using GBGIsotropicTurbulence
@@ -34,7 +34,7 @@ println("audit-pinned:      tracers=", length(m_arrays(tracers)),
 for scheme in (EndpointHeun(), AdamsBashforth(order = 2), AdamsBashforth(order = 4),
                AdamsBashforth(order = 8))
   sim = Simulation(domain; viscosity = 0.1, number_of_particles = M,
-                   trajectory_scheme = scheme, rng = MersenneTwister(1))
+                   particle_integration_scheme = scheme, rng = MersenneTwister(1))
   acc = AbstractArray[]
   collect_field_arrays!(acc, sim, Set{UInt}(), 2)
   n = count(a -> size(a) == (M, 3), acc)
@@ -45,7 +45,7 @@ end
 # Why the count above does not move: the reflective walk stops at an `AbstractArray`, so a
 # `Vector{<:AbstractArray}` (the history container) is counted as ONE array and never recursed into.
 sim8 = Simulation(domain; viscosity = 0.1, number_of_particles = M,
-                  trajectory_scheme = AdamsBashforth(order = 8), rng = MersenneTwister(1))
+                  particle_integration_scheme = AdamsBashforth(order = 8), rng = MersenneTwister(1))
 acc = AbstractArray[]
 collect_field_arrays!(acc, sim8, Set{UInt}(), 2)
 println("AB8 walk, all reached array shapes: ", sort(string.(size.(acc))))

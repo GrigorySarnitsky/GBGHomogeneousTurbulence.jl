@@ -49,13 +49,13 @@ end
   advance!(manual; dt = dt)                     # same genuine sample
 
   # The claim's own sequence: step + deposit, then read the slot directly through `advect!`.
-  step!(manual.integration_scheme, manual.state, manual.generator, manual.domain, manual.buffers, manual.cache, dt)
+  step!(manual.field_integration_scheme, manual.state, manual.generator, manual.domain, manual.buffers, manual.cache, dt)
   deposit!(manual.cache, manual.state, manual.domain, manual.buffers)
 
   # The cache reports the sample stale here — this is the window `advance!` also advects in.
   @test_throws ErrorException velocity_at_particles(manual.cache)
 
-  advect!(manual.trajectory_scheme, manual.tracers, velocity_physical(manual.cache), manual.domain,
+  advect!(manual.particle_integration_scheme, manual.tracers, velocity_physical(manual.cache), manual.domain,
           manual.particle_buffers, dt)
 
   # The decisive assertion: the "stale" value consumed was the correct u(tₙ, X(tₙ)), so the

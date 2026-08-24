@@ -1,16 +1,16 @@
 key,longest_paragraph_words,admonitions,total_words
 Cache.jl::Cache,115,0,328
-Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing， history_depth = 1),71,1,720
-Cache.jl::deposit_sample!(cache),76,0,142
-Cache.jl::fields_modified!(cache),70,1,248
-Cache.jl::particle_velocities(cache),109,0,110
+Cache.jl::ObservablesCache(domain; scalar = false， number_of_particles = 0， history_depth = 1),80,1,739
+Cache.jl::deposit_sample!(cache),73,0,139
+Cache.jl::fields_modified!(cache),70,1,249
 Cache.jl::particles_modified!(cache),65,0,247
 Cache.jl::scalar_physical(cache),55,0,56
+Cache.jl::velocity_at_particles(cache),111,0,112
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
 Forcing.jl::AbstractForcing,86,1,303
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,404
-Forcing.jl::DeferredForcing,54,0,205
+Forcing.jl::DeferredForcing,54,0,203
 Forcing.jl::Forcing,59,0,317
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),62,0,171
 Forcing.jl::NoForcing(),16,0,17
@@ -25,7 +25,7 @@ Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,165
 GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,99
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),81,1,249
 Generator.jl::Generator,118,0,184
-Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,564
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,561
 Generator.jl::finalize!(generator， state， domain),77,0,80
 Generator.jl::prepare!(generator， state， domain， dt),84,0,88
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
@@ -47,17 +47,17 @@ Particles.jl::AbstractParticleIntegrator,53,0,102
 Particles.jl::AdamsBashforth(; order = 4),100,1,692
 Particles.jl::EndpointHeun(),53,1,249
 Particles.jl::MultistepBuffers,49,0,132
-Particles.jl::ParticleIntegratorBuffers,43,0,169
+Particles.jl::ParticleIntegratorBuffers,44,0,170
 Particles.jl::Particles,8,0,137
-Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,95,0,721
-Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,57,1,215
+Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,84,0,617
+Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,58,1,216
 Particles.jl::history_depth(scheme) -> Int,28,0,47
 Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
 Particles.jl::new_scalar_point_values(tracers),29,0,30
 Particles.jl::new_vector_point_values(tracers),29,0,30
 Particles.jl::number_of_particles(tracers),10,0,11
 Particles.jl::particle_positions(tracers),19,0,20
-Particles.jl::record_particle_velocities!(tracers， u) -> tracers,82,0,181
+Particles.jl::record_velocity_at_particles!(cache， tracers， u) -> cache,55,0,208
 Particles.jl::restart!(scheme， buffers) -> buffers,60,0,138
 Particles.jl::unwrapped_positions(tracers),89,0,155
 Phenomenology.jl::FlowParameters(; viscosity， dissipation， rms_velocity， integral_scale，,52,0,368
@@ -80,7 +80,7 @@ Propagator.jl::IFLowStorageRK3(),73,0,278
 Propagator.jl::IFRK2(),54,1,186
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
-Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,86,0,208
+Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,87,0,209
 Propagator.jl::deposit!(cache， state， domain， buffers),88,0,300
 Propagator.jl::recommended_cfl(scheme， domain),90,1,433
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,319
@@ -90,7 +90,7 @@ Scalings.jl::ScalingLaw <: TurbulenceLaw,60,0,63
 Scalings.jl::Sreenivasan1995(; C_K = 1.5),59,0,95
 Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
 Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,71,0,76
-SimulationDomain.jl::DealiasingStrategy,101,0,102
+SimulationDomain.jl::DealiasingStrategy,97,0,98
 SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,35,1,471
 SimulationDomain.jl::HouLi(; order = 36， strength = nothing),80,0,223
 SimulationDomain.jl::PhaseShift(),86,1,272
@@ -104,7 +104,7 @@ SimulationDomain.jl::new_tensor_field_spectral(domain),18,0,19
 SimulationDomain.jl::new_vector_field_physical(domain),17,0,18
 SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2004
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2006
 SimulationRun.jl::SimulationRun,89,0,121
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,98,0,571
 SimulationRun.jl::advance!(sim; dt = nothing),51,0,86
@@ -137,7 +137,7 @@ Spectra.jl::large_scale_length(f， fp) -> Float64,65,0,144
 State.jl::ResolvedFields(domain; scalar = false),78,0,125
 State.jl::State,77,0,143
 State.jl::random_scalar_spectral!(φ̂， domain; scalar_variance， envelope_wavenumber，,85,1,317
-State.jl::random_solenoidal_velocity_spectral!(û， domain; kinetic_energy， envelope_wavenumber，,96,1,338
+State.jl::random_solenoidal_velocity_spectral!(û， domain; kinetic_energy， envelope_wavenumber，,94,1,336
 StructureFunctions.jl::Kolmogorov1941(; C₂ = 2.0),54,0,151
 StructureFunctions.jl::Kolmogorov1962(; μ = 0.25),54,0,110
 StructureFunctions.jl::Lundgren2002(),38,1,168

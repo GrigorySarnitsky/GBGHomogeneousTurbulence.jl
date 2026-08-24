@@ -21,7 +21,7 @@ using Test
   #     trajectory history the warning says the bare-cache form cannot reach.
   K = 4
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
-                   trajectory_scheme = AdamsBashforth(order = K), rng = MersenneTwister(1))
+                   particle_integration_scheme = AdamsBashforth(order = K), rng = MersenneTwister(1))
   for _ in 1:5
     advance!(sim)
   end

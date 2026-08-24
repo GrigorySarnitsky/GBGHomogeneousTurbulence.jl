@@ -23,7 +23,7 @@ const M = 8
 const DT = 0.01
 
 make_sim(scheme) = Simulation(grid_points_per_axis = N, viscosity = 0.05, number_of_particles = M,
-                              trajectory_scheme = scheme, rng = MersenneTwister(1))
+                              particle_integration_scheme = scheme, rng = MersenneTwister(1))
 
 # Announce + refill the trajectory-bound slot after a hand-written change of the tracer positions.
 function reseed!(sim, positions)

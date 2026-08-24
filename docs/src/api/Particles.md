@@ -22,7 +22,7 @@ unwrapped_positions
 number_of_particles
 ```
 
-## The trajectory scheme
+## The particle integration scheme
 
 How the positions are advanced over one step — the Lagrangian counterpart of the field schemes.
 `EndpointHeun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches

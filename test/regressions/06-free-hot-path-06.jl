@@ -1,4 +1,4 @@
-# Witness: `advance!` must reject a non-positive `dt` regardless of the trajectory scheme.
+# Witness: `advance!` must reject a non-positive `dt` regardless of the particle integration scheme.
 #
 # Today the only guard on a degenerate step lives in `advect!(::AdamsBashforth, …)`
 # (src/Particles.jl:459), so whether the call is refused depends on which *trajectory* scheme a run
@@ -8,16 +8,16 @@
 
 using Test, Random, GBGIsotropicTurbulence
 
-@testset "advance! rejects a non-positive dt for every trajectory scheme, not only AdamsBashforth" begin
+@testset "advance! rejects a non-positive dt for every particle integration scheme, not only AdamsBashforth" begin
 
   # Control: the multistep scheme already refuses it, at the wrong layer.
   a = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 4,
-                 trajectory_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(1))
+                 particle_integration_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(1))
   @test_throws ArgumentError advance!(a; dt = -2e-3)
 
-  # The claim: the same call, same physics, default one-step trajectory scheme.
+  # The claim: the same call, same physics, default one-step particle integration scheme.
   b = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 4,
-                 trajectory_scheme = EndpointHeun(), rng = MersenneTwister(1))
+                 particle_integration_scheme = EndpointHeun(), rng = MersenneTwister(1))
   @test_throws ArgumentError advance!(b; dt = -2e-3)
   @test current_step(b) == 0            # a refused call must not have advanced the run
   @test current_time(b) ≥ 0             # the clock must never run backwards

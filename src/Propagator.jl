@@ -22,11 +22,11 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `integration_scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
+the `field_integration_scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
-- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `integration_scheme` is chosen from.
+- [`AbstractIntegrator`](@ref) — the scheme supertype a run's `field_integration_scheme` is chosen from.
 - [`IFLowStorageRK3`](@ref), [`IFRK2`](@ref) — the schemes (RK3 low-storage; IFRK2/Heun a
   two-stage alternative — cheaper in transforms, dearer by one register per field, and
   imaginary-axis unstable).
@@ -159,7 +159,7 @@ backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `no
 [`IFRK2`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
 adds the nested `ScalarBuffers`, likewise sized to the scheme.
 
-The second and third serve the trajectory schemes: each builds the registers the `scheme` (an
+The second and third serve the particle integration schemes: each builds the registers the `scheme` (an
 [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
 needs, sized to the tracer set `tracers` — the two-argument form the
 [`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) of a

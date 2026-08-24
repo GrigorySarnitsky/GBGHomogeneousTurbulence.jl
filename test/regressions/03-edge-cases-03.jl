@@ -18,7 +18,7 @@ const NPART = 24
 
 function build(scheme)
   Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = NPART,
-             trajectory_scheme = scheme, rng = MersenneTwister(SEED))
+             particle_integration_scheme = scheme, rng = MersenneTwister(SEED))
 end
 
 @testset "AdamsBashforth restarts its history when the tracers are reseeded" begin
@@ -32,7 +32,7 @@ end
   @test ab.cache.history_filled == 3          # precondition: history is full
 
   # The two runs carry identical fields (same seed; tracers do not feed back on the flow), so any
-  # difference in the tracer positions is the trajectory scheme alone. Before the reseed the two
+  # difference in the tracer positions is the particle integration scheme alone. Before the reseed the two
   # legitimately differ — AB4 has switched over and is more accurate than Heun.
 
   # Reseed both tracer sets to the same brand-new positions, by the documented protocol.

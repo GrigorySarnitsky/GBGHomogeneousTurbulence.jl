@@ -11,7 +11,7 @@
 #
 # The assertion below is physical, not stylistic: over one CFL-limited step a tracer displacement
 # must be the explicit-Euler displacement h·u(Xₙ) up to the field's own change over that step,
-# i.e. the relative departure must be O(h/τ) ≪ 1 — whatever the trajectory scheme.  A control run
+# i.e. the relative departure must be O(h/τ) ≪ 1 — whatever the particle integration scheme.  A control run
 # that takes the identical step with an intact history calibrates that number.
 #
 # Measured on the tree of 2026-08-20: departure_control = 0.0475, departure_reseed = 1.750 — the
@@ -33,7 +33,7 @@ const K = 4
 const M = 8
 
 fresh_sim() = Simulation(grid_points_per_axis = N, viscosity = 0.05, number_of_particles = M,
-                         trajectory_scheme = AdamsBashforth(order = K), rng = MersenneTwister(3))
+                         particle_integration_scheme = AdamsBashforth(order = K), rng = MersenneTwister(3))
 
 # Relative departure of one tracer step from the explicit-Euler displacement built on the velocity
 # the tracers actually sample in the field they are moving in.  Dimensionless, and small for any

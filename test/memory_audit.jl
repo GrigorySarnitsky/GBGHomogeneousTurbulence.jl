@@ -307,7 +307,7 @@ const EPISODE_UNITS = [
     for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
-                       velocity_forcing = NoForcing(), integration_scheme = _scheme(scheme),
+                       velocity_forcing = NoForcing(), field_integration_scheme = _scheme(scheme),
                        number_of_particles = tracers, rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
             _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
@@ -350,7 +350,7 @@ const EPISODE_UNITS = [
   # observable — so it is priced on the cache, not on the scheme's registers, and it scales with the
   # order rather than with the grid. Nothing else about the scheme costs storage: its weight solve
   # works in two `order`-element host vectors and its bootstrap reuses the one-step registers.
-  @testset "the multistep trajectory scheme prices its history, and nothing else" begin
+  @testset "the multistep particle integration scheme prices its history, and nothing else" begin
     domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
                          array_type = Array, dealiasing = TwoThirds())
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom)
@@ -502,7 +502,7 @@ const EPISODE_UNITS = [
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFRK2()),
         scalar in (false, true)
       sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
-                       integration_scheme = scheme, rng = MersenneTwister(1))
+                       field_integration_scheme = scheme, rng = MersenneTwister(1))
       advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
       @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * unit
     end

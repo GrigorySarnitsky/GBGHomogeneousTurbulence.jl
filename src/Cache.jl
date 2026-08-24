@@ -88,8 +88,8 @@ and seeds one for you; a hand-assembled run constructs it here.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
   including the current one: the value of
-  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(trajectory_scheme)` for
-  the run's trajectory scheme, which is where a hand-assembled run gets the number. A one-step
+  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(particle_integration_scheme)` for
+  the run's particle integration scheme, which is where a hand-assembled run gets the number. A one-step
   scheme needs 1 and stores no history; an `order`-step scheme needs `order`, and the scheme's
   register allocation refuses a cache built too shallow.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
@@ -121,7 +121,7 @@ depends on.
 - `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
 - `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first, and
   `sample_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
-  multistep trajectory scheme integrates over these; an announced reposition invalidates them
+  multistep particle integration scheme integrates over these; an announced reposition invalidates them
   together with the current sample.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
@@ -377,7 +377,7 @@ Returns its argument.
 
 !!! warning "It also discards the Lagrangian sample history"
     Those samples are the velocity measured along the trajectory *through the state being
-    replaced*, so a multistep trajectory scheme integrating over them would blend the old field
+    replaced*, so a multistep particle integration scheme integrating over them would blend the old field
     into the new one. The run's own field advance is not such a change and keeps its history.
 """
 fields_modified!(cache::ObservablesCache) =
@@ -385,7 +385,7 @@ fields_modified!(cache::ObservablesCache) =
 
 
 # The run's OWN field advance, which is not an out-of-band replacement and must not clear the sample
-# history: the samples it took are exactly what a multistep trajectory scheme integrates over next.
+# history: the samples it took are exactly what a multistep particle integration scheme integrates over next.
 # `step!` calls this at every stage, so clearing there would pin the scheme in its bootstrap forever
 # — the same trap the particles counterpart carries, and for the same reason: one verb was serving
 # both "the run advanced" and "someone replaced the state behind the run's back".

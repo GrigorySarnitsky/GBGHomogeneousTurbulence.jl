@@ -73,7 +73,7 @@ end
 
 A ready-to-run case: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and the
-assembly scratch), the chosen scheme, the [`ResolvedFields`](@ref) state (the velocity
+assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the
 [`ObservablesCache`](@ref) holding what the last iteration deposited, any [`Tracers`](@ref), and a
 clock.
@@ -214,14 +214,14 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   diffusive-decay bound that stops that, needing no constant from the caller. `max_dt` is for a
   ceiling only the caller knows, since any *default* constant would be a claim about the velocity
   scale they happened to choose.
-- `integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(integration_scheme, domain)` — the
+- `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom`, `unwrapped = false` — the number
   of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions, and
   whether to also track the winding-preserving unwrapped positions (read with
   [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
   mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
-- `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
+- `particle_integration_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
@@ -262,10 +262,10 @@ their contents as the scheme's business rather than the run's state.
 
 - `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
 - `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
-- `domain`, `buffers`, `generator`, `integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
+- `domain`, `buffers`, `generator`, `field_integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `tracers`, `trajectory_scheme`, `particle_buffers` — the `Tracers` being advected along with the
+- `tracers`, `particle_integration_scheme`, `particle_buffers` — the `Tracers` being advected along with the
   fields, the scheme advancing them along their trajectories, and that scheme's registers. All `nothing` when the run carries no tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
@@ -273,11 +273,11 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
-  integration_scheme::IG
+  field_integration_scheme::IG
   state::RF                # ResolvedFields: the evolving (û, φ̂), the single source of truth
   cache::DF                # ObservablesCache: what the last iteration deposited, for an observation to read
   tracers::TR              # Tracers, or nothing — trajectory STATE only
-  trajectory_scheme::PI  # AbstractParticleIntegrator, or nothing
+  particle_integration_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
   cfl::Float64
   max_dt::Float64          # a ceiling on the adaptive step, in the caller's own units; Inf = none
@@ -340,13 +340,13 @@ function Simulation(domain::FixedDomain;
                     schmidt::Real = 1.0,
                     velocity_forcing = nothing,
                     scalar_forcing = NoForcing(),
-                    integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
-                    cfl::Real = recommended_cfl(integration_scheme, domain), max_dt::Real = Inf,
+                    field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
+                    cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
                     unwrapped::Bool = false,
-                    trajectory_scheme::AbstractParticleIntegrator = EndpointHeun(),
+                    particle_integration_scheme::AbstractParticleIntegrator = EndpointHeun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
@@ -398,7 +398,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     ν = Float64(viscosity)
   end
 
-  buffers = allocate_buffers(integration_scheme, domain; scalar)
+  buffers = allocate_buffers(field_integration_scheme, domain; scalar)
   # `nothing` means the default controller holding `kinetic_energy` — a sentinel rather than a
   # default closure, so a HAND-BUILT forcing is detectable: in grid mode ν was calibrated on the
   # assumption that the run holds k = `kinetic_energy`, and a forcing that holds something else
@@ -453,18 +453,18 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 
   tracers = number_of_particles > 0 ?
     Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, unwrapped, rng) : nothing
-  # The cache is built first: it carries the Lagrangian sample history a multistep trajectory scheme
+  # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
                            number_of_particles = tracers === nothing ? 0 : Int(number_of_particles),
-                           history_depth = history_depth(trajectory_scheme))
+                           history_depth = history_depth(particle_integration_scheme))
   particle_buffers = tracers === nothing ? nothing :
-                     allocate_buffers(trajectory_scheme, tracers, cache)
+                     allocate_buffers(particle_integration_scheme, tracers, cache)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     (record_velocity_at_particles!(cache, tracers, velocity_physical(cache)); deposit_sample!(cache))
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integration_scheme, state, cache,
-                    tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
+                    tracers, tracers === nothing ? nothing : particle_integration_scheme, particle_buffers,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
 
@@ -622,7 +622,7 @@ function advance!(sim::Simulation; dt = nothing)
   # the epoch is verified here, at tₙ, where they are the current-epoch observable.
   sim.tracers === nothing || velocity_at_particles(sim.cache)
 
-  step!(sim.integration_scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
+  step!(sim.field_integration_scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
   # The closing deposit: fill every slot, at the new epoch, from the state the step just produced; the tracer
   # push then completes its Heun pair — the head-checked sample as v₁, the just-deposited u(tₙ₊₁)
@@ -630,7 +630,7 @@ function advance!(sim::Simulation; dt = nothing)
   # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
-    advect!(sim.trajectory_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
+    advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
             sim.particle_buffers, Δt)
     # The run's own advance, not an out-of-band reposition: the epoch moves so the previous sample
     # reads stale, but the history the advance just extended stays intact.
@@ -668,7 +668,7 @@ function particles_modified!(sim::Simulation)
   # Dispatch the scheme's own restart rather than relying on the cache's inline clear. They coincide
   # today only because this scheme's history IS the cache's; a scheme carrying registers of its own
   # would need them cleared here, and `Cache` — included before `Particles` — can never reach it.
-  sim.particle_buffers === nothing || restart!(sim.trajectory_scheme, sim.particle_buffers)
+  sim.particle_buffers === nothing || restart!(sim.particle_integration_scheme, sim.particle_buffers)
   # The unwrapped record restarts at the new positions: winding is a property of the trajectory
   # just abandoned, and a record continued across a reposition would splice two unrelated paths.
   sim.tracers === nothing || sim.tracers.unwrapped_points === nothing ||
@@ -678,7 +678,7 @@ end
 
 
 # The fields twin, for the same reason its particle counterpart exists: an out-of-band replacement of
-# the state invalidates the Lagrangian sample history a multistep trajectory scheme integrates over,
+# the state invalidates the Lagrangian sample history a multistep particle integration scheme integrates over,
 # and the cache form is what discards it. Added because the particle form was and this one was not —
 # a caller holding a run should not have to know which of the two verbs happens to have the
 # convenience method.

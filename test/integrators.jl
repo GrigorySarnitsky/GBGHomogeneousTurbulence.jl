@@ -120,7 +120,7 @@ end
   function measured_order(forcing)
     reference = nothing; errors = Float64[]
     for n in (1024, 32, 64)
-      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, integration_scheme = IFLowStorageRK3(),
+      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, field_integration_scheme = IFLowStorageRK3(),
                        velocity_forcing = forcing, rng = MersenneTwister(7))
       for _ in 1:n; advance!(sim; dt = T / n); end
       data = copy(field_data(sim.state.velocity_spectral))

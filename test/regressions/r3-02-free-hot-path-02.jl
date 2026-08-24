@@ -1,5 +1,5 @@
 # Witness: an announced out-of-band change to the resolved fields must not leave the multistep
-# trajectory scheme extrapolating over Lagrangian samples taken in the abandoned flow.
+# particle integration scheme extrapolating over Lagrangian samples taken in the abandoned flow.
 #
 # The package states the invariant for the position case (`restart!` / `particles_modified!`:
 # "integrating over those would blend the old path with the new one"). A reseeded velocity field
@@ -13,7 +13,7 @@ using GBGIsotropicTurbulence
 
 function warmed_run(seed)
   s = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 6,
-                 trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(seed))
+                 particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(seed))
   for _ in 1:6
     advance!(s; dt = 2e-3)
   end
@@ -37,7 +37,7 @@ end
 
   announced_reseed!(a)                                    # the documented protocol, nothing more
   announced_reseed!(b)
-  restart!(b.trajectory_scheme, b.particle_buffers)       # b additionally discards the stale history
+  restart!(b.particle_integration_scheme, b.particle_buffers)       # b additionally discards the stale history
 
   advance!(a; dt = 2e-3)
   advance!(b; dt = 2e-3)

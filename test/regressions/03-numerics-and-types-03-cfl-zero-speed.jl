@@ -19,7 +19,7 @@ using Test
 function resting_run(; N, ν, scalar::Bool, seed = 20250820)
   sim = Simulation(grid_points_per_axis = N, side_length = 2π, viscosity = ν,
                    velocity_forcing = NoForcing(), scalar_forcing = NoForcing(),
-                   scalar = scalar, integration_scheme = IFLowStorageRK3(),
+                   scalar = scalar, field_integration_scheme = IFLowStorageRK3(),
                    rng = MersenneTwister(seed))
   fill!(field_data(sim.state.velocity_spectral), 0)
   fields_modified!(sim.cache)

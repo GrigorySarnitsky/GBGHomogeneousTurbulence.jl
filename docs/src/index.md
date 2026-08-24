@@ -117,7 +117,7 @@ Listed in build order — each module uses the ones above it. The
   `AbstractIntegrator`.
 - [`Particles`](api/Particles.md): Lagrangian particle tracking — today the massless tracer —
   advection along trajectories and field sampling there, with selectable interpolation and
-  trajectory schemes.
+  particle integration schemes.
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
   Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.

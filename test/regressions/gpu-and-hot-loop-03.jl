@@ -27,9 +27,9 @@ end
 
   # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not IT's.
   heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                    trajectory_scheme = EndpointHeun(), rng = MersenneTwister(11))
+                    particle_integration_scheme = EndpointHeun(), rng = MersenneTwister(11))
   for _ in 1:3; advance!(heun); end
-  heun_bytes = allocations_of(advect!, heun.trajectory_scheme, heun.tracers,
+  heun_bytes = allocations_of(advect!, heun.particle_integration_scheme, heun.tracers,
                               velocity_physical(heun.cache), heun.domain,
                               heun.particle_buffers, 1.0e-3)
   interp_bytes = allocations_of(IT.Particles.record_velocity_at_particles!, heun.cache, heun.tracers,
@@ -38,11 +38,11 @@ end
 
   # ---- the claim: AdamsBashforth(4), history full (filled == order - 1 == 3), no interpolation --
   ab = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                  trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(11))
+                  particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(11))
   for _ in 1:5; advance!(ab); end
   @test ab.cache.history_filled == 3                      # the multistep branch is the live one
 
-  ab_bytes = allocations_of(advect!, ab.trajectory_scheme, ab.tracers,
+  ab_bytes = allocations_of(advect!, ab.particle_integration_scheme, ab.tracers,
                             velocity_physical(ab.cache), ab.domain,
                             ab.particle_buffers, 1.0e-3)
   @info "per-advance host allocations, multistep branch" ab_bytes

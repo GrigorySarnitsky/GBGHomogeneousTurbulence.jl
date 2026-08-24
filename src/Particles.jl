@@ -23,7 +23,7 @@ Lagrangian particle tracking — today the massless tracer:
   [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory
   velocities are read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
-- [`AbstractParticleIntegrator`](@ref) — the trajectory time-integration schemes,
+- [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
   [`EndpointHeun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) and
   [`MultistepBuffers`](@ref) the per-step storage each needs, and [`history_depth`](@ref) the
   sample-history length a scheme requires.
@@ -41,7 +41,7 @@ using Random
 using ..SimulationDomain: FixedDomain, _real_type
 using ..Cache: ObservablesCache
 # One generic builds the per-scheme registers on both sides of the run — the field scheme's and
-# the trajectory scheme's — because it is one concept: allocate exactly what this scheme needs.
+# the particle integration scheme's — because it is one concept: allocate exactly what this scheme needs.
 import ..Propagator: allocate_buffers
 
 export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
@@ -125,7 +125,7 @@ run's observables cache through
 [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles), where the
 iteration's closing deposit leaves them.
 
-The trajectory scheme's own working storage is **not** here: it lives in a
+The particle integration scheme's own working storage is **not** here: it lives in a
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 
 # Fields
@@ -179,7 +179,7 @@ end
 """
     AbstractParticleIntegrator
 
-The supertype of the trajectory time-integration schemes — how the tracer positions are advanced
+The supertype of the particle integration schemes — how the tracer positions are advanced
 over one step, the Lagrangian counterpart of the field side's
 [`AbstractIntegrator`](@ref GBGIsotropicTurbulence.Propagator.AbstractIntegrator). A scheme is a
 value (`EndpointHeun()`), passed to [`advect!`](@ref) and to
@@ -248,7 +248,7 @@ function restart! end
 """
     ParticleIntegratorBuffers
 
-The per-step storage a trajectory scheme computes in, sized to a tracer set and allocated once,
+The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated once,
 so advancing the tracers allocates nothing. Build it with
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme, tracers)`,
 which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
@@ -563,7 +563,7 @@ end
     advect!(scheme, tracers, velocity_end, domain, buffers, dt) -> tracers
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
-below), in place, under the trajectory scheme `scheme` (an
+below), in place, under the particle integration scheme `scheme` (an
 [`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (the
 registers [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
 that scheme — `ParticleIntegratorBuffers` or [`MultistepBuffers`](@ref)). The `domain` (a [`FixedDomain`](@ref))

@@ -426,7 +426,7 @@ Particles are **instruments** — probes of the turbulence — not a second phys
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
 inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
-with the trajectory scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
+with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints. ``\boldsymbol{v}_1`` is the **trajectory
@@ -451,7 +451,7 @@ the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
-registers. Two axes matter: the trajectory scheme — the default second-order `EndpointHeun`, and the
+registers. Two axes matter: the particle integration scheme — the default second-order `EndpointHeun`, and the
 variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
 and its own registers in `MultistepBuffers`; decision 57) for a run whose trajectory accuracy in
 time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
@@ -2053,7 +2053,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     without renaming any exported type: `integration_scheme::AbstractIntegrator` shares its morpheme
     with the family. Scope: the `Simulation` keyword and struct field only — bare `scheme` remains
     the positional-argument name in the protocol (`step!`, `allocate_buffers`, `recommended_cfl`),
-    where dispatch already types it.
+    where dispatch already types it. *(Refined 2026-08-24, decision 68: the two time-integration
+    members are now `field_integration_scheme` / `particle_integration_scheme`, naming the system
+    half each one advances.)*
 
 63. **(2026-08) The three-item PF request of 2026-08-23 was delivered in full and is wired in.**
     Raised under invariant 2 (field machinery is requested, never reimplemented here), shipped by
@@ -2163,6 +2165,20 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     (the `at_particles` morpheme from `interpolate_at_particles!`), and prose everywhere says "the
     velocity at the particles", never "the particle velocities". Ownership and naming landed in one
     commit, so each affected doc surface was written once.
+
+68. **(2026-08, user-directed) The two time-integration keywords name the system half each
+    advances: `integration_scheme` → `field_integration_scheme`, `trajectory_scheme` →
+    `particle_integration_scheme`.** Decision 62's `<role>_scheme` family named its two
+    time-integration members asymmetrically: `integration_scheme` claimed the unqualified word for
+    the fields, and `trajectory_scheme` named the particles' scheme by the object it produces
+    rather than the thing it advances. The user weighed the frame vocabulary (Eulerian /
+    Lagrangian) and chose the system vocabulary: the run advances **fields** and **particles** —
+    decision 51's umbrella word — so the keywords are `field_integration_scheme` /
+    `particle_integration_scheme` / `interpolation_scheme`, and the two renamed keywords' morphemes
+    now align with their supertypes (`AbstractIntegrator` / `AbstractParticleIntegrator`). Prose
+    follows the keywords: "the particle integration scheme", with "trajectory scheme" retired
+    outside this log. Scope, as in decision 62: the `Simulation` keywords and struct fields only —
+    bare `scheme` remains the protocol's positional name, where dispatch already types it.
 
 ## References
 

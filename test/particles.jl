@@ -114,7 +114,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     cache = ObservablesCache(domain; scalar = true, number_of_particles = 200)
     deposit!(cache, state, domain, buffers)
     tracers = Tracers(domain; number_of_particles = 200, interpolation_scheme = CatmullRom, rng = MersenneTwister(5))
-    push_buffers = allocate_buffers(EndpointHeun(), tracers, cache)   # the trajectory scheme's registers,
+    push_buffers = allocate_buffers(EndpointHeun(), tracers, cache)   # the particle integration scheme's registers,
                                                                # distinct from the field scheme's
 
     Δx = L / N
@@ -157,7 +157,7 @@ end
 
   @testset "the history fills and the scheme takes over" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                     trajectory_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
+                     particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
     # The sample history is the cache's: it holds earlier values of a deposited observable, so an
     # announced reposition invalidates it where the epoch lives rather than in the scheme's registers.
     @test sim.particle_buffers isa MultistepBuffers
@@ -181,7 +181,7 @@ end
 
   @testset "positions stay in the box and tracers actually move" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                     trajectory_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(8))
+                     particle_integration_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(8))
     X0 = copy(particle_positions(sim.tracers))
     for _ in 1:5; advance!(sim); end
     X = particle_positions(sim.tracers)

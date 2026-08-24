@@ -3,7 +3,7 @@ using GBGIsotropicTurbulence.Cache: particles_modified!
 
 @testset "particles_modified!(sim) — the form the docstring says to prefer — is callable" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                   number_of_particles = 8, trajectory_scheme = AdamsBashforth(order = 4))
+                   number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4))
   advance!(sim)
 
   # (1) The documented `sim` form must exist.
@@ -22,7 +22,7 @@ using GBGIsotropicTurbulence.Cache: particles_modified!
   #     The correct state of affairs is what the code does: it also clears the multistep history,
   #     which is byte-for-byte what restart!(::AdamsBashforth, buffers) does.
   sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                    number_of_particles = 8, trajectory_scheme = AdamsBashforth(order = 4))
+                    number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4))
   advance!(sim2)
   @test sim2.cache.history_filled > 0            # the history did fill
   particles_modified!(sim2.cache)

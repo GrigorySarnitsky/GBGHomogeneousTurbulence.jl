@@ -15,7 +15,7 @@ using Test
 @testset "an announced tracer reposition restarts the AdamsBashforth history" begin
   K = 4
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
-                   trajectory_scheme = AdamsBashforth(order = K), rng = MersenneTwister(7))
+                   particle_integration_scheme = AdamsBashforth(order = K), rng = MersenneTwister(7))
   for _ in 1:5
     advance!(sim)
   end
@@ -42,12 +42,12 @@ using Test
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an
   # independent integrator needs its own cache to hold its own history. The assertion is unchanged.
   fresh_cache = ObservablesCache(sim.domain; number_of_particles = number_of_particles(fresh),
-                                 history_depth = history_depth(sim.trajectory_scheme))
-  fresh_buffers = allocate_buffers(sim.trajectory_scheme, fresh, fresh_cache)
+                                 history_depth = history_depth(sim.particle_integration_scheme))
+  fresh_buffers = allocate_buffers(sim.particle_integration_scheme, fresh, fresh_cache)
   record_velocity_at_particles!(fresh_cache, fresh, u)
 
-  advect!(sim.trajectory_scheme, sim.tracers, u, sim.domain, sim.particle_buffers, dt)
-  advect!(sim.trajectory_scheme, fresh, u, sim.domain, fresh_buffers, dt)
+  advect!(sim.particle_integration_scheme, sim.tracers, u, sim.domain, sim.particle_buffers, dt)
+  advect!(sim.particle_integration_scheme, fresh, u, sim.domain, fresh_buffers, dt)
 
   @test particle_positions(sim.tracers) ≈ particle_positions(fresh)
 end
