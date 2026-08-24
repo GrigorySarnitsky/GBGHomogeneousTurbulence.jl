@@ -35,6 +35,9 @@ Lagrangian particle tracking — today the massless tracer:
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
+- [`write_tracers`](@ref) / [`read_tracers`](@ref) — the tracer set's HDF5 persistence: positions,
+  the opt-in unwrapped positions, and the interpolation scheme as one self-describing group
+  (available once `HDF5` is loaded).
 """
 module Particles
 
@@ -656,6 +659,51 @@ new_scalar_point_values(tracers::Tracers) =
   ScalarPointValues(similar(point_coordinates(tracers.positions),
                             eltype(point_coordinates(tracers.positions)),
                             npoints(tracers.positions)))
+
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
+# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
+# persistence pairs established).
+
+export write_tracers, read_tracers
+
+
+"""
+    write_tracers(parent::HDF5.H5DataStore, name::AbstractString, tracers::Tracers)
+
+Write the [`Tracers`](@ref) `tracers` under `parent` as one self-describing HDF5 group — the
+wrapped positions, the unwrapped positions when tracked, and the interpolation scheme, each
+persisted through the field library's own pairs. Available once the `HDF5` package is loaded; the
+caller owns the file.
+
+The arguments are:
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `tracers` — the tracer set to record.
+
+Returns the created group. Reload with [`read_tracers`](@ref).
+"""
+function write_tracers end
+
+
+"""
+    read_tracers(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain) -> Tracers
+
+Rebuild a [`Tracers`](@ref) from the group [`write_tracers`](@ref) wrote, its positions allocated
+on the storage backend of `domain` (a [`FixedDomain`](@ref)), whose element type must agree with
+the file or the read is refused with an `ArgumentError`, as is a group not written by
+`write_tracers`. Available once the `HDF5` package is loaded.
+
+The arguments are:
+- `parent` — the open HDF5 file or group holding the tracer group.
+- `name` — the group's name.
+- `domain` — the `FixedDomain` whose backend the rebuilt set lives on.
+"""
+function read_tracers end
 
 
 end # module Particles

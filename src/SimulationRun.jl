@@ -30,6 +30,8 @@ The run layer:
   observation, and `warmup!`, the one-line shorthand that runs it.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
+- [`write_simulation`](@ref) / [`read_simulation`](@ref) — checkpoint and restore: the restartable
+  run as one self-describing HDF5 group (available once `HDF5` is loaded).
 
 Read a run's state through `sim.state` and its deposited observables through `sim.cache`, with the
 observables and cache accessors that own them; the run layer adds no forwarding methods of its own.
@@ -991,6 +993,62 @@ warmup!(sim; gate_skewness = false)   # relax the skewness gate (a shorter, loos
 Returns `sim`.
 """
 warmup!(sim::Simulation; kwargs...) = run!(StationarityCriterion(; kwargs...), sim)
+
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
+# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
+# persistence pairs established).
+
+export write_simulation, read_simulation
+
+
+"""
+    write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::Simulation)
+
+Checkpoint the run: write everything needed to restore `sim` (a [`Simulation`](@ref)) as one
+self-describing HDF5 group — the domain's parameters, the state in spectral representation, the
+tracer set, both forcing strategies, the Lagrangian sample history a multistep particle
+integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
+derivable is stored: the physical-representation observables, the current velocity sample, and
+every register and plan are recomputed on read. A stochastic forcing's evolving state is
+deliberately not stored (its parameters are), so continuation is exact for deterministic
+forcings. Available once the `HDF5` package is loaded; opening and closing the file is the
+caller's job, and `parent[name] = sim` is equivalent sugar.
+
+The arguments are:
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `sim` — the run to checkpoint.
+
+Returns the created group. Restore with [`read_simulation`](@ref).
+"""
+function write_simulation end
+
+
+"""
+    read_simulation(parent::HDF5.H5DataStore, name::AbstractString;
+                    array_type = Array) -> Simulation
+
+Restore a run from the group [`write_simulation`](@ref) wrote: rebuild the [`Simulation`](@ref)
+through its own constructor from the recorded parameters, overwrite the freshly seeded state and
+positions with the stored ones, re-deposit every observable the schedule carries, restore the
+Lagrangian sample history fill-aware (a scheme of a different order keeps what fits and
+bootstraps the rest), and set the clock — the next [`advance!`](@ref) continues the checkpointed
+run. The one deliberate divergence is a stochastic forcing, which resumes on a fresh stream. A
+group not written by `write_simulation`, or written by a newer schema version, is refused with an
+`ArgumentError`. Available once the `HDF5` package is loaded.
+
+The arguments are:
+- `parent` — the open HDF5 file or group holding the checkpoint group.
+- `name` — the group's name.
+- `array_type = Array` — the storage backend the restored run lives on; the reader names it, so a
+  checkpoint written on one backend loads on any other.
+"""
+function read_simulation end
 
 
 end # module SimulationRun

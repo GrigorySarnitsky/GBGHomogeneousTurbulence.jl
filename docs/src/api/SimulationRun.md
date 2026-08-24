@@ -45,3 +45,12 @@ reference law can be evaluated at the run's measured state.
 ```@docs
 flow_parameters
 ```
+
+## Persistence
+
+Checkpoint and restore — the restartable run as one self-describing group, available once `HDF5` is loaded.
+
+```@docs
+write_simulation
+read_simulation
+```

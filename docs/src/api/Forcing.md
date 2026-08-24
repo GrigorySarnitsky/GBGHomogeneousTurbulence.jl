@@ -46,3 +46,12 @@ add_forcing_source!
 project_forcing!
 uses_steady_linear_rate
 ```
+
+## Persistence
+
+A strategy's HDF5 persistence — its defining parameters as one self-describing group, available once `HDF5` is loaded.
+
+```@docs
+write_forcing
+read_forcing
+```

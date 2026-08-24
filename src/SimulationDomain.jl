@@ -19,6 +19,8 @@ The discretized periodic box a run lives on — the reusable, read-only frame:
   [`new_tensor_field_spectral`](@ref), [`new_tensor_field_physical`](@ref) — the field allocators
   (a zeroed field of the named kind and representation, on the domain's backend and element type).
 - [`truncate_to_band!`](@ref) — apply the dealias kernel to a field in spectral representation, in place.
+- [`write_domain`](@ref) / [`read_domain`](@ref) — the domain's HDF5 persistence: one
+  self-describing group of its defining parameters (available once `HDF5` is loaded).
 
 Precision and backend enter here and flow everywhere from here.
 """
@@ -426,5 +428,53 @@ scalar field in spectral representation. Returns `field`.
     generator does.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
+# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
+# persistence pairs established).
+
+export write_domain, read_domain
+
+
+"""
+    write_domain(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain)
+
+Write the [`FixedDomain`](@ref) `domain` under `parent` as one self-describing HDF5 group — its
+defining parameters (the grid points per axis, the side length, the element type, and the
+dealiasing strategy with its settings), never the derived machinery (transform plans, multipliers,
+kernels), which the reader rebuilds. Available once the `HDF5` package is loaded; opening and
+closing the file is the caller's job.
+
+The arguments are:
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `domain` — the `FixedDomain` to record.
+
+Returns the created group. Reload with [`read_domain`](@ref).
+"""
+function write_domain end
+
+
+"""
+    read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array) -> FixedDomain
+
+Rebuild a [`FixedDomain`](@ref) from the group [`write_domain`](@ref) wrote — the recorded
+parameters through the ordinary constructor, so the transform plans, multipliers and kernels are
+rebuilt, never read. A group that was not written by `write_domain`, or was written by a newer
+schema version, is refused with an `ArgumentError`. Available once the `HDF5` package is loaded.
+
+The arguments are:
+- `parent` — the open HDF5 file or group holding the domain group.
+- `name` — the group's name.
+- `array_type = Array` — the storage backend the rebuilt domain lives on. The backend is
+  deliberately not taken from the file: a checkpoint written on one backend loads on any other, so
+  the reader, not the writer, names it.
+"""
+function read_domain end
+
 
 end # module SimulationDomain

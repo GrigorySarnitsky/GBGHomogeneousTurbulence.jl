@@ -82,3 +82,12 @@ velocity_at_particles(sim.cache)               # u(tₙ, X(tₙ)) — the Lagran
 out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
 interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```
+
+## Persistence
+
+The tracer set's HDF5 persistence — positions, the unwrapped record and the interpolation scheme as one self-describing group, available once `HDF5` is loaded.
+
+```@docs
+write_tracers
+read_tracers
+```

@@ -24,3 +24,12 @@ Seed a large-scale-peaked, dealiased, rescaled random solenoidal velocity, or a 
 random_solenoidal_velocity_spectral!
 random_scalar_spectral!
 ```
+
+## Persistence
+
+The state's HDF5 persistence — the spectral fields as one self-describing group, available once `HDF5` is loaded.
+
+```@docs
+write_state
+read_state
+```

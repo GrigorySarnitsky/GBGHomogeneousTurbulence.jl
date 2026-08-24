@@ -1,0 +1,171 @@
+# The HDF5 checkpoint slice (decision 75): each writer/reader pair round-trips its object through
+# one self-describing group, and a restored run continues bitwise where the checkpointed one left
+# off. The leaves are the field library's own persistence (write_field / write_points /
+# write_scheme); nothing derivable is stored, so the reads below also exercise the re-deposit and
+# the fill-aware history restore.
+using Test, Random, HDF5
+using GBGIsotropicTurbulence
+using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_coordinates, point_values,
+                         field_data, npoints
+
+
+make_domain(; T = Float64, dealiasing = TwoThirds()) =
+  FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,
+              array_type = Array, dealiasing)
+
+
+@testset "write_domain / read_domain round-trip the defining parameters" begin
+  path = tempname() * ".h5"
+  for dealiasing in (TwoThirds(), HouLi(order = 20, strength = 0.5), PhaseShift())
+    domain = make_domain(; T = Float32, dealiasing)
+    h5open(io -> (io["d"] = domain), path, "w")
+    back = h5open(io -> read_domain(io, "d"), path, "r")
+    @test back.grid.grid_size == domain.grid.grid_size
+    @test back.grid.domain_size == domain.grid.domain_size
+    @test back.dealiasing === dealiasing
+    @test eltype(field_data(new_scalar_field_physical(back))) == Float32
+  end
+  # A dataset, a missing name, and a foreign group are each refused with a named error.
+  h5open(path, "w") do io
+    io["plain"] = [1.0, 2.0]
+    create_group(io, "foreign")
+  end
+  h5open(path, "r") do io
+    @test_throws ArgumentError read_domain(io, "absent")
+    @test_throws ArgumentError read_domain(io, "plain")
+    @test_throws ArgumentError read_domain(io, "foreign")
+  end
+end
+
+
+@testset "write_state / read_state are bitwise, and refuse a mismatched domain" begin
+  path = tempname() * ".h5"
+  domain = make_domain()
+  state = GBGIsotropicTurbulence.State.ResolvedFields(domain; scalar = true)
+  rng = MersenneTwister(3)
+  copyto!(field_data(state.velocity_spectral),
+          randn(rng, ComplexF64, size(field_data(state.velocity_spectral))))
+  copyto!(field_data(state.scalar_spectral),
+          randn(rng, ComplexF64, size(field_data(state.scalar_spectral))))
+  h5open(io -> write_state(io, "s", state), path, "w")
+  back = h5open(io -> read_state(io, "s", domain), path, "r")
+  @test field_data(back.velocity_spectral) == field_data(state.velocity_spectral)
+  @test field_data(back.scalar_spectral) == field_data(state.scalar_spectral)
+  bigger = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                       array_type = Array, dealiasing = TwoThirds())
+  h5open(path, "r") do io
+    @test_throws ArgumentError read_state(io, "s", bigger)
+  end
+end
+
+
+@testset "write_tracers / read_tracers keep positions, scheme, and the unwrapped record" begin
+  path = tempname() * ".h5"
+  domain = make_domain()
+  tracers = Tracers(domain; number_of_particles = 5, interpolation_scheme = LalescuSpline(2, 1),
+                    unwrapped = true, rng = MersenneTwister(4))
+  h5open(io -> (io["t"] = tracers), path, "w")
+  back = h5open(io -> read_tracers(io, "t", domain), path, "r")
+  @test point_coordinates(back.positions) == point_coordinates(tracers.positions)
+  @test back.interpolation_scheme === tracers.interpolation_scheme
+  @test point_coordinates(unwrapped_positions(back)) ==
+        point_coordinates(unwrapped_positions(tracers))
+  # An untracked set stays untracked through the round trip.
+  plain = Tracers(domain; number_of_particles = 3, interpolation_scheme = CatmullRom)
+  h5open(io -> write_tracers(io, "p", plain), path, "w")
+  back2 = h5open(io -> read_tracers(io, "p", domain), path, "r")
+  @test_throws ArgumentError unwrapped_positions(back2)
+end
+
+
+@testset "write_forcing / read_forcing rebuild each strategy from its parameters" begin
+  path = tempname() * ".h5"
+  domain = make_domain()
+  built = (NoForcing(),
+           GBGIsotropicTurbulence.Forcing.Linear(domain; rate = 0.3, lowest_shell = 2,
+                                                 highest_shell = 3),
+           ConstantPower(domain; injection_rate = 0.1),
+           VarianceRescaling(domain; target = 0.5, over = :band),
+           VarianceController(domain; target = 1.2, gain = 2.0),
+           GBGIsotropicTurbulence.Forcing.StochasticOU(domain; variance = 1.0, correlation_time = 0.3))
+  h5open(path, "w") do io
+    for (i, f) in enumerate(built)
+      io["f$i"] = f
+    end
+    # A deferred (operator-free) form is a constructor, not a built strategy.
+    @test_throws ArgumentError write_forcing(io, "deferred",
+                                             ConstantPower(injection_rate = 0.1))
+  end
+  h5open(path, "r") do io
+    for (i, f) in enumerate(built)
+      back = read_forcing(io, "f$i", domain)
+      @test nameof(typeof(back)) == nameof(typeof(f))
+      for p in (:rate, :injection_rate, :target, :gain, :turnover_time, :over, :variance,
+                :correlation_time, :lowest_shell, :highest_shell)
+        hasproperty(f, p) && @test getproperty(back, p) == getproperty(f, p)
+      end
+    end
+  end
+end
+
+
+@testset "a restored run continues the checkpointed one bitwise" begin
+  path = tempname() * ".h5"
+  # A multistep tracer scheme past its bootstrap, a scalar, and the unwrapped record: the
+  # configuration where every stored piece — state, positions, unwrapped record, and the sample
+  # history — is load-bearing for the continuation below.
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+                   number_of_particles = 6, unwrapped = true,
+                   particle_integration_scheme = AdamsBashforth(order = 2),
+                   rng = MersenneTwister(7))
+  for _ in 1:4
+    advance!(sim; dt = 0.01)
+  end
+  h5open(io -> (io["run"] = sim), path, "w")
+  sim2 = h5open(io -> read_simulation(io, "run"), path, "r")
+
+  @test current_time(sim2) == current_time(sim)
+  @test current_step(sim2) == current_step(sim)
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+  @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
+  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
+  @test point_coordinates(unwrapped_positions(sim2.tracers)) ==
+        point_coordinates(unwrapped_positions(sim.tracers))
+  @test sim2.cache.history_filled == sim.cache.history_filled
+  @test sim2.cache.history_steps == sim.cache.history_steps
+  for j in 1:sim.cache.history_filled
+    @test point_values(sim2.cache.velocity_at_particles_history[j]) ==
+          point_values(sim.cache.velocity_at_particles_history[j])
+  end
+  # The re-deposited observables equal the originals: nothing derivable was stored, so this pins
+  # the restore's recomputation, not a copy.
+  @test field_data(velocity_physical(sim2.cache)) == field_data(velocity_physical(sim.cache))
+  @test velocity_at_particles(sim2.cache) == velocity_at_particles(sim.cache)
+
+  # Continuation: 4 + 3 steps in one run equals 4 steps, a checkpoint, and 3 more — bitwise, the
+  # default deterministic forcing making the comparison exact.
+  for _ in 1:3
+    advance!(sim; dt = 0.01)
+    advance!(sim2; dt = 0.01)
+  end
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+  @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
+  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
+  @test point_coordinates(unwrapped_positions(sim2.tracers)) ==
+        point_coordinates(unwrapped_positions(sim.tracers))
+end
+
+
+@testset "a tracer-free, scalar-free run checkpoints and continues too" begin
+  path = tempname() * ".h5"
+  sim = Simulation(grid_points_per_axis = 8, viscosity = 0.05, rng = MersenneTwister(9),
+                   velocity_forcing = ConstantPower(injection_rate = 0.1))
+  advance!(sim; dt = 0.01)
+  h5open(io -> write_simulation(io, "run", sim), path, "w")
+  sim2 = h5open(io -> read_simulation(io, "run"), path, "r")
+  @test sim2.tracers === nothing
+  @test sim2.state.scalar_spectral === nothing
+  advance!(sim; dt = 0.01)
+  advance!(sim2; dt = 0.01)
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+end

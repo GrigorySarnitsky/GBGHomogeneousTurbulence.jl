@@ -58,3 +58,12 @@ product.
 ```@docs
 truncate_to_band!
 ```
+
+## Persistence
+
+The domain's HDF5 persistence — its defining parameters as one self-describing group, available once `HDF5` is loaded.
+
+```@docs
+write_domain
+read_domain
+```

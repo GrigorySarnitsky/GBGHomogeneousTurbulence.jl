@@ -2278,6 +2278,30 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     structurally. *Front door* survives in its sanctioned entry-point sense (§4.7's heading, the
     decision log) and the glossary row now marks it historical, resolving to *domain-building*.
 
+75. **(2026-08, user-directed) HDF5 checkpointing: one self-describing group fully restores the
+    run, recursively composed, with nothing derivable stored.** The persistence surface is five
+    writer/reader pairs, one per user-meaningful object — `write_simulation`/`read_simulation`,
+    `write_domain`/`read_domain`, `write_state`/`read_state`, `write_tracers`/`read_tracers`,
+    `write_forcing`/`read_forcing` — with the field library's `write_field`/`write_points`/
+    `write_scheme` groups as the leaves (its transfer-scheme pair was raised for exactly this and
+    delivered as PF decision 75, same day). The methods live in the `GBGIsotropicTurbulenceHDF5Ext`
+    weak-dependency extension; the bare generics and docstrings stay in the owning modules, so the
+    REPL and docs work without HDF5. The file is opened and closed by the caller; each group
+    carries a type tag and a schema version, checked on read; and the storage backend is the
+    *reader's* keyword, never taken from the file — a checkpoint written on one backend loads on
+    any other, with the element type file-bound. Not stored, recomputed on read: every physical
+    chart, the current velocity sample, kernels, plans, and all scratch — the reader rebuilds the
+    `Simulation` through its own constructor and replays the seeding deposits over the loaded
+    state. Stored because irreplaceable: the spectral state, the positions and the opt-in
+    unwrapped record, the clock, and the **Lagrangian sample history** (ring, step sizes, fill
+    count), restored fill-aware after the epoch announcements — the order is load-bearing, since
+    `particles_modified!` discards the history and restarts the unwrapped record, so both are
+    written after it. Ruled non-persistent: a stochastic forcing's evolving force and stream — a
+    reloaded `StochasticOU` resumes on a fresh stream (parameters only), so continuation is exact
+    (bitwise, pinned by test) for deterministic forcings. The forcing structs now **store their
+    shell bounds** — the parameters their band kernels are derived from, previously dropped at
+    construction — the "an object is its parameters" lesson applied one layer up.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

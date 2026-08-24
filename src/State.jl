@@ -14,6 +14,8 @@ The evolving state a run advances, and how it is seeded:
   single source of truth: the physical fields are recovered from it and never held in the state.
 - [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random
   initial conditions (a divergence-free velocity, a mean-zero scalar) that seed it.
+- [`write_state`](@ref) / [`read_state`](@ref) — the state's HDF5 persistence: the spectral fields
+  as one self-describing group (available once `HDF5` is loaded).
 
 All sized to a [`FixedDomain`](@ref).
 
@@ -251,5 +253,51 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
   field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance)
   return φ̂
 end
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
+# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
+# persistence pairs established).
+
+export write_state, read_state
+
+
+"""
+    write_state(parent::HDF5.H5DataStore, name::AbstractString, state::ResolvedFields)
+
+Write the [`ResolvedFields`](@ref) `state` under `parent` as one self-describing HDF5 group — the
+velocity, and the scalar when the run carries one, each a nested field group in spectral
+representation. The spectral representation is the single source of truth, so no physical
+representation is stored. Available once the `HDF5` package is loaded; the caller owns the file.
+
+The arguments are:
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `state` — the `ResolvedFields` to record.
+
+Returns the created group. Reload with [`read_state`](@ref).
+"""
+function write_state end
+
+
+"""
+    read_state(parent::HDF5.H5DataStore, name::AbstractString,
+               domain::FixedDomain) -> ResolvedFields
+
+Rebuild a [`ResolvedFields`](@ref) from the group [`write_state`](@ref) wrote, allocated on and
+copied to the storage backend of `domain` (a [`FixedDomain`](@ref)) — which must agree with the
+file in grid size and element type, or the read is refused with an `ArgumentError`, as is a group
+not written by `write_state`. Available once the `HDF5` package is loaded.
+
+The arguments are:
+- `parent` — the open HDF5 file or group holding the state group.
+- `name` — the group's name.
+- `domain` — the `FixedDomain` whose backend the rebuilt state lives on.
+"""
+function read_state end
+
 
 end # module State

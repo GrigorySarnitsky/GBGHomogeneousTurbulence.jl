@@ -51,6 +51,8 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
   [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
+- [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
+  parameters as one self-describing group (available once `HDF5` is loaded).
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
@@ -388,11 +390,15 @@ transfer: the band and whole-field observables ride a single fused traversal, in
 - `band` — the band-pass kernel selecting the rescaled shells.
 - `target` — the held value.
 - `over` — `:band` or `:total`.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters the band kernel
+  is derived from, kept so the strategy remains its own record.
 """
 struct VarianceRescaling{K, T} <: AbstractForcing
   band::K              # annular band-pass kernel (ScalarFieldSpectral)
   target::T            # the VALUE to hold, of kinetic_energy (velocity) or scalar_variance (scalar)
   over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
+  lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
+  highest_shell::Int
 end
 
 function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
@@ -405,7 +411,8 @@ function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
     throw(ArgumentError("VarianceRescaling `target` must be non-negative, got $target: it is the " *
                         "kinetic energy or scalar variance the forcing holds, and the rescale " *
                         "takes its square root"))
-  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over)
+  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over,
+                           Int(lowest_shell), Int(highest_shell))
 end
 
 
@@ -454,17 +461,21 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
 # Fields
 - `indicator` — the band indicator as a real array.
 - `rate` — the fixed linear rate ``A``.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `indicator` is
+  derived from.
 """
 struct Linear{M, T} <: AbstractForcing
   indicator::M         # real array: the band indicator (1 in band, 0 outside)
   rate::T              # the linear rate A
+  lowest_shell::Int    # the band's shell bounds — the parameters `indicator` is derived from
+  highest_shell::Int
 end
 
 function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
   # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
   # indicator is materialized once here — the same stored mask this forcing always carried.
   indicator = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
-  return Linear(indicator, float(rate))
+  return Linear(indicator, float(rate), Int(lowest_shell), Int(highest_shell))
 end
 
 uses_steady_linear_rate(::Linear) = true
@@ -523,10 +534,14 @@ rather than the integrating factor, where freezing it would cost the scheme its 
 - `band` — the band-pass kernel, lazy: the per-stage source both weights the band observable with it
   and convolves against it, so no indicator array is stored.
 - `injection_rate` — the held rate.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
+  from.
 """
 struct ConstantPower{K, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
   injection_rate::T    # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
+  lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
+  highest_shell::Int
 end
 
 """
@@ -596,12 +611,16 @@ does not take.
 # Fields
 - `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
 - `target`, `gain`, `turnover_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
+  from.
 """
 struct VarianceController{K, T} <: AbstractForcing
   band::K
   target::T
   gain::T
   turnover_time::T
+  lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
+  highest_shell::Int
 end
 
 
@@ -630,7 +649,8 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
   # Promote the three together, and `float` only `target` — which is what fixes the element type.
   # Flooring each argument separately re-imports Float64 through the back door, because `float(1)` on
   # the integer default gain is a Float64 and promotion then carries the whole struct up with it.
-  return VarianceController(band, promote(float(target), gain, tℓ)...)
+  return VarianceController(band, promote(float(target), gain, tℓ)...,
+                            Int(lowest_shell), Int(highest_shell))
 end
 
 
@@ -687,7 +707,8 @@ function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::
   # No materialized indicator: it existed only to fill the integrating-factor rate array, and this
   # forcing no longer uses that route. The lazy kernel is convolved against directly, so a
   # `ConstantPower` run now carries NO field-scale storage of its own — two arrays fewer.
-  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(injection_rate))
+  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(injection_rate),
+                       Int(lowest_shell), Int(highest_shell))
 end
 
 # NOT a steady rate, and declaring it one was the defect. `A = ε/2k_band` is linear in the field but
@@ -780,6 +801,8 @@ mutable struct StochasticOU{B, R, T} <: AbstractForcing
   state::Union{Nothing, AbstractFieldSpectral}   # the OU forcing f̂ (allocated on first use)
   noise_physical::Union{Nothing, AbstractFieldPhysical}  # own noise scratch (allocated on first use)
   noise_spectral::Union{Nothing, AbstractFieldSpectral}
+  lowest_shell::Int                          # the band's shell bounds — the parameters `band` is derived from
+  highest_shell::Int
 end
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
@@ -795,7 +818,7 @@ function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Rea
                         "Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
   band = _shell_band(domain, lowest_shell, highest_shell)
   return StochasticOU(band, float(correlation_time), float(variance), MersenneTwister(seed),
-                      nothing, nothing, nothing)
+                      nothing, nothing, nothing, Int(lowest_shell), Int(highest_shell))
 end
 
 _ou_state(::VectorFieldSpectral, domain) = new_vector_field_spectral(domain)
@@ -854,6 +877,55 @@ VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
 StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
   DeferredForcing(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
+
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
+# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
+# persistence pairs established).
+
+export write_forcing, read_forcing
+
+
+"""
+    write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::AbstractForcing)
+
+Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
+self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
+indicator array) is rebuilt from them on read. `StochasticOU` stores its parameters and
+**not** its evolving force or random stream: a reloaded stochastic forcing resumes on a fresh
+stream, so continuation across a checkpoint is exact only for the deterministic strategies. A
+[`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`
+package is loaded; the caller owns the file.
+
+The arguments are:
+- `parent` — the open HDF5 file or group to write under.
+- `name` — the created group's name.
+- `forcing` — the built strategy to record.
+
+Returns the created group. Reload with [`read_forcing`](@ref).
+"""
+function write_forcing end
+
+
+"""
+    read_forcing(parent::HDF5.H5DataStore, name::AbstractString,
+                 domain::FixedDomain) -> AbstractForcing
+
+Rebuild a forcing strategy from the group [`write_forcing`](@ref) wrote, through its ordinary
+keyword constructor on `domain` (a [`FixedDomain`](@ref)) — the derived band kernel or indicator
+is rebuilt, never read. A group not written by `write_forcing`, or written by a newer schema
+version, is refused with an `ArgumentError`. Available once the `HDF5` package is loaded.
+
+The arguments are:
+- `parent` — the open HDF5 file or group holding the forcing group.
+- `name` — the group's name.
+- `domain` — the `FixedDomain` the strategy is rebuilt on.
+"""
+function read_forcing end
 
 
 end # module Forcing

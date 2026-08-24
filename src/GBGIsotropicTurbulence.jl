@@ -253,4 +253,15 @@ export FixedDomain,
        flow_parameters
 
 
+
+# The HDF5 persistence pairs (methods in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# extension, loaded alongside the HDF5 package).
+using .SimulationDomain: write_domain, read_domain
+using .State: write_state, read_state
+using .Particles: write_tracers, read_tracers
+using .Forcing: write_forcing, read_forcing
+using .SimulationRun: write_simulation, read_simulation
+export write_domain, read_domain, write_state, read_state, write_tracers, read_tracers,
+       write_forcing, read_forcing, write_simulation, read_simulation
+
 end # module GBGIsotropicTurbulence
