@@ -81,10 +81,11 @@ assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@
 [`ObservablesCache`](@ref) holding what the last iteration deposited, any [`Tracers`](@ref), and a
 clock.
 
-The first form is the **front door**: from `grid_points_per_axis` and `side_length` it builds every
-piece with sensible defaults, seeds a divergence-free velocity (and, with `scalar = true`, a
-mean-zero scalar ``\\varphi``), and returns a `Simulation` at ``t = 0``. The second takes a
-`FixedDomain` you built yourself.
+The two forms differ only in where the `FixedDomain` comes from. The first is
+**domain-building**: from `grid_points_per_axis` and `side_length` it builds the domain and every
+piece above it with sensible defaults, seeds a divergence-free velocity (and, with `scalar = true`,
+a mean-zero scalar ``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
+**domain-taking**: the same assembly on a `FixedDomain` you built yourself.
 
 Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref). Read its measured state by
 applying the observables to `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or
@@ -144,13 +145,20 @@ there — and the viscosity is chosen from the grid rather than supplied:
 
 # Arguments
 
-All keyword except `domain` (below). The ones marked *(front door only)* configure the `FixedDomain` and are consumed by the first form;
-the rest are forwarded to the `Simulation(domain; …)` form.
+All keyword except `domain`. The keywords split as the two forms do: the **domain group** is
+consumed by the domain-building form, and the domain-taking form replaces the whole group with its
+one positional argument; the **run group** is accepted by both.
 
-- `grid_points_per_axis` — the number of grid points ``N`` along each side (front door only); required.
-- `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
-  argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
-  `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
+The domain group:
+- `domain` — a pre-built `FixedDomain`: the **positional** argument of the domain-taking form,
+  standing in for every other keyword of this group.
+- `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
+- `side_length = 2π` — the box side ``L``.
+- `element_type = Float64`, `array_type = Array` — the real element type and storage backend.
+- `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
+  `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step.
+
+The run group:
 - `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` a derived ``\\nu`` is set from;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
   and the derivation then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
@@ -159,10 +167,6 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit to derive ``\\nu`` from the grid.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
   an r.m.s. velocity ``u' = \\sqrt{2k/3} = 1``.
-- `side_length = 2π` — the box side ``L`` (front door only).
-- `element_type = Float64`, `array_type = Array` — the real element type and storage backend (front door only).
-- `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
-  `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step (front door only).
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
   ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
   scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
@@ -173,6 +177,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   viscosity mode, since the check reads the resolved ``\\nu`` however it was obtained — a warning,
   not an error, so a deliberately under-resolved scalar stays reachable but not silent; the remedy
   is `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
+- `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
+  ``\\varphi``), and its initial variance.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` left at `nothing` means the default — a
@@ -181,8 +187,6 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   Under a derived ν a hand-built velocity forcing is **checked against the ν calibration**: one that
   holds a different target, a band instead of the whole field, or nothing at all draws a warning,
   since the chosen ν then describes a state the run never reaches.
-- `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
-  ``\\varphi``), and its initial variance.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
@@ -206,6 +210,8 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
+- `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
+  [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
@@ -217,8 +223,6 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   diffusive-decay bound that stops that, needing no constant from the caller. `max_dt` is for a
   ceiling only the caller knows, since any *default* constant would be a claim about the velocity
   scale they happened to choose.
-- `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
-  [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom`, `unwrapped = false` — the number
   of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions, and
   whether to also track the winding-preserving unwrapped positions (read with
@@ -252,7 +256,7 @@ sim = Simulation(grid_points_per_axis = 128)
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
-# Domain-first — build the frame yourself, then hand it to the second form:
+# Domain-taking — build the frame yourself, then hand it over:
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
                      element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 1e-2)

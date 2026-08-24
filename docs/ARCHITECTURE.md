@@ -2267,6 +2267,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     matched the old warn text. Verbatim historical quotes in witness headers and the decision log
     keep the old words.
 
+74. **(2026-08, user-directed) The `Simulation` constructor forms name their mechanism —
+    **domain-building** / **domain-taking** — and the argument list is grouped the same way.**
+    "Front door" as the name of the no-`domain` form said nothing about what distinguishes it (it
+    builds the `FixedDomain` for you), so the form dichotomy is now mechanism-named and exhaustive:
+    the domain is either built from keywords or taken pre-built. The `# Arguments` section splits
+    into the **domain group** (consumed by the domain-building form; the domain-taking form
+    replaces the whole group with its one positional argument) and the **run group** (accepted by
+    both), retiring the per-bullet *(front door only)* markers the grouping now carries
+    structurally. *Front door* survives in its sanctioned entry-point sense (§4.7's heading, the
+    decision log) and the glossary row now marks it historical, resolving to *domain-building*.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
