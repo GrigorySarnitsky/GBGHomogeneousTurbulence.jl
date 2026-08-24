@@ -50,17 +50,22 @@ export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
 
 
 """
-    Tracers(domain; number_of_particles, interpolation_scheme, rng = default_rng())
-    Tracers(domain; positions, interpolation_scheme)
+    Tracers(domain; number_of_particles, interpolation_scheme, unwrapped = false,
+            rng = default_rng())
+    Tracers(domain; positions, interpolation_scheme, unwrapped = false)
 
 (One method, shown as the two ways it is called — keywords do not dispatch.)
 
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
 Give **exactly one** of `number_of_particles`, which seeds that many tracers uniformly at random in
-the periodic box, or `positions`, an `(M, 3)` array of tracer positions to wrap (the columns being
-the ``x, y, z`` components), converted to `domain`'s backend and element type. Supplying both, or
-neither, raises an `ArgumentError`.
+the periodic box, or `positions`, a `GBGPeriodicFields`
+[`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) of tracer positions
+(build one from an `(M, 3)` array — columns the ``x, y, z`` components — with `PointSet(array)`),
+copied to `domain`'s backend and element type. Supplying both, or neither, raises an
+`ArgumentError` — as does a raw array where the `PointSet` is expected: coordinates cross into the
+package only through the `GBGPeriodicFields` point types, and a caller who needs the bare array
+back extracts it with that package's accessors.
 
 The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
 sampled field — at the tracer positions.
@@ -76,8 +81,10 @@ smoothness parameters.
 
 - `domain` — the [`FixedDomain`](@ref) whose backend, element type and box the set is built on.
 - `number_of_particles` — seed this many tracers uniformly at random in the box.
-- `positions` — or wrap this `(M, 3)` array instead; give exactly one of the two.
+- `positions` — or copy this `PointSet` in instead; give exactly one of the two.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
+- `unwrapped = false` — also track the winding-preserving record [`unwrapped_positions`](@ref)
+  serves; the wrapped positions stay the dynamical state either way.
 - `rng` — the random stream seeding the positions (used with `number_of_particles`, ignored with
   `positions`); defaults to `Random.default_rng()`.
 
@@ -103,7 +110,8 @@ Building a set directly — to place tracers deliberately rather than at random,
 by hand — takes the `positions` form, and then the scheme's per-step storage is yours to allocate:
 
 ```julia
-tracers = Tracers(domain; positions = [0.1 0.2 0.3; 1.0 1.0 1.0], interpolation_scheme = CatmullRom)
+tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
+                  interpolation_scheme = CatmullRom)
 buffers = allocate_buffers(EndpointHeun(), tracers)
 
 record_particle_velocities!(tracers, u)     # u(tₙ) at the current positions — do this first
@@ -124,10 +132,10 @@ The trajectory scheme's own working storage is **not** here: it lives in a
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 
 # Fields
-- `positions` — the `(M, 3)` tracer positions (read with `particle_positions`).
-- `position_points` — a
-  [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `positions`: the
-  same coordinates in the form `GBGPeriodicFields`' interpolation takes, which is why both exist.
+- `position_points` — the tracer positions, as the
+  [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) every operation takes:
+  the one storage, always wrapped — the dynamical state. `particle_positions` serves its `(M, 3)`
+  matrix view.
 - `particle_velocities` — the interpolated velocity at the positions the tracers occupy, at the
   instant they occupy them: the genuine Lagrangian sample. This array **is** the observables cache's
   particle-velocities slot, the same storage under two names, so it carries that slot's rules —
@@ -138,9 +146,8 @@ The trajectory scheme's own working storage is **not** here: it lives in a
   by every push with the same displacement terms but never reduced to the box; `nothing` when
   untracked. Read it through `unwrapped_positions`.
 """
-struct Tracers{P, PSX, VV, S, UP}
-  positions::P              # (M, 3), always wrapped — the dynamical state
-  position_points::PSX      # PointSet wrapping `positions`
+struct Tracers{PSX, VV, S, UP}
+  position_points::PSX      # PointSet — the (always wrapped) dynamical state; the ONE storage
   particle_velocities::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
   interpolation_scheme::S
   unwrapped_points::UP      # PointSet (the opt-in unwrapped record, winding kept), or nothing
@@ -154,24 +161,26 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
                  number_of_particles = nothing, unwrapped::Bool = false,
                  rng = Random.default_rng())
   count(!isnothing, (positions, number_of_particles)) == 1 ||
-    throw(ArgumentError("give exactly one of `positions` (an (M, 3) array to wrap) or " *
+    throw(ArgumentError("give exactly one of `positions` (a `PointSet` of tracer positions) or " *
                         "`number_of_particles` (a count to seed at random)"))
   T = _real_type(domain)
   if isnothing(positions)
     M = Int(number_of_particles)
-    positions = domain.storage_family{T}(undef, M, 3)
-    copyto!(positions, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))
-    pos = positions
+    pos = domain.storage_family{T}(undef, M, 3)
+    copyto!(pos, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))
   else
-    size(positions, 2) == 3 ||
-      throw(DimensionMismatch("tracer positions must have shape (M, 3); got $(size(positions))"))
-    pos = domain.storage_family{T}(undef, size(positions)...)   # the domain's backend + element type
-    copyto!(pos, positions)
+    positions isa PointSet ||
+      throw(ArgumentError("`positions` must be a `GBGPeriodicFields` `PointSet` (wrap an (M, 3) " *
+                          "array with `PointSet(array)`); got a $(typeof(positions)). Raw arrays " *
+                          "cross into the package only through the `GBGPeriodicFields` point types."))
+    supplied = point_coordinates(positions)
+    pos = domain.storage_family{T}(undef, size(supplied)...)    # the domain's backend + element type
+    copyto!(pos, supplied)
   end
   # The unwrapped record starts equal to the wrapped positions and thereafter receives the same
   # displacements WITHOUT the periodic reduction (the grid-free `displace!` — PF's universal-cover
   # lift), so the two can never disagree on a step, only on the winding the wrap discards.
-  return Tracers(pos, PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme,
+  return Tracers(PointSet(pos), VectorPointValues(similar(pos)), interpolation_scheme,
                  unwrapped ? PointSet(copy(pos)) : nothing)
 end
 
@@ -276,7 +285,7 @@ end
 
 
 function allocate_buffers(::EndpointHeun, tracers::Tracers)
-  predictor = similar(tracers.positions)
+  predictor = similar(point_coordinates(tracers.position_points))
   return ParticleIntegratorBuffers(predictor, PointSet(predictor),
                                    VectorPointValues(similar(predictor)))
 end
@@ -459,7 +468,7 @@ end
 
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::MultistepBuffers, dt::Real) where {K}
-  T = real(eltype(tracers.positions))
+  T = real(eltype(point_coordinates(tracers.position_points)))
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
   # basis divides by the node differences — so the next warmed-up step divides by zero and returns
@@ -582,7 +591,7 @@ function advect! end
 
 function advect!(::EndpointHeun, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real)
-  Δt = real(eltype(tracers.positions))(dt)
+  Δt = real(eltype(point_coordinates(tracers.position_points)))(dt)
   # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
   displace!(buffers.predictor_points, tracers.position_points, domain.grid,
             (Δt, tracers.particle_velocities))
@@ -625,7 +634,7 @@ end
 The `(M, 3)` array of current tracer positions — the probes' own state, read off the tracer set
 `tracers`.
 """
-particle_positions(tracers::Tracers) = tracers.positions
+particle_positions(tracers::Tracers) = point_coordinates(tracers.position_points)
 
 
 """
@@ -659,7 +668,7 @@ end
 
 The number of tracers ``M`` in the tracer set `tracers`.
 """
-number_of_particles(tracers::Tracers) = size(tracers.positions, 1)
+number_of_particles(tracers::Tracers) = npoints(tracers.position_points)
 
 
 """
@@ -669,7 +678,7 @@ Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Poi
 shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the velocity at the particle positions.
 """
-new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
+new_vector_point_values(tracers::Tracers) = similar_pointvalues(tracers.particle_velocities, Val(1))
 
 """
     new_scalar_point_values(tracers)
@@ -679,7 +688,7 @@ length ``M`` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` at the particle positions.
 """
 new_scalar_point_values(tracers::Tracers) =
-  ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), number_of_particles(tracers)))
+  similar_pointvalues(tracers.particle_velocities, Val(0))
 
 
 end # module Particles

@@ -2127,6 +2127,21 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     is a property of the trajectory just abandoned. Accumulating statistics over the record is the
     caller's analysis, per the charter.
 
+66. **(2026-08, user-directed) The particle boundary is PF-typed: coordinates and sampled values
+    cross into the package only as `PointSet` / `PointValues`, never as raw arrays.** The ruling
+    generalizes what decision 64 made possible: with `displace!` owning the motion and
+    `point_coordinates` extracting the matrix view, the `positions`/`position_points` pair in
+    `Tracers` had lost its reason (the raw field existed for the axpy-and-wrap arithmetic decision
+    64 deleted, and the new unwrapped record already used the single-`PointSet` pattern). `Tracers`
+    now carries **one** position storage — `position_points::PointSet` — and one type parameter
+    fewer; `particle_positions` serves the `(M, 3)` view through `point_coordinates`, the count
+    comes from `npoints`, and the point-value allocators are thin wrappers over
+    `similar_pointvalues`. The constructor's `positions` keyword takes a **`PointSet`**, and a raw
+    array is refused with the rule stated in the error: raw arrays cross the boundary only through
+    the `GBGPeriodicFields` point types, and a caller who needs the bare array back extracts it
+    with that package's accessors. (A malformed shape is refused one layer down, by `PointSet`'s
+    own constructor — the guard lives with the type that owns the invariant.)
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

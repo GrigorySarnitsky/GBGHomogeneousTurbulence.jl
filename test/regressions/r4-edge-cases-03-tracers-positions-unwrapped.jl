@@ -7,7 +7,7 @@
 # for every position that reaches the boundary through `advect!`.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 using Test
 
 @testset "hand-built tracer positions are read periodically (x = L is the same point as x = 0)" begin
@@ -30,7 +30,7 @@ using Test
   end
 
   sample(X) = begin
-    tracers = Tracers(domain; positions = copy(X), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X)), interpolation_scheme = CatmullRom)
     record_particle_velocities!(tracers, u)
     copy(point_values(tracers.particle_velocities))
   end

@@ -19,7 +19,7 @@ using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Particles: EndpointHeun, advect!, record_particle_velocities!,
                                         particle_positions
 using GBGIsotropicTurbulence.Propagator: allocate_buffers
-using GBGPeriodicFields: field_data
+using GBGPeriodicFields: field_data, PointSet
 using GBGPeriodicFields.Interpolation: CatmullRom
 
 const N = 16
@@ -30,7 +30,7 @@ function poisoned_step(poison)
                        element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
   u = new_vector_field_physical(domain)
   field_data(u) .= poison
-  tracers = Tracers(domain; positions = [1.0 2.0 3.0; 0.5 0.5 0.5],
+  tracers = Tracers(domain; positions = PointSet([1.0 2.0 3.0; 0.5 0.5 0.5]),
                     interpolation_scheme = CatmullRom)
   buffers = allocate_buffers(EndpointHeun(), tracers)
   record_particle_velocities!(tracers, u)

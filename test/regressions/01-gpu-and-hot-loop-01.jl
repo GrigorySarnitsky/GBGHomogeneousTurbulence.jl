@@ -1,12 +1,12 @@
 # Witness: the `AdamsBashforth` docstring promises "the same restart happens if the tracers are
-# reseeded" — after a hand-written reseed of `tracers.positions` (the pattern `particles_modified!`
+# reseeded" — after a hand-written reseed of `particle_positions(tracers)` (the pattern `particles_modified!`
 # sanctions: "a reseed, a hand-written correction, any direct write to the tracer storage"), the
 # scheme must fall back to the `EndpointHeun` startup instead of blending Lagrangian samples taken
 # along the *old*, pre-reseed trajectory into the *new* one.
 
 using Test
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 
 
 # A smooth, spatially varying velocity field, so that a sample taken at the old positions differs
@@ -35,7 +35,7 @@ end
   X1 = T[5.1 0.9 2.2; 2.8 4.6 0.7; 1.1 3.3 5.9]     # the reseeded one, elsewhere in the box
 
   scheme = AdamsBashforth(order = 2)                # K = 2 ⇒ one past sample needed
-  tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+  tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an
   # independent integrator needs its own cache to hold its own history. The assertion is unchanged.
   cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
@@ -55,7 +55,7 @@ end
   # `particles_modified!` is the announcement, and the sibling witness 03-state-machine-03 tests the
   # announced path. Adding the announcement here makes this test the contract rather than a stronger
   # claim no design satisfies.
-  copyto!(tracers.positions, X1)
+  copyto!(particle_positions(tracers), X1)
   particles_modified!(cache)
   record_particle_velocities!(tracers, u0)
   @test cache.history_filled == 0                         # the promised restart: no history to reuse
@@ -64,7 +64,7 @@ end
   reseeded = copy(particle_positions(tracers))
 
   # The behaviour the docstring promises: an `EndpointHeun` startup step from the new positions.
-  reference = Tracers(domain; positions = copy(X1), interpolation_scheme = CatmullRom)
+  reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
   heun = allocate_buffers(EndpointHeun(), reference)
   record_particle_velocities!(reference, u0)
   advect!(EndpointHeun(), reference, u1, domain, heun, dt)

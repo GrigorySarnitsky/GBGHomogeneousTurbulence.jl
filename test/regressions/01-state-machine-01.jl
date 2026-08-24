@@ -29,7 +29,7 @@ end
     # An out-of-band reposition, announced exactly as the docstring prescribes, and NOT yet
     # completed with `record_particle_velocities!` / `deposit_sample!`.
     L = sim.domain.grid.domain_size[1]
-    sim.tracers.positions .= mod.(sim.tracers.positions .+ 0.3, L)
+    particle_positions(sim.tracers) .= mod.(particle_positions(sim.tracers) .+ 0.3, L)
     particles_modified!(sim.cache)
 
     # The sample now belongs to the abandoned positions: reading it must throw.
@@ -48,7 +48,7 @@ end
   @testset "advance! refuses to step on a sample stale in the particles epoch" begin
     sim = fresh_run()
     L = sim.domain.grid.domain_size[1]
-    sim.tracers.positions .= mod.(sim.tracers.positions .+ 0.3, L)
+    particle_positions(sim.tracers) .= mod.(particle_positions(sim.tracers) .+ 0.3, L)
     particles_modified!(sim)      # the run-level announcement, per its own docstring
 
     # advance!'s opening guard exists to refuse a step whose trajectory v₁ is stale.

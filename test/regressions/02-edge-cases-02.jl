@@ -33,7 +33,7 @@ function walk(sim, steps)
       return (:crash, err)
     end
   end
-  return (:ok, copy(Array(sim.tracers.positions)))
+  return (:ok, copy(Array(particle_positions(sim.tracers))))
 end
 
 

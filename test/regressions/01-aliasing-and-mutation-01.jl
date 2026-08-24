@@ -27,7 +27,7 @@ make_sim(scheme) = Simulation(grid_points_per_axis = N, viscosity = 0.05, number
 
 # Announce + refill the trajectory-bound slot after a hand-written change of the tracer positions.
 function reseed!(sim, positions)
-  copyto!(sim.tracers.positions, positions)
+  copyto!(particle_positions(sim.tracers), positions)
   particles_modified!(sim.cache)
   record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
   deposit_sample!(sim.cache)
@@ -51,12 +51,12 @@ function positions_after_reseed(scheme)
   fresh = rand(MersenneTwister(11), M, 3) .* L
   reseed!(a, fresh)
   reseed!(b, fresh)
-  @test Array(a.tracers.positions) == Array(b.tracers.positions)
+  @test Array(particle_positions(a.tracers)) == Array(particle_positions(b.tracers))
   @test Array(particle_velocities(a.cache)) == Array(particle_velocities(b.cache))
 
   advance!(a; dt = DT)
   advance!(b; dt = DT)
-  return Array(a.tracers.positions), Array(b.tracers.positions)
+  return Array(particle_positions(a.tracers)), Array(particle_positions(b.tracers))
 end
 
 @testset "control — EndpointHeun, which keeps no history, is unaffected by a reseed" begin

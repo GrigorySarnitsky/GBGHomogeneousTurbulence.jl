@@ -14,7 +14,7 @@
 # the trajectory is the analytic ∫₀ᵀ cos(ωt) dt.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
 
@@ -36,7 +36,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   # One tracer, a fixed step schedule, the two-verb push a run performs: record the sample at tₙ,
   # then advect. The multistep history is the cache's, so the cache is sized by the scheme's depth.
   final_x(scheme, nsteps) = begin
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
                              history_depth = history_depth(scheme))
     buffers = allocate_buffers(scheme, tracers, cache)

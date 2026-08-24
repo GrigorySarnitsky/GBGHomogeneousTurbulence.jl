@@ -6,7 +6,7 @@
 # the record (winding belongs to the abandoned trajectory), and an untracked set refuses the read.
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 
 
 set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx); uf)
@@ -22,7 +22,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   set_uniform_x!(u, 1.0)                                # steady uniform flow: Heun is exact
 
   X0 = T[1.0 1.0 1.0]
-  tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom,
+  tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom,
                     unwrapped = true)
   buffers = allocate_buffers(EndpointHeun(), tracers)
   nsteps = 160
@@ -39,7 +39,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @test Xw[1, 1] ≈ mod(Xu[1, 1], L) rtol = 1e-10         # and the two agree modulo the box
 
   # The AdamsBashforth path shares the terms: same flow, same drift, both records advanced.
-  ab = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom, unwrapped = true)
+  ab = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom, unwrapped = true)
   sim_free_cache = ObservablesCache(domain; particle_velocities = ab.particle_velocities,
                                     history_depth = history_depth(AdamsBashforth(order = 2)))
   ab_buffers = allocate_buffers(AdamsBashforth(order = 2), ab, sim_free_cache)
@@ -50,7 +50,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @test unwrapped_positions(ab)[1, 1] ≈ X0[1, 1] + 2.5L rtol = 1e-10
 
   # An untracked set refuses the read with an actionable error.
-  bare = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+  bare = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   @test_throws ArgumentError unwrapped_positions(bare)
 
   # A reposition through the run's announcement restarts the record at the new positions.

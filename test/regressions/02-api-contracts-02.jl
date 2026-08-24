@@ -6,7 +6,7 @@
 # This file asserts the CORRECT behaviour: every returned coordinate is strictly less than L.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
 set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx); uf)
@@ -24,7 +24,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     # -ulp(1.0e-3) ≈ -2.2e-19 — magnitude far below eps(L)/2 ≈ 7.7e-16, hence inside the band.
     dt = 1.0e-3
     X0 = T[prevfloat(1.0e-3) 1.0 1.0]
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     buffers = allocate_buffers(EndpointHeun(), tracers)
     set_uniform_x!(u, -1.0)
     record_particle_velocities!(tracers, u)
@@ -37,7 +37,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @testset "the same, reached from x = 0 with a tiny negative velocity" begin
     dt = 1.0
     X0 = T[0.0 1.0 1.0]
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     buffers = allocate_buffers(EndpointHeun(), tracers)
     set_uniform_x!(u, -1.0e-20)
     record_particle_velocities!(tracers, u)

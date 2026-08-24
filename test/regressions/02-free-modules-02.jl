@@ -9,7 +9,7 @@
 # on either half fails here, not just in PF's own suite.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values,
+using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet,
                          PointSet, wrap!, point_coordinates
 using Test
 
@@ -48,7 +48,7 @@ using Test
     u = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0]
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     buffers = allocate_buffers(EndpointHeun(), tracers)
 
     field_data(u) .= NaN                       # the ordinary blow-up mode of an over-stepped run

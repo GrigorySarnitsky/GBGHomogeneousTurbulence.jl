@@ -31,7 +31,7 @@ build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
   before = copy(Array(particle_velocities(sim.cache)))
 
   L = sim.domain.grid.domain_size[1]
-  sim.tracers.positions .= mod.(sim.tracers.positions .+ 3.0, L)
+  particle_positions(sim.tracers) .= mod.(particle_positions(sim.tracers) .+ 3.0, L)
 
   # (a) The announcement alone: the sample belongs to the abandoned positions, so the read is refused.
   particles_modified!(sim.cache)

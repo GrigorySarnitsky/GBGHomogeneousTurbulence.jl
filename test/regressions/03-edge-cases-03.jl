@@ -39,7 +39,7 @@ end
   L = 2π
   X_new = L .* rand(MersenneTwister(99), Float64, NPART, 3)
   for sim in (ab, heun)
-    copyto!(sim.tracers.positions, X_new)
+    copyto!(particle_positions(sim.tracers), X_new)
     particles_modified!(sim.cache)
     record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)

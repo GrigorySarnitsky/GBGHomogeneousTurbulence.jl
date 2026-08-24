@@ -37,7 +37,7 @@ using GBGIsotropicTurbulence
 
   # An out-of-band reposition, announced through the sanctioned verb. The state is untouched; the
   # positions the sample belongs to are abandoned.
-  sim.tracers.positions .= 0.5 .* sim.tracers.positions
+  particle_positions(sim.tracers) .= 0.5 .* particle_positions(sim.tracers)
   particles_modified!(sim)
   @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch          # fields did not move
   @test sim.cache.sample_particles_epoch != sim.cache.particles_epoch    # positions did

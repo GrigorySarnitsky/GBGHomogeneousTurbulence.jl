@@ -7,7 +7,7 @@
 # different trajectory and must not enter the next position update.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_values
+using GBGPeriodicFields: PointSet, point_values
 using Random
 using Test
 
@@ -23,7 +23,7 @@ using Test
 
   # The sanctioned reposition sequence, exactly as `particles_modified!`'s docstring describes.
   L = sim.domain.grid.domain_size[1]
-  copyto!(sim.tracers.positions, mod.(particle_positions(sim.tracers) .+ L / 2, L))
+  copyto!(particle_positions(sim.tracers), mod.(particle_positions(sim.tracers) .+ L / 2, L))
   particles_modified!(sim.cache)
   record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
   deposit_sample!(sim.cache)
@@ -36,7 +36,7 @@ using Test
   #     it must not depend on samples taken before the reposition.
   u  = velocity_physical(sim.cache)
   dt = 0.001
-  fresh = Tracers(sim.domain; positions = copy(particle_positions(sim.tracers)),
+  fresh = Tracers(sim.domain; positions = PointSet(copy(particle_positions(sim.tracers))),
                   interpolation_scheme = sim.tracers.interpolation_scheme)
   record_particle_velocities!(fresh, u)
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an

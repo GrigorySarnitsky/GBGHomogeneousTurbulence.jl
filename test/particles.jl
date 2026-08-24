@@ -4,7 +4,7 @@
 # the trajectories; and the two-verb push (record + advect) allocates nothing per step.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, field_data, to_physical,
+using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, field_data, to_physical, PointSet,
                          CatmullRom, LagrangeSpline, point_values
 using Random
 using Test
@@ -22,7 +22,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "uniform field advects exactly" begin
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0; 2.0 3.0 4.0]
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     buffers = allocate_buffers(EndpointHeun(), tracers)
     c = 0.5
     set_uniform_x!(uniform, c)
@@ -44,7 +44,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     exact_x = X0[1, 1] + sin(ω * Tfinal) / ω                  # ∫₀ᵀ cos(ωt) dt
 
     final_x(nsteps) = begin
-      tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+      tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
       buffers = allocate_buffers(EndpointHeun(), tracers)
       u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
       u_end = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
@@ -65,7 +65,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "positions wrap into [0, L)" begin
     X0 = T[6.2 6.2 6.2]                                        # near the upper boundary (L = 2π ≈ 6.283)
-    tracers = Tracers(domain; positions = copy(X0), interpolation_scheme = CatmullRom)
+    tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
     buffers = allocate_buffers(EndpointHeun(), tracers)
     set_uniform_x!(uniform, 1.0)
     for _ in 1:30
