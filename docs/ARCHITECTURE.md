@@ -1955,8 +1955,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     docstring rather than discovered by a convergence study, and a test pins its order below 1.5 so
     the caveat cannot rot into a claim.
 
-    The replacement is `VarianceController`, the constant-``k`` controller of Bassenne, Urzay, Park &
-    Moin (2016, Eq. 20): ``A = [\varepsilon - G(k - k_\infty)/t_\ell]/(2k_f)`` — the whole field's
+    The replacement is `VarianceController`, the constant-``k`` controller of Bassenne et al.
+    (2016, Eq. 20): ``A = [\varepsilon - G(k - k_\infty)/t_\ell]/(2k_f)`` — the whole field's
     variance ``k`` in the restoring term, the forced band's ``k_f`` normalizing, and the two are not
     interchangeable (see the postscript). Its marginal term
     ``\varepsilon/2k_f`` reinjects exactly what dissipation removes, and its proportional term gives
@@ -2097,79 +2097,67 @@ The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law 
 self-contained citation in a `Reference` value, so this list need not duplicate the ~two dozen it
 cites.
 
-- Betchov, R. (1956). An inequality concerning the production of vorticity in isotropic turbulence.
-  *J. Fluid Mech.* **1**(5), 497–504. <https://doi.org/10.1017/S0022112056000317> *(The isotropy
+- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317).
+  *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy
   relations behind the strain-skewness constant, §4.3.)*
-- Patterson, G. S. & Orszag, S. A. (1971). Spectral calculations of isotropic turbulence: efficient
-  removal of aliasing interactions. *Phys. Fluids* **14**, 2538–2541. <https://doi.org/10.1063/1.1693365> *(Phase-shift dealiasing; the
+- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* **14**, 2538–2541. *(Phase-shift dealiasing; the
   `PhaseShift` strategy, §7, decision 27.)*
-- Orszag, S. A. (1971). On the elimination of aliasing in finite-difference schemes by filtering
-  high-wavenumber components. *J. Atmos. Sci.* **28**, 1074. <https://doi.org/10.1175/1520-0469(1971)028%3C1074:OTEOAI%3E2.0.CO;2> *(The ``2/3`` truncation rule.)*
-- Orszag, S. A. & Patterson, G. S. (1972). Numerical simulation of three-dimensional homogeneous
-  isotropic turbulence. *Phys. Rev. Lett.* **28**, 76–79. <https://doi.org/10.1103/PhysRevLett.28.76> *(The pseudospectral method.)*
+- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
+- Orszag, S. A. & Patterson, G. S. (1972). [*Numerical simulation of three-dimensional homogeneous isotropic turbulence*](https://doi.org/10.1103/PhysRevLett.28.76). *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
 - Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(No DOI;
   a NASA technical memorandum. The sheared-frame scheme, §7; the spherical-truncation dealiasing of
   the `PhaseShift` strategy, decision 27.)*
-- Hou, T. Y. & Li, R. (2007). Computing nearly singular solutions using pseudo-spectral methods.
-  *J. Comput. Phys.* **226**, 379–397. <https://doi.org/10.1016/j.jcp.2007.04.014> *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
-- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). Effective dissipation and turbulence
-  in spectrally truncated Euler flows. *Phys. Rev. Lett.* **95**, 264502. <https://doi.org/10.1103/PhysRevLett.95.264502> *(Thermalization of the
+- Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014).
+  *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
+- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). [*Effective dissipation and turbulence in spectrally truncated Euler flows*](https://doi.org/10.1103/PhysRevLett.95.264502). *Phys. Rev. Lett.* **95**, 264502. *(Thermalization of the
   Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
-- Chollet, J.-P. & Lesieur, M. (1981). Parameterization of small scales of three-dimensional isotropic
-  turbulence utilizing spectral closures. *J. Atmos. Sci.* **38**, 2747–2757. <https://doi.org/10.1175/1520-0469(1981)038%3C2747:POSSOT%3E2.0.CO;2> *(The spectral eddy
+- Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
-- Eswaran, V. & Pope, S. B. (1988). An examination of forcing in direct numerical simulations of
-  turbulence. *Computers & Fluids* **16**, 257–278. <https://doi.org/10.1016/0045-7930(88)90013-8> *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Li, Y., Perlman, E., Wan, M., Yang, Y., Meneveau, C., Burns, R., Chen, S., Szalay, A. & Eyink, G.
-  (2008). A public turbulence database cluster and applications to study Lagrangian evolution of
-  velocity increments in turbulence. *J. Turbulence* **9**, N31.
-  <https://doi.org/10.1080/14685240802376389> *(The box-normalized dissipation law `Li2008`, which
+  (2008). [*A public turbulence database cluster and applications to study Lagrangian evolution of velocity increments in turbulence*](https://doi.org/10.1080/14685240802376389). *J. Turbulence* **9**, N31.
+  *(The box-normalized dissipation law `Li2008`, which
   sets ``\nu`` in the run layer's grid mode.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
-- Lalescu, C. C., Teaca, B. & Carati, D. (2010). Implementation of high order spline interpolations
-  for tracking test particles in discretized fields. *J. Comput. Phys.* **229**(17), 5862–5869.
-  <https://doi.org/10.1016/j.jcp.2010.04.006> *(The interpolation family `LalescuSpline` implements,
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
+  *(The interpolation family `LalescuSpline` implements,
   and the source for choosing interpolation order in particle tracking — decision 57's floor.)*
-- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). An efficient particle tracking
-  algorithm for large-scale parallel pseudo-spectral simulations of turbulence. *Comput. Phys.
-  Commun.* **278**, 108406. <https://doi.org/10.1016/j.cpc.2022.108406> *(TurTLE; the
+- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys.
+  Commun.* **278**, 108406. *(TurTLE; the
   Adams–Bashforth tracer integration `AdamsBashforth` follows, decision 57.)*
-- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). Deterministic forcing of homogeneous,
-  isotropic turbulence. *Phys. Fluids* **6**(4), 1612–1614.
-  <https://doi.org/10.1063/1.868274> *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6**(4), 1612–1614.
+  *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
   modes to a fixed band energy. Kept as the reference implementation, with its first-order
   operator-splitting caveat documented rather than hidden.)*
-- Nosé, S. (1984). A unified formulation of the constant temperature molecular dynamics methods.
-  *J. Chem. Phys.* **81**(1), 511–519. <https://doi.org/10.1063/1.447334> *(the thermostat analogy
+- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334).
+  *J. Chem. Phys.* **81**(1), 511–519. *(the thermostat analogy
   `VarianceController` cites: feedback inside the equations rather than per-step rescaling.)*
-- Hoover, W. G. (1985). Canonical dynamics: Equilibrium phase-space distributions. *Phys. Rev. A*
-  **31**(3), 1695–1697. <https://doi.org/10.1103/PhysRevA.31.1695> *(the companion half of the
+- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A*
+  **31**(3), 1695–1697. *(the companion half of the
   Nosé–Hoover move.)*
-- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). Constant-energetics physical-space forcing
-  methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden
-  flows. *Phys. Fluids* **28**, 035114. <https://doi.org/10.1063/1.4944629>
+- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
   *(`VarianceController`: the constant-``k`` controller of their Eq. 20, the marginal law
   ``A = \varepsilon/2k_f`` plus a proportional restoring term measuring the whole-field ``k``, giving exponential relaxation to a stable
   attractor. The smooth, gain-limited replacement for the discontinuous projection above.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
-  Molecular dynamics with coupling to an external bath. *J. Chem. Phys.* **81**, 3684–3690.
-  <https://doi.org/10.1063/1.448118> *(The thermostat whose deterministic-rescaling limit
+  [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
+  *(The thermostat whose deterministic-rescaling limit
   `VarianceRescaling` is; named there and now cited.)*
-- Bussi, G., Donadio, D. & Parrinello, M. (2007). Canonical sampling through velocity rescaling.
-  *J. Chem. Phys.* **126**, 014101. <https://doi.org/10.1063/1.2408420> *(Stochastic velocity rescaling; its deterministic limit is the
+- Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420).
+  *J. Chem. Phys.* **126**, 014101. *(Stochastic velocity rescaling; its deterministic limit is the
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
   the caveat `VarianceRescaling` carries.)*
-- Williamson, J. H. (1980). Low-storage Runge–Kutta schemes. *J. Comput. Phys.* **35**, 48–56. <https://doi.org/10.1016/0021-9991(80)90033-9> *(The
+- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* **35**, 48–56. *(The
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
   cites the family rather than a numbered case.)*
-- Pope, S. B. (2000). *Turbulent Flows.* Cambridge University Press. <https://doi.org/10.1017/CBO9780511840531> *(Notation; the
+- Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press. *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
-- Mori, H. (1965). Transport, collective motion, and Brownian motion. *Prog. Theor. Phys.* **33**,
-  423–455. <https://doi.org/10.1143/PTP.33.423> *(The projection formalism, the foundation of §3 and §8.)*
-- Zwanzig, R. (1973). Nonlinear generalized Langevin equations. *J. Stat. Phys.* **9**, 215–220. <https://doi.org/10.1007/BF01008729> *(The projection formalism, with Mori 1965.)*
-- Morrison, P. J. (1986). A paradigm for joined Hamiltonian and dissipative systems. *Physica D* **18**,
-  410–419. <https://doi.org/10.1016/0167-2789(86)90209-5> *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
-- Öttinger, H. C. (2005). *Beyond Equilibrium Thermodynamics.* Wiley. <https://doi.org/10.1002/0471727903> *(GENERIC; the
+- Mori, H. (1965). [*Transport, collective motion, and Brownian motion*](https://doi.org/10.1143/PTP.33.423). *Prog. Theor. Phys.* **33**,
+  423–455. *(The projection formalism, the foundation of §3 and §8.)*
+- Zwanzig, R. (1973). [*Nonlinear generalized Langevin equations*](https://doi.org/10.1007/BF01008729). *J. Stat. Phys.* **9**, 215–220. *(The projection formalism, with Mori 1965.)*
+- Morrison, P. J. (1986). [*A paradigm for joined Hamiltonian and dissipative systems*](https://doi.org/10.1016/0167-2789%2886%2990209-5). *Physica D* **18**,
+  410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
+- Öttinger, H. C. (2005). [*Beyond Equilibrium Thermodynamics.*](https://doi.org/10.1002/0471727903) Wiley. *(GENERIC; the
   reversible/irreversible split, §8.)*

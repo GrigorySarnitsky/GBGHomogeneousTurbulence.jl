@@ -171,10 +171,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   is `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
   [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
-  operator-free constructor); `velocity_forcing` defaults to a `VarianceController` driving the
-  whole-field kinetic energy to the value given by the `kinetic_energy` keyword, and
-  `scalar_forcing` to `NoForcing()`. The
-  velocity and scalar are forced independently.
+  operator-free constructor); `velocity_forcing` left at `nothing` means the default — a
+  `VarianceController` driving the whole-field kinetic energy to the `kinetic_energy` value — and
+  `scalar_forcing` defaults to `NoForcing()`. The velocity and scalar are forced independently.
+  In grid mode a hand-built velocity forcing is **checked against the ν calibration**: one that
+  holds a different target, a band instead of the whole field, or nothing at all draws a warning,
+  since the chosen ν then describes a state the run never reaches.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
@@ -287,10 +289,53 @@ _materialize_forcing(f::AbstractForcing, ::FixedDomain) = f
 _materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
+# Grid mode chose ν assuming the run HOLDS k = `kinetic_energy`. A hand-built forcing that holds a
+# different target, holds a band instead of the whole field, or holds nothing at all leaves that ν
+# calibrated against a state the run never reaches — the docstring names the precondition, and this
+# names the violation at the one moment it is checkable (the band's shells are not recoverable from
+# a built forcing, so only what the strategy itself records is compared).
+function _warn_grid_mode_forcing_mismatch(vf::VarianceController, kinetic_energy)
+  isapprox(vf.target, kinetic_energy; rtol = 1e-8) ||
+    @warn "Simulation (grid mode): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
+          "but the velocity forcing holds target = $(vf.target). The run will settle at the " *
+          "forcing's target, and κ_max·η / Re_λ will not match the calibration. Pass the same " *
+          "value to both, or set `viscosity` yourself."
+  return nothing
+end
+
+function _warn_grid_mode_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
+  if vf.over !== :total
+    @warn "Simulation (grid mode): ν was calibrated assuming the run holds the WHOLE-field " *
+          "k = $kinetic_energy, but this `VarianceRescaling(over = :band)` holds only the band " *
+          "and lets k settle elsewhere. Use `over = :total` with the same target, or set " *
+          "`viscosity` yourself."
+  elseif !isapprox(vf.target, kinetic_energy; rtol = 1e-8)
+    @warn "Simulation (grid mode): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
+          "but the velocity forcing holds target = $(vf.target). Pass the same value to both, " *
+          "or set `viscosity` yourself."
+  end
+  return nothing
+end
+
+_warn_grid_mode_forcing_mismatch(vf::NoForcing, kinetic_energy) =
+  (@warn "Simulation (grid mode): ν was calibrated assuming a forcing holds k = $kinetic_energy, " *
+         "but the run is unforced and will decay away from that state. Grid mode is calibrated " *
+         "on a stationary forced balance — a decaying run should set `viscosity` explicitly.";
+   nothing)
+
+_warn_grid_mode_forcing_mismatch(vf::AbstractForcing, kinetic_energy) =
+  (@warn "Simulation (grid mode): ν was calibrated assuming the run holds k = $kinetic_energy, " *
+         "which a $(nameof(typeof(vf))) does not hold (it drives a rate or a band, and k settles " *
+         "wherever the balance puts it). The κ_max·η / Re_λ the constructor reports are then " *
+         "estimates for a state the run may not reach; set `viscosity` yourself for a calibrated " *
+         "run.";
+   nothing)
+
+
 function Simulation(domain::FixedDomain;
                     kinetic_energy::Real = 1.5, κ_max_η = nothing, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = d -> VarianceController(d; target = kinetic_energy),
+                    velocity_forcing = nothing,
                     scalar_forcing = NoForcing(),
                     integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(integration_scheme, domain), max_dt::Real = Inf,
@@ -350,8 +395,18 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
 
   buffers = allocate_buffers(integration_scheme, domain; scalar)
+  # `nothing` means the default controller holding `kinetic_energy` — a sentinel rather than a
+  # default closure, so a HAND-BUILT forcing is detectable: in grid mode ν was calibrated on the
+  # assumption that the run holds k = `kinetic_energy`, and a forcing that holds something else
+  # (or nothing) silently voids that calibration. The check below warns exactly there
+  # (owner-ruled 2026-08-24); explicit-ν runs and the default forcing stay silent.
+  vf = _materialize_forcing(velocity_forcing === nothing ?
+                              VarianceController(domain; target = kinetic_energy) :
+                              velocity_forcing, domain)
+  viscosity === nothing && velocity_forcing !== nothing &&
+    _warn_grid_mode_forcing_mismatch(vf, kinetic_energy)
   conditions = FlowConditions(; viscosity = ν, schmidt,
-                    velocity_forcing = _materialize_forcing(velocity_forcing, domain),
+                    velocity_forcing = vf,
                     scalar_forcing = _materialize_forcing(scalar_forcing, domain))
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).

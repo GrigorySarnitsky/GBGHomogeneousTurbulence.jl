@@ -14,7 +14,7 @@
 # is a function of the grid and the target energy alone, deliberately independent of the forcing,
 # and the log line reports that design target rather than a measured state.
 
-using Test, Random
+using Test, Random, Logging
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Phenomenology: kolmogorov_length
 const κ_max = GBGIsotropicTurbulence.SimulationDomain.max_wavenumber
@@ -51,8 +51,19 @@ end
   #    error dominates. Adding the requested `velocity_forcing` check would leave arm 2 untouched.
   @test abs(log(ratio_band / 2.0)) > 0.5 * abs(log(ratio_cp01 / 2.0))
 
-  # 4. Grid mode really is reachable with any forcing, without warning or error — the documented
-  #    behaviour ("Give the velocity a forcing that lets k float and the ν chosen here no longer
-  #    matches the run"), which the docstring states as a precondition on the user, not a guard.
+  # 4. Grid mode remains REACHABLE with any forcing — but the disposition this item once pinned
+  #    ("without warning or error ... a precondition on the user, not a guard") was REVERSED by the
+  #    owner on 2026-08-24: a hand-built forcing that voids the ν calibration now draws a WARNING
+  #    (never an error). Reachability and the warning are asserted together below.
   @test ν_band > 0
+  # A matching :total rescale is consistent with the calibration and stays silent; a forcing that
+  # does not hold k warns; a mismatched target warns. Construction only — no spin-up needed.
+  @test_logs min_level=Logging.Warn Simulation(grid_points_per_axis = 16,
+      velocity_forcing = VarianceRescaling(target = 1.5, over = :total), rng = MersenneTwister(1))
+  @test_logs (:warn, r"grid mode.*does not hold") match_mode=:any Simulation(
+      grid_points_per_axis = 16, velocity_forcing = ConstantPower(injection_rate = 0.1),
+      rng = MersenneTwister(1))
+  @test_logs (:warn, r"holds target = 0.5") match_mode=:any Simulation(
+      grid_points_per_axis = 16, velocity_forcing = VarianceController(target = 0.5),
+      rng = MersenneTwister(1))
 end

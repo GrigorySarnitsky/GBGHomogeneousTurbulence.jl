@@ -295,7 +295,7 @@ the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangl
 and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
 (Betchov 1956, *An inequality concerning the production of vorticity in isotropic turbulence*,
 *J. Fluid Mech.* **1**(5), 497–504,
-[doi:10.1017/S0022112056000317](https://doi.org/10.1017/S0022112056000317)). So the
+[*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317)). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 

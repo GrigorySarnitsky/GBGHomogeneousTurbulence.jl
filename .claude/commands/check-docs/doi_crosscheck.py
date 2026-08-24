@@ -1,77 +1,51 @@
-"""check-docs backstop: every DOI cited in a src docstring appears in ARCHITECTURE §References.
+"""check-docs backstop: every citation link in a src docstring matches ARCHITECTURE §References.
 
-The subtlety this script exists for. `ARCHITECTURE.md` carries its DOIs as markdown AUTOLINKS
-(`<https://doi.org/…>`), which cannot contain `>`; a docstring carries them as INLINE LINKS
-(`[text](https://doi.org/…)`), which cannot contain unescaped `(` or `)`. An AMS DOI such as
-
-    10.1175/1520-0469(1971)028<1074:OTEOAI>2.0.CO;2
-
-contains all three characters, so the SAME identifier must be percent-encoded DIFFERENTLY on the two
-surfaces. Comparing the raw strings therefore reports a mismatch that is not one — and a regex that
-stops at the first `)` truncates the identifier and reports mismatches in both directions. Extract
-per format, then compare DECODED.
+ONE FORMAT since 2026-08-24 (owner-ruled, adopting PF's convention): a citation carries its
+clickable DOI on the paper's *title* — `[*Title*](https://doi.org/…)` — identically in the
+§References bibliography and in every inline docstring copy. The format is self-verifying by
+construction: this script checks that (a) every inline citation link's DOI appears in §References,
+and (b) the inline TITLE matches the §References title for that DOI, so the two surfaces cannot
+drift apart in either half. DOIs are still compared DECODED (an AMS DOI percent-encodes `()<>`,
+and two encoders may differ on which characters they escape).
 
 The extraction-bound `Phenomenology` leaf is exempt: its reference laws carry self-contained
-`Reference` values by design and are not duplicated in §References.
+`Reference` values by design (compact author–year + labelled DOI, no title) and are not duplicated
+in §References.
 """
 import re
 import glob
 import urllib.parse
 
 ARCH = 'docs/ARCHITECTURE.md'
+arch = open(ARCH).read()
+refs = arch[arch.find('## References'):]
 
-# ARCHITECTURE: autolinks. Everything up to the closing '>' is the identifier.
-architecture_dois = {
-    urllib.parse.unquote(m)
-    for m in re.findall(r'<https://(doi\.org/[^>]+)>', open(ARCH).read())
-}
+# §References: [*Title*](https://doi.org/...) — title-as-link entries.
+TITLE_LINK = re.compile(r'\[(\*[^]]+?\*)\]\((https://doi\.org/[^)]*(?:%29[^)]*)*)\)')
+arch_by_doi = {}
+for title, url in TITLE_LINK.findall(refs):
+    arch_by_doi[urllib.parse.unquote(url)] = ' '.join(title.split())
 
-# A docstring: inline links. A percent-encoded ')' (%29) is part of the DOI, a literal ')' closes it.
-INLINE = re.compile(r'\]\(https://(doi\.org/[^)]*(?:%29[^)]*)*)\)')
-
-mismatches = 0
-cited = 0
-for path in sorted(glob.glob('src/*.jl')):
-    if 'Phenomenology' in path:
+problems = 0
+for f in glob.glob('src/*.jl'):
+    if 'Phenomenology' in f:
         continue
-    for match in INLINE.findall(open(path).read()):
-        cited += 1
-        doi = urllib.parse.unquote(match)
-        if doi not in architecture_dois:
-            mismatches += 1
-            print(f'NOT IN §References: {path}  {doi}')
+    text = open(f).read()
+    for title, url in TITLE_LINK.findall(text):
+        doi = urllib.parse.unquote(url)
+        flat = ' '.join(title.split())
+        if doi not in arch_by_doi:
+            print(f'{f}: cited DOI not in ARCHITECTURE §References: {doi}')
+            problems += 1
+        elif arch_by_doi[doi] != flat:
+            print(f'{f}: inline title differs from §References for {doi}:')
+            print(f'  inline: {flat}')
+            print(f'  refs:   {arch_by_doi[doi]}')
+            problems += 1
+    # The retired two-format world's inline label must not reappear outside the exempt leaf.
+    for m in re.findall(r'\[doi:[^\]]+\]', text):
+        print(f'{f}: retired [doi:…] label form: {m} — use the title-as-link form')
+        problems += 1
 
-# The reverse pass. The doc policy requires every inline cite to have a §References entry AND every
-# entry a citing docstring or body mention, so a one-directional check certifies half the rule.
-#
-# Parse the ENTRY, not the line the DOI happens to sit on: a reference bullet wraps across lines, and
-# taking the surname from the DOI's own line yields the middle of a journal title. Split §References
-# into bullets first, then read each bullet's leading surname.
-docstring_dois = set()
-for path in sorted(glob.glob('src/*.jl')):
-    if 'Phenomenology' in path:
-        continue
-    docstring_dois |= {urllib.parse.unquote(m) for m in INLINE.findall(open(path).read())}
-
-body, _, references = open(ARCH).read().partition('\n## References')
-entries = re.split(r'\n(?=- )', references)
-
-uncited = []
-for entry in entries:
-    if not entry.lstrip().startswith('- '):
-        continue
-    found = re.search(r'<https://(doi\.org/[^>]+)>', entry)
-    if not found:
-        continue                                   # the three works with no DOI
-    doi = urllib.parse.unquote(found.group(1))
-    if doi in docstring_dois:
-        continue                                   # cited by a docstring
-    surname = entry.lstrip('- ').split(',')[0].strip()
-    if surname and surname not in body:            # nor discussed in the design-doc body
-        uncited.append((doi, surname))
-
-for doi, surname in uncited:
-    print(f'IN §References, cited by no docstring and no body mention: {surname}  {doi}')
-
-print(f'docstring DOIs: {cited}   §References DOIs: {len(architecture_dois)}   '
-      f'mismatches: {mismatches}   uncited entries: {len(uncited)}')
+print('doi_crosscheck:', 'CLEAN' if problems == 0 else f'{problems} problem(s)')
+raise SystemExit(1 if problems else 0)

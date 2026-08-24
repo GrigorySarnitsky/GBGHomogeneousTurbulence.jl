@@ -180,7 +180,7 @@ julia --startup-file=no .claude/commands/check-docs/argcov.jl
 ```bash
 python3 .claude/commands/check-docs/abutting_spans.py    # (a) `code` next to ``math``
 julia --project --startup-file=no .claude/commands/check-docs/xlink.jl   # (b) unlinked cross-module names
-python3 .claude/commands/check-docs/doi_crosscheck.py    # (c) docstring DOIs vs §References
+python3 .claude/commands/check-docs/doi_crosscheck.py    # (c) citation links vs §References (DOI + title)
 julia --project --startup-file=no .claude/commands/check-docs/signature_fidelity.jl  # (d) displayed vs defined signatures
 ```
 
@@ -207,11 +207,11 @@ display suppresses the hidden-keyword direction (the `# Arguments` bullets carry
 the argument-coverage sweep); a dispatch-tag method with an unnamed slot suppresses the positional
 direction; the spectral-pair forms (`f(u)` / `f(û)`) are accent-normalized rather than flagged.
 
-**(c) The DOI cross-check, format-aware.** `ARCHITECTURE.md` uses autolinks `<…>`, which cannot
-contain `>`; a docstring uses `[text](…)`, which cannot contain unescaped parens. An AMS DOI contains
-all three, so the same identifier is percent-encoded DIFFERENTLY on the two surfaces and the sides
-must be compared DECODED. The earlier inline regex truncated at the first paren and would report
-false mismatches in both directions.
+**(c) The citation cross-check.** One format on both surfaces since 2026-08-24 (owner-ruled,
+PF's convention): `[*Title*](https://doi.org/…)` identically in `§References` and inline. The
+script verifies the DOI (compared DECODED — an AMS DOI percent-encodes `()<>`, and encoders may
+differ) **and** the title against the `§References` entry, and refuses the retired `[doi:…]` label
+form outside the exempt `Phenomenology` leaf.
 
 ```bash
 # ---- SURFACE 4: the built API pages. Run AFTER `julia --project=docs docs/make.jl`. ----

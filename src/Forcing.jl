@@ -327,7 +327,7 @@ struct NoForcing <: AbstractForcing end
     VarianceRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
 The deterministic rescaling forcing of Sullivan, Mahalingam & Kerr (1994,
-[doi:10.1063/1.868274](https://doi.org/10.1063/1.868274)), built on the [`FixedDomain`](@ref)
+[*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274)), built on the [`FixedDomain`](@ref)
 `domain`: after each step the in-band Fourier modes — the integer shells `lowest_shell` to
 `highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a single factor that
 holds `target`. The rescale is per-mode, so a divergence-free velocity stays divergence-free.
@@ -415,7 +415,11 @@ function project_forcing!(forcing::VarianceRescaling, field, domain::FixedDomain
   # empty-band floor in either mode, and the :total deficit on top.
   band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
   band_value = factor * band_raw                       # the band observable (fused; no band-pass copy)
-  _band_is_empty(band_raw, whole_raw) && return field  # roundoff-level band: leave it alone
+  if _band_is_empty(band_raw, whole_raw)               # roundoff-level band: leave it alone
+    @warn "VarianceRescaling: the forced band is empty (band observable $band_raw against a " *
+          "whole-field $whole_raw): the rescale is skipped until content reaches the band" maxlog = 1
+    return field
+  end
   # aim the band at: the target itself (:band), or what makes the *whole field* hit the target
   target_band = if forcing.over === :total
     total_value = factor * whole_raw                   # the observable over the whole field
@@ -532,8 +536,8 @@ end
                        lowest_shell = 1, highest_shell = 2)
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
-``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of Bassenne,
-Urzay, Park & Moin (2016, [doi:10.1063/1.4944629](https://doi.org/10.1063/1.4944629)).
+``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of
+Bassenne et al. (2016, [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629)).
 
 Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, which is nearly always:
 it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
@@ -562,13 +566,15 @@ The two variances there are **not interchangeable**: ``k`` is the whole field's,
 left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documents), so seed content
 in the band if the run depends on the controller taking hold.
 
-The mechanism is the one molecular dynamics settled on for the same problem: holding a quantity by
-per-step rescaling is the naive thermostat, feedback inside the equations is the Nosé–Hoover move
-(Nosé 1984, [doi:10.1063/1.447334](https://doi.org/10.1063/1.447334); Hoover 1985,
-[doi:10.1103/PhysRevA.31.1695](https://doi.org/10.1103/PhysRevA.31.1695)),
-and gain-limited relaxation toward a target is Berendsen weak coupling (Berendsen et al. 1984,
-[doi:10.1063/1.448118](https://doi.org/10.1063/1.448118)), whose deterministic-rescaling limit is
-[`VarianceRescaling`](@ref).
+The molecular-dynamics thermostats map the design space exactly, and **this controller is the
+Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984,
+[*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118)), carrying that class's known caveat: the
+held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
+thermostat, whose limit here is [`VarianceRescaling`](@ref); the contrasting extended-variable class
+that restores canonical fluctuations is Nosé–Hoover
+(Nosé 1984, [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334); Hoover 1985,
+[*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695)), a design this package
+does not take.
 
 # Arguments
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
@@ -665,8 +671,14 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * dirichlet
   restoring = forcing.gain * (whole_variance - forcing.target) / forcing.turnover_time
-  amplitude = _band_is_empty(band, whole) ? 0.0 :
-              (dissipation - restoring) / (2 * band_variance)
+  if _band_is_empty(band, whole)
+    @warn "VarianceController: the forced band is empty (band observable $band against a " *
+          "whole-field $whole): the amplitude is clamped to zero and the controller is inert " *
+          "until content reaches the band" maxlog = 1
+    amplitude = 0.0
+  else
+    amplitude = (dissipation - restoring) / (2 * band_variance)
+  end
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))
   return N̂
 end
@@ -692,8 +704,13 @@ uses_steady_linear_rate(::ConstantPower) = false
 function _injection_amplitude(injection_rate, band_observable, whole_observable)
   # TurTLE guards the same division with `if (energy_in_shell < 10*eps) energy_in_shell = 1`, a
   # machine-epsilon-relative floor substituting a benign denominator rather than skipping the step.
-  return _band_is_empty(band_observable, whole_observable) ? 0.0 :
-         injection_rate / (2 * band_observable)
+  if _band_is_empty(band_observable, whole_observable)
+    @warn "the forced band is empty (band observable $band_observable against a whole-field " *
+          "$whole_observable): the amplitude is clamped to zero and the forcing is inert until " *
+          "content reaches the band" maxlog = 1
+    return 0.0
+  end
+  return injection_rate / (2 * band_observable)
 end
 
 
@@ -718,7 +735,7 @@ end
 
 Stochastic forcing — Eswaran & Pope (1988), *An examination of forcing in direct numerical
 simulations of turbulence*, *Computers & Fluids* **16**, 257–278,
-[doi:10.1016/0045-7930(88)90013-8](https://doi.org/10.1016/0045-7930%2888%2990013-8) — built on the
+[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8) — built on the
 [`FixedDomain`](@ref) `domain`: each forced
 Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
 box's fundamental ``2\\pi/L`` — carries an
