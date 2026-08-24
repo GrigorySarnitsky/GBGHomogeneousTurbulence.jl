@@ -2,8 +2,10 @@
 
 `Phenomenology` collects the established turbulence phenomenology — model spectra, structure-function
 laws, and dimensionless scaling constants — as evaluatable reference predictions. It is the *predicted*
-counterpart to the measured observables: the DNS measures, the laws predict, and the validation layer
-sets them side by side. No law is assumed by the solver; each is a testable prediction, and our own
+counterpart to the measured observables: the DNS measures, the laws predict, and setting the two
+side by side is the caller's own comparison — the package ships no comparer (its test suite
+practices the comparison internally). No law is assumed by the solver; each is a testable
+prediction, and our own
 fits sit beside the literature on equal footing.
 
 **One pattern.** Each law family is an abstract type; each parametrization is a named preset

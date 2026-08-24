@@ -161,7 +161,10 @@ Two research disciplines live on these two kinds of variation:
 
 Both disciplines are the *same comparison machine* — run a configuration against a reference and check
 chosen physical functionals (spectra, fluxes, conserved quantities, a target statistic) within tolerance —
-pointed at different axes. Those functionals are exactly the Observables of §4.3.
+pointed at different axes. Those functionals are exactly the Observables of §4.3. The machine is a
+discipline the caller runs, not a component the package ships: the package provides the two sides —
+the measured observables and the reference laws — and no public comparer (its own test suite
+practices the comparison internally).
 
 ---
 
@@ -518,7 +521,8 @@ comparison machine of §3 sets them side by side. Two properties follow, both in
 *investigate the physics, do not assume it*:
 
 - **A provider, not a comparer.** A law evaluates itself from the flow parameters; it knows nothing of the
-  DNS. The comparison lives consumer-side (the validation layer), which reads both.
+  DNS. The comparison lives consumer-side — the caller's own analysis, or a test suite — reading
+  both; the package ships no comparer.
 - **No parametrization is privileged.** A published fit and one of our own are the same kind of object —
   subtypes of one law family, discovered and validated alike, never baked in as truth.
 

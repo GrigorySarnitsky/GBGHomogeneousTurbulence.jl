@@ -1,6 +1,6 @@
 # Phenomenology — reference turbulence laws (model spectra, structure-function laws, scaling
 # constants), each an author-year parametrization of an abstract law family per quantity. The
-# *predicted* counterpart to `Observables`: a provider the validation layer reads, never a comparer.
+# *predicted* counterpart to `Observables`: a provider the caller's own validation reads, never a comparer.
 #
 # Extraction-bound (docs/ARCHITECTURE.md §4.8, decision 18): this module depends on no field or
 # statistics backend and no dynamics — a law is a scalar function — and the umbrella does NOT
@@ -12,8 +12,9 @@
 
 Reference turbulence phenomenology — the fitted scalings, model spectra, and structure-function laws
 that theory and experiment have established, each an author-year parametrization of an abstract law
-family. This is the *predicted* counterpart to the measured `Observables`: a provider the validation
-layer reads to compare a run against, never a comparer itself and never assumed by the dynamics.
+family. This is the *predicted* counterpart to the measured `Observables`: a provider a caller's own
+validation reads to compare a run against — the package ships no comparer — never a comparer itself
+and never assumed by the dynamics.
 
 The module's contents:
 - [`FlowParameters`](@ref) — the flow-state bundle a law evaluates against, with the
