@@ -98,8 +98,8 @@ kinetic energy to the value given by the
 [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword and holds it
 there — and the viscosity is chosen from the grid rather than supplied:
 
-  * **Grid mode** (no `viscosity`): the constructor picks the highest Reynolds number consistent with
-    the resolution criterion `κ_max_η`, in two steps.
+  * **Derived viscosity** (no `viscosity` passed explicitly): the constructor picks the highest
+    Reynolds number consistent with the resolution criterion `κ_max_η`, in two steps.
 
     First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
     `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
@@ -133,9 +133,9 @@ there — and the viscosity is chosen from the grid rather than supplied:
     `VarianceRescaling(over = :band)` holds the band instead), and the ``\\nu`` chosen here no
     longer matches the run.
 
-  * **Explicit mode**: pass `viscosity` and it is used directly; the two are alternatives, and
+  * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` rather than dropping one — for a decaying
-    run (`velocity_forcing = NoForcing()`) or manual control. Grid mode is calibrated on a *stationary
+    run (`velocity_forcing = NoForcing()`) or manual control. The derived viscosity is calibrated on a *stationary
     forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
     law assumes.
@@ -149,12 +149,12 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 - `domain` — a pre-built `FixedDomain`. This one is **positional**, not a keyword: it is the
   argument of the second form, `Simulation(domain; …)` (the front door builds one for you from
   `grid_points_per_axis`, `side_length`, `dealiasing`, `element_type`, `array_type`).
-- `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` used to set ``\\nu`` in grid mode;
+- `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` a derived ``\\nu`` is set from;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
-  and grid mode then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
+  and the derivation then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
   an explicit one, so that giving both it and `viscosity` is an error rather than a silent drop.
 - `viscosity` — the kinematic viscosity ``\\nu``, which is how the Reynolds number is set (it is
-  ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit for grid mode.
+  ``1/\\nu`` only in units where ``u' = L = 1``; measure ``\\mathrm{Re}_\\lambda`` for the run's actual value); omit to derive ``\\nu`` from the grid.
 - `kinetic_energy = 1.5` — the initial, and when forced the held, kinetic energy ``k``; `1.5` gives
   an r.m.s. velocity ``u' = \\sqrt{2k/3} = 1``.
 - `side_length = 2π` — the box side ``L`` (front door only).
@@ -176,7 +176,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   operator-free constructor); `velocity_forcing` left at `nothing` means the default — a
   `VarianceController` driving the whole-field kinetic energy to the `kinetic_energy` value — and
   `scalar_forcing` defaults to `NoForcing()`. The velocity and scalar are forced independently.
-  In grid mode a hand-built velocity forcing is **checked against the ν calibration**: one that
+  Under a derived ν a hand-built velocity forcing is **checked against the ν calibration**: one that
   holds a different target, a band instead of the whole field, or nothing at all draws a warning,
   since the chosen ν then describes a state the run never reaches.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
@@ -243,10 +243,10 @@ the rest are forwarded to the `Simulation(domain; …)` form.
 The two ways in, and the two ways to set the Reynolds number:
 
 ```julia
-# Grid mode — a 128³ forced-stationary run, ν set from the resolution criterion:
+# Derived viscosity — a 128³ forced-stationary run, ν set from the resolution criterion:
 sim = Simulation(grid_points_per_axis = 128)
 
-# Explicit mode — set ν directly, carry a passive scalar, force at constant power:
+# Supplied viscosity — set ν directly, carry a passive scalar, force at constant power:
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
@@ -293,14 +293,14 @@ _materialize_forcing(f::AbstractForcing, ::FixedDomain) = f
 _materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
-# Grid mode chose ν assuming the run HOLDS k = `kinetic_energy`. A hand-built forcing that holds a
+# The ν derivation assumed the run HOLDS k = `kinetic_energy`. A hand-built forcing that holds a
 # different target, holds a band instead of the whole field, or holds nothing at all leaves that ν
 # calibrated against a state the run never reaches — the docstring names the precondition, and this
 # names the violation at the one moment it is checkable (the band's shells are not recoverable from
 # a built forcing, so only what the strategy itself records is compared).
 function _warn_grid_mode_forcing_mismatch(vf::VarianceController, kinetic_energy)
   isapprox(vf.target, kinetic_energy; rtol = 1e-8) ||
-    @warn "Simulation (grid mode): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
+    @warn "Simulation (derived viscosity): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
           "but the velocity forcing holds target = $(vf.target). The run will settle at the " *
           "forcing's target, and κ_max·η / Re_λ will not match the calibration. Pass the same " *
           "value to both, or set `viscosity` yourself."
@@ -309,12 +309,12 @@ end
 
 function _warn_grid_mode_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
   if vf.over !== :total
-    @warn "Simulation (grid mode): ν was calibrated assuming the run holds the WHOLE-field " *
+    @warn "Simulation (derived viscosity): ν was calibrated assuming the run holds the WHOLE-field " *
           "k = $kinetic_energy, but this `VarianceRescaling(over = :band)` holds only the band " *
           "and lets k settle elsewhere. Use `over = :total` with the same target, or set " *
           "`viscosity` yourself."
   elseif !isapprox(vf.target, kinetic_energy; rtol = 1e-8)
-    @warn "Simulation (grid mode): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
+    @warn "Simulation (derived viscosity): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
           "but the velocity forcing holds target = $(vf.target). Pass the same value to both, " *
           "or set `viscosity` yourself."
   end
@@ -322,13 +322,13 @@ function _warn_grid_mode_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
 end
 
 _warn_grid_mode_forcing_mismatch(vf::NoForcing, kinetic_energy) =
-  (@warn "Simulation (grid mode): ν was calibrated assuming a forcing holds k = $kinetic_energy, " *
-         "but the run is unforced and will decay away from that state. Grid mode is calibrated " *
+  (@warn "Simulation (derived viscosity): ν was calibrated assuming a forcing holds k = $kinetic_energy, " *
+         "but the run is unforced and will decay away from that state. The derived viscosity is calibrated " *
          "on a stationary forced balance — a decaying run should set `viscosity` explicitly.";
    nothing)
 
 _warn_grid_mode_forcing_mismatch(vf::AbstractForcing, kinetic_energy) =
-  (@warn "Simulation (grid mode): ν was calibrated assuming the run holds k = $kinetic_energy, " *
+  (@warn "Simulation (derived viscosity): ν was calibrated assuming the run holds k = $kinetic_energy, " *
          "which a $(nameof(typeof(vf))) does not hold (it drives a rate or a band, and k settles " *
          "wherever the balance puts it). The κ_max·η / Re_λ the constructor reports are then " *
          "estimates for a state the run may not reach; set `viscosity` yourself for a calibrated " *
@@ -350,7 +350,7 @@ function Simulation(domain::FixedDomain;
                     particle_integration_scheme::AbstractParticleIntegrator = Heun(),
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
-  # It sets ν in grid mode and shapes a `Phenomenology` `initial_spectrum`.
+  # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
   # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
   # argument that caused it. Likewise a scalar variance, ⟨φ²⟩ ≥ 0.
@@ -376,7 +376,7 @@ function Simulation(domain::FixedDomain;
     throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
 directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
-  if isnothing(viscosity)                                    # grid mode: highest Re the grid resolves
+  if isnothing(viscosity)                              # no ν supplied: derive the highest Re resolved
     resolution = isnothing(κ_max_η) ? 2 : κ_max_η
     # ν is solved from this, so a non-positive or non-finite resolution yields ν = 0, NaN or Inf and
     # a run that is not a run. κ_max·η is a positive, finite resolution criterion by construction.
@@ -401,7 +401,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 
   buffers = allocate_buffers(field_integration_scheme, domain; scalar)
   # `nothing` means the default controller holding `kinetic_energy` — a sentinel rather than a
-  # default closure, so a HAND-BUILT forcing is detectable: in grid mode ν was calibrated on the
+  # default closure, so a HAND-BUILT forcing is detectable: a derived ν was calibrated on the
   # assumption that the run holds k = `kinetic_energy`, and a forcing that holds something else
   # (or nothing) silently voids that calibration. The check below warns exactly there
   # (owner-ruled 2026-08-24); explicit-ν runs and the default forcing stay silent.
@@ -415,8 +415,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                     scalar_forcing = _materialize_forcing(scalar_forcing, domain))
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).
-  # The velocity's criterion does not cover it. ν was chosen (grid
-  # mode) or given (explicit mode) against the VELOCITY cutoff κ_max·η, but a scalar at Sc > 1 lives
+  # The velocity's criterion does not cover it. ν was derived or supplied
+  # against the VELOCITY cutoff κ_max·η, but a scalar at Sc > 1 lives
   # down to the finer Batchelor scale η_B = η/√Sc, so the same grid resolves it worse by √Sc and
   # `scalar_dissipation` then measures a truncated field. Both modes know ν and the stationary ε
   # estimate here, so the actual κ_max·η_B is computable and is CHECKED rather than left to a

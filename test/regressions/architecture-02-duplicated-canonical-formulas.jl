@@ -20,7 +20,7 @@ using GBGPeriodicFields: inner
                             rng = MersenneTwister(2))
 
     # (1) The seeded field must hold what the caller asked for, measured by the CANONICAL function —
-    #     the property the grid-mode viscosity calibration in SimulationRun assumes. No test in the
+    #     the property the derived-viscosity calibration in SimulationRun assumes. No test in the
     #     suite pins this today; it is what a divergence between the two copies would break.
     @test kinetic_energy(û)  ≈ T(0.5)
     @test scalar_variance(φ̂) ≈ T(1)

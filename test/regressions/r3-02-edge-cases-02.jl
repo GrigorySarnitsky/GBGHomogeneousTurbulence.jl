@@ -18,7 +18,7 @@ using Test, GBGIsotropicTurbulence
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
                                         kinetic_energy = -1.0)
 
-  # Grid mode (the default): ε genuinely sets ν here, but the rejection must still be the
+  # Derived viscosity (the default): ε genuinely sets ν here, but the rejection must still be the
   # documented-precondition one, not an exponentiation failure inside the scaling law.
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8, kinetic_energy = -1.0)
 

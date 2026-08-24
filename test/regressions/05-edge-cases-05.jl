@@ -5,7 +5,7 @@
 # `max_wavenumber(domain)` falls at or below the grid's lowest nonzero wavenumber 2π/L, the dealias
 # kernel zeroes every surviving mode (the envelope already zeroes κ = 0), `current_energy` is exactly
 # 0, the `current_energy > 0` guard at src/State.jl:138 skips the rescale, and the function returns an
-# all-zero û — silently, while the `Simulation` grid-mode branch has already logged ν, ε and Re_λ
+# all-zero û — silently, while the `Simulation` derivation branch has already logged ν, ε and Re_λ
 # computed as if `kinetic_energy` had been realized.
 #
 # Correct behaviour: either the requested kinetic energy is realized, or the caller is told (an error

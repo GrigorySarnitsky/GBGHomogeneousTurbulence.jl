@@ -1,16 +1,16 @@
-# Witness r4-free-hot-path-04 — grid-mode `Simulation` must validate `κ_max_η`.
+# Witness r4-free-hot-path-04 — a derived-viscosity `Simulation` must validate `κ_max_η`.
 #
-# `κ_max_η` is the resolution criterion grid mode exists to honour: it sets
+# `κ_max_η` is the resolution criterion the viscosity derivation exists to honour: it sets
 # ν = ε^(1/3) (κ_max·η / κ_max)^(4/3), so it must be a positive finite number.
 # Its neighbours `kinetic_energy` and `scalar_variance` are guarded with named
 # `ArgumentError`s precisely so a bad value cannot surface far downstream; the
 # same guard is owed here.
 using Test, Random, GBGIsotropicTurbulence
 
-# A grid-mode run whose ν came out non-positive or non-finite is not a DNS.
+# A derived-viscosity run whose ν came out non-positive or non-finite is not a DNS.
 build(v) = Simulation(grid_points_per_axis = 8, κ_max_η = v, rng = MersenneTwister(1))
 
-@testset "grid-mode Simulation rejects a non-positive or non-finite κ_max_η with a named ArgumentError" begin
+@testset "a derived-viscosity Simulation rejects a non-positive or non-finite κ_max_η with a named ArgumentError" begin
   for bad in (0, -1, NaN, Inf)
     err = try
       sim = build(bad)

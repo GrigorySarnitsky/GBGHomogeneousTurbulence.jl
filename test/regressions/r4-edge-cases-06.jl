@@ -1,16 +1,16 @@
 # Candidate (r4, edge-cases, 06): "Grid-mode viscosity selection assumes `over = :total`
 # `VarianceRescaling` but never checks the actual `velocity_forcing`" — SimulationRun.jl:297.
 #
-# The hunter's discriminator was: in grid mode with a non-`VarianceRescaling(over = :total)` forcing,
+# The hunter's discriminator was: under a derived ν with a non-`VarianceRescaling(over = :total)` forcing,
 # the measured `max_wavenumber * kolmogorov_length` should stay near the nominal `κ_max_η = 2` the
 # constructor's `@info` reports, and does not.
 #
 # This file runs that discriminator against BOTH arms — the accused forcing AND the control the
 # docstring (lines 196-199) declares self-consistent, `VarianceRescaling(over = :total)`. The control
-# misses 2 as well, because grid mode's ν comes from the *modeled* `Li2008` dissipation
+# misses 2 as well, because the derived ν comes from the *modeled* `Li2008` dissipation
 # (`ε = (k/G)^{3/2}/L`, "a modeled estimate, not a measurement" — the comment at line 272), and at
 # 32³ that model underestimates the box's actual ε by ~2×. The forcing check the candidate asks for
-# would not move the control. The tests below assert what the code actually contracts: grid-mode ν
+# would not move the control. The tests below assert what the code actually contracts: the derived ν
 # is a function of the grid and the target energy alone, deliberately independent of the forcing,
 # and the log line reports that design target rather than a measured state.
 
@@ -20,7 +20,7 @@ using GBGIsotropicTurbulence.Phenomenology: kolmogorov_length
 const κ_max = GBGIsotropicTurbulence.SimulationDomain.max_wavenumber
 
 
-"Build a 32³ grid-mode run with `forcing`, spin it up, return (ν, measured κ_max·η)."
+"Build a 32³ derived-viscosity run with `forcing`, spin it up, return (ν, measured κ_max·η)."
 function grid_mode_run(forcing)
   sim = Simulation(grid_points_per_axis = 32, velocity_forcing = forcing,
                    rng = MersenneTwister(4242))
@@ -30,13 +30,13 @@ function grid_mode_run(forcing)
 end
 
 
-@testset "Grid-mode ν is forcing-independent by contract, and its κ_max·η target is a modeled design value" begin
+@testset "The derived ν is forcing-independent by contract, and its κ_max·η target is a modeled design value" begin
   ν_band,  ratio_band  = grid_mode_run(VarianceRescaling(target = 1.5, over = :total))
   ν_cp01,  ratio_cp01  = grid_mode_run(ConstantPower(injection_rate = 0.1))
   ν_cp30,  ratio_cp30  = grid_mode_run(ConstantPower(injection_rate = 3.0))
   @info "measured" ν_band ratio_band ratio_cp01 ratio_cp30
 
-  # 1. The contract the constructor states: in grid mode ν is fixed by the grid, `kinetic_energy`
+  # 1. The contract the constructor states: a derived ν is fixed by the grid, `kinetic_energy`
   #    and `κ_max_η`. It is the same number under every forcing — that is not an oversight, it is
   #    the documented meaning of the mode ("the constructor picks the highest Reynolds number
   #    consistent with the resolution criterion").
@@ -51,7 +51,7 @@ end
   #    error dominates. Adding the requested `velocity_forcing` check would leave arm 2 untouched.
   @test abs(log(ratio_band / 2.0)) > 0.5 * abs(log(ratio_cp01 / 2.0))
 
-  # 4. Grid mode remains REACHABLE with any forcing — but the disposition this item once pinned
+  # 4. The derived route remains REACHABLE with any forcing — but the disposition this item once pinned
   #    ("without warning or error ... a precondition on the user, not a guard") was REVERSED by the
   #    owner on 2026-08-24: a hand-built forcing that voids the ν calibration now draws a WARNING
   #    (never an error). Reachability and the warning are asserted together below.
@@ -60,7 +60,7 @@ end
   # does not hold k warns; a mismatched target warns. Construction only — no spin-up needed.
   @test_logs min_level=Logging.Warn Simulation(grid_points_per_axis = 16,
       velocity_forcing = VarianceRescaling(target = 1.5, over = :total), rng = MersenneTwister(1))
-  @test_logs (:warn, r"grid mode.*does not hold") match_mode=:any Simulation(
+  @test_logs (:warn, r"derived viscosity.*does not hold") match_mode=:any Simulation(
       grid_points_per_axis = 16, velocity_forcing = ConstantPower(injection_rate = 0.1),
       rng = MersenneTwister(1))
   @test_logs (:warn, r"holds target = 0.5") match_mode=:any Simulation(

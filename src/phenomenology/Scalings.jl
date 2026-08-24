@@ -136,7 +136,7 @@ package's own reduction of that database's forced-isotropic dataset (``\\mathrm{
 periodic-box DNS. The calibration is that single point: a low-Reynolds-number box — the small grids
 a smoke test reaches — uses this constant as an **extrapolation**. Its `Reference` records a
 conservative validity floor of ``\\mathrm{Re}_\\lambda = 100`` below the calibration point;
-`Reference`'s advisory-only contract still applies, and the grid-mode ``\\nu`` solve that consumes
+`Reference`'s advisory-only contract still applies, and the ``\\nu`` derivation that consumes
 the law inherits the same standing.
 
 The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)`

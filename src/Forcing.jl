@@ -359,7 +359,7 @@ modes differ in which quantity a run may no longer measure:
     sets and the band is free.
 
 Neither is a default, because the right answer depends on what the run is calibrated against.
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) in grid mode chooses ``\\nu``
+A [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
 calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
@@ -585,7 +585,7 @@ does not take.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
   Left at `nothing` it is computed for you from that formula, with ``\\varepsilon_\\infty`` the
-  stationary estimate for this box — the same estimate the grid-mode viscosity solve uses, so a run
+  stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
   that sets ``\\nu`` explicitly against a very different regime should pass its own value.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
 
@@ -620,7 +620,7 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         "the bare marginal law — no restoring at all — and is allowed."))
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
-  # the same estimate the grid-mode viscosity solve uses, so the two agree on what "stationary" means.
+  # the same estimate the viscosity derivation uses, so the two agree on what "stationary" means.
   tℓ = turnover_time === nothing ?
        2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
                                                                  domain.grid.domain_size[1])) :
@@ -638,7 +638,7 @@ end
 # group Li et al. (2008) fit to JHTDB. Spelled here rather than reached for from `Phenomenology`,
 # which is an extraction-bound leaf this module must not depend on — so the value is duplicated
 # deliberately, and `test/forcing.jl` pins it against `Scalings.Li2008` so the copy cannot drift.
-# It has to be the SAME estimate the grid-mode viscosity solve uses: that solve chooses ν from the
+# It has to be the SAME estimate the viscosity derivation uses: that derivation chooses ν from the
 # assumed k, and the controller's default relaxation time sets how fast the run reaches it. Two
 # different notions of "stationary for this box" would put the two out of step with each other.
 # A `Rational` and a rational exponent, never floating literals — the same rule `_target_factor`

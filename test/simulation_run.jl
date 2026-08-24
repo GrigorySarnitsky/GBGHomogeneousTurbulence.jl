@@ -63,7 +63,7 @@ using Test
     @test kinetic_energy(sim.state.velocity_spectral) < k0                             # unforced ⇒ decays
   end
 
-  @testset "grid-resolved viscosity (grid mode)" begin
+  @testset "the derived viscosity honours the resolution criterion" begin
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = κ_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
     ν = sim.generator.conditions.viscosity
@@ -251,11 +251,11 @@ using Test
 end
 
 
-# The grid-mode ν solve is `kolmogorov_length`'s law inverted, spelled as bare arithmetic because no
+# The derived-ν solve is `kolmogorov_length`'s law inverted, spelled as bare arithmetic because no
 # inverse exists to call. That is a duplication a maintainer could break from either side, so the two
 # are pinned together here: solve for ν through the constructor, then measure η through the canonical
 # law and recover the κ_max·η that was asked for. A change to either spelling alone fails this.
-@testset "grid mode inverts kolmogorov_length, and the round trip closes" begin
+@testset "the viscosity derivation inverts kolmogorov_length, and the round trip closes" begin
   k = 1.5                                    # passed explicitly, not inherited from the default
   for target in (1.0, 1.5, 2.0, 3.0)
     sim = Simulation(grid_points_per_axis = 32, κ_max_η = target, kinetic_energy = k,
@@ -271,8 +271,8 @@ end
   end
 
 
-  @testset "the default run holds the kinetic energy grid mode calibrated it against" begin
-    # Grid mode chooses ν from the ASSUMED kinetic energy, so κ_max·η is self-consistent only if the
+  @testset "the default run holds the kinetic energy the derived viscosity was calibrated against" begin
+    # The derivation chooses ν from the ASSUMED kinetic energy, so κ_max·η is self-consistent only if the
     # run really holds k there. That makes this an end-to-end check of a *precondition*, not a
     # forcing unit test: it is the only place the calibration's assumption is confronted with the
     # integrated trajectory. It caught nothing when written, because it did not exist — the audit
@@ -298,10 +298,10 @@ end
 
 
   @testset "the constructor warns when the scalar is clearly under-resolved, and only then" begin
-    # Grid mode resolves the VELOCITY at κ_max·η; a scalar at Sc > 1 lives down to η_B = η/√Sc, so
+    # The derived ν resolves the VELOCITY at κ_max·η; a scalar at Sc > 1 lives down to η_B = η/√Sc, so
     # the same grid resolves it worse by √Sc. The check fires when the run's actual κ_max·η_B falls
     # below 1.5 — the same floor the docstring calls well-resolved for the velocity — which at the
-    # grid-mode default κ_max·η = 2 means Sc > (2/1.5)² ≈ 1.78. It must fire in BOTH ν modes, and
+    # derivation-default κ_max·η = 2 means Sc > (2/1.5)² ≈ 1.78. It must fire in BOTH ν modes, and
     # never without a scalar: the defect it closes was a wrong `scalar_dissipation` with no signal.
     fires(; kw...) = begin
       buf = IOBuffer()

@@ -32,7 +32,7 @@ using GBGIsotropicTurbulence.Phenomenology: FlowParameters, taylor_reynolds
     fp = flow_parameters(sim)
     @test fp.rms_velocity ≈ sqrt(2k / 3)
 
-    # (3) The grid-mode @info line's Re_λ is built from site 301's copy; recomputing it from the
+    # (3) The ν-derivation @info line's Re_λ is built from site 301's copy; recomputing it from the
     #     bridge's u' gives the same number today — the two copies are numerically identical.
     ν = sim.generator.conditions.viscosity
     reλ_from_bridge = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = fp.dissipation,

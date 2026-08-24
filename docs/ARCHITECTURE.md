@@ -474,8 +474,8 @@ Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
   builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
-  scheme. The viscosity is set from the grid by default — the highest Reynolds number consistent with the
-  chosen resolution criterion `κ_max_η` (decision 20) — with an explicit `viscosity` the opt-in override.
+  scheme. The viscosity is derived from the grid by default — the highest Reynolds number consistent with the
+  chosen resolution criterion `κ_max_η` (decision 20) — with a supplied `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -2253,6 +2253,20 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     one storage per concept the fields are `positions` / `unwrapped_positions`, named for content,
     not for type.
 
+73. **(2026-08, user-directed) The viscosity modes name the mechanism: *derived* / *supplied*, not
+    *grid* / *explicit*.** The old pair failed the dichotomy test the user applied: *grid* and
+    *explicit* are not opposing terms, so the two labels never said they exhaust the choice — and
+    "(no `viscosity`)" under-specified the trigger, which is the keyword *not being passed
+    explicitly*. The new pair is exhaustive by construction — ``\nu`` is either **supplied**
+    (`viscosity = …`, used directly) or, absent, **derived** (from the grid, as the highest
+    Reynolds number consistent with `κ_max_η`; decision 20's solve, now called *the viscosity
+    derivation* everywhere it is named). Swept across the `Simulation` docstring (bullets,
+    examples, keyword entries), the five `@warn` prefixes (`"Simulation (derived viscosity): …"`),
+    the `Forcing` / `Scalings` cross-references to the solve, §4.7, the `Li2008` reference
+    annotation, and the test comments and names — including the one `@test_logs` regex that
+    matched the old warn text. Verbatim historical quotes in witness headers and the decision log
+    keep the old words.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
@@ -2284,7 +2298,7 @@ cites.
 - Li, Y., Perlman, E., Wan, M., Yang, Y., Meneveau, C., Burns, R., Chen, S., Szalay, A. & Eyink, G.
   (2008). [*A public turbulence database cluster and applications to study Lagrangian evolution of velocity increments in turbulence*](https://doi.org/10.1080/14685240802376389). *J. Turbulence* **9**, N31.
   *(The box-normalized dissipation law `Li2008`, which
-  sets ``\nu`` in the run layer's grid mode.)*
+  sets ``\nu`` in the run layer's viscosity derivation.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.

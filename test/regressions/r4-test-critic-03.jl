@@ -15,7 +15,7 @@ using GBGPeriodicFields: field_data
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
                                         scalar = true, scalar_variance = -1.0)
 
-  # Grid mode (the default ν route) must reject it just as early.
+  # The ν derivation (the default route) must reject it just as early.
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8,
                                         scalar = true, scalar_variance = -1.0)
 

@@ -7,7 +7,7 @@
 #   src/SimulationRun.jl:283   ν = ε^(1//3) * (resolution / max_wavenumber(domain))^(4//3)   # inverse
 #   test/simulation_run.jl:68  η = (ν^3 / ε)^(1 / 4)                                         # test copy
 #
-# The third is what makes this more than untidiness: the ONLY test that pins the grid-mode
+# The third is what makes this more than untidiness: the ONLY test that pins the derived-ν
 # calibration re-derives η from a bare literal instead of calling `kolmogorov_length`, so it is
 # not independent of what it guards. This script asserts the relation the code SHOULD hold —
 # routed through the canonical home — and demonstrates it holds today.
@@ -17,7 +17,7 @@ using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGIsotropicTurbulence.Phenomenology.Scalings: stationary_dissipation, Li2008
 using Random
 
-@testset "grid-mode ν solves `kolmogorov_length`'s relation, measured by that function" begin
+@testset "the derived ν solves `kolmogorov_length`'s relation, measured by that function" begin
   for (N, L, k, res) in ((32, 2π, 1.5, 2), (32, 2π, 1.5, 3), (16, 1.0, 0.75, 2), (48, 4π, 3.0, 1.5))
     sim = Simulation(grid_points_per_axis = N, side_length = L, kinetic_energy = k,
                      κ_max_η = res, rng = MersenneTwister(3))

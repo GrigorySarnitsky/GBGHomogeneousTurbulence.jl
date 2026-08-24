@@ -286,7 +286,7 @@ end
   @testset "the local stationary-dissipation estimate matches Phenomenology's Li2008" begin
     # Forcing.jl spells the law locally because `Phenomenology` is an extraction-bound leaf it must
     # not depend on. That duplication is deliberate and this is the pin that keeps the copy honest:
-    # the controller's default relaxation time and the grid-mode viscosity solve must agree on what
+    # the controller's default relaxation time and the viscosity derivation must agree on what
     # "stationary for this box" means, or the run is driven toward a target on one clock and
     # resolved on another. They disagreed by a factor of 2.68 when the copy was written by hand.
     local_estimate = getfield(GBGIsotropicTurbulence.Forcing, :_stationary_dissipation_estimate)
