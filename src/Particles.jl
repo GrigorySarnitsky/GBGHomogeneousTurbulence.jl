@@ -320,13 +320,24 @@ produce.
   TurTLE's default. Orders above `8` are refused with an `ArgumentError`: past it the four-point
   Gauss–Legendre rule that integrates the interpolation weights stops being exact, and the refusal
   is loud because the alternative is silently wrong weights. The cap is far above any useful order,
-  since an Adams–Bashforth stability region shrinks with each step added.
+  since an Adams–Bashforth stability region shrinks with each step added — and the bootstrap makes
+  high orders *worse*, not just useless: over a fixed window, `order = 6` and `order = 8` measure
+  the same third-order convergence as `order = 4` with **larger** errors (measured ``1.0`` and
+  ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `EndpointHeun` bootstrap
+  costs more than the extra history returns). `order = 4` is the practical ceiling.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
     shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
     constant ``K`` over a span ``t``, Grönwall bounds the trajectory error by
     ``\\delta(\\mathrm{e}^{Kt} - 1)/K`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
+    Where `EndpointHeun`'s docstring reports a crossover in resolution, this scheme has **none**:
+    at third order under the advective-CFL loop the time error falls as ``\\Delta x^{3}`` — the
+    same rate as the default `CatmullRom` floor's ``\\Delta x^{d+1}`` — so their ratio is set by
+    prefactors alone, and measured on a band-limited field at ``N = 32``–``128`` the floor stays
+    two to three orders of magnitude *below* the time error. At CFL steps the interpolant never
+    limits an Adams–Bashforth trajectory, and a wider stencil buys nothing; only a ``\\Delta t``
+    cut well below the CFL value surfaces the floor.
 
     The floor is set by the interpolant's **polynomial reproduction degree**, not its smoothness
     class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying

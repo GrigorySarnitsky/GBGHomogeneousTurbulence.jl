@@ -114,3 +114,18 @@ whole value. Keep entries short: what was flagged, why it is not a defect.
 - **`ConstantPower`'s band storage** — settled by decision 38's supersession note (decision 58 moved
   it off the rate route; only `Linear` keeps an indicator). Do not re-flag the decision-log history
   against the current struct.
+
+
+## Owner rulings, 2026-08-24 (the panel escalation list) — settled as NOT defects
+
+- **Averaging-window guidance for diagnostics** (external-standard): out of scope by owner ruling —
+  "that's the user's job; the package offers no cross-run averaging machinery, so it has nothing to
+  do with us." Do not re-flag the absence of statistical-convergence guidance.
+- **A user-runnable conservation recipe** (external-standard): deferred to the ν = 0
+  truncated-Euler oracle already recorded in ARCHITECTURE §7; nothing lands before it.
+- **A decaying-run transient-end marker** (external-standard): out of scope by owner ruling —
+  decaying-run methodology is the user's own analysis.
+- **A forcing-magnitude term in the timestep discussion** (external-standard): the owner chose no
+  claim over an unverified one; do not flag the absence.
+- **Kolmogorov (1941) DAN 30 pagination** (free-reader): both 299–303 and 301–305 circulate in the
+  literature for the same paper; the corpus's 301–305 is one of the two standard forms.

@@ -44,7 +44,7 @@ Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,119
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
-Particles.jl::AdamsBashforth(; order = 4),100,1,529
+Particles.jl::AdamsBashforth(; order = 4),100,1,692
 Particles.jl::EndpointHeun(),53,1,249
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,43,0,169
