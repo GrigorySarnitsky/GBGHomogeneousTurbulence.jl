@@ -306,7 +306,7 @@ deposit_max_speed!(cache::ObservablesCache{PV, PS, TS, T}, value::Real) where {P
 Record the particle velocities already written into `cache` (an [`ObservablesCache`](@ref)) as
 current, so [`particle_velocities`](@ref) will serve them instead of throwing.
 
-Use it after writing new values along the trajectories —
+Use it after writing new values at the particle positions —
 [`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!)
 writes, this call records. The two are separate because the slot is the tracer set's own storage: the
 cache never fills it, and cannot know when its contents became current. A run does both for you at

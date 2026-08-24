@@ -30,7 +30,7 @@ Lagrangian particle tracking — today the massless tracer:
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
-- [`interpolate_at_particles!`](@ref) — read a field along the trajectories; [`new_vector_point_values`](@ref) /
+- [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate its `out` buffers.
 """
 module Particles
@@ -642,7 +642,7 @@ number_of_particles(tracers::Tracers) = size(tracers.positions, 1)
 
 Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) of
 shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
-[`interpolate_at_particles!`](@ref) when sampling the velocity along the trajectories.
+[`interpolate_at_particles!`](@ref) when sampling the velocity at the particle positions.
 """
 new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(tracers.positions))
 
@@ -651,7 +651,7 @@ new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(tracers.po
 
 Allocate a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues) of
 length ``M`` matching the tracer set `tracers`, for use as the `out` of
-[`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` along the trajectories.
+[`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` at the particle positions.
 """
 new_scalar_point_values(tracers::Tracers) =
   ScalarPointValues(similar(tracers.positions, eltype(tracers.positions), number_of_particles(tracers)))

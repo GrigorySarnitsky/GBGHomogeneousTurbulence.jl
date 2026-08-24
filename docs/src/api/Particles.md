@@ -44,8 +44,8 @@ MultistepBuffers
 ## The tracking loop
 
 The steps of Lagrangian tracking: record the flow velocity where each tracer currently sits, advance
-the tracers once the fields have moved, then read any physical field along the trajectories for the
-Lagrangian statistics. Recording and pushing are two verbs because `EndpointHeun` needs the velocity
+the tracers once the fields have moved, then read any physical field at the particle positions for
+the Lagrangian statistics. Recording and pushing are two verbs because `EndpointHeun` needs the velocity
 at both ends of the step: the run records the sample at the iteration's end, off the just-deposited
 velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 

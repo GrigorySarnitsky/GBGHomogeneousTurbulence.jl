@@ -1,7 +1,7 @@
 key,longest_paragraph_words,admonitions,total_words
 Cache.jl::Cache,115,0,328
 Cache.jl::ObservablesCache(domain; scalar = false， particle_velocities = nothing， history_depth = 1),71,1,720
-Cache.jl::deposit_sample!(cache),75,0,141
+Cache.jl::deposit_sample!(cache),76,0,142
 Cache.jl::fields_modified!(cache),70,1,248
 Cache.jl::particle_velocities(cache),109,0,110
 Cache.jl::particles_modified!(cache),65,0,247
@@ -48,13 +48,13 @@ Particles.jl::AdamsBashforth(; order = 4),100,1,692
 Particles.jl::EndpointHeun(),53,1,249
 Particles.jl::MultistepBuffers,49,0,132
 Particles.jl::ParticleIntegratorBuffers,43,0,169
-Particles.jl::Particles,8,0,129
+Particles.jl::Particles,8,0,130
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， rng = default_rng()),86,0,597
 Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,57,1,215
 Particles.jl::history_depth(scheme) -> Int,28,0,47
 Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
-Particles.jl::new_scalar_point_values(tracers),28,0,29
-Particles.jl::new_vector_point_values(tracers),28,0,29
+Particles.jl::new_scalar_point_values(tracers),29,0,30
+Particles.jl::new_vector_point_values(tracers),29,0,30
 Particles.jl::number_of_particles(tracers),10,0,11
 Particles.jl::particle_positions(tracers),19,0,20
 Particles.jl::record_particle_velocities!(tracers， u) -> tracers,82,0,181

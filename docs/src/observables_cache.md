@@ -321,7 +321,7 @@ representation at once. The vorticity is deposited at the iteration's end either
 run's residency, not the cache's contents.
 
 The tracer scheme consumes two velocity samples per push. The first — the **particle velocities**
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity sampled along the trajectories — is the
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
 cache's deposit from the previous closing deposit; the
 second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
