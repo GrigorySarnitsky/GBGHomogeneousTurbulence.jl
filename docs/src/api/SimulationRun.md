@@ -22,9 +22,12 @@ Advance one iteration, or observe-and-advance until the callback stops the run; 
 stationarity observation and its one-line shorthand spin a fresh run up to measurement readiness.
 
 ```@docs
+StationarityCriterion
+```
+
+```@docs
 advance!
 run!
-StationarityCriterion
 warmup!
 ```
 

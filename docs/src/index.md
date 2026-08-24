@@ -62,8 +62,11 @@ fields, and ``\boldsymbol{f}`` a forcing, the momentum equation is advanced in r
 advective term carried by the Lamb vector ``\boldsymbol{u}\times\boldsymbol{\omega}``),
 
 ```math
-\partial_t \boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
-\qquad \nabla\cdot\boldsymbol{u} = 0,
+\begin{aligned}
+\partial_t \boldsymbol{u} &= \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})
+  + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}, &
+\nabla\cdot\boldsymbol{u} &= 0,
+\end{aligned}
 ```
 
 and the passive scalar ``\varphi`` by the advection–diffusion equation

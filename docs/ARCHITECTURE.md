@@ -494,9 +494,16 @@ Over it:
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
   `point_coordinates(sim.tracers.positions)` (decision 72: the raw view is `GBGPeriodicFields`'
   own accessor, not a forwarding method of this package). 
+- **`write_simulation` / `read_simulation`** — the HDF5 checkpoint (decision 75): one
+  self-describing group fully restores the run, recursively composed of the per-object pairs
+  (`write_domain`, `write_state`, `write_tracers`, `write_forcing`) with the field library's
+  `write_field`/`write_points`/`write_scheme` groups as the leaves. Nothing derivable is stored —
+  the reader rebuilds through the constructor and replays the seeding deposits — and the methods
+  live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency extension, so the surface exists
+  only when `HDF5` is loaded.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
-  `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) the
-  current-state diagnostics, for a callback to read.
+  `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) are
+  the current-state diagnostics, for a callback to read.
 
 The layer wires §4.1–§4.6 together and holds no physics or numerics of its own.
 
@@ -664,12 +671,12 @@ generalization is built for them until a second concrete case forces the abstrac
   absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
   increment is the one exception to the allocation-free hot loop
   (invariant 4) — it allocates — so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
-- **Checkpoint / exact restart to HDF5 — the scheduled next capability.** Four of the five
-  reference-practice audit lanes independently converged on its absence (2026-08-23), and it is the
-  one missing piece for long production runs: persist the spectral state, the clock and timestep,
-  and the stochastic forcing's RNG state (Fluidsim stores its seeds and last-change time so a
-  restarted force history continues bit-exactly — the reference bar), and reload to a run that
-  continues as the same realization. Owner-directed to-do, not a passive deferral.
+- **Checkpoint / exact restart to HDF5 — DELIVERED (decision 75).** Five writer/reader pairs,
+  composed recursively on the field library's persistence groups, restore a run that continues
+  bitwise for deterministic forcings (§4.7). The one recorded gap against the Fluidsim reference
+  bar is deliberate: a stochastic forcing's evolving force and stream are ruled non-persistent, so
+  a reloaded `StochasticOU` resumes on a fresh stream rather than continuing the same
+  realization.
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
@@ -838,8 +845,8 @@ one usually encodes a decision.
 7. **A library, not a framework.** The run layer is a convenience over exposed pieces (§2, §4.7), never a
    mandatory shell.
 8. **The scalar is denoted ``\varphi``**, never ``\theta`` — in code, mathematics, and prose.
-   And it is an **``\mathrm{Sc} = O(1)`` scalar**: no Batchelor-range machinery exists, the grid
-   mode resolves the velocity's cutoff rather than ``\eta_B = \eta/\sqrt{\mathrm{Sc}}``, and the
+   And it is an **``\mathrm{Sc} = O(1)`` scalar**: no Batchelor-range machinery exists, the derived
+   viscosity resolves the velocity's cutoff rather than ``\eta_B = \eta/\sqrt{\mathrm{Sc}}``, and the
    constructor warns — never refuses — when the scalar is clearly under-resolved. High-Schmidt
    support is a deliberate absence, not an oversight.
 9. **Deferred futures are accounted for, not owed** (§7); no speculative extension points.
@@ -2005,7 +2012,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     bias accumulates uncorrected (measured: ``k`` drifting monotonically ~1% per 1000 steps at
     ``24^3``, against a G = 1 controller holding 1.498 flat). The guard is now finite-and-non-negative;
     a negative gain stays refused (anti-restoring). The witness is the discriminating experiment, not
-    a construction test: seeded at ``k = 0.5`` against ``target = 1.5``, the marginal law must stay at
+    a construction test: seeded at ``k = 0.5`` against `target = 1.5`, the marginal law must stay at
     0.5 — conservation *and* the absence of restoration, which no drift could fake.
 
 60. **(2026-08) The advective term's ``\kappa = 0`` mode is pinned to zero exactly; the forcing
@@ -2031,12 +2038,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     *state*, whose divergence — injected at roundoff by the stage combinations — is damped only by
     ``\exp(-\nu\kappa^{2}\Delta t)``, nearly nothing at the largest scales. Measured in Float32 at
     ``32^3``: ``\lvert\nabla\cdot\boldsymbol{u}\rvert`` grew ×120 per 1500 steps, reaching
-    ``800\,\varepsilon_{\mathrm{mach}}`` by step 2000 and compounding; Float64 sat harmlessly at
-    ``\sim 10\,\varepsilon_{\mathrm{mach}}``. Since precision is a studied fitness axis, the Float32
+    ``800 \varepsilon_{\mathrm{mach}}`` by step 2000 and compounding; Float64 sat harmlessly at
+    ``\sim 10 \varepsilon_{\mathrm{mach}}``. Since precision is a studied fitness axis, the Float32
     behaviour is a defect, not a curiosity. The pin is one in-place pointwise pass
     (`helmholtz_projection!(û, û, …)` — the backend's projection may alias destination and source)
     at the END of `step!`, after `finalize!`, so a post-step forcing's writes are covered too.
-    Measured after: Float32 divergence flat at ``0.3\,\varepsilon_{\mathrm{mach}}`` over 2000 steps.
+    Measured after: Float32 divergence flat at ``0.3 \varepsilon_{\mathrm{mach}}`` over 2000 steps.
     The compute ledger re-froze at +2 `spectral_vector` per cell in the same commit; the witness
     injects an O(1) pure-gradient corruption through the `fields_modified!` escape hatch and
     requires one step to scrub it to ``10^{-12}``, which no viscous decay could fake.
@@ -2069,7 +2076,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
       needed no change — the hot loop's last external allocation closed from the backend.
     - **The multi-weight fused reduction** (item 2, PF decision 72; their measurement on this
       host's card: 2.14× at ``128^3`` over three separate passes, before counting the retired
-      synchronizations). `weighted_inner(f, (w_1, \ldots, w_n))` answers ``n`` weighted sums from
+      synchronizations). The fused `weighted_inner(f, (w_1, \ldots, w_n))` answers ``n`` weighted sums from
       one traversal and one readback, bitwise identical to the separate calls. Wired at every
       same-field multi-reduction site: `VarianceController` (three weights per stage — the unit,
       the band, ``\lvert\boldsymbol{\kappa}\rvert^{2}``), `VarianceRescaling`'s `:total` pair,
@@ -2130,7 +2137,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the **same displacement terms** to both records — the wrapped positions through `displace!`'s
     grid form, the record through the grid-free universal-cover lift (the two cannot disagree on a
     step, only on the winding the wrap discards). Read through `unwrapped_positions`; an untracked
-    set throws. `particles_modified!` on a run restarts the record at the new positions — winding
+    set throws. An announced `particles_modified!` on a run restarts the record at the new positions — winding
     is a property of the trajectory just abandoned. Accumulating statistics over the record is the
     caller's analysis, per the charter.
 
@@ -2157,12 +2164,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     velocity of its own — so `Tracers` now carries positions and the interpolation scheme only,
     and the `ObservablesCache` allocates the slot itself (a `number_of_particles` keyword sizes an
     ``M \times 3`` point-value section on the domain's backend, plus the multistep history)
-    exactly as it allocates the field charts. `record_velocity_at_particles!(cache, tracers, u)`
+    exactly as it allocates the field charts. The write moved with it:
+    `record_velocity_at_particles!(cache, tracers, u)`
     writes into the cache it is handed; `allocate_buffers(scheme, tracers, cache)` takes the cache
     whose slot and history the scheme's registers ride; the checked read is unchanged in contract.
     The name changed with the ownership, on the user's ruling: *particle velocities* would name
     particle **state** — the inertial ladder's own ``\boldsymbol{v}`` — while this slot holds the
-    flow's velocity sampled at the particle positions. `particle_velocities` /
+    flow's velocity sampled at the particle positions. The old names `particle_velocities` /
     `record_particle_velocities!` became `velocity_at_particles` / `record_velocity_at_particles!`
     (the `at_particles` morpheme from `interpolate_at_particles!`), and prose everywhere says "the
     velocity at the particles", never "the particle velocities". Ownership and naming landed in one

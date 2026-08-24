@@ -86,6 +86,13 @@ function defined_sets(name)
     isdefined(mod, name) && (f = getfield(mod, name); break)
   end
   f isa Function || f isa Type || return nothing
+  # A bare generic whose methods live in an unloaded weak-dependency extension (the HDF5
+  # persistence pairs) has an empty method table here: nothing to compare a displayed signature
+  # against, so it is reported once as extension-homed rather than as thirty phantom arguments.
+  if f isa Function && isempty(methods(f))
+    println("$name: EXTENSION-HOMED (no methods loaded) — skipped")
+    return nothing
+  end
   pkgroot = dirname(dirname(pathof(PKG)))
   pos, kw = Set{Symbol}(), Set{Symbol}()
   unnamed = false             # a `::DispatchTag` slot with no binding reports `#unused#`; a

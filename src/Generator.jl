@@ -380,15 +380,21 @@ end
 """
     prepare!(generator, state, domain, dt)
 
-Open a step of the [`ResolvedGenerator`](@ref) `generator`: advance each forcing's internal state once (its per-step
+Open a step of the generator: advance each forcing's internal state once (its per-step
 [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
-per-mode linear forcing rates (fill them, so the factor verbs return them instead of `nothing`)
-(its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook,
-written into the generator's rate arrays) from the start-of-step `state` (a
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) over the
-timestep `dt`, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once before its Runge–Kutta
-stages; the stage evaluations and the integrating factors then consume what it prepared. Returns
-`generator`.
+per-mode linear forcing rates — fill them, so the factor verbs return them instead of `nothing`
+(its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook, written
+into the generator's rate arrays). A scheme calls this once before its Runge–Kutta stages; the
+stage evaluations and the integrating factors then consume what it prepared.
+
+The arguments are:
+- `generator` — the [`ResolvedGenerator`](@ref) being opened.
+- `state` — the start-of-step [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)
+  the forcing hooks read.
+- `domain` — the [`FixedDomain`](@ref) the rates are formed on.
+- `dt` — the timestep the forcings prepare for.
+
+Returns `generator`.
 """
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
   generator.displaced_velocity_source = nothing     # a new step opens with the displaced scratch stale
@@ -408,12 +414,19 @@ end
 """
     finalize!(generator, state, domain)
 
-Close a step of the [`ResolvedGenerator`](@ref) `generator`: apply each of its forcings' post-step
-projections (the [`project_forcing!`](@ref GBGIsotropicTurbulence.Forcing.project_forcing!) hook —
-e.g. the energy rescale of a [`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling))
-to the advanced `state`, velocity first, then the scalar
-when the run carries one, on the [`FixedDomain`](@ref) `domain`. A scheme calls this once after its final stage, so everything that follows
-the step — the diagnostics, the derived observables, the tracer advance — sees the forced end-of-step fields.
+Close a step of the generator: apply each of its forcings' post-step projections (the
+[`project_forcing!`](@ref GBGIsotropicTurbulence.Forcing.project_forcing!) hook — e.g. the energy
+rescale of a [`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling)) to the
+advanced state, velocity first, then the scalar when the run carries one. A scheme calls this once
+after its final stage, so everything that follows the step — the diagnostics, the derived
+observables, the tracer advance — sees the forced end-of-step fields.
+
+The arguments are:
+- `generator` — the [`ResolvedGenerator`](@ref) whose forcings project.
+- `state` — the advanced [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) the
+  projections act on.
+- `domain` — the [`FixedDomain`](@ref) they act over.
+
 Returns `state`.
 """
 function finalize!(generator::ResolvedGenerator, state, domain::FixedDomain)
@@ -444,11 +457,18 @@ _zero_mean_mode_data!(data::AbstractArray{T, 4}) where {T} = fill!(view(data, 1:
     velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)
 
 Assemble the explicit right-hand side of the momentum equation into `N̂` — the dealiased,
-Leray-projected rotational nonlinear term plus any additive forcing source — from the stage velocity
-`û` in spectral representation and its physical velocity `u` and vorticity `ω_consumed`, on the
-[`FixedDomain`](@ref) `domain`, using the [`ResolvedGenerator`](@ref) `generator`'s conditions and
-scratch. Two arguments are written, not one: `N̂` receives the result, and `ω_consumed` is consumed
-in place — the `_consumed` suffix marks it, since Julia's `!` convention flags only the first.
+Leray-projected rotational nonlinear term plus any additive forcing source. Two arguments are
+written, not one: `N̂` receives the result, and `ω_consumed` is consumed in place — the
+`_consumed` suffix marks it, since Julia's `!` convention flags only the first.
+
+The arguments are:
+- `N̂` — the spectral field receiving the assembled term.
+- `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
+- `û` — the stage velocity in spectral representation, consulted by `PhaseShift`'s displaced
+  evaluation; a mask strategy leaves it unused.
+- `u` — the stage velocity in physical representation, only read.
+- `ω_consumed` — the stage vorticity in physical representation, consumed (the closing note).
+- `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
 
@@ -477,6 +497,10 @@ scratch) — averages the two to cancel the aliasing, then truncates spherically
 Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
+The advective term's ``\\kappa = 0`` mode is zeroed exactly
+(``\\langle\\boldsymbol{u}\\times\\boldsymbol{\\omega}\\rangle = 0`` holds discretely only to
+roundoff, and the mean mode has no viscous damping); the forcing source, added after, may carry a mean.
+
 Returns `N̂`.
 
 !!! note "The vorticity argument is read and then overwritten"
@@ -491,10 +515,6 @@ Returns `N̂`.
     [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
     to infer it. Only the spectral product scratch remains on the generator, and the operation
     allocates nothing.
-
-The advective term's ``\\kappa = 0`` mode is zeroed exactly
-(``\\langle\\boldsymbol{u}\\times\\boldsymbol{\\omega}\\rangle = 0`` holds discretely only to
-roundoff, and the mean mode has no viscous damping); the forcing source, added after, may carry a mean.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
@@ -602,11 +622,20 @@ scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
                 displaced_velocity_current = false)
 
 Assemble the explicit right-hand side of the passive-scalar equation into `N̂` — the dealiased
-advection term plus any additive forcing source — from the stage velocity `û` and scalar `φ̂` in
-spectral representation and their physical `u_consumed`, `φ`, on the [`FixedDomain`](@ref) `domain`,
-using the [`ResolvedGenerator`](@ref) `generator`'s conditions and scratch. Two arguments are
-written, not one: `N̂` receives the result, and `u_consumed` is consumed in place — the `_consumed`
-suffix marks it, since Julia's `!` convention flags only the first.
+advection term plus any additive forcing source. Two arguments are written, not one: `N̂` receives
+the result, and `u_consumed` is consumed in place — the `_consumed` suffix marks it, since Julia's
+`!` convention flags only the first.
+
+The arguments are:
+- `N̂` — the spectral field receiving the assembled term.
+- `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
+- `û`, `φ̂` — the stage velocity and scalar in spectral representation, consulted by `PhaseShift`;
+  a mask strategy leaves both unused.
+- `u_consumed` — the stage velocity in physical representation, consumed (the closing note).
+- `φ` — the stage scalar in physical representation, only read.
+- `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
+- `displaced_velocity_current = false` — the reuse promise for `PhaseShift`'s displaced velocity,
+  explained below.
 
 In conservative form the advection is ``-\\nabla\\cdot(\\boldsymbol{u}\\varphi)`` (equal to
 ``-\\boldsymbol{u}\\cdot\\nabla\\varphi`` since ``\\nabla\\cdot\\boldsymbol{u} = 0``). The conservative
@@ -637,6 +666,10 @@ record alone can only force a rebuild, never a wrong reuse; the keyword is the l
 containers are rewritten in place, so a false promise over the *same* container is quietly wrong,
 where the default merely rebuilds (one shift, three inverse transforms) and stays correct.
 
+The advective term's ``\\kappa = 0`` mode is zeroed exactly
+(``\\langle\\nabla\\cdot(\\boldsymbol{u}\\varphi)\\rangle = 0`` holds discretely only to roundoff,
+and the mean of ``\\varphi`` has no diffusive damping); the forcing source, added after, may carry a mean.
+
 Returns `N̂`.
 
 !!! note "The assembly consumes the velocity argument"
@@ -645,10 +678,6 @@ Returns `N̂`.
     is only read. As in `velocity_rhs!`, the consumed argument is fixed by the physics rather than
     by its position in the signature, and is named for it. Only the spectral product scratch remains
     on the generator, and the operation allocates nothing.
-
-The advective term's ``\\kappa = 0`` mode is zeroed exactly
-(``\\langle\\nabla\\cdot(\\boldsymbol{u}\\varphi)\\rangle = 0`` holds discretely only to roundoff,
-and the mean of ``\\varphi`` has no diffusive damping); the forcing source, added after, may carry a mean.
 """
 scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain::FixedDomain;
             displaced_velocity_current::Bool = false) =

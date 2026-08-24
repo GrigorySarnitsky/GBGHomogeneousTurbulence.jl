@@ -39,10 +39,14 @@ abstract type ScalingLaw <: TurbulenceLaw end
     stationary_dissipation(law, kinetic_energy, side_length) -> Float64
 
 The dissipation rate ``\\varepsilon`` a stationary run sustains, predicted by a box-normalized
-dissipation `law` from the turbulent kinetic energy ``\\texttt{kinetic\\_energy} \\equiv k`` and the
-periodic-box side length ``\\texttt{side\\_length} \\equiv L`` — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
-[`Li2008`](@ref) gives the ``(k/G)^{3/2}/L`` form). This is the seam by which a run's
-viscosity can be set from its grid and target energy, rather than the reverse.
+dissipation law — the inverse of the law's [`scaling`](@ref) group (each law owns its own inverse;
+[`Li2008`](@ref) gives the ``(k/G)^{3/2}/L`` form). This is the seam by which a run's viscosity
+can be set from its grid and target energy, rather than the reverse.
+
+The arguments are:
+- `law` — the dissipation law inverted.
+- `kinetic_energy` — the turbulent kinetic energy, ``\\texttt{kinetic\\_energy} \\equiv k``.
+- `side_length` — the periodic-box side, ``\\texttt{side\\_length} \\equiv L``.
 """
 function stationary_dissipation end
 

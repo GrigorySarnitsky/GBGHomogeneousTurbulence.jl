@@ -64,8 +64,8 @@ export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
 
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
-Give **exactly one** of the two. `number_of_particles` seeds that many tracers uniformly at random
-in the periodic box. `positions` supplies the tracer positions as a `GBGPeriodicFields`
+Give **exactly one** of the two. The `number_of_particles` form seeds that many tracers uniformly
+at random in the periodic box. The `positions` form supplies the tracer positions as a `GBGPeriodicFields`
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet), copied to `domain`'s
 backend and element type. Supplying both, or neither, raises an `ArgumentError`, and so does a raw
 array in place of the `PointSet`: coordinates cross into the package only through the
@@ -74,7 +74,7 @@ array in place of the `PointSet`: coordinates cross into the package only throug
 The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
 sampled field — at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1``
-choice and `Simulation`'s default; it is a ready-made value rather than a type, so it is passed
+choice and [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)'s default; it is a ready-made value rather than a type, so it is passed
 bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
 and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
 offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
@@ -126,8 +126,8 @@ advect!(Heun(), tracers, u_end, domain, buffers, dt)
 Read the particle state off the fields directly — the positions are
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)s, and raw arrays and
 counts come from `GBGPeriodicFields`' `point_coordinates` and `npoints`, never from accessors of
-this package. `unwrapped = true` additionally tracks the winding-preserving
-unwrapped positions [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical
+this package. Passing `unwrapped = true` additionally tracks the winding-preserving
+unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: read them from the
 run's observables cache through
 [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles), where the
@@ -139,8 +139,8 @@ The particle integration scheme's own working storage is **not** here: it lives 
 # Fields
 - `positions` — the tracer positions, as the
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) every operation takes:
-  the one storage, always wrapped — the dynamical state. `particle_positions` serves its `(M, 3)`
-  matrix view.
+  the one storage, always wrapped — the dynamical state. `GBGPeriodicFields`' `point_coordinates`
+  serves its `(M, 3)` matrix view, with ``M`` the tracer count.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
 - `unwrapped_positions` — the opt-in unwrapped positions (`unwrapped = true`) as a `PointSet`, advanced
   by every push with the same displacement terms but never reduced to the box; `nothing` when
@@ -237,15 +237,15 @@ struct Heun <: AbstractParticleIntegrator end
 """
     restart!(scheme, buffers) -> buffers
 
-Discard whatever history `buffers` holds, so the next [`advect!`](@ref) starts the scheme from
-scratch.
+Discard whatever history `buffers` holds for the particle integration scheme `scheme`, so the
+next [`advect!`](@ref) starts that scheme from scratch.
 
 Call it whenever the tracer positions are changed from outside the iteration — a reseed, a
 hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
 trajectory just abandoned, and integrating over those would blend the old path with the new one.
 
-The `Simulation` form of
+The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) form of
 [`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
 after announcing the reposition to the observables cache. Its bare-cache form clears only the
 sample history the cache itself holds and cannot dispatch here — so a hand-run loop that announces
@@ -326,15 +326,15 @@ restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
     AdamsBashforth(; order = 4)
 
 Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
-its default order (Lalescu et al. 2022, *An efficient particle tracking algorithm for large-scale
-parallel pseudo-spectral simulations of turbulence*, *Comput. Phys. Commun.* **278**, 108406,
+its default order (Lalescu et al. 2022,
 [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406)) — buying accuracy in
 time at **no extra field evaluation and no extra interpolation** per step.
 
 Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
 buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
 reuses the Lagrangian samples the run has already deposited at earlier instants. The trade is one
-stored array per extra order against one interpolation per step.
+stored array per extra order against one interpolation per step; the update formula is given with
+[`advect!`](@ref).
 
 The steps are **not** assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
 which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each
@@ -380,9 +380,8 @@ produce.
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
     [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006)).
 
-# Fields
-The plain constructor `AdamsBashforth(order)` takes the one field directly:
-- `order` — the target method order; the scheme ramps to it as the sample history fills.
+The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
+above is the only way to build one.
 """
 struct AdamsBashforth{K} <: AbstractParticleIntegrator end
 
@@ -561,6 +560,19 @@ representation:
 with positions wrapped into ``[0, L)``. This is second-order accurate in time — advecting on the
 frozen start-of-step velocity alone would be first order.
 
+Under [`AdamsBashforth`](@ref), the position update integrates over the deposited samples instead
+of interpolating a second time,
+
+```math
+\\boldsymbol{X} \\leftarrow \\boldsymbol{X}
+  + \\sum_{j=0}^{K-1} b_j \\boldsymbol{u}(t_{n-j}, \\boldsymbol{X}(t_{n-j})),
+```
+
+with ``K`` the order and the weights ``b_j`` re-solved each step by integrating the Lagrange basis
+on the recorded step history (the steps are not assumed uniform). The first ``K - 1`` pushes have
+no history yet and are taken under `Heun`; `velocity_end` feeds only those bootstrap
+pushes.
+
 !!! note "The start-of-step velocity is read, never recomputed"
     ``\\boldsymbol{v}_1`` is read from the cache's velocity-at-particles slot, not recomputed
     here: it must hold ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
@@ -613,7 +625,7 @@ end
 """
     unwrapped_positions(tracers)
 
-The **unwrapped** tracer positions, as a
+The **unwrapped** positions of the tracer set `tracers`, as a
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) — the trajectory with its
 winding kept, each coordinate the literal sum of every displacement since seeding, never reduced to
 the periodic box. These are the positions a mean-square-displacement or dispersion diagnostic
@@ -691,7 +703,8 @@ function write_tracers end
 
 
 """
-    read_tracers(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain) -> Tracers
+    read_tracers(parent::HDF5.H5DataStore, name::AbstractString,
+                 domain::FixedDomain) -> Tracers
 
 Rebuild a [`Tracers`](@ref) from the group [`write_tracers`](@ref) wrote, its positions allocated
 on the storage backend of `domain` (a [`FixedDomain`](@ref)), whose element type must agree with

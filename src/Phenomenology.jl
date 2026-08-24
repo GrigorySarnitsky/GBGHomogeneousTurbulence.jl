@@ -213,11 +213,17 @@ function provenance end
 """
     spectrum(law, κ, fp) -> Float64
 
-The reference spectrum predicted by a model `law` at wavenumber `κ` for the state `fp` (a
-[`FlowParameters`](@ref)) — the velocity energy spectrum ``E(\\kappa)`` for an `EnergySpectrum` (the
-density in wavenumber of the kinetic energy, ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), or the scalar
-spectrum ``E_\\varphi(\\kappa)`` for a `ScalarSpectrum`. Its home and the composed form are in
-[`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
+The reference spectrum predicted by a model law — the velocity energy spectrum ``E(\\kappa)``
+for an `EnergySpectrum` (the density in wavenumber of the kinetic energy,
+``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), or the scalar spectrum
+``E_\\varphi(\\kappa)`` for a `ScalarSpectrum`.
+
+The arguments are:
+- `law` — the model law evaluated.
+- `κ` — the wavenumber it is evaluated at.
+- `fp` — the flow state, a [`FlowParameters`](@ref).
+
+Its home and the composed form are in [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
 """
 function spectrum end
 
@@ -225,11 +231,15 @@ function spectrum end
 """
     scaling_exponent(law; order) -> Float64
 
-The inertial-range scaling exponent ``\\zeta_p`` of the longitudinal velocity structure function of
-order ``p`` (the `order` argument), ``D_{L\\dots}(r) \\sim r^{\\zeta_p}``, predicted by a
-`law` (a `StructureFunction`) — the
-self-similar ``\\zeta_p = p/3`` of K41, or the anomalous exponent of an intermittency model. Its home is
-[`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+The inertial-range scaling exponent ``\\zeta_p`` of the longitudinal velocity structure
+function, ``D_{L\\dots}(r) \\sim r^{\\zeta_p}`` — the self-similar ``\\zeta_p = p/3`` of K41, or
+the anomalous exponent of an intermittency model.
+
+The arguments are:
+- `law` — the `StructureFunction` law evaluated.
+- `order` — the moment order ``p``.
+
+Its home is [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """
 function scaling_exponent end
 
@@ -237,13 +247,21 @@ function scaling_exponent end
 """
     structure_function(law, r, fp; order) -> Float64
 
-The reference structure function of the given `order` predicted by a `law` (a
-[`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)) at
-separation `r` for the state `fp` (a [`FlowParameters`](@ref)). Most laws give the longitudinal
-**velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` (the `order`-th moment ``p``) of the
-velocity increment ``\\delta u_L`` across a distance `r`; a mixed velocity–scalar law (`Yaglom1949`) instead gives
-``\\langle\\delta u_L (\\delta\\varphi)^{2}\\rangle``, the transport of scalar variance. Its home is
-[`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+The reference structure function predicted by a law at a given separation. Most laws give the
+longitudinal **velocity** moment ``D_{L\\dots}(r) = \\langle(\\delta u_L)^p\\rangle`` of the
+velocity increment ``\\delta u_L`` across the separation; a mixed velocity–scalar law
+(`Yaglom1949`) instead gives ``\\langle\\delta u_L (\\delta\\varphi)^{2}\\rangle``, the transport
+of scalar variance.
+
+The arguments are:
+- `law` — the
+  [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)
+  law evaluated.
+- `r` — the separation distance.
+- `fp` — the flow state, a [`FlowParameters`](@ref).
+- `order` — the moment order ``p``.
+
+Its home is [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
 """
 function structure_function end
 

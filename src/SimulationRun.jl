@@ -18,6 +18,7 @@
     SimulationRun
 
 The run layer:
+
 - [`Simulation`](@ref) — everything the next iteration needs, in one value: the domain, the
   fields at the current instant, the observables cache, the equations of motion with their
   forcing, the integration schemes with their scratch, any tracers, and the clock — built with
@@ -152,6 +153,7 @@ consumed by the domain-building form, and the domain-taking form replaces the wh
 one positional argument; the **run group** is accepted by both.
 
 The domain group:
+
 - `domain` — a pre-built `FixedDomain`: the **positional** argument of the domain-taking form,
   standing in for every other keyword of this group.
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
@@ -161,6 +163,7 @@ The domain group:
   `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step.
 
 The run group:
+
 - `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` a derived ``\\nu`` is set from;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
   and the derivation then uses `2`; the sentinel is what lets the constructor tell an omitted keyword from
@@ -173,7 +176,7 @@ The run group:
   ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
   scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
   ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
-  grid, with `scalar_dissipation` then measuring a truncated field. The package targets
+  grid, with [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) then measuring a truncated field. The package targets
   ``\\mathrm{Sc} = O(1)``, with no Batchelor-range machinery. The constructor **warns** when the
   run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — in **either**
   viscosity mode, since the check reads the resolved ``\\nu`` however it was obtained — a warning,
@@ -240,13 +243,6 @@ The run group:
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 
-!!! note "The default drives the kinetic energy to a set value, so read it as a control target"
-    `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
-    scale of ``\\mathrm{Re}_\\lambda``. It does not *impose* the value step by step as a rescale
-    does, so the fluctuation it leaves is genuine — but it is a controlled variable's fluctuation,
-    with the gain setting its amplitude. For the free fluctuation of ``k``, force with fixed
-    injection ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead.
-
 # Examples
 The two ways in, and the two ways to set the Reynolds number:
 
@@ -263,6 +259,13 @@ domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing
                      element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 1e-2)
 ```
+
+!!! note "The default drives the kinetic energy to a set value, so read it as a control target"
+    `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
+    scale of ``\\mathrm{Re}_\\lambda``. It does not *impose* the value step by step as a rescale
+    does, so the fluctuation it leaves is genuine — but it is a controlled variable's fluctuation,
+    with the gain setting its amplitude. For the free fluctuation of ``k``, force with fixed
+    injection ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead.
 
 # Fields
 Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the machinery the step runs
@@ -306,7 +309,7 @@ _materialize_forcing(f, domain::FixedDomain) = f(domain)
 # calibrated against a state the run never reaches — the docstring names the precondition, and this
 # names the violation at the one moment it is checkable (the band's shells are not recoverable from
 # a built forcing, so only what the strategy itself records is compared).
-function _warn_grid_mode_forcing_mismatch(vf::VarianceController, kinetic_energy)
+function _warn_derived_viscosity_forcing_mismatch(vf::VarianceController, kinetic_energy)
   isapprox(vf.target, kinetic_energy; rtol = 1e-8) ||
     @warn "Simulation (derived viscosity): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
           "but the velocity forcing holds target = $(vf.target). The run will settle at the " *
@@ -315,7 +318,7 @@ function _warn_grid_mode_forcing_mismatch(vf::VarianceController, kinetic_energy
   return nothing
 end
 
-function _warn_grid_mode_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
+function _warn_derived_viscosity_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
   if vf.over !== :total
     @warn "Simulation (derived viscosity): ν was calibrated assuming the run holds the WHOLE-field " *
           "k = $kinetic_energy, but this `VarianceRescaling(over = :band)` holds only the band " *
@@ -329,13 +332,13 @@ function _warn_grid_mode_forcing_mismatch(vf::VarianceRescaling, kinetic_energy)
   return nothing
 end
 
-_warn_grid_mode_forcing_mismatch(vf::NoForcing, kinetic_energy) =
+_warn_derived_viscosity_forcing_mismatch(vf::NoForcing, kinetic_energy) =
   (@warn "Simulation (derived viscosity): ν was calibrated assuming a forcing holds k = $kinetic_energy, " *
          "but the run is unforced and will decay away from that state. The derived viscosity is calibrated " *
          "on a stationary forced balance — a decaying run should set `viscosity` explicitly.";
    nothing)
 
-_warn_grid_mode_forcing_mismatch(vf::AbstractForcing, kinetic_energy) =
+_warn_derived_viscosity_forcing_mismatch(vf::AbstractForcing, kinetic_energy) =
   (@warn "Simulation (derived viscosity): ν was calibrated assuming the run holds k = $kinetic_energy, " *
          "which a $(nameof(typeof(vf))) does not hold (it drives a rate or a band, and k settles " *
          "wherever the balance puts it). The κ_max·η / Re_λ the constructor reports are then " *
@@ -417,7 +420,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                               VarianceController(domain; target = kinetic_energy) :
                               velocity_forcing, domain)
   viscosity === nothing && velocity_forcing !== nothing &&
-    _warn_grid_mode_forcing_mismatch(vf, kinetic_energy)
+    _warn_derived_viscosity_forcing_mismatch(vf, kinetic_energy)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = vf,
                     scalar_forcing = _materialize_forcing(scalar_forcing, domain))
@@ -599,10 +602,13 @@ end
 """
     advance!(sim; dt = nothing)
 
-Advance `sim` by one timestep in place and return it. Pass `dt` to force a fixed step; with
-`dt = nothing` the step is adaptive — the smallest of the advective-CFL value for the current
-velocity, the longest mode's diffusive-decay time (the same diffusive-decay bound the `Simulation`
-docstring states), and `max_dt`.
+Advance `sim` by one timestep in place and return it.
+
+The arguments are:
+- `sim` — the [`Simulation`](@ref) to advance.
+- `dt = nothing` — pass a value to force a fixed step; `nothing` picks the adaptive step, the
+  smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
+  time (the same diffusive-decay bound the `Simulation` docstring states), and `max_dt`.
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
 is readable when it returns. Advects the tracers, if any, under the run's chosen particle

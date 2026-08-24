@@ -165,7 +165,7 @@ The second form serves the particle integration schemes: it builds the
 needs, sized to the tracer set `tracers`; the `cache` argument is the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) whose
 velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample history
-it integrates over. One generic covers all three because it is
+it integrates over. One generic covers both because it is
 one concept, and because every side keeps the same separation: the evolving state holds no scheme's
 scratch.
 """
@@ -179,6 +179,7 @@ Advance the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varp
 by one timestep `dt` in place. Dispatches on the concrete `scheme` type (see `IFHeun`,
 `IFLowStorageRK3`).
 
+The arguments are:
 - `scheme` — the stateless dispatch tag naming the scheme.
 - `state` — the [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) this call
   mutates: the fields in spectral representation.
@@ -219,9 +220,8 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980) 2N-storage family —
-*Low-storage Runge–Kutta schemes*, *J. Comput. Phys.* **35**, 48–56,
-[*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). The
+Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980,
+[*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9)) 2N-storage family. The
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
 unlike [`IFHeun`](@ref).
 

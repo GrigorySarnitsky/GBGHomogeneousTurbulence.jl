@@ -187,7 +187,7 @@ representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
 integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
-(``D`` the field's diffusivity). Only a forcing declaring [`uses_steady_linear_rate`](@ref) is ever handed
+(``D`` the field's diffusivity). Only a forcing declaring `uses_steady_linear_rate` is ever handed
 a rate array, so the default method is never reached in a run; it returns `rate` untouched. The
 `field` is the start-of-step field in spectral representation; `domain` is the
 [`FixedDomain`](@ref).
@@ -373,7 +373,7 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     the rescale is applied *after* the step, which is Lie–Trotter operator splitting — the step's
     map and the rescale's map composed one after the other, a composition whose error is
     ``O(\\Delta t)`` regardless of how accurate either map is alone — so it
-    is first-order however good the scheme is. Measured on the third-order `IFLowStorageRK3`: **1.02**
+    is first-order however good the scheme is. Measured on the third-order [`IFLowStorageRK3`](@ref GBGIsotropicTurbulence.Propagator.IFLowStorageRK3): **1.02**
     here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
     (A stochastic forcing is outside that comparison — it has no classical order to lose.)
     Molecular dynamics reached the same
@@ -444,7 +444,8 @@ end
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
 Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
-variant of Lundgren 2003, *CTR Annual Research Briefs*, which carries no DOI — whose linear forcing
+variant of Lundgren (2003) — *Linearly forced isotropic turbulence*, CTR Annual Research Briefs
+(no DOI) — whose linear forcing
 acts at every wavenumber), built on the [`FixedDomain`](@ref) `domain`. The rate is folded into the
 integrating factor, so the forced band modes grow at net rate
 ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
@@ -585,13 +586,15 @@ The molecular-dynamics thermostats map the design space exactly, and **this cont
 Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984,
 [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118)), carrying that class's known caveat: the
 held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
-thermostat, whose limit here is [`VarianceRescaling`](@ref); the contrasting extended-variable class
+thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
 that restores canonical fluctuations is Nosé–Hoover
 (Nosé 1984, [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334); Hoover 1985,
 [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695)), a design this package
 does not take.
 
 # Arguments
+- `domain` — the [`FixedDomain`](@ref) the band kernel is built on (the first form; the
+  operator-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
 - `gain = 1` — the dimensionless gain ``G``. A larger gain relaxes faster; Bassenne et al. report
@@ -754,9 +757,8 @@ end
     StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 0)
 
-Stochastic forcing — Eswaran & Pope (1988), *An examination of forcing in direct numerical
-simulations of turbulence*, *Computers & Fluids* **16**, 257–278,
-[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8) — built on the
+Stochastic forcing — Eswaran & Pope (1988,
+[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8)) — built on the
 [`FixedDomain`](@ref) `domain`: each forced
 Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
 box's fundamental ``2\\pi/L`` — carries an
@@ -792,6 +794,15 @@ velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
 !!! note "The random increment is generated host-side"
     The random increment is generated host-side each step; on the GPU this is a portability-first
     choice, not yet a performance-tuned one.
+
+# Fields
+- `band` — the band-pass kernel for the noise.
+- `correlation_time`, `variance` — ``T_L`` and ``\\sigma^{2}``.
+- `rng` — the random stream, persisting across steps.
+- `state`, `noise_physical`, `noise_spectral` — the evolving force ``\\hat{\\boldsymbol{f}}`` and
+  its noise scratch, each `nothing` until first use.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is
+  derived from.
 """
 mutable struct StochasticOU{B, R, T} <: AbstractForcing
   band::B                                    # band-pass kernel for the noise
@@ -891,7 +902,8 @@ export write_forcing, read_forcing
 
 
 """
-    write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::AbstractForcing)
+    write_forcing(parent::HDF5.H5DataStore, name::AbstractString,
+                  forcing::AbstractForcing)
 
 Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
 self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an

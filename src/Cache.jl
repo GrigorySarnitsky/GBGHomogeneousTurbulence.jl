@@ -16,7 +16,8 @@ from the values the run has already computed.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
-- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
+- [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a mutation of the state or
+  of the [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers) the run advects
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
@@ -258,7 +259,7 @@ end
     velocity_at_particles(cache)
 
 The flow velocity at the particle positions, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the
-current epoch — the ``(M, 3)`` array of the velocity sampled at the position each tracer occupies at
+current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at the position each tracer occupies at
 that instant: the genuine Lagrangian velocity the statistics accumulate. Treat the returned array as
 read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. The
 checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
@@ -399,7 +400,7 @@ The run layer never calls this verb: its own tracer advance inside
 separate, history-keeping announcement — the advance *extends* the history this verb discards.
 
 A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)`(cache, tracers, u)` — from the
+`deposit!(cache, tracers, u)` — from the
 deposited velocity, so the slot is refilled at the new positions. A loop
 announcing to a bare cache rather than a `Simulation` must also call
 [`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying its own

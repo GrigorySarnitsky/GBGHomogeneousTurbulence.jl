@@ -147,7 +147,7 @@ viscosity)` — each formula at its own home; the dissipation is bitwise identic
 call, the kinetic energy equal to within summation-order roundoff (a few ulp: the single reduces
 on a threaded tree, the fused pass serially) — but the pair costs one read of the coefficients and
 one blocking device-to-host readback instead of two. Reach for it wherever both are
-wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t\\,\\varepsilon/k``
+wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t \\varepsilon/k``
 of a spin-up or budget loop, which is how
 [`StationarityCriterion`](@ref GBGIsotropicTurbulence.SimulationRun.StationarityCriterion) measures it.
 
@@ -213,13 +213,20 @@ max_speed(u) = maximum(norm, u)
 """
     vorticity_physical!(ω, û, domain, spectral_scratch)
 
-Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical representation
-into `ω`, from the velocity `û` in spectral representation — the field-valued observable the
-iteration deposits into its cache. The curl is formed as
-``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` in `spectral_scratch` (a vector field
-in spectral representation, consumed — its coefficients are undefined on return) and transformed to
-physical representation by the [`FixedDomain`](@ref) `domain`'s plans; `û` is only read, so unlike a
-pure representation recovery no preservation copy is needed. Returns `ω`.
+Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical
+representation into `ω` — the field-valued observable the iteration deposits into its cache. The
+curl is formed as ``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` in spectral
+representation and transformed to physical.
+
+The arguments are:
+- `ω` — the vector field in physical representation receiving the vorticity.
+- `û` — the velocity in spectral representation; only read, so unlike a pure representation
+  recovery no preservation copy is needed.
+- `domain` — the [`FixedDomain`](@ref) whose plans transform.
+- `spectral_scratch` — a vector field in spectral representation the curl is formed in; consumed —
+  its coefficients are undefined on return.
+
+Returns `ω`.
 
 The deposited value is read back with
 [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical), which serves the
@@ -247,10 +254,12 @@ scalar_variance(φ) = inner(φ, φ)
     scalar_dissipation(φ̂, domain, diffusivity)
 
 The mean scalar-variance dissipation rate
-``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``, from the
-scalar field in spectral representation ``\\hat\\varphi`` (the `φ̂` argument), the
-[`FixedDomain`](@ref) bundle `domain`, and the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``
-(the `diffusivity` argument).
+``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``.
+
+The arguments are:
+- `φ̂` — the scalar field in spectral representation.
+- `domain` — the [`FixedDomain`](@ref) bundle.
+- `diffusivity` — the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``.
 
 The gradient energy ``\\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle`` — the mean square of the
 scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — equals
@@ -293,8 +302,7 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
 and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
-(Betchov 1956, *An inequality concerning the production of vorticity in isotropic turbulence*,
-*J. Fluid Mech.* **1**(5), 497–504,
+(Betchov 1956,
 [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317)). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
@@ -306,22 +314,24 @@ transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangl
 ``\\langle\\det\\boldsymbol{S}\\rangle`` (the fused mapped mean over the pointwise determinant, which
 materializes no determinant field); `domain` also sizes the per-call tensor scratch.
 
-!!! note "This is the run's largest transient allocation"
-    The rank-2 strain tensor is allocated per call rather than kept resident — an occasional
-    diagnostic should not hold field-scale storage for a whole run — but while it lives it is the
-    biggest single memory episode a default configuration reaches, larger than the resident working
-    set. `warmup!` calls this every sampling interval, so a run near its memory ceiling should size
-    for the diagnostic rather than for the steady state.
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free. That pricing is the sharp-truncation one: the wider
-`PhaseShift` ball carries the same kind of residual over its larger retained band, and `HouLi`'s
+[`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi)'s
 smooth taper leaves a residual of its own shape that no bound here prices — on either, treat the
 skewness as an indicator, not an alias-controlled measurement.
+
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
 (all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an
 empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the "real turbulence yet"
 gate of the warm-up detector.
+
+!!! note "This is the run's largest transient allocation"
+    The rank-2 strain tensor is allocated per call rather than kept resident — an occasional
+    diagnostic should not hold field-scale storage for a whole run — but while it lives it is the
+    biggest single memory episode a default configuration reaches, larger than the resident working
+    set. The [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) driver calls this every sampling interval, so a run near its memory ceiling
+    should size for the diagnostic rather than for the steady state.
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
@@ -356,7 +366,7 @@ return with the reduction, so a caller needs no transfer of its own.
 Each value is the shell's energy — half the `GBGPeriodicFields` radial spectrum, which sums
 ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` — divided by the shell width
 ``\\Delta\\kappa = 2\\pi/L``, making Parseval the quadrature
-``k = \\sum_n E(\\kappa_n)\\,\\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
+``k = \\sum_n E(\\kappa_n) \\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
 integer shells hold few lattice modes, so the density estimate is correspondingly lumpy there.
 """
 function energy_spectrum(û, domain::FixedDomain)
@@ -389,7 +399,7 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 The integrals above are the idealized continuous definition, written with the spectral density
-``E(\\kappa)`` that [`energy_spectrum`](@ref) measures; they are evaluated as quadrature sums over
+``E(\\kappa)`` that `energy_spectrum` measures; they are evaluated as quadrature sums over
 the shells, the common shell width canceling in the ratio.
 
 The cancellation is exact; what is approximate is the *shell* itself: ``E_n`` is the exact sum over

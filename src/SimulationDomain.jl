@@ -57,9 +57,8 @@ abstract type DealiasingStrategy end
 """
     TwoThirds()
 
-The sharp isotropic ``2/3``-rule truncation of Orszag (1971) — *On the elimination of aliasing in
-finite-difference schemes by filtering high-wavenumber components*, *J. Atmos. Sci.* **28**, 1074,
-[*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2).
+The sharp isotropic ``2/3``-rule truncation of Orszag (1971,
+[*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2)).
 Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
@@ -71,9 +70,8 @@ struct TwoThirds <: DealiasingStrategy end
 """
     HouLi(; order = 36, strength = nothing)
 
-The smooth spectral filter of Hou & Li (2007) — *Computing nearly singular solutions using
-pseudo-spectral methods*, *J. Comput. Phys.* **226**, 379–397,
-[*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014). Each mode is multiplied
+The smooth spectral filter of Hou & Li (2007,
+[*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014)). Each mode is multiplied
 by the transfer function
 ``\\exp\\!\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
 applied isotropically in ``\\kappa``, with
@@ -109,9 +107,8 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
 """
     PhaseShift()
 
-Phase-shift dealiasing — Patterson & Orszag (1971) — *Spectral calculations of isotropic turbulence:
-efficient removal of aliasing interactions*, *Phys. Fluids* **14**, 2538–2541,
-[*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365), combined with the spherical truncation of
+Phase-shift dealiasing — Patterson & Orszag (1971,
+[*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365)), combined with the spherical truncation of
 Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble
 each quadratic nonlinear term on the grid **and** on a grid displaced by half a cell, average the
 two, and truncate spherically at
@@ -207,7 +204,8 @@ objects, each linked to its own documentation.
   with no array allocated.
 - `unit_kernel` — the constant weight ``1``, the same lazy form: the identity weight that lets a plain
   variance join a multi-weight fused reduction (one traversal answering several weighted sums at
-  once), since ``\\langle f, 1\\cdot f\\rangle`` is the variance itself.
+  once), since ``\\langle f, 1\\cdot f\\rangle`` is the mean square — the variance of a
+  mean-zero field.
 - `storage_family` — the storage family (`Array` /
   [`CuArray`](https://cuda.juliagpu.org/stable/) / `ROCArray`) the run's arrays live in — a type,
   not an array; the allocators hand it to `GBGPeriodicFields`' family-taking field constructors.
@@ -460,7 +458,8 @@ function write_domain end
 
 
 """
-    read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array) -> FixedDomain
+    read_domain(parent::HDF5.H5DataStore, name::AbstractString;
+                array_type = Array) -> FixedDomain
 
 Rebuild a [`FixedDomain`](@ref) from the group [`write_domain`](@ref) wrote — the recorded
 parameters through the ordinary constructor, so the transform plans, multipliers and kernels are

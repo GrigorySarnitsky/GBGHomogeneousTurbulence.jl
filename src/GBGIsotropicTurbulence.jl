@@ -44,6 +44,9 @@ the caller's own analysis, for which the two sibling packages supply the tools �
 and [`GBGStreamingStatistics`](https://github.com/GrigorySarnitsky/GBGStreamingStatistics.jl) the
 online estimators.
 
+A run checkpoints to HDF5 and restores from it — `write_simulation` / `read_simulation`, once the
+`HDF5` package is loaded.
+
 Built on `GBGPeriodicFields`.
 
 The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary

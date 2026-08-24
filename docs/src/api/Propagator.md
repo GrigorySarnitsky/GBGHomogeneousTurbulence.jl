@@ -23,6 +23,9 @@ a step allocates no field-sized memory.
 
 ```@docs
 IntegratorBuffers
+```
+
+```@docs
 allocate_buffers
 ```
 

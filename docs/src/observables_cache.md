@@ -328,8 +328,8 @@ reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
-with `history_depth` ``> 1`` it keeps a bounded ring of **past** velocity samples —
-`history_depth` ``- 1`` further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
+with `history_depth` above 1 it keeps a bounded ring of **past** velocity samples —
+`history_depth` minus one further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
 integrates over and an out-of-band reposition discards (`particles_modified!`). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
 latest deposit, and it exists here rather than in the scheme's registers because the object that
@@ -416,7 +416,8 @@ particle positions — a cached read like the fields' — and [`interpolate_at_p
 particle positions.
 
 ```julia
-domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π,
+                     dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration
 
 # With tracers, the cache allocates the velocity-at-particles slot, sized by the count.

@@ -91,6 +91,16 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 `kinetic_energy`. The Leray–Helmholtz projection ``\\mathbb{P}`` enforces
 ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
+The arguments are:
+- `û` — the velocity field in spectral representation to fill.
+- `domain` — the [`FixedDomain`](@ref) the field is generated on.
+- `kinetic_energy` — the kinetic energy the seeded field is rescaled to.
+- `envelope_wavenumber` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
+  default branch below); inert when `initial_spectrum` is given.
+- `initial_spectrum = nothing` — a target radial energy spectrum ``\\kappa \\mapsto E(\\kappa)``
+  (the second branch below).
+- `rng = default_rng()` — the random stream.
+
 By default (`initial_spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian
 envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
 amplitudes, zeroed at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` so the mean mode stays empty; its
@@ -104,14 +114,11 @@ pre-rescale seed into shells the mask holds empty, and no guard checks this.
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy
 spectrum, to seed that shape instead — e.g. a von Kármán or Pope form from the
 [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model spectra, which the run
-layer can wire in for you (`Simulation` forwards its `initial_spectrum` keyword here). Each mode is
+layer can wire in for you ([`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) forwards its `initial_spectrum` keyword here). Each mode is
 scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed spectrum is
 ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` and the overall amplitude is fixed by
 the `kinetic_energy` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
 carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}``.
-
-The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
-stream (defaults to `Random.default_rng()`).
 
 Returns `û`.
 
@@ -186,6 +193,16 @@ requested `scalar_variance`. The mean vanishes by construction: the envelope is 
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 
+The arguments are:
+- `φ̂` — the scalar field in spectral representation to fill.
+- `domain` — the [`FixedDomain`](@ref) the field is generated on.
+- `scalar_variance` — the variance the seeded field is rescaled to.
+- `envelope_wavenumber` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
+  default branch below); inert when `initial_spectrum` is given.
+- `initial_spectrum = nothing` — a target radial scalar-variance spectrum
+  ``\\kappa \\mapsto E_\\varphi(\\kappa)`` (the second branch below).
+- `rng = default_rng()` — the random stream.
+
 By default (`initial_spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian
 envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
 amplitudes — zeroed, as above, at the origin — whose characteristic wavenumber ``\\kappa_p`` is
@@ -202,9 +219,6 @@ scalar-variance spectrum, to seed that shape instead — e.g. an Obukhov–Corrs
 shell-summed spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the
 `scalar_variance` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
 carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}``.
-
-The `domain` (a [`FixedDomain`](@ref)) is what the field is generated on; the `rng` is the random
-stream (defaults to `Random.default_rng()`).
 
 Returns `φ̂`.
 
