@@ -218,7 +218,7 @@ the rest are forwarded to the `Simulation(domain; …)` form.
   [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
 - `number_of_particles = 0`, `interpolation_scheme = CatmullRom`, `unwrapped = false` — the number
   of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions, and
-  whether to also track the winding-preserving unwrapped record (read with
+  whether to also track the winding-preserving unwrapped positions (read with
   [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
   mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
 - `trajectory_scheme = EndpointHeun()` — the scheme that advances the trajectories in time, an

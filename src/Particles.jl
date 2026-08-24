@@ -19,7 +19,7 @@
 Lagrangian particle tracking — today the massless tracer:
 
 - [`Tracers`](@ref) — the tracer set (positions, a selectable `interpolation_scheme`, and an
-  opt-in unwrapped record read by [`unwrapped_positions`](@ref));
+  opt-in unwrapped positions read by [`unwrapped_positions`](@ref));
   [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The trajectory
   velocities are read from the run's observables cache through
   [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities).
@@ -83,8 +83,8 @@ smoothness parameters.
 - `number_of_particles` — seed this many tracers uniformly at random in the box.
 - `positions` — or copy this `PointSet` in instead; give exactly one of the two.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
-- `unwrapped = false` — also track the winding-preserving record [`unwrapped_positions`](@ref)
-  serves; the wrapped positions stay the dynamical state either way.
+- `unwrapped = false` — also track the winding-preserving unwrapped positions
+  [`unwrapped_positions`](@ref) serves; the wrapped positions stay the dynamical state either way.
 - `rng` — the random stream seeding the positions (used with `number_of_particles`, ignored with
   `positions`); defaults to `Random.default_rng()`.
 
@@ -120,8 +120,8 @@ advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
 which read the tracer set directly; `unwrapped = true` additionally tracks the winding-preserving
-record [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical state either
-way. The velocities are the exception, and deliberately so: they are a
+unwrapped positions [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical
+state either way. The velocities are the exception, and deliberately so: they are a
 *deposited observable* rather than tracer state, so they are read from the run's observables cache
 through
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the
@@ -142,7 +142,7 @@ The trajectory scheme's own working storage is **not** here: it lives in a
   read it through
   `particle_velocities`, which serves it only when current, and treat it as read-only, since the tracer advance writes here mid-iteration.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
-- `unwrapped_points` — the opt-in unwrapped record (`unwrapped = true`) as a `PointSet`, advanced
+- `unwrapped_points` — the opt-in unwrapped positions (`unwrapped = true`) as a `PointSet`, advanced
   by every push with the same displacement terms but never reduced to the box; `nothing` when
   untracked. Read it through `unwrapped_positions`.
 """
@@ -150,7 +150,7 @@ struct Tracers{PSX, VV, S, UP}
   position_points::PSX      # PointSet — the (always wrapped) dynamical state; the ONE storage
   particle_velocities::VV   # VectorPointValues: u at the occupied positions — the Lagrangian sample
   interpolation_scheme::S
-  unwrapped_points::UP      # PointSet (the opt-in unwrapped record, winding kept), or nothing
+  unwrapped_points::UP      # PointSet (the opt-in unwrapped positions, winding kept), or nothing
 end
 
 
@@ -642,21 +642,21 @@ particle_positions(tracers::Tracers) = point_coordinates(tracers.position_points
 
 The `(M, 3)` array of **unwrapped** tracer positions — the trajectory with its winding kept, each
 coordinate the literal sum of every displacement since seeding, never reduced to the periodic box.
-This is the record a mean-square-displacement or dispersion diagnostic needs: those are functions
+These are the positions a mean-square-displacement or dispersion diagnostic needs: those are functions
 of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped positions cannot supply across a
-crossing. Accumulating such statistics over the record is the caller's analysis.
+crossing. Accumulating such statistics over them is the caller's analysis.
 
-The record exists only when the tracer set was built with `unwrapped = true`; reading an untracked
+The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading an untracked
 set throws an `ArgumentError`. The wrapped [`particle_positions`](@ref) remain the dynamical state
 either way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
-absolute floating-point resolution, while this record only ever feeds differences, whose *relative*
+absolute floating-point resolution, while the unwrapped positions only ever feed differences, whose *relative*
 accuracy the growth does not touch. An announced reposition
 ([`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) on a run) restarts
-the record at the new positions: winding is a property of the trajectory just abandoned.
+the unwrapped positions at the wrapped ones: winding is a property of the trajectory just abandoned.
 """
 function unwrapped_positions(tracers::Tracers)
   tracers.unwrapped_points === nothing &&
-    throw(ArgumentError("this tracer set carries no unwrapped record: build it with " *
+    throw(ArgumentError("this tracer set carries no unwrapped positions: build it with " *
                         "`unwrapped = true` (a `Tracers` keyword, forwarded by `Simulation`) " *
                         "to track winding alongside the wrapped positions"))
   return point_coordinates(tracers.unwrapped_points)
