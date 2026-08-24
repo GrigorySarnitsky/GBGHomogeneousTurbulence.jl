@@ -58,14 +58,12 @@ export Tracers, AbstractParticleIntegrator, EndpointHeun, AdamsBashforth,
 
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
-Give **exactly one** of `number_of_particles`, which seeds that many tracers uniformly at random in
-the periodic box, or `positions`, a `GBGPeriodicFields`
-[`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) of tracer positions
-(build one from an `(M, 3)` array — columns the ``x, y, z`` components — with `PointSet(array)`),
-copied to `domain`'s backend and element type. Supplying both, or neither, raises an
-`ArgumentError` — as does a raw array where the `PointSet` is expected: coordinates cross into the
-package only through the `GBGPeriodicFields` point types, and a caller who needs the bare array
-back extracts it with that package's accessors.
+Give **exactly one** of the two. `number_of_particles` seeds that many tracers uniformly at random
+in the periodic box. `positions` supplies the tracer positions as a `GBGPeriodicFields`
+[`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet), copied to `domain`'s
+backend and element type. Supplying both, or neither, raises an `ArgumentError`, and so does a raw
+array in place of the `PointSet`: coordinates cross into the package only through the
+`GBGPeriodicFields` point types.
 
 The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
 sampled field — at the tracer positions.
