@@ -10,29 +10,29 @@
 # step (tₙ and tₙ₊₁), unlike advecting on the frozen start-of-step velocity (effectively first
 # order). Its two velocity fields are exactly what the field solver already produces each step, so
 # the tracer advance stays decoupled from the field Runge–Kutta internals. A higher-order scheme would
-# want different registers (RK4 several stage velocities; a multistep scheme a velocity HISTORY and
-# no predictor at all) — which is precisely why they are not in `Tracers`.
+# want different registers (RK4 several stage velocities; a multistep scheme only host weight
+# scratch, its sample history living in the cache) — which is precisely why they are not in `Tracers`.
 
 """
     Particles
 
 Lagrangian particle tracking — today the massless tracer:
 
-- [`Tracers`](@ref) — the tracer set (positions, a selectable `interpolation_scheme`, and an
+- [`Tracers`](@ref) — the tracer set (positions, a selectable interpolation scheme, and an
   opt-in unwrapped positions read by [`unwrapped_positions`](@ref));
   [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The velocity
   at the particles is read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
   [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
-  per-step storage a scheme needs, and [`history_depth`](@ref) the
-  sample-history length a scheme requires.
+  per-step storage a scheme needs, and [`history_depth`](@ref) the length of the
+  velocity-at-particles history a scheme requires.
 - [`record_velocity_at_particles!`](@ref) — store the flow velocity at the tracers' current positions,
   which is both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
-  [`new_scalar_point_values`](@ref) allocate its `out` buffers.
+  [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
 """
 module Particles
 
