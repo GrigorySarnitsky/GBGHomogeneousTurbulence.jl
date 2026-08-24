@@ -1,4 +1,5 @@
 using Test, Random, GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "allocate_buffers rejects a cache whose sample history is too short for the scheme" begin
@@ -11,7 +12,7 @@ using GBGPeriodicFields: field_data, CatmullRom
 
   scheme = AdamsBashforth(order = 4)              # needs history_depth(scheme) == 4
   # A hand-assembled run that forgets `history_depth` gets the default 1 — no past slots at all.
-  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
   @test history_depth(scheme) == 4
   @test length(cache.velocity_at_particles_history) == 0
 

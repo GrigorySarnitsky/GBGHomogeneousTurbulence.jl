@@ -3,6 +3,7 @@
 # audits pin (four (M, 3) arrays, Heun) beside what a front-door `AdamsBashforth` run
 # actually holds, using the audits' own reflective walk.
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 using GBGPeriodicFields: CatmullRom
 using Random
 
@@ -24,7 +25,7 @@ m_arrays(owner) = (acc = AbstractArray[];
 # What the audit's testset pins, verbatim (test/memory_audit.jl:321-333).
 tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                   rng = MersenneTwister(1))
-cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
 heun_buffers = allocate_buffers(Heun(), tracers, cache)
 println("audit-pinned:      tracers=", length(m_arrays(tracers)),
         " buffers=", length(m_arrays(heun_buffers)),

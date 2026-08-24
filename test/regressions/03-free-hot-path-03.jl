@@ -15,8 +15,9 @@
 # the current outcome: silent, finite-looking zeros.
 
 using Test, Random
+using GBGPeriodicFields: point_coordinates, npoints
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Particles: Heun, advect!, particle_positions
+using GBGIsotropicTurbulence.Particles: Heun, advect!
 using GBGIsotropicTurbulence.Propagator: allocate_buffers
 using GBGPeriodicFields: field_data, PointSet
 using GBGPeriodicFields.Interpolation: CatmullRom
@@ -31,7 +32,7 @@ function poisoned_step(poison)
   field_data(u) .= poison
   tracers = Tracers(domain; positions = PointSet([1.0 2.0 3.0; 0.5 0.5 0.5]),
                     interpolation_scheme = CatmullRom)
-  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
   buffers = allocate_buffers(Heun(), tracers, cache)
   deposit!(cache, tracers, u)
   try
@@ -39,7 +40,7 @@ function poisoned_step(poison)
   catch err
     return (:rejected, err)
   end
-  return (:ok, copy(Array(particle_positions(tracers))))
+  return (:ok, copy(Array(point_coordinates(tracers.positions))))
 end
 
 
@@ -65,7 +66,7 @@ end
     rejected = false
     try
       advance!(sim; dt = 0.01)
-      X = copy(Array(particle_positions(sim.tracers)))
+      X = copy(Array(point_coordinates(sim.tracers.positions)))
     catch err
       rejected = true
     end

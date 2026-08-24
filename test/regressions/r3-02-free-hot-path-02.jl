@@ -8,6 +8,7 @@
 # `deposit!` — is the only sequence a user is told to run.
 
 using Test
+using GBGPeriodicFields: point_coordinates
 using Random: MersenneTwister
 using GBGIsotropicTurbulence
 
@@ -33,7 +34,7 @@ end
   a = warmed_run(3)
   b = warmed_run(3)
   @test a.cache.history_filled == 3                       # AB4 is past its bootstrap
-  @test particle_positions(a.tracers) == particle_positions(b.tracers)
+  @test point_coordinates(a.tracers.positions) == point_coordinates(b.tracers.positions)
 
   announced_reseed!(a)                                    # the documented protocol, nothing more
   announced_reseed!(b)
@@ -42,7 +43,7 @@ end
   advance!(a; dt = 2e-3)
   advance!(b; dt = 2e-3)
 
-  Xa, Xb = particle_positions(a.tracers), particle_positions(b.tracers)
+  Xa, Xb = point_coordinates(a.tracers.positions), point_coordinates(b.tracers.positions)
   @info "witness" history_after_reseed_a = a.cache.history_filled max_difference = maximum(abs, Xa .- Xb)
   # The invariant: the update after an announced reseed may depend only on post-reseed measurements,
   # so discarding the pre-reseed history must change nothing.

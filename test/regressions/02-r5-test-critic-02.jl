@@ -10,6 +10,7 @@
 # the guard line and part (1) fails; check the wrong epoch there and part (1) fails too.
 
 using Test, Random, GBGIsotropicTurbulence
+using GBGPeriodicFields: point_coordinates
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
                      rng = MersenneTwister(1))
@@ -29,7 +30,7 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   sim = build()
   advance!(sim; dt = 0.01)
   L = sim.domain.grid.domain_size[1]
-  X = particle_positions(sim.tracers)
+  X = point_coordinates(sim.tracers.positions)
   X .= mod.(X .+ 0.3, L)
   particles_modified!(sim)
   step_before = current_step(sim)

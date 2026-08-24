@@ -15,6 +15,7 @@
 # — a message naming a configuration the user never asked for, and not naming the keyword at fault.
 
 using Test, Random, GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 
 @testset "a negative `number_of_particles` is rejected at construction, not read as zero" begin
   build(n) = Simulation(; grid_points_per_axis = 8, viscosity = 0.1,
@@ -25,5 +26,5 @@ using Test, Random, GBGIsotropicTurbulence
 
   # The neighbouring cases must keep working exactly as before.
   @test build(0).tracers === nothing                        # zero honestly means "no tracers"
-  @test number_of_particles(build(4).tracers) == 4          # a positive count seeds that many
+  @test npoints(build(4).tracers.positions) == 4            # a positive count seeds that many
 end

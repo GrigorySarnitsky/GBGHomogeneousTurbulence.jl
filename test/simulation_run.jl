@@ -4,6 +4,7 @@
 # it; and the bring-your-own-domain constructor and fixed-`dt` `advance!` work.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: point_coordinates
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
@@ -48,7 +49,7 @@ using Test
     end
     @test !isempty(samples) && all(isfinite, samples)          # the cadenced observation fired
     @test current_time(sim) ≥ t0 + 0.3
-    @test all(0 .<= particle_positions(sim.tracers) .< L)        # tracers advected, still in the box
+    @test all(0 .<= point_coordinates(sim.tracers.positions) .< L)        # tracers advected, still in the box
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && isfinite(scalar_variance(sim.state.scalar_spectral))
   end
 

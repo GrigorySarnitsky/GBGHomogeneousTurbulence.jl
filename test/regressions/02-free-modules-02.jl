@@ -9,6 +9,7 @@
 # on either half fails here, not just in PF's own suite.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet,
                          PointSet, wrap!, point_coordinates
 using Test
@@ -49,7 +50,7 @@ using Test
 
     X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
     buffers = allocate_buffers(Heun(), tracers, cache)
 
     field_data(u) .= NaN                       # the ordinary blow-up mode of an over-stepped run
@@ -63,6 +64,6 @@ using Test
       threw = true
     end
     # either the push refuses the non-finite state, or the corruption stays visible downstream
-    @test threw || !all(isfinite, particle_positions(tracers))
+    @test threw || !all(isfinite, point_coordinates(tracers.positions))
   end
 end

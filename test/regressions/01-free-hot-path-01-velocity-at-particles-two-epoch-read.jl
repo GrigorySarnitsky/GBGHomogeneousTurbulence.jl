@@ -20,6 +20,7 @@
 # and the run layer's opening guard fires.
 
 using Test
+using GBGPeriodicFields: point_coordinates
 using Random
 using GBGIsotropicTurbulence
 
@@ -37,7 +38,7 @@ using GBGIsotropicTurbulence
 
   # An out-of-band reposition, announced through the sanctioned verb. The state is untouched; the
   # positions the sample belongs to are abandoned.
-  particle_positions(sim.tracers) .= 0.5 .* particle_positions(sim.tracers)
+  point_coordinates(sim.tracers.positions) .= 0.5 .* point_coordinates(sim.tracers.positions)
   particles_modified!(sim)
   @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch          # fields did not move
   @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch    # positions did

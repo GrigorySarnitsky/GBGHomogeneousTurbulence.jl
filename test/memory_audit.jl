@@ -37,6 +37,7 @@
 # real_spectral_scalar ≈ ½·(1+1/N) — the shape |κ|², the de-alias mask and a forcing rate all share.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); audited for the re-add
 using GBGPeriodicFields: field_data, CatmullRom
 using Random
@@ -358,7 +359,7 @@ const EPISODE_UNITS = [
                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);
                        [a for a in acc if size(a) == (4, 3)])
     for K in (1, 2, 4, 8)
-      cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
+      cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
                                history_depth = K)
       buffers = allocate_buffers(AdamsBashforth(order = K), tracers, cache)
       @test length(cache.velocity_at_particles_history) == K - 1     # the whole of the order's cost

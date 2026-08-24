@@ -17,9 +17,7 @@ Tracers
 ```
 
 ```@docs
-particle_positions
 unwrapped_positions
-number_of_particles
 ```
 
 ## The particle integration scheme
@@ -79,7 +77,7 @@ sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
 warmup!(sim)
 advance!(sim)
 
-particle_positions(sim.tracers)              # (M, 3) positions at the current instant
+point_coordinates(sim.tracers.positions)     # (M, 3) positions, via the field library
 velocity_at_particles(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
 out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
 interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)

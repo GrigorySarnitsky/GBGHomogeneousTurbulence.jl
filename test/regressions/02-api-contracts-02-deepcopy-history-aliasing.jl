@@ -14,6 +14,7 @@
 # AMDGPU's `ROCArray`); the GPU half of this witness lives beside it and needs a CUDA environment.
 
 using Test, Random
+using GBGPeriodicFields: npoints
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
 
@@ -27,7 +28,7 @@ using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
                        dealiasing = TwoThirds(), array_type = Array)
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
-  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
+  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
                            history_depth = K)
   past = cache.velocity_at_particles_history
   @test length(past) == K - 1

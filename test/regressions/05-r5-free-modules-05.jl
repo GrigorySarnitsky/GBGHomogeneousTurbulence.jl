@@ -3,6 +3,7 @@
 # not a raw `BoundsError` from the cache's history vector, and not a silent wrong-order run.
 
 using Test, Random
+using GBGPeriodicFields: npoints
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data, CatmullRom, point_values
 
@@ -15,7 +16,7 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
   # --- forward mismatch: buffers for order 2, driven at order 4 -------------------------------
   tracers = Tracers(domain; number_of_particles = 6, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
-  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
+  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
                            history_depth = 2)
   buffers = allocate_buffers(AdamsBashforth(order = 2), tracers, cache)
 
@@ -29,7 +30,7 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
   # --- reverse mismatch: buffers for order 4, driven at order 2 -------------------------------
   tracers2 = Tracers(domain; number_of_particles = 6, interpolation_scheme = CatmullRom,
                      rng = MersenneTwister(1))
-  cache2 = ObservablesCache(domain; number_of_particles = number_of_particles(tracers2),
+  cache2 = ObservablesCache(domain; number_of_particles = npoints(tracers2.positions),
                             history_depth = 4)
   buffers2 = allocate_buffers(AdamsBashforth(order = 4), tracers2, cache2)
 

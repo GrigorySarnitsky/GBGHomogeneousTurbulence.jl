@@ -1,10 +1,11 @@
 # Witness: the `AdamsBashforth` docstring promises "the same restart happens if the tracers are
-# reseeded" — after a hand-written reseed of `particle_positions(tracers)` (the pattern `particles_modified!`
+# reseeded" — after a hand-written reseed of `point_coordinates(tracers.positions)` (the pattern `particles_modified!`
 # sanctions: "a reseed, a hand-written correction, any direct write to the tracer storage"), the
 # scheme must fall back to the `Heun` startup instead of blending Lagrangian samples taken
 # along the *old*, pre-reseed trajectory into the *new* one.
 
 using Test
+using GBGPeriodicFields: point_coordinates, npoints
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 
@@ -38,7 +39,7 @@ end
   tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an
   # independent integrator needs its own cache to hold its own history. The assertion is unchanged.
-  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
+  cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
                            history_depth = history_depth(scheme))
   buffers = allocate_buffers(scheme, tracers, cache)
 
@@ -55,20 +56,20 @@ end
   # `particles_modified!` is the announcement, and the sibling witness 03-state-machine-03 tests the
   # announced path. Adding the announcement here makes this test the contract rather than a stronger
   # claim no design satisfies.
-  copyto!(particle_positions(tracers), X1)
+  copyto!(point_coordinates(tracers.positions), X1)
   particles_modified!(cache)
   deposit!(cache, tracers, u0)
   @test cache.history_filled == 0                         # the promised restart: no history to reuse
 
   advect!(scheme, tracers, u1, domain, buffers, dt)
-  reseeded = copy(particle_positions(tracers))
+  reseeded = copy(point_coordinates(tracers.positions))
 
   # The behaviour the docstring promises: an `Heun` startup step from the new positions.
   reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
-  reference_cache = ObservablesCache(domain; number_of_particles = number_of_particles(reference))
+  reference_cache = ObservablesCache(domain; number_of_particles = npoints(reference.positions))
   heun = allocate_buffers(Heun(), reference, reference_cache)
   deposit!(reference_cache, reference, u0)
   advect!(Heun(), reference, u1, domain, heun, dt)
 
-  @test reseeded ≈ particle_positions(reference)
+  @test reseeded ≈ point_coordinates(reference.positions)
 end

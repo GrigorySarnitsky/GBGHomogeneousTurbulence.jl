@@ -492,7 +492,8 @@ Over it:
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
-  `particle_positions(sim.tracers)`. 
+  `point_coordinates(sim.tracers.positions)` (decision 72: the raw view is `GBGPeriodicFields`'
+  own accessor, not a forwarding method of this package). 
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) the
   current-state diagnostics, for a callback to read.
@@ -2234,6 +2235,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     internal names shed the bare "sample" the user flagged as undescriptive (`sample_steps` →
     `history_steps`, the slot's epoch pair → `velocity_at_particles_fields_epoch` /
     `velocity_at_particles_particles_epoch`).
+
+72. **(2026-08, user-directed) The container principle reaches the tracer set: the forwarding
+    accessors are retired, and the position fields are named for their content.**
+    `particle_positions` and `number_of_particles` were pure forwarding — one-line compositions of
+    `GBGPeriodicFields`' `point_coordinates` / `npoints` over the position storage — surviving from
+    the era when `Tracers` held raw arrays. They contradicted two recorded rulings at once:
+    decision 66's *"if one needs pure arrays, he calls PF machinery"* (each baked a raw-array
+    extraction into this package's surface) and decision 49's container-not-reading-surface
+    principle, under which an accessor earns its place only by enforcing a contract. Both are
+    deleted; a caller reads `tracers.positions` and applies the field library's own accessors.
+    `unwrapped_positions` stays as the one guarded read — the opt-in slot with the named
+    `ArgumentError` — and now returns the **`PointSet`**, keeping the PF-typed boundary on output
+    exactly as decision 66 fixed it on input; the raw view is one `point_coordinates` away. The
+    fields shed the `_points` suffix, a fossil of the pre-66 dual-field era in which
+    `position_points` disambiguated the `PointSet` wrapper from its raw `positions` sibling: with
+    one storage per concept the fields are `positions` / `unwrapped_positions`, named for content,
+    not for type.
 
 ## References
 

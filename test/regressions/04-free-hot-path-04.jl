@@ -8,6 +8,7 @@
 # hazard in this subsystem takes), not a `BoundsError` from library internals on a later `advect!`.
 
 using Test, Random
+using GBGPeriodicFields: npoints
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: field_data, CatmullRom
 
@@ -22,7 +23,7 @@ using GBGPeriodicFields: field_data, CatmullRom
   make = () -> begin
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom,
                       rng = MersenneTwister(1))
-    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
     (tracers, cache)                          # history_depth defaults to 1 ⇒ zero past slots
   end
 

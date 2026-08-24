@@ -19,8 +19,8 @@
 Lagrangian particle tracking — today the massless tracer:
 
 - [`Tracers`](@ref) — the tracer set (positions, a selectable interpolation scheme, and an
-  opt-in unwrapped positions read by [`unwrapped_positions`](@ref));
-  [`particle_positions`](@ref) and [`number_of_particles`](@ref) read its state. The velocity
+  opt-in unwrapped positions read by [`unwrapped_positions`](@ref)); its state is `PointSet`s,
+  read directly and unwrapped to raw arrays by `GBGPeriodicFields`' own accessors. The velocity
   at the particles is read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
@@ -48,7 +48,7 @@ import ..Propagator: allocate_buffers, deposit!
 export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
        ParticleIntegratorBuffers,
        advect!, restart!, history_depth, interpolate_at_particles!,
-       particle_positions, unwrapped_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
+       unwrapped_positions, new_vector_point_values, new_scalar_point_values
 
 
 """
@@ -99,7 +99,7 @@ iterations:
 sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
 advance!(sim)
 
-X = particle_positions(sim.tracers)         # the (M, 3) positions at this instant
+X = point_coordinates(sim.tracers.positions)   # the (M, 3) positions, via the field library
 v = velocity_at_particles(sim.cache)          # u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
 
 out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
@@ -112,15 +112,17 @@ by hand — takes the `positions` form, and then the scheme's per-step storage i
 ```julia
 tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
                   interpolation_scheme = CatmullRom)
-cache   = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+cache   = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
 buffers = allocate_buffers(Heun(), tracers, cache)
 
 deposit!(cache, tracers, u)                 # u(tₙ) at the current positions — do this first
 advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
-Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
-which read the tracer set directly; `unwrapped = true` additionally tracks the winding-preserving
+Read the particle state off the fields directly — the positions are
+[`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)s, and raw arrays and
+counts come from `GBGPeriodicFields`' `point_coordinates` and `npoints`, never from accessors of
+this package. `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: read them from the
 run's observables cache through
@@ -131,19 +133,19 @@ The particle integration scheme's own working storage is **not** here: it lives 
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 
 # Fields
-- `position_points` — the tracer positions, as the
+- `positions` — the tracer positions, as the
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) every operation takes:
   the one storage, always wrapped — the dynamical state. `particle_positions` serves its `(M, 3)`
   matrix view.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
-- `unwrapped_points` — the opt-in unwrapped positions (`unwrapped = true`) as a `PointSet`, advanced
+- `unwrapped_positions` — the opt-in unwrapped positions (`unwrapped = true`) as a `PointSet`, advanced
   by every push with the same displacement terms but never reduced to the box; `nothing` when
   untracked. Read it through `unwrapped_positions`.
 """
 struct Tracers{PSX, S, UP}
-  position_points::PSX      # PointSet — the (always wrapped) dynamical state; the ONE storage
+  positions::PSX      # PointSet — the (always wrapped) dynamical state; the ONE storage
   interpolation_scheme::S
-  unwrapped_points::UP      # PointSet (the opt-in unwrapped positions, winding kept), or nothing
+  unwrapped_positions::UP      # PointSet (the opt-in unwrapped positions, winding kept), or nothing
 end
 
 
@@ -301,7 +303,7 @@ function _allocate_particle_buffers(tracers::Tracers, cache::ObservablesCache, o
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set — the sample the push " *
                         "consumes is the cache's observable, not tracer state"))
-  predictor = similar(point_coordinates(tracers.position_points))
+  predictor = similar(point_coordinates(tracers.positions))
   return ParticleIntegratorBuffers(predictor, PointSet(predictor),
                                    VectorPointValues(similar(predictor)), cache,
                                    zeros(Float64, order), zeros(Float64, order))
@@ -451,7 +453,7 @@ end
 
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real) where {K}
-  T = real(eltype(point_coordinates(tracers.position_points)))
+  T = real(eltype(point_coordinates(tracers.positions)))
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
   # basis divides by the node differences — so the next warmed-up step divides by zero and returns
@@ -489,9 +491,9 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
     # when tracked, takes the identical terms through the grid-free form.
     terms = ((T(b[1]), cache.velocity_at_particles),
              ntuple(j -> (T(b[j + 1]), past[j]), K - 1)...)
-    displace!(tracers.position_points, domain.grid, terms...)
-    tracers.unwrapped_points === nothing ||
-      displace!(tracers.unwrapped_points, terms...)
+    displace!(tracers.positions, domain.grid, terms...)
+    tracers.unwrapped_positions === nothing ||
+      displace!(tracers.unwrapped_positions, terms...)
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -521,7 +523,7 @@ function deposit!(cache::ObservablesCache, tracers::Tracers, u)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set"))
-  interpolate!(cache.velocity_at_particles, u, tracers.position_points, tracers.interpolation_scheme)
+  interpolate!(cache.velocity_at_particles, u, tracers.positions, tracers.interpolation_scheme)
   deposit_velocity_at_particles!(cache)
   return cache
 end
@@ -566,10 +568,10 @@ function advect! end
 
 function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real)
-  Δt = real(eltype(point_coordinates(tracers.position_points)))(dt)
+  Δt = real(eltype(point_coordinates(tracers.positions)))(dt)
   # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
   v₁ = buffers.cache.velocity_at_particles
-  displace!(buffers.predictor_points, tracers.position_points, domain.grid,
+  displace!(buffers.predictor_points, tracers.positions, domain.grid,
             (Δt, v₁))
   # v₂ is evaluated at the PREDICTOR positions and is a stage register, never the deposited velocity sample —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
@@ -577,12 +579,12 @@ function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
   # the thing you measure).
   interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points, tracers.interpolation_scheme)
   # The corrector: one fused two-term displacement, wrap included.
-  displace!(tracers.position_points, domain.grid,
+  displace!(tracers.positions, domain.grid,
             (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
   # The unwrapped positions take the SAME terms through the grid-free form: winding kept, and the
   # two records share the displacement by construction.
-  tracers.unwrapped_points === nothing ||
-    displace!(tracers.unwrapped_points,
+  tracers.unwrapped_positions === nothing ||
+    displace!(tracers.unwrapped_positions,
               (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
   return tracers
 end
@@ -599,52 +601,38 @@ a field is gathered along the trajectories; what is then accumulated over those 
 caller's own analysis.
 """
 function interpolate_at_particles!(out, field, tracers::Tracers)
-  interpolate!(out, field, tracers.position_points, tracers.interpolation_scheme)
+  interpolate!(out, field, tracers.positions, tracers.interpolation_scheme)
   return out
 end
 
 
 """
-    particle_positions(tracers)
-
-The `(M, 3)` array of current tracer positions — the probes' own state, read off the tracer set
-`tracers`.
-"""
-particle_positions(tracers::Tracers) = point_coordinates(tracers.position_points)
-
-
-"""
     unwrapped_positions(tracers)
 
-The `(M, 3)` array of **unwrapped** tracer positions — the trajectory with its winding kept, each
-coordinate the literal sum of every displacement since seeding, never reduced to the periodic box.
-These are the positions a mean-square-displacement or dispersion diagnostic needs: those are functions
-of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped positions cannot supply across a
-crossing. Accumulating such statistics over them is the caller's analysis.
+The **unwrapped** tracer positions, as a
+[`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) — the trajectory with its
+winding kept, each coordinate the literal sum of every displacement since seeding, never reduced to
+the periodic box. These are the positions a mean-square-displacement or dispersion diagnostic
+needs: those are functions of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped
+positions cannot supply across a crossing. Accumulating such statistics over them — on the raw
+`(M, 3)` array `GBGPeriodicFields`' `point_coordinates` extracts — is the caller's analysis.
 
-The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading an untracked
-set throws an `ArgumentError`. The wrapped [`particle_positions`](@ref) remain the dynamical state
-either way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
-absolute floating-point resolution, while the unwrapped positions only ever feed differences, whose *relative*
-accuracy the growth does not touch. An announced reposition
+The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading
+an untracked set throws an `ArgumentError` (which is why this checked read exists where the plain
+state is read off the fields directly). The wrapped positions remain the dynamical state either
+way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
+absolute floating-point resolution, while the unwrapped positions only ever feed differences,
+whose *relative* accuracy the growth does not touch. An announced reposition
 ([`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) on a run) restarts
 the unwrapped positions at the wrapped ones: winding is a property of the trajectory just abandoned.
 """
 function unwrapped_positions(tracers::Tracers)
-  tracers.unwrapped_points === nothing &&
+  tracers.unwrapped_positions === nothing &&
     throw(ArgumentError("this tracer set carries no unwrapped positions: build it with " *
                         "`unwrapped = true` (a `Tracers` keyword, forwarded by `Simulation`) " *
                         "to track winding alongside the wrapped positions"))
-  return point_coordinates(tracers.unwrapped_points)
+  return tracers.unwrapped_positions
 end
-
-
-"""
-    number_of_particles(tracers)
-
-The number of tracers ``M`` in the tracer set `tracers`.
-"""
-number_of_particles(tracers::Tracers) = npoints(tracers.position_points)
 
 
 """
@@ -654,7 +642,7 @@ Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Poi
 shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the velocity at the particle positions.
 """
-new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_coordinates(tracers.position_points)))
+new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_coordinates(tracers.positions)))
 
 """
     new_scalar_point_values(tracers)
@@ -664,9 +652,9 @@ length ``M`` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` at the particle positions.
 """
 new_scalar_point_values(tracers::Tracers) =
-  ScalarPointValues(similar(point_coordinates(tracers.position_points),
-                            eltype(point_coordinates(tracers.position_points)),
-                            npoints(tracers.position_points)))
+  ScalarPointValues(similar(point_coordinates(tracers.positions),
+                            eltype(point_coordinates(tracers.positions)),
+                            npoints(tracers.positions)))
 
 
 end # module Particles

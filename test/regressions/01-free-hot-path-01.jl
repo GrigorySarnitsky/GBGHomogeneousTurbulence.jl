@@ -7,6 +7,7 @@
 # that instruction after reseeding tracers must not get a `MethodError`.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: point_coordinates
 using GBGIsotropicTurbulence.Cache: particles_modified!
 using Random
 using Test
@@ -28,7 +29,7 @@ using Test
   @test sim.cache.history_filled == K - 1        # precondition: steady multistep operation
 
   L = sim.domain.grid.domain_size[1]
-  copyto!(particle_positions(sim.tracers), mod.(particle_positions(sim.tracers) .+ L / 2, L))
+  copyto!(point_coordinates(sim.tracers.positions), mod.(point_coordinates(sim.tracers.positions) .+ L / 2, L))
 
   @test (particles_modified!(sim); true)         # the docstring's prescribed call must not throw
   @test sim.cache.history_filled == 0            # and must restart the abandoned-path history

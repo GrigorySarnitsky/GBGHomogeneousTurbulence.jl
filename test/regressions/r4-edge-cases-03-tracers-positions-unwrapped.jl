@@ -7,6 +7,7 @@
 # for every position that reaches the boundary through `advect!`.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 using Test
 
@@ -31,7 +32,7 @@ using Test
 
   sample(X) = begin
     tracers = Tracers(domain; positions = PointSet(copy(X)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
     deposit!(cache, tracers, u)
     copy(point_values(cache.velocity_at_particles))
   end

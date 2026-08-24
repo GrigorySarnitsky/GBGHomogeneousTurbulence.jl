@@ -6,6 +6,7 @@
 # This file asserts the CORRECT behaviour: every returned coordinate is strictly less than L.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: point_coordinates, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
@@ -25,12 +26,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dt = 1.0e-3
     X0 = T[prevfloat(1.0e-3) 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
     buffers = allocate_buffers(Heun(), tracers, cache)
     set_uniform_x!(u, -1.0)
     deposit!(cache, tracers, u)
     advect!(Heun(), tracers, u, domain, buffers, dt)
-    X = particle_positions(tracers)
+    X = point_coordinates(tracers.positions)
     @test all(0 .<= X)
     @test all(X .< L)
   end
@@ -39,12 +40,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     dt = 1.0
     X0 = T[0.0 1.0 1.0]
     tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
     buffers = allocate_buffers(Heun(), tracers, cache)
     set_uniform_x!(u, -1.0e-20)
     deposit!(cache, tracers, u)
     advect!(Heun(), tracers, u, domain, buffers, dt)
-    X = particle_positions(tracers)
+    X = point_coordinates(tracers.positions)
     @test all(X .< L)
   end
 end

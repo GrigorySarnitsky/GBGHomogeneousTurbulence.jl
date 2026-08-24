@@ -49,7 +49,6 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
-                   unwrapped_positions, particle_positions,
                    restart!, history_depth
 using ..Phenomenology: FlowParameters, taylor_reynolds
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
@@ -668,8 +667,8 @@ function particles_modified!(sim::Simulation)
   sim.particle_buffers === nothing || restart!(sim.particle_integration_scheme, sim.particle_buffers)
   # The unwrapped record restarts at the new positions: winding is a property of the trajectory
   # just abandoned, and a record continued across a reposition would splice two unrelated paths.
-  sim.tracers === nothing || sim.tracers.unwrapped_points === nothing ||
-    copyto!(unwrapped_positions(sim.tracers), particle_positions(sim.tracers))
+  sim.tracers === nothing || sim.tracers.unwrapped_positions === nothing ||
+    copyto!(point_coordinates(sim.tracers.unwrapped_positions), point_coordinates(sim.tracers.positions))
   return sim
 end
 

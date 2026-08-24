@@ -56,6 +56,7 @@
 # decided.
 
 using GBGIsotropicTurbulence
+using GBGPeriodicFields: point_coordinates
 using GBGPeriodicFields: field_data, materialize_kernel
 using Test
 
@@ -391,7 +392,7 @@ const SYNC_LEDGER = (
     @test all(a -> !(a isa AbstractArray) || length(a) <= 3 * tracer_count, owned)
     # …including the point-value buffers, which is where a retained field would have to hide: the
     # recorded start-of-step velocity is M interpolated vectors, read back through the public readout.
-    @test size(particle_positions(sim.tracers)) == (tracer_count, 3)
+    @test size(point_coordinates(sim.tracers.positions)) == (tracer_count, 3)
     @test size(velocity_at_particles(sim.cache)) == (tracer_count, 3)
 
     # (b) An unforced field carries no linear-rate array: the storage tracks the physics.
