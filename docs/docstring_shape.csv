@@ -1,9 +1,8 @@
 key,longest_paragraph_words,admonitions,total_words
-Cache.jl::Cache,115,0,328
+Cache.jl::Cache,105,0,322
 Cache.jl::ObservablesCache(domain; scalar = false， number_of_particles = 0， history_depth = 1),80,1,739
-Cache.jl::deposit_sample!(cache),73,0,139
 Cache.jl::fields_modified!(cache),70,1,249
-Cache.jl::particles_modified!(cache),66,0,248
+Cache.jl::particles_modified!(cache),72,0,256
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_at_particles(cache),111,0,112
 Cache.jl::velocity_physical(cache),83,0,84
@@ -45,18 +44,17 @@ Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),77,0,106
 Particles.jl::AbstractParticleIntegrator,53,0,102
 Particles.jl::AdamsBashforth(; order = 4),100,1,692
-Particles.jl::Heun(),54,1,250
+Particles.jl::Heun(),62,1,258
 Particles.jl::ParticleIntegratorBuffers,54,0,271
-Particles.jl::Particles,8,0,144
-Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,84,0,631
-Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,55,1,213
+Particles.jl::Particles,8,0,154
+Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,84,0,625
+Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,55,1,211
 Particles.jl::history_depth(scheme) -> Int,28,0,47
 Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
 Particles.jl::new_scalar_point_values(tracers),29,0,30
 Particles.jl::new_vector_point_values(tracers),29,0,30
 Particles.jl::number_of_particles(tracers),10,0,11
 Particles.jl::particle_positions(tracers),19,0,20
-Particles.jl::record_velocity_at_particles!(cache， tracers， u) -> cache,55,0,208
 Particles.jl::restart!(scheme， buffers) -> buffers,60,0,138
 Particles.jl::unwrapped_positions(tracers),89,0,155
 Phenomenology.jl::FlowParameters(; viscosity， dissipation， rms_velocity， integral_scale，,52,0,368
@@ -80,7 +78,7 @@ Propagator.jl::IFLowStorageRK3(),73,0,278
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,76,0,194
-Propagator.jl::deposit!(cache， state， domain， buffers),88,0,300
+Propagator.jl::deposit!(cache， state， domain， buffers),109,0,410
 Propagator.jl::recommended_cfl(scheme， domain),90,1,433
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,319
 Scalings.jl::Li2008(; dissipation_group = 0.9),114,0,317

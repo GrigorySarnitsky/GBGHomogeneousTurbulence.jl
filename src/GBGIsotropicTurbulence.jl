@@ -97,8 +97,7 @@ using .Cache:
   scalar_physical,
   velocity_at_particles,
   fields_modified!,
-  particles_modified!,
-  deposit_sample!
+  particles_modified!
 
 using .Generator:
   FlowConditions,
@@ -152,7 +151,6 @@ using .Particles:
   Heun,
   AdamsBashforth,
   ParticleIntegratorBuffers,
-  record_velocity_at_particles!,
   restart!,
   history_depth,
   advect!,
@@ -183,7 +181,6 @@ export FixedDomain,
        velocity_at_particles,
        fields_modified!,
        particles_modified!,
-       deposit_sample!,
        new_vector_field_spectral,
        new_vector_field_physical,
        new_scalar_field_spectral,
@@ -241,7 +238,6 @@ export FixedDomain,
        Heun,
        AdamsBashforth,
        ParticleIntegratorBuffers,
-       record_velocity_at_particles!,
        advect!,
        restart!,
        history_depth,

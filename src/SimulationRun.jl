@@ -38,7 +38,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_fie
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 import ..Cache: particles_modified!, fields_modified!
-using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_particles_epoch!,
+using ..Cache: ObservablesCache, check_deposits, advance_particles_epoch!,
                advance_fields_epoch!,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
@@ -48,7 +48,7 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, AbstractParticleIntegrator, Heun, record_velocity_at_particles!, advect!,
+using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
                    unwrapped_positions, particle_positions,
                    restart!, history_depth
 using ..Phenomenology: FlowParameters, taylor_reynolds
@@ -461,8 +461,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   particle_buffers = tracers === nothing ? nothing :
                      allocate_buffers(particle_integration_scheme, tracers, cache)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
-  tracers === nothing ||
-    (record_velocity_at_particles!(cache, tracers, velocity_physical(cache)); deposit_sample!(cache))
+  tracers === nothing || deposit!(cache, tracers, velocity_physical(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
                     tracers, tracers === nothing ? nothing : particle_integration_scheme, particle_buffers,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
@@ -484,11 +483,10 @@ end
 
 function deposit!(sim::Simulation)
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-  # The velocity sample rides the same re-deposit: the positions are unchanged, so re-recording
+  # The velocity sample rides the same re-deposit: the positions are unchanged, so re-depositing
   # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
-    (record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache));
-     deposit_sample!(sim.cache))
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   return sim
 end
 
@@ -635,8 +633,7 @@ function advance!(sim::Simulation; dt = nothing)
     # The run's own advance, not an out-of-band reposition: the epoch moves so the previous sample
     # reads stale, but the history the advance just extended stays intact.
     advance_particles_epoch!(sim.cache)
-    record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-    deposit_sample!(sim.cache)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   end
   check_deposits(sim.cache)
 

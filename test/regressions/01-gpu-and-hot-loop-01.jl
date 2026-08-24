@@ -43,7 +43,7 @@ end
   buffers = allocate_buffers(scheme, tracers, cache)
 
   for _ in 1:2                                      # warm the history up past the startup steps
-    record_velocity_at_particles!(cache, tracers, u0)
+    deposit!(cache, tracers, u0)
     advect!(scheme, tracers, u1, domain, buffers, dt)
   end
   @test cache.history_filled == 1                         # history full: the multistep branch is live
@@ -57,7 +57,7 @@ end
   # claim no design satisfies.
   copyto!(particle_positions(tracers), X1)
   particles_modified!(cache)
-  record_velocity_at_particles!(cache, tracers, u0)
+  deposit!(cache, tracers, u0)
   @test cache.history_filled == 0                         # the promised restart: no history to reuse
 
   advect!(scheme, tracers, u1, domain, buffers, dt)
@@ -67,7 +67,7 @@ end
   reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
   reference_cache = ObservablesCache(domain; number_of_particles = number_of_particles(reference))
   heun = allocate_buffers(Heun(), reference, reference_cache)
-  record_velocity_at_particles!(reference_cache, reference, u0)
+  deposit!(reference_cache, reference, u0)
   advect!(Heun(), reference, u1, domain, heun, dt)
 
   @test reseeded ≈ particle_positions(reference)

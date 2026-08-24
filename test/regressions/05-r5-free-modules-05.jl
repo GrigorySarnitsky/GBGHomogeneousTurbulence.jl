@@ -21,7 +21,7 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
 
   @test_throws ArgumentError begin
     for _ in 1:5
-      record_velocity_at_particles!(cache, tracers, u)
+      deposit!(cache, tracers, u)
       advect!(AdamsBashforth(order = 4), tracers, u, domain, buffers, 0.01)
     end
   end
@@ -35,7 +35,7 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
 
   @test_throws ArgumentError begin
     for _ in 1:5
-      record_velocity_at_particles!(cache2, tracers2, u)
+      deposit!(cache2, tracers2, u)
       advect!(AdamsBashforth(order = 2), tracers2, u, domain, buffers2, 0.01)
     end
   end

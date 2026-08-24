@@ -1,26 +1,20 @@
 # Witness (round 4, state-machine lane, 02): the sanctioned reposition protocol yields a genuine
-# post-reposition sample, and an incomplete protocol is refused.
+# post-reposition sample, and an un-completed announcement is refused.
 #
-# The candidate claimed `deposit_sample!` is defective because, called alone, it stamps whatever the
-# velocity-at-particles array happens to hold as the current-epoch observable. That is the documented
-# contract of the call, not a defect: `deposit_sample!` is the MARK half of a two-call protocol whose
-# WRITE half is `record_velocity_at_particles!` ("the cache never fills it, and cannot know when its
-# contents became current" — its own docstring), exactly as `deposit_velocity!` / `deposit_vorticity!`
-# / `deposit_scalar!` / `deposit_max_speed!` mark slots their producers have just written. Every
-# in-package call site pairs the two unconditionally (SimulationRun.jl:335-336, 361-362, 466-467).
-#
-# What must hold — and what this file asserts — is the reachable contract:
+# The candidate once claimed the mark half of the old two-call protocol (`deposit_sample!`) was
+# defective because, called alone, it stamped whatever the velocity-at-particles array happened to
+# hold as the current-epoch observable. Decision 71 removed the reachable form of that hazard
+# outright: the particle `deposit!` writes and stamps in one act, so no public call can mark values
+# it did not just produce. What must hold — and what this file asserts — is the reachable contract:
 #   (a) an announced reposition alone leaves the sample unreadable (the read throws);
-#   (b) the write alone does not make it readable either;
-#   (c) the complete protocol (move → announce → record → deposit) serves a sample that genuinely
-#       belongs to the NEW positions, not the pre-reposition values;
-#   (d) the run's own iteration keeps the pairing, so a plain `advance!` never leaves a marked-but-
-#       unwritten sample behind.
+#   (b) the single particle `deposit!` restores the read with values that genuinely belong to the
+#       NEW positions, not the pre-reposition values;
+#   (c) the run's own iteration leaves the slot exactly reproducible from the deposited velocity at
+#       the deposited positions — the closing deposit wrote it, it did not merely mark it.
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles, deposit_sample!
-using GBGIsotropicTurbulence.Particles: record_velocity_at_particles!
+using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
 
 build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                      number_of_particles = 8, rng = MersenneTwister(1))
@@ -37,12 +31,8 @@ build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
   particles_modified!(sim.cache)
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
-  # (b) The write alone still leaves the slot stale — the epochs have not been recorded.
-  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-  @test_throws ErrorException velocity_at_particles(sim.cache)
-
-  # (c) The completed protocol serves values measured at the NEW positions.
-  deposit_sample!(sim.cache)
+  # (b) The single particle deposit restores the read with values of the NEW positions.
+  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   after = copy(Array(velocity_at_particles(sim.cache)))
   @test size(after) == (8, 3)
   @test after != before
@@ -57,8 +47,7 @@ end
     @test all(isfinite, v)
     # Re-deriving the sample by hand from the deposited velocity at the same positions must
     # reproduce the slot exactly: the closing deposit wrote it, it did not merely mark it.
-    record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-    deposit_sample!(sim.cache)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
     @test Array(velocity_at_particles(sim.cache)) == v
   end
 end

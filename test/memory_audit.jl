@@ -368,7 +368,7 @@ const EPISODE_UNITS = [
       startup_own = [a for a in m_arrays(buffers)
                      if !(objectid(a) in Set(objectid.(m_arrays(cache))))]
       @test length(startup_own) == 2
-      @test length(cache.sample_steps) == K - 1                  # host scalars, one per past sample
+      @test length(cache.history_steps) == K - 1                  # host scalars, one per past sample
     end
   end
 

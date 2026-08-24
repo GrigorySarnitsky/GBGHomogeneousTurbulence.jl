@@ -32,7 +32,7 @@ using Test
   sample(X) = begin
     tracers = Tracers(domain; positions = PointSet(copy(X)), interpolation_scheme = CatmullRom)
     cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
-    record_velocity_at_particles!(cache, tracers, u)
+    deposit!(cache, tracers, u)
     copy(point_values(cache.velocity_at_particles))
   end
 

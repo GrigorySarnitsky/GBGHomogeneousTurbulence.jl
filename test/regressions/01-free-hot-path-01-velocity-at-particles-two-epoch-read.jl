@@ -2,12 +2,12 @@
 #
 # The cache's velocity-at-particles slot is the one observable that is a function of TWO things — the
 # resolved state (the velocity that was interpolated) and the tracer positions (where it was
-# interpolated). The cache keeps two counters for exactly that reason: `deposit_sample!`
-# (src/Cache.jl:310-311) stamps both, `check_deposits` (src/Cache.jl:328-329) compares both, the
+# interpolated). The cache keeps two counters for exactly that reason: the particle `deposit!`
+# (its stamping half, `deposit_velocity_at_particles!`) stamps both, `check_deposits` compares both, the
 # accessor's own docstring says the sample "is current only when both counters match its own", and
 # `docs/src/observables_cache.md` §3.2 says the read is checked "against both epochs".
 #
-# `velocity_at_particles` (src/Cache.jl:264) compares only `sample_fields_epoch == fields_epoch`.
+# `velocity_at_particles` (src/Cache.jl:264) compares only `velocity_at_particles_fields_epoch == fields_epoch`.
 # `particles_modified!` — the announced-reposition verb — advances `particles_epoch` alone, so the
 # exact mutation the two-counter design exists to catch is invisible to the read.
 #
@@ -30,8 +30,8 @@ using GBGIsotropicTurbulence
   advance!(sim)
 
   # Precondition — a closed iteration leaves the slot current on both counters and the read serves.
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
+  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
   v0 = copy(velocity_at_particles(sim.cache))
   @test size(v0) == (8, 3)
 
@@ -39,8 +39,8 @@ using GBGIsotropicTurbulence
   # positions the sample belongs to are abandoned.
   particle_positions(sim.tracers) .= 0.5 .* particle_positions(sim.tracers)
   particles_modified!(sim)
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch          # fields did not move
-  @test sim.cache.sample_particles_epoch != sim.cache.particles_epoch    # positions did
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch          # fields did not move
+  @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch    # positions did
 
   # (1) The cache's central invariant: a checked read serves a current value or throws.
   @test_throws ErrorException velocity_at_particles(sim.cache)

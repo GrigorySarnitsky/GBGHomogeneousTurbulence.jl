@@ -7,7 +7,7 @@
 # epoch, and the value sitting in `tracers.velocity_at_particles` at that moment is exactly
 # u(tₙ, X(tₙ)) — the right v₁ for the step just taken. `advance!` verifies its freshness at tₙ (its
 # opening `velocity_at_particles(sim.cache)` guard) precisely because the later read cannot be checked:
-# the cache's "stale" flag is by design raised between the step and the closing `deposit_sample!`,
+# the cache's "stale" flag is by design raised between the step and the closing particle `deposit!`,
 # and `advance!` itself calls `advect!` in exactly that window.
 #
 # So the assertions are:

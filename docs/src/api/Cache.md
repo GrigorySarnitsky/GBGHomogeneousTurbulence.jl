@@ -14,7 +14,6 @@ deposited value or throws, and nothing is ever recomputed on a read.
 ObservablesCache
 fields_modified!
 particles_modified!
-deposit_sample!
 ```
 
 ## The checked reads

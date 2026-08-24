@@ -6,7 +6,7 @@
 #    reseeded."
 #
 # A reseed is announced with `particles_modified!` (the documented protocol: write the positions,
-# announce, `record_velocity_at_particles!`, `deposit_sample!`). After that protocol the AB scheme's
+# announce, then the particle `deposit!`). After that protocol the AB scheme's
 # stored past samples are Lagrangian velocities of the abandoned trajectories, so the scheme must
 # restart: `filled == 0`, and the next advance must be the startup `Heun` step.
 
@@ -41,8 +41,7 @@ end
   for sim in (ab, heun)
     copyto!(particle_positions(sim.tracers), X_new)
     particles_modified!(sim.cache)
-    record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-    deposit_sample!(sim.cache)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   end
 
   # The documented restart: the abandoned trajectories' samples are discarded.

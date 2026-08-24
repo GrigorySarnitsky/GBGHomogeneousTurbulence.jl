@@ -25,8 +25,7 @@ using Test
   L = sim.domain.grid.domain_size[1]
   copyto!(particle_positions(sim.tracers), mod.(particle_positions(sim.tracers) .+ L / 2, L))
   particles_modified!(sim.cache)
-  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-  deposit_sample!(sim.cache)
+  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
 
   # (1) The promised restart: the pre-reposition history is no longer valid.
   @test sim.cache.history_filled < K - 1
@@ -44,7 +43,7 @@ using Test
   fresh_cache = ObservablesCache(sim.domain; number_of_particles = number_of_particles(fresh),
                                  history_depth = history_depth(sim.particle_integration_scheme))
   fresh_buffers = allocate_buffers(sim.particle_integration_scheme, fresh, fresh_cache)
-  record_velocity_at_particles!(fresh_cache, fresh, u)
+  deposit!(fresh_cache, fresh, u)
 
   advect!(sim.particle_integration_scheme, sim.tracers, u, sim.domain, sim.particle_buffers, dt)
   advect!(sim.particle_integration_scheme, fresh, u, sim.domain, fresh_buffers, dt)

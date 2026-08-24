@@ -499,39 +499,49 @@ _recovery_scratch(sb::ScalarBuffers) =
 
 """
     deposit!(cache, state, domain, buffers)
+    deposit!(cache, tracers, u)
     deposit!(sim)
 
-Close an iteration: deposit the field observables the cache's fixed schedule carries — the velocity,
-vorticity and scalar recoveries and the maximum speed, the same set every iteration — into `cache` (an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), from the `state` (a
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) the step has just produced,
-and record each slot at the current epoch (the cache's freshness counter).
+Close a producer's advance by depositing the observables it has just made measurable: compute them
+from the arguments, write them into `cache` (an
+[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), and record each slot at
+the current epoch (the cache's freshness counter). One generic serves both sides of the run because
+it is one concept — each dynamical factor's advance is followed by its own deposit, so an iteration
+closes as `step!` then `deposit!`, then
+[`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) then `deposit!` again.
 
-The deposits are the next iteration's first-stage work moved to the iteration's end: the velocity,
-vorticity and — when the run carries one — scalar recoveries in physical representation, then the
-maximum-speed reduction over the just-deposited velocity. The recoveries run on the
-[`FixedDomain`](@ref) `domain`'s plans, through a spectral stage register of `buffers` (an
-[`IntegratorBuffers`](@ref)) that is dead at the iteration's end.
+The **field form** deposits the field-derived slots — the velocity, vorticity and, when the run
+carries one, scalar recoveries in physical representation, then the maximum-speed reduction over
+the just-deposited velocity — from the `state` (a
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) the step has just produced.
+The recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a spectral stage register
+of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end. Every recovery
+is work the next iteration's first stage would have done anyway, so closing the iteration costs no
+extra transforms — one extra pass only, the maximum-speed reduction, which runs every iteration
+even under a hand-fixed ``\\Delta t`` that never reads it.
 
-Every recovery here is work the next iteration's first stage would have done anyway, so closing the
-iteration costs it no extra transforms. It costs one extra pass: the maximum-speed reduction runs
-every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
+The **particle form** deposits the one trajectory-bound slot: it interpolates the velocity field
+`u` (physical representation — normally the field form's own fresh deposit) at the current
+positions of the tracer set `tracers` (a [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers),
+whose interpolation scheme does the sampling), and stamps the slot against **both** counters — the
+fields epoch of the interpolated velocity and the particles epoch of the positions, since the
+velocity at the particles is a function of the two together. It therefore runs **after** the tracer
+push, which itself consumed the field form's deposit.
 
-The velocity-at-particles slot is **not** among them: it depends on the tracer positions as well as
-the state, so it is filled by
-[`record_velocity_at_particles!`](@ref GBGIsotropicTurbulence.Particles.record_velocity_at_particles!)
-wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
+The deposited values serve twice: they are
+the Lagrangian velocity a caller accumulates, and the start-of-step velocity the next `advect!`
+reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint field would cost
+``N^{3} \\times 3``.
 
-Every iteration ends with this call: the run layer's
-[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs it after `step!`, a
-hand-run loop calls it itself, and the
+Every iteration ends with these deposits: the run layer's
+[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs them for you, the
 [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor makes the seeding
-deposit so the
-first iteration finds the initial state's observables. The leading argument is `cache`, the object this call mutates; `state`, `domain`, `buffers` follow
-in `step!`'s order. After mutating the state out of band, announce
-it with [`fields_modified!`](@ref) and re-deposit with the second form: `sim`, a
-`Simulation`, unpacks its own cache, state,
-domain and buffers and calls the first.
+deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
+each form itself after the advance it closes. After mutating the state or the positions out of
+band, announce it — [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!) /
+[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) — and re-deposit
+with the **`sim` form**: given a `Simulation` it unpacks the run and performs every deposit its
+configuration carries.
 
 Returns `cache` (or `sim`).
 """

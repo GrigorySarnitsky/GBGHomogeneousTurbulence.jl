@@ -56,7 +56,7 @@ end
     advance!(control)
   end
   @test control.cache.history_filled == K - 1        # precondition: steady multistep operation
-  h = control.cache.sample_steps[1]                  # keep stepping at the size the run has settled on
+  h = control.cache.history_steps[1]                  # keep stepping at the size the run has settled on
   departure_control = euler_departure!(control, h)
 
   # ---- the sanctioned out-of-band reseed, exactly as the seeder's note prescribes ----

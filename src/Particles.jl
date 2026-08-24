@@ -27,8 +27,9 @@ Lagrangian particle tracking — today the massless tracer:
   [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
   per-step storage a scheme needs, and [`history_depth`](@ref) the length of the
   velocity-at-particles history a scheme requires.
-- [`record_velocity_at_particles!`](@ref) — store the flow velocity at the tracers' current positions,
-  which is both the measured Lagrangian sample and the first velocity the next advance needs.
+- [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) — this module adds the particle
+  method: deposit the flow velocity at the tracers' current positions into the observables cache —
+  both the measured Lagrangian sample and the first velocity the next advance needs.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
@@ -39,14 +40,14 @@ module Particles
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, _real_type
-using ..Cache: ObservablesCache
+using ..Cache: ObservablesCache, deposit_velocity_at_particles!
 # One generic builds the per-scheme registers on both sides of the run — the field scheme's and
 # the particle integration scheme's — because it is one concept: allocate exactly what this scheme needs.
-import ..Propagator: allocate_buffers
+import ..Propagator: allocate_buffers, deposit!
 
 export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
        ParticleIntegratorBuffers,
-       record_velocity_at_particles!, advect!, restart!, history_depth, interpolate_at_particles!,
+       advect!, restart!, history_depth, interpolate_at_particles!,
        particle_positions, unwrapped_positions, number_of_particles, new_vector_point_values, new_scalar_point_values
 
 
@@ -114,8 +115,7 @@ tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
 cache   = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
 buffers = allocate_buffers(Heun(), tracers, cache)
 
-record_velocity_at_particles!(cache, tracers, u)   # u(tₙ) at the current positions — do this first
-deposit_sample!(cache)                             # and mark it current
+deposit!(cache, tracers, u)                 # u(tₙ) at the current positions — do this first
 advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
@@ -201,8 +201,10 @@ abstract type AbstractParticleIntegrator end
 
 Second-order Heun-in-time on the velocity at the two **ends** of the step — the particle
 integration scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
-velocity that [`record_velocity_at_particles!`](@ref) stored and the end-of-step velocity field
-the solver has just produced, so it needs nothing from inside the field scheme's stages.
+velocity the previous iteration's closing particle
+[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) left in the cache and the
+end-of-step velocity field the solver has just produced, so it needs nothing from inside the field
+scheme's stages.
 
 It needs one set of predicted positions and the velocity interpolated there
 ([`ParticleIntegratorBuffers`](@ref)); the formula is given with [`advect!`](@ref).
@@ -461,7 +463,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
   # The past samples are the cache's, not this scheme's: an announced reposition clears them there,
   # so a history that survived one is not reachable from here.
   cache = buffers.cache
-  past, steps = cache.velocity_at_particles_history, cache.sample_steps
+  past, steps = cache.velocity_at_particles_history, cache.history_steps
   # The history's depth IS the order this call will actually achieve. Handed buffers built for a
   # shallower scheme, the loop below would read fewer past samples than `K` claims and integrate at
   # a lower order without saying so.
@@ -511,40 +513,16 @@ end
 restart!(::AdamsBashforth, buffers::ParticleIntegratorBuffers) = (buffers.cache.history_filled = 0; buffers)
 
 
-"""
-    record_velocity_at_particles!(cache, tracers, u) -> cache
-
-Store the flow velocity at the particle positions, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))`` —
-the velocity seen by each tracer where it currently sits — by interpolation at the instant the
-positions are current.
-
-The arguments are:
-- `cache` — the run's [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache),
-  built with a `number_of_particles` matching the tracer set: the values go into its
-  velocity-at-particles slot.
-- `tracers` — the [`Tracers`](@ref) whose positions the field is sampled at, and whose
-  interpolation scheme does the sampling.
-- `u` — the velocity field in physical representation.
-
-**This call is the slot's only producer of values**, but it writes values only: the slot stays
-stale, and reads of it throw, until
-[`deposit_sample!`](@ref GBGIsotropicTurbulence.Cache.deposit_sample!) records them as current.
-Interpolate here, then mark current there — a run does both at the end of each iteration, on the
-just-deposited velocity at the just-advanced positions, and reading
-[`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles) after only the
-first throws.
-
-The stored values serve twice: they are the genuine Lagrangian velocity a caller accumulates, and they
-are the start-of-step velocity ``\\boldsymbol{v}_1`` the next [`advect!`](@ref) needs — which is why
-an [`Heun`](@ref) advance never interpolates at ``t_n`` itself. Storing them costs
-``M\\times3`` values for ``M`` tracers, where keeping the velocity field would cost
-``N^{3} \\times 3``.
-"""
-function record_velocity_at_particles!(cache::ObservablesCache, tracers::Tracers, u)
+# The particle method of `deposit!` — the generic, and the one docstring covering all its forms,
+# live in `Propagator`. This method interpolates and stamps in one act: it is the slot's only
+# producer of values, and the two counters it stamps against advance elsewhere (the step and the
+# push), so the deposit is the pure closing measurement of both.
+function deposit!(cache::ObservablesCache, tracers::Tracers, u)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set"))
   interpolate!(cache.velocity_at_particles, u, tracers.position_points, tracers.interpolation_scheme)
+  deposit_velocity_at_particles!(cache)
   return cache
 end
 
@@ -561,7 +539,7 @@ that scheme). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into.
 
 Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
-step — the start-of-step values that [`record_velocity_at_particles!`](@ref) stored, and
+step — the start-of-step values the previous iteration's closing particle deposit stored, and
 `velocity_end`, the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical
 representation:
 
@@ -578,11 +556,11 @@ with positions wrapped into ``[0, L)``. This is second-order accurate in time �
 frozen start-of-step velocity alone would be first order.
 
 !!! note "The start-of-step velocity is read, never recomputed"
-    ``\\boldsymbol{v}_1`` is read from the tracer set, not recomputed here: it must hold
-    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, recorded by `record_velocity_at_particles!`
-    at the previous iteration's end. In a run the observables cache records that sample at its epoch
-    and the run layer reads it checked before each advance; a hand-run loop must call
-    `record_velocity_at_particles!` itself between advances.
+    ``\\boldsymbol{v}_1`` is read from the cache's velocity-at-particles slot, not recomputed
+    here: it must hold ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
+    form of [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) at the previous
+    iteration's end. The run layer reads it checked before each advance; a hand-run loop must make
+    that deposit itself between advances.
 """
 function advect! end
 

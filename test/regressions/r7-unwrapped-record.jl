@@ -29,7 +29,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   nsteps = 160
   dt = T(2.5) * L / nsteps                              # total drift 2.5 boxes in x
   for _ in 1:nsteps
-    record_velocity_at_particles!(cache, tracers, u)
+    deposit!(cache, tracers, u)
     advect!(Heun(), tracers, u, domain, buffers, dt)
   end
   Xw = particle_positions(tracers)
@@ -45,7 +45,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
                                     history_depth = history_depth(AdamsBashforth(order = 2)))
   ab_buffers = allocate_buffers(AdamsBashforth(order = 2), ab, sim_free_cache)
   for _ in 1:nsteps
-    record_velocity_at_particles!(sim_free_cache, ab, u)
+    deposit!(sim_free_cache, ab, u)
     advect!(AdamsBashforth(order = 2), ab, u, domain, ab_buffers, dt)
   end
   @test unwrapped_positions(ab)[1, 1] ≈ X0[1, 1] + 2.5L rtol = 1e-10

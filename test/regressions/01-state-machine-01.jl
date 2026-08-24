@@ -1,10 +1,10 @@
 # Witness: the velocity-at-particles cached read must be checked against BOTH epochs.
 #
 # `velocity_at_particles(cache)`'s own docstring and `check_deposits` agree that the sample is current
-# only when `sample_fields_epoch == fields_epoch` AND `sample_particles_epoch == particles_epoch`
+# only when `velocity_at_particles_fields_epoch == fields_epoch` AND `velocity_at_particles_particles_epoch == particles_epoch`
 # (it is a function of the state and of the positions together). After an announced out-of-band
 # reposition — `particles_modified!` — that has not yet been completed with
-# `record_velocity_at_particles!` + `deposit_sample!`, the sample is stale: it holds
+# the particle `deposit!`, the sample is stale: it holds
 # u(tₙ, X_old), not u(tₙ, X_new). The read must throw, and `advance!` — whose opening guard is
 # exactly this read — must refuse to step on it.
 
@@ -27,7 +27,7 @@ end
     v_before = copy(Array(velocity_at_particles(sim.cache)))
 
     # An out-of-band reposition, announced exactly as the docstring prescribes, and NOT yet
-    # completed with `record_velocity_at_particles!` / `deposit_sample!`.
+    # completed with the particle `deposit!`.
     L = sim.domain.grid.domain_size[1]
     particle_positions(sim.tracers) .= mod.(particle_positions(sim.tracers) .+ 0.3, L)
     particles_modified!(sim.cache)

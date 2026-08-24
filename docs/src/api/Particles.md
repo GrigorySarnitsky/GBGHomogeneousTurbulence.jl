@@ -50,7 +50,6 @@ at both ends of the step: the run records the sample at the iteration's end, off
 velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 
 ```@docs
-record_velocity_at_particles!
 advect!
 restart!
 history_depth

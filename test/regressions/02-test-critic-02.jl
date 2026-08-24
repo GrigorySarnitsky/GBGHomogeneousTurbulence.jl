@@ -20,17 +20,17 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 
   # (1) A fields-only out-of-band mutation. The positions are untouched, so the particles epoch
-  #     still matches; only `sample_fields_epoch` falls behind, and the read must still throw.
+  #     still matches; only `velocity_at_particles_fields_epoch` falls behind, and the read must still throw.
   fields_modified!(sim.cache)
-  @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch   # the other counter agrees
+  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch   # the other counter agrees
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # (2) A particles-only mutation. The fields are untouched, so the fields epoch still matches;
-  #     only `sample_particles_epoch` falls behind, and the read must still throw.
+  #     only `velocity_at_particles_particles_epoch` falls behind, and the read must still throw.
   sim = build()
   advance!(sim; dt = 0.01)
   particles_modified!(sim.cache)                       # the documented reposition announcement
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch         # the other counter agrees
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch         # the other counter agrees
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # (2b) The same direction through the run's own tracer-advance verb, which bumps the particles
@@ -38,16 +38,16 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   sim = build()
   advance!(sim; dt = 0.01)
   advance_particles_epoch!(sim.cache)
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
-  # (3) Recording the values without recording the epochs must NOT make the slot readable: the
-  #     write alone leaves it stale, as `deposit_sample!`'s docstring states.
+  # (3) The particle deposit restores the read in ONE act: `deposit!(cache, tracers, u)` writes and
+  #     stamps BOTH epochs together (decision 71), so nothing between the announcement and the
+  #     deposit can serve the slot, and nothing after the deposit refuses it.
   sim = build()
   advance!(sim; dt = 0.01)
   particles_modified!(sim.cache)
-  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   @test_throws ErrorException velocity_at_particles(sim.cache)
-  deposit_sample!(sim.cache)                            # …and only this restores the read
+  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 end

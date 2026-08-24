@@ -10,8 +10,8 @@
 #
 # Two simulations are built whose velocity fields stay bit-identical (the tracers are passive, so
 # they cannot feed back) but whose tracer histories differ.  Both are then reseeded onto the SAME
-# positions through the sanctioned announcement (`particles_modified!` → `record_velocity_at_particles!`
-# → `deposit_sample!`, the recipe `particles_modified!`'s docstring prescribes) and each takes one
+# positions through the sanctioned announcement (`particles_modified!` → the particle `deposit!`,
+# the recipe `particles_modified!`'s docstring prescribes) and each takes one
 # further step of the same size.  Their post-reseed state is identical, so the resulting positions
 # must be identical.  `Heun`, which keeps no history, is the control.
 
@@ -29,8 +29,7 @@ make_sim(scheme) = Simulation(grid_points_per_axis = N, viscosity = 0.05, number
 function reseed!(sim, positions)
   copyto!(particle_positions(sim.tracers), positions)
   particles_modified!(sim.cache)
-  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-  deposit_sample!(sim.cache)
+  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   return sim
 end
 

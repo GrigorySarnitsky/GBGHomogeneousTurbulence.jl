@@ -7,9 +7,9 @@
 # factor alone must make the read throw. The two halves are exercised independently:
 #
 #   (1) `fields_modified!(cache)` alone — the tracer positions are untouched, so
-#       `sample_particles_epoch == particles_epoch` still holds and only the fields half can fire;
+#       `velocity_at_particles_particles_epoch == particles_epoch` still holds and only the fields half can fire;
 #   (2) `particles_modified!(cache)` alone — the fields are untouched, so
-#       `sample_fields_epoch == fields_epoch` still holds and only the particles half can fire.
+#       `velocity_at_particles_fields_epoch == fields_epoch` still holds and only the particles half can fire.
 #
 # Each case pins the *other* counter as still-matching before asserting the throw, which is what
 # makes the case discriminating: under `||` (or a dropped half) the surviving comparison would be
@@ -17,8 +17,7 @@
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!,
-                                    deposit_sample!
+using GBGIsotropicTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!
 
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
@@ -30,8 +29,8 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   # ————— the control: a completed iteration leaves both counters current and the read served —————
   sim = build()
   advance!(sim; dt = 0.01)
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
+  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 
   # ————— (1) the fields half alone —————
@@ -39,8 +38,8 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   advance!(sim; dt = 0.01)
   fields_modified!(sim.cache)
   # the particles half is still satisfied, so only the fields comparison can raise the throw
-  @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
-  @test sim.cache.sample_fields_epoch != sim.cache.fields_epoch
+  @test sim.cache.velocity_at_particles_particles_epoch == sim.cache.particles_epoch
+  @test sim.cache.velocity_at_particles_fields_epoch != sim.cache.fields_epoch
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # ————— (2) the particles half alone —————
@@ -48,12 +47,11 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   advance!(sim; dt = 0.01)
   particles_modified!(sim.cache)
   # the fields half is still satisfied, so only the particles comparison can raise the throw
-  @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
-  @test sim.cache.sample_particles_epoch != sim.cache.particles_epoch
+  @test sim.cache.velocity_at_particles_fields_epoch == sim.cache.fields_epoch
+  @test sim.cache.velocity_at_particles_particles_epoch != sim.cache.particles_epoch
   @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # ————— and the sanctioned completion restores the read in the particles direction —————
-  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
-  deposit_sample!(sim.cache)
+  deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   @test size(velocity_at_particles(sim.cache)) == (4, 3)
 end

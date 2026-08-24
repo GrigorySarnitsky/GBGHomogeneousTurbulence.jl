@@ -30,7 +30,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     for n in 0:nsteps-1
       set_uniform_x!(u_start, cos(ω * n * dt))
       set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
-      record_velocity_at_particles!(cache, tracers, u_start)
+      deposit!(cache, tracers, u_start)
       advect!(scheme, tracers, u_end, domain, buffers, dt)
     end
     particle_positions(tracers)[1, 1]

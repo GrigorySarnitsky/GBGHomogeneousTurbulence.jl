@@ -42,8 +42,7 @@ using GBGPeriodicFields: field_data, CatmullRom
   let (tracers, cache) = make()
     outcome = try
       buffers = allocate_buffers(scheme, tracers, cache)
-      record_velocity_at_particles!(cache, tracers, u)
-      deposit_sample!(cache)
+      deposit!(cache, tracers, u)
       advect!(scheme, tracers, u, domain, buffers, 0.01)
       :advanced
     catch err

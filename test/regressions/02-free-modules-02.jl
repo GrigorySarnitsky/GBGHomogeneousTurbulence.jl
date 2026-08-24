@@ -53,7 +53,7 @@ using Test
     buffers = allocate_buffers(Heun(), tracers, cache)
 
     field_data(u) .= NaN                       # the ordinary blow-up mode of an over-stepped run
-    record_velocity_at_particles!(cache, tracers, u)     # v1 <- u(t_n, X(t_n)), now non-finite
+    deposit!(cache, tracers, u)     # v1 <- u(t_n, X(t_n)), now non-finite
     @test !all(isfinite, point_values(cache.velocity_at_particles))
 
     threw = false

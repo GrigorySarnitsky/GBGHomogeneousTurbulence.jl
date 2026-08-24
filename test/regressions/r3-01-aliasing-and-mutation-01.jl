@@ -31,7 +31,7 @@ using GBGIsotropicTurbulence.Cache: advance_particles_epoch!
           end)
 
   # (b) the same window the run itself passes through mid-iteration: the epoch bump that precedes
-  #     `record_velocity_at_particles!` + `deposit_sample!`
+  #     the closing particle `deposit!`
   sim2 = Simulation(; grid_points_per_axis = 16, number_of_particles = 4,
                     kinetic_energy = 1.5, rng = MersenneTwister(20260821))
   advance!(sim2)

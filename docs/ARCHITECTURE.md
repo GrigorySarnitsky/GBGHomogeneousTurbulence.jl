@@ -435,12 +435,13 @@ Lagrangian velocity, held in the observables cache's own `velocity_at_particles`
 against BOTH epochs, since it is a function of the state and the positions together (read through
 `velocity_at_particles`, §11 decisions 42 and 67). ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, `record_velocity_at_particles!` writes the new sample at the new
-positions from the same deposited field and `deposit_sample!` records it at the current epochs (the
-write alone leaves the slot stale), completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
-trajectories for Lagrangian statistics.
+`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, the particle form of
+`deposit!` interpolates the new sample at the new positions from the same deposited field and
+stamps it at the current epochs — one closing act per dynamical factor, `step!` then `deposit!`,
+`advect!` then `deposit!` — completing the iteration's deposits; `interpolate_at_particles!` reads
+any field along the trajectories for Lagrangian statistics.
 
-The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
+The sample deposit is what keeps an ``M``-point instrument at ``M``-point cost: depositing the sample
 at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
 ``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
@@ -2211,6 +2212,28 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     deletes one public type, the doubled cache reference, and the order-mismatch hazard of handing
     one scheme another's wrapper — `advect!` now checks the weight scratch's length against the
     scheme's order outright.
+
+71. **(2026-08, user-directed) One deposit verb: `record_velocity_at_particles!` /
+    `deposit_sample!` are folded into `deposit!`.** A deposit is one concept — *compute the
+    observables from the state you were handed, write them into the cache, stamp them with the
+    current counters* — and the field `deposit!` already was exactly that. The particle side's
+    write/stamp pair was decision 42's residue: with the slot borrowed from the tracer set, the
+    cache genuinely could not stamp what it neither owned nor saw written. Decision 67 removed that
+    constraint, and the one justification left ("only the writer knows when it has finished") is an
+    argument for the *writer stamping in the same call*, not for the caller sequencing two calls.
+    `deposit!` is now one generic with three methods: the field form (after `step!`), the particle
+    form `deposit!(cache, tracers, u)` — added by `Particles` exactly as it extends
+    `allocate_buffers`, interpolating and stamping **both** epochs in one act (the stamping half
+    lives on in `Cache` as the private `deposit_velocity_at_particles!`, beside its field-slot
+    siblings) — and the `sim` form, which performs every deposit the configuration carries. The
+    dependency chain still forces two deposit *moments* per iteration — the push consumes the field
+    deposit and the trajectory observable exists only at the new positions — but the iteration now
+    reads as the model itself: advance a factor, bank what it made measurable, twice. The
+    glossary's *deposit* entry loses its exception clause; the two-verb ritual's failure mode
+    (write without stamp → a stale-read throw far from its cause) is gone by construction; and the
+    internal names shed the bare "sample" the user flagged as undescriptive (`sample_steps` →
+    `history_steps`, the slot's epoch pair → `velocity_at_particles_fields_epoch` /
+    `velocity_at_particles_particles_epoch`).
 
 ## References
 

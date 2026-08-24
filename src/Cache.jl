@@ -18,8 +18,6 @@ The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a state or tracer mutation
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
-- [`deposit_sample!`](@ref) — records the velocity sample
-  [`record_velocity_at_particles!`](@ref GBGIsotropicTurbulence.Particles.record_velocity_at_particles!) wrote.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
 - [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
@@ -33,7 +31,8 @@ fields. Each slot carries the value **and** the epoch that value belongs to, so 
 rather than served stale.
 
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
-iteration's end (the velocity-at-particles slot has its own pair of verbs, recorded below) and sets
+iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
+after the tracer push) and sets
 its epoch. A caller reads through the accessors and never deposits.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
@@ -53,7 +52,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_fie
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
 export ObservablesCache, velocity_physical, vorticity_physical, scalar_physical,
-       velocity_at_particles, fields_modified!, particles_modified!, deposit_sample!
+       velocity_at_particles, fields_modified!, particles_modified!
 
 
 # Epoch sentinels. A slot's epoch is the fields epoch it was deposited at; the sentinels mark the
@@ -120,12 +119,12 @@ depends on.
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
 - `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first, and
-  `sample_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
+  `history_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
   multistep particle integration scheme integrates over these; an announced reposition invalidates them
   together with the current sample.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
-- `sample_fields_epoch`, `sample_particles_epoch` — the velocity sample's two epochs, against
+- `velocity_at_particles_fields_epoch`, `velocity_at_particles_particles_epoch` — the velocity-at-particles slot's two epochs, against
   **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
   [`fields_modified!`](@ref), so it runs ahead of
@@ -145,15 +144,15 @@ mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   # can invalidate the whole history in one place. Held apart from the current slot rather than as a
   # ring including it, because the current slot is the tracer set's own storage, written in place.
   const velocity_at_particles_history::Vector{TS}
-  const sample_steps::Vector{Float64}
+  const history_steps::Vector{Float64}
   history_filled::Int
   velocity_epoch::Int
   vorticity_epoch::Int
   scalar_epoch::Int
   max_speed::T
   max_speed_epoch::Int
-  sample_fields_epoch::Int
-  sample_particles_epoch::Int
+  velocity_at_particles_fields_epoch::Int
+  velocity_at_particles_particles_epoch::Int
   fields_epoch::Int
   particles_epoch::Int
 end
@@ -276,8 +275,8 @@ function velocity_at_particles(cache::ObservablesCache)
   # `particles_modified!` advances the particles epoch and touches nothing else, so a sample measured
   # along an abandoned trajectory was served as current, and `advance!`'s opening guard could never
   # fire. `check_deposits` had the test right; this read did not.
-  (cache.sample_fields_epoch == cache.fields_epoch &&
-   cache.sample_particles_epoch == cache.particles_epoch) ||
+  (cache.velocity_at_particles_fields_epoch == cache.fields_epoch &&
+   cache.velocity_at_particles_particles_epoch == cache.particles_epoch) ||
     error("the cached velocity at the particles is stale: the state or the tracer positions have advanced " *
           "past the deposited values, and nothing in the cache is ever recomputed; read " *
           "between iterations, after the closing deposit")
@@ -303,28 +302,14 @@ deposit_vorticity!(cache::ObservablesCache) = (cache.vorticity_epoch = cache.fie
 deposit_scalar!(cache::ObservablesCache) = (cache.scalar_epoch = cache.fields_epoch; cache.scalar_physical)
 deposit_max_speed!(cache::ObservablesCache{PV, PS, TS, T}, value::Real) where {PV, PS, TS, T} =
   (cache.max_speed = T(value); cache.max_speed_epoch = cache.fields_epoch; value)
-"""
-    deposit_sample!(cache)
-
-Record the velocity sample already written into `cache` (an [`ObservablesCache`](@ref)) as
-current, so [`velocity_at_particles`](@ref) will serve it instead of throwing.
-
-Use it after writing new values at the particle positions —
-[`record_velocity_at_particles!`](@ref GBGIsotropicTurbulence.Particles.record_velocity_at_particles!)
-writes, this call records. The two are separate because this slot's producer is the tracer push,
-not the field advance, and only the writer knows when it has finished. A run does both at the end
-of each iteration; a hand-run loop that advances tracers itself must call both, in that order —
-the write alone leaves the slot stale.
-
-This slot is the one checked against **two** epochs — the fields epoch of the velocity that was
-interpolated, and the particles epoch of the positions it was interpolated at — so this call sets
-both from the cache's current counters.
-
-Returns the velocity-at-particles slot.
-"""
-deposit_sample!(cache::ObservablesCache) =
-  (cache.sample_fields_epoch = cache.fields_epoch;
-   cache.sample_particles_epoch = cache.particles_epoch; cache.velocity_at_particles)
+# The stamping half of the particle deposit, beside its field-slot siblings above: mark the
+# velocity-at-particles slot current against BOTH counters — the fields epoch of the interpolated
+# velocity and the particles epoch of the positions — since the sample is a function of the two
+# together. `deposit!`'s particle method (in `Particles`, the module that owns the interpolation)
+# writes the values and then calls this.
+deposit_velocity_at_particles!(cache::ObservablesCache) =
+  (cache.velocity_at_particles_fields_epoch = cache.fields_epoch;
+   cache.velocity_at_particles_particles_epoch = cache.particles_epoch; cache.velocity_at_particles)
 
 
 # The deposit-completeness check: every slot the configuration carries must sit at the
@@ -341,8 +326,8 @@ function check_deposits(cache::ObservablesCache)
   cache.max_speed_epoch == cache.fields_epoch ||
     error("iteration closed with the maximum speed undeposited — a solver scheduling bug")
   cache.velocity_at_particles === nothing ||
-    (cache.sample_fields_epoch == cache.fields_epoch &&
-     cache.sample_particles_epoch == cache.particles_epoch) ||
+    (cache.velocity_at_particles_fields_epoch == cache.fields_epoch &&
+     cache.velocity_at_particles_particles_epoch == cache.particles_epoch) ||
     error("iteration closed with the velocity sample undeposited — a solver scheduling bug")
   return cache
 end
@@ -413,16 +398,16 @@ The run layer never calls this verb: its own tracer advance inside
 [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) moves the particles epoch through a
 separate, history-keeping announcement — the advance *extends* the history this verb discards.
 
-A hand-run loop that repositions tracers itself calls this, then
-[`record_velocity_at_particles!`](@ref GBGIsotropicTurbulence.Particles.record_velocity_at_particles!),
-then `deposit_sample!` (the write alone leaves the slot stale, and a read of it throws). A loop
+A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
+[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)`(cache, tracers, u)` — from the
+deposited velocity, so the slot is refilled at the new positions. A loop
 announcing to a bare cache rather than a `Simulation` must also call
 [`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying its own
 registers: the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form to reach for when a run is what you are holding, mirroring
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)'s two forms.
+[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)'s own `sim` form.
 
 Returns its argument.
 """
