@@ -21,7 +21,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   final_x(scheme, nsteps) = begin
     tracers = Tracers(domain; positions = PointSet(T[1.0 1.0 1.0]), interpolation_scheme = CatmullRom)
-    cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
                              history_depth = history_depth(scheme))
     buffers = allocate_buffers(scheme, tracers, cache)
     u_start = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
@@ -30,7 +30,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     for n in 0:nsteps-1
       set_uniform_x!(u_start, cos(ω * n * dt))
       set_uniform_x!(u_end, cos(ω * (n + 1) * dt))
-      record_particle_velocities!(tracers, u_start)
+      record_velocity_at_particles!(cache, tracers, u_start)
       advect!(scheme, tracers, u_end, domain, buffers, dt)
     end
     particle_positions(tracers)[1, 1]

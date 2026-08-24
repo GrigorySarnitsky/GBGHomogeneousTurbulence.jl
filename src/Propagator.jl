@@ -518,9 +518,9 @@ Every recovery here is work the next iteration's first stage would have done any
 iteration costs it no extra transforms. It costs one extra pass: the maximum-speed reduction runs
 every iteration, including under a hand-fixed ``\\Delta t`` that never reads it.
 
-The particle-velocities slot is **not** among them: it depends on the tracer positions as well as
+The velocity-at-particles slot is **not** among them: it depends on the tracer positions as well as
 the state, so it is filled by
-[`record_particle_velocities!`](@ref GBGIsotropicTurbulence.Particles.record_particle_velocities!)
+[`record_velocity_at_particles!`](@ref GBGIsotropicTurbulence.Particles.record_velocity_at_particles!)
 wherever the positions move — which `advance!` and the `deposit!(sim)` form above both do for you.
 
 Every iteration ends with this call: the run layer's

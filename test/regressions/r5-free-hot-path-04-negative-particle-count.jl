@@ -11,7 +11,7 @@
 #       Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, rng) : nothing
 #
 # A sign typo therefore yields a run that constructs and advances normally, and only surfaces much
-# later as `ArgumentError("this run advects no tracers, …")` from `particle_velocities(sim.cache)`
+# later as `ArgumentError("this run advects no tracers, …")` from `velocity_at_particles(sim.cache)`
 # — a message naming a configuration the user never asked for, and not naming the keyword at fault.
 
 using Test, Random, GBGIsotropicTurbulence

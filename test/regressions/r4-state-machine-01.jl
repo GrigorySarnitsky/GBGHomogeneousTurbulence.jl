@@ -1,12 +1,12 @@
-# Witness for the claim: "`advect!` reads the particle-velocities slot by direct array access,
+# Witness for the claim: "`advect!` reads the velocity-at-particles slot by direct array access,
 # bypassing the cache's checked accessor, so it silently consumes a sample the cache itself
 # considers stale."
 #
 # The correct behaviour this file asserts is the one the code and its docstrings actually promise:
 # the start-of-step velocity v₁ is CONSUMED MID-ITERATION, after the step has advanced the fields
-# epoch, and the value sitting in `tracers.particle_velocities` at that moment is exactly
+# epoch, and the value sitting in `tracers.velocity_at_particles` at that moment is exactly
 # u(tₙ, X(tₙ)) — the right v₁ for the step just taken. `advance!` verifies its freshness at tₙ (its
-# opening `particle_velocities(sim.cache)` guard) precisely because the later read cannot be checked:
+# opening `velocity_at_particles(sim.cache)` guard) precisely because the later read cannot be checked:
 # the cache's "stale" flag is by design raised between the step and the closing `deposit_sample!`,
 # and `advance!` itself calls `advect!` in exactly that window.
 #
@@ -30,14 +30,14 @@ function fresh_sim(seed)
 end
 
 
-@testset "the mid-iteration particle-velocity read consumes the correct v₁" begin
+@testset "the mid-iteration velocity-at-particles read consumes the correct v₁" begin
   dt = 0.002
 
   # ————— (1) the run layer's guard on a genuinely stale sample —————
   guarded = fresh_sim(1)
   advance!(guarded; dt = dt)
   fields_modified!(guarded.cache)               # an out-of-band state change: the sample is now stale
-  @test_throws ErrorException particle_velocities(guarded.cache)
+  @test_throws ErrorException velocity_at_particles(guarded.cache)
   @test_throws ErrorException advance!(guarded; dt = dt)
 
   # ————— (2) the hand-composed iteration —————
@@ -53,7 +53,7 @@ end
   deposit!(manual.cache, manual.state, manual.domain, manual.buffers)
 
   # The cache reports the sample stale here — this is the window `advance!` also advects in.
-  @test_throws ErrorException particle_velocities(manual.cache)
+  @test_throws ErrorException velocity_at_particles(manual.cache)
 
   advect!(manual.trajectory_scheme, manual.tracers, velocity_physical(manual.cache), manual.domain,
           manual.particle_buffers, dt)

@@ -22,14 +22,14 @@ using GBGPeriodicFields: field_data, CatmullRom
   make = () -> begin
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom,
                       rng = MersenneTwister(1))
-    cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities)
+    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
     (tracers, cache)                          # history_depth defaults to 1 ⇒ zero past slots
   end
 
   # 1. The mismatch is detectable where it is created: the cache carries fewer past-sample slots
   #    than the scheme's order requires.
   let (tracers, cache) = make()
-    @test length(cache.particle_velocity_history) < history_depth(scheme) - 1
+    @test length(cache.velocity_at_particles_history) < history_depth(scheme) - 1
   end
 
   # 2. The guard: `allocate_buffers` should refuse the pairing with a named `ArgumentError`.
@@ -42,7 +42,7 @@ using GBGPeriodicFields: field_data, CatmullRom
   let (tracers, cache) = make()
     outcome = try
       buffers = allocate_buffers(scheme, tracers, cache)
-      record_particle_velocities!(tracers, u)
+      record_velocity_at_particles!(cache, tracers, u)
       deposit_sample!(cache)
       advect!(scheme, tracers, u, domain, buffers, 0.01)
       :advanced

@@ -99,7 +99,7 @@ inverse. Operators and extended Base functions are imported before being extende
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
 `φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
 `cache.vorticity_physical`, `generator.product_spectral`, `state.velocity_spectral`,
-`Tracers.particle_velocities` — as do
+`cache.velocity_at_particles` — as do
 function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
 variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)

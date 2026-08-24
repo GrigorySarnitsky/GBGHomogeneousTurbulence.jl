@@ -25,7 +25,7 @@ using Test
   L = sim.domain.grid.domain_size[1]
   copyto!(particle_positions(sim.tracers), mod.(particle_positions(sim.tracers) .+ L / 2, L))
   particles_modified!(sim.cache)
-  record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
+  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   deposit_sample!(sim.cache)
 
   # (1) The promised restart: the pre-reposition history is no longer valid.
@@ -38,12 +38,13 @@ using Test
   dt = 0.001
   fresh = Tracers(sim.domain; positions = PointSet(copy(particle_positions(sim.tracers))),
                   interpolation_scheme = sim.tracers.interpolation_scheme)
-  record_particle_velocities!(fresh, u)
+
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an
   # independent integrator needs its own cache to hold its own history. The assertion is unchanged.
-  fresh_cache = ObservablesCache(sim.domain; particle_velocities = fresh.particle_velocities,
+  fresh_cache = ObservablesCache(sim.domain; number_of_particles = number_of_particles(fresh),
                                  history_depth = history_depth(sim.trajectory_scheme))
   fresh_buffers = allocate_buffers(sim.trajectory_scheme, fresh, fresh_cache)
+  record_velocity_at_particles!(fresh_cache, fresh, u)
 
   advect!(sim.trajectory_scheme, sim.tracers, u, sim.domain, sim.particle_buffers, dt)
   advect!(sim.trajectory_scheme, fresh, u, sim.domain, fresh_buffers, dt)

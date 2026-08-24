@@ -11,9 +11,9 @@ using GBGPeriodicFields: field_data, CatmullRom
 
   scheme = AdamsBashforth(order = 4)              # needs history_depth(scheme) == 4
   # A hand-assembled run that forgets `history_depth` gets the default 1 — no past slots at all.
-  cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities)
+  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
   @test history_depth(scheme) == 4
-  @test length(cache.particle_velocity_history) == 0
+  @test length(cache.velocity_at_particles_history) == 0
 
   # The mismatch must be refused where it is introduced, not deferred to a raw BoundsError deep
   # inside the tracer advance — the same construction-time refusal the package applies elsewhere.
@@ -21,6 +21,6 @@ using GBGPeriodicFields: field_data, CatmullRom
 end
 
 # Measured on the tree at 9b3ecdd: `allocate_buffers` returns a `MultistepBuffers` silently, and the
-# first `advect!` (after `record_particle_velocities!`) then throws
+# first `advect!` (after `record_velocity_at_particles!`) then throws
 #   BoundsError: attempt to access 0-element Vector{VectorPointValues{Float64, Matrix{Float64}}} at index [1]
 # from Particles.jl:474, `copyto!(point_values(past[1]), f0)` — naming neither the cache nor the scheme.

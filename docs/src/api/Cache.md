@@ -26,5 +26,5 @@ maximum speed is read through `max_speed`, documented with the reduction it stor
 velocity_physical
 vorticity_physical
 scalar_physical
-particle_velocities
+velocity_at_particles
 ```

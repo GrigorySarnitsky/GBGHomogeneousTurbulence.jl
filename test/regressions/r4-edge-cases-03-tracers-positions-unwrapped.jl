@@ -31,8 +31,9 @@ using Test
 
   sample(X) = begin
     tracers = Tracers(domain; positions = PointSet(copy(X)), interpolation_scheme = CatmullRom)
-    record_particle_velocities!(tracers, u)
-    copy(point_values(tracers.particle_velocities))
+    cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+    record_velocity_at_particles!(cache, tracers, u)
+    copy(point_values(cache.velocity_at_particles))
   end
 
   # (a) the excluded upper endpoint against its image at 0 — the case `_wrap!`'s own comment names

@@ -135,7 +135,7 @@ iteration's end would destroy the deposited velocity and vorticity, and keeping 
 minimal-memory schedule deliberately does not carry. The nonlinear terms therefore stay in the next
 step's first stage, and §2.4 lists them as not cached — the survival test deciding, as always. The numbers and the particle sample ride the same
 schedule: the maximum speed is reduced from the just-deposited velocity for the next iteration's
-timestep choice, and the particle velocities are interpolated from that velocity at each particle's new
+timestep choice, and the velocity at the particles is interpolated from that velocity at each particle's new
 position for the next advance's predictor.
 
 **The loop observes, then advances.** The callback reads what it wants and answers whether the run
@@ -320,15 +320,15 @@ into the velocity's. No third array exists, and the evaluation holds two vector 
 representation at once. The vorticity is deposited at the iteration's end either way, so the reuse changes the
 run's residency, not the cache's contents.
 
-The tracer scheme consumes two velocity samples per push. The first — the **particle velocities**
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
+The tracer scheme consumes two velocity samples per push. The first — the **velocity at the
+particles**, ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
 cache's deposit from the previous closing deposit; the
 second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 A multistep trajectory scheme looks further back, and the cache is where that history lives: built
-with `history_depth` ``> 1`` it keeps a bounded ring of **past** particle-velocity samples —
+with `history_depth` ``> 1`` it keeps a bounded ring of **past** velocity samples —
 `history_depth` ``- 1`` further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
 integrates over and an out-of-band reposition discards (`particles_modified!`). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
@@ -352,7 +352,7 @@ whether the package holds the observable today, and reads `—` wherever *Cached
 | ``\boldsymbol{u}`` | physical, grid | yes | yes | the closing recovery; read by the timestep choice, the tracer advance, the Lamb assembly, and observations |
 | ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the closing recovery; read by the Lamb assembly |
 | ``\varphi`` | physical, grid | yes | yes | the closing recovery; read by the flux assembly |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the particle velocities | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
 | the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | yes | kept only when a multistep trajectory scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | yes | the closing reduction over the cached velocity; read by the next timestep choice |
 | ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
@@ -387,9 +387,9 @@ third — a number, obtained by summing over wavenumbers without building any fi
 [`dissipation`](@ref) returns when an observation applies it to the state. It may be written with
 either form precisely because they agree in the mean.
 
-**Only one tracer sample reflects the flow.** The particle velocities
-``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` give the velocity at each particle's own position and
-moment, and are what a Lagrangian statistic accumulates. The second, at a predicted position differing
+**Only one tracer sample reflects the flow.** The velocity at the particles,
+``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, is the velocity at each particle's own position and
+moment, and is what a Lagrangian statistic accumulates. The second, at a predicted position differing
 from the endpoint by ``\mathcal{O}(\Delta t^{2})``, exists only to give the position update its
 second-order accuracy; it belongs to no instant along the trajectory.
 
@@ -411,25 +411,25 @@ no deposit is current. The closing [`deposit!`](@ref) ends an iteration (the run
 after every step; the `Simulation` constructor makes the seeding deposit), and
 [`fields_modified!`](@ref) announces a change made outside an iteration — the *resolved
 fields* being the two integrated fields — after which reads
-throw until an explicit `deposit!`. The accessor [`particle_velocities`](@ref) returns the particle velocities —
-a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
+throw until an explicit `deposit!`. The accessor [`velocity_at_particles`](@ref) returns the velocity sampled at the
+particle positions — a cached read like the fields' — and [`interpolate_at_particles!`](@ref) interpolates any physical field at the
 particle positions.
 
 ```julia
 domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 cache  = ObservablesCache(domain; scalar = true)   # the slots follow the configuration
 
-# With tracers, the particle-velocities slot is the tracer set's own storage, passed in.
+# With tracers, the cache allocates the velocity-at-particles slot, sized by the count.
 # The interpolation scheme comes from the field library, not from this package:
 using GBGPeriodicFields: CatmullRom
 tracers = Tracers(domain; number_of_particles = 1024, interpolation_scheme = CatmullRom)
-cache   = ObservablesCache(domain; scalar = true, particle_velocities = tracers.particle_velocities)
+cache   = ObservablesCache(domain; scalar = true, number_of_particles = 1024)
 ```
 
 ### 3.2 Coverage — the page against the code
 
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
-epoch — the particle velocities included, against both epochs — three-valued slot epochs that
+epoch — the velocity sample included, against both epochs — three-valued slot epochs that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the
 deposit-completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes the run after every iteration and once before the first — ``n`` iterations, ``n + 1``

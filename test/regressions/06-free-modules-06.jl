@@ -24,7 +24,8 @@ m_arrays(owner) = (acc = AbstractArray[];
 # What the audit's testset pins, verbatim (test/memory_audit.jl:321-333).
 tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                   rng = MersenneTwister(1))
-heun_buffers = allocate_buffers(EndpointHeun(), tracers)
+cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+heun_buffers = allocate_buffers(EndpointHeun(), tracers, cache)
 println("audit-pinned:      tracers=", length(m_arrays(tracers)),
         " buffers=", length(m_arrays(heun_buffers)),
         " total=", length(m_arrays(tracers)) + length(m_arrays(heun_buffers)))
@@ -38,7 +39,7 @@ for scheme in (EndpointHeun(), AdamsBashforth(order = 2), AdamsBashforth(order =
   collect_field_arrays!(acc, sim, Set{UInt}(), 2)
   n = count(a -> size(a) == (M, 3), acc)
   println(rpad(string(typeof(scheme)), 46), " live (M,3) arrays = ", n,
-          "   history slots = ", length(sim.cache.particle_velocity_history))
+          "   history slots = ", length(sim.cache.velocity_at_particles_history))
 end
 
 # Why the count above does not move: the reflective walk stops at an `AbstractArray`, so a
@@ -49,6 +50,6 @@ acc = AbstractArray[]
 collect_field_arrays!(acc, sim8, Set{UInt}(), 2)
 println("AB8 walk, all reached array shapes: ", sort(string.(size.(acc))))
 println("history container is itself an AbstractArray: ",
-        sim8.cache.particle_velocity_history isa AbstractArray,
-        "  eltype = ", eltype(sim8.cache.particle_velocity_history),
-        "  bytes held = ", sum(sizeof, sim8.cache.particle_velocity_history))
+        sim8.cache.velocity_at_particles_history isa AbstractArray,
+        "  eltype = ", eltype(sim8.cache.velocity_at_particles_history),
+        "  bytes held = ", sum(sizeof, sim8.cache.velocity_at_particles_history))

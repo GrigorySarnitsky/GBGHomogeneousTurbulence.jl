@@ -15,13 +15,13 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
   # --- forward mismatch: buffers for order 2, driven at order 4 -------------------------------
   tracers = Tracers(domain; number_of_particles = 6, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
-  cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
                            history_depth = 2)
   buffers = allocate_buffers(AdamsBashforth(order = 2), tracers, cache)
 
   @test_throws ArgumentError begin
     for _ in 1:5
-      record_particle_velocities!(tracers, u)
+      record_velocity_at_particles!(cache, tracers, u)
       advect!(AdamsBashforth(order = 4), tracers, u, domain, buffers, 0.01)
     end
   end
@@ -29,13 +29,13 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
   # --- reverse mismatch: buffers for order 4, driven at order 2 -------------------------------
   tracers2 = Tracers(domain; number_of_particles = 6, interpolation_scheme = CatmullRom,
                      rng = MersenneTwister(1))
-  cache2 = ObservablesCache(domain; particle_velocities = tracers2.particle_velocities,
+  cache2 = ObservablesCache(domain; number_of_particles = number_of_particles(tracers2),
                             history_depth = 4)
   buffers2 = allocate_buffers(AdamsBashforth(order = 4), tracers2, cache2)
 
   @test_throws ArgumentError begin
     for _ in 1:5
-      record_particle_velocities!(tracers2, u)
+      record_velocity_at_particles!(cache2, tracers2, u)
       advect!(AdamsBashforth(order = 2), tracers2, u, domain, buffers2, 0.01)
     end
   end

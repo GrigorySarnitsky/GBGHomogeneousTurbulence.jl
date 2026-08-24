@@ -6,7 +6,7 @@
 #
 # Scope note, measured here and NOT part of the claim: the tracer path is not allocation-free as a
 # whole — `GBGPeriodicFields`' `interpolate!` allocates 912 bytes per call, so `EndpointHeun`'s
-# `advect!` and `record_particle_velocities!` each cost that much per step whatever the scheme.
+# `advect!` and `record_velocity_at_particles!` each cost that much per step whatever the scheme.
 # That is a backend cost, outside this package. The multistep branch of `advect!(::AdamsBashforth, …)`
 # interpolates nothing, so its correct allocation count is exactly zero: the assertions below are
 # achievable by giving `MultistepBuffers` the two weight registers (or by a stack-allocated solve).
@@ -32,7 +32,7 @@ end
   heun_bytes = allocations_of(advect!, heun.trajectory_scheme, heun.tracers,
                               velocity_physical(heun.cache), heun.domain,
                               heun.particle_buffers, 1.0e-3)
-  interp_bytes = allocations_of(IT.Particles.record_particle_velocities!, heun.tracers,
+  interp_bytes = allocations_of(IT.Particles.record_velocity_at_particles!, heun.cache, heun.tracers,
                                 velocity_physical(heun.cache))
   @info "reference: one-step advance and its interpolation" heun_bytes interp_bytes
 

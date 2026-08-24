@@ -4,7 +4,7 @@
 # `random_solenoidal_velocity_spectral!`'s own note (src/State.jl:88-98) sanctions the sequence
 # "seed into a live run → `fields_modified!` → `deposit!` → advance again".  `deposit!(sim)`
 # re-records the CURRENT Lagrangian sample from the new field, but `fields_modified!`
-# (src/Cache.jl:352) advances the fields epoch only: `cache.particle_velocity_history` keeps the
+# (src/Cache.jl:352) advances the fields epoch only: `cache.velocity_at_particles_history` keeps the
 # samples interpolated from the DISCARDED field, and `advect!(::AdamsBashforth, …)` — which decides
 # on `cache.history_filled` alone — blends them into the next position update at full weight
 # (equal steps, order 4: 55/24·fₙ − 59/24·f₁ + 37/24·f₂ − 9/24·f₃).
@@ -41,7 +41,7 @@ fresh_sim() = Simulation(grid_points_per_axis = N, viscosity = 0.05, number_of_p
 function euler_departure!(sim, h)
   L  = Float64(sim.domain.grid.domain_size[1])
   X0 = copy(Array(particle_positions(sim.tracers)))
-  f0 = copy(Array(particle_velocities(sim.cache)))
+  f0 = copy(Array(velocity_at_particles(sim.cache)))
   advance!(sim; dt = h)
   d  = copy(Array(particle_positions(sim.tracers))) .- X0
   d .= d .- L .* round.(d ./ L)                    # undo the periodic wrap

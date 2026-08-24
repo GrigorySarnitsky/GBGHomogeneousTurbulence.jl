@@ -1,7 +1,7 @@
-# Witness: the particle-velocities slot is the one cached observable that depends on TWO counters —
+# Witness: the velocity-at-particles slot is the one cached observable that depends on TWO counters —
 # the fields epoch of the interpolated velocity and the particles epoch of the positions it was
 # interpolated at.  `deposit_sample!` (Cache.jl:309) stamps both, and `check_deposits` (Cache.jl:327)
-# compares both.  The checked read `particle_velocities` (Cache.jl:264) compares only the fields
+# compares both.  The checked read `velocity_at_particles` (Cache.jl:264) compares only the fields
 # epoch, so after an announced reposition — `particles_modified!`, which advances `particles_epoch`
 # and leaves `fields_epoch` alone — the read serves the sample taken at the ABANDONED positions as
 # though it were current, instead of throwing.
@@ -18,7 +18,7 @@ using Test
 using Random
 using GBGIsotropicTurbulence
 
-@testset "particle_velocities(cache) throws after an announced reposition (both epochs checked)" begin
+@testset "velocity_at_particles(cache) throws after an announced reposition (both epochs checked)" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                    number_of_particles = 8, rng = MersenneTwister(3))
   advance!(sim)
@@ -26,7 +26,7 @@ using GBGIsotropicTurbulence
   # Baseline: after a plain advance! the slot is current on BOTH counters, so the read serves.
   @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
   @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
-  @test size(particle_velocities(sim.cache)) == (8, 3)
+  @test size(velocity_at_particles(sim.cache)) == (8, 3)
 
   # Announce an out-of-band reposition: the positions the sample belongs to are abandoned.
   particles_modified!(sim.cache)
@@ -34,7 +34,7 @@ using GBGIsotropicTurbulence
   @test sim.cache.sample_particles_epoch != sim.cache.particles_epoch  # positions moved on
 
   # The cache's central invariant: a read finds a current value or throws.
-  @test_throws ErrorException particle_velocities(sim.cache)
+  @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # The cache's own completeness check agrees the slot is not current on this identical state —
   # so a passing read above is the cache contradicting itself.

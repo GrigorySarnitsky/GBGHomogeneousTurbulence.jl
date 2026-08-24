@@ -1,16 +1,16 @@
-# Witness: the particle-velocities cached read must be checked against BOTH epochs.
+# Witness: the velocity-at-particles cached read must be checked against BOTH epochs.
 #
-# `particle_velocities(cache)`'s own docstring and `check_deposits` agree that the sample is current
+# `velocity_at_particles(cache)`'s own docstring and `check_deposits` agree that the sample is current
 # only when `sample_fields_epoch == fields_epoch` AND `sample_particles_epoch == particles_epoch`
 # (it is a function of the state and of the positions together). After an announced out-of-band
 # reposition — `particles_modified!` — that has not yet been completed with
-# `record_particle_velocities!` + `deposit_sample!`, the sample is stale: it holds
+# `record_velocity_at_particles!` + `deposit_sample!`, the sample is stale: it holds
 # u(tₙ, X_old), not u(tₙ, X_new). The read must throw, and `advance!` — whose opening guard is
 # exactly this read — must refuse to step on it.
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particles_modified!, particle_velocities
+using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
 using GBGIsotropicTurbulence.SimulationRun: Simulation, advance!
 
 function fresh_run()
@@ -20,24 +20,24 @@ function fresh_run()
   return sim
 end
 
-@testset "the particle-velocities read is stale after an announced reposition" begin
+@testset "the velocity-at-particles read is stale after an announced reposition" begin
 
   @testset "the accessor throws once the positions have moved past the sample" begin
     sim = fresh_run()
-    v_before = copy(Array(particle_velocities(sim.cache)))
+    v_before = copy(Array(velocity_at_particles(sim.cache)))
 
     # An out-of-band reposition, announced exactly as the docstring prescribes, and NOT yet
-    # completed with `record_particle_velocities!` / `deposit_sample!`.
+    # completed with `record_velocity_at_particles!` / `deposit_sample!`.
     L = sim.domain.grid.domain_size[1]
     particle_positions(sim.tracers) .= mod.(particle_positions(sim.tracers) .+ 0.3, L)
     particles_modified!(sim.cache)
 
     # The sample now belongs to the abandoned positions: reading it must throw.
-    @test_throws ErrorException particle_velocities(sim.cache)
+    @test_throws ErrorException velocity_at_particles(sim.cache)
 
     # And it must certainly not silently serve the pre-reposition values.
     ok = try
-      v_after = copy(Array(particle_velocities(sim.cache)))
+      v_after = copy(Array(velocity_at_particles(sim.cache)))
       !(v_after == v_before)      # served something — it had better not be the stale sample
     catch
       true                        # threw, as it should

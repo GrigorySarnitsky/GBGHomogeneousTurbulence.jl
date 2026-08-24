@@ -51,7 +51,7 @@ at both ends of the step: the run records the sample at the iteration's end, off
 velocity, and the next iteration's `advect!` reads it back as the first half of its pair.
 
 ```@docs
-record_particle_velocities!
+record_velocity_at_particles!
 advect!
 restart!
 history_depth
@@ -82,7 +82,7 @@ warmup!(sim)
 advance!(sim)
 
 particle_positions(sim.tracers)              # (M, 3) positions at the current instant
-particle_velocities(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
+velocity_at_particles(sim.cache)               # u(tₙ, X(tₙ)) — the Lagrangian sample, a checked read
 out = new_vector_point_values(sim.tracers)   # allocate once, then reuse
 interpolate_at_particles!(out, velocity_physical(sim.cache), sim.tracers)
 ```

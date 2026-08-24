@@ -210,7 +210,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   The recovered values land in the **`ObservablesCache`** — its own module, `Cache`, included after
   `Observables`. That is the storage each iteration fills at its end with its observables: the
   physical velocity, vorticity and scalar, the maximum speed, and, when tracers ride the run, the
-  particle velocities ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``. It fills them under the
+  velocity at the particles ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``. It fills them under the
   no-recompute rule (`docs/src/observables_cache.md` is the design page; §11 decision 40).
 
   A slot IS its producer's register: the step takes the chart arrays as its
@@ -431,17 +431,17 @@ scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on th
 (decision 50). The default scheme, `EndpointHeun`, is Heun-in-time on
 the velocity at the iteration's two endpoints. ``\boldsymbol{v}_1`` is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
-Lagrangian velocity, held in `Tracers.particle_velocities` and recorded in the observables cache
+Lagrangian velocity, held in the observables cache's own `velocity_at_particles` slot and dated
 against BOTH epochs, since it is a function of the state and the positions together (read through
-`particle_velocities`, §11 decision 42). ``\boldsymbol{v}_2`` interpolates the just-deposited
+`velocity_at_particles`, §11 decisions 42 and 67). ``\boldsymbol{v}_2`` interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
-`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, `record_particle_velocities!` writes the new sample at the new
+`ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, `record_velocity_at_particles!` writes the new sample at the new
 positions from the same deposited field and `deposit_sample!` records it at the current epochs (the
 write alone leaves the slot stale), completing the iteration's deposits; `interpolate_at_particles!` reads any field along the
 trajectories for Lagrangian statistics.
 
 The two-verb split is what keeps an ``M``-point instrument at ``M``-point cost: recording the sample
-onto the tracers stores ``M\times3`` values where retaining the endpoint field would cost an
+at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
 ``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
 recorded as **forbidden**: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
@@ -450,7 +450,7 @@ differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so reusing i
 the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
 Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
-same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers)` builds its
+same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
 registers. Two axes matter: the trajectory scheme — the default second-order `EndpointHeun`, and the
 variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
 and its own registers in `MultistepBuffers`; decision 57) for a run whose trajectory accuracy in
@@ -1607,7 +1607,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     kernels landed; passes and transforms are untouched — the decision moves residency only.
 
 42. **(2026-08) The trajectory sample is a cache slot, and the tracer velocity registers are named
-    for what they are.** `Tracers.velocity1` / `velocity2` were categorically different objects
+    for what they are.** *[The storage wiring — the slot as the tracer set's own array under two
+    names — is superseded by decision 67: the cache allocates and owns the slot. The sample's slot
+    status, its two epochs, the iteration-end schedule, the unserved predictor register, and the
+    forbidden reuse all stand.]* `Tracers.velocity1` / `velocity2` were categorically different objects
     wearing sequence numbers: the first is the **trajectory sample**
     ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable between iterations —
     the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
@@ -2141,6 +2144,25 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the `GBGPeriodicFields` point types, and a caller who needs the bare array back extracts it
     with that package's accessors. (A malformed shape is refused one layer down, by `PointSet`'s
     own constructor — the guard lives with the type that owns the invariant.)
+
+67. **(2026-08, user-directed) The velocity sample is cache-owned, and named for what it measures:
+    `velocity_at_particles`.** Decision 42 made the trajectory sample a cache slot but wired the
+    slot to the tracer set's own point-value storage — one array under two names. That aliasing was
+    the last seam in the observable/state split: the sample
+    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is an observable of the **flow** — a tracer has no
+    velocity of its own — so `Tracers` now carries positions and the interpolation scheme only,
+    and the `ObservablesCache` allocates the slot itself (a `number_of_particles` keyword sizes an
+    ``M \times 3`` point-value section on the domain's backend, plus the multistep history)
+    exactly as it allocates the field charts. `record_velocity_at_particles!(cache, tracers, u)`
+    writes into the cache it is handed; `allocate_buffers(scheme, tracers, cache)` takes the cache
+    whose slot and history the scheme's registers ride; the checked read is unchanged in contract.
+    The name changed with the ownership, on the user's ruling: *particle velocities* would name
+    particle **state** — the inertial ladder's own ``\boldsymbol{v}`` — while this slot holds the
+    flow's velocity sampled at the particle positions. `particle_velocities` /
+    `record_particle_velocities!` became `velocity_at_particles` / `record_velocity_at_particles!`
+    (the `at_particles` morpheme from `interpolate_at_particles!`), and prose everywhere says "the
+    velocity at the particles", never "the particle velocities". Ownership and naming landed in one
+    commit, so each affected doc surface was written once.
 
 ## References
 

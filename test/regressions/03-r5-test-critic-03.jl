@@ -1,4 +1,4 @@
-# Witness for the claim: "`particle_velocities(cache)`'s two-epoch AND check is never driven to a
+# Witness for the claim: "`velocity_at_particles(cache)`'s two-epoch AND check is never driven to a
 # stale state by either epoch alone, so a regression flipping `&&` to `||`, or dropping either half,
 # would pass the whole suite."
 #
@@ -17,7 +17,7 @@
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particle_velocities, fields_modified!, particles_modified!,
+using GBGIsotropicTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!,
                                     deposit_sample!
 
 
@@ -25,14 +25,14 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
                      rng = MersenneTwister(20260821))
 
 
-@testset "each epoch alone drives the particle-velocities read stale" begin
+@testset "each epoch alone drives the velocity-at-particles read stale" begin
 
   # ————— the control: a completed iteration leaves both counters current and the read served —————
   sim = build()
   advance!(sim; dt = 0.01)
   @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
   @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
-  @test size(particle_velocities(sim.cache)) == (4, 3)
+  @test size(velocity_at_particles(sim.cache)) == (4, 3)
 
   # ————— (1) the fields half alone —————
   sim = build()
@@ -41,7 +41,7 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   # the particles half is still satisfied, so only the fields comparison can raise the throw
   @test sim.cache.sample_particles_epoch == sim.cache.particles_epoch
   @test sim.cache.sample_fields_epoch != sim.cache.fields_epoch
-  @test_throws ErrorException particle_velocities(sim.cache)
+  @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # ————— (2) the particles half alone —————
   sim = build()
@@ -50,10 +50,10 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   # the fields half is still satisfied, so only the particles comparison can raise the throw
   @test sim.cache.sample_fields_epoch == sim.cache.fields_epoch
   @test sim.cache.sample_particles_epoch != sim.cache.particles_epoch
-  @test_throws ErrorException particle_velocities(sim.cache)
+  @test_throws ErrorException velocity_at_particles(sim.cache)
 
   # ————— and the sanctioned completion restores the read in the particles direction —————
-  record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
+  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   deposit_sample!(sim.cache)
-  @test size(particle_velocities(sim.cache)) == (4, 3)
+  @test size(velocity_at_particles(sim.cache)) == (4, 3)
 end

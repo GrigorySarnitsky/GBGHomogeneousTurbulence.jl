@@ -24,11 +24,12 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   X0 = T[1.0 1.0 1.0]
   tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom,
                     unwrapped = true)
-  buffers = allocate_buffers(EndpointHeun(), tracers)
+  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers))
+  buffers = allocate_buffers(EndpointHeun(), tracers, cache)
   nsteps = 160
   dt = T(2.5) * L / nsteps                              # total drift 2.5 boxes in x
   for _ in 1:nsteps
-    record_particle_velocities!(tracers, u)
+    record_velocity_at_particles!(cache, tracers, u)
     advect!(EndpointHeun(), tracers, u, domain, buffers, dt)
   end
   Xw = particle_positions(tracers)
@@ -40,11 +41,11 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   # The AdamsBashforth path shares the terms: same flow, same drift, both records advanced.
   ab = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom, unwrapped = true)
-  sim_free_cache = ObservablesCache(domain; particle_velocities = ab.particle_velocities,
+  sim_free_cache = ObservablesCache(domain; number_of_particles = number_of_particles(ab),
                                     history_depth = history_depth(AdamsBashforth(order = 2)))
   ab_buffers = allocate_buffers(AdamsBashforth(order = 2), ab, sim_free_cache)
   for _ in 1:nsteps
-    record_particle_velocities!(ab, u)
+    record_velocity_at_particles!(sim_free_cache, ab, u)
     advect!(AdamsBashforth(order = 2), ab, u, domain, ab_buffers, dt)
   end
   @test unwrapped_positions(ab)[1, 1] ≈ X0[1, 1] + 2.5L rtol = 1e-10

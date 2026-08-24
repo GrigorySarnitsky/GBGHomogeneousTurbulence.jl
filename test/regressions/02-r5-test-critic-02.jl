@@ -1,4 +1,4 @@
-# Witness: `advance!`'s opening guard — `sim.tracers === nothing || particle_velocities(sim.cache)`
+# Witness: `advance!`'s opening guard — `sim.tracers === nothing || velocity_at_particles(sim.cache)`
 # (src/SimulationRun.jl:456) — must actually refuse an iteration whose trajectory v₁ is not the
 # sample the previous closing deposit deposited, and must let the iteration through once the
 # sanctioned announcement/completion protocol has restored it.
@@ -6,7 +6,7 @@
 # The claim under test was that nothing exercises this line. This file exercises it directly: a
 # hand-written reposition of the tracer positions, announced with `particles_modified!` and NOT yet
 # completed, must make the next `advance!` throw; completing the protocol
-# (`record_particle_velocities!` + `deposit_sample!`) must make the next `advance!` succeed. Delete
+# (`record_velocity_at_particles!` + `deposit_sample!`) must make the next `advance!` succeed. Delete
 # the guard line and part (1) fails; check the wrong epoch there and part (1) fails too.
 
 using Test, Random, GBGIsotropicTurbulence
@@ -37,9 +37,9 @@ build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_parti
   @test current_step(sim) == step_before          # the refused iteration left the clock alone
 
   # (2) The sanctioned completion restores the read, and the very next `advance!` succeeds.
-  record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
+  record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   deposit_sample!(sim.cache)
-  @test size(particle_velocities(sim.cache)) == (4, 3)
+  @test size(velocity_at_particles(sim.cache)) == (4, 3)
   advance!(sim; dt = 0.01)
   @test current_step(sim) == step_before + 1
 

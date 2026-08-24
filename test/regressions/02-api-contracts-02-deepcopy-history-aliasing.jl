@@ -1,4 +1,4 @@
-# Witness: the claim that `past = [deepcopy(particle_velocities) for _ in 1:…]` (src/Cache.jl:166)
+# Witness: the claim that `past = [deepcopy(velocity_at_particles) for _ in 1:…]` (src/Cache.jl:166)
 # may alias rather than independently duplicate its storage — on a device backend in particular —
 # so that the multistep history shift `copyto!(point_values(past[j]), point_values(past[j-1]))`
 # (src/Particles.jl:483) would corrupt a slot some other slot secretly shares.
@@ -27,13 +27,13 @@ using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
                        dealiasing = TwoThirds(), array_type = Array)
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
-  cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
                            history_depth = K)
-  past = cache.particle_velocity_history
+  past = cache.velocity_at_particles_history
   @test length(past) == K - 1
 
   # every slot is a distinct object over a distinct array, including against the current slot
-  slots = Any[tracers.particle_velocities, past...]
+  slots = Any[cache.velocity_at_particles, past...]
   arrays = map(point_values, slots)
   for i in eachindex(arrays), j in eachindex(arrays)
     i == j && continue
@@ -59,7 +59,7 @@ using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
   for j in (K - 1):-1:2
     copyto!(point_values(past[j]), point_values(past[j-1]))
   end
-  copyto!(point_values(past[1]), point_values(tracers.particle_velocities))
+  copyto!(point_values(past[1]), point_values(cache.velocity_at_particles))
   # slots 1 (current) and past[1] now hold 1.0; past[j] holds the old past[j-1] = j
   @test all(point_values(past[1]) .== T(1))
   for j in 2:(K - 1)

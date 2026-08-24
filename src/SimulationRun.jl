@@ -10,7 +10,7 @@
 # closing `deposit!` recovers the iteration's observables into the cache at the new epoch, and the deposit-
 # completeness check closes the iteration. The timestep choice reads the cached maximum speed — scalar
 # arithmetic, no grid pass. The tracer advance is Heun on the two endpoint velocities: v₁ is the
-# particle velocities the PREVIOUS closing deposit left (read checked), v₂ interpolates the just-deposited
+# velocity sample the PREVIOUS closing deposit left (read checked), v₂ interpolates the just-deposited
 # u(tₙ₊₁) at the predictor positions, and the new sample is recorded at the new positions from the
 # same field, completing the iteration's deposits; only M-sized point values are held, never a second field copy.
 
@@ -40,7 +40,7 @@ using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scal
 import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits, deposit_sample!, advance_particles_epoch!,
                advance_fields_epoch!,
-               velocity_physical, max_speed, particle_velocities
+               velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController
@@ -48,7 +48,7 @@ using ..Generator: FlowConditions, ResolvedGenerator
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
-using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_particle_velocities!, advect!,
+using ..Particles: Tracers, AbstractParticleIntegrator, EndpointHeun, record_velocity_at_particles!, advect!,
                    unwrapped_positions, particle_positions,
                    restart!, history_depth
 using ..Phenomenology: FlowParameters, taylor_reynolds
@@ -456,13 +456,13 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # The cache is built first: it carries the Lagrangian sample history a multistep trajectory scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
-                           particle_velocities = tracers === nothing ? nothing : tracers.particle_velocities,
+                           number_of_particles = tracers === nothing ? 0 : Int(number_of_particles),
                            history_depth = history_depth(trajectory_scheme))
   particle_buffers = tracers === nothing ? nothing :
                      allocate_buffers(trajectory_scheme, tracers, cache)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
-    (record_particle_velocities!(tracers, velocity_physical(cache)); deposit_sample!(cache))
+    (record_velocity_at_particles!(cache, tracers, velocity_physical(cache)); deposit_sample!(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), integration_scheme, state, cache,
                     tracers, tracers === nothing ? nothing : trajectory_scheme, particle_buffers,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
@@ -484,10 +484,10 @@ end
 
 function deposit!(sim::Simulation)
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
-  # The particle velocities ride the same re-deposit: the positions are unchanged, so re-recording
+  # The velocity sample rides the same re-deposit: the positions are unchanged, so re-recording
   # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
-    (record_particle_velocities!(sim.tracers, velocity_physical(sim.cache));
+    (record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache));
      deposit_sample!(sim.cache))
   return sim
 end
@@ -617,10 +617,10 @@ function advance!(sim::Simulation; dt = nothing)
     throw(ArgumentError("the timestep must be positive, got $Δt" *
                         (dt === nothing ? " from the adaptive CFL rule (check `cfl`)" : "")))
 
-  # The checked read at the iteration's start: the advance's v₁ must be the particle velocities the previous
+  # The checked read at the iteration's start: the advance's v₁ must be the velocity sample the previous
   # closing deposit deposited. They are consumed mid-iteration (after the step, as the solver's own scratch), so
   # the epoch is verified here, at tₙ, where they are the current-epoch observable.
-  sim.tracers === nothing || particle_velocities(sim.cache)
+  sim.tracers === nothing || velocity_at_particles(sim.cache)
 
   step!(sim.integration_scheme, sim.state, sim.generator, sim.domain, sim.buffers, sim.cache, Δt)
 
@@ -635,7 +635,7 @@ function advance!(sim::Simulation; dt = nothing)
     # The run's own advance, not an out-of-band reposition: the epoch moves so the previous sample
     # reads stale, but the history the advance just extended stays intact.
     advance_particles_epoch!(sim.cache)
-    record_particle_velocities!(sim.tracers, velocity_physical(sim.cache))
+    record_velocity_at_particles!(sim.cache, sim.tracers, velocity_physical(sim.cache))
     deposit_sample!(sim.cache)
   end
   check_deposits(sim.cache)

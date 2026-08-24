@@ -321,22 +321,29 @@ const EPISODE_UNITS = [
           _add(FRAME, _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:band, :velocity)))
   end
 
-  @testset "tracer storage scales with M, not N — and splits state from scheme" begin
-    # Four (M, 3) arrays in total, but they are owned by two different values, and WHICH owns which
-    # is the invariant (decision 50). The tracer set holds trajectory STATE only — the positions and
-    # the recorded Lagrangian velocity; the predictor pair belongs to the scheme's registers, so a
-    # different scheme changes the second count and never the first.
+  @testset "tracer storage scales with M, not N — and splits state from observable from scheme" begin
+    # Four (M, 3) arrays in total, owned by THREE different values, and WHICH owns which is the
+    # invariant (decisions 50 and 67). The tracer set holds trajectory STATE only — the positions;
+    # the recorded Lagrangian velocity is an OBSERVABLE, so its slot is the cache's like every
+    # other slot; the predictor pair belongs to the scheme's registers, so a different scheme
+    # changes that count and neither of the others.
     tracers = Tracers(domains[:TwoThirds]; number_of_particles = 4, interpolation_scheme = CatmullRom, rng = MersenneTwister(1))
-    buffers = allocate_buffers(EndpointHeun(), tracers)
+    tcache = ObservablesCache(domains[:TwoThirds]; number_of_particles = 4)
+    buffers = allocate_buffers(EndpointHeun(), tracers, tcache)
     _m_arrays(owner) = (acc = AbstractArray[];
                         collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
                         [a for a in acc if size(a) == (4, 3)])
-    @test length(_m_arrays(tracers)) == 2                  # positions, particle_velocities
-    @test length(_m_arrays(buffers)) == 2                  # predictor, velocity_predictor
-    # The split moved storage; it did not add any. The total is what the ledger prices.
-    @test length(_m_arrays(tracers)) + length(_m_arrays(buffers)) == 4
-    # And no scheme register hides in the state.
-    @test isempty(intersect((:predictor, :predictor_points, :velocity_predictor), fieldnames(Tracers)))
+    @test length(_m_arrays(tracers)) == 1                  # positions — state, nothing else
+    @test length(_m_arrays(tcache)) == 1                   # velocity_at_particles — the cache's slot
+    # The scheme's OWN registers: walked from `buffers` the count includes the cache it references,
+    # so the cache's arrays are subtracted by identity.
+    cache_ids = Set(objectid.(_m_arrays(tcache)))
+    @test length([a for a in _m_arrays(buffers) if !(objectid(a) in cache_ids)]) == 2
+    # The split moved storage; it did not add any: 1 + 1 + 2 unique arrays.
+    @test length(unique(objectid, vcat(_m_arrays(tracers), _m_arrays(tcache), _m_arrays(buffers)))) == 4
+    # And neither a scheme register nor the observable hides in the state.
+    @test isempty(intersect((:predictor, :predictor_points, :velocity_predictor, :velocity_at_particles),
+                            fieldnames(Tracers)))
   end
 
   # The multistep scheme's extra storage is its SAMPLE HISTORY, and the history is a deposited
@@ -351,14 +358,16 @@ const EPISODE_UNITS = [
                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);
                        [a for a in acc if size(a) == (4, 3)])
     for K in (1, 2, 4, 8)
-      cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+      cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
                                history_depth = K)
       buffers = allocate_buffers(AdamsBashforth(order = K), tracers, cache)
-      @test length(cache.particle_velocity_history) == K - 1     # the whole of the order's cost
+      @test length(cache.velocity_at_particles_history) == K - 1     # the whole of the order's cost
       # The scheme's OWN registers are the bootstrap pair and nothing else. Walked from `buffers`
       # the count would be one higher, because the buffers now reach the cache holding the history —
       # which is the point of the refactor, and is priced on the line above, not here.
-      @test length(m_arrays(buffers.startup)) == 2
+      startup_own = [a for a in m_arrays(buffers.startup)
+                     if !(objectid(a) in Set(objectid.(m_arrays(cache))))]
+      @test length(startup_own) == 2
       @test length(cache.sample_steps) == K - 1                  # host scalars, one per past sample
     end
   end

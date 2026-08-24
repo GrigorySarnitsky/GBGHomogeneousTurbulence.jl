@@ -38,12 +38,12 @@ end
   tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   # The sample history now lives in the ObservablesCache that owns the observable it extends, so an
   # independent integrator needs its own cache to hold its own history. The assertion is unchanged.
-  cache = ObservablesCache(domain; particle_velocities = tracers.particle_velocities,
+  cache = ObservablesCache(domain; number_of_particles = number_of_particles(tracers),
                            history_depth = history_depth(scheme))
   buffers = allocate_buffers(scheme, tracers, cache)
 
   for _ in 1:2                                      # warm the history up past the startup steps
-    record_particle_velocities!(tracers, u0)
+    record_velocity_at_particles!(cache, tracers, u0)
     advect!(scheme, tracers, u1, domain, buffers, dt)
   end
   @test cache.history_filled == 1                         # history full: the multistep branch is live
@@ -57,7 +57,7 @@ end
   # claim no design satisfies.
   copyto!(particle_positions(tracers), X1)
   particles_modified!(cache)
-  record_particle_velocities!(tracers, u0)
+  record_velocity_at_particles!(cache, tracers, u0)
   @test cache.history_filled == 0                         # the promised restart: no history to reuse
 
   advect!(scheme, tracers, u1, domain, buffers, dt)
@@ -65,8 +65,9 @@ end
 
   # The behaviour the docstring promises: an `EndpointHeun` startup step from the new positions.
   reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
-  heun = allocate_buffers(EndpointHeun(), reference)
-  record_particle_velocities!(reference, u0)
+  reference_cache = ObservablesCache(domain; number_of_particles = number_of_particles(reference))
+  heun = allocate_buffers(EndpointHeun(), reference, reference_cache)
+  record_velocity_at_particles!(reference_cache, reference, u0)
   advect!(EndpointHeun(), reference, u1, domain, heun, dt)
 
   @test reseeded ≈ particle_positions(reference)
