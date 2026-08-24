@@ -16,6 +16,7 @@
 # must be identical.  `EndpointHeun`, which keeps no history, is the control.
 
 using Test, Random, GBGIsotropicTurbulence
+using GBGPeriodicFields: field_data
 
 const N = 16
 const M = 8
@@ -44,8 +45,8 @@ function positions_after_reseed(scheme)
 
   advance!(a; dt = DT)
   advance!(b; dt = DT)
-  @test Array(a.state.velocity_spectral.fourier_coefficients) ==
-        Array(b.state.velocity_spectral.fourier_coefficients)   # the tracers are passive
+  @test Array(field_data(a.state.velocity_spectral)) ==
+        Array(field_data(b.state.velocity_spectral))   # the tracers are passive
 
   fresh = rand(MersenneTwister(11), M, 3) .* L
   reseed!(a, fresh)

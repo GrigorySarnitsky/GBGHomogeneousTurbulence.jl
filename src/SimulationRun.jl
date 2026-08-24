@@ -689,8 +689,8 @@ end
 
 function _check_reality(field, name)
   residual = reality_residual(field)
-  scale = maximum(abs, field.fourier_coefficients)
-  T = real(eltype(field.fourier_coefficients))
+  scale = maximum(abs, field_data(field))
+  T = field_scalar_type(field)
   residual <= sqrt(eps(T)) * scale ||
     throw(ArgumentError("fields_modified!: the $name coefficients are not the spectrum of a real " *
                         "field — the conjugate-symmetry residual is $residual against a field scale " *

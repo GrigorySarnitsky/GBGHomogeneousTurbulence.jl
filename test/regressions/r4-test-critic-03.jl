@@ -8,6 +8,7 @@
 # that a later `>` -for- `>=` slip cannot pass in silence.
 
 using Test, GBGIsotropicTurbulence
+using GBGPeriodicFields: field_data
 
 @testset "`Simulation` rejects a negative `scalar_variance` and accepts the zero boundary" begin
   # Explicit-viscosity mode.
@@ -37,5 +38,5 @@ using Test, GBGIsotropicTurbulence
   sim = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
                    scalar = true, scalar_variance = 0.0)
   @test scalar_variance(sim.state.scalar_spectral) == 0.0
-  @test all(isfinite, Array(sim.state.scalar_spectral.fourier_coefficients))
+  @test all(isfinite, Array(field_data(sim.state.scalar_spectral)))
 end
