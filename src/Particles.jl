@@ -119,12 +119,10 @@ advect!(EndpointHeun(), tracers, u_end, domain, buffers, dt)
 Read the particle state with [`particle_positions`](@ref) and [`number_of_particles`](@ref), both of
 which read the tracer set directly; `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions [`unwrapped_positions`](@ref) serves — the wrapped positions stay the dynamical
-state either way. The velocities are the exception, and deliberately so: they are a
-*deposited observable* rather than tracer state, so they are read from the run's observables cache
-through
+state either way. The velocities are a *deposited observable*, not tracer state: read them from the
+run's observables cache through
 [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the
-iteration's
-closing deposit leaves them.
+iteration's closing deposit leaves them.
 
 The trajectory scheme's own working storage is **not** here: it lives in a
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
