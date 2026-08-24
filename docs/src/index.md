@@ -35,22 +35,23 @@ you — spin it up to stationarity, and advance it:
 ```julia
 using GBGIsotropicTurbulence
 
-sim = Simulation(grid_points_per_axis = 64)   # a 64³ forced-stationary run;
-                                              # ν is set so the grid captures the dissipation scale
-warmup!(sim)                                  # spin up to statistical stationarity
-                                              # (the default forcing holds the kinetic energy at
-                                              #  the `kinetic_energy` keyword's value, 1.5 —
-                                              #  see VarianceController before measuring k itself)
+sim = Simulation(grid_points_per_axis = 64)
+# A 64³ forced-stationary run; ν is set so the grid captures the dissipation scale.
 
-t_end = current_time(sim) + 5.0               # observe and advance: the callback reads the run,
-run!(sim) do s                                # records what it wants, and decides continuation
-    current_time(s) < t_end
+warmup!(sim)
+# Spin up to statistical stationarity. The default forcing holds the kinetic energy
+# at the `kinetic_energy` keyword's value, 1.5 — see VarianceController before
+# measuring k itself.
+
+t_end = current_time(sim) + 5.0
+run!(sim) do s              # observe and advance: the callback reads the run,
+    current_time(s) < t_end # records what it wants, and decides continuation
 end
 
-# The state is always current; the cache serves what the last iteration's closing deposit
-# recorded (the epoch — the cache's freshness counter — is what a read is checked against).
-kinetic_energy(sim.state.velocity_spectral)   # a measured observable, read off the state
-velocity_physical(sim.cache)                  # what the last iteration's closing deposit left
+# The state is always current; the cache serves what the last iteration's closing
+# deposit recorded (the epoch — the cache's freshness counter — gates every read).
+kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
+velocity_physical(sim.cache)                 # the last closing deposit's field
 flow_parameters(sim)                          # the run's measured flow state
 ```
 
