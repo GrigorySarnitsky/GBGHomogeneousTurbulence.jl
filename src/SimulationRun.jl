@@ -72,7 +72,7 @@ end
                  dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; κ_max_η = nothing, kinetic_energy = 1.5, kwargs...)
 
-A ready-to-run case: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
+Everything one run needs, bundled: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and the
 assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the

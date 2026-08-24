@@ -113,7 +113,7 @@ stream (defaults to `Random.default_rng()`).
 
 Returns `û`.
 
-!!! note "Seeding a running case invalidates the observables cache"
+!!! note "Seeding a running simulation invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
@@ -206,7 +206,7 @@ stream (defaults to `Random.default_rng()`).
 
 Returns `φ̂`.
 
-!!! note "Seeding a running case invalidates the observables cache"
+!!! note "Seeding a running simulation invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
