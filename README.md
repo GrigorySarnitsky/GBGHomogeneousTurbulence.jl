@@ -4,7 +4,8 @@ A small, focused pseudospectral DNS of homogeneous isotropic turbulence on three
 domains: an incompressible velocity field and a single passive scalar, each optionally forced,
 advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle tracking
 and field sampling along the trajectories. Accumulating statistics over the fields and the sampled
-values is the caller's own analysis: `GBGPeriodicFields` supplies the field reductions and
+values is the caller's own analysis:
+[`GBGPeriodicFields.jl`](https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl) supplies the field reductions and
 [`GBGStreamingStatistics.jl`](https://github.com/GrigorySarnitsky/GBGStreamingStatistics.jl) the
 online estimators.
 
