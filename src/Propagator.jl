@@ -152,22 +152,27 @@ Allocate the per-step registers a scheme needs, dispatching on the concrete sche
 here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
 a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
 
-The first form serves the field schemes: it builds the [`IntegratorBuffers`](@ref) `scheme`
-needs, sized to the `domain` (a [`FixedDomain`](@ref), which fixes the grid, precision, and storage
-backend of every register). [`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`;
-[`IFHeun`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. Passing `scalar = true`
-adds the nested `ScalarBuffers`, likewise sized to the scheme.
+The arguments are:
+- `scheme` — the concrete scheme dispatched on: an [`AbstractIntegrator`](@ref) in the field form,
+  an
+  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator)
+  in the particle form.
+- `domain` — field form: the [`FixedDomain`](@ref), which fixes the grid, precision, and storage
+  backend of every register.
+- `scalar = false` — field form: `true` adds the nested `ScalarBuffers`, likewise sized to the
+  scheme.
+- `tracers` — particle form: the tracer set the registers are sized to.
+- `cache` — particle form: the
+  [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) whose
+  velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample
+  history it integrates over.
 
-The second form serves the particle integration schemes: it builds the
-[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers) the
-`scheme` (an
-[`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator))
-needs, sized to the tracer set `tracers`; the `cache` argument is the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) whose
-velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample history
-it integrates over. One generic covers both because it is
-one concept, and because every side keeps the same separation: the evolving state holds no scheme's
-scratch.
+The first form builds the [`IntegratorBuffers`](@ref) the scheme needs:
+[`IFLowStorageRK3`](@ref) allocates `stage1` and `nonlinear`; [`IFHeun`](@ref) allocates `stage1`,
+`stage2`, and `velocity_predictor_spectral`. The second form builds the
+[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers).
+One generic covers both because it is one concept, and because every side keeps the same
+separation: the evolving state holds no scheme's scratch.
 """
 function allocate_buffers end
 
@@ -510,20 +515,29 @@ it is one concept — each dynamical factor's advance is followed by its own dep
 closes as `step!` then `deposit!`, then
 [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) then `deposit!` again.
 
+The arguments are:
+- `cache` — every form's destination: the cache whose slots receive the deposits.
+- `state` — field form: the [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)
+  the step has just produced.
+- `domain` — field form: the [`FixedDomain`](@ref) whose plans run the recoveries.
+- `buffers` — field form: the scheme's [`IntegratorBuffers`](@ref), one spectral stage register of
+  which — dead at the iteration's end — is the recovery scratch.
+- `tracers` — particle form: the [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers) whose
+  current positions are sampled, with the set's own interpolation scheme.
+- `u` — particle form: the velocity field in physical representation to interpolate — normally the
+  field form's own fresh deposit.
+- `sim` — `sim` form: the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) to
+  unpack.
+
 The **field form** deposits the field-derived slots — the velocity, vorticity and, when the run
 carries one, scalar recoveries in physical representation, then the maximum-speed reduction over
-the just-deposited velocity — from the `state` (a
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)) the step has just produced.
-The recoveries run on the [`FixedDomain`](@ref) `domain`'s plans, through a spectral stage register
-of `buffers` (an [`IntegratorBuffers`](@ref)) that is dead at the iteration's end. Every recovery
+the just-deposited velocity — from the state the step has just produced. Every recovery
 is work the next iteration's first stage would have done anyway, so closing the iteration costs no
 extra transforms — one extra pass only, the maximum-speed reduction, which runs every iteration
 even under a hand-fixed ``\\Delta t`` that never reads it.
 
-The **particle form** deposits the one trajectory-bound slot: it interpolates the velocity field
-`u` (physical representation — normally the field form's own fresh deposit) at the current
-positions of the tracer set `tracers` (a [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers),
-whose interpolation scheme does the sampling), and stamps the slot against **both** counters — the
+The **particle form** deposits the one trajectory-bound slot: it interpolates `u` at the tracer
+set's current positions and stamps the slot against **both** counters — the
 fields epoch of the interpolated velocity and the particles epoch of the positions, since the
 velocity at the particles is a function of the two together. It therefore runs **after** the tracer
 push, which itself consumed the field form's deposit.
@@ -535,13 +549,12 @@ reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint f
 
 Every iteration ends with these deposits: the run layer's
 [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs them for you, the
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor makes the seeding
+`Simulation` constructor makes the seeding
 deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
 each form itself after the advance it closes. After mutating the state or the positions out of
 band, announce it — [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!) /
 [`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) — and re-deposit
-with the **`sim` form**: given a `Simulation` it unpacks the run and performs every deposit its
-configuration carries.
+with the **`sim` form**, which performs every deposit the run's configuration carries.
 
 Returns `cache` (or `sim`).
 """

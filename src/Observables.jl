@@ -83,8 +83,7 @@ kinetic_energy(u) = inner(u, u) / 2
     dissipation(ω, viscosity)
     dissipation(û, domain, viscosity)
 
-The mean kinetic-energy dissipation rate of a homogeneous flow — a single number, not a field — at
-the kinematic viscosity ``\\nu`` (the `viscosity` argument):
+The mean kinetic-energy dissipation rate of a homogeneous flow — a single number, not a field:
 
 ```math
 \\begin{aligned}
@@ -98,13 +97,18 @@ boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\bold
 the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
+The arguments are:
+- `ω` — first form: a vorticity field, in either representation.
+- `û` — second form: the velocity in spectral representation.
+- `domain` — second form: the [`FixedDomain`](@ref) supplying the
+  ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` multiplier.
+- `viscosity` — both forms: the kinematic viscosity ``\\nu``.
+
 Two routes reach the same rate; take the one whose input is already in hand. The first form measures
-from a vorticity field ``\\boldsymbol{\\omega}`` (the `ω` argument) in either representation, as the
-normalized inner product (Parseval) — use it where ``\\boldsymbol{\\omega}`` exists for its own sake,
-as the cached vorticity does. The second measures straight from the velocity in spectral
-representation ``\\hat{\\boldsymbol{u}}`` (the `û` argument), with the [`FixedDomain`](@ref) `domain`
-supplying the multiplier and no vorticity formed at all — use it to measure off the state, where a
-``\\boldsymbol{\\omega}`` would be built only to be reduced away.
+from the vorticity as the normalized inner product (Parseval) — use it where
+``\\boldsymbol{\\omega}`` exists for its own sake, as the cached vorticity does. The second
+measures straight from the velocity, with no vorticity formed at all — use it to measure off the
+state, where a ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
 
 The second route trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral
 inner product against the `domain.squared_wavenumber_kernel` multiplier: from

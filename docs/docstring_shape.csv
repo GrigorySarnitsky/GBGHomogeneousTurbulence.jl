@@ -35,7 +35,7 @@ Generator.jl::velocity_integrating_factor(generator， τ),87,0,207
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,496
 Observables.jl::Observables,119,0,295
 Observables.jl::derivative_skewness(û， domain),84,1,411
-Observables.jl::dissipation(ω， viscosity),97,1,294
+Observables.jl::dissipation(ω， viscosity),75,1,307
 Observables.jl::energy_spectrum(û， domain),66,0,178
 Observables.jl::integral_scale(û， domain),65,0,229
 Observables.jl::kinetic_energy(u),67,0,154
@@ -79,8 +79,8 @@ Propagator.jl::IFHeun(),57,1,189
 Propagator.jl::IFLowStorageRK3(),73,0,269
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
-Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,75,0,193
-Propagator.jl::deposit!(cache， state， domain， buffers),109,0,410
+Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,99,0,214
+Propagator.jl::deposit!(cache， state， domain， buffers),116,0,467
 Propagator.jl::recommended_cfl(scheme， domain),90,1,433
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,322
 Scalings.jl::Li2008(; dissipation_group = 0.9),113,0,316
