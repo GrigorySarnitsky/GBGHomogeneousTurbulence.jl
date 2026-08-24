@@ -38,6 +38,21 @@ using ..SimulationDomain: FixedDomain, max_wavenumber, new_vector_field_spectral
 export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 
 
+# The seeded spectrum peaks at κ_p/√2; a peak at or beyond the retained band's edge puts most of
+# the pre-rescale seed into shells the dealias mask holds empty — the energy rescale then inflates
+# what little survives, and the run starts from a field nothing like the envelope's shape. The
+# forcing-band warning's sibling (owner-ruled 2026-08-24).
+function _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
+  κ_max = max_wavenumber(domain)
+  peak = envelope_wavenumber / sqrt(2)
+  peak >= κ_max &&
+    @warn "the seed's spectrum peak κ_p/√2 = $peak sits at or beyond the dealias cutoff " *
+          "$κ_max: most of the drawn field lies in masked shells, and the energy rescale will " *
+          "amplify the retained residue. Lower `envelope_wavenumber` well below the cutoff."
+  return nothing
+end
+
+
 """
     ResolvedFields(domain; scalar = false)
 
@@ -107,21 +122,6 @@ Returns `û`.
     [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
     interval between the two calls is yours to close.
 """
-# The seeded spectrum peaks at κ_p/√2; a peak at or beyond the retained band's edge puts most of
-# the pre-rescale seed into shells the dealias mask holds empty — the energy rescale then inflates
-# what little survives, and the run starts from a field nothing like the envelope's shape. The
-# forcing-band warning's sibling (owner-ruled 2026-08-24).
-function _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
-  κ_max = max_wavenumber(domain)
-  peak = envelope_wavenumber / sqrt(2)
-  peak >= κ_max &&
-    @warn "the seed's spectrum peak κ_p/√2 = $peak sits at or beyond the dealias cutoff " *
-          "$κ_max: most of the drawn field lies in masked shells, and the energy rescale will " *
-          "amplify the retained residue. Lower `envelope_wavenumber` well below the cutoff."
-  return nothing
-end
-
-
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      kinetic_energy::Real, envelope_wavenumber::Real,
                                      initial_spectrum = nothing, rng = Random.default_rng())
