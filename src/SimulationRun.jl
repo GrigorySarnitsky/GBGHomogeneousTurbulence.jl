@@ -18,7 +18,9 @@
     SimulationRun
 
 The run layer:
-- [`Simulation`](@ref) — the assembled state of a case.
+- [`Simulation`](@ref) — one run, fully assembled: the domain, the evolving fields, the
+  observables cache, the equations of motion with their forcing, the integration schemes with
+  their scratch, any tracers, and the clock — built with defaults from a few numbers.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
   iteration — and its return decides continuation).
