@@ -81,7 +81,7 @@ smoothness parameters.
 - `number_of_particles` — seed this many tracers uniformly at random in the box.
 - `positions` — or copy this `PointSet` in instead; give exactly one of the two.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
-- `unwrapped = false` — also track the winding-preserving unwrapped positions
+- `unwrapped = false` — set to `true` to also track the winding-preserving unwrapped positions
   [`unwrapped_positions`](@ref) serves; the wrapped positions stay the dynamical state either way.
 - `rng` — the random stream seeding the positions (used with `number_of_particles`, ignored with
   `positions`); defaults to `Random.default_rng()`.
