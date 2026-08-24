@@ -18,18 +18,19 @@
 
 Lagrangian particle tracking — today the massless tracer:
 
-- [`Tracers`](@ref) — the tracer set (positions, a selectable interpolation scheme, and an
-  opt-in unwrapped positions read by [`unwrapped_positions`](@ref)); its state is `PointSet`s,
-  read directly and unwrapped to raw arrays by `GBGPeriodicFields`' own accessors. The velocity
-  at the particles is read from the run's observables cache through
+- [`Tracers`](@ref) — the tracer set: the positions (a
+  [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)), a selectable
+  interpolation scheme, and opt-in unwrapped positions read by [`unwrapped_positions`](@ref). The
+  velocity at the particles is read from the run's observables cache through
   [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
   [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
   per-step storage a scheme needs, and [`history_depth`](@ref) the length of the
   velocity-at-particles history a scheme requires.
 - [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) — this module adds the particle
-  method: deposit the flow velocity at the tracers' current positions into the observables cache —
-  both the measured Lagrangian sample and the first velocity the next advance needs.
+  method: interpolate the flow velocity at the tracers' current positions and deposit it in the
+  observables cache. One value, two consumers: the Lagrangian statistics a caller accumulates,
+  and the next advance, which reads it as its start-of-step velocity.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
