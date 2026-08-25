@@ -1,12 +1,12 @@
 {
- "head": "ca34e55620e54a94146a5509277ac7df6d4ba2ae",
+ "head": "8f2ef751d4603ed63b6c8fe80f42daee4b865c92",
  "base": "2ad45f9",
  "covered_paths": [
   "src",
   "test",
   "ext"
  ],
- "instrument": "bug-hunt round 6 edit audit (wf_2ea672d2-607); prior latest.json archived as r6-previous-latest.json",
+ "instrument": "bug-hunt round 6 edit audits: wf_2ea672d2-607 (2ad45f9..cedb7aa) + increment wf_4a67636f-815 (ca34e55..8808bf1); repairs landed in ca34e55 and 8f2ef75",
  "findings": [
   {
    "severity": "serious",
@@ -196,6 +196,146 @@
    "lane": "claim-versus-edit",
    "file": "src/Forcing.jl",
    "disposition": "fixed in part (attribution restored via the strategy Symbol); the factor-scaled quoted numbers stay \u2014 the emptiness test is factor-invariant and the quoted pair self-consistent."
+  },
+  {
+   "severity": "serious",
+   "title": "The new guard does not survive an HDF5 checkpoint round-trip",
+   "lane": "free-reader",
+   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
+  },
+  {
+   "severity": "notable",
+   "title": "The new restriction is undocumented on both surfaces a user actually calls (FlowConditions and Simulation)",
+   "lane": "free-reader",
+   "file": "src/Generator.jl",
+   "disposition": "fixed (8f2ef75): a FlowConditions warning admonition and a Simulation scalar_forcing clause document the refusal on both surfaces a user calls."
+  },
+  {
+   "severity": "minor",
+   "title": "The guard special-cases one concrete forcing type by isa/field-read instead of using the codebase's established per-forcing-type trait protocol",
+   "lane": "free-reader",
+   "file": "src/Generator.jl",
+   "disposition": "accepted with reasoning: one concrete case; a dispatch trait for a single type is speculative structure (invariant 3), and the isa site carries the physics comment. Revisit if a second target-derived default ever appears."
+  },
+  {
+   "severity": "minor",
+   "title": "The scalar-forcing fix to memory_audit.jl also silently drops velocity-forcing coverage of the default-derivation branch",
+   "lane": "free-reader",
+   "file": "test/memory_audit.jl",
+   "disposition": "accepted: the derived branch stays exercised by test/forcing.jl and the promoted witnesses; the sweep audits storage, and an explicit turnover_time is memory-inert."
+  },
+  {
+   "severity": "notable",
+   "title": "The new guard is bypassed by an HDF5 checkpoint round-trip \u2014 executed and confirmed",
+   "lane": "executing",
+   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
+  },
+  {
+   "severity": "notable",
+   "title": "Previously valid input now throws: a defaulted-tl controller in the scalar slot \u2014 intended, owner-ruled, and the physical defect it fixes reproduces",
+   "lane": "executing",
+   "file": "src/Generator.jl",
+   "disposition": "accepted as intended: the owner-ruled decision 77 \u2014 the refusal is the fix."
+  },
+  {
+   "severity": "minor",
+   "title": "The plain positional constructor changed arity \u2014 a 7th argument inserted mid-list",
+   "lane": "executing",
+   "file": "src/Forcing.jl",
+   "disposition": "accepted: the API is not frozen (working agreement), the # Fields inventory shows the new order, and the positional form is not advertised on this type."
+  },
+  {
+   "severity": "minor",
+   "title": "The docstring-growth guard was re-baselined in the same commit that grew the docstring",
+   "lane": "executing",
+   "file": "docs/docstring_shape.csv",
+   "disposition": "accepted: the documented plain-first protocol \u2014 the plain build gates caps and structure, the deliberate growth is re-frozen in the same commit, per CLAUDE.md."
+  },
+  {
+   "severity": "minor",
+   "title": "The docstring-shape growth guard was re-baselined in the same commit as the growth it would have refused",
+   "lane": "under-rejection",
+   "file": "docs/docstring_shape.csv",
+   "disposition": "accepted: the documented plain-first protocol \u2014 the plain build gates caps and structure, the deliberate growth is re-frozen in the same commit, per CLAUDE.md."
+  },
+  {
+   "severity": "notable",
+   "title": "Documented-valid input now refused: defaulted-turnover_time controller as scalar_forcing throws",
+   "lane": "behaviour-change",
+   "file": "src/Generator.jl",
+   "disposition": "accepted as intended: the owner-ruled decision 77 \u2014 the refusal is the fix."
+  },
+  {
+   "severity": "notable",
+   "title": "New invariant silently not enforced across the checkpoint boundary; flag does not round-trip",
+   "lane": "behaviour-change",
+   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
+  },
+  {
+   "severity": "minor",
+   "title": "Positional constructor arity changed 6 \u2192 7 (Bool inserted mid-signature)",
+   "lane": "behaviour-change",
+   "file": "src/Forcing.jl",
+   "disposition": "accepted: the API is not frozen (working agreement), the # Fields inventory shows the new order, and the positional form is not advertised on this type."
+  },
+  {
+   "severity": "minor",
+   "title": "Oracle edited in the same window: audit harness rerouted around the new guard, shape baseline re-frozen with the growth it gates",
+   "lane": "behaviour-change",
+   "file": "test/memory_audit.jl",
+   "disposition": "accepted: the derived branch stays exercised by test/forcing.jl and the promoted witnesses; the sweep audits storage, and an explicit turnover_time is memory-inert."
+  },
+  {
+   "severity": "notable",
+   "title": "Documented-valid usage now refused: defaulted-turnover_time controller as scalar_forcing",
+   "lane": "over-rejection",
+   "file": "src/Generator.jl",
+   "disposition": "accepted as intended: the owner-ruled decision 77 \u2014 the refusal is the fix."
+  },
+  {
+   "severity": "notable",
+   "title": "Refusal wider than the defect: fires at gain = 0, where turnover_time never enters the dynamics",
+   "lane": "over-rejection",
+   "file": "src/Generator.jl",
+   "disposition": "fixed (8f2ef75): the guard requires gain > 0 \u2014 at gain = 0 the settling time never enters the dynamics \u2014 and both docstrings state the scope."
+  },
+  {
+   "severity": "minor",
+   "title": "The oracle accommodated in the same commit: memory audit sweep edited to dodge the new rejection",
+   "lane": "over-rejection",
+   "file": "test/memory_audit.jl",
+   "disposition": "accepted: the derived branch stays exercised by test/forcing.jl and the promoted witnesses; the sweep audits storage, and an explicit turnover_time is memory-inert."
+  },
+  {
+   "severity": "notable",
+   "title": "FlowConditions now throws on a previously-accepted scalar_forcing argument, but its own docstring is not updated to say so",
+   "lane": "public-contract",
+   "file": "src/Generator.jl",
+   "disposition": "fixed (8f2ef75): a FlowConditions warning admonition and a Simulation scalar_forcing clause document the refusal on both surfaces a user calls."
+  },
+  {
+   "severity": "minor",
+   "title": "VarianceController's exported struct gained a field mid-layout, silently changing its positional-constructor arity",
+   "lane": "public-contract",
+   "file": "src/Forcing.jl",
+   "disposition": "accepted: the API is not frozen (working agreement), the # Fields inventory shows the new order, and the positional form is not advertised on this type."
+  },
+  {
+   "severity": "notable",
+   "title": "Scalar-forcing guard checks turnover_time_derived but not gain, rejecting a previously-valid, physically harmless configuration",
+   "lane": "numerics",
+   "file": "src/Generator.jl",
+   "disposition": "fixed (8f2ef75): the guard requires gain > 0 \u2014 at gain = 0 the settling time never enters the dynamics \u2014 and both docstrings state the scope."
+  },
+  {
+   "severity": "minor",
+   "title": "New docstring states the scalar-binding hazard as unconditional, even though it depends on gain > 0",
+   "lane": "numerics",
+   "file": "src/Forcing.jl",
+   "disposition": "fixed (8f2ef75): the guard requires gain > 0 \u2014 at gain = 0 the settling time never enters the dynamics \u2014 and both docstrings state the scope."
   }
  ]
 }
