@@ -191,11 +191,22 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # plan count is the attribution. So the work area is field-scale, scales as N³, and — unlike every
 # other named exclusion — is the SAME order as the thing the working-set ledger bounds.
 #
+# CONFIRMED OUT OF SAMPLE the same day, on a configuration the count was not read off: 192³ /
+# PhaseShift, whose working-set ledger is a different one (9 field-scale arrays, not 6). Predicting
+# ledger + 26 plan-components gives 733.2 + 702.0 = 1435.2 MiB against a measured 1442.8 MiB, +0.5%.
+# Three configurations across two grids and two dealiasing strategies now fit the same two-part
+# model, so the N³ scaling and the plan-count are established. What is still inferred is the
+# ATTRIBUTION — that the excess is the plan work area specifically, rather than some other
+# vendor-owned device residency of the same count and scaling. `CUDA.@allocated` around the plan
+# construction settles it in one line, and should precede any optimization built on it.
+#
 # It also names an optimization this audit cannot see: `tensor_plans` carries 9 of those 13
 # components and has exactly ONE consumer, the strain-tensor diagnostic in Observables. Built
 # eagerly for every run, it is ~144 MiB at 128³ and ~1.15 GiB at 256³ of device residency a run
-# that never calls the diagnostic still pays. Open item G1; the completeness invariant's CPU-only
-# reach is G2.
+# that never calls the diagnostic still pays — and the share rises with the band, since PhaseShift
+# doubles the transforms but not the plan set: on the 192³ run the plans are 49% of the pool and
+# `tensor_plans` alone is ~486 MiB, about a third of it, roughly the size of the entire evolving
+# state. Open item G1; the completeness invariant's CPU-only reach is G2.
 frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 
