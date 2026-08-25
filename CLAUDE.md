@@ -166,7 +166,10 @@ it measures before the numerical method** — the physics-first mirror of PF's r
 docstring, never one per method. Across an `f` / `f!` pair the in-place `!` form is the **home** (owns
 the formula and the kernel, listed first); the allocating form is a thin `@ref`-linking wrapper with no
 second copy of the formula and no notation that drifts across the pair (`\partial_i` vs
-`\partial_{x_i}`).
+`\partial_{x_i}`). PF's verbatim in-place-steer sentence is deliberately **not** adopted
+(owner-ruled 2026-08-25): IT's pairs are few and non-uniform — the flagship
+`vorticity_physical!` / `vorticity_physical` pair is a compute/cached-read split, not an
+in-place/allocating pair, so PF's sentence would be false of it.
 
 **Cross-referencing — a link earns its place.** Backtick every code identifier; promote to `@ref` (or
 `@extref` for an external / cross-package object) only where a reader would genuinely jump and there is
@@ -218,7 +221,7 @@ line rather than a clause:
   needs no `Returns` sentence; arrow and sentence never both appear.
 - A **module map is identity → contents list → optional trailing remark**, in that order, with no
   essay before the list — deliberately tighter than PF's map rule, which asks for scope-and-invariants
-  prose ahead of the list: IT's four-role maps stay list-first.
+  prose ahead of the list: IT's four-role maps stay list-first (owner-ratified 2026-08-25).
 
 **Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
 docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never
