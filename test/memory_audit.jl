@@ -195,10 +195,20 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # PhaseShift, whose working-set ledger is a different one (9 field-scale arrays, not 6). Predicting
 # ledger + 26 plan-components gives 733.2 + 702.0 = 1435.2 MiB against a measured 1442.8 MiB, +0.5%.
 # Three configurations across two grids and two dealiasing strategies now fit the same two-part
-# model, so the N³ scaling and the plan-count are established. What is still inferred is the
-# ATTRIBUTION — that the excess is the plan work area specifically, rather than some other
-# vendor-owned device residency of the same count and scaling. `CUDA.@allocated` around the plan
-# construction settles it in one line, and should precede any optimization built on it.
+# model, so the N³ scaling and the plan-count are established.
+#
+# A FOURTH run varies the axis the others held fixed — PRECISION — and it is the one that
+# discriminates: 192³ / PhaseShift / Float64, pool 2884.6 MiB against the same configuration's
+# 1442.8 MiB in Float32, ×1.9993. Split off the ledger (which doubles by construction) and the
+# EXCESS itself went 709.6 → 1418.2 MiB, ×1.9986. Storage that doubles with the element type is
+# sized in elements of the transform type; plan metadata, an index or twiddle table, and a fixed
+# scratch arena do not. So the attribution now rests on three independent scalings — N³ (three
+# grids), the count 26 = 13 components × 2 directions (two dealiasing strategies with different
+# ledgers), and element size — and it is hard to name a second candidate that satisfies all three.
+#
+# It is still not a device query. `CUDA.@allocated` around the plan construction closes the last
+# step in one line, and remains the thing to run before an optimization is built on the reading —
+# but the premise is now far better supported than an inference from a single fitted ratio.
 #
 # It also names an optimization this audit cannot see: `tensor_plans` carries 9 of those 13
 # components and has exactly ONE consumer, the strain-tensor diagnostic in Observables. Built
