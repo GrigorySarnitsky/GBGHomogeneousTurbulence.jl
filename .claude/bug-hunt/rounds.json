@@ -19,6 +19,15 @@
   "escalated": 2,
   "refuted": 0,
   "open": 8,
-  "note": "8 findings still open \u2014 see .claude/bug-hunt/OPEN-DEFECTS.md; the gate fails on this until they are dispositioned"
+  "note": "8 findings still open \u2014 see .claude/bug-hunt/OPEN-DEFECTS.md; the gate fails on this until they are dispositioned",
+  "open_resolved": "the 8 were closed or parked 2026-08-22/23 (decisions 58/60/63, owner parking); see OPEN-DEFECTS.md header"
+ },
+ {
+  "round": 6,
+  "confirmed": 14,
+  "fixed": 13,
+  "escalated": 1,
+  "refuted": 0,
+  "note": "7 REPRODUCED (6 fixed + 1 escalated: the VarianceController scalar turnover_time default, witness in witnesses/escalated/) + 7 EVIDENCED (all fixed; verify-fixes 7/7 FIXED, no RELOCATED). Dismissals audited: 11 sound, 1 wrong (already corrected by the landed fields_modified! fix). 12 regressions promoted r6-prefixed."
  }
 ]

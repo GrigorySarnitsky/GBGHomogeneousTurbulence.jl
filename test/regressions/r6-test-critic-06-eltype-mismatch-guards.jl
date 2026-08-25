@@ -2,8 +2,15 @@
 # naming the element types, a Float64-written state / tracer set read back against a Float32 domain
 # of the SAME grid size (and vice versa for state) — the branch the suite's domain-mismatch test
 # (grid-size only, Float64 throughout) never exercises.
-using Test, Random, HDF5
+using Test, Random
 using GBGIsotropicTurbulence
+# Under `julia --project` the main env has no HDF5 (a weak dep); the pile keeps a dedicated env
+# with the package dev'd + HDF5, located through `pkgdir`. Under Pkg.test this branch is dead.
+if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"), "HDF5")) === nothing
+  import Pkg
+  Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
+end
+using HDF5
 using GBGPeriodicFields: field_data, point_coordinates, LalescuSpline
 
 

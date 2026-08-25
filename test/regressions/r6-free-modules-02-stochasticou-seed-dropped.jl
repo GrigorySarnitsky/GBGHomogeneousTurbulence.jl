@@ -4,14 +4,15 @@
 # NEITHER reading: the user's configured seed is silently discarded, and two runs checkpointed with
 # different seeds (independent ensemble members) restore to bitwise-identical forcing noise.
 using Test, Random
+using GBGIsotropicTurbulence
 # Under the gate's `julia --project` the main env has no HDF5 (it is a weak dep); the pile keeps a
-# dedicated env with the package dev'd + HDF5. Promoted into test/regressions/ this branch is dead:
-# Pkg.test's merged env already resolves HDF5, so the activation never fires there.
+# dedicated env with the package dev'd + HDF5, located through `pkgdir` so the file works from any
+# depth. Promoted into test/regressions/ this branch is dead: Pkg.test's merged env already
+# resolves HDF5, so the activation never fires there.
 if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"), "HDF5")) === nothing
   import Pkg
-  Pkg.activate(joinpath(@__DIR__, "..", "env"); io = devnull)
+  Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
 end
-using GBGIsotropicTurbulence
 using HDF5
 using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); persistable via write_forcing
 

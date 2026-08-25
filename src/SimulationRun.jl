@@ -231,13 +231,16 @@ The run group:
   diffusive-decay bound that stops that, needing no constant from the caller. `max_dt` is for a
   ceiling only the caller knows, since any *default* constant would be a claim about the velocity
   scale they happened to choose.
-- `number_of_particles = 0`, `interpolation_scheme = CatmullRom`, `unwrapped = false` — the number
-  of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions, and
-  whether to also track the winding-preserving unwrapped positions (read with
+- `number_of_particles = 0`, `interpolation_scheme = nothing`, `unwrapped = false` — the number
+  of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions
+  (`nothing` means the default `CatmullRom`), and whether to also track the winding-preserving
+  unwrapped positions (read with
   [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
   mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
-- `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
-  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator);
+  A particle-only setting given on a particle-free run is refused rather than silently discarded.
+- `particle_integration_scheme = nothing` — the scheme that advances the trajectories in time, an
+  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator)
+  (`nothing` means the default [`Heun`](@ref GBGIsotropicTurbulence.Particles.Heun));
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
   [`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`()` when trajectory
@@ -313,7 +316,9 @@ _materialize_forcing(f, domain::FixedDomain) = f(domain)
 # names the violation at the one moment it is checkable (the band's shells are not recoverable from
 # a built forcing, so only what the strategy itself records is compared).
 function _warn_derived_viscosity_forcing_mismatch(vf::VarianceController, kinetic_energy)
-  isapprox(vf.target, kinetic_energy; rtol = 1e-8) ||
+  # The tolerance absorbs the target's own storage precision: on a Float32 domain the stored
+  # target differs from the caller's Float64 by ~1.2e-7 — rounding, not a configured mismatch.
+  isapprox(vf.target, kinetic_energy; rtol = max(1e-8, 100 * eps(one(vf.target)))) ||
     @warn "Simulation (derived viscosity): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
           "but the velocity forcing holds target = $(vf.target). The run will settle at the " *
           "forcing's target, and κ_max·η / Re_λ will not match the calibration. Pass the same " *
@@ -327,7 +332,7 @@ function _warn_derived_viscosity_forcing_mismatch(vf::VarianceRescaling, kinetic
           "k = $kinetic_energy, but this `VarianceRescaling(over = :band)` holds only the band " *
           "and lets k settle elsewhere. Use `over = :total` with the same target, or set " *
           "`viscosity` yourself."
-  elseif !isapprox(vf.target, kinetic_energy; rtol = 1e-8)
+  elseif !isapprox(vf.target, kinetic_energy; rtol = max(1e-8, 100 * eps(one(vf.target))))
     @warn "Simulation (derived viscosity): ν was calibrated for k = $kinetic_energy (`kinetic_energy`), " *
           "but the velocity forcing holds target = $(vf.target). Pass the same value to both, " *
           "or set `viscosity` yourself."
@@ -359,9 +364,9 @@ function Simulation(domain::FixedDomain;
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
-                    number_of_particles::Integer = 0, interpolation_scheme = CatmullRom,
+                    number_of_particles::Integer = 0, interpolation_scheme = nothing,
                     unwrapped::Bool = false,
-                    particle_integration_scheme::AbstractParticleIntegrator = Heun(),
+                    particle_integration_scheme::Union{Nothing, AbstractParticleIntegrator} = nothing,
                     rng = Random.default_rng())
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
@@ -474,19 +479,38 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
   scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
 
+  # `nothing` sentinels, like `velocity_forcing`'s: a particle-only setting configured on a
+  # particle-free run would be silently discarded, which is the quiet-wrong-configuration shape
+  # `ResolvedGenerator` refuses for a scalar forcing without a scalar.
+  if number_of_particles == 0
+    for (name, value) in (("interpolation_scheme", interpolation_scheme),
+                          ("particle_integration_scheme", particle_integration_scheme))
+      value === nothing ||
+        throw(ArgumentError("`$name` was given but `number_of_particles = 0`: the run advects no " *
+                            "tracers, so the setting would be silently discarded. Ask for " *
+                            "particles, or drop the setting."))
+    end
+    unwrapped &&
+      throw(ArgumentError("`unwrapped = true` but `number_of_particles = 0`: the run advects no " *
+                          "tracers, so there are no positions to unwrap. Ask for particles, or " *
+                          "drop the setting."))
+  end
+  pscheme = particle_integration_scheme === nothing ? Heun() : particle_integration_scheme
   tracers = number_of_particles > 0 ?
-    Tracers(domain; number_of_particles, interpolation_scheme = interpolation_scheme, unwrapped, rng) : nothing
+    Tracers(domain; number_of_particles,
+            interpolation_scheme = interpolation_scheme === nothing ? CatmullRom : interpolation_scheme,
+            unwrapped, rng) : nothing
   # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
                            number_of_particles = tracers === nothing ? 0 : Int(number_of_particles),
-                           history_depth = history_depth(particle_integration_scheme))
+                           history_depth = history_depth(pscheme))
   particle_buffers = tracers === nothing ? nothing :
-                     allocate_buffers(particle_integration_scheme, tracers, cache)
+                     allocate_buffers(pscheme, tracers, cache)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing || deposit!(cache, tracers, velocity_physical(cache))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
-                    tracers, tracers === nothing ? nothing : particle_integration_scheme, particle_buffers,
+                    tracers, tracers === nothing ? nothing : pscheme, particle_buffers,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
 

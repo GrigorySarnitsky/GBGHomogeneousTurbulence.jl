@@ -1,4 +1,27 @@
-# Open code defects — found by /bug-hunt rounds 4-5
+# Open code defects — the /bug-hunt escalation register
+
+## Round 6 (2026-08-25) — one escalation, awaiting the owner
+
+**ESCALATED: `r6-free-hot-path-01` — VarianceController's default `turnover_time` plugs a scalar
+variance into Bassenne's kinetic-energy law, breaking the passive scalar's exact amplitude
+covariance** (major). The default is tℓ = 2·target/(3·ε∞(target)) with ε∞ = (target/0.9)^{3/2}/L —
+dimensionally a kinetic-energy law. Driving the SCALAR, target is ⟨φ²⟩ in arbitrary units, so tℓ
+scales as L/√⟨φ²⟩ and the exactly-linear scalar equation loses its φ → s·φ covariance (witnessed:
+1.5e-6 violation after 5 steps under the default; exactly 0.0 with an explicit equal turnover_time).
+The physically right timescale is the FLOW's turnover time, which the constructor cannot know from
+a scalar target. Witness: `witnesses/escalated/`, deliberately NOT promoted. Owner options:
+(a) refuse a defaulted turnover_time when the strategy is bound as `scalar_forcing` (needs a
+was-derived marker on the struct); (b) same, plus the run layer supplies the flow's tℓ when it
+builds a scalar controller; (c) document the caveat and keep the default (breaks the linearity
+invariance the empty-band floor was redesigned to preserve — not recommended).
+
+**Still parked (owner, 2026-08-23): `r5-aliasing-and-mutation-01`** — a mutable `StochasticOU`
+shared by two `Simulation`s couples their forcing state; the strategy is archived, do not fix.
+Witness moved to `witnesses/escalated/` with the round-6 escalation.
+
+---
+
+# Historical register — rounds 4-5 (all closed or parked)
 
 **RE-VERIFIED 2026-08-22 by running every witness.** The witnesses had gone BROKEN on the
 `BandRescaling`/`uses_linear_rate`/`apply_forcing!` renames — five of seven reported nothing at all,

@@ -417,14 +417,15 @@ function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
                        lowest_shell::Integer = 1, highest_shell::Integer = 2)
   over in (:band, :total) ||
     throw(ArgumentError("VarianceRescaling `over` must be :band or :total; got :$over"))
+  # Cast to the domain's element type FIRST, so the guard certifies the stored value.
+  target = _real_type(domain)(target)
   # The target is an energy or a variance — both non-negative — and the rescale takes its square
   # root, so a negative value surfaced as a bare `DomainError` out of `sqrt` naming nothing.
-  target >= 0 ||
-    throw(ArgumentError("VarianceRescaling `target` must be non-negative, got $target: it is the " *
-                        "kinetic energy or scalar variance the forcing holds, and the rescale " *
-                        "takes its square root"))
-  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell),
-                           _real_type(domain)(target), over,
+  (isfinite(target) && target >= 0) ||
+    throw(ArgumentError("VarianceRescaling `target` must be finite and non-negative, got $target: " *
+                        "it is the kinetic energy or scalar variance the forcing holds, and the " *
+                        "rescale takes its square root"))
+  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), target, over,
                            Int(lowest_shell), Int(highest_shell))
 end
 
@@ -647,6 +648,15 @@ end
 function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                             turnover_time = nothing, lowest_shell::Integer = 1,
                             highest_shell::Integer = 2)
+  # The strategy carries the DOMAIN's element type: each scalar is cast to it, so a Float32 run's
+  # default controller stays Float32 even when the target arrives as an untyped Float64 literal —
+  # the Simulation keyword default rode `promote(float(target), …)` up to Float64 on every
+  # default-forced Float32 run before this cast. The cast comes FIRST, so the guards below certify
+  # the values the struct will actually hold — a value that narrows to `Inf32` or `0.0f0` on a
+  # Float32 domain is refused, not stored in violation of its own guard.
+  Td = _real_type(domain)
+  target = Td(target)
+  gain = Td(gain)
   # Finite AND positive, as the codebase's other positive-scalar guards read: `Inf` passes `> 0` and
   # then propagates a NaN amplitude into the right-hand side, which surfaces as a blown-up run far
   # from the constructor that accepted it.
@@ -660,10 +670,10 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
   # the same estimate the viscosity derivation uses, so the two agree on what "stationary" means.
-  tℓ = turnover_time === nothing ?
-       2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
-                                                                 domain.grid.domain_size[1])) :
-       turnover_time
+  tℓ = Td(turnover_time === nothing ?
+          2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
+                                                                    domain.grid.domain_size[1])) :
+          turnover_time)
   # r6-edge-cases-01: the message must show the value the check REJECTED. When the keyword was
   # omitted, that is the derived tℓ, never the caller's `nothing`.
   (isfinite(tℓ) && tℓ > 0) ||
@@ -671,12 +681,7 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         (turnover_time === nothing ?
                          " (derived from `target` = $target and the box side; pass " *
                          "`turnover_time` explicitly)" : "")))
-  # The strategy carries the DOMAIN's element type: each scalar is cast to it, so a Float32 run's
-  # default controller stays Float32 even when the target arrives as an untyped Float64 literal —
-  # the Simulation keyword default rode `promote(float(target), …)` up to Float64 on every
-  # default-forced Float32 run before this cast.
-  Td = _real_type(domain)
-  return VarianceController(band, Td(target), Td(gain), Td(tℓ),
+  return VarianceController(band, target, gain, tℓ,
                             Int(lowest_shell), Int(highest_shell))
 end
 
@@ -720,7 +725,8 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
   restoring = forcing.gain * (whole_variance - forcing.target) / forcing.turnover_time
   # One home for the empty-band clamp: the combinator ConstantPower shares. The controller's
   # numerator is what its amplitude must hold — the dissipation less the restoring term.
-  amplitude = _injection_amplitude(dissipation - restoring, band_variance, whole_variance)
+  amplitude = _injection_amplitude(dissipation - restoring, band_variance, whole_variance,
+                                   :VarianceController)
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))
   return N̂
 end
@@ -745,13 +751,16 @@ uses_steady_linear_rate(::ConstantPower) = false
 
 # The amplitude A that injects `injection_rate` into the band, evaluated AT THE FIELD IT IS GIVEN.
 # Shared by `ConstantPower` and `VarianceController`, which differ only in what A is asked to hold.
-function _injection_amplitude(injection_rate, band_observable, whole_observable)
+# `strategy` names the caller in the warning, and keys the warning's dedup budget (`_id`), so an
+# inert velocity forcing does not swallow the one warning a later inert scalar forcing would emit —
+# `maxlog` dedups by log-statement identity, which a shared helper would otherwise collapse.
+function _injection_amplitude(injection_rate, band_observable, whole_observable, strategy::Symbol)
   # TurTLE guards the same division with `if (energy_in_shell < 10*eps) energy_in_shell = 1`, a
   # machine-epsilon-relative floor substituting a benign denominator rather than skipping the step.
   if _band_is_empty(band_observable, whole_observable)
-    @warn "the forced band is empty (band observable $band_observable against a whole-field " *
-          "$whole_observable): the amplitude is clamped to zero and the forcing is inert until " *
-          "content reaches the band" maxlog = 1
+    @warn "$strategy: the forced band is empty (band observable $band_observable against a " *
+          "whole-field $whole_observable): the amplitude is clamped to zero and the forcing is " *
+          "inert until content reaches the band" maxlog = 1 _id = Symbol(:empty_band_, strategy)
     return 0.0
   end
   return injection_rate / (2 * band_observable)
@@ -765,7 +774,8 @@ function add_forcing_source!(forcing::ConstantPower, N̂, field, domain::FixedDo
   # empty-band floor divides against — same crossing count as the bare band read.
   band_raw, whole_raw = weighted_inner(field, (forcing.band, domain.unit_kernel))
   band_observable = _target_factor(field) * band_raw                              # at the STAGE state
-  amplitude = _injection_amplitude(forcing.injection_rate, band_observable, _target_factor(field) * whole_raw)
+  amplitude = _injection_amplitude(forcing.injection_rate, band_observable,
+                                   _target_factor(field) * whole_raw, :ConstantPower)
   # N̂ ← N̂ + A·𝟙_band·field, the band-limited linear forcing as an explicit source. `convolve!`'s
   # α/β form accumulates in place, so this costs one fused pass and no scratch.
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))
@@ -819,6 +829,7 @@ velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
 # Fields
 - `band` — the band-pass kernel for the noise.
 - `correlation_time`, `variance` — ``T_L`` and ``\\sigma^{2}``.
+- `seed` — the integer that seeded `rng`: a defining parameter, persisted by the HDF5 layer.
 - `rng` — the random stream, persisting across steps.
 - `state`, `noise_physical`, `noise_spectral` — the evolving force ``\\hat{\\boldsymbol{f}}`` and
   its noise scratch, each `nothing` until first use.
@@ -840,18 +851,22 @@ end
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
                       lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0)
-  # Both are documented non-negative and neither was checked: the variance's square root is taken
-  # when the increment is scaled, so a negative one surfaced as a bare `DomainError` from `sqrt` two
-  # frames away, naming nothing the caller had typed.
-  variance >= 0 ||
-    throw(ArgumentError("`variance` must be non-negative, got $variance: it is the stationary " *
-                        "variance the process holds, and its square root sets the noise amplitude"))
-  correlation_time > 0 ||
-    throw(ArgumentError("`correlation_time` must be positive, got $correlation_time: it is the " *
-                        "Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
-  band = _shell_band(domain, lowest_shell, highest_shell)
+  # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
+  # documented non-negative: the variance's square root is taken when the increment is scaled, so a
+  # negative one surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the
+  # caller had typed.
   Td = _real_type(domain)
-  return StochasticOU(band, Td(correlation_time), Td(variance), Int(seed), MersenneTwister(seed),
+  variance = Td(variance)
+  correlation_time = Td(correlation_time)
+  (isfinite(variance) && variance >= 0) ||
+    throw(ArgumentError("`variance` must be finite and non-negative, got $variance: it is the " *
+                        "stationary variance the process holds, and its square root sets the " *
+                        "noise amplitude"))
+  (isfinite(correlation_time) && correlation_time > 0) ||
+    throw(ArgumentError("`correlation_time` must be finite and positive, got $correlation_time: " *
+                        "it is the Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
+  band = _shell_band(domain, lowest_shell, highest_shell)
+  return StochasticOU(band, correlation_time, variance, Int(seed), MersenneTwister(seed),
                       nothing, nothing, nothing, Int(lowest_shell), Int(highest_shell))
 end
 

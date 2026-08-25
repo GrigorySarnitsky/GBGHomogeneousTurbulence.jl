@@ -279,7 +279,10 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
                               lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGIsotropicTurbulence.StochasticOU"
     return StochasticOU(domain; variance = a["variance"],
-                        correlation_time = a["correlation_time"], seed = a["seed"],
+                        correlation_time = a["correlation_time"],
+                        # A checkpoint written before the seed was persisted carries no attribute;
+                        # the constructor default 0 reproduces exactly what such a file restored to.
+                        seed = haskey(a, "seed") ? a["seed"] : 0,
                         lowest_shell = lo, highest_shell = hi)
   else
     throw(ArgumentError("read_forcing: unrecognized forcing tag \"$tag\" in group \"$name\""))
