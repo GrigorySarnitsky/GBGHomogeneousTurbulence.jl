@@ -21,7 +21,10 @@
 #     because they answer different questions — the working set is what the schedule needs live, the
 #     frame is what the discretization costs to have precomputed — and a COMPLETENESS test then
 #     requires their sum to account for every field-scale array a live `Simulation` can reach, so
-#     nothing can fall between them again.
+#     nothing can fall between them again. Read "reach" strictly: the walk follows Julia fields, so
+#     a device buffer owned by a vendor library and reachable from none of them is outside it by
+#     construction — see the named exclusion at the frame ledger, where the cuFFT work area is now
+#     measured at 2.45× this ledger.
 #
 #  3. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
 #     from the step! bodies and the generator protocol, give every value a live range; the peak
@@ -179,6 +182,20 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # only by a device query. Like the O(N) axis multipliers and shell vectors it is outside both
 # ledgers — but unlike them it is not small on GPU, so it belongs on the benchmark-side empirics
 # (decision 33's scope statement) rather than in this static projection.
+#
+# MEASURED 2026-08-25 on CUDA (RTX 5070 Ti, Float32, TwoThirds, unforced-scalar default), and the
+# number is why the exclusion is no longer merely noted: the live pool ran 2.45× the working-set
+# ledger at BOTH grids — 356.75 MiB against 145.5 MiB at 128³, 2835.5 MiB against 1164.0 MiB at
+# 256³. The excess is 26.4 and 26.1 physical-scalar-equivalents respectively, against a plan set of
+# 13 components (velocity 3 + scalar 1 + tensor 9) in two directions = 26. Two grids landing on the
+# plan count is the attribution. So the work area is field-scale, scales as N³, and — unlike every
+# other named exclusion — is the SAME order as the thing the working-set ledger bounds.
+#
+# It also names an optimization this audit cannot see: `tensor_plans` carries 9 of those 13
+# components and has exactly ONE consumer, the strain-tensor diagnostic in Observables. Built
+# eagerly for every run, it is ~144 MiB at 128³ and ~1.15 GiB at 256³ of device residency a run
+# that never calls the diagnostic still pays. Open item G1; the completeness invariant's CPU-only
+# reach is G2.
 frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 
