@@ -108,7 +108,8 @@ only the scheme's own spectral stage registers.
 - `nonlinear` — the assembled right-hand side; `IFLowStorageRK3` only, else `nothing`.
 - `stage2`, `velocity_predictor_spectral` — the second stage register and the substage velocity predictor
   ``\\hat{\\boldsymbol{u}}^{*}`` in spectral representation; `IFHeun` only, else `nothing`.
-- `scalar` — a `ScalarBuffers` for the passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
+- `scalar` — a `ScalarBuffers` (an internal record; this entry is its full description) for the
+  passive scalar ``\\varphi`` when `scalar = true`, else `nothing`;
   when `nothing`, the run evolves no scalar and none of its field-sized buffers are allocated. Its
   fields mirror the per-scheme breakdown above, sized to the scalar: `stage1` (every scheme),
   `stage2` and `predictor_spectral` (`IFHeun`'s corrector register and predictor state ``\\hat\\varphi^*``),
@@ -209,8 +210,8 @@ stage registers. The cache's fields epoch — the freshness counter every new de
 at — is advanced when the step completes.
 
 The two calls of a hand-run loop align: `step!` leads with the dispatch tag and mutates its second
-argument, while `deposit!` leads with `cache`, the object it mutates; after the leader both take
-`state`, `domain`, `buffers` in the same order.
+argument, while `deposit!` leads with `cache`, the object it mutates; after that first argument,
+the shared trio `state`, `domain`, `buffers` appears in the same relative order in both.
 
 Returns `state`.
 
@@ -635,9 +636,9 @@ The base is then scaled by the domain's dealiasing: a strategy that keeps modes 
 ``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the
 Nyquist wavenumber) takes a proportionally smaller step,
 ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to both schemes' bases,
-`IFHeun`'s empirical one included — the dependence on how much of the band is kept is geometric,
-holding whether the base was computed or measured — the scaled value is only as trustworthy as
-its base. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
+`IFHeun`'s empirical one included: for a computed base it is the geometry of the retained band; for
+the empirical base it is an extrapolation in the same proportion, not a derived limit — and the
+scaled value is only as trustworthy as its base. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 """
 function recommended_cfl end

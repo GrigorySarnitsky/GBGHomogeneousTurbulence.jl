@@ -27,7 +27,7 @@ random_scalar_spectral!
 
 ## Persistence
 
-The state's HDF5 persistence — the spectral fields as one self-describing group, available once `HDF5` is loaded.
+The state's HDF5 persistence — the fields in spectral representation as one self-describing group, available once `HDF5` is loaded.
 
 ```@docs
 write_state

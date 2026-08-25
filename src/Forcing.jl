@@ -56,8 +56,10 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
-a run holds fixed — `target`, `rate`, `over` — has no canonical value and is required. A default
-never hides a choice you needed to make.
+a run holds fixed — `target`, `rate`, `injection_rate`, `over` — has no canonical value and is
+required. A default at this layer never hides a choice you needed to make; the run layer's
+convenience default (a controller targeting the initial kinetic energy) is that layer's own,
+documented choice.
 
 A band reaching above the dealias cutoff is inert there — the mask holds those modes empty, and a
 band forcing multiplies the field — so construction warns about it.
@@ -119,7 +121,10 @@ legitimately use both.
 
 Which channel a rate may take is decided by steadiness in time, **not** linearity in the field: the
 integrating factor holds a rate fixed for the whole step, so one re-solved from the state must go
-through `add_forcing_source!` instead. The declaration is measured at construction, not trusted.
+through `add_forcing_source!` instead. The declaration is cross-checked when the generator is
+built, not trusted: a strategy that implements `set_forcing_rate!` without declaring
+`uses_steady_linear_rate` is refused with an `ArgumentError`. Steadiness itself remains the
+author's promise — no construction-time check can watch a rate over time.
 
 Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
 `add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns
@@ -162,7 +167,7 @@ sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
                  velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Or build it directly, once the domain is in hand:
-domain = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(),
+domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(),
                      element_type = Float64, array_type = Array)
 forcing = ConstantPower(domain; injection_rate = 0.1)
 ```
@@ -378,8 +383,12 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
     (A stochastic forcing is outside that comparison — it has no classical order to lose.)
     Molecular dynamics reached the same
-    conclusion about the same manoeuvre — rescaling to fix a quantity each step is the naive
-    thermostat, and the fix is to extend the dynamics with feedback rather than project after the fact.
+    conclusion about the same manoeuvre — per-step rescaling is the deterministic (Berendsen) limit
+    of stochastic velocity rescaling, with no conserved quantity and no well-defined ensemble except
+    in limiting cases (Bussi, Donadio & Parrinello 2007,
+    [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420),
+    *J. Chem. Phys.* **126**, 014101) — and the fix is to extend the dynamics with feedback rather
+    than project after the fact.
 
     Two configurations also behave sharply. Under `:total`, if the out-of-band value alone exceeds
     `target`, the band is **zeroed** — the closest reachable state, and the most violent intervention
@@ -605,7 +614,7 @@ does not take.
 - `gain = 1` — the dimensionless gain ``G``. A larger gain relaxes faster; Bassenne et al. report
   ``O(1-10)``, and the default sits at that range's gentle end so the controller perturbs the
   dynamics least. `0` is the bare marginal law above.
-- `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/3\\varepsilon_\\infty``
+- `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/(3\\varepsilon_\\infty)``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
   Left at `nothing` it is computed for you from that formula, with ``\\varepsilon_\\infty`` the
   stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
@@ -913,9 +922,10 @@ export write_forcing, read_forcing
 
 Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
 self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
-indicator array) is rebuilt from them on read. `StochasticOU` stores its parameters and
-**not** its evolving force or random stream: a reloaded stochastic forcing resumes on a fresh
-stream, so continuation across a checkpoint is exact only for the deterministic strategies. A
+indicator array) is rebuilt from them on read. A stochastic forcing (the archived, un-exported
+`StochasticOU`) stores its parameters and **not** its evolving force or random stream: a reloaded
+stochastic forcing resumes on a fresh stream, so continuation across a checkpoint is exact only
+for the deterministic strategies. A
 [`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`
 package is loaded; the caller owns the file.
 

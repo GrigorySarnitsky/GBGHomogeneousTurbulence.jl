@@ -34,7 +34,9 @@ rather than served stale.
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
 iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
 after the tracer push) and sets
-its epoch. A caller reads through the accessors and never deposits.
+its epoch. A caller reads through the accessors and deposits only to re-seed the cache after an
+out-of-band mutation it announced (`fields_modified!`); the iteration's own deposits are the
+solver's.
 
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
@@ -87,11 +89,10 @@ and seeds one for you; a hand-assembled run constructs it here.
 - `domain` — the `FixedDomain` the run lives on; it sizes every slot.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
-  including the current one: the value of
-  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(particle_integration_scheme)` for
-  the run's particle integration scheme, which is where a hand-assembled run gets the number. A one-step
-  scheme needs 1 and stores no history; an `order`-step scheme needs `order`, and the scheme's
-  register allocation refuses a cache built too shallow.
+  including the current one. A hand-assembled run sets it to
+  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(scheme)` for its particle
+  integration scheme. A one-step scheme needs 1 and stores no history; an `order`-step scheme needs
+  `order`, and the scheme's register allocation refuses a cache built too shallow.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
   the velocity-at-particles slot (an ``M \\times 3`` point-value section) and its sample history.
 
@@ -347,7 +348,7 @@ the next deposit; that interval belongs to whoever made the change.
 This verb is only for out-of-band changes — [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
 advances the epoch itself, and the closing deposit restores the cache. After a hand-made mutation,
 re-deposit with the
-run layer's [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
+`Propagator`'s [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 
 Coefficients written by hand must respect the real-field layout's conjugate symmetry — a violation
@@ -357,7 +358,8 @@ and throws on an inconsistency beyond roundoff. The `cache` form cannot see the 
 the caller; the package's own seeders satisfy the constraint by construction.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
-to that run's cache — the form mirroring `particles_modified!`'s two.
+to that run's cache — the form to reach for when a run is what you are holding
+(`particles_modified!` offers the same pair of forms).
 
 Returns its argument.
 

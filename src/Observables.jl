@@ -18,7 +18,7 @@ The measured functions of the flow state:
 - [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
-  spectral state, the one field-valued observable
+  state's spectral representation, the one field-valued observable
   (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical),
   lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
@@ -323,8 +323,8 @@ Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its g
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free. That pricing is the sharp-truncation one: the wider
 [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi)'s
-smooth taper leaves a residual of its own shape that no bound here prices — on either, treat the
-skewness as an indicator, not an alias-controlled measurement.
+smooth taper leaves a residual of its own shape that no bound here prices — on every strategy,
+treat the skewness as an indicator, not an alias-controlled measurement.
 
 ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
 (all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an

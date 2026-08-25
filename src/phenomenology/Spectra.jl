@@ -107,9 +107,10 @@ the same one. The default is the longitudinal integral scale ``L_{11}``, which
 same coefficient ``L_{11}`` instead breaks that normalization.
 
 The two lengths are related by ``L_{11}/\\ell_{0} = C_\\varepsilon (2/3)^{3/2}``, so the gap is
-set by the normalized dissipation constant, not fixed: at ``C_\\varepsilon = 0.5`` the length is
-3.7 times smaller and the spectrum integrates to ``0.42k``; at Pope's high-Reynolds-number
-``L_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to ``0.57k``
+set by the normalized dissipation constant, not fixed: at ``C_\\varepsilon = 0.5`` the measured
+``L_{11}`` is 3.7 times smaller than ``\\ell_{0}`` and the spectrum integrates to ``0.42k``; at
+Pope's high-Reynolds-number ``L_{11} = 0.43\\ell_{0}`` it is 2.3 times smaller and integrates to
+``0.57k``
 (``\\int E\\,\\mathrm{d}\\kappa \\propto \\ell^{2/3}``).
 """
 function large_scale_length end
@@ -220,12 +221,13 @@ large_scale_factor(::UnitLargeScale, κL) = one(κL)
 
 Pao's dissipation-range roll-off
 ``f_\\eta(\\kappa\\eta) = \\exp\\!\\bigl(-\\tfrac{3}{2} \\alpha (\\kappa\\eta)^{4/3}\\bigr)``, from the
-hypothesis that the spectral energy flux stays constant through the dissipation range; `α` is the
-Kolmogorov constant ``C_K`` (Pao 1965).
+hypothesis that the cascade timescale — the spectral flux per unit spectral energy — retains its
+inertial-range form through the dissipation range, so the flux decays there as viscosity drains
+it; `α` is the Kolmogorov constant ``C_K`` (Pao 1965).
 
 # Fields
 The plain constructor `PaoDissipation(α)` takes the field directly:
-- `α` — the Kolmogorov constant the flux hypothesis reuses.
+- `α` — the Kolmogorov constant the cascade-timescale hypothesis reuses.
 """
 struct PaoDissipation <: DissipationFactor
   α::Float64
@@ -305,7 +307,7 @@ an inertial-range core with Kolmogorov constant `C_K` times a large-scale roll-o
 mix roll-off forms, or use a preset such as [`Pope2000`](@ref) — a preset's pairing carries its
 published [`provenance`](@ref); an ad-hoc mix evaluates like any other, but it is not a published
 model, so `provenance` throws for it rather than inventing a source. Evaluated by
-[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the roll-off's own length ``L``
+[`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the roll-off's own length ``\\ell``
 (see [`large_scale_length`](@ref) — ``L_{11}`` for most forms, ``k^{3/2}/\\varepsilon`` for Pope's) from
 `fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).
 
@@ -404,7 +406,7 @@ The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no ener
 
 [`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is unity and
 ``f_\\eta`` is Pao's ``\\exp\\!\\bigl(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\bigr)``. It covers the
-inertial and dissipation ranges from a constant-spectral-flux hypothesis — the Kolmogorov
+inertial and dissipation ranges from the constant-cascade-timescale hypothesis — the Kolmogorov
 constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
 (unlike [`Pope2000`](@ref)). It has no energy-containing range; use `Pope2000` or
 [`VonKarman1948`](@ref) when the large scales matter.
@@ -445,8 +447,12 @@ constant (``\\approx 0.67`` for the three-dimensional spectrum — the high-Reyn
 Sreenivasan 1996, *Phys. Fluids* **8**, 189), quoted — unlike Yaglom's classical
 ``4/3`` — for the *full*-variance scalar dissipation ``2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``,
 so it pairs directly with this package's full-variance ``\\varepsilon_\\varphi`` (`scalar_dissipation`)
-with no factor-of-two conversion. The name is a dual eponym — Obukhov
-(1949) and Corrsin (independently, 1951); the `1949` handle is Obukhov's year. Evaluating
+with no factor-of-two conversion (the constant is invariant so long as a source scales its scalar
+spectrum and its dissipation together — both double or both halve — so only a mixed-convention
+quote would shift it by two).
+
+The name is a dual eponym — Obukhov (1949) and Corrsin (independently, 1951); the `1949` handle is
+Obukhov's year. Evaluating
 [`spectrum`](@ref) reads
 the scalar dissipation ``\\varepsilon_\\varphi`` (`fp.scalar_dissipation`, which must be set) and the
 kinetic-energy dissipation ``\\varepsilon`` from `fp`.

@@ -14,8 +14,8 @@ The evolving state a run advances, and how it is seeded:
   single source of truth: the physical fields are recovered from it and never held in the state.
 - [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random
   initial conditions (a divergence-free velocity, a mean-zero scalar) that seed it.
-- [`write_state`](@ref) / [`read_state`](@ref) — the state's HDF5 persistence: the spectral fields
-  as one self-describing group (available once `HDF5` is loaded).
+- [`write_state`](@ref) / [`read_state`](@ref) — the state's HDF5 persistence: the fields in
+  spectral representation as one self-describing group (available once `HDF5` is loaded).
 
 All sized to a [`FixedDomain`](@ref).
 

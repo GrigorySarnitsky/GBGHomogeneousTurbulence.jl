@@ -123,7 +123,7 @@ deposit!(cache, tracers, u)                 # u(tₙ) at the current positions �
 advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
-Read the particle state off the fields directly — the positions are
+Read the particle state straight off the struct's own fields — the positions are
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)s, and raw arrays and
 counts come from `GBGPeriodicFields`' `point_coordinates` and `npoints`, never from accessors of
 this package. Passing `unwrapped = true` additionally tracks the winding-preserving
@@ -244,6 +244,8 @@ Call it whenever the tracer positions are changed from outside the iteration —
 hand-written correction, any direct write to the tracer storage. A one-step scheme carries no
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
 trajectory just abandoned, and integrating over those would blend the old path with the new one.
+This is an in-memory reset of one scheme's history, not a checkpoint verb — restoring a saved run
+is `read_simulation`'s job.
 
 The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) form of
 [`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
@@ -645,8 +647,8 @@ positions cannot supply across a crossing. Accumulating such statistics over the
 `(M, 3)` array `GBGPeriodicFields`' `point_coordinates` extracts — is the caller's analysis.
 
 The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading
-an untracked set throws an `ArgumentError` (which is why this checked read exists where the plain
-state is read off the fields directly). The wrapped positions remain the dynamical state either
+an untracked set throws an `ArgumentError` (which is why this checked read exists while the plain
+state is read straight off the struct's fields). The wrapped positions remain the dynamical state either
 way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
 absolute floating-point resolution, while the unwrapped positions only ever feed differences,
 whose *relative* accuracy the growth does not touch. An announced reposition

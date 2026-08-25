@@ -51,7 +51,7 @@ max_speed
 ## Vorticity recovery
 
 The vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` recovered in physical representation
-from the spectral state — the field-valued observable the iteration deposits (its cached read is
+from the state's spectral representation — the field-valued observable the iteration deposits (its cached read is
 [`vorticity_physical`](@ref)).
 
 ```@docs

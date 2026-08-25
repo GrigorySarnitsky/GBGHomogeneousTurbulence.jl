@@ -48,9 +48,9 @@ ceiling. They come in two families: a **mask** strategy
 acts on the assembled product alone, while a **shift** strategy also changes how that product is
 evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
-truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The default is chosen
-by the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)
-constructor that builds a whole run from a few keywords.
+truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor that builds a whole
+run from a few keywords defaults to `TwoThirds`.
 """
 abstract type DealiasingStrategy end
 
@@ -126,7 +126,8 @@ keeping the resolved band out to
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}``
 (``\\approx 2.8\\times`` the modes in the retained sphere).
 
-Use it when that top third of wavenumbers is worth the price: a **second** nonlinear-term transform
+Use it when the recovered bulk of that discarded top third — out to
+``\\approx 0.94\\kappa_{\\mathrm{Ny}}``, never the Nyquist-adjacent remainder — is worth the price: a **second** nonlinear-term transform
 per stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale
 spectral-representation buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step
@@ -336,7 +337,11 @@ with ``N`` the grid points per side, ``L`` the box side, ``f`` the retained-Nyqu
 For the sharp strategies the cutoff sits strictly **below** the grid Nyquist
 ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each step. `HouLi` is the exception
 its ``f = 1`` implies: its cutoff *is* the Nyquist, so there is no band above to zero, and it instead
-damps modes as they approach it (to machine epsilon at Nyquist). It fixes both the advective-CFL step
+damps modes as they approach it (to machine epsilon at Nyquist) — so under `HouLi` every
+representable mode counts as resolved signal, and ``\\kappa_{\\max}`` bounds the representable band
+rather than separating kept from damped content.
+
+The cutoff fixes both the advective-CFL step
 ([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)) and the resolution
 criterion
 ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a run is set

@@ -48,7 +48,9 @@ first.
 The choice therefore closes every cost axis at once: an iteration's arithmetic, traffic, and
 residency all follow from the configuration, never from what is read afterwards. The opposite choice
 is defensible — an iteration could do extra work, or keep extra arrays, so that a later read finds
-more — but this package caches only what the iteration produces anyway. What the choice gives up is
+more — but this package caches only what the iteration produces anyway. One standing exception
+survives, priced in §1.4: the closing deposit's maximum-speed reduction, a traffic-axis cost kept
+so the schedule never varies with how the run is driven. What the choice gives up is
 control over the contents: since nothing may be added on any axis, what the cache holds is decided by
 the solver's own schedule, not by the reader — §1.2 derives the contents and §1.4 states that price.
 
@@ -66,8 +68,9 @@ first a matter of kind, the other three the design choice read along its three a
 **Is the quantity an observable?** It must be determined by the state at a single ``t_n`` — by the
 state alone, in every argument. A quantity carrying anything else fails: the step size ``\Delta t``, a
 forcing's internal variables (the Ornstein–Uhlenbeck state of a stochastic source, say), the
-coefficients of the time scheme. For a quantity along a trajectory the probe's position counts as an
-argument and is bound by the same rule.
+coefficients of the time scheme. For a quantity along a trajectory the probe's position — a state of the
+probe's own (§1.1), not of the fluid — counts as an additional argument and is bound by the same
+single-``t_n`` rule.
 
 This is where the artifacts of the discretization fall out, and they are worth naming because they
 look observable and are not. A Runge–Kutta stage value
@@ -103,7 +106,7 @@ cache holds.
 **Surviving — the schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
 the register its producer computed it in — a **register** being storage a component computes one
-value into and overwrites at the next, holding nothing a reader should trust between times. An
+value into and overwrites at the next use, holding nothing a reader should trust between times. An
 observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
 what removes one: a register overwritten before the iteration's end has nothing left to deposit. The contents
@@ -143,15 +146,16 @@ continues; only then does the next iteration run. Read from the callback's side 
 iteration, which is how [`run!`](@ref) describes it — the same loop, named from the two ends. Stopping
 is thereby the caller's decision on observables, not a run option — a budget in turnovers, for
 instance, is a callback that accumulates ``\Delta t \varepsilon/k`` — the eddy-turnover clock — and says stop. Every instant a run
-reaches is observed exactly once: the first because a deposit seeding the initial state is made when
-the cache is built, the last because the observation that stops the run has already
+reaches is observed exactly once: the first because the `Simulation` constructor makes a deposit seeding the initial
+state as it builds the run, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
 closing deposit has no following iteration to fold into; it serves the final observation instead.
 Relative to a cacheless solver serving only its own dynamics, the run therefore pays **one** extra
 closing deposit per run: the state-only share of one first-stage evaluation, one reduction, and one
 interpolation.
-That is the cache's *added* cost. The reduction inside every other closing deposit recurs per
-iteration, and is work the following first stage would have done anyway (§1.4).
+That is the cache's *added* cost per run. Inside every other closing deposit the recovery is work
+the following first stage would have done anyway; the maximum-speed reduction is owed by no stage —
+it is the standing per-iteration traffic cost §1.4 prices.
 
 **A slot's epoch says which of three states the slot is in**: holding the observable at a
 named ``t_n``, holding the producer's scratch, or holding nothing yet deposited. (In the code the named time is
@@ -181,9 +185,10 @@ happened.
 Code that writes the state outside an iteration — a reseed, a filter — must announce the change by
 calling [`fields_modified!`](@ref), which advances the fields counter past every slot, so that reads
 throw
-until the next deposit. That interval belongs to whoever made the change: the recoveries are
-exported, so a caller who mutates the state mid-run computes what they need themselves, in their own
-buffer.
+until the next deposit. That interval belongs to whoever made the change: the recoveries stay callable — the field ones
+through the backend (`GBGPeriodicFields`' four-argument `to_physical!`), the vorticity through this
+package's [`vorticity_physical!`](@ref) — so a caller who mutates the state mid-run computes what
+they need themselves, in their own buffer.
 
 **The numbers follow the same rule on the same schedule.** The maximum speed is a cache entry like
 any other — deposited at the iteration's end, at that epoch, and read by the next iteration's timestep choice,
@@ -211,7 +216,7 @@ that value whole at its end — §2.3's in-place reuse does not, which is why it
 and the package version, not an interface a reader chooses from.
 
 A reader who needs an absent observable computes it at an observation, from the state or the cached
-fields, with the exported recoveries and reductions — in storage they own. The sizes say when that is
+fields, with the exported reductions and the backend's recoveries — in storage they own. The sizes say when that is
 a real decision: a vector field on the grid is ``3N^{3}`` reals, 384 MiB at ``N = 256`` in double
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
 third of a gigabyte; a number costs nothing worth counting.
@@ -228,10 +233,13 @@ every class.
 
 ## 2. The system
 
-One configuration fixes the system: a mask dealiasing rule (`TwoThirds` or `HouLi`, each removing the
-aliased wavenumbers by a per-wavenumber multiplication), a three-stage scheme, the default controller
-velocity forcing, an adaptive timestep. Those axes fix the whole of an iteration's work — stopping belongs
-to the observation (§1.3), and nothing a reader does changes what an iteration computes.
+One configuration fixes the system. The chapter's running instance is the default one — a mask
+dealiasing rule (`TwoThirds` or `HouLi`, each removing the aliased wavenumbers by a per-wavenumber
+multiplication), a three-stage scheme, the default controller velocity forcing, an adaptive
+timestep — and §2.3 prices the departures from it (`PhaseShift`, another stage count, a hand-fixed
+``\Delta t``). Whatever the configuration, those axes fix the whole of an iteration's work —
+stopping belongs to the observation (§1.3), and nothing a reader does changes what an iteration
+computes.
 
 ### 2.1 The equations
 
@@ -343,32 +351,30 @@ each. Its **Cached** column takes four values: *yes*, the schedule leaves the ob
 between iterations; *depends*, the observable survives in some configurations and not in others; *no*, a
 genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
 observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —
-there is no moment to date it to, so no act at an observation builds it either. Its **Built** column says
-whether the package holds the observable today, and reads `—` wherever *Cached* is *no* or
-*never* (a *depends* row is built whenever its configuration asks for it).
+there is no moment to date it to, so no act at an observation builds it either.
 
-| Observable | Where it lives | Cached | Built | Producer, or reason |
-|:---|:---|:---|:---|:---|
-| ``\boldsymbol{u}`` | physical, grid | yes | yes | the closing recovery; read by the timestep choice, the tracer advance, the Lamb assembly, and observations |
-| ``\boldsymbol{\omega}`` | physical, grid | yes | yes | the closing recovery; read by the Lamb assembly |
-| ``\varphi`` | physical, grid | yes | yes | the closing recovery; read by the flux assembly |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
-| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | yes | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
-| the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | yes | the closing reduction over the cached velocity; read by the next timestep choice |
-| ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | — | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
-| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | — | not surviving, for the same reason as the row above |
-| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | — | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
-| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | — | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
-| ``E(\kappa_n)``, the spectral density | per shell | no | — | not computed: no iteration forms it, and it needs its own binning pass |
-| the integral scale | one number | no | — | not computed: no iteration forms it |
-| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | — | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
-| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | — | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
-| ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | — | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
-| ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | — | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
-| a rescaling forcing's equivalent field | — | never | — | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |
-| an additive stochastic ``\boldsymbol{f}`` | spectral, grid | never | — | not an observable: depends on the forcing's internal variables |
-| stage values of ``\boldsymbol{u}``, ``\boldsymbol{\omega}``, ``\varphi`` | physical, grid | never | — | not an observable: carries ``\Delta t`` and the scheme's coefficients |
-| velocity at the predicted particle position | ``M\times3`` at points | never | — | not an observable: the probe occupies no such position |
+| Observable | Where it lives | Cached | Producer, or reason |
+|:---|:---|:---|:---|
+| ``\boldsymbol{u}`` | physical, grid | yes | the closing recovery; read by the timestep choice, the tracer advance, the Lamb assembly, and observations |
+| ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the Lamb assembly |
+| ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
+| the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
+| the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | the closing reduction over the cached velocity; read by the next timestep choice |
+| ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
+| ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
+| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
+| ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
+| ``E(\kappa_n)``, the spectral density | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
+| the integral scale | one number | no | not computed: no iteration forms it |
+| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
+| ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
+| ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
+| a rescaling forcing's equivalent field | — | never | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |
+| an additive stochastic ``\boldsymbol{f}`` | spectral, grid | never | not an observable: depends on the forcing's internal variables |
+| stage values of ``\boldsymbol{u}``, ``\boldsymbol{\omega}``, ``\varphi`` | physical, grid | never | not an observable: carries ``\Delta t`` and the scheme's coefficients |
+| velocity at the predicted particle position | ``M\times3`` at points | never | not an observable: the probe occupies no such position |
 
 ### 2.5 Three points the table alone does not settle
 

@@ -137,8 +137,8 @@ relating the turbulent kinetic energy ``k``, the periodic-box side length ``L``,
 dissipation rate ``\\varepsilon`` — nearly Reynolds-number-independent. The author–year
 handle names the dataset's source — Li et al. (2008) is the JHTDB paper — while the value is this
 package's own reduction of that database's forced-isotropic dataset (``\\mathrm{Re}_\\lambda \\approx 433``), consistent with higher-Reynolds-number
-periodic-box DNS. The calibration is that single point: a low-Reynolds-number box — the small grids
-a smoke test reaches — uses this constant as an **extrapolation**. Its `Reference` records a
+periodic-box DNS. The calibration is that single point: applied to a low-Reynolds-number box — the small grids a
+smoke test reaches — the constant is an **extrapolation** below its calibration. Its `Reference` records a
 conservative validity floor of ``\\mathrm{Re}_\\lambda = 100`` below the calibration point;
 `Reference`'s advisory-only contract still applies, and the ``\\nu`` derivation that consumes
 the law inherits the same standing.

@@ -59,20 +59,22 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
 warmup!(sim)
 
 # Observe and advance. The callback fires after every iteration (and once at the
-# start); it records
-# what it wants and its return decides continuation — stopping is the caller's decision.
+# start); it records what it wants and its return decides continuation — stopping
+# is the caller's decision.
+energies = Float64[]
 t_end = current_time(sim) + 20.0
 run!(sim) do s
-    accumulate_statistics!(my_stats, s)
+    push!(energies, kinetic_energy(s.state.velocity_spectral))
     current_time(s) < t_end
 end
 ```
 
-The run layer holds the pieces of §4 in one `Simulation` value, chooses a stable timestep each
-iteration from the advective-CFL condition over the cached maximum speed (§4.5), serves the deposited
-observables from the deposit-driven `ObservablesCache` (§4.1), and runs the **observation-first
-loop**: after every iteration, and once at the seeded ``t_0`` — ``n`` iterations, ``n+1``
-observations — the callback reads the run and decides whether it continues (§11 decision 43).
+The run layer holds the pieces of §4 in one `Simulation` value. Each iteration it chooses a stable
+timestep from the advective-CFL condition over the cached maximum speed (§4.5) and serves the
+deposited observables from the deposit-driven `ObservablesCache` (§4.1). It runs the
+**observation-first loop**: after every iteration, and once at the seeded ``t_0`` — ``n``
+iterations, ``n+1`` observations — the callback reads the run and decides whether it continues
+(§11 decision 43).
 Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
 advances until the flow is statistically stationary, watching the running dissipation
 ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` — the small-scale signals that
@@ -225,7 +227,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   causes a computation.
 
   Freshness is tracked by one epoch counter per dynamical factor of the run — fields, particles.
-  A completed `step!` advances the fields epoch. An out-of-band mutation of the spectral state is
+  A completed `step!` advances the fields epoch. An out-of-band mutation of the state's spectral representation is
   the one freshness event the cache cannot detect itself, so it is declared through
   `fields_modified!` — or, for an out-of-band edit of the tracer positions, through the particle-side
   twin `particles_modified!` — and followed by a `deposit!` before the run advances again (§11
@@ -233,9 +235,9 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The
   per-step scratch is **not** state: the scheme's registers live with the scheme (`IntegratorBuffers`
-  in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2), each
-  preallocated so a step allocates no field-sized memory (§9, invariant 4) and sized
-  to the run (no scalar buffers when the run carries no scalar; GPU memory is tight). A `Simulation`
+  in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2).
+  Each is preallocated, so a step allocates no field-sized memory (§9, invariant 4), and sized to
+  the run — no scalar buffers when the run carries no scalar; GPU memory is tight. A `Simulation`
   composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in
   place — each iteration a `step!` closed by the closing `deposit!`.
 
@@ -469,7 +471,9 @@ scheme** — the reversible generator of §8 again — so the split does not nai
 
 ### 4.7 `SimulationRun` — the front door
 
-A `Simulation` value bundles what one iteration advances and reads — the present instant, no history: the `FixedDomain`, the `ResolvedFields` state (the
+A `Simulation` value bundles what one iteration advances and reads — the present instant (the one
+bounded look-back is the cache's Lagrangian sample history, which a multistep particle scheme
+needs): the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
@@ -487,12 +491,12 @@ Over it:
   deposit-completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
   observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
-- **`StationarityCriterion`** is the packaged spin-up observation — stationarity detection on the
-  running dissipation ``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` (a
-  trailing-window flatness test that **gates** on ``\varepsilon`` rather than on the clampable
-  ``k(t)``; ``k`` is still measured, to normalize the eddy-turnover clock ``\Delta t \varepsilon/k``.
-  When the scalar is forced, ``\langle\varphi^2\rangle`` must settle too) — and **`warmup!(sim; ...)`**
-  its one-line sugar. A fixed budget is a three-line callback, not a run option.
+- **`StationarityCriterion`** is the packaged spin-up observation, and **`warmup!(sim; ...)`** its
+  one-line sugar: stationarity detection on the running dissipation ``\varepsilon(t)`` and the
+  velocity-derivative skewness ``S(t)`` — a trailing-window flatness test that **gates** on
+  ``\varepsilon`` rather than on the clampable ``k(t)``, though ``k`` is still measured, to
+  normalize the eddy-turnover clock ``\Delta t \varepsilon/k``. When the scalar is forced,
+  ``\langle\varphi^2\rangle`` must settle too. A fixed budget is a three-line callback, not a run option.
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
@@ -633,7 +637,7 @@ Precision and the memory-footprint/accuracy trade-off are **objects of study**, 
 numerical counterpart of the charter that the tool investigates the physics rather than assuming it (§8).
 
 - **Both precisions are supported equally, and no kernel privileges either.** (The `Simulation`
-  `Simulation` must start somewhere and starts at `Float64` / `Array`; that is a convenience
+  constructor must start somewhere and starts at `Float64` / `Array`; that is a convenience
   constructor's choice, not a property of the library, and `FixedDomain` takes both from the caller.) `Float32` buys twice the
   grid per byte and roughly twice the throughput on a consumer GPU; `Float64` buys the accuracy
   margin a long integration or a sensitive diagnostic may need. Which one a run wants is a fitness
@@ -721,8 +725,8 @@ generalization is built for them until a second concrete case forces the abstrac
 - **User-selectable FFT planner effort.** `GBGPeriodicFields` lets each transform plan carry a backend
   planner flag and time limit — the `fft_flags` and `fft_timelimit` keywords of `FieldTransformPlans` —
   yet `FixedDomain` (§4.1) builds its velocity, scalar, and tensor plans without them, so every run takes
-  the planner default (`FFTW.ESTIMATE` on the CPU path) and neither the domain nor the `Simulation` front
-  door exposes an override. Closing it is a two-keyword passthrough, deferred on cost/benefit: the
+  the planner default (`FFTW.ESTIMATE` on the CPU path) and neither the domain nor the `Simulation`
+  constructor exposes an override. Closing it is a two-keyword passthrough, deferred on cost/benefit: the
   transform is the dominant per-step cost, so a one-time `FFTW.MEASURE` / `FFTW.PATIENT` planning search
   is a genuine performance lever beside the precision and footprint axes (§5) — but that search is an
   FFTW planning concept that pays off on the **CPU** path, IT's development-and-small-run platform, not
@@ -808,12 +812,13 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   (each row reads only itself and the rows above — the fields never read the tracer positions, the
   clock reads nothing), so the flow is a skew product and `advance!` is its Gauss–Seidel sweep in
   topological order (step the fields, refresh the observation, push the tracers, tick the clock).
-  Triangularity is what licenses the composed propagator — splitting error cannot propagate *up* the
-  triangle — and it gives every state slot a litmus: **the restart record holds exactly what the flow
-  map needs** (``\hat{\boldsymbol{u}}``, ``\hat\varphi``; the tracer positions; a stochastic
-  forcing's internal state — the extended-phase-space discipline of molecular dynamics' thermostats);
-  the observables cache holds spent compute, reconstructable from the record (delete it and the
-  trajectory is unchanged); and the clock and what a run records are the experimenter's logbook rather than physics. The
+  Triangularity is what licenses the composed propagator: splitting error cannot propagate *up* the
+  triangle. It also gives every state slot a litmus. **The restart record holds exactly what the
+  flow map needs** — ``\hat{\boldsymbol{u}}``, ``\hat\varphi``, the tracer positions, and a
+  stochastic forcing's internal state (the extended-phase-space discipline of molecular dynamics'
+  thermostats); the observables cache holds spent compute, reconstructable from the record (delete
+  it and the trajectory is unchanged); and the clock and what a run records are the experimenter's
+  logbook rather than physics. The
   `ObservablesCache` charts are the tower's *algebraic* variables — solved, never integrated — and their
   per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
 

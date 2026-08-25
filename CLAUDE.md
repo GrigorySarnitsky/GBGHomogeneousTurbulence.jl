@@ -217,7 +217,8 @@ line rather than a clause:
   instead carry **`-> arg`**, naming the argument it returns — the corpus-wide idiom — and then
   needs no `Returns` sentence; arrow and sentence never both appear.
 - A **module map is identity → contents list → optional trailing remark**, in that order, with no
-  essay before the list.
+  essay before the list — deliberately tighter than PF's map rule, which asks for scope-and-invariants
+  prose ahead of the list: IT's four-role maps stay list-first.
 
 **Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
 docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never

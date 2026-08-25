@@ -305,10 +305,11 @@ you.
 
 !!! note "One optimization crosses two verbs"
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
-    stage's `scalar_rhs!` to reuse, recorded as the identity of the `û` it was taken of rather than
-    either signature. The record half is opportunistic, never load-bearing — a false record can only
-    force a redundant rebuild, with the same value: a `scalar_rhs!` handed a different `û`
-    than the recorded one rebuilds the displaced velocity itself, value-identically.
+    stage's `scalar_rhs!` to reuse. Neither verb's signature carries the handoff: the generator
+    records which `û` the displaced velocity was taken of, and `scalar_rhs!` reuses the scratch only
+    when that record matches its own `û`. The record is opportunistic, never load-bearing — a
+    mismatch only forces a redundant rebuild with the same value: a `scalar_rhs!` handed a different
+    `û` than the recorded one rebuilds the displaced velocity itself, value-identically.
 
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
@@ -327,9 +328,10 @@ you.
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds,
-  left fresh by `velocity_rhs!` for the same stage's `scalar_rhs!` (`PhaseShift` only). Half of a
-  conjunctive contract — reuse needs this record to match **and** the caller's
-  `displaced_velocity_current` promise; the record alone can only force a rebuild.
+  left fresh by `velocity_rhs!` for the same stage's `scalar_rhs!` (`PhaseShift` only). Reuse takes
+  two conditions together: this record must match the caller's `û`, **and** the caller must promise
+  through `displaced_velocity_current` that the scratch is still fresh. The record alone can only
+  force a rebuild.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
@@ -419,7 +421,8 @@ Close a step of the generator: apply each of its forcings' post-step projections
 rescale of a [`VarianceRescaling`](@ref GBGIsotropicTurbulence.Forcing.VarianceRescaling)) to the
 advanced state, velocity first, then the scalar when the run carries one. A scheme calls this once
 after its final stage, so everything that follows the step — the diagnostics, the derived
-observables, the tracer advance — sees the forced end-of-step fields.
+observables, the tracer advance — sees the forced end-of-step fields. The name is this protocol's
+step-closing verb, unrelated to `Base.finalize`, Julia's garbage-collection finalizer vocabulary.
 
 The arguments are:
 - `generator` — the [`ResolvedGenerator`](@ref) whose forcings project.
@@ -462,12 +465,12 @@ written, not one: `N̂` receives the result, and `ω_consumed` is consumed in pl
 `_consumed` suffix marks it, since Julia's `!` convention flags only the first.
 
 The arguments are:
-- `N̂` — the spectral field receiving the assembled term.
+- `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
 - `û` — the stage velocity in spectral representation, consulted by `PhaseShift`'s displaced
   evaluation; a mask strategy leaves it unused.
 - `u` — the stage velocity in physical representation, only read.
-- `ω_consumed` — the stage vorticity in physical representation, consumed (the closing note).
+- `ω_consumed` — the stage vorticity in physical representation, consumed (see the note below).
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
 
 In physical space the rotational form writes the convective term as the Lamb vector, through the identity
@@ -627,11 +630,11 @@ the result, and `u_consumed` is consumed in place — the `_consumed` suffix mar
 `!` convention flags only the first.
 
 The arguments are:
-- `N̂` — the spectral field receiving the assembled term.
+- `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
 - `û`, `φ̂` — the stage velocity and scalar in spectral representation, consulted by `PhaseShift`;
   a mask strategy leaves both unused.
-- `u_consumed` — the stage velocity in physical representation, consumed (the closing note).
+- `u_consumed` — the stage velocity in physical representation, consumed (see the note below).
 - `φ` — the stage scalar in physical representation, only read.
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
 - `displaced_velocity_current = false` — the reuse promise for `PhaseShift`'s displaced velocity,
@@ -666,9 +669,11 @@ record alone can only force a rebuild, never a wrong reuse; the keyword is the l
 containers are rewritten in place, so a false promise over the *same* container is quietly wrong,
 where the default merely rebuilds (one shift, three inverse transforms) and stays correct.
 
-The advective term's ``\\kappa = 0`` mode is zeroed exactly
-(``\\langle\\nabla\\cdot(\\boldsymbol{u}\\varphi)\\rangle = 0`` holds discretely only to roundoff,
-and the mean of ``\\varphi`` has no diffusive damping); the forcing source, added after, may carry a mean.
+The advective term's ``\\kappa = 0`` mode is zero exactly by construction — the divergence
+multiplier ``\\mathrm{i}\\boldsymbol{\\kappa}`` vanishes identically at
+``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` — and the assembly pins it anyway, for uniformity with
+the velocity route, whose product mean is only roundoff-small; the mean of ``\\varphi`` has no
+diffusive damping. The forcing source, added after, may carry a mean.
 
 Returns `N̂`.
 

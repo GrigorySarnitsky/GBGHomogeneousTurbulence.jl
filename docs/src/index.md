@@ -48,8 +48,8 @@ run!(sim) do s              # observe and advance: the callback reads the run,
     current_time(s) < t_end # records what it wants, and decides continuation
 end
 
-# The state is always current; the cache serves what the last iteration's closing
-# deposit recorded (the epoch — the cache's freshness counter — gates every read).
+# The state is always current; the cache serves what the last iteration recorded
+# at its end — a stale read throws rather than serving an old value.
 kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
 velocity_physical(sim.cache)                 # the last closing deposit's field
 flow_parameters(sim)                          # the run's measured flow state
@@ -85,7 +85,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref) and
     [`IFHeun`](@ref)), with the forcing menu `NoForcing`, `Linear`, `ConstantPower`,
-    `VarianceController` (the default), and `VarianceRescaling`, and Lagrangian particle
+    `VarianceController` (the velocity default), and `VarianceRescaling`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     provide usable model spectra, structure-function laws, and scaling constants. Accumulating
     statistics over the fields and the sampled trajectories is the caller's own analysis:
@@ -100,7 +100,8 @@ Listed in build order — each module uses the ones above it. The
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
-  diagnostics of the flow and the scalar, the developed-turbulence marker (`derivative_skewness`),
+  diagnostics of the flow and the scalar (including the fused pair
+  `kinetic_energy_and_dissipation`), the developed-turbulence marker (`derivative_skewness`),
   the spectrum-derived scales, the CFL speed bound (`max_speed`), and the one field-valued
   observable, the vorticity recovery.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
@@ -128,4 +129,4 @@ Listed in build order — each module uses the ones above it. The
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
   the umbrella), designed to be extractable into a standalone package. In the actual include order
-  this dependency-light leaf comes *first*; it is listed last here because a reader meets it last.
+  this dependency-light leaf comes *first*; it is listed last here because a user's workflow reaches it last — validating against the laws comes after running.

@@ -22,8 +22,9 @@ The run layer:
 - [`Simulation`](@ref) — everything the next iteration needs, in one value: the domain, the
   fields at the current instant, the observables cache, the equations of motion with their
   forcing, the integration schemes with their scratch, any tracers, and the clock — built with
-  defaults from a few numbers. It holds the present instant only; past instants exist only in
-  what an observation recorded as the run advanced.
+  defaults from a few numbers. It holds the present instant — plus the one bounded look-back a
+  multistep particle scheme needs, the cache's Lagrangian sample history — and past instants
+  otherwise exist only in what an observation recorded as the run advanced.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
   iteration — and its return decides continuation).
@@ -124,7 +125,7 @@ there — and the viscosity is chosen from the grid rather than supplied:
         [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
         [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
         rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
-        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.96\\Delta x`` for ``2/3``,
+        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.95\\Delta x`` for ``2/3``,
         and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
         higher on the same grid. Raise `κ_max_η` when comparing across strategies.
 
@@ -206,9 +207,9 @@ The run group:
   `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
   that same energy, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
   (rather than the ``L_{11}`` the seeded field will actually have). Note the ``\\varepsilon`` half:
-  it is the *stationary forced* estimate, so on a decaying run — where the explicit-``\\nu`` advice
-  above exists precisely because that balance does not hold — the model's dissipation-range
-  placement inherits the same mismatch.
+  it is the *stationary forced* estimate. On a decaying run that balance does not hold — the reason
+  the explicit-``\\nu`` advice above exists — so the model's dissipation-range placement inherits
+  the same mismatch.
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
@@ -220,7 +221,8 @@ The run group:
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
-  time ``1/(D\\kappa_{\\min}^{2})`` — with ``D`` the **larger** of the run's diffusivities (``\\nu``,
+  time ``1/(D\\kappa_{\\min}^{2})`` — with ``\\kappa_{\\min} = 2\\pi/L`` the box's fundamental
+  wavenumber and ``D`` the **larger** of the run's diffusivities (``\\nu``,
   and ``\\varkappa = \\nu/\\mathrm{Sc}`` when a scalar rides), since the faster-diffusing field
   decays first — and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
@@ -916,12 +918,13 @@ build a fresh one per run.
 The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
 `skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
 that judge them. Build one through the keyword constructor above.
-- `monitor` — the sampled signals (the turnover clock, ``\\varepsilon``, the scalar variance, the
-  skewness — not ``k``, which this criterion deliberately never gates on) and the
-  gate settings and tolerances that test them.
+- `monitor` — the sampled signal series (``\\varepsilon``, the scalar variance, the skewness — not
+  ``k``, which this criterion deliberately never gates on), each recorded against the turnover
+  clock's readings, and the gate settings and tolerances that test them.
 - `max_turnovers` — the give-up cap.
 - `gate_scalar` — the requested scalar gate (applied only when the run's scalar is forced).
-- `elapsed_turn`, `last_time`, `started` — the turnover clock's state.
+- `elapsed_turn`, `last_time`, `started` — the turnover clock itself: the accumulated turnovers,
+  the instant last read, and whether the clock has started.
 """
 mutable struct StationarityCriterion
   const monitor::StationarityMonitor
