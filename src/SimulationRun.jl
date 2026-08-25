@@ -207,9 +207,9 @@ The run group:
   `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
   that same energy, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
   (rather than the ``L_{11}`` the seeded field will actually have). Note the ``\\varepsilon`` half:
-  it is the *stationary forced* estimate. On a decaying run that balance does not hold — the reason
-  the explicit-``\\nu`` advice above exists — so the model's dissipation-range placement inherits
-  the same mismatch.
+  it is the *stationary forced* estimate, so on a decaying run the model's dissipation-range
+  placement is misplaced from the start. That failed balance is the same reason the
+  explicit-``\\nu`` advice above exists.
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
@@ -1022,10 +1022,12 @@ self-describing HDF5 group — the domain's parameters, the state in spectral re
 tracer set, both forcing strategies, the Lagrangian sample history a multistep particle
 integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
 derivable is stored: the physical-representation observables, the current velocity sample, and
-every register and plan are recomputed on read. A stochastic forcing's evolving state is
-deliberately not stored (its parameters are), so continuation is exact for deterministic
-forcings. Available once the `HDF5` package is loaded; opening and closing the file is the
-caller's job, and `parent[name] = sim` is equivalent sugar.
+every register and plan are recomputed on read. A stochastic forcing — none currently ships;
+the one implementation is archived — has its evolving state deliberately not stored (its
+parameters are), so continuation is exact for deterministic forcings.
+
+Available once the `HDF5` package is loaded; opening and closing the file is the caller's job,
+and `parent[name] = sim` is equivalent sugar.
 
 The arguments are:
 - `parent` — the open HDF5 file or group to write under.
@@ -1046,7 +1048,8 @@ through its own constructor from the recorded parameters, overwrite the freshly 
 positions with the stored ones, re-deposit every observable the schedule carries, restore the
 Lagrangian sample history fill-aware (a scheme of a different order keeps what fits and
 bootstraps the rest), and set the clock — the next [`advance!`](@ref) continues the checkpointed
-run. The one deliberate divergence is a stochastic forcing, which resumes on a fresh stream. A
+run. The one deliberate divergence is a stochastic forcing (none currently ships — the one
+implementation is archived), which resumes on a fresh stream. A
 group not written by `write_simulation`, or written by a newer schema version, is refused with an
 `ArgumentError`. Available once the `HDF5` package is loaded.
 

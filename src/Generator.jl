@@ -307,7 +307,9 @@ you.
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
     stage's `scalar_rhs!` to reuse. Neither verb's signature carries the handoff: the generator
     records which `û` the displaced velocity was taken of, and `scalar_rhs!` reuses the scratch only
-    when that record matches its own `û`. The record is opportunistic, never load-bearing — a
+    when that record matches its own `û` **and** its caller promises through
+    `displaced_velocity_current` that the scratch is still fresh. The record is opportunistic,
+    never load-bearing — a
     mismatch only forces a redundant rebuild with the same value: a `scalar_rhs!` handed a different
     `û` than the recorded one rebuilds the displaced velocity itself, value-identically.
 

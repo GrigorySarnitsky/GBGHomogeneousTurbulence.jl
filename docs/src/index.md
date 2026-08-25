@@ -51,7 +51,7 @@ end
 # The state is always current; the cache serves what the last iteration recorded
 # at its end — a stale read throws rather than serving an old value.
 kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
-velocity_physical(sim.cache)                 # the last closing deposit's field
+velocity_physical(sim.cache)                 # the field the last iteration recorded
 flow_parameters(sim)                          # the run's measured flow state
 ```
 

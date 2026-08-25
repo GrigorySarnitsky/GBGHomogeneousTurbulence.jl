@@ -548,7 +548,9 @@ author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014
 would be Kolmogorov 1941 across two submodules — `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5
 laws) and a spectrum counterpart `Spectra.Kolmogorov1941`, were one added — separated by the submodule
 alone. The full
-handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction.
+handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction — and
+where a preset's value is *not* read off its name's paper (`Li2008`'s own database reduction,
+`Sreenivasan1995`'s as-quoted value), the docstring says so at the value.
 
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
 
@@ -816,9 +818,9 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   triangle. It also gives every state slot a litmus. **The restart record holds exactly what the
   flow map needs** — ``\hat{\boldsymbol{u}}``, ``\hat\varphi``, the tracer positions, and a
   stochastic forcing's internal state (the extended-phase-space discipline of molecular dynamics'
-  thermostats); the observables cache holds spent compute, reconstructable from the record (delete
-  it and the trajectory is unchanged); and the clock and what a run records are the experimenter's
-  logbook rather than physics. The
+  thermostats). The observables cache holds spent compute, reconstructable from the record —
+  delete it and the trajectory is unchanged. The clock and what a run records are the
+  experimenter's logbook rather than physics. The
   `ObservablesCache` charts are the tower's *algebraic* variables — solved, never integrated — and their
   per-factor epochs inherit the triangle: a chart is stale against exactly the factors it reads.
 

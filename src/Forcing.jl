@@ -65,8 +65,9 @@ A band reaching above the dealias cutoff is inert there — the mask holds those
 band forcing multiplies the field — so construction warns about it.
 
 The two fields are forced **independently**:
-[`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate
-`velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
+[`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) — the `Generator`
+parameter record bundling the viscosity, the Schmidt number, and the two forcings — takes a
+separate `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
 
 """
 module Forcing
@@ -121,10 +122,11 @@ legitimately use both.
 
 Which channel a rate may take is decided by steadiness in time, **not** linearity in the field: the
 integrating factor holds a rate fixed for the whole step, so one re-solved from the state must go
-through `add_forcing_source!` instead. The declaration is cross-checked when the generator is
-built, not trusted: a strategy that implements `set_forcing_rate!` without declaring
-`uses_steady_linear_rate` is refused with an `ArgumentError`. Steadiness itself remains the
-author's promise — no construction-time check can watch a rate over time.
+through `add_forcing_source!` instead. The declaration is measured when the generator is built,
+not trusted: a declared rate is probed on two different fields and refused with an
+`ArgumentError` if the outputs differ — the hook takes no time argument, so a field-independent
+rate is steady — and a strategy that implements `set_forcing_rate!` without the declaration is
+refused likewise.
 
 Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
 `add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns

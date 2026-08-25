@@ -7,10 +7,10 @@ Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_at_particles(cache),115,0,116
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
-Forcing.jl::AbstractForcing,86,1,335
+Forcing.jl::AbstractForcing,94,1,350
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,419
 Forcing.jl::DeferredForcing,54,0,204
-Forcing.jl::Forcing,81,0,360
+Forcing.jl::Forcing,81,0,376
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,190
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,415
@@ -26,7 +26,7 @@ Forcing.jl::write_forcing(parent::HDF5.H5DataStore， name::AbstractString，,96
 GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,118
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),81,1,249
 Generator.jl::Generator,118,0,184
-Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,581
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,593
 Generator.jl::finalize!(generator， state， domain),84,0,119
 Generator.jl::prepare!(generator， state， domain， dt),67,0,113
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
@@ -105,17 +105,17 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,62,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2029
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2028
 SimulationRun.jl::SimulationRun,31,0,218
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = true， min_turnovers = 5，,98,0,589
 SimulationRun.jl::advance!(sim; dt = nothing),53,0,99
 SimulationRun.jl::current_step(sim),85,0,100
 SimulationRun.jl::current_time(sim),6,0,7
 SimulationRun.jl::flow_parameters(sim),96,0,97
-SimulationRun.jl::read_simulation(parent::HDF5.H5DataStore， name::AbstractString;,106,0,163
+SimulationRun.jl::read_simulation(parent::HDF5.H5DataStore， name::AbstractString;,115,0,172
 SimulationRun.jl::run!(callback， sim),66,0,231
 SimulationRun.jl::warmup!(sim; kwargs...),70,0,114
-SimulationRun.jl::write_simulation(parent::HDF5.H5DataStore， name::AbstractString， sim::Simulation),112,0,151
+SimulationRun.jl::write_simulation(parent::HDF5.H5DataStore， name::AbstractString， sim::Simulation),100,0,162
 Spectra.jl::DissipationFactor,39,1,115
 Spectra.jl::EnergySpectrum <: TurbulenceLaw,19,0,22
 Spectra.jl::ExponentialDissipation(β),45,0,168

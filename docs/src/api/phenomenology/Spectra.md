@@ -61,12 +61,9 @@ ObukhovCorrsin1949
 
 ## References
 
-The published provenance of each preset on this page, read from its
-[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)` — the extraction-bound leaf
-carries its own citations, so a reader never has to leave the page for them. This
-list is scoped to the laws' own provenance; sources cited inline for an individual coefficient or a
-comparison (e.g. Sagaut & Cambon, *Homogeneous Turbulence Dynamics*, 2nd ed., Springer, 2018) are
-cited in place and deliberately not repeated here.
+The published provenance of each law on this page, read from its
+[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)`; a source cited inline
+for an individual coefficient or a comparison is cited in place and not repeated here.
 
 ```@eval
 import GBGIsotropicTurbulence.Phenomenology as Phen
