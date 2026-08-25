@@ -76,6 +76,12 @@ All keyword, all required:
     Its per-step state belongs to one field, so passing the same *mutable* strategy instance as both
     `velocity_forcing` and `scalar_forcing` throws an `ArgumentError` naming it. Build two.
 
+!!! warning "A defaulted controller settling time never drives the scalar"
+    A [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) whose
+    `turnover_time` was left at its default derives the settling time from a kinetic-energy law,
+    which is meaningless for a scalar variance — passed as `scalar_forcing` with a positive gain
+    it throws an `ArgumentError`. Pass the flow's turnover time explicitly.
+
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
 four fields directly, in the order shown; each holds the value documented for the keyword of the same name
@@ -119,7 +125,10 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
     # A defaulted controller settling time is Bassenne's kinetic-energy law — valid only when the
     # target IS a kinetic energy. Bound to the scalar, the derived tℓ would scale with the scalar's
     # amplitude unit and break the scalar equation's exact linearity in φ (owner-ruled 2026-08-25).
+    # At gain = 0 the restoring term vanishes and tℓ never enters the dynamics, so the marginal
+    # law stays legal whatever the provenance.
     scalar_forcing isa VarianceController && scalar_forcing.turnover_time_derived &&
+      scalar_forcing.gain > 0 &&
       throw(ArgumentError("this `VarianceController` is bound as `scalar_forcing` but its " *
                           "`turnover_time` was left at the default, which derives the settling " *
                           "time from a kinetic-energy law; a scalar variance is not an energy, so " *

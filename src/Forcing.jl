@@ -624,10 +624,12 @@ does not take.
   stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
   that sets ``\\nu`` explicitly against a very different regime should pass its own value. The
   derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
-  controller left at the default and handed to `FlowConditions` as a `scalar_forcing` is refused
-  there — a scalar variance is not an energy, and the derived settling time would depend on the
-  scalar's amplitude unit, breaking the scalar equation's exact linearity in ``\\varphi``. Driving
-  the scalar, pass the **flow's** turnover time ``2k/(3\\varepsilon)`` explicitly.
+  controller left at the default and handed to `FlowConditions` as a `scalar_forcing` with a
+  positive gain is refused there — a scalar variance is not an energy, and the derived settling
+  time would depend on the scalar's amplitude unit, breaking the scalar equation's exact
+  linearity in ``\\varphi`` (at `gain = 0` the settling time never enters the dynamics and the
+  marginal law stays legal). Driving the scalar, pass the **flow's** turnover time
+  ``2k/(3\\varepsilon)`` explicitly.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
 
 !!! note "The settling time, not the gain, is the physical parameter"

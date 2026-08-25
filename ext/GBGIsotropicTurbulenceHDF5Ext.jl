@@ -234,6 +234,7 @@ function write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::
   a["target"] = forcing.target
   a["gain"] = forcing.gain
   a["turnover_time"] = forcing.turnover_time
+  a["turnover_time_derived"] = forcing.turnover_time_derived
   a["lowest_shell"] = forcing.lowest_shell
   a["highest_shell"] = forcing.highest_shell
   return g
@@ -274,8 +275,14 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
     return VarianceRescaling(domain; target = a["target"], over = Symbol(a["over"]),
                              lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGIsotropicTurbulence.VarianceController"
+    # A derived settling time is reconstructed by re-deriving (turnover_time = nothing): the
+    # default is a pure function of the stored target and the box side, so the value is
+    # bit-identical — and the provenance survives the round-trip, which the scalar-binding guard
+    # of decision 77 reads. A file written before the flag existed reads as explicit, exactly
+    # what such a file restored to.
+    derived = haskey(a, "turnover_time_derived") ? Bool(a["turnover_time_derived"]) : false
     return VarianceController(domain; target = a["target"], gain = a["gain"],
-                              turnover_time = a["turnover_time"],
+                              turnover_time = derived ? nothing : a["turnover_time"],
                               lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGIsotropicTurbulence.StochasticOU"
     return StochasticOU(domain; variance = a["variance"],

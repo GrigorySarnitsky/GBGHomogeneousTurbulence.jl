@@ -190,6 +190,9 @@ The run group:
   operator-free constructor); `velocity_forcing` left at `nothing` means the default — a
   `VarianceController` driving the whole-field kinetic energy to the `kinetic_energy` value — and
   `scalar_forcing` defaults to `NoForcing()`. The velocity and scalar are forced independently.
+  A `VarianceController` with a defaulted `turnover_time` is refused as `scalar_forcing` (its
+  derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
+  explicitly there.
   Under a derived ν a hand-built velocity forcing is **checked against the ν calibration**: one that
   holds a different target, a band instead of the whole field, or nothing at all draws a warning,
   since the chosen ν then describes a state the run never reaches.

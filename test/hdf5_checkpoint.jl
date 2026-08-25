@@ -100,8 +100,8 @@ end
     for (i, f) in enumerate(built)
       back = read_forcing(io, "f$i", domain)
       @test nameof(typeof(back)) == nameof(typeof(f))
-      for p in (:rate, :injection_rate, :target, :gain, :turnover_time, :over, :variance,
-                :correlation_time, :lowest_shell, :highest_shell)
+      for p in (:rate, :injection_rate, :target, :gain, :turnover_time, :turnover_time_derived,
+                :over, :variance, :correlation_time, :lowest_shell, :highest_shell)
         hasproperty(f, p) && @test getproperty(back, p) == getproperty(f, p)
       end
     end
