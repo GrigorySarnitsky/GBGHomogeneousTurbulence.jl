@@ -243,6 +243,9 @@ function write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::
   g, a = _forcing_group(parent, name, "StochasticOU")
   a["variance"] = forcing.variance
   a["correlation_time"] = forcing.correlation_time
+  # The seed is a defining parameter (it fixes the stream, so a forced run is reproducible); the
+  # stream's evolving POSITION is deliberately not stored — that is the documented divergence.
+  a["seed"] = forcing.seed
   a["lowest_shell"] = forcing.lowest_shell
   a["highest_shell"] = forcing.highest_shell
   return g
@@ -276,7 +279,7 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
                               lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGIsotropicTurbulence.StochasticOU"
     return StochasticOU(domain; variance = a["variance"],
-                        correlation_time = a["correlation_time"],
+                        correlation_time = a["correlation_time"], seed = a["seed"],
                         lowest_shell = lo, highest_shell = hi)
   else
     throw(ArgumentError("read_forcing: unrecognized forcing tag \"$tag\" in group \"$name\""))

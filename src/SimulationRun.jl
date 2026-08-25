@@ -52,13 +52,13 @@ using ..Cache: ObservablesCache, check_deposits,
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController
-using ..Generator: FlowConditions, ResolvedGenerator
+using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
                    restart!, history_depth
-using ..Phenomenology: FlowParameters, taylor_reynolds
+using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
@@ -198,7 +198,8 @@ The run group:
   ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
   sets the integral scale of the *assumed state* that model is evaluated at. Keep ``\\kappa_p`` well
   below the dealias cutoff: a value near or above it concentrates the pre-rescale seed in shells
-  the mask holds empty, and no guard checks this — unlike a forcing band, which warns.
+  the mask holds empty; the seeders warn when the envelope's peak reaches the cutoff (a
+  model-spectrum seed is shaped by its model instead and is not guarded).
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
@@ -438,17 +439,25 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # carries the measured numbers and the remedies. A warning, never an error: the value stays legal
   # (a deliberately under-resolved scalar is a legitimate experiment), it just cannot be silent.
   if scalar
-    η = (ν^3 / ε)^(1//4)
-    κ_max_η_B = max_wavenumber(domain) * η / sqrt(schmidt)
+    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε,
+                                         rms_velocity = sqrt(2 * kinetic_energy / 3),
+                                         integral_scale = inv(envelope_wavenumber), schmidt))
+    κ_max_η = max_wavenumber(domain) * η
+    κ_max_η_B = κ_max_η / sqrt(schmidt)
     if κ_max_η_B < 1.5
+      # The velocity clause must agree with the number it quotes: claim resolution only when the
+      # velocity actually clears the same floor the sentence applies to the scalar.
+      velocity_clause = κ_max_η >= 1.5 ?
+        "The grid resolves the velocity (κ_max·η = $(round(κ_max_η, digits = 2))), but at " *
+        "Sc = $(schmidt) the scalar's Batchelor scale η_B = η/√Sc is finer by √Sc, and " :
+        "The velocity is under-resolved too (κ_max·η = $(round(κ_max_η, digits = 2)) against " *
+        "the same floor), the scalar's Batchelor scale η_B = η/√Sc being no coarser, so "
       @warn "Simulation: the scalar is under-resolved — κ_max·η_B = $(round(κ_max_η_B, digits = 2)) " *
-            "against the well-resolved floor of 1.5. The grid resolves the velocity " *
-            "(κ_max·η = $(round(max_wavenumber(domain) * η, digits = 2))), but at Sc = $(schmidt) " *
-            "the scalar's Batchelor scale η_B = η/√Sc is finer by √Sc, and `scalar_dissipation` " *
-            "will measure a truncated field. Raise `κ_max_η` by √Sc, lower `schmidt`, or set " *
-            "`viscosity` yourself if the truncation is deliberate. (η here uses the stationary " *
-            "dissipation estimate at the requested `kinetic_energy`; a decaying run resolves " *
-            "better than this as it decays.)"
+            "against the well-resolved floor of 1.5. " * velocity_clause *
+            "`scalar_dissipation` will measure a truncated field. Raise `κ_max_η` by √Sc, lower " *
+            "`schmidt`, or set `viscosity` yourself if the truncation is deliberate. (η here uses " *
+            "the stationary dissipation estimate at the requested `kinetic_energy`; a decaying " *
+            "run resolves better than this as it decays.)"
     end
   end
 
@@ -521,7 +530,7 @@ function flow_parameters(sim::Simulation)
   k = kinetic_energy(sim.state.velocity_spectral)
   ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
   εφ = sim.state.scalar_spectral === nothing ? NaN :
-    scalar_dissipation(sim.state.scalar_spectral, sim.domain, sim.generator.conditions.viscosity / sim.generator.conditions.schmidt)
+    scalar_dissipation(sim.state.scalar_spectral, sim.domain, scalar_diffusivity(sim.generator.conditions))
   FlowParameters(; viscosity = sim.generator.conditions.viscosity, dissipation = ε,
                  rms_velocity = sqrt(2k / 3),
                  integral_scale = integral_scale(sim.state.velocity_spectral, sim.domain),
@@ -594,7 +603,7 @@ function cfl_timestep(sim::Simulation)
   advective = speed > 0 ? sim.cfl * Δx / speed : sim.cfl * Δx
   conditions = sim.generator.conditions
   diffusivity = sim.state.scalar_spectral === nothing ? conditions.viscosity :
-                max(conditions.viscosity, conditions.viscosity / conditions.schmidt)
+                max(conditions.viscosity, scalar_diffusivity(conditions))
   κ_min = 2π / Float64(sim.domain.grid.domain_size[1])
   resolution = 1 / (diffusivity * κ_min^2)
   return min(advective, resolution, sim.max_dt)
@@ -705,6 +714,10 @@ function fields_modified!(sim::Simulation)
   _check_reality(sim.state.velocity_spectral, "velocity")
   sim.state.scalar_spectral === nothing || _check_reality(sim.state.scalar_spectral, "scalar")
   fields_modified!(sim.cache)
+  # Dispatch the scheme's own restart, exactly as the particles twin does: the cache form discards
+  # the sample history it owns, but a scheme carrying registers of its own would need them cleared
+  # here too, and `Cache` — included before `Particles` — can never reach it.
+  sim.particle_buffers === nothing || restart!(sim.particle_integration_scheme, sim.particle_buffers)
   return sim
 end
 
@@ -964,7 +977,9 @@ function (criterion::StationarityCriterion)(sim::Simulation)
     # units that have stopped advancing — so the give-up cap below could never be reached and the
     # loop would run forever. A run that is not dissipating also cannot reach the developed cascade
     # this criterion tests for, so the honest outcome is to stop and say why.
-    @warn "StationarityCriterion: the dissipation rate is not positive (ε = $ε), so the eddy-turnover            clock cannot advance and stationarity can never be detected — stopping. A run with no            dissipation has no cascade to become stationary."
+    @warn "StationarityCriterion: the dissipation rate is not positive (ε = $ε), so the " *
+          "eddy-turnover clock cannot advance and stationarity can never be detected — " *
+          "stopping. A run with no dissipation has no cascade to become stationary."
     return false
   end
   _observe_and_test!(criterion.monitor, sim, criterion.elapsed_turn, ε) && return false

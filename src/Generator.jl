@@ -125,6 +125,15 @@ FlowConditions(viscosity::Real, schmidt::Real, velocity_forcing::AbstractForcing
                scalar_forcing::AbstractForcing) =
   FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
+
+"""
+    scalar_diffusivity(conditions) -> Float64
+
+The scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` the [`FlowConditions`](@ref) `conditions`
+imply for the passive scalar.
+"""
+scalar_diffusivity(conditions::FlowConditions) = conditions.viscosity / conditions.schmidt
+
 FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing) =
   FlowConditions(Float64(viscosity), Float64(schmidt), velocity_forcing, scalar_forcing)
 
@@ -617,7 +626,7 @@ The passive scalar's exact linear subflow over a substep `τ` — the same expon
 ``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
 """
 scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
-  (coefficient = -(generator.conditions.viscosity / generator.conditions.schmidt) * τ,
+  (coefficient = -scalar_diffusivity(generator.conditions) * τ,
    offset_scale = τ,
    offset = generator.scalar_rate)
 
@@ -692,7 +701,7 @@ scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain:
                       displaced_velocity_current);
    _zero_mean_mode!(N̂);
    add_forcing_source!(generator.conditions.scalar_forcing, N̂, φ̂, domain,
-                       generator.conditions.viscosity / generator.conditions.schmidt))
+                       scalar_diffusivity(generator.conditions)))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·
 # sign folded into its own pass (the kernel-composed arity, α = −1) — one pass fewer.

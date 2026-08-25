@@ -74,7 +74,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, max_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical
+using ..SimulationDomain: FixedDomain, max_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower,
@@ -423,7 +423,8 @@ function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
     throw(ArgumentError("VarianceRescaling `target` must be non-negative, got $target: it is the " *
                         "kinetic energy or scalar variance the forcing holds, and the rescale " *
                         "takes its square root"))
-  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), float(target), over,
+  return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell),
+                           _real_type(domain)(target), over,
                            Int(lowest_shell), Int(highest_shell))
 end
 
@@ -488,7 +489,7 @@ function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, high
   # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
   # indicator is materialized once here — the same stored mask this forcing always carried.
   indicator = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
-  return Linear(indicator, float(rate), Int(lowest_shell), Int(highest_shell))
+  return Linear(indicator, _real_type(domain)(rate), Int(lowest_shell), Int(highest_shell))
 end
 
 uses_steady_linear_rate(::Linear) = true
@@ -663,12 +664,19 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
        2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
                                                                  domain.grid.domain_size[1])) :
        turnover_time
+  # r6-edge-cases-01: the message must show the value the check REJECTED. When the keyword was
+  # omitted, that is the derived tℓ, never the caller's `nothing`.
   (isfinite(tℓ) && tℓ > 0) ||
-    throw(ArgumentError("`turnover_time` must be finite and positive, got $turnover_time"))
-  # Promote the three together, and `float` only `target` — which is what fixes the element type.
-  # Flooring each argument separately re-imports Float64 through the back door, because `float(1)` on
-  # the integer default gain is a Float64 and promotion then carries the whole struct up with it.
-  return VarianceController(band, promote(float(target), gain, tℓ)...,
+    throw(ArgumentError("`turnover_time` must be finite and positive, got $tℓ" *
+                        (turnover_time === nothing ?
+                         " (derived from `target` = $target and the box side; pass " *
+                         "`turnover_time` explicitly)" : "")))
+  # The strategy carries the DOMAIN's element type: each scalar is cast to it, so a Float32 run's
+  # default controller stays Float32 even when the target arrives as an untyped Float64 literal —
+  # the Simulation keyword default rode `promote(float(target), …)` up to Float64 on every
+  # default-forced Float32 run before this cast.
+  Td = _real_type(domain)
+  return VarianceController(band, Td(target), Td(gain), Td(tℓ),
                             Int(lowest_shell), Int(highest_shell))
 end
 
@@ -710,14 +718,9 @@ function add_forcing_source!(forcing::VarianceController, N̂, field, domain::Fi
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * dirichlet
   restoring = forcing.gain * (whole_variance - forcing.target) / forcing.turnover_time
-  if _band_is_empty(band, whole)
-    @warn "VarianceController: the forced band is empty (band observable $band against a " *
-          "whole-field $whole): the amplitude is clamped to zero and the controller is inert " *
-          "until content reaches the band" maxlog = 1
-    amplitude = 0.0
-  else
-    amplitude = (dissipation - restoring) / (2 * band_variance)
-  end
+  # One home for the empty-band clamp: the combinator ConstantPower shares. The controller's
+  # numerator is what its amplitude must hold — the dissipation less the restoring term.
+  amplitude = _injection_amplitude(dissipation - restoring, band_variance, whole_variance)
   convolve!(N̂, field, forcing.band, T(amplitude), one(T))
   return N̂
 end
@@ -726,7 +729,8 @@ function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::
   # No materialized indicator: it existed only to fill the integrating-factor rate array, and this
   # forcing no longer uses that route. The lazy kernel is convolved against directly, so a
   # `ConstantPower` run now carries NO field-scale storage of its own — two arrays fewer.
-  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell), float(injection_rate),
+  return ConstantPower(_shell_band(domain, lowest_shell, highest_shell),
+                       _real_type(domain)(injection_rate),
                        Int(lowest_shell), Int(highest_shell))
 end
 
@@ -825,6 +829,7 @@ mutable struct StochasticOU{B, R, T} <: AbstractForcing
   band::B                                    # band-pass kernel for the noise
   correlation_time::T                        # T_L
   variance::T                                # σ²: stationary forcing variance ⟨|f|²⟩
+  seed::Int                                  # the stream's seed — a defining parameter, persisted
   rng::R                                     # random stream (persists across steps)
   state::Union{Nothing, AbstractFieldSpectral}   # the OU forcing f̂ (allocated on first use)
   noise_physical::Union{Nothing, AbstractFieldPhysical}  # own noise scratch (allocated on first use)
@@ -845,7 +850,8 @@ function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Rea
     throw(ArgumentError("`correlation_time` must be positive, got $correlation_time: it is the " *
                         "Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
   band = _shell_band(domain, lowest_shell, highest_shell)
-  return StochasticOU(band, float(correlation_time), float(variance), MersenneTwister(seed),
+  Td = _real_type(domain)
+  return StochasticOU(band, Td(correlation_time), Td(variance), Int(seed), MersenneTwister(seed),
                       nothing, nothing, nothing, Int(lowest_shell), Int(highest_shell))
 end
 

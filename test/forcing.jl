@@ -346,4 +346,37 @@ end
     @test isempty(warns(() -> Linear(d16; rate = 0.1)))                          # the default band
     @test isempty(warns(() -> VarianceController(d16; target = 1.5)))            # every strategy routes through _shell_band
   end
+
+
+  @testset "VarianceController's in-line scalar dissipation matches scalar_dissipation" begin
+    # The controller re-derives the field's dissipation mid-reduction (it cannot call the
+    # `Observables` reduction without a second traversal) — a duplicated spelling the file's own
+    # duplicate-then-pin rule demands a pin for. The velocity branch is pinned above through the
+    # ν·⟨û,|κ|²û⟩ route; this is the scalar branch's 2ϰ convention. With `gain = 0` the restoring
+    # term vanishes, so the controller's amplitude is exactly ε_φ/(2⟨φ²⟩_band) — the same amplitude
+    # `ConstantPower` computes when handed `injection_rate = ε_φ`. Same band, same field: if the
+    # controller's spelling drifted from `scalar_dissipation` (a lost 2, a wrong factor), the two
+    # amplitudes part.
+    domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                         dealiasing = TwoThirds(), array_type = Array)
+    φ̂ = new_scalar_field_spectral(domain)
+    random_scalar_spectral!(φ̂, domain; scalar_variance = 0.4, envelope_wavenumber = 2.0,
+                            rng = MersenneTwister(31))
+    ϰ = 0.05 / 0.7
+    εφ = scalar_dissipation(φ̂, domain, ϰ)
+
+    apply(forcing, diffusivity) = begin
+      N̂ = new_scalar_field_spectral(domain); fill!(field_data(N̂), 0)
+      add_forcing_source!(forcing, N̂, φ̂, domain, diffusivity)
+      # N̂ = A·𝟙_band·φ̂; read A off the κ = (1,0,0) mode, which the default band [1,2] contains.
+      real(field_data(N̂)[2, 1, 1] / field_data(φ̂)[2, 1, 1])
+    end
+    A_controller = apply(VarianceController(domain; target = 1.0, gain = 0), ϰ)
+    A_constant = apply(ConstantPower(domain; injection_rate = εφ), ϰ)
+    @test isapprox(A_controller, A_constant; rtol = 1e-12)
+    # The discriminating half: halve the diffusivity and the controller's amplitude halves with
+    # the dissipation it re-derives — a drifted spelling with a constant offset would not.
+    @test isapprox(apply(VarianceController(domain; target = 1.0, gain = 0), ϰ / 2),
+                   A_constant / 2; rtol = 1e-12)
+  end
 end

@@ -403,12 +403,14 @@ AdamsBashforth(; order::Integer = 4) =
 
 
 function allocate_buffers(::AdamsBashforth{K}, tracers::Tracers, cache::ObservablesCache) where {K}
-  # The history is the cache's, so a cache built for a shallower scheme would leave this one reading
-  # fewer past samples than its order claims — a silently lower-order integration.
-  length(cache.velocity_at_particles_history) >= K - 1 ||
+  # Equality, not sufficiency — the same demand every advect! makes. A shallower cache would read
+  # fewer past samples than the order claims (a silently lower-order integration); a deeper one
+  # passes allocation only to be refused by the first push, since the shared history's fill level
+  # is capped against the order of the advancing call.
+  length(cache.velocity_at_particles_history) == K - 1 ||
     throw(ArgumentError("this cache carries $(length(cache.velocity_at_particles_history)) past " *
-                        "sample(s), but `AdamsBashforth(order = $K)` integrates over $(K - 1); " *
-                        "build the cache with `history_depth = $K`"))
+                        "sample(s), but `AdamsBashforth(order = $K)` integrates over exactly " *
+                        "$(K - 1); build the cache with `history_depth = $K`"))
   return _allocate_particle_buffers(tracers, cache, K)
 end
 
