@@ -329,7 +329,8 @@ struct NoForcing <: AbstractForcing end
     VarianceRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
 The deterministic rescaling forcing of Sullivan, Mahalingam & Kerr (1994,
-[*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274)), built on the [`FixedDomain`](@ref)
+[*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274),
+*Phys. Fluids* **6**(4), 1612–1614), built on the [`FixedDomain`](@ref)
 `domain`: after each step the in-band Fourier modes — the integer shells `lowest_shell` to
 `highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a single factor that
 holds `target`. The rescale is per-mode, so a divergence-free velocity stays divergence-free.
@@ -444,8 +445,8 @@ end
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
 Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
-variant of Lundgren (2003) — *Linearly forced isotropic turbulence*, CTR Annual Research Briefs
-(no DOI) — whose linear forcing
+variant of Lundgren (2003) — *Linearly forced isotropic turbulence*, *CTR Annual Research
+Briefs*, 461–473 (no DOI) — whose linear forcing
 acts at every wavenumber), built on the [`FixedDomain`](@ref) `domain`. The rate is folded into the
 integrating factor, so the forced band modes grow at net rate
 ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
@@ -553,7 +554,8 @@ end
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
 ``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of
-Bassenne et al. (2016, [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629)).
+Bassenne et al. (2016, [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629),
+*Phys. Fluids* **28**, 035114).
 
 Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, which is nearly always:
 it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
@@ -584,12 +586,15 @@ in the band if the run depends on the controller taking hold.
 
 The molecular-dynamics thermostats map the design space exactly, and **this controller is the
 Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984,
-[*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118)), carrying that class's known caveat: the
+[*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118),
+*J. Chem. Phys.* **81**, 3684–3690), carrying that class's known caveat: the
 held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
 thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
 that restores canonical fluctuations is Nosé–Hoover
-(Nosé 1984, [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334); Hoover 1985,
-[*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695)), a design this package
+(Nosé 1984, [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334),
+*J. Chem. Phys.* **81**(1), 511–519; Hoover 1985,
+[*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695),
+*Phys. Rev. A* **31**(3), 1695–1697), a design this package
 does not take.
 
 # Arguments
@@ -758,7 +763,8 @@ end
                  highest_shell = 2, seed = 0)
 
 Stochastic forcing — Eswaran & Pope (1988,
-[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8)) — built on the
+[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
+*Computers & Fluids* **16**, 257–278) — built on the
 [`FixedDomain`](@ref) `domain`: each forced
 Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
 box's fundamental ``2\\pi/L`` — carries an

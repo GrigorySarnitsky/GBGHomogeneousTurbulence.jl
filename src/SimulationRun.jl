@@ -45,7 +45,7 @@ using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_fie
                           DealiasingStrategy, TwoThirds, max_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 import ..Cache: particles_modified!, fields_modified!
-using ..Cache: ObservablesCache, check_deposits, advance_particles_epoch!,
+using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
@@ -645,9 +645,8 @@ function advance!(sim::Simulation; dt = nothing)
   if sim.tracers !== nothing
     advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
             sim.particle_buffers, Δt)
-    # The run's own advance, not an out-of-band reposition: the epoch moves so the previous sample
-    # reads stale, but the history the advance just extended stays intact.
-    advance_particles_epoch!(sim.cache)
+    # `advect!` announced the push itself (decision 76), so the previous sample already reads
+    # stale; the closing particle deposit refreshes it at the new positions.
     deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   end
   check_deposits(sim.cache)

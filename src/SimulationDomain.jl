@@ -58,7 +58,8 @@ abstract type DealiasingStrategy end
     TwoThirds()
 
 The sharp isotropic ``2/3``-rule truncation of Orszag (1971,
-[*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2)).
+[*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2),
+*J. Atmos. Sci.* **28**, 1074).
 Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
@@ -71,7 +72,8 @@ struct TwoThirds <: DealiasingStrategy end
     HouLi(; order = 36, strength = nothing)
 
 The smooth spectral filter of Hou & Li (2007,
-[*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014)). Each mode is multiplied
+[*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014),
+*J. Comput. Phys.* **226**, 379–397). Each mode is multiplied
 by the transfer function
 ``\\exp\\!\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
 applied isotropically in ``\\kappa``, with
@@ -108,7 +110,8 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
     PhaseShift()
 
 Phase-shift dealiasing — Patterson & Orszag (1971,
-[*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365)), combined with the spherical truncation of
+[*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365),
+*Phys. Fluids* **14**, 2538–2541), combined with the spherical truncation of
 Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble
 each quadratic nonlinear term on the grid **and** on a grid displaced by half a cell, average the
 two, and truncate spherically at

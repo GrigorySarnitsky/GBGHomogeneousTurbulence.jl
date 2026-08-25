@@ -1,8 +1,8 @@
 key,longest_paragraph_words,admonitions,total_words
 Cache.jl::Cache,113,0,330
-Cache.jl::ObservablesCache(domain; scalar = false， number_of_particles = 0， history_depth = 1),80,1,739
+Cache.jl::ObservablesCache(domain; scalar = false， number_of_particles = 0， history_depth = 1),80,1,733
 Cache.jl::fields_modified!(cache),70,1,249
-Cache.jl::particles_modified!(cache),71,0,255
+Cache.jl::particles_modified!(cache),71,0,249
 Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_at_particles(cache),115,0,116
 Cache.jl::velocity_physical(cache),83,0,84
@@ -11,11 +11,11 @@ Forcing.jl::AbstractForcing,86,1,303
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,419
 Forcing.jl::DeferredForcing,54,0,203
 Forcing.jl::Forcing,59,0,338
-Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),65,0,189
+Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,190
 Forcing.jl::NoForcing(),16,0,17
-Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,410
-Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,95,1,671
-Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,691
+Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,97,1,415
+Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,690
+Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,695
 Forcing.jl::add_forcing_source!(forcing， N̂， field， domain， diffusivity) -> N̂,76,1,226
 Forcing.jl::prepare_forcing!(forcing， field， domain， dt) -> nothing,40,0,46
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
@@ -34,7 +34,7 @@ Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， 
 Generator.jl::velocity_integrating_factor(generator， τ),87,0,207
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,496
 Observables.jl::Observables,119,0,295
-Observables.jl::derivative_skewness(û， domain),84,1,411
+Observables.jl::derivative_skewness(û， domain),84,1,416
 Observables.jl::dissipation(ω， viscosity),75,1,307
 Observables.jl::energy_spectrum(û， domain),66,0,178
 Observables.jl::integral_scale(û， domain),65,0,229
@@ -45,12 +45,12 @@ Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),66,0,131
 Particles.jl::AbstractParticleIntegrator,53,0,102
-Particles.jl::AdamsBashforth(; order = 4),100,1,679
+Particles.jl::AdamsBashforth(; order = 4),100,1,689
 Particles.jl::Heun(),62,1,258
 Particles.jl::ParticleIntegratorBuffers,54,0,271
 Particles.jl::Particles,8,0,190
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,85,0,654
-Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,55,1,285
+Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,55,1,330
 Particles.jl::history_depth(scheme) -> Int,28,0,47
 Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
 Particles.jl::new_scalar_point_values(tracers),29,0,30
@@ -76,7 +76,7 @@ Phenomenology.jl::taylor_microscale(fp) -> Float64,28,0,31
 Phenomenology.jl::taylor_reynolds(fp) -> Float64,35,0,38
 Propagator.jl::AbstractIntegrator,36,0,37
 Propagator.jl::IFHeun(),57,1,189
-Propagator.jl::IFLowStorageRK3(),73,0,269
+Propagator.jl::IFLowStorageRK3(),73,0,274
 Propagator.jl::IntegratorBuffers,110,0,322
 Propagator.jl::Propagator,41,0,122
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,99,0,214
@@ -91,10 +91,10 @@ Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
 Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,55,0,89
 SimulationDomain.jl::DealiasingStrategy,97,0,98
 SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,35,1,478
-SimulationDomain.jl::HouLi(; order = 36， strength = nothing),80,0,210
-SimulationDomain.jl::PhaseShift(),74,1,257
+SimulationDomain.jl::HouLi(; order = 36， strength = nothing),80,0,215
+SimulationDomain.jl::PhaseShift(),75,1,261
 SimulationDomain.jl::SimulationDomain,112,0,123
-SimulationDomain.jl::TwoThirds(),72,0,73
+SimulationDomain.jl::TwoThirds(),77,0,78
 SimulationDomain.jl::max_wavenumber(domain),114,0,137
 SimulationDomain.jl::new_scalar_field_physical(domain),17,0,18
 SimulationDomain.jl::new_scalar_field_spectral(domain),17,0,18

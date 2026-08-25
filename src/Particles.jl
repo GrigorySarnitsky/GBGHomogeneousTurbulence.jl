@@ -44,7 +44,7 @@ module Particles
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, _real_type
-using ..Cache: ObservablesCache, deposit_velocity_at_particles!
+using ..Cache: ObservablesCache, deposit_velocity_at_particles!, advance_particles_epoch!
 # One generic builds the per-scheme registers on both sides of the run — the field scheme's and
 # the particle integration scheme's — because it is one concept: allocate exactly what this scheme needs.
 import ..Propagator: allocate_buffers, deposit!
@@ -327,7 +327,8 @@ restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
 
 Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
 its default order (Lalescu et al. 2022,
-[*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406)) — buying accuracy in
+[*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406),
+*Comput. Phys. Commun.* **278**, 108406) — buying accuracy in
 time at **no extra field evaluation and no extra interpolation** per step.
 
 Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
@@ -378,7 +379,8 @@ produce.
     the smoothness at fixed degree left the time convergence unchanged. Raise the degree when the
     floor is what limits you; smoothness buys something different, namely readouts that
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
-    [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006)).
+    [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006),
+    *J. Comput. Phys.* **229**(17), 5862–5869).
 
 The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
 above is the only way to build one.
@@ -497,6 +499,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
     displace!(tracers.positions, domain.grid, terms...)
     tracers.unwrapped_positions === nothing ||
       displace!(tracers.unwrapped_positions, terms...)
+    advance_particles_epoch!(cache)          # the bootstrap branch announced through Heun's push
   end
 
   # Shift the history: the sample just used at t_n becomes the most recent past sample. The copy is
@@ -560,6 +563,10 @@ representation:
 with positions wrapped into ``[0, L)``. This is second-order accurate in time — advecting on the
 frozen start-of-step velocity alone would be first order.
 
+Every push also advances the cache's particles counter — the push announces itself — so the
+previously deposited velocity sample reads stale until the closing particle deposit refreshes it
+at the new positions. A hand-run loop therefore gets the same staleness protection as a run.
+
 Under [`AdamsBashforth`](@ref), the position update integrates over the deposited samples instead
 of interpolating a second time,
 
@@ -602,6 +609,10 @@ function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
   tracers.unwrapped_positions === nothing ||
     displace!(tracers.unwrapped_positions,
               (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
+  # The push announces itself (decision 76): the positions changed, so the particles counter moves
+  # and the previously deposited sample reads stale until the closing particle deposit. This keeps
+  # the two-epoch guard live on a hand-run loop, not only under `advance!`.
+  advance_particles_epoch!(buffers.cache)
   return tracers
 end
 

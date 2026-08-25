@@ -226,7 +226,8 @@ function step! end
     IFLowStorageRK3()
 
 Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980,
-[*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9)) 2N-storage family. The
+[*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9),
+*J. Comput. Phys.* **35**, 48–56) 2N-storage family. The
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
 unlike [`IFHeun`](@ref).
 

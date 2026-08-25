@@ -2315,6 +2315,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     shell bounds** — the parameters their band kernels are derived from, previously dropped at
     construction — the "an object is its parameters" lesson applied one layer up.
 
+76. **(2026-08, user-directed) The push announces itself: `advect!` advances the particles
+    epoch.** The 2026-08-24 panel's logician showed the two-epoch guard on `velocity_at_particles`
+    was vacuous on the documented hand-run path: the history-keeping counter advance was an
+    internal function only `advance!` called, and the one public announcement
+    (`particles_modified!`) discards the history — so a hand loop either froze the counter (the
+    staleness guard could never fire across its pushes) or wiped the multistep history every step.
+    Decision 71's principle — the mutator announces — applied to the counter: `advect!` now
+    advances the particles epoch itself at the end of every push (the Adams–Bashforth bootstrap
+    announces through the Heun push it delegates to), the run layer's separate internal call is
+    gone, and `particles_modified!` remains the out-of-band verb, discarding history exactly as
+    before. A hand-run loop gets the same staleness protection as a run, with no new verb to
+    remember. The same panel round also completed the citation architecture (T9): every inline
+    docstring citation now carries the full reference — the linked title plus journal, volume,
+    pages, verbatim against §References — the PF rule adopted whole, closing the compact-inline
+    narrowing the 2026-08-24 title-as-link sweep had introduced undecided.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

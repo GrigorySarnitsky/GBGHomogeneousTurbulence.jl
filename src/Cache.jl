@@ -131,9 +131,9 @@ depends on.
   [`fields_modified!`](@ref), so it runs ahead of
   [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A
   field-derived slot is readable exactly when its epoch equals this.
-- `particles_epoch` — the tracer positions' counter. The run layer advances it as part of the tracer
-  advance; a hand-run loop that moves tracers itself announces the change with
-  [`particles_modified!`](@ref), which is what advances it.
+- `particles_epoch` — the tracer positions' counter, advanced by every
+  [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) push — the push announces itself —
+  and by [`particles_modified!`](@ref) for a reposition made outside the push.
 """
 mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
   const velocity_physical::PV
@@ -395,9 +395,9 @@ integration scheme starts over from the new positions rather than integrating ac
 why the history lives here and not in the scheme's own registers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
-The run layer never calls this verb: its own tracer advance inside
-[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) moves the particles epoch through a
-separate, history-keeping announcement — the advance *extends* the history this verb discards.
+A sanctioned push never needs this verb:
+[`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) moves the particles epoch itself, a
+history-keeping announcement — the push *extends* the history this verb discards.
 
 A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
 `deposit!(cache, tracers, u)` — from the
