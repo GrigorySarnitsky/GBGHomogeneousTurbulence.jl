@@ -622,7 +622,12 @@ does not take.
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
   Left at `nothing` it is computed for you from that formula, with ``\\varepsilon_\\infty`` the
   stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
-  that sets ``\\nu`` explicitly against a very different regime should pass its own value.
+  that sets ``\\nu`` explicitly against a very different regime should pass its own value. The
+  derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
+  controller left at the default and handed to `FlowConditions` as a `scalar_forcing` is refused
+  there — a scalar variance is not an energy, and the derived settling time would depend on the
+  scalar's amplitude unit, breaking the scalar equation's exact linearity in ``\\varphi``. Driving
+  the scalar, pass the **flow's** turnover time ``2k/(3\\varepsilon)`` explicitly.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
 
 !!! note "The settling time, not the gain, is the physical parameter"
@@ -632,6 +637,8 @@ does not take.
 # Fields
 - `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
 - `target`, `gain`, `turnover_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
+- `turnover_time_derived` — `true` when ``t_\\ell`` came from the kinetic-energy default rather
+  than the caller; the scalar binding refuses such a controller.
 - `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
   from.
 """
@@ -640,6 +647,7 @@ struct VarianceController{K, T} <: AbstractForcing
   target::T
   gain::T
   turnover_time::T
+  turnover_time_derived::Bool   # true when tℓ came from the kinetic-energy default, not the caller
   lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
   highest_shell::Int
 end
@@ -681,7 +689,7 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         (turnover_time === nothing ?
                          " (derived from `target` = $target and the box side; pass " *
                          "`turnover_time` explicitly)" : "")))
-  return VarianceController(band, target, gain, tℓ,
+  return VarianceController(band, target, gain, tℓ, turnover_time === nothing,
                             Int(lowest_shell), Int(highest_shell))
 end
 

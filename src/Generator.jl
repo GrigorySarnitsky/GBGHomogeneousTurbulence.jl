@@ -40,7 +40,7 @@ using GBGPeriodicFields
 using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..Observables: vorticity_physical!
-using ..Forcing: AbstractForcing, NoForcing,
+using ..Forcing: AbstractForcing, NoForcing, VarianceController,
                  set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!,
                  add_forcing_source!
 
@@ -116,6 +116,16 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
       throw(ArgumentError("the same $(nameof(typeof(velocity_forcing))) instance was given as both " *
                           "`velocity_forcing` and `scalar_forcing`; that strategy carries per-field " *
                           "state, so construct one instance per forced field"))
+    # A defaulted controller settling time is Bassenne's kinetic-energy law — valid only when the
+    # target IS a kinetic energy. Bound to the scalar, the derived tℓ would scale with the scalar's
+    # amplitude unit and break the scalar equation's exact linearity in φ (owner-ruled 2026-08-25).
+    scalar_forcing isa VarianceController && scalar_forcing.turnover_time_derived &&
+      throw(ArgumentError("this `VarianceController` is bound as `scalar_forcing` but its " *
+                          "`turnover_time` was left at the default, which derives the settling " *
+                          "time from a kinetic-energy law; a scalar variance is not an energy, so " *
+                          "the derived value would depend on the scalar's amplitude unit. Pass " *
+                          "`turnover_time` explicitly — the flow's large-eddy turnover time " *
+                          "2k/(3ε) is the physical choice."))
     return new{VF, SF}(viscosity, schmidt, velocity_forcing, scalar_forcing)
   end
 end

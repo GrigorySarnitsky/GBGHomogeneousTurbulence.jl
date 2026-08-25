@@ -25,9 +25,9 @@
  {
   "round": 6,
   "confirmed": 14,
-  "fixed": 13,
-  "escalated": 1,
+  "fixed": 14,
+  "escalated": 0,
   "refuted": 0,
-  "note": "7 REPRODUCED (6 fixed + 1 escalated: the VarianceController scalar turnover_time default, witness in witnesses/escalated/) + 7 EVIDENCED (all fixed; verify-fixes 7/7 FIXED, no RELOCATED). Dismissals audited: 11 sound, 1 wrong (already corrected by the landed fields_modified! fix). 12 regressions promoted r6-prefixed."
+  "note": "7 REPRODUCED + 7 EVIDENCED, all 14 fixed (the VarianceController scalar turnover_time escalation was ruled option (a) same day \u2014 decision 77 \u2014 and its witness flipped and promoted). Dismissals audited: 11 sound, 1 wrong (corrected). Plus the resurrected r5 finding (particle-only settings silently discarded) fixed with nothing-sentinels. 14 regressions promoted r6-prefixed + 02-r5-edge-cases-02."
  }
 ]

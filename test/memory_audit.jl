@@ -149,7 +149,9 @@ _build_forcing(tag, domain) =
   tag === :band  ? VarianceRescaling(domain; target = 0.5, over = :band) :
   tag === :linear ? Linear(domain; rate = 0.1) :
   tag === :power ? ConstantPower(domain; injection_rate = 0.1) :
-  tag === :controller ? VarianceController(domain; target = 0.5) :
+  # Explicit turnover_time: the scalar slot refuses the derived (kinetic-energy-law) default,
+  # and the value is memory-inert — this sweep audits storage, not physics.
+  tag === :controller ? VarianceController(domain; target = 0.5, turnover_time = 1.0) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFHeun()

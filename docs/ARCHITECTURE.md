@@ -2338,6 +2338,20 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     pages, verbatim against §References — the PF rule adopted whole, closing the compact-inline
     narrowing the 2026-08-24 title-as-link sweep had introduced undecided.
 
+77. **(2026-08, user-directed) A defaulted controller settling time never drives the scalar.**
+    `VarianceController`'s default ``t_\ell = 2k_\infty/(3\varepsilon_\infty)`` is Bassenne's
+    kinetic-energy law — valid only when `target` *is* a kinetic energy. Bound as a
+    `scalar_forcing`, the derived value would scale as ``L/\sqrt{\langle\varphi^2\rangle}`` with
+    the scalar's arbitrary amplitude unit, breaking the scalar equation's exact linearity in
+    ``\varphi`` (witnessed by the round-6 hunt: a ``1.5\times10^{-6}`` covariance violation in
+    five steps under the default, exactly zero with an explicit equal turnover time). The owner
+    ruled option (a): the struct records whether its turnover time was derived
+    (`turnover_time_derived`), and `FlowConditions`' inner constructor — the one seam every
+    construction path crosses — refuses a derived-``t_\ell`` controller in the scalar slot with an
+    `ArgumentError` naming the remedy (pass the flow's ``2k/(3\varepsilon)`` explicitly). The
+    velocity slot keeps the derived default; the regression is
+    `test/regressions/r6-free-hot-path-01-variance-controller-scalar-amplitude-covariance.jl`.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

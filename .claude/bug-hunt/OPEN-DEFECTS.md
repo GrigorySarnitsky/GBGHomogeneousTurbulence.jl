@@ -1,8 +1,13 @@
 # Open code defects — the /bug-hunt escalation register
 
-## Round 6 (2026-08-25) — one escalation, awaiting the owner
+## Round 6 (2026-08-25) — CLOSED: the escalation ruled and fixed same day
 
-**ESCALATED: `r6-free-hot-path-01` — VarianceController's default `turnover_time` plugs a scalar
+**CLOSED by owner ruling (a), 2026-08-25:** `r6-free-hot-path-01` — `turnover_time_derived` marker
+on the struct; `FlowConditions` refuses a derived-tℓ controller in the scalar slot (decision 77).
+Witness rewritten to the ruled contract, flipped 7/7, promoted to `test/regressions/`. The
+historical escalation text follows.
+
+**ESCALATED (historical): `r6-free-hot-path-01` — VarianceController's default `turnover_time` plugs a scalar
 variance into Bassenne's kinetic-energy law, breaking the passive scalar's exact amplitude
 covariance** (major). The default is tℓ = 2·target/(3·ε∞(target)) with ε∞ = (target/0.9)^{3/2}/L —
 dimensionally a kinetic-energy law. Driving the SCALAR, target is ⟨φ²⟩ in arbitrary units, so tℓ
