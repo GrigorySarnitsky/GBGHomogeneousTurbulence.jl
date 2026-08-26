@@ -21,10 +21,10 @@
 #     because they answer different questions — the working set is what the schedule needs live, the
 #     frame is what the discretization costs to have precomputed — and a COMPLETENESS test then
 #     requires their sum to account for every field-scale array a live `Simulation` can reach, so
-#     nothing can fall between them again. Read "reach" strictly: the walk follows Julia fields, so
-#     a device buffer owned by a vendor library and reachable from none of them is outside it by
-#     construction — see the named exclusion at the frame ledger, where the cuFFT work area is now
-#     measured at 2.45× this ledger.
+#     nothing can fall between them again. The gap that survives is not one of REACH — the walk
+#     recurses through any struct's fields and would descend into a transform plan's buffer — but
+#     one of BACKEND: every domain built below passes `array_type = Array`, and the plan buffers
+#     exist only on a GPU. See the named exclusion at the frame ledger, and open item G2.
 #
 #  3. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
 #     from the step! bodies and the generator protocol, give every value a live range; the peak
@@ -185,9 +185,9 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # PhaseShift, whose ledger is larger — 9 field-scale arrays against 6 — while the plan set is not.
 # The plan set depends on the field TYPES a run transforms, never on the scheme or the dealiasing.
 #
-# WHAT IT IS (established 2026-08-26 by reading CUDA.jl, after three days of believing otherwise —
-# see the postmortem below). It is not principally the vendor FFT work area. It is CUDA.jl's own
-# per-plan buffers, allocated in Julia at plan construction:
+# WHAT IT IS (established 2026-08-26 by reading CUDA.jl and then MEASURING ON THE CARD, after three
+# days of believing otherwise — see the postmortem below). It is not the vendor FFT work area. It is
+# the GPU backend's own per-plan buffers, allocated in Julia at plan construction:
 #
 #   plan_rfft   → `buffer = CuArray{complex(T)}(undef, ydims...)`   ydims is the SPECTRAL shape
 #   plan_brfft  → `buffer = CuArray{T}(undef, size(X))`             T complex, X the SPECTRAL input
@@ -218,8 +218,23 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # bind `cufftSetWorkArea` and `cufftSetAutoAllocation` for a caller that wants to.
 #
 # ROCm lands on the identical total to the displayed digit (192³ PhaseShift: 1.409 GiB in F32,
-# 2.817 GiB in F64, both matching CUDA exactly), which is expected: AMDGPU.jl implements the same
-# AbstractFFTs contract against the same "c2r overwrites its input" constraint.
+# 2.817 GiB in F64, both matching CUDA exactly). AMDGPU.jl's fft.jl is line-for-line the same
+# design — `buffer = ROCArray{complex(T)}(undef, ydims)` in plan_rfft, `ROCArray{T}(undef, size(X))`
+# in plan_brfft, and the same `z = p.buffer; copyto!(z, x)` in `mul!` — so the identity is structural,
+# not a coincidence.
+#
+# DIRECTLY MEASURED 2026-08-26 on the RTX 5070 Ti, `CUDA.@allocated` around plan construction at
+# 64³/Float32 — the check this note twice deferred as a formality:
+#
+#   scalar plans (1 component)    2.06 MiB  =  2.000 × (components × one spectral scalar)
+#   velocity plans (3 components) 6.19 MiB  =  2.000 × (components × one spectral scalar)
+#   tensor plans (9 components)  18.56 MiB  =  2.000 × (components × one spectral scalar)
+#
+# Exactly two spectral-sized buffers per component, on the nose, for all three families. Note this
+# also localizes the vendor work area: `@allocated` sees only Julia-side allocations, while the pool
+# figure the runs report is the same quantity — so cuFFT's own work area, allocated by the library
+# outside CUDA.jl's pool, appears in `nvidia-smi` and in "Effective GPU memory usage" but in neither
+# of the numbers modelled here.
 #
 # TWO CONSEQUENCES THIS AUDIT CANNOT SEE.
 #
@@ -229,12 +244,15 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 #      it during every default warm-up is off by default. The velocity and scalar plans stay eager:
 #      the time loop transforms both every step, so there is nothing to defer.
 #
-#   2. IT PAYS THE PRESERVING COPY TWICE. PF's four-argument `to_physical!` copies the spectral
-#      field into a scratch precisely so the source survives, then calls `mul!` — which copies again
-#      into the plan's own buffer. Two copies and two resident buffers for one need, because the
-#      scratch PF passes is already expendable. The fix is upstream of IT (a path that lets the
-#      transform destroy an input the caller has already copied), which is invariant 2's shape one
-#      level further out.
+#   2. HALF THE BUFFERS ARE NEVER USED, and the preserving copy is redundant on GPU. Both measured
+#      on the card 2026-08-26; open item G4. The forward plan's buffer serves `ldiv!` alone, which PF
+#      never calls — a sentinel filled into both buffers survives a forward AND an inverse transform
+#      in the forward plan's, so 13 of the 26 are dead weight (4 of the remaining 8 after decision
+#      78, 868 MiB at 384³/Float32). And the THREE-argument `to_physical!`, the one PF documents as
+#      consuming its source, was measured to PRESERVE it on CUDA and destroy it on CPU — so the
+#      four-argument form's copy buys, on GPU, a guarantee the backend already provides, at 14.7% of
+#      inverse-transform time. Both fixes are upstream of IT, which is invariant 2's shape one level
+#      further out.
 #
 # POSTMORTEM, kept because the failure is the instructive part. From 2026-08-25 this note asserted
 # the storage was the vendor work area, and grew three rounds of confirmation: the N³ scaling over
