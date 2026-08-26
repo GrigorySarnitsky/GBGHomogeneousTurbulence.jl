@@ -2371,6 +2371,35 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     asks, and that asking twice builds once — an accessor rebuilding on every call would pass the
     first while replacing the resident cost with per-call churn.
 
+
+79. **(2026-08, blind-panel confirmed) The memory audit measures a device backend, and the frame is
+    not zero there.** Every ledger in `test/memory_audit.jl` was built with `array_type = Array`, so
+    the all-zero frame table was a *CPU fact frozen as a backend-invariant claim* — in a package
+    whose primary target is the GPU. What escapes on a device backend is the transform plans'
+    staging buffers: one spectral-shaped device array per plan, allocated eagerly by the backend's
+    plan constructor, giving
+    ``\texttt{DEVICE\_FRAME} = (\text{spectral vector } 2, \text{ spectral scalar } 2)`` — 65.0,
+    218.25 and 516.0 MiB at ``128^3``, ``192^3`` and ``256^3`` in `Float32`, invariant under
+    dealiasing strategy, integrator and the scalar axis. This is not decision 36's failure mode
+    (storage on an unwalked owner): the reflective walk reaches these buffers and counts them
+    correctly. The owner was simply never instantiated on the backend where it holds anything.
+
+    The device leg now runs the frame ledger and the completeness invariant whenever a functional
+    CUDA or AMDGPU backend is present, and **records a visibly unfulfilled test when it is not** —
+    a conditional that passed quietly on a CPU-only runner would rebuild the same blindness in a
+    new form. The register is bidirectional as everywhere else in that file: when the backend stops
+    allocating eagerly, `DEVICE_FRAME` must fall in the same commit.
+
+    Half of the cell is dead weight and is recorded as such: the *forward* plans' buffers exist for
+    an inverse route this package never takes, and a sentinel written into them survives complete
+    forward and inverse transforms untouched. Removing that half is an upstream request, not a
+    local change — reaching into a dependency's private field would trade a memory cost for silent
+    numerical corruption.
+
+    Diagnosed independently by seven blind agents over a scrubbed copy of the tree, after three
+    successive wrong mechanisms had been recorded here from inference; all seven converged on the
+    same cause, the same closed form and the same allocation sites.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

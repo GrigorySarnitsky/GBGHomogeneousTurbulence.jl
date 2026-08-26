@@ -267,6 +267,54 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 
+# ---------------------------------------------------------------- the device backend
+
+# Every ledger above is measured with `array_type = Array`, and the frame's all-zero table is a
+# CPU FACT: an FFTW plan reaches no Julia array, so the walk finds nothing to count. On a GPU
+# backend the same walk, over the same objects, finds the transform plans' staging buffers — one
+# spectral-shaped device array per plan, allocated eagerly by the backend's plan constructor. The
+# audit was blind to that for as long as it only ever built CPU domains, which is exactly the
+# failure decision 36 was written to prevent, displaced one level: not storage hanging off an
+# unwalked owner, but an owner never instantiated on the backend where it holds anything.
+#
+# So the device frame is ledgered here rather than excluded. It is NOT zero, and the register is
+# bidirectional like every other in this file: when the backend stops allocating eagerly (the
+# upstream request), this table must fall to `FRAME` in the same commit that closes it.
+#
+#   velocity plans: forward + inverse, one spectral VECTOR buffer each   → spectral_vector = 2
+#   scalar plans:   forward + inverse, one spectral SCALAR buffer each   → spectral_scalar = 2
+#
+# The forward buffers of both pairs are DEAD WEIGHT and measured so: the backend allocates them
+# for an `ldiv!` route this package never takes (it builds a separate inverse plan instead), and a
+# sentinel written into them survives complete forward and inverse transforms untouched. Half of
+# this cell is therefore recoverable with no change to what the package computes.
+const DEVICE_FRAME = (spectral_vector = 2, physical_vector = 0, spectral_scalar = 2,
+                      physical_scalar = 0, real_spectral_scalar = 0)
+
+# A GPU is hardware, so this leg cannot be a plain `@test`. It must not be a SILENT skip either:
+# a conditional that quietly passes on a CPU-only runner rebuilds the blindness it exists to
+# remove, in a new form. `@test_skip` records a visibly unfulfilled test in the summary, and the
+# warning names why.
+# Resolved at INCLUDE time, not inside the testset: `Base.require` loads the backend into a new
+# world age, so a `functional()` called from the same function that loaded it is invisible — hence
+# `invokelatest` here, and hence the testset (a later top-level expression) can then call the
+# backend's constructors normally.
+const DEVICE_BACKEND = let found = nothing
+  for (mod, arr) in (("CUDA", :CuArray), ("AMDGPU", :ROCArray))
+    id = Base.identify_package(mod)
+    id === nothing && continue
+    m = try Base.require(id) catch; nothing end
+    m === nothing && continue
+    ok = try Base.invokelatest(getproperty(m, :functional)) catch; false end
+    if ok
+      found = (mod, getproperty(m, arr))
+      break
+    end
+  end
+  found
+end
+
+
 # ---------------------------------------------------------------- the liveness audit
 
 # The op lists (rk3_ops / rk2_ops and their builders) and peak_liveness live in audit_ops.jl —
@@ -315,9 +363,10 @@ const GAP_HOLDERS = Dict(
 #   seeding (scalar)      ≈ 2.1 (3.1) — noise scalar 1.0 + host randn staging 1.0; envelope lazy.
 #   derivative_skewness   ≈ 18.6 (19.6) — spectral tensor 9 × 1.06 + physical tensor 9; the det
 #                                  field (was 1) is gone — ⟨det S⟩ is the fused mapped mean now: the
-#                                  DOMINANT episode (~ +55 % over the default resident set), and ON
-#                                  BY DEFAULT during warmup!'s skewness gate — the binding device
-#                                  peak of a default warm-up at the largest N that fits. Invariant
+#                                  DOMINANT episode (~ +55 % over the default resident set), reached
+#                                  whenever the skewness gate is enabled — OFF by default since
+#                                  decision 78, so this is the binding device peak of a warm-up that
+#                                  opts in, not of the default one. Invariant
 #                                  4's per-call-diagnostic trade, priced. (PF stores full 9-component
 #                                  tensors; symmetric 6-component storage is the recorded reduction.)
 #   energy_spectrum       ≈ 0.0 (1.6) — GBGPeriodicFields fused its radial_spectrum staging into the
@@ -385,6 +434,33 @@ const EPISODE_UNITS = [
     # run does not carry.
     @test BASE[(:RK3, :PhaseShift, false)].spectral_scalar ==
           BASE[(:RK3, :TwoThirds, false)].spectral_scalar
+  end
+
+  @testset "the frame ledger on a device backend — the plans' staging buffers, named" begin
+    backend = DEVICE_BACKEND
+    if backend === nothing
+      @warn "memory audit: the DEVICE frame ledger did not run — no functional GPU backend in " *
+            "this environment. The CPU tables above do NOT bound device residency: the frame is " *
+            "all-zero on CPU and $(DEVICE_FRAME) on a GPU. This leg is SKIPPED, not passed."
+      @test_skip false
+    else
+      name, array_type = backend
+      for tag in (:TwoThirds, :PhaseShift), T in (Float64, Float32)
+        domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = T,
+                             array_type = array_type,
+                             dealiasing = tag === :TwoThirds ? TwoThirds() : PhaseShift())
+        @test frame_ledger(domain) == DEVICE_FRAME
+      end
+      # The completeness invariant, on the backend that has something to complete: working set plus
+      # the DEVICE frame must still account for every field-scale array a live run reaches.
+      domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = Float64,
+                           array_type = array_type, dealiasing = TwoThirds())
+      sim = Simulation(domain; viscosity = 0.1, velocity_forcing = NoForcing(),
+                       rng = MersenneTwister(1))
+      @test _counts((sim,), N_AUDIT) ==
+            _add(DEVICE_FRAME, BASE[(:RK3, :TwoThirds, false)])
+      @info "memory audit: the device frame ledger ran on $name"
+    end
   end
 
   @testset "no field-scale storage escapes both ledgers" begin
