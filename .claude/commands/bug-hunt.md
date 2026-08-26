@@ -140,7 +140,7 @@ A finding in none of those is a **dropped** finding, and `finished.py` fails on 
 2. `verify-fixes.js` — the architecture class, which has no witness by nature. It hunts the
    **RELOCATED** verdict: a duplicate moved to a new file reads as a fix in a diff and as a defect in
    the tree.
-3. `dismissals.js` — **the findings that were never confirmed.** `NOT-REPRODUCED` and `NOT-A-DEFECT`
+3. `dismissals.js` — **the findings that were never confirmed.** `NOT-REPRODUCED`, `WITNESS-WRONG` and `NOT-A-DEFECT`
    are judgement calls that get *filed*, so nothing revisits them; under a one-hunt design a wrong
    dismissal is simply lost. Round 1 dismissed the `particle_velocities` two-epoch check as "correct
    on the current tree" — a **blocker** — and `_base_cfl`'s fallback as "sanctioned by the contract",
@@ -204,6 +204,17 @@ python3 .claude/commands/bug-hunt/finished.py
   again the moment the bug returns in a different form.
 - **Never weaken an assertion until it fails.** That proves persistence, not a defect. If the witness
   passes, the verdict is NOT-REPRODUCED and the candidate dies.
+
+  **A failing witness is necessary and NOT sufficient** (raised by the PF session, 2026-08-27, while
+  porting this instrument; the gap was real and is now closed in `hunt.js`). A witness can fail
+  because the *witness* is wrong — a test asserting a false identity fails on perfectly correct code,
+  and adopting it aims a fix pass at working code, which is precisely the harm this instrument exists
+  to prevent, reached by the route that feels most rigorous. So adjudication must derive the expected
+  value **independently of the assertion under test** — from the documented contract, an analytic case,
+  a mathematical identity, or a second route to the same quantity — and may return `WITNESS-WRONG`
+  when that derivation agrees with the code instead. The `api-semantics` branch already required this
+  (official documentation must agree with the run); the change extends it to `runtime`, where the
+  oracle is a derivation rather than a document.
 - **Witness filenames collide across rounds** — every round starts its numbering at `01-<lane>-01`,
   so a bulk copy into `test/regressions/` silently OVERWRITES an earlier round's regression test with
   a new, still-failing one. The earlier test is then gone and the suite fails for a reason that looks

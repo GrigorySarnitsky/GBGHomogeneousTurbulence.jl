@@ -1,7 +1,8 @@
 // THE DISMISSAL AUDIT — the half of the verifier the witness gate cannot cover.
 //
 // `witnesses.jl pass` proves that every CONFIRMED finding of a hunt was fixed. It says nothing about
-// the findings that were never confirmed. Those verdicts — NOT-REPRODUCED, NOT-A-DEFECT — are
+// the findings that were never confirmed. Those verdicts — NOT-REPRODUCED, WITNESS-WRONG,
+// NOT-A-DEFECT — are
 // judgement calls made by one agent under time pressure, and they are FILED, so nothing revisits
 // them. Under a one-hunt design (which is the design: the instrument runs once, the verifier loops
 // over its findings) a wrong dismissal is simply lost.

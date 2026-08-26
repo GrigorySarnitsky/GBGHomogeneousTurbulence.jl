@@ -63,13 +63,24 @@ const SCHEMA = {
         verdict: { type: 'string', enum: ['HONORED', 'ADJACENT', 'INSERTED', 'LINE-ONLY', 'NEW-DEFECT', 'SCOPE-CREEP', 'UNDONE', 'LAUNDERED'] },
         question: { type: 'string', enum: ['fidelity', 'strategy', 'implementation', 'scope', 'none'], description: 'which of the four questions the verdict answers; "none" for HONORED' },
         evidence: { type: 'string', description: 'file:line + the decisive quote from the CURRENT source, and from the diff where the act matters' },
+        class_surfaces: { type: 'array', items: { type: 'string' },
+          description: 'EVERY surface the finding\'s own text names or implies as carrying the same class, each with whether it was swept and the file:line that shows it. Enumerate from the FINDING, not from the diff and not from memory. Empty is a LINE-ONLY verdict, never HONORED.' },
       },
-      required: ['finding', 'user_ask', 'verdict', 'question', 'evidence'],
+      required: ['finding', 'user_ask', 'verdict', 'question', 'evidence', 'class_surfaces'],
     } },
   },
   required: ['batch', 'audits'],
 }
 
+// HONORED IS EARNED BY ENUMERATION, NOT BY A STORY (PF's addition, ported 2026-08-27). PF raised
+// this while porting the instrument, and it lands on IT's own worst measured failure: eleven of
+// thirteen deficiencies in one round were LINE-ONLY — the flagged site fixed, the class alive on
+// surfaces the finding had ALREADY NAMED. An auditor asked "was the class swept?" will accept a
+// plausible account, because a plausible account is what a fix pass produces. So the verdict now
+// requires the auditor to LIST the other surfaces and say what happened at each; an empty list is
+// demoted to LINE-ONLY by rule rather than judged. The enumeration comes from the finding's text —
+// the surfaces it named are the ones that must be checked — never from the diff, which shows only
+// where someone already looked.
 const PREAMBLE = `You are an ADVERSARIAL FIX AUDITOR for GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence.
 
 The package owner read the rendered documentation and reported defects in their own words. An assistant then fixed them. YOU AUDIT THE FIXES. Your allegiance is to the owner, not to the assistant: assume the fix is deficient until its evidence convinces you otherwise.
@@ -103,7 +114,13 @@ FOR EACH FINDING IN YOUR BATCH, ask FOUR questions in order, and stop at the fir
 
 VERDICTS — HONORED is the ONLY verdict that requires evidence; every other verdict you may assert on
 the strength of a quote, and you should prefer them when in doubt:
-  HONORED     — the ask landed, by the right means, correctly, without creep. Cite what you checked.
+  HONORED     — the ask landed, by the right means, correctly, without creep. Cite what you checked,
+                AND fill \`class_surfaces\`: enumerate from the FINDING'S OWN TEXT every other surface
+                carrying the same class, and say for each whether it was swept, with a file:line.
+                An empty \`class_surfaces\` is LINE-ONLY by rule — not a judgement call. This is the
+                measured failure mode: eleven of thirteen deficiencies in one round were LINE-ONLY,
+                on surfaces the finding had already named. HONORED is earned by enumeration, never
+                by a plausible account of a sweep.
   ADJACENT    — something was done, but not what was asked (a synonym, a partial reading, a different fix).
   INSERTED    — repaired by appending; the flagged text survives.
   LINE-ONLY   — the instance is fixed, the class is alive. Name the surviving sites.

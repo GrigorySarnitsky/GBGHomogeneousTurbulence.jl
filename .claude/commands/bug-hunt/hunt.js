@@ -85,7 +85,7 @@ const VERDICT_SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
     title: { type: 'string' },
-    verdict: { type: 'string', enum: ['REPRODUCED', 'NOT-REPRODUCED', 'NO-WITNESS-POSSIBLE', 'EVIDENCED', 'NOT-A-DEFECT'] },
+    verdict: { type: 'string', enum: ['REPRODUCED', 'NOT-REPRODUCED', 'WITNESS-WRONG', 'NO-WITNESS-POSSIBLE', 'EVIDENCED', 'NOT-A-DEFECT'] },
     witness_path: { type: 'string', description: 'REPRODUCED only: path of the banked .jl witness' },
     observed: { type: 'string', description: 'the actual output that proves it — a failing @test line, or the two quoted divergent blocks. <= 60 words.' },
     docs_url: { type: 'string', description: 'api-semantics only: the official page fetched, with the sentence it says' },
@@ -236,9 +236,25 @@ HOW TO PROVE IT, by kind:
   Save it to ${PILE}/witnesses/<NN>-<slug>.jl, then RUN it — NOTE THE QUOTES, these paths contain
   spaces and an unquoted cd silently lands you in the wrong directory:
       cd "${REPO}" && julia --project --startup-file=no "${PILE}/witnesses/<NN>-<slug>.jl"
-  Read the output. If a @test FAILS, the defect is real: verdict REPRODUCED, and quote the failing
-  line. If everything PASSES, the hunter was wrong: verdict NOT-REPRODUCED — do not rescue the
-  candidate by weakening the assertion until it fails, which proves nothing but your persistence.
+  Read the output. If everything PASSES, the hunter was wrong: verdict NOT-REPRODUCED — do not
+  rescue the candidate by weakening the assertion until it fails, which proves nothing but your
+  persistence.
+
+  A FAILING TEST IS NECESSARY AND NOT SUFFICIENT, and this is the step most likely to be skipped.
+  A witness can fail because the WITNESS is wrong: a test asserting a false identity fails on
+  perfectly correct code, and adopting it aims a fix pass at working code — the exact harm the
+  witness rule exists to prevent, arrived at by the route that feels most rigorous. So before
+  returning REPRODUCED, DERIVE THE EXPECTED VALUE INDEPENDENTLY of the assertion you just wrote:
+  from the documented contract, from an analytic case you can evaluate by hand, from a
+  mathematical identity the operation must satisfy, or from a second route to the same quantity.
+  State that derivation in `observed`. If the independent derivation agrees with the CODE rather
+  than with your assertion, the verdict is WITNESS-WRONG — say what the correct expectation is and
+  why the witness encoded a different one. That is a clean outcome, not a failure; it is also the
+  only verdict that protects working code from a confident test.
+  (The `api-semantics` branch below already works this way — official documentation must agree with
+  the run before REPRODUCED. This paragraph extends the same requirement to `runtime`, where the
+  oracle is a derivation rather than a document.)
+
   Keep the file: on REPRODUCED it becomes the regression test, so it must assert the RIGHT behaviour
   rather than merely exhibit the wrong one.
 
