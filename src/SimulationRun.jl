@@ -897,8 +897,8 @@ function _push_and_test!(m::StationarityMonitor, elapsed_turn, ε, φ2, S)
   return m.converged
 end
 
-# Compute the signals from `sim` (only when a sample is due — the skewness costs three inverse
-# transforms) and test.
+# Compute the signals from `sim` (only when a sample is due — the skewness inverse-transforms a
+# NINE-component rank-2 field, and is the only observation here that does) and test.
 function _observe_and_test!(m::StationarityMonitor, sim, elapsed_turn, ε)
   (isempty(m.turn) || elapsed_turn - m.turn[end] ≥ m.sample_gap) || return false
   φ2 = m.gate_scalar ? (sim.state.scalar_spectral === nothing ? NaN : scalar_variance(sim.state.scalar_spectral)) : 0.0
@@ -910,7 +910,7 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 
 
 """
-    StationarityCriterion(; gate_scalar = true, gate_skewness = true, min_turnovers = 5,
+    StationarityCriterion(; gate_scalar = true, gate_skewness = false, min_turnovers = 5,
                             window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
                             max_turnovers = 60)
 
@@ -937,9 +937,14 @@ flatness would certify the forcing, not the flow.
   ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal, exactly as
   strict as its floor (see `skew_floor` below): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
-  ``S \\approx -0.5``. The skewness costs transforms, so it is measured on the criterion's own
-  sampling interval — one sample per `window_turnovers / 40` of turnover time, giving about forty
-  samples across the trailing window — rather than every iteration.
+  ``S \\approx -0.5``. It is **off by default**, and turning it on is the stricter spin-up: the
+  ``\\varepsilon`` gate alone can be satisfied by a field whose cascade is not yet developed, so a
+  run whose measurement depends on the small scales should set it. The cost is why it is not the
+  default — the skewness is the only observation here that transforms a rank-2 field, so it alone
+  builds the domain's rank-2 plans, and on a GPU backend those are the larger part of a run's plan
+  residency. When it is on, the skewness is measured on the criterion's own sampling interval — one
+  sample per `window_turnovers / 40` of turnover time, giving about forty samples across the
+  trailing window — rather than every iteration.
 - `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tol`.
@@ -975,7 +980,7 @@ mutable struct StationarityCriterion
   started::Bool
 end
 
-function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool = true,
+function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool = false,
                                min_turnovers::Real = 5, window_turnovers::Real = 4,
                                tol::Real = 0.05, skew_floor::Real = 0.1,
                                max_turnovers::Real = 60)
@@ -1036,8 +1041,8 @@ and for every option. For a fixed spin-up budget, write the three-line budget ca
 
 # Examples
 ```julia
-warmup!(sim)                          # detect stationarity (ε- and skewness-plateau gates)
-warmup!(sim; gate_skewness = false)   # relax the skewness gate (a shorter, looser spin-up)
+warmup!(sim)                         # detect stationarity on the ε-plateau gate
+warmup!(sim; gate_skewness = true)   # also require a developed cascade (stricter, and costlier)
 ```
 
 Returns `sim`.

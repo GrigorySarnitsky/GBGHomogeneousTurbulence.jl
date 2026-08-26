@@ -2352,6 +2352,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     velocity slot keeps the derived default; the regression is
     `test/regressions/r6-free-hot-path-01-variance-controller-scalar-amplitude-covariance.jl`.
 
+78. **(2026-08, user-directed) The rank-2 transform plans are built on first use, and the skewness
+    gate is off by default.** A transform plan is not free on a GPU backend: CUDA.jl gives each one
+    a spectral-sized device buffer per direction, so a run's plan residency is
+    ``2 \times`` (velocity 3 + scalar 1 + tensor 9) spectral fields — measured to within 0.05% on
+    five configurations across two grids, two dealiasing strategies, two precisions and two vendor
+    libraries. The rank-2 family is 9 of those 13 components, and its only consumer is
+    `derivative_skewness`: **3.81 GiB at ``384^3`` / `Float32`** held for the life of a run to serve
+    one occasional diagnostic. `FixedDomain` now stores a memo cell and `tensor_plans` builds on the
+    first rank-2 transform. The velocity and scalar plans stay eager — the time loop transforms both
+    every step, so there is nothing to defer.
+    Deferral alone would have bought nothing on the default path, because `StationarityCriterion`
+    gated on the skewness by default and so built the plans during every warm-up; that default is
+    now `false`. The cost is real and stated rather than hidden: the ``\varepsilon``-plateau gate
+    can be satisfied by a field whose cascade is not yet developed, so `gate_skewness = true` is the
+    stricter spin-up and a run whose measurement depends on the small scales should set it.
+    The assertions are bidirectional — absent until asked for, deposited and reused after — in
+    `test/simulation_run.jl`.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

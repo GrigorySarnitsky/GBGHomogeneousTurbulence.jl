@@ -318,3 +318,40 @@ end
     @test fires(; scalar = true, schmidt = 7.0, viscosity = 0.08)       # explicit ν is checked too
   end
 end
+
+
+# The rank-2 transform plans are the one plan family a run may never need, and on a GPU backend a
+# plan is not free — it holds a spectral-sized device buffer per direction, and the rank-2 family is
+# nine-component against the velocity's three. Building it with the domain therefore spent the larger
+# part of a run's plan residency on a diagnostic many runs never call (3.81 GiB at 384³ / Float32,
+# measured). It is now built on first use. The assertion is BIDIRECTIONAL: absent until asked for,
+# present and REUSED afterwards — a memo that rebuilt every call would trade residency for churn.
+@testset "the rank-2 plans are built on first use, not with the domain" begin
+  using GBGIsotropicTurbulence.SimulationDomain: tensor_plans
+  domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                       dealiasing = TwoThirds(), array_type = Array)
+  @test domain.tensor_plans_memo[] === nothing            # nothing built, and nothing to build it from
+
+  built = tensor_plans(domain)
+  @test domain.tensor_plans_memo[] === built              # the first call deposits
+  @test tensor_plans(domain) === built                    # and every later one serves the deposit
+
+  # The diagnostic is the consumer, and it must reach the plans through the accessor: a fresh domain
+  # whose skewness is measured has them, one whose skewness is not, does not.
+  cold = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                     dealiasing = TwoThirds(), array_type = Array)
+  sim = Simulation(cold; viscosity = 0.05)
+  advance!(sim)
+  @test cold.tensor_plans_memo[] === nothing              # a step never transforms a rank-2 field
+  derivative_skewness(sim.state.velocity_spectral, cold)
+  @test cold.tensor_plans_memo[] !== nothing              # the diagnostic does
+end
+
+
+# Decision 78: the skewness gate is OFF by default. It is the only observation that transforms a
+# rank-2 field, so it alone builds those plans; a default that turned it on would defeat the
+# deferral above for every default `warmup!`.
+@testset "the packaged criterion does not gate on skewness by default" begin
+  @test StationarityCriterion().monitor.gate_skewness == false
+  @test StationarityCriterion(; gate_skewness = true).monitor.gate_skewness == true
+end

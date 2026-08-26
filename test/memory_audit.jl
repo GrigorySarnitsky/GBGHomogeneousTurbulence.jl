@@ -189,21 +189,27 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 # see the postmortem below). It is not principally the vendor FFT work area. It is CUDA.jl's own
 # per-plan buffers, allocated in Julia at plan construction:
 #
-#   plan_rfft   → `buffer = CuArray{complex(T)}(undef, ydims...)`   a full SPECTRAL-sized array
-#   plan_brfft  → `buffer = CuArray{T}(undef, size(X))`             a full PHYSICAL-sized array
+#   plan_rfft   → `buffer = CuArray{complex(T)}(undef, ydims...)`   ydims is the SPECTRAL shape
+#   plan_brfft  → `buffer = CuArray{T}(undef, size(X))`             T complex, X the SPECTRAL input
 #
-# They exist because an out-of-place complex-to-real transform always overwrites its input, so
-# `mul!` copies the input into the buffer before executing. IT therefore builds one spectral and
-# one physical field-sized device array PER PLAN COMPONENT: velocity 3 + scalar 1 + tensor 9 = 13,
-# one buffer of each kind apiece.
+# BOTH are spectral-sized — the buffer holds the transform's complex side in each case. They exist
+# because an out-of-place complex-to-real transform always overwrites its input, so `mul!` copies
+# the input into the buffer before executing. IT therefore builds TWO spectral-sized device arrays
+# PER PLAN COMPONENT: velocity 3 + scalar 1 + tensor 9 = 13 components, 26 buffers.
 #
-# The prediction is 13 × (one spectral scalar + one physical scalar), and it holds across every
-# configuration measured:
+# The prediction is 26 × one spectral scalar, and it holds across every configuration measured:
 #
-#   128³  TwoThirds  F32     predicted  209.6 MiB   measured  211.3 MiB   +0.8%
-#   192³  PhaseShift F32     predicted  705.6 MiB   measured  709.6 MiB   +0.6%
-#   256³  TwoThirds  F32     predicted 1670.5 MiB   measured 1677.5 MiB   +0.4%
-#   192³  PhaseShift F64     predicted 1411.2 MiB   measured 1418.2 MiB   +0.5%
+#   128³  TwoThirds  F32     predicted  211.25 MiB   measured  211.25 MiB   exact
+#   192³  PhaseShift F32     predicted  709.3  MiB   measured  709.6  MiB   +0.04%
+#   256³  TwoThirds  F32     predicted 1677.0  MiB   measured 1677.5  MiB   +0.03%
+#   192³  PhaseShift F64     predicted 1418.6  MiB   measured 1418.2  MiB   −0.03%
+#   384³  PhaseShift F32 + scalar + 10⁶ tracers: ledger 7366.5 + buffers 5645.25 = 13011.75 MiB
+#                                                 against 13058 measured, the 46 MiB residual being
+#                                                 the tracers' O(M) arrays.
+#
+# (An earlier version of this note read the second buffer as physical-sized and carried a uniform
+# +0.4…0.8% residual. A residual with STRUCTURE is a wrong model, not pool rounding; reading the
+# two allocation sites properly removed it.)
 #
 # The residual few MiB is the actual cuFFT work area plus pool rounding — so the vendor scratch is
 # real but SMALL, which is what a 3-D transform that can work in its output buffer should cost.
@@ -217,9 +223,11 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 #
 # TWO CONSEQUENCES THIS AUDIT CANNOT SEE.
 #
-#   1. `tensor_plans` carries 9 of the 13 components and has exactly ONE consumer, the strain-tensor
-#      diagnostic in Observables. Built eagerly for every run, it is ~145 MiB at 128³ and ~1.16 GiB
-#      at 256³ that a run never calling the diagnostic still pays. Open item G1.
+#   1. CLOSED 2026-08-26, decision 78. `tensor_plans` carries 9 of the 13 components and has exactly
+#      ONE consumer, the strain-tensor diagnostic in Observables — 3.81 GiB at 384³/Float32 held for
+#      the life of a run. It is now built on first use, and the skewness gate that would have built
+#      it during every default warm-up is off by default. The velocity and scalar plans stay eager:
+#      the time loop transforms both every step, so there is nothing to defer.
 #
 #   2. IT PAYS THE PRESERVING COPY TWICE. PF's four-argument `to_physical!` copies the spectral
 #      field into a scratch precisely so the source survives, then calls `mul!` — which copies again
