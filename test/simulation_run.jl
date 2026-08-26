@@ -324,8 +324,10 @@ end
 # plan is not free — it holds a spectral-sized device buffer per direction, and the rank-2 family is
 # nine-component against the velocity's three. Building it with the domain therefore spent the larger
 # part of a run's plan residency on a diagnostic many runs never call (3.81 GiB at 384³ / Float32,
-# measured). It is now built on first use. The assertion is BIDIRECTIONAL: absent until asked for,
-# present and REUSED afterwards — a memo that rebuilt every call would trade residency for churn.
+# measured). It is now built on first use. Two things are asserted, not one: that nothing is built
+# until something asks, and that asking twice builds once. The second is the one that earns its
+# place — an accessor that rebuilt on every call would also pass the first, and would replace the
+# resident cost with per-call churn of the same size.
 @testset "the rank-2 plans are built on first use, not with the domain" begin
   using GBGIsotropicTurbulence.SimulationDomain: tensor_plans
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
@@ -333,8 +335,8 @@ end
   @test domain.tensor_plans_memo[] === nothing            # nothing built, and nothing to build it from
 
   built = tensor_plans(domain)
-  @test domain.tensor_plans_memo[] === built              # the first call deposits
-  @test tensor_plans(domain) === built                    # and every later one serves the deposit
+  @test domain.tensor_plans_memo[] === built              # the first call stores what it built
+  @test tensor_plans(domain) === built                    # and later calls return it, never rebuild
 
   # The diagnostic is the consumer, and it must reach the plans through the accessor: a fresh domain
   # whose skewness is measured has them, one whose skewness is not, does not.

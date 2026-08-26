@@ -2367,8 +2367,9 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     now `false`. The cost is real and stated rather than hidden: the ``\varepsilon``-plateau gate
     can be satisfied by a field whose cascade is not yet developed, so `gate_skewness = true` is the
     stricter spin-up and a run whose measurement depends on the small scales should set it.
-    The assertions are bidirectional — absent until asked for, deposited and reused after — in
-    `test/simulation_run.jl`.
+    `test/simulation_run.jl` asserts two things, not one: that nothing is built until something
+    asks, and that asking twice builds once — an accessor rebuilding on every call would pass the
+    first while replacing the resident cost with per-call churn.
 
 ## References
 
