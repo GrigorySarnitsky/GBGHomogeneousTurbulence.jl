@@ -177,46 +177,67 @@ const FORCING_TAGS = (:none, :band, :linear, :power, :controller, :ou)
 const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
                physical_scalar = 0, real_spectral_scalar = 0)
 
-# Named exclusion, so it is recorded rather than merely absent: a backend FFT plan's work area is
-# owned by the vendor library (FFTW, rocFFT, cuFFT), reachable from no Julia field, and observable
-# only by a device query. Like the O(N) axis multipliers and shell vectors it is outside both
-# ledgers — but unlike them it is not small on GPU, so it belongs on the benchmark-side empirics
-# (decision 33's scope statement) rather than in this static projection.
+# Named exclusion, so it is recorded rather than merely absent: the per-plan device storage a
+# transform backend holds. It is reachable from no Julia field the walk visits, so it is outside
+# both ledgers by construction — but unlike the O(N) axis multipliers and shell vectors it groups
+# with, it is NOT small on GPU: measured 2026-08-25/26 on CUDA and ROCm it is COMPARABLE TO THE
+# WHOLE WORKING SET. Precisely, excess/ledger is 1.45 under TwoThirds (both grids) and 0.97 under
+# PhaseShift, whose ledger is larger — 9 field-scale arrays against 6 — while the plan set is not.
+# The plan set depends on the field TYPES a run transforms, never on the scheme or the dealiasing.
 #
-# MEASURED 2026-08-25 on CUDA (RTX 5070 Ti, Float32, TwoThirds, unforced-scalar default), and the
-# number is why the exclusion is no longer merely noted: the live pool ran 2.45× the working-set
-# ledger at BOTH grids — 356.75 MiB against 145.5 MiB at 128³, 2835.5 MiB against 1164.0 MiB at
-# 256³. The excess is 26.4 and 26.1 physical-scalar-equivalents respectively, against a plan set of
-# 13 components (velocity 3 + scalar 1 + tensor 9) in two directions = 26. Two grids landing on the
-# plan count is the attribution. So the work area is field-scale, scales as N³, and — unlike every
-# other named exclusion — is the SAME order as the thing the working-set ledger bounds.
+# WHAT IT IS (established 2026-08-26 by reading CUDA.jl, after three days of believing otherwise —
+# see the postmortem below). It is not principally the vendor FFT work area. It is CUDA.jl's own
+# per-plan buffers, allocated in Julia at plan construction:
 #
-# CONFIRMED OUT OF SAMPLE the same day, on a configuration the count was not read off: 192³ /
-# PhaseShift, whose working-set ledger is a different one (9 field-scale arrays, not 6). Predicting
-# ledger + 26 plan-components gives 733.2 + 702.0 = 1435.2 MiB against a measured 1442.8 MiB, +0.5%.
-# Three configurations across two grids and two dealiasing strategies now fit the same two-part
-# model, so the N³ scaling and the plan-count are established.
+#   plan_rfft   → `buffer = CuArray{complex(T)}(undef, ydims...)`   a full SPECTRAL-sized array
+#   plan_brfft  → `buffer = CuArray{T}(undef, size(X))`             a full PHYSICAL-sized array
 #
-# A FOURTH run varies the axis the others held fixed — PRECISION — and it is the one that
-# discriminates: 192³ / PhaseShift / Float64, pool 2884.6 MiB against the same configuration's
-# 1442.8 MiB in Float32, ×1.9993. Split off the ledger (which doubles by construction) and the
-# EXCESS itself went 709.6 → 1418.2 MiB, ×1.9986. Storage that doubles with the element type is
-# sized in elements of the transform type; plan metadata, an index or twiddle table, and a fixed
-# scratch arena do not. So the attribution now rests on three independent scalings — N³ (three
-# grids), the count 26 = 13 components × 2 directions (two dealiasing strategies with different
-# ledgers), and element size — and it is hard to name a second candidate that satisfies all three.
+# They exist because an out-of-place complex-to-real transform always overwrites its input, so
+# `mul!` copies the input into the buffer before executing. IT therefore builds one spectral and
+# one physical field-sized device array PER PLAN COMPONENT: velocity 3 + scalar 1 + tensor 9 = 13,
+# one buffer of each kind apiece.
 #
-# It is still not a device query. `CUDA.@allocated` around the plan construction closes the last
-# step in one line, and remains the thing to run before an optimization is built on the reading —
-# but the premise is now far better supported than an inference from a single fitted ratio.
+# The prediction is 13 × (one spectral scalar + one physical scalar), and it holds across every
+# configuration measured:
 #
-# It also names an optimization this audit cannot see: `tensor_plans` carries 9 of those 13
-# components and has exactly ONE consumer, the strain-tensor diagnostic in Observables. Built
-# eagerly for every run, it is ~144 MiB at 128³ and ~1.15 GiB at 256³ of device residency a run
-# that never calls the diagnostic still pays — and the share rises with the band, since PhaseShift
-# doubles the transforms but not the plan set: on the 192³ run the plans are 49% of the pool and
-# `tensor_plans` alone is ~486 MiB, about a third of it, roughly the size of the entire evolving
-# state. Open item G1; the completeness invariant's CPU-only reach is G2.
+#   128³  TwoThirds  F32     predicted  209.6 MiB   measured  211.3 MiB   +0.8%
+#   192³  PhaseShift F32     predicted  705.6 MiB   measured  709.6 MiB   +0.6%
+#   256³  TwoThirds  F32     predicted 1670.5 MiB   measured 1677.5 MiB   +0.4%
+#   192³  PhaseShift F64     predicted 1411.2 MiB   measured 1418.2 MiB   +0.5%
+#
+# The residual few MiB is the actual cuFFT work area plus pool rounding — so the vendor scratch is
+# real but SMALL, which is what a 3-D transform that can work in its output buffer should cost.
+# CUDA.jl declines to manage it explicitly and says so ("we currently do not use the worksize to
+# allocate our own workarea, instead relying on the automatic allocation strategy"), though it does
+# bind `cufftSetWorkArea` and `cufftSetAutoAllocation` for a caller that wants to.
+#
+# ROCm lands on the identical total to the displayed digit (192³ PhaseShift: 1.409 GiB in F32,
+# 2.817 GiB in F64, both matching CUDA exactly), which is expected: AMDGPU.jl implements the same
+# AbstractFFTs contract against the same "c2r overwrites its input" constraint.
+#
+# TWO CONSEQUENCES THIS AUDIT CANNOT SEE.
+#
+#   1. `tensor_plans` carries 9 of the 13 components and has exactly ONE consumer, the strain-tensor
+#      diagnostic in Observables. Built eagerly for every run, it is ~145 MiB at 128³ and ~1.16 GiB
+#      at 256³ that a run never calling the diagnostic still pays. Open item G1.
+#
+#   2. IT PAYS THE PRESERVING COPY TWICE. PF's four-argument `to_physical!` copies the spectral
+#      field into a scratch precisely so the source survives, then calls `mul!` — which copies again
+#      into the plan's own buffer. Two copies and two resident buffers for one need, because the
+#      scratch PF passes is already expendable. The fix is upstream of IT (a path that lets the
+#      transform destroy an input the caller has already copied), which is invariant 2's shape one
+#      level further out.
+#
+# POSTMORTEM, kept because the failure is the instructive part. From 2026-08-25 this note asserted
+# the storage was the vendor work area, and grew three rounds of confirmation: the N³ scaling over
+# three grids, the count 26 = 13 × 2 over two dealiasing strategies with different ledgers, and
+# element-size scaling over a precision pair — each round strengthening the claim, none testing it.
+# All three are properties of ANY per-plan field-sized allocation. They pinned the SIZE and were
+# read as pinning the CAUSE. The note even named the check that would have settled it and deferred
+# it as a formality, having mistaken accumulated fit for identification. What actually settled it
+# was reading the allocation site in CUDA.jl, prompted by the owner pointing out that CUDA and ROCm
+# have their own options rather than inheriting FFTW.jl's. A model that predicts out of sample
+# constrains the magnitude of a mechanism; it does not name one.
 frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 
