@@ -13,3 +13,16 @@ dupref.jl                    2026-08-19   Same @ref target linked more than once
 lanes.js                     2026-08-17   /check-docs review lanes — the judgment half of the battery, fanned out per surface plus the two
 signature_fidelity.jl        2026-08-24   Signature fidelity — the ADVERTISED signature versus the DEFINED one (attack round C4/C8,
 xlink.jl                     2026-08-17   Every docstring's first mention of a name whose DEFINING module differs from the docstring's own
+
+FALSIFICATION STATUS — a sweep reporting zero is the one to distrust (PF, 2026-08-27), and IT proved
+it: argcov.jl reported 0 for its whole existence and COULD NOT have reported otherwise. Each
+deterministic sweep below has now been run against a fixture carrying a known positive and the
+false-positive cases it is meant to tolerate. Re-falsify after changing any of them.
+
+  argcov.jl            FALSIFIED 2026-08-27  was blind to the last positional arg before a `;`; fixed
+  dupref.jl            FALSIFIED 2026-08-27  catches a doubled @ref, ignores two distinct targets
+  doi_crosscheck.py    FALSIFIED 2026-08-27  flags an unlisted DOI, ignores a listed one
+  abutting_spans.py    LIVE — reports 3 real hits on the corpus, so not silently blind
+  signature_fidelity.jl  states its denominator ("CLEAN over 98 bindings") and names what it skipped
+  xlink.jl             LIVE — reports 2 real hits on the corpus
+  lanes.js             agent lanes, not a deterministic sweep; falsification does not apply
