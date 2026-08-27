@@ -179,11 +179,46 @@ for (let i = 0; i < BATCHES.length; i++) {
   all.push(r)
 }
 
+// MECHANICAL DEMOTION — the script applies it, not the auditor (2026-08-27).
+// The preamble told the auditor "an empty `class_surfaces` is LINE-ONLY BY RULE — not a judgement
+// call", and then nothing applied it: the tally below counted whatever verdict came back. That is
+// this repository's own recorded weakness — writing the rule instead of building the check — in the
+// script whose entire purpose is catching a fixer who did the same thing. It was found by following
+// a PF report about a DIFFERENT defect in PF's demotion, which is the third time the cross-check has
+// surfaced something neither of us was looking for.
+//
+// The predicate is EMPTINESS, deliberately, and that is the whole of it. PF's demotion matched a
+// fixed vocabulary and a `file:line` shape, and demoted ten sound answers out of thirteen for
+// writing "lines 195, 273" or "nothing to sweep". A rule that cries wolf fails in the other
+// direction — the next reader who finds ten of thirteen demotions spurious stops reading demotions
+// at all. An empty array is a structural fact about the response and cannot be misread; anything
+// that parses the CONTENT of those strings would be re-introducing PF's bug here.
+// Falsified in both directions before landing (no JS runtime on this host, so the predicate was
+// evaluated directly against five cases):
+//   honored + one surface named          -> kept HONORED
+//   honored + empty array                -> demoted
+//   honored + field absent               -> demoted
+//   honored + "ARCHITECTURE.md (lines 195, 273) — nothing to sweep"  -> kept HONORED
+//     (that is verbatim the phrasing PF's content-matching demotion rejected; it must pass here)
+//   UNDONE + empty array                 -> left UNDONE, never touched
+let demoted = 0
+for (const r of all) for (const a of (r.audits || [])) {
+  if (a.verdict === 'HONORED' && !(Array.isArray(a.class_surfaces) && a.class_surfaces.length)) {
+    a.verdict = 'LINE-ONLY'
+    a.evidence = `[DEMOTED BY SCRIPT: HONORED claimed with no enumerated class surface] ${a.evidence || ''}`
+    demoted++
+  }
+}
+
 const tally = {}
 for (const r of all) for (const a of (r.audits || [])) tally[a.verdict] = (tally[a.verdict] || 0) + 1
 log(`TOTAL: ${JSON.stringify(tally)}`)
+if (demoted) {
+  log(`   ${demoted} HONORED → LINE-ONLY by script (no class surface enumerated). Counted separately`)
+  log(`   so the mechanical share of the demotions is visible rather than folded into the auditors'.`)
+}
 if (anomalies.length) {
   log(`!! ${anomalies.length} ANOMALY(S) — THE TALLY IS INCOMPLETE, DO NOT READ IT AS A FIX-QUALITY RATE:`)
   for (const a of anomalies) log(`   !! ${a}`)
 }
-return { tally, anomalies, batches: BATCHES, complete: anomalies.length === 0, results: all }
+return { tally, demoted_by_script: demoted, anomalies, batches: BATCHES, complete: anomalies.length === 0, results: all }
