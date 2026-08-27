@@ -463,3 +463,32 @@ actively check for it.
   Instances (2026-08-17): the eleven above, plus a scan I wrote that caught only the form I had first
   noticed (bare `` `code` `` beside math, not the linked `[`code`](@ref …)` form), certifying clean
   while three sites stood.
+
+- **Writing the rule down instead of building the check — and the rule's presence then reading as
+  compliance.** The generalisation of the entry above, and the one that explains why that entry
+  keeps recurring despite being written. Over three days of cross-checking instruments against the
+  sibling PF session, six defects were found across the two trees, and in **every one the correct
+  behaviour was already written down in the same tree**: the class-sweep rule sat in the discipline
+  section while eleven of thirteen fixes were `LINE-ONLY`; `hunt.js`'s "it must assert the RIGHT
+  behaviour" sat three lines above code that accepted *any* failing test as proof; this file's own
+  doc-edit checklist names `domain` as the argument an enumeration must not skip, while
+  `ResolvedFields(domain; …)` left `domain` unbound and `argcov.jl` reported `0` and **could not have
+  reported otherwise** — its parser discarded the last positional argument of every signature
+  carrying a `;`. PF hit the mirror image the same day: its unbound argument was the *stencil width*,
+  the example its own rulebook gives verbatim for that class.
+
+  **The mechanism (PF's, and it is the useful part):** a rule is written by whoever has just fixed an
+  instance, at the moment they are most confident the class is handled — which is precisely the
+  moment nobody builds the check, because *the fix feels like the closure*. So the rule is written
+  **instead of** enforcement, not merely alongside it. Afterwards the rule reads as evidence of
+  compliance rather than of intent, and from inside the tree you read it and believe the tree obeys.
+  That is why this class is invisible from inside and obvious from outside, and why it needed a
+  second package to surface: neither session found more than two instances in its own tree alone.
+
+  The rule: **when you write a rule down, name what would catch its next violation — and if the
+  answer is "someone remembering this rule", it is not enforced.** A rule and its check belong in the
+  same commit. And on the checks themselves: **a sweep reporting zero is the one to distrust** —
+  falsify it against a fixture carrying a known positive before believing a clean run, because a
+  pass over a corpus is a property of the corpus, not of the code. Prefer a stated denominator to a
+  bare verdict: "CLEAN over 98 bindings" is falsifiable where "CLEAN" is not.
+  Instances (2026-08-25/27): the six above.
