@@ -6,7 +6,7 @@
 # in a single read.
 
 FILE                         CHANGED      PURPOSE
-INVENTORY.md                 uncommitted  Instrument inventory — IT, and what it shares with PF
+INVENTORY.md                 2026-08-27   Instrument inventory — IT, and what it shares with PF
 audit-changes.md             2026-08-21   /audit-changes — were these edits justified, and did they silently change behaviour?
 bug-hunt.md                  2026-08-27   /bug-hunt — the CODE instrument
 check-consistency.md         2026-08-27   /check-consistency — the fresh-eyed multi-hat RENDERED-docs panel

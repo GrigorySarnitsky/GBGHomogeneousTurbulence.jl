@@ -88,3 +88,34 @@ shared package rather than being ported.
 Not retired, demoted. Diffing detects divergence after the fact and a shared package prevents it —
 but a shared package can be PINNED AT TWO VERSIONS in two consumers, and then the toolboxes are
 being diffed again. It is the right solution to a smaller problem.
+
+## Instrument freeze — 2026-08-27
+
+**IT's instruments are frozen as of `fdeba74`** (owner-directed; PF froze at `faa164a1` the same day).
+From here an instrument change is **its own commit, never folded into a round it is scoring**.
+
+The reason is not tidiness. Both packages spent this week editing graders while those graders were
+grading: PF made four such edits, IT roughly eight, and IT ported one of PF's mid-round. An
+instrument that changes under the work it measures makes the measurement uninterpretable — PF's own
+round 3→4 jump from 54.8% to 96.8% cannot be read as progress, because ten of round 3's demotions
+were a grader misfire fixed in the same interval as three real gaps. IT's published 43→90% sequence
+predates all of this week's edits (verified against `git log`: both verifiers created 2026-08-17,
+untouched until the 2026-08-18 hardening), so no IT number is contaminated — but that is luck rather
+than discipline, and the next sequence would not have been.
+
+`lint_review_closure()` was the last change before the freeze, and it landed as its own commit,
+which is the rule applied to its own arrival.
+
+**Deferred by the freeze**, recorded so the absences are decisions rather than oversights:
+
+- Strengthening the closure gate to require every finding HONORED. Needs verdicts on disk; IT's
+  verifiers return them as workflow results, and a workflow script cannot write files. Must read the
+  GRADER's verdicts, never the graded party's file — PF's gate read 30 HONORED against its script's
+  authoritative 23 by getting exactly this wrong.
+- `recall_selftest.py`. IT's perturbation arms are a comment instructing a human to re-run them
+  where PF's is a script — the rule-versus-check distinction, in IT's own file, after the
+  `CLAUDE.md` entry about it.
+- A per-finding **adjudicated** channel. PF used its wholesale `CLOSED.md` exit exactly once in a
+  full round; the routine exit was a per-finding entry quoting the title with a reason and an
+  overturn condition. IT currently has only the wholesale escape (`closed:`), which PF warns is the
+  one you reach for when there is no per-finding alternative.
