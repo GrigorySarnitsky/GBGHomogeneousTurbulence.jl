@@ -272,7 +272,7 @@ const SYNC_LEDGER = (
   @testset "the pass floor — two tiers, each claimed" begin
     # achieved ≥ bound ≥ floor everywhere, and each positive tier carries its holder. The floor is
     # the fused ideal with the per-mode symbols evaluated in register instead of swept from memory.
-    for scheme in (:RK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
+    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
       ops = _ops(scheme, dealiasing, scalar)
       achieved = _passes(ops)
       bound    = _fusion_bound(ops)
@@ -295,7 +295,7 @@ const SYNC_LEDGER = (
     # real-spectral-scalar class — once entirely |κ|² swept per factor build — is empty outright. A
     # future op that reads a field-scale configuration array reopens the tier and must bring a new
     # holder with it.
-    for scheme in (:RK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
+    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
       ops = _ops(scheme, dealiasing, scalar)
       @test _fusion_bound(ops) == _fusion_bound(ops; materialize_symbols = false)
       @test _passes(ops).real_spectral_scalar == 0
@@ -349,7 +349,7 @@ const SYNC_LEDGER = (
     # The direction that keeps the register honest. A holder whose gap has been closed everywhere
     # must be retired in the commit that closes it; leaving it would let a solved problem go on
     # looking like an accepted cost.
-    cells = [(s, d, sc) for s in (:RK3, :RK2) for d in DEALIASINGS for sc in (false, true)]
+    cells = [(s, d, sc) for s in (:RK3, :SSPRK3, :RK2) for d in DEALIASINGS for sc in (false, true)]
     fusion_live = false
     for (scheme, dealiasing, scalar) in cells
       ops = _ops(scheme, dealiasing, scalar)

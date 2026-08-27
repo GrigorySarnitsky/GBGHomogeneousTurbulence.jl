@@ -58,9 +58,21 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     v4 = integrate_fixed(rk2, domain, û0, unforced, Tfinal / (4n), 4n)
     rk2_ratio = diffnorm(v1, v2) / diffnorm(v2, v4)
 
+    ssp = IFSSPRK3()
+    w1 = integrate_fixed(ssp, domain, û0, unforced, Tfinal / n, n)
+    w2 = integrate_fixed(ssp, domain, û0, unforced, Tfinal / (2n), 2n)
+    w4 = integrate_fixed(ssp, domain, û0, unforced, Tfinal / (4n), 4n)
+    ssp_ratio = diffnorm(w1, w2) / diffnorm(w2, w4)
+
     @test 5.0 < rk3_ratio < 12.0      # third order ⇒ ≈ 8
+    @test 5.0 < ssp_ratio < 12.0      # third order ⇒ ≈ 8 (same order, different error constants)
     @test 3.0 < rk2_ratio < 6.0       # second order ⇒ ≈ 4
     @test rk3_ratio > rk2_ratio       # RK3 converges faster than RK2
+    # The two RK3s are DIFFERENT tableaux: they must agree at Δt→0 (same equation) while their
+    # single-Δt states differ (different error constants) — the pair pins "same order, distinct
+    # scheme", which a convergence ratio alone cannot.
+    @test diffnorm(u4, w4) < diffnorm(u1, w1)
+    @test diffnorm(u1, w1) > 0
   end
 
   @testset "IFLowStorageRK3 forced-HIT invariants" begin

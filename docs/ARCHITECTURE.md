@@ -2400,6 +2400,26 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     successive wrong mechanisms had been recorded here from inference; all seven converged on the
     same cause, the same closed form and the same allocation sites.
 
+
+80. **(2026-08, user-directed) `IFSSPRK3` — TurTLE's tableau, at the low-storage scheme's cost.**
+    For the code-to-code validation against TurTLE the owner wants the time discretization shared,
+    so the third scheme is the Shu–Osher SSPRK3 (Shu & Osher 1988) in exactly TurTLE's stage
+    arrangement: forward a full step, back to the midpoint, forward again
+    (abscissae ``c = (0, 1, \tfrac{1}{2})``), each convex-combination term transported by the exact
+    integrating factor. Every three-stage third-order explicit RK shares the stability function
+    ``R(z) = 1 + z + z^{2}/2 + z^{3}/6``, so the advective ceiling is `IFLowStorageRK3`'s 0.5 —
+    the two differ only in nonlinear error constants, which is precisely what makes the pair a
+    convergence-test discriminator (same limit, different finite-``\Delta t`` states; pinned in
+    `test/integrators.jl`).
+    The implementation was designed into RK3's register shape — the stage state and the
+    right-hand-side register, with the accumulator's role played by the state itself, which holds
+    ``t_n`` until the final combination — so the memory cells equal `:RK3`'s in every configuration
+    and the optimality audit holds the new cells AT their liveness bounds with no new holder.
+    Transforms are identical to RK3 (same recovery schedule); pointwise passes are two fewer per
+    field (no accumulator rotations, against stage 2's three-pass two-factor combination). The one
+    scheme-specific caveat is stage 2's backward transport ``\mathcal{E}(-\Delta t/2)`` — a growing
+    exponential, exact but amplifying high-``\kappa`` roundoff when ``\nu\kappa^{2}\Delta t`` is
+    large; under an advective CFL step the exponent is small, and the docstring says so.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
@@ -2466,6 +2486,8 @@ cites.
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
   cites the family rather than a numbered case.)*
+- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471. *(The SSPRK3 tableau
+  `IFSSPRK3` implements, in TurTLE's stage arrangement.)*
 - Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press. *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
 - Mori, H. (1965). [*Transport, collective motion, and Brownian motion*](https://doi.org/10.1143/PTP.33.423). *Prog. Theor. Phys.* **33**,

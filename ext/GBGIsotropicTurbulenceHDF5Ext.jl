@@ -24,7 +24,7 @@ using GBGIsotropicTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForcin
                                       StochasticOU
 import GBGIsotropicTurbulence.Forcing: write_forcing, read_forcing
 using GBGIsotropicTurbulence.Cache: fields_modified!, particles_modified!
-using GBGIsotropicTurbulence.Propagator: IFLowStorageRK3, IFHeun, deposit!
+using GBGIsotropicTurbulence.Propagator: IFLowStorageRK3, IFSSPRK3, IFHeun, deposit!
 using GBGIsotropicTurbulence.SimulationRun: Simulation
 import GBGIsotropicTurbulence.SimulationRun: write_simulation, read_simulation
 
@@ -304,6 +304,7 @@ end
 
 _field_scheme_tag(::IFLowStorageRK3) = "IFLowStorageRK3"
 _field_scheme_tag(::IFHeun) = "IFHeun"
+_field_scheme_tag(::IFSSPRK3) = "IFSSPRK3"
 _particle_scheme_tag(::Heun) = "Heun"
 _particle_scheme_tag(::AdamsBashforth) = "AdamsBashforth"
 
@@ -353,6 +354,7 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
   ftag = a["field_integration_scheme"]
   field_integration_scheme = ftag == "IFLowStorageRK3" ? IFLowStorageRK3() :
                              ftag == "IFHeun" ? IFHeun() :
+                             ftag == "IFSSPRK3" ? IFSSPRK3() :
                              throw(ArgumentError("read_simulation: unrecognized field scheme tag " *
                                                  "\"$ftag\" in group \"$name\""))
   has_tracers = haskey(g, "tracers")

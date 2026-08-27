@@ -221,7 +221,8 @@ The run group:
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
 - `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
-  [`AbstractIntegrator`](@ref) scheme and its advective-CFL ceiling (adapts to `dealiasing`).
+  [`AbstractIntegrator`](@ref) scheme (`IFSSPRK3` and `IFHeun` are the alternatives) and its
+  advective-CFL ceiling (adapts to `dealiasing`).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay

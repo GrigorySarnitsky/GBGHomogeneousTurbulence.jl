@@ -98,6 +98,16 @@ const BASE = Dict(
   (:RK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
+  # IFSSPRK3 (decision 80): the SAME cells as :RK3 in every configuration, and the equality is the
+  # point — the scheme was designed into RK3's register shape (stage state + nonlinear; the
+  # accumulator's role played by the state itself), so TurTLE's tableau costs nothing over the
+  # low-storage one. A divergence here would mean that design claim failed.
+  (:SSPRK3, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :TwoThirds,  true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:SSPRK3, :HouLi,      false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:SSPRK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
@@ -157,7 +167,7 @@ _build_forcing(tag, domain) =
   tag === :controller ? VarianceController(domain; target = 0.5, turnover_time = 1.0) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
-_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : IFHeun()
+_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : tag === :SSPRK3 ? IFSSPRK3() : IFHeun()
 const FORCING_TAGS = (:none, :band, :linear, :power, :controller, :ou)
 
 
@@ -402,7 +412,7 @@ const EPISODE_UNITS = [
     # scheme × dealiasing × scalar × velocity forcing × scalar forcing × tracers: every combination
     # must equal base + velocity-forcing delta + scalar-forcing delta + tracer delta. A cross-term
     # (a buffer whose existence depends on two axes at once) fails here and must be recorded.
-    for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift), scalar in (false, true),
+    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift), scalar in (false, true),
         vtag in FORCING_TAGS, stag in (scalar ? FORCING_TAGS : (:none,)), tracers in (false, true)
       domain = domains[dealiasing]
       counts = ledger(domain, _scheme(scheme), scalar,
@@ -468,7 +478,7 @@ const EPISODE_UNITS = [
     # observation cache, generator, scheme registers, tracers — and require the total to equal
     # frame + working set, cell by cell. A future buffer that neither table names fails here
     # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
-    for scheme in (:RK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
+    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
                        velocity_forcing = NoForcing(), field_integration_scheme = _scheme(scheme),
@@ -564,7 +574,7 @@ const EPISODE_UNITS = [
     # deleting the scalar copy register closed the scalar gap — each holder retired in the same
     # commit. This equality CAN fail: extend a register's life past the schedule's need (or add a
     # resident buffer) and the ledger rises off the bound with no holder to claim it.
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
+    for (scheme, ops_of) in ((:RK3, rk3_ops), (:SSPRK3, ssprk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
       @test peak_liveness(ops_of(scalar)) == BASE[(scheme, :TwoThirds, scalar)]
     end
     # PhaseShift's displaced-evaluation registers are working values like any other, and its cells
@@ -593,7 +603,7 @@ const EPISODE_UNITS = [
     # substage recovery registers AND as the quadratic products' in-place targets (decision 41) —
     # with the three vectors retired since decision 37 (the two-chart gap + the product register,
     # 1.15 GiB at 256³ / Float64) banked, not held.
-    for (scheme, ops_of) in ((:RK3, rk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
+    for (scheme, ops_of) in ((:RK3, rk3_ops), (:SSPRK3, ssprk3_ops), (:RK2, rk2_ops)), scalar in (false, true)
       @test peak_liveness(ops_of(scalar)).physical_vector == 2
     end
   end

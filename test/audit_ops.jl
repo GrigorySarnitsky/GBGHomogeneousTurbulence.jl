@@ -89,6 +89,7 @@ const VALUE_CLASS = Dict(
   :û => :spectral_vector, :ps => :spectral_vector,
   :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
   :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
+  :s => :spectral_vector, :sb_s => :spectral_scalar,
   :vshift => :spectral_vector,
   :chart_u => :physical_vector, :chart_ω => :physical_vector,
   :noise_p => :physical_vector,
@@ -286,6 +287,51 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
 end
 
 
+# IFSSPRK3 (Shu–Osher, TurTLE's arrangement) as one iteration: the state û holds t_n until the
+# final combination, the stage register `s` carries q⁽¹⁾ then q⁽²⁾, and `nl` doubles as the
+# right-hand-side register and (spent) recovery scratch — the same two registers as IFLowStorageRK3,
+# with the accumulator's role played by the state itself. Stage 2's two terms carry DIFFERENT
+# integrating factors, so its combination is three pointwise passes where RK3's is one fused pass;
+# against that, no accumulator is ever rotated. Net pointwise passes per field: 7 vs RK3's 8.
+function ssprk3_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)
+  ops = Op[]
+  # stage 1 — RHS at the deposited state; q⁽¹⁾ into `s`, û untouched
+  append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; phase_shift))
+  scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
+  push!(ops, Op("s ← E(û+Δt·N̂)", [:û, :nl], [:s]))
+  scalar && push!(ops, Op("sφ ← E(φ̂+Δt·N̂)", [:φ̂, :sb_nl], [:sb_s]))
+  for i in 2:3
+    append!(ops, _recoveries(:s; scratch = :nl))
+    append!(ops, _velocity_assembly(:s, :chart_u, :chart_ω, :nl; phase_shift))
+    scalar && append!(ops, _scalar_assembly(:s, :sb_s, :chart_u, :sb_nl; recover = true, sscratch = :sb_nl, phase_shift))
+    if i == 2   # q⁽²⁾ = ¾ E(Δt/2) û + ¼ E(−Δt/2)(q⁽¹⁾ + Δt N̂) — two factors, three passes
+      push!(ops, Op("s ← E⁻(s+Δt·N̂)", [:s, :nl], [:s]))
+      push!(ops, Op("nl ← ¾E·û", [:û], [:nl]))
+      push!(ops, Op("s ← ¼s+nl", [:s, :nl], [:s]))
+      scalar && append!(ops, [
+        Op("sφ ← E⁻(sφ+Δt·N̂)", [:sb_s, :sb_nl], [:sb_s]),
+        Op("sb_nl ← ¾E·φ̂", [:φ̂], [:sb_nl]),
+        Op("sφ ← ¼sφ+sb_nl", [:sb_s, :sb_nl], [:sb_s]),
+      ])
+    else        # û ← ⅓ E(Δt) û + ⅔ E(Δt/2)(q⁽²⁾ + Δt N̂)
+      push!(ops, Op("s ← E(s+Δt·N̂)", [:s, :nl], [:s]))
+      push!(ops, Op("û ← ⅓E·û", [:û], [:û]))
+      push!(ops, Op("û ← û+⅔s", [:û, :s], [:û]))
+      scalar && append!(ops, [
+        Op("sφ ← E(sφ+Δt·N̂)", [:sb_s, :sb_nl], [:sb_s]),
+        Op("φ̂ ← ⅓E·φ̂", [:φ̂], [:φ̂]),
+        Op("φ̂ ← φ̂+⅔sφ", [:φ̂, :sb_s], [:φ̂]),
+      ])
+    end
+  end
+  push!(ops, Op("finalize", [:û], [:û]))
+  # The advanced state's re-projection (decision 61), identical to the other schemes.
+  push!(ops, Op("state re-projection", [:û], [:û]))
+  closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
+  return ops
+end
+
+
 # IFHeun (Heun) as one iteration: stage 1 through the deposited observables, the predictor
 # pair, the stage-2 assembly at the predictor state (recovered into the taken chart slots), the
 # corrector combinations, then the closing deposit.
@@ -407,6 +453,10 @@ for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl 
              "rotate û", "rotate hu", "rotate φ̂", "rotate hφ",
              "rotate N̂_u,1", "rotate N̂_φ,1",
              "û corrector 1", "û corrector 2", "φ̂ corrector 1", "φ̂ corrector 2",
+             "s ← E(û+Δt·N̂)", "sφ ← E(φ̂+Δt·N̂)", "s ← E⁻(s+Δt·N̂)", "sφ ← E⁻(sφ+Δt·N̂)",
+             "nl ← ¾E·û", "sb_nl ← ¾E·φ̂", "s ← ¼s+nl", "sφ ← ¼sφ+sb_nl",
+             "s ← E(s+Δt·N̂)", "sφ ← E(sφ+Δt·N̂)", "û ← ⅓E·û", "φ̂ ← ⅓E·φ̂",
+             "û ← û+⅔s", "φ̂ ← φ̂+⅔sφ",
              "draw noise", "project noise", "f̂ ← θf̂ + sξ", "add OU source")
   OP_COST[name] = _cost(:pointwise)
 end
@@ -505,11 +555,14 @@ end
 const DEALIASINGS = (:TwoThirds, :HouLi, :PhaseShift)
 
 _ops(scheme, dealiasing, scalar; ou = false) =
-  scheme === :RK3 ?
-    rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift) :
-    rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift)
+  scheme === :RK3 ? rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift) :
+  scheme === :SSPRK3 ? ssprk3_ops(scalar; phase_shift = dealiasing === :PhaseShift) :
+  rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift)
 
-_evals(scheme)  = scheme === :RK3 ? 3 : 2     # right-hand-side evaluations per step
-_applies(scheme) = scheme === :RK3 ? 5 : 3    # fused-exponential applications per field per step
+_evals(scheme)  = scheme === :RK2 ? 2 : 3     # right-hand-side evaluations per step
+_applies(scheme) = scheme === :RK3 ? 5 : scheme === :SSPRK3 ? 6 : 3
+                                              # fused-exponential applications per field per step
                                               # (RK3: 3 state updates + 2 accumulator rotations;
+                                              #  SSPRK3: 3 stage updates + 3 single-operand
+                                              #  transports — no rotations;
                                               #  RK2: predictor + first-stage + state rotations)

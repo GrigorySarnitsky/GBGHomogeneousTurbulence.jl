@@ -59,6 +59,14 @@ const TRANSFORMS_BASE = Dict(
   (:RK3, :HouLi,      true)  => (c2r = 21, r2c = 18),
   (:RK3, :PhaseShift, false) => (c2r = 36, r2c = 18),
   (:RK3, :PhaseShift, true)  => (c2r = 42, r2c = 36),
+  # IFSSPRK3 (decision 80): transform cells IDENTICAL to :RK3 — same three stages, same recovery
+  # and assembly schedule; the tableau changes the pointwise combinations alone.
+  (:SSPRK3, :TwoThirds,  false) => (c2r = 18, r2c = 9),
+  (:SSPRK3, :TwoThirds,  true)  => (c2r = 21, r2c = 18),
+  (:SSPRK3, :HouLi,      false) => (c2r = 18, r2c = 9),
+  (:SSPRK3, :HouLi,      true)  => (c2r = 21, r2c = 18),
+  (:SSPRK3, :PhaseShift, false) => (c2r = 36, r2c = 18),
+  (:SSPRK3, :PhaseShift, true)  => (c2r = 42, r2c = 36),
   (:RK2, :TwoThirds,  false) => (c2r = 12, r2c = 6),
   (:RK2, :TwoThirds,  true)  => (c2r = 14, r2c = 12),
   (:RK2, :HouLi,      false) => (c2r = 12, r2c = 6),
@@ -114,6 +122,16 @@ const PASSES_BASE = Dict(
   (:RK3, :HouLi,      true)  => (spectral_vector = 44, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
   (:RK3, :PhaseShift, false) => (spectral_vector = 74, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :PhaseShift, true)  => (spectral_vector = 80, physical_vector = 31, spectral_scalar = 54, physical_scalar = 6, real_spectral_scalar = 0),
+  # IFSSPRK3 (decision 80): two spectral passes FEWER than :RK3 per field (41→39, 30→28 scalar
+  # spectral) — stage 2 pays three passes where RK3's fused update pays one, but no accumulator is
+  # ever rotated, and the rotations cost more than the extra combinations. AUDIT_PRINT-generated,
+  # reviewed against the step! body.
+  (:SSPRK3, :TwoThirds,  false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :TwoThirds,  true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 28, physical_scalar = 3, real_spectral_scalar = 0),
+  (:SSPRK3, :HouLi,      false) => (spectral_vector = 39, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :HouLi,      true)  => (spectral_vector = 42, physical_vector = 16, spectral_scalar = 28, physical_scalar = 3, real_spectral_scalar = 0),
+  (:SSPRK3, :PhaseShift, false) => (spectral_vector = 72, physical_vector = 19, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:SSPRK3, :PhaseShift, true)  => (spectral_vector = 78, physical_vector = 31, spectral_scalar = 52, physical_scalar = 6, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 27, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 29, physical_vector = 11, spectral_scalar = 19, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 27, physical_vector = 7, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
@@ -210,7 +228,7 @@ const TRACER_PASS_DELTA = ZERO
 
 if get(ENV, "AUDIT_PRINT", "") == "1"
   println("— computed compute-ledger cells (review, then freeze) —")
-  for scheme in (:RK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
+  for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
     ops = _ops(scheme, dealiasing, scalar)
     t = _transforms(ops)
     println((scheme, dealiasing, scalar))
@@ -234,7 +252,7 @@ end
 @testset "compute audit" begin
   @testset "every op is priced" begin
     all_ops = vcat((_ops(scheme, dealiasing, scalar; ou)
-                    for scheme in (:RK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true),
+                    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true),
                         ou in (false, true) if !(ou && scheme === :RK2))...)
     @test all(op -> haskey(OP_COST, op.name), all_ops)
     @test all(op -> all(v -> haskey(VALUE_CLASS, v), Iterators.flatten((op.reads, op.writes))), all_ops)
@@ -254,7 +272,7 @@ end
     end
     # PhaseShift's price for exact quadratic dealiasing at √2·N/3 modes: exactly double the mask
     # velocity transforms — the displaced evaluation is a full second pipeline.
-    for scheme in (:RK3, :RK2)
+    for scheme in (:RK3, :SSPRK3, :RK2)
       mask = TRANSFORMS_BASE[(scheme, :TwoThirds, false)]
       @test TRANSFORMS_BASE[(scheme, :PhaseShift, false)] == (c2r = 2mask.c2r, r2c = 2mask.r2c)
     end

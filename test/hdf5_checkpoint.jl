@@ -169,3 +169,22 @@ end
   advance!(sim2; dt = 0.01)
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
 end
+
+
+# Decision 80: the third field scheme round-trips by tag like the other two, and the restored run
+# continues bitwise — the checkpoint contract is scheme-blind, so a new scheme must not silently
+# restore as the default.
+@testset "an IFSSPRK3 run checkpoints, restores its scheme, and continues bitwise" begin
+  path = tempname() * ".h5"
+  sim = Simulation(grid_points_per_axis = 8, viscosity = 0.05, rng = MersenneTwister(11),
+                   field_integration_scheme = IFSSPRK3(),
+                   velocity_forcing = ConstantPower(injection_rate = 0.1))
+  advance!(sim; dt = 0.01)
+  h5open(io -> write_simulation(io, "run", sim), path, "w")
+  sim2 = h5open(io -> read_simulation(io, "run"), path, "r")
+  @test sim2.field_integration_scheme isa IFSSPRK3
+  advance!(sim; dt = 0.01)
+  advance!(sim2; dt = 0.01)
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+  rm(path)
+end

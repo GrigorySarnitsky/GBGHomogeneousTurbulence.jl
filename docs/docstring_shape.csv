@@ -78,8 +78,9 @@ Phenomenology.jl::taylor_reynolds(fp) -> Float64,35,0,38
 Propagator.jl::AbstractIntegrator,36,0,37
 Propagator.jl::IFHeun(),57,1,189
 Propagator.jl::IFLowStorageRK3(),73,0,274
+Propagator.jl::IFSSPRK3(),103,1,364
 Propagator.jl::IntegratorBuffers,110,0,331
-Propagator.jl::Propagator,41,0,122
+Propagator.jl::Propagator,41,0,132
 Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorBuffers,99,0,214
 Propagator.jl::deposit!(cache， state， domain， buffers),116,0,467
 Propagator.jl::recommended_cfl(scheme， domain),98,1,441
@@ -107,7 +108,7 @@ SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractStrin
 SimulationDomain.jl::tensor_plans(domain) -> FieldTransformPlans,104,1,234
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2093
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2099
 SimulationRun.jl::SimulationRun,31,0,218
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false， min_turnovers = 5，,98,0,676
 SimulationRun.jl::advance!(sim; dt = nothing),53,0,99

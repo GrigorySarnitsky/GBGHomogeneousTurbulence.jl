@@ -27,7 +27,8 @@ are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `field_integration_scheme` is chosen from.
-- [`IFLowStorageRK3`](@ref), [`IFHeun`](@ref) — the schemes (RK3 low-storage; IFHeun a
+- [`IFLowStorageRK3`](@ref), [`IFSSPRK3`](@ref), [`IFHeun`](@ref) — the schemes (RK3 low-storage;
+  the Shu–Osher SSPRK3 in TurTLE's arrangement, for code-to-code comparison; IFHeun a
   two-stage Heun — cheaper in transforms, dearer by one register per field, and
   imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
@@ -49,7 +50,7 @@ using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_p
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
 
-export AbstractIntegrator, IFHeun, IFLowStorageRK3, IntegratorBuffers, allocate_buffers, step!,
+export AbstractIntegrator, IFHeun, IFLowStorageRK3, IFSSPRK3, IntegratorBuffers, allocate_buffers, step!,
        deposit!, recommended_cfl
 
 
@@ -467,11 +468,147 @@ function step!(::IFHeun, state::ResolvedFields, generator::ResolvedGenerator,
 end
 
 
+"""
+    IFSSPRK3()
+
+Integrating-factor strong-stability-preserving third-order Runge–Kutta of Shu & Osher (1988,
+[*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5),
+*J. Comput. Phys.* **77**, 439–471) — the SSPRK3 tableau, in exactly the stage arrangement of
+TurTLE, the reference pseudospectral solver, so a code-to-code comparison against it shares the time
+discretization. Choose it for that comparison; for everything else it and [`IFLowStorageRK3`](@ref)
+are interchangeable — same order, same three right-hand-side evaluations, same two registers per
+field, and the **same linear stability** (every three-stage third-order explicit Runge–Kutta has
+stability function ``R(z) = 1 + z + z^2/2 + z^3/6``, imaginary-axis limit ``\\sqrt{3}``), differing
+only in the nonlinear error constants.
+
+With ``\\mathcal{E}(\\tau)`` the diffusive integrating factor over a span ``\\tau`` (from the generator's
+[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor);
+applied per mode by the fused exponential convolution, never built as a field) and
+``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a field ``\\hat q`` is the
+Shu–Osher convex-combination form, each term transported to its stage's time:
+
+```math
+\\begin{aligned}
+\\hat q^{(1)} &= \\mathcal{E}(\\Delta t)\\bigl[\\hat q_n + \\Delta t \\widehat{\\boldsymbol{N}}(\\hat q_n)\\bigr], \\\\
+\\hat q^{(2)} &= \\tfrac{3}{4} \\mathcal{E}(\\tfrac{\\Delta t}{2}) \\hat q_n
+  + \\tfrac{1}{4} \\mathcal{E}(-\\tfrac{\\Delta t}{2})\\bigl[\\hat q^{(1)} + \\Delta t \\widehat{\\boldsymbol{N}}(\\hat q^{(1)})\\bigr], \\\\
+\\hat q_{n+1} &= \\tfrac{1}{3} \\mathcal{E}(\\Delta t) \\hat q_n
+  + \\tfrac{2}{3} \\mathcal{E}(\\tfrac{\\Delta t}{2})\\bigl[\\hat q^{(2)} + \\Delta t \\widehat{\\boldsymbol{N}}(\\hat q^{(2)})\\bigr],
+\\end{aligned}
+```
+
+with abscissae ``c = (0, 1, \\tfrac{1}{2})``: the stages step forward to ``t_{n+1}``, back to the
+midpoint, forward again. The velocity and scalar are advanced in lockstep, each with its own
+diffusivity, and any post-step forcing is applied after the third stage.
+
+The cost is three nonlinear evaluations per step and two registers per field — the stage state and
+the right-hand-side register — the same count as `IFLowStorageRK3` (one pointwise pass fewer, since
+no accumulator is rotated).
+
+!!! note "The midpoint stage transports backward"
+    The ``\\mathcal{E}(-\\Delta t/2)`` factor is ``\\mathrm{e}^{+\\nu\\kappa^{2}\\Delta t/2}`` — a growing
+    exponential, exact but amplifying at large ``\\nu\\kappa^{2}\\Delta t`` before the convex
+    combination cancels it. Under an advective CFL step this exponent is small and the loss is
+    roundoff-level; a run driven with a hand-fixed ``\\Delta t \\gg`` the advective step would
+    amplify high-wavenumber roundoff instead. `IFLowStorageRK3`'s stages only ever transport
+    forward and carry no such term.
+"""
+struct IFSSPRK3 <: AbstractIntegrator end
+
+
+function step!(::IFSSPRK3, state::ResolvedFields, generator::ResolvedGenerator,
+               domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
+  û, φ̂ = state.velocity_spectral, state.scalar_spectral
+  T = real(eltype(field_data(û)))
+  dt_T = T(dt)
+  s = buffers.stage1                                    # the STAGE STATE q⁽¹⁾, then q⁽²⁾ — where
+  nl = buffers.nonlinear                                # IFLowStorageRK3 accumulates, this holds the
+  sb = buffers.scalar                                   # stage; û stays at t_n until the last line
+  has_scalar = φ̂ !== nothing
+
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
+
+  # ---- stage 1: N̂ at the deposited state; q⁽¹⁾ = E(Δt)(û + Δt N̂) ----
+  u = velocity_physical(cache)                     # the deposited observables, deposited by the
+  ω = vorticity_physical(cache)                    # previous iteration's closing deposit
+  take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
+  has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
+  velocity_rhs!(nl, generator, û, u, ω, domain)
+  if has_scalar
+    φ = scalar_physical(cache)
+    scalar_rhs!(sb.nonlinear, generator, û, φ̂, u, φ, domain; displaced_velocity_current = true)
+  end
+  ℰ_full = velocity_integrating_factor(generator, dt)
+  _exponential_update!(s, one(T), û, dt_T, nl, domain, ℰ_full)                    # q⁽¹⁾, û untouched
+  if has_scalar
+    ℰφ_full = scalar_integrating_factor(generator, dt)
+    _exponential_update!(sb.stage1, one(T), φ̂, dt_T, sb.nonlinear, domain, ℰφ_full)
+  end
+
+  # ---- stage 2: N̂ at q⁽¹⁾ (t_{n+1}); q⁽²⁾ = ¾ E(Δt/2) û + ¼ E(−Δt/2)(q⁽¹⁾ + Δt N̂) ----
+  u, ω = take_velocity!(cache), take_vorticity!(cache)
+  to_physical!(u, s, domain.velocity_plans, nl)          # nl is spent — the preserving scratch
+  vorticity_physical!(ω, s, domain, nl)
+  velocity_rhs!(nl, generator, s, u, ω, domain)
+  if has_scalar
+    φ = take_scalar!(cache)
+    to_physical!(φ, sb.stage1, domain.scalar_plans, sb.nonlinear)
+    scalar_rhs!(sb.nonlinear, generator, s, sb.stage1, u, φ, domain; displaced_velocity_current = true)
+  end
+  # The two terms carry DIFFERENT factors, so the combination cannot be one fused pass: transport
+  # the stage term back a half step in place, form the transported t_n term in the spent nl, add.
+  ℰ_back = velocity_integrating_factor(generator, -dt / 2)
+  ℰ_half = velocity_integrating_factor(generator, dt / 2)
+  _exponential_update!(s, one(T), s, dt_T, nl, domain, ℰ_back)                    # E(−Δt/2)(q⁽¹⁾+Δt N̂)
+  _exponential_update!(nl, T(3 // 4), û, zero(T), û, domain, ℰ_half)              # ¾ E(Δt/2) û
+  combine!(s, T(1 // 4), s, one(T), nl)                                           # q⁽²⁾
+  if has_scalar
+    ℰφ_back = scalar_integrating_factor(generator, -dt / 2)
+    ℰφ_half = scalar_integrating_factor(generator, dt / 2)
+    _exponential_update!(sb.stage1, one(T), sb.stage1, dt_T, sb.nonlinear, domain, ℰφ_back)
+    _exponential_update!(sb.nonlinear, T(3 // 4), φ̂, zero(T), φ̂, domain, ℰφ_half)
+    combine!(sb.stage1, T(1 // 4), sb.stage1, one(T), sb.nonlinear)
+  end
+
+  # ---- stage 3: N̂ at q⁽²⁾ (the midpoint); û ← ⅓ E(Δt) û + ⅔ E(Δt/2)(q⁽²⁾ + Δt N̂) ----
+  u, ω = take_velocity!(cache), take_vorticity!(cache)
+  to_physical!(u, s, domain.velocity_plans, nl)
+  vorticity_physical!(ω, s, domain, nl)
+  velocity_rhs!(nl, generator, s, u, ω, domain)
+  if has_scalar
+    φ = take_scalar!(cache)
+    to_physical!(φ, sb.stage1, domain.scalar_plans, sb.nonlinear)
+    scalar_rhs!(sb.nonlinear, generator, s, sb.stage1, u, φ, domain; displaced_velocity_current = true)
+  end
+  _exponential_update!(s, one(T), s, dt_T, nl, domain, ℰ_half)                    # E(Δt/2)(q⁽²⁾+Δt N̂)
+  _exponential_update!(û, T(1 // 3), û, zero(T), û, domain, ℰ_full)               # ⅓ E(Δt) û
+  combine!(û, one(T), û, T(2 // 3), s)
+  if has_scalar
+    ℰφ_full = scalar_integrating_factor(generator, dt)
+    ℰφ_half = scalar_integrating_factor(generator, dt / 2)
+    _exponential_update!(sb.stage1, one(T), sb.stage1, dt_T, sb.nonlinear, domain, ℰφ_half)
+    _exponential_update!(φ̂, T(1 // 3), φ̂, zero(T), φ̂, domain, ℰφ_full)
+    combine!(φ̂, one(T), φ̂, T(2 // 3), sb.stage1)
+  end
+
+  finalize!(generator, state, domain)             # post-step forcing projections (e.g. VarianceRescaling)
+  # Same rationale as IFLowStorageRK3 (decision 61): the stage tendencies are projected, the state's
+  # own roundoff divergence is not, and it compounds — one in-place pass pins it every step.
+  helmholtz_projection!(û, û, domain.multipliers)
+  advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
+  return state
+end
+
+
 # Per-scheme scratch — each scheme allocates exactly its working set; there is no `::AbstractIntegrator`
 # fallback, so a scheme with no method here is a hard error (never a silent over-allocation).
 # IFLowStorageRK3 uses stage1 + nonlinear; IFHeun uses stage1 + stage2 + velocity_predictor_spectral; each
 # leaves the other scheme's registers `nothing`.
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
+  new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
+)
+ScalarBuffers(::IFSSPRK3, domain::FixedDomain) = ScalarBuffers(
   new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
 )
 ScalarBuffers(::IFHeun, domain::FixedDomain) = ScalarBuffers(
@@ -484,6 +621,14 @@ allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) =
   nothing,                                                # velocity_predictor_spectral (IFHeun only)
   new_vector_field_spectral(domain),                                # nonlinear
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
+)
+
+allocate_buffers(::IFSSPRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
+  new_vector_field_spectral(domain),                                # stage1 — the stage state q⁽¹⁾/q⁽²⁾
+  nothing,                                                # stage2 (IFHeun only)
+  nothing,                                                # velocity_predictor_spectral (IFHeun only)
+  new_vector_field_spectral(domain),                                # nonlinear
+  scalar ? ScalarBuffers(IFSSPRK3(), domain) : nothing,
 )
 
 allocate_buffers(::IFHeun, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
@@ -654,6 +799,10 @@ function recommended_cfl end
 # scheme, so the scheme states it or the run refuses to guess.
 _base_cfl(::IFHeun) = 0.25
 _base_cfl(::IFLowStorageRK3) = 0.5
+# Same 0.5 as IFLowStorageRK3, and not by coincidence: every three-stage third-order explicit RK has
+# the SAME stability function R(z) = 1 + z + z²/2 + z³/6, so the imaginary-axis limit √3 is shared
+# and the advective ceiling with it.
+_base_cfl(::IFSSPRK3) = 0.5
 
 # Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
 # (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).
