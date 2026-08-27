@@ -1,0 +1,15 @@
+# check-docs — instrument manifest
+#
+# One line per file: name, the date git last changed it, and its purpose.
+# Regenerate with `python3 .claude/commands/manifest.py` and commit the result.
+# Format agreed with the PF session 2026-08-27 so either package can diff toolboxes
+# in a single read.
+
+FILE                         CHANGED      PURPOSE
+abutting_spans.py            2026-08-17   —
+argcov.jl                    2026-08-19   Argument coverage: every positional and keyword parameter in a docstring SIGNATURE must be
+doi_crosscheck.py            2026-08-24   check-docs backstop: every citation link in a src docstring matches ARCHITECTURE §References.
+dupref.jl                    2026-08-19   Same @ref target linked more than once inside one docstring — CLAUDE.md caps a target at its
+lanes.js                     2026-08-17   /check-docs review lanes — the judgment half of the battery, fanned out per surface plus the two
+signature_fidelity.jl        2026-08-24   Signature fidelity — the ADVERTISED signature versus the DEFINED one (attack round C4/C8,
+xlink.jl                     2026-08-17   —

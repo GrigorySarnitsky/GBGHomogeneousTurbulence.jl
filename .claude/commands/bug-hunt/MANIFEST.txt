@@ -1,0 +1,14 @@
+# bug-hunt — instrument manifest
+#
+# One line per file: name, the date git last changed it, and its purpose.
+# Regenerate with `python3 .claude/commands/manifest.py` and commit the result.
+# Format agreed with the PF session 2026-08-27 so either package can diff toolboxes
+# in a single read.
+
+FILE                         CHANGED      PURPOSE
+closure.py                   2026-08-20   The /bug-hunt CLOSURE GATE — mechanical, mandatory, and it refuses to be optimistic.
+dismissals.js                2026-08-27   THE DISMISSAL AUDIT — the half of the verifier the witness gate cannot cover.
+finished.py                  2026-08-21   IS THIS WORK FINISHED? — answered by an exit code, never by my assessment of it.
+hunt.js                      2026-08-27   /bug-hunt — the CODE instrument, as against /check-docs and /check-consistency which audit prose
+verify-fixes.js              2026-08-20   The ARCHITECTURE-class fix verifier. The runtime and api-semantics classes need no agent at all 
+witnesses.jl                 2026-08-20   The witness runner — the mechanical half of /bug-hunt, and the reason the instrument can verify 

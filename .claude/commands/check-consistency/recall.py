@@ -18,11 +18,20 @@
 #   B  one hat quoting exactly ONE mutation -> that seed DETECTED and attributed to that
 #      hat, the other two still MISSED.                                                    PASS
 #   C  one hat quoting the ORIGINAL text at all three sites -> 0/3.                        PASS
-# Arm C is the one that matters and is not in PF's pair: it is the FALSE-POSITIVE direction, where
-# the instrument would credit the panel for "finding" a defect that was never planted and inflate
-# recall — the failure that flatters. It passes because `fragments()` keeps only tokens present in
-# the mutated context and ABSENT from the original, so quoting the unmutated sentence matches
-# nothing. Re-run all three arms after any change to `fragments()`.
+#   D  a seed whose ORIGINAL contains a hyphenated token, hat quotes the original -> 0/1.  PASS
+#
+# Arms A and B check that recall is not falsely LOW. Arms C and D check that it is not falsely
+# HIGH — the direction that flatters, so the one nobody reading the number questions.
+#
+# ARM D EXISTS BECAUSE IT FAILED. PF ran arm C against ITS catalog, hit a false positive, traced it
+# to `fragments()`, and warned IT to check. IT's arm C passed — but only because no IT mutation
+# happened to produce a word inside a hyphenated original. Arm D constructs that case directly and
+# IT scored 1/1 recall on a defect nobody found. A passing test over a catalog is not a property of
+# the code; it is a property of the catalog. Both fixes are PF's: substring containment against the
+# original TEXT rather than membership in its token SET, and no `frags or [mut[:40]]` fallback,
+# since a slice of mostly-shared context is how a false positive gets in.
+#
+# All four arms test `fragments()` and nothing else. Re-run them after any change to it.
 import json, glob, os, re, sys
 
 TRUTH, PILE = sys.argv[1], sys.argv[2]
@@ -37,13 +46,27 @@ skipped = _gt.get("skipped", [])
 
 
 def fragments(seed):
-    mut = seed["mutated_context"]
-    # Distinctive pieces of the mutation itself (not the shared context): the tokens present in
-    # mutated_context and absent from original_context.
-    orig_tokens = set(re.findall(r"\S+", seed["original_context"]))
-    frags = [t for t in re.findall(r"\S+", mut) if t not in orig_tokens and len(t) >= 4]
-    return frags or [mut[:40]]
+    """Distinctive pieces of the MUTATION — tokens that do not occur in the original AT ALL.
 
+    Containment is a SUBSTRING test against the original text, not membership in its token set.
+    The difference is the whole correctness of this function, and it was found by PF running arm C
+    on its own catalog (2026-08-27): with whitespace tokenising, `bitwise-identical` is ONE token,
+    so a mutation's standalone `identical` is absent from the original's token SET while being
+    plainly present in the original's TEXT. A hat quoting the unmutated sentence then scored a
+    detection. IT had the identical bug and passed arm C only because no IT mutation happened to
+    produce a word inside a hyphenated original — a property of the catalog, not of the code.
+    Reproduced in IT as arm D before this fix: 1/1 recall for a defect nobody found.
+    """
+    mut, orig = seed["mutated_context"], seed["original_context"]
+    frags = [t for t in re.findall(r"\S+", mut) if len(t) >= 4 and t not in orig]
+    # No fallback. A slice of mostly-shared context is exactly how a false positive gets in, so a
+    # seed with no distinctive fragment is UNVERIFIABLE and is excluded from the denominator rather
+    # than measured against a fragment that cannot discriminate.
+    return frags
+
+
+unverifiable = [s for s in truth if not fragments(s)]
+truth = [s for s in truth if fragments(s)]
 
 hits = {s["id"]: [] for s in truth}
 for path in sorted(glob.glob(os.path.join(PILE, "[0-9][0-9]-*.md"))):
@@ -56,6 +79,12 @@ for path in sorted(glob.glob(os.path.join(PILE, "[0-9][0-9]-*.md"))):
 measured_classes = sorted({s["class"] for s in truth})
 print(f"seeded: {len(truth)}   detected: {sum(1 for v in hits.values() if v)}")
 print(f"classes MEASURED: {len(measured_classes)}   classes SKIPPED (recall UNDEFINED): {len(skipped)}")
+if unverifiable:
+    print(f"UNVERIFIABLE seeds (no fragment distinguishes the mutation from the original): "
+          f"{len(unverifiable)} — excluded from every number below")
+    for s in unverifiable:
+        print(f"  {s['id']} [{s['class']}] on '{s['page']}' — re-word the mutation so it introduces "
+              f"text absent from the original")
 if skipped:
     print("  the panel was NOT tested on: " + ", ".join(sorted(skipped)))
     print("  re-anchor these in the catalog before reading any coverage claim off this run")

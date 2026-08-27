@@ -1,0 +1,11 @@
+# audit-changes — instrument manifest
+#
+# One line per file: name, the date git last changed it, and its purpose.
+# Regenerate with `python3 .claude/commands/manifest.py` and commit the result.
+# Format agreed with the PF session 2026-08-27 so either package can diff toolboxes
+# in a single read.
+
+FILE                         CHANGED      PURPOSE
+attack-design.js             2026-08-22   ADVERSARIAL ATTACK ON AN INSTRUMENT'S LENS DESIGN. Generalized 2026-08-22 over the `subject` arg
+audit.js                     2026-08-21   /audit-changes — WERE THESE EDITS JUSTIFIED, AND DID THEY SILENTLY CHANGE BEHAVIOUR?
+gate.py                      2026-08-21   THE DISPOSITION GATE — has this audit been answered, and does it still describe the tree?
