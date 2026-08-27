@@ -250,12 +250,26 @@ julia --project -e 'using GBGIsotropicTurbulence;
   `julia --project=docs docs/make.jl > /tmp/build.log 2>&1; echo $?` and require `0`. Then revert the
   transient dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list
   `docs/Manifest.toml`.
-- **Re-run the lanes after the fix pass — this phase is not optional.** The deterministic scans are
-  self-verifying (re-run the scan that found it and read the count), but the JUDGMENT findings are
-  not: applying a fix by hand and asserting it is exactly the accounting failure `/check-consistency`
-  gained `verify.js` to prevent, and this battery had the same hole. Re-run
-  `.claude/commands/check-docs/lanes.js` and close each finding **by number**, as *fixed* or
-  *dismissed with its reason*.
+- **Close the banked findings, and do not confuse that with searching again — this phase is not
+  optional.** The deterministic scans are self-verifying (re-run the scan that found it and read the
+  count), but the JUDGMENT findings are not: applying a fix by hand and asserting it is exactly the
+  accounting failure `/check-consistency` gained `verify.js` to prevent, and this battery had the
+  same hole.
+
+  These are TWO ACTIVITIES and only one of them converges (raised by the PF session, 2026-08-27):
+
+  1. **Closure — the loop.** Bank the lane findings once, then fix → verify → fix over *that fixed
+     set*, closing each finding **by number** as *fixed* or *dismissed with its reason*, until every
+     one is honored or adjudicated. The denominator does not move, so this terminates. Stop on a
+     PLATEAU rather than on a good round — `/check-consistency`'s measured rates ran
+     43 → 69 → 76 → 95 → 93 → 90%, and round 2 looked like progress while concealing eleven
+     `LINE-ONLY`s.
+  2. **Searching again — not a loop.** Re-running `lanes.js` over a just-edited corpus is a NEW
+     SEARCH: fresh eyes on changed prose return fresh findings, so "re-run until it comes back
+     empty" has no fixed point and no termination condition. It is worth doing, and it is a separate
+     decision with a separate cost — after closure, not as the way to reach it.
+
+  The measurement below is why both matter, and it is a measurement of (2), not of (1).
 
   Measured on the first run of this rule (2026-08-17): 18 findings, 17 applied and **one silently
   skipped** — and the re-run then surfaced eight more, of which two were the fix pass's own damage.
