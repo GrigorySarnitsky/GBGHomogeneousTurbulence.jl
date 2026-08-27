@@ -77,9 +77,10 @@ sampled field — at the tracer positions.
 choice and [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)'s default; it is a ready-made value rather than a type, so it is passed
 bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
 and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
-offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
-readouts such as acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and
-smoothness parameters.
+offer higher order at a wider stencil, useful for derivative-sensitive readouts such as acceleration
+statistics. `n` sets the stencil to ``(2n+2)^3`` nodes, but only `LagrangeSpline` gains order from
+it (degree ``2n+1``); `LalescuSpline` reproduces to ``\\min(2m+1, 2n)``, so `m` caps the degree and a
+wider `n` buys traffic alone — ``(2,2)`` reaches degree 4 in 216 nodes, ``(3,1)`` degree 3 in 512.
 
 # Arguments
 
@@ -226,7 +227,8 @@ It needs one set of predicted positions and the velocity interpolated there
     ``6\\times10^{-5}`` — setup-specific numbers; only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is not what limits a Heun
     trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
     below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
-    more than an order of magnitude. What governs this in a run is how well the grid resolves the
+    more than an order of magnitude. (`LalescuSpline(2, 1)` is the better buy: same degree 3 in 216
+    stencil nodes against 512. The figure is quoted for the width actually run.) What governs this in a run is how well the grid resolves the
     dissipation scale, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``.
 """
 struct Heun <: AbstractParticleIntegrator end
