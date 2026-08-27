@@ -1,0 +1,13 @@
+# commands (instrument definitions) — instrument manifest
+#
+# One line per file: name, the date git last changed it, and its purpose.
+# Regenerate with `python3 .claude/commands/manifest.py` and commit the result.
+# Format agreed with the PF session 2026-08-27 so either package can diff toolboxes
+# in a single read.
+
+FILE                         CHANGED      PURPOSE
+audit-changes.md             2026-08-21   /audit-changes — were these edits justified, and did they silently change behaviour?
+bug-hunt.md                  2026-08-27   /bug-hunt — the CODE instrument
+check-consistency.md         2026-08-23   /check-consistency — the fresh-eyed multi-hat RENDERED-docs panel
+check-docs.md                2026-08-24   Run the COMPLETE documentation-quality battery — every check across every doc surface, fix all f
+manifest.py                  2026-08-27   Regenerate MANIFEST.txt for every instrument directory under .claude/commands/.

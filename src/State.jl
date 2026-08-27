@@ -65,7 +65,7 @@ of it — since the state holds no derived copies, nothing in it can fall out of
 physical representations at its end into the
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
 
-Build it on a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
+Build it on `domain`, a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
 
 # Fields
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.

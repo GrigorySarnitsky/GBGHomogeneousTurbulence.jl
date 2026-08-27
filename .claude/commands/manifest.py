@@ -19,19 +19,40 @@ HEADER_RE = re.compile(r"^\s*(?:#!.*|#|//|\"\"\"|'''|--)\s*(.*\S)\s*$")
 
 
 def purpose(path):
-    """First substantive comment line, trimmed. Falls back to a dash rather than guessing."""
+    """The file's own statement of what it is. Never a guess: a dash where none is found.
+
+    Markdown is read differently from code, and the difference is not cosmetic. A `#` opens a
+    COMMENT in a script and a HEADING in markdown, so the code path would happily return whatever
+    section heading it met first — `check-docs.md` reported "Cost modes — cheap lanes by default",
+    a real line from the middle of the file and a false description of it. A confidently wrong
+    purpose is worse than a dash, because a dash prompts someone to look and a wrong line does not.
+    So markdown is read from its front-matter `description:` (which slash commands carry) or its
+    first `# ` title, and nothing else.
+    """
+    md = path.endswith(".md")
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
-            for i, line in enumerate(fh):
-                if i > 12:
-                    break
-                if line.startswith("#!"):
-                    continue
-                m = HEADER_RE.match(line)
-                if m and len(m.group(1)) > 12:
-                    return m.group(1)[:96]
+            lines = [next(fh, "") for _ in range(30)]
     except OSError:
-        pass
+        return "—"
+
+    if md:
+        for line in lines:
+            m = re.match(r"^description:\s*(.*\S)", line)
+            if m:
+                return m.group(1)[:96]
+        for line in lines:
+            m = re.match(r"^#\s+(.*\S)", line)
+            if m:
+                return m.group(1)[:96]
+        return "—"
+
+    for i, line in enumerate(lines):
+        if line.startswith("#!"):
+            continue
+        m = HEADER_RE.match(line)
+        if m and len(m.group(1)) > 12:
+            return m.group(1)[:96]
     return "—"
 
 
@@ -44,15 +65,9 @@ def changed(rel):
         return "?"
 
 
-def main():
-    dirs = sorted(d for d in os.listdir(HERE)
-                  if os.path.isdir(os.path.join(HERE, d)))
-    for d in dirs:
-        full = os.path.join(HERE, d)
-        files = sorted(f for f in os.listdir(full)
-                       if os.path.isfile(os.path.join(full, f)) and f != "MANIFEST.txt")
-        lines = [
-            f"# {d} — instrument manifest",
+def write_manifest(full, title, files):
+    lines = [
+            f"# {title} — instrument manifest",
             "#",
             "# One line per file: name, the date git last changed it, and its purpose.",
             "# Regenerate with `python3 .claude/commands/manifest.py` and commit the result.",
@@ -61,12 +76,33 @@ def main():
             "",
             f"{'FILE':<28} {'CHANGED':<12} PURPOSE",
         ]
-        for f in files:
-            rel = os.path.relpath(os.path.join(full, f), REPO)
-            lines.append(f"{f:<28} {changed(rel):<12} {purpose(os.path.join(full, f))}")
-        with open(os.path.join(full, "MANIFEST.txt"), "w", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
-        print(f"{d}: {len(files)} files")
+    for f in files:
+        rel = os.path.relpath(os.path.join(full, f), REPO)
+        lines.append(f"{f:<28} {changed(rel):<12} {purpose(os.path.join(full, f))}")
+    with open(os.path.join(full, "MANIFEST.txt"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    print(f"{title}: {len(files)} files")
+
+
+def main():
+    # The ROOT manifest, over the command-level files themselves (PF's addition, 2026-08-27).
+    # Walking only directories omitted the four `*.md` INSTRUMENT DEFINITIONS — the files a person
+    # reads to learn what each instrument does, and the ones most needing visibility. PF hit the
+    # same gap: its /check-docs has no directory at all, so a per-directory manifest would have
+    # omitted the very instrument it most needed to surface. No extension filter anywhere here, for
+    # the reason PF found the hard way — an extension table is a list of the file types you thought
+    # of, and PF's omitted `.sh`, making guards.sh invisible to its own manifest.
+    root_files = sorted(f for f in os.listdir(HERE)
+                        if os.path.isfile(os.path.join(HERE, f)) and f != "MANIFEST.txt")
+    write_manifest(HERE, "commands (instrument definitions)", root_files)
+
+    dirs = sorted(d for d in os.listdir(HERE)
+                  if os.path.isdir(os.path.join(HERE, d)))
+    for d in dirs:
+        full = os.path.join(HERE, d)
+        files = sorted(f for f in os.listdir(full)
+                       if os.path.isfile(os.path.join(full, f)) and f != "MANIFEST.txt")
+        write_manifest(full, d, files)
     return 0
 
 
