@@ -344,7 +344,18 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
    (Raised by the PF session 2026-08-27, whose owner caught the same sentence reading as "re-run the
    battery until it comes back clean".)
    Measured over ten runs (2026-08-17, six of `verify-fixes.js` and four of `verify.js`), the honored
-   fraction went 43 → 69 → 76 → 95 → 93 → 90 %. **Converged means three rounds flat within noise,
+   fraction went 43 → 69 → 76 → 95 → 93 → 90 %.
+
+   **A rate sequence only means anything at a FIXED instrument** (PF, 2026-08-27, reporting its own
+   16.1 → 38.7 → 54.8 → 96.8 % with the caveat that ten of round 3's demotions were a grader misfire
+   fixed in the same interval as three real gaps — so that jump mixes a fix effect with a measurement
+   change, and is not a plateau claim). For the sequence above: `git log` shows both verifiers created
+   on 2026-08-17 and not touched again until the hardening of 2026-08-18, so the ten runs sit inside
+   a stable window and the numbers are comparable. That is *consistent with* a fixed instrument
+   rather than proof of one — the runs record no script version, so nothing pins a given rate to a
+   given verifier. If a future sequence spans an instrument change, say so beside the numbers or do
+   not quote them as a trend: a rate improved by loosening one's own grader is the exact failure this
+   whole phase exists to catch. **Converged means three rounds flat within noise,
    each surfacing *different* marginal items** — at that point the residue is the auditor's own
    resolution, and further rounds buy variance rather than information. Stopping at the first
    plateau is wrong: round 2 looked like progress and hid eleven `LINE-ONLY`s.
