@@ -88,7 +88,7 @@ using Test
     function nlt(domain, ûf, phaseshift::Bool)
       u = SD.new_vector_field_physical(domain); ω = SD.new_vector_field_physical(domain)
       tmp = SD.new_vector_field_spectral(domain)
-      to_physical!(u, ûf, domain.velocity_plans, tmp)
+      to_physical!(u, ûf, domain.transform_plans, tmp)
       vorticity_physical!(ω, ûf, domain, tmp)
       out = SD.new_vector_field_spectral(domain)
       if phaseshift

@@ -195,11 +195,11 @@ The machinery types below are [`GBGPeriodicFields`](https://grigorysarnitsky.git
 objects, each linked to its own documentation.
 - `grid`, `layout` — the [`Grid3D`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.Grid3D) and its
   [`RealFourierLayout`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.RealFourierLayout) memory layout.
-- `velocity_plans`, `scalar_plans` — the real-to-complex
-  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans) for the
-  velocity and the scalar, built with the domain because the time loop transforms both every step.
-- `tensor_plans_memo` — where the rank-2 plans go once `tensor_plans` builds them, which it does on
-  the first rank-2 transform rather than here. Read them through that function, never this field.
+- `transform_plans` — the real-to-complex
+  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans),
+  one pair for every field whatever its tensor order: the plans transform one component and are
+  applied per component, so the velocity, the scalar, and the rank-2 strain tensor all go through
+  this one object.
 - `multipliers` — the
   [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers),
   the spectral first-derivative operators.
@@ -219,12 +219,10 @@ objects, each linked to its own documentation.
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
   mode) and the [`DealiasingStrategy`](@ref) that built it.
 """
-struct FixedDomain{G, L, VP, SP, TP, M, SK, UK, D, DS, SF}
+struct FixedDomain{G, L, TP, M, SK, UK, D, DS, SF}
   grid::G
   layout::L
-  velocity_plans::VP
-  scalar_plans::SP
-  tensor_plans_memo::TP            # rank-2 transform plans, BUILT ON FIRST USE — read via `tensor_plans`
+  transform_plans::TP              # ONE rank-blind plan pair (PF decision 76) — every field, every rank
   multipliers::M
   squared_wavenumber_kernel::SK    # |k|² as a lazy RadialKernel — the Dirichlet-energy weight for `weighted_inner`
   unit_kernel::UK                  # the constant-1 weight, same lazy form — lets a variance join a fused multi-weight reduction
@@ -255,13 +253,13 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   scalar_physical_template = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
   scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(0))), grid)
 
-  velocity_plans = FieldTransformPlans(velocity_physical, velocity_spectral)
-  scalar_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage)
-  # The rank-2 plans are NOT built here — see `tensor_plans`. They are nine-component, serve one
-  # occasional diagnostic, and on a GPU backend a plan is not free: each one holds a spectral-sized
-  # device buffer per direction, so building them eagerly costs 9/13 of the run's whole plan
-  # residency (3.81 GiB at 384³ / Float32) whether or not the diagnostic is ever called.
-  tensor_plans_memo = Base.RefValue{Any}(nothing)
+  # ONE plan pair serves every field since PF's decision 76 made the plans rank-blind: they
+  # transform a single component and are applied per component, so the velocity (3), the scalar (1)
+  # and the strain tensor (9) share this object. Built from the scalar pair — any matching pair
+  # would do, and the scalar templates are already in hand. This retired IT decision 78's lazy
+  # rank-2 memo: laziness solved the per-rank buffer multiplication, and upstream deleted the
+  # multiplication itself (decision 81).
+  transform_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage)
   multipliers = FieldSpectralMultipliers(velocity_spectral)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
@@ -273,7 +271,7 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   unit_kernel = radial_kernel(_unit_symbol, multipliers)
   dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, N, L, T)
 
-  return FixedDomain(grid, layout, velocity_plans, scalar_plans, tensor_plans_memo, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
+  return FixedDomain(grid, layout, transform_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
 end
 
 
@@ -323,42 +321,6 @@ end
 # `_reference`/`_blank` composition this replaces read a multipliers axis vector off-label; PF
 # decision 74 closed it at the source).
 _real_type(domain::FixedDomain) = eltype(domain.grid.domain_size)
-
-
-"""
-    tensor_plans(domain) -> FieldTransformPlans
-
-The rank-2 transform plans of `domain` (a [`FixedDomain`](@ref)), built on first use and kept
-thereafter.
-
-Use it wherever a rank-2 field is transformed; it is the only supported way to reach these plans,
-because the domain does not hold them until someone asks. The velocity and scalar plans are ordinary
-fields and need no accessor: the time loop transforms those every step, so there is nothing to defer.
-
-A transform plan is not free on a GPU backend — each one holds a device buffer the size of the
-spectral field it transforms, per direction — and the rank-2 plans are nine-component, where the
-velocity is three and the scalar one. Building them with the domain therefore spends the larger part
-of a run's plan residency on the single occasional diagnostic that uses them
-([`derivative_skewness`](@ref GBGIsotropicTurbulence.Observables.derivative_skewness)), for the whole
-life of the run, whether or not it is ever called. Deferring the build to the first call spends it
-only when it is wanted, and the deferral is invisible to a caller.
-
-!!! note "The first call pays for the build"
-    Creating the plans allocates their buffers, so the first rank-2 transform of a run carries a
-    one-time cost that later ones do not — a field-scale device allocation, not merely planner time.
-    A run that measures the skewness on a schedule pays it at the first sample and never again.
-"""
-function tensor_plans(domain::FixedDomain)
-  memoized = domain.tensor_plans_memo[]
-  memoized === nothing || return memoized
-  T = _real_type(domain)
-  grid, layout, array_type = domain.grid, domain.layout, domain.storage_family
-  physical_template = TensorFieldPhysical(_zeros(array_type, T, physical_field_shape(grid, Val(2))), grid)
-  spectral_template = TensorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(2))), grid)
-  built = FieldTransformPlans(physical_template, spectral_template)
-  domain.tensor_plans_memo[] = built
-  return built
-end
 
 
 

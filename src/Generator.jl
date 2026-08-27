@@ -573,7 +573,7 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω_cons
   T = real(eltype(field_data(nonlinear)))
   _velocity_lamb!(nonlinear, u, ω_consumed, domain, product_spectral, domain.dealias)   # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
-  to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
+  to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.transform_plans, product_spectral)
   vorticity_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
   # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
   # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
@@ -594,7 +594,7 @@ end
 # image carries the term from here).
 function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_spectral, kernel = nothing)
   cross!(ω, u, ω)
-  to_spectral!(product_spectral, ω, domain.velocity_plans)
+  to_spectral!(product_spectral, ω, domain.transform_plans)
   kernel === nothing ? helmholtz_projection!(out, product_spectral, domain.multipliers) :
                        helmholtz_projection!(out, product_spectral, domain.multipliers, kernel)
   return out
@@ -759,11 +759,11 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_cons
   # rebuild makes a hand-run pairing correct rather than quietly wrong.
   if !(displaced_velocity_current && generator.displaced_velocity_source === û)
     convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
-    to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.velocity_plans, product_spectral)
+    to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.transform_plans, product_spectral)
   end
   generator.displaced_velocity_source = nothing     # the flux below consumes u_shifted
   convolve!(phase_shift.scalar_shifted, φ̂, phase_shift.to_shifted)                                       # φ̂ on the displaced grid
-  to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain.scalar_plans, phase_shift.scalar_copy)
+  to_physical!(phase_shift.phi_shifted, phase_shift.scalar_shifted, domain.transform_plans, phase_shift.scalar_copy)
   _scalar_flux!(product_spectral, phase_shift.u_shifted, phase_shift.phi_shifted, domain)                # (u_s φ_s)^, formed over u_s
   divergence!(phase_shift.scalar_shifted, product_spectral, domain.multipliers)                          # displaced ∇·, still on the displaced grid
   # The shift-back symbol commutes through the iκ· contraction (iκ·(ĝ v̂) = ĝ (iκ·v̂)), so it rides
@@ -795,7 +795,7 @@ end
 # physical register of its own.
 function _scalar_flux!(flux_spectral, u, φ, domain::FixedDomain)
   multiply!(u, φ, u)
-  to_spectral!(flux_spectral, u, domain.velocity_plans)
+  to_spectral!(flux_spectral, u, domain.transform_plans)
   return flux_spectral
 end
 

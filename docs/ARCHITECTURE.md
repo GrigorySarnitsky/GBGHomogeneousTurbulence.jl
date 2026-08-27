@@ -2420,6 +2420,21 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     scheme-specific caveat is stage 2's backward transport ``\mathcal{E}(-\Delta t/2)`` — a growing
     exponential, exact but amplifying high-``\kappa`` roundoff when ``\nu\kappa^{2}\Delta t`` is
     large; under an advective CFL step the exponent is small, and the docstring says so.
+
+81. **(2026-08, user-directed) One rank-blind plan pair; decision 78's memo retired.** PF's decision
+    76 — prompted by this package's residency measurement — removed the tensor order from
+    `FieldTransformPlans`: the plans transform one component and are applied per component, so a
+    plan pair is a property of the *box*, not of a field's rank. `FixedDomain` accordingly holds a
+    single `transform_plans` where it held `velocity_plans`, `scalar_plans` and a lazily-built
+    rank-2 memo — three copies of what is now the same object. Decision 78's laziness is retired
+    outright: it existed to avoid multiplying per-plan GPU buffers by the rank, and upstream deleted
+    the multiplication itself (its skewness-gate default, the other half of 78, stands — that cost
+    is transforms and a per-call episode, not plan residency). The GPU frame cell fell from 8
+    spectral-scalar equivalents to 2 (`DEVICE_FRAME` re-frozen in the same commit), and the first
+    pull of 76 was refused before being taken: it broke the invariant-4 witness at 896 B/step
+    (upstream `reshape` wrappers, constant in rank and grid), was reported, fixed by PF the same
+    day, and the bump landed only when the witness read zero.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,

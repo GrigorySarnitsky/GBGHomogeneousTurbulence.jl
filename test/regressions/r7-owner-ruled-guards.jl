@@ -28,8 +28,8 @@ using GBGPeriodicFields: field_data, convolve!, to_physical, to_spectral
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(5))
   convolve!(û, û, forcing.band, -1.0, 1.0)
-  field_data(û) .= field_data(to_spectral(to_physical(û, domain.velocity_plans),
-                                          domain.velocity_plans))
+  field_data(û) .= field_data(to_spectral(to_physical(û, domain.transform_plans),
+                                          domain.transform_plans))
   N̂ = new_vector_field_spectral(domain); fill!(field_data(N̂), 0)
   @test_logs (:warn, r"band is empty") match_mode=:any add_forcing_source!(
       forcing, N̂, û, domain, 0.05)

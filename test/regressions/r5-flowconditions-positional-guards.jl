@@ -22,7 +22,7 @@
 # The hazard the guard exists for is real and reachable. `StochasticOU` allocates its per-field state
 # lazily on first `prepare_forcing!` (`Forcing.jl:534–536`), keyed on the field it is first handed:
 # driving the velocity allocates a VECTOR `noise_physical`, and the scalar leg then reaches
-# `to_spectral!(noise_spectral, noise_physical, domain.scalar_plans)` with the vector scratch still in
+# `to_spectral!(noise_spectral, noise_physical, domain.transform_plans)` with the vector scratch still in
 # place. The misconfiguration therefore surfaces as a `MethodError` raised inside GBGPeriodicFields,
 # naming neither `FlowConditions` nor the shared forcing.
 #

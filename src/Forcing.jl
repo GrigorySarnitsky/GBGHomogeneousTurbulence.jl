@@ -884,8 +884,8 @@ _ou_state(::VectorFieldSpectral, domain) = new_vector_field_spectral(domain)
 _ou_state(::ScalarFieldSpectral, domain) = new_scalar_field_spectral(domain)
 _ou_noise(::VectorFieldSpectral, domain) = (new_vector_field_physical(domain), new_vector_field_spectral(domain))
 _ou_noise(::ScalarFieldSpectral, domain) = (new_scalar_field_physical(domain), new_scalar_field_spectral(domain))
-_ou_plans(::VectorFieldSpectral, domain) = domain.velocity_plans
-_ou_plans(::ScalarFieldSpectral, domain) = domain.scalar_plans
+_ou_plans(::VectorFieldSpectral, domain) = domain.transform_plans
+_ou_plans(::ScalarFieldSpectral, domain) = domain.transform_plans
 
 
 function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real)

@@ -291,14 +291,17 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 # bidirectional like every other in this file: when the backend stops allocating eagerly (the
 # upstream request), this table must fall to `FRAME` in the same commit that closes it.
 #
-#   velocity plans: forward + inverse, one spectral VECTOR buffer each   → spectral_vector = 2
-#   scalar plans:   forward + inverse, one spectral SCALAR buffer each   → spectral_scalar = 2
+# RE-FROZEN 2026-08-28 (decision 81, on PF's decision 76): the plans are rank-blind and the domain
+# holds ONE pair, so the per-plan buffers are two COMPONENT-sized spectral arrays, forward and
+# inverse, however many field types the run transforms:
 #
-# The forward buffers of both pairs are DEAD WEIGHT and measured so: the backend allocates them
-# for an `ldiv!` route this package never takes (it builds a separate inverse plan instead), and a
-# sentinel written into them survives complete forward and inverse transforms untouched. Half of
-# this cell is therefore recoverable with no change to what the package computes.
-const DEVICE_FRAME = (spectral_vector = 2, physical_vector = 0, spectral_scalar = 2,
+#   transform_plans: forward + inverse, one spectral SCALAR buffer each  → spectral_scalar = 2
+#
+# Down from (spectral_vector = 2, spectral_scalar = 2) = 8 scalar-equivalents to 2. The superseded
+# cell is kept in the note below as the record of what was measured. The forward buffer is STILL
+# dead weight (allocated for an `ldiv!` route this package never takes — open item G4-A, upstream),
+# but the stake fell from 4 scalar-equivalents to 1.
+const DEVICE_FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2,
                       physical_scalar = 0, real_spectral_scalar = 0)
 
 # A GPU is hardware, so this leg cannot be a plain `@test`. It must not be a SILENT skip either:

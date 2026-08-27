@@ -42,7 +42,7 @@ mean_mode_of(sim) = mean_mode(sim.state.velocity_spectral)
     # With and without an imposed uniform sweep: the conservation law holds for either.
     for U in (0.0, 1.0)
       field_data(û)[1, 1, 1, 1] = U * N^3          # a uniform mean flow U in x
-      to_physical!(u, û, domain.velocity_plans, scratch)
+      to_physical!(u, û, domain.transform_plans, scratch)
       vorticity_physical!(ω, û, domain, scratch)
       prepare!(generator, ResolvedFields(û, nothing), domain, 0.005)
       velocity_rhs!(N̂, generator, û, u, ω, domain)

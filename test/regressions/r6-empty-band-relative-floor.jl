@@ -24,8 +24,8 @@ using Random
   # exact (x − x = 0), but the transform pair repopulates the emptied shells at roundoff, and
   # roundoff is POSITIVE — precisely the content the bare positivity guard mistook for a band.
   convolve!(û, û, forcing.band, -1.0, 1.0)
-  u = to_physical(û, domain.velocity_plans)
-  field_data(û) .= field_data(to_spectral(u, domain.velocity_plans))
+  u = to_physical(û, domain.transform_plans)
+  field_data(û) .= field_data(to_spectral(u, domain.transform_plans))
   band_left = weighted_inner(û, forcing.band)
   @test 0 < band_left < 1e-25                        # roundoff, and positive: the old guard's hole
 

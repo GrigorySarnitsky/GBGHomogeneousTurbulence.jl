@@ -17,12 +17,12 @@ using GBGIsotropicTurbulence.Observables: vorticity_physical!
   u2, w2 = new_vector_field_physical(domain), new_vector_field_physical(domain)
 
   # order A — the order every call site uses
-  to_physical!(u1, û, domain.velocity_plans, scratch)
+  to_physical!(u1, û, domain.transform_plans, scratch)
   vorticity_physical!(w1, û, domain, scratch)
 
   # order B — swapped
   vorticity_physical!(w2, û, domain, scratch)
-  to_physical!(u2, û, domain.velocity_plans, scratch)
+  to_physical!(u2, û, domain.transform_plans, scratch)
 
   @test field_data(u1) == field_data(u2)
   @test field_data(w1) == field_data(w2)

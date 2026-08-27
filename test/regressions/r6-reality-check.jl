@@ -24,7 +24,7 @@ using Random
 
   # The documented repair: the physical round trip projects onto the nearest real field's spectrum.
   û = sim.state.velocity_spectral
-  field_data(û) .= field_data(to_spectral(to_physical(û, sim.domain.velocity_plans),
-                                          sim.domain.velocity_plans))
+  field_data(û) .= field_data(to_spectral(to_physical(û, sim.domain.transform_plans),
+                                          sim.domain.transform_plans))
   @test fields_modified!(sim) === sim
 end

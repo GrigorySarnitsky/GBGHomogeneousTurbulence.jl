@@ -102,7 +102,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     grad_spectral = new_vector_field_spectral(domain)
     grad_physical = new_vector_field_physical(domain)
     gradient!(grad_spectral, φ̂, domain.multipliers)
-    to_physical!(grad_physical, grad_spectral, domain.velocity_plans)
+    to_physical!(grad_physical, grad_spectral, domain.transform_plans)
     expected = 2 * κ * inner(grad_physical, grad_physical)
 
     @test scalar_dissipation(φ̂, domain, κ) > 0

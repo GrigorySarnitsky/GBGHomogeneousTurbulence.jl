@@ -30,7 +30,7 @@ const SD = GBGIsotropicTurbulence.SimulationDomain
   # fresh physical recoveries — both assemblies CONSUME their velocity/vorticity arguments
   function physical_velocity(û)
     u = SD.new_vector_field_physical(domain)
-    to_physical!(u, û, domain.velocity_plans, SD.new_vector_field_spectral(domain))
+    to_physical!(u, û, domain.transform_plans, SD.new_vector_field_spectral(domain))
     return u
   end
   function physical_vorticity(û)
@@ -40,7 +40,7 @@ const SD = GBGIsotropicTurbulence.SimulationDomain
   end
   function physical_scalar(φ̂)
     φ = SD.new_scalar_field_physical(domain)
-    to_physical!(φ, φ̂, domain.scalar_plans, SD.new_scalar_field_spectral(domain))
+    to_physical!(φ, φ̂, domain.transform_plans, SD.new_scalar_field_spectral(domain))
     return φ
   end
   generator() = ResolvedGenerator(domain, conditions; scalar = true)

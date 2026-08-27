@@ -47,7 +47,7 @@ module Observables
 
 using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
-using ..SimulationDomain: FixedDomain, new_tensor_field_physical, tensor_plans
+using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
@@ -238,7 +238,7 @@ iteration's deposit or throws — measure with this function, read with that one
 """
 function vorticity_physical!(ω, û, domain::FixedDomain, spectral_scratch)
   curl!(spectral_scratch, û, domain.multipliers)
-  to_physical!(ω, spectral_scratch, domain.velocity_plans)
+  to_physical!(ω, spectral_scratch, domain.transform_plans)
   return ω
 end
 
@@ -341,7 +341,7 @@ gate of the warm-up detector.
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
   strain_physical = new_tensor_field_physical(domain)
-  to_physical!(strain_physical, strain, tensor_plans(domain))            # S in physical space (Ŝ is consumed)
+  to_physical!(strain_physical, strain, domain.transform_plans)            # S in physical space (Ŝ is consumed)
   ss = inner(strain_physical, strain_physical)                       # ⟨S:S⟩
   ss <= 0 && return zero(ss)      # degenerate strain: keep the field's element type, not a Float64 literal
   # ⟨det S⟩ as the fused mapped reduction: the determinant is formed per grid point in registers and

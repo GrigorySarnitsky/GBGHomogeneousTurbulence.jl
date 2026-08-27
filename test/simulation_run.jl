@@ -320,33 +320,22 @@ end
 end
 
 
-# The rank-2 transform plans are the one plan family a run may never need, and on a GPU backend a
-# plan is not free — it holds a spectral-sized device buffer per direction, and the rank-2 family is
-# nine-component against the velocity's three. Building it with the domain therefore spent the larger
-# part of a run's plan residency on a diagnostic many runs never call (3.81 GiB at 384³ / Float32,
-# measured). It is now built on first use. Two things are asserted, not one: that nothing is built
-# until something asks, and that asking twice builds once. The second is the one that earns its
-# place — an accessor that rebuilt on every call would also pass the first, and would replace the
-# resident cost with per-call churn of the same size.
-@testset "the rank-2 plans are built on first use, not with the domain" begin
-  using GBGIsotropicTurbulence.SimulationDomain: tensor_plans
+# Decision 78's lazy rank-2 memo is RETIRED (decision 81): PF's rank-blind plans (its decision 76)
+# deleted the per-rank buffer multiplication the laziness existed to avoid, so the domain holds ONE
+# plan pair for every field and there is nothing left to defer. The skewness-gate default below
+# outlives it — the gate's cost is transforms and a field-scale episode, not plan residency.
+@testset "one rank-blind plan pair serves every field (decision 81)" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
                        dealiasing = TwoThirds(), array_type = Array)
-  @test domain.tensor_plans_memo[] === nothing            # nothing built, and nothing to build it from
-
-  built = tensor_plans(domain)
-  @test domain.tensor_plans_memo[] === built              # the first call stores what it built
-  @test tensor_plans(domain) === built                    # and later calls return it, never rebuild
-
-  # The diagnostic is the consumer, and it must reach the plans through the accessor: a fresh domain
-  # whose skewness is measured has them, one whose skewness is not, does not.
-  cold = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                     dealiasing = TwoThirds(), array_type = Array)
-  sim = Simulation(cold; viscosity = 0.05)
-  advance!(sim)
-  @test cold.tensor_plans_memo[] === nothing              # a step never transforms a rank-2 field
-  derivative_skewness(sim.state.velocity_spectral, cold)
-  @test cold.tensor_plans_memo[] !== nothing              # the diagnostic does
+  sim = Simulation(domain; viscosity = 0.05)
+  advance!(sim)                                            # velocity through the pair
+  # The strain-tensor diagnostic — rank 2 — goes through the SAME object, with no memo and no
+  # second family anywhere on the domain.
+  S = derivative_skewness(sim.state.velocity_spectral, domain)
+  @test S isa Real
+  @test :transform_plans in fieldnames(typeof(domain))
+  @test isempty(intersect((:velocity_plans, :scalar_plans, :tensor_plans_memo),
+                          fieldnames(typeof(domain))))
 end
 
 

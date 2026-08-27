@@ -27,7 +27,7 @@ using Test
     deposit!(cache, state, domain, buffers)
     u = velocity_physical(cache)
     u_reference = new_vector_field_physical(domain)
-    to_physical!(u_reference, û, domain.velocity_plans, new_vector_field_spectral(domain))
+    to_physical!(u_reference, û, domain.transform_plans, new_vector_field_spectral(domain))
     @test field_data(u) == field_data(u_reference)                 # the deposit is the recovery
     @test velocity_physical(cache) === u                         # second read: same storage, no work
     ω_reference = new_vector_field_physical(domain)
@@ -57,7 +57,7 @@ using Test
     after = field_data(velocity_physical(cache))
     @test after != before                                          # the new deposit is the new field
     u_reference = new_vector_field_physical(domain)
-    to_physical!(u_reference, û, domain.velocity_plans, new_vector_field_spectral(domain))
+    to_physical!(u_reference, û, domain.transform_plans, new_vector_field_spectral(domain))
     @test after == field_data(u_reference)
   end
 

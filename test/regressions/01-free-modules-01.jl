@@ -44,11 +44,11 @@ using GBGPeriodicFields: field_data, to_physical!, combine!
     scratch_s = new_scalar_field_spectral(domain)
     # Both assemblies CONSUME their physical argument, so each recovery gets its own register.
     velocity() = (u = new_vector_field_physical(domain);
-                  to_physical!(u, û, domain.velocity_plans, scratch_v); u)
+                  to_physical!(u, û, domain.transform_plans, scratch_v); u)
     vorticity() = (ω = new_vector_field_physical(domain);
                    vorticity_physical!(ω, û, domain, scratch_v); ω)
     scalar() = (φ = new_scalar_field_physical(domain);
-                to_physical!(φ, φ̂, domain.scalar_plans, scratch_s); φ)
+                to_physical!(φ, φ̂, domain.transform_plans, scratch_s); φ)
 
     cached = ResolvedGenerator(domain, conditions; scalar = true)
     prepare!(cached, state, domain, dt)

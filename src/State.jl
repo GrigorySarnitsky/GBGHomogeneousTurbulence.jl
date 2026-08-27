@@ -139,7 +139,7 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
   noise = new_vector_field_physical(domain)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(1))...))
-  to_spectral!(û, noise, domain.velocity_plans)
+  to_spectral!(û, noise, domain.transform_plans)
 
   # The envelope is a radial symbol of |κ|², built as a lazy kernel (no field of coefficients); the
   # closures capture converted VALUES only — a captured `Type` is not a bitstype and a GPU launch
@@ -240,7 +240,7 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
   noise = new_scalar_field_physical(domain)
   copyto!(field_data(noise), randn(rng, T, physical_field_shape(domain.grid, Val(0))...))
-  to_spectral!(φ̂, noise, domain.scalar_plans)
+  to_spectral!(φ̂, noise, domain.transform_plans)
 
   # Radial-symbol envelope, as for the velocity: lazy kernels, value-only captures.
   zero_value = zero(T)

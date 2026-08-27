@@ -50,7 +50,7 @@ const GEN6 = GBGIsotropicTurbulence.Generator
   function projected_lamb(domain, ûf)
     u = SD6.new_vector_field_physical(domain); ω = SD6.new_vector_field_physical(domain)
     tmp = SD6.new_vector_field_spectral(domain)
-    to_physical!(u, ûf, domain.velocity_plans, tmp)
+    to_physical!(u, ûf, domain.transform_plans, tmp)
     vorticity_physical!(ω, ûf, domain, tmp)
     out = SD6.new_vector_field_spectral(domain)
     GEN6._velocity_lamb!(out, u, ω, domain, SD6.new_vector_field_spectral(domain))
