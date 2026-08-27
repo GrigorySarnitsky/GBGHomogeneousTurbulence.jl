@@ -337,6 +337,12 @@ manuscripts go in `$SCRATCH`; the findings pile is the repo's `.claude/doc-revie
 
    **Loop until it converges, and know what convergence looks like.** One pass is never enough: a
    fix pass introduces its own defects, so verify → fix → verify again until the numbers stop moving.
+   **The loop runs over the BANKED FINDINGS, not over the instrument.** Re-verify the same set, fix
+   what came back `LINE-ONLY` / `UNDONE`, re-verify that set again — the denominator is fixed, so it
+   converges. Re-running the panel over a just-edited corpus is a different activity and does not
+   converge: fresh eyes on changed prose always return fresh findings, and prose has no fixed point.
+   (Raised by the PF session 2026-08-27, whose owner caught the same sentence reading as "re-run the
+   battery until it comes back clean".)
    Measured over ten runs (2026-08-17, six of `verify-fixes.js` and four of `verify.js`), the honored
    fraction went 43 → 69 → 76 → 95 → 93 → 90 %. **Converged means three rounds flat within noise,
    each surfacing *different* marginal items** — at that point the residue is the auditor's own
