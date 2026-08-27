@@ -31,6 +31,12 @@ const A = typeof args === 'string' ? JSON.parse(args) : (args || {})
 const STRENGTH = A.strength === 'full' ? 'full' : 'economy'
 const PILE = A.pile
 const REPO = A.repo
+// The do-not-re-flag list panel.js already injects into every hat (PF's finding, ported 2026-08-27).
+// Without it a finding the owner SETTLED as not-a-defect is graded as still present and counted as
+// unclosed: closure is depressed by noise, and the next fix pass is invited to edit something
+// deliberately left alone. Defaults to the conventional location so a caller that forgets it still
+// gets the guard; an absent file is not fatal, since the list is often empty early in a cycle.
+const ADJUDICATED = A.adjudicated || `${A.repo}/.claude/doc-review-adjudicated.md`
 
 // The hat files, in the panel's own order. A verifier is spawned per file.
 //
@@ -93,6 +99,51 @@ if (Array.isArray(A.hats) && A.hats.length) {
 }
 if (!HATS.length) throw new Error('no hats selected')
 
+// THE DENOMINATOR COMES FROM OUTSIDE THE GRADED PARTY (PF's finding, ported 2026-08-27). Until now
+// `findings_in_file` was returned by the SAME agent that adjudicated the file — the instrument's own
+// antipattern one level down: asking the constrained party whether the constraint binds. A lane that
+// graded 5 of 13 and reported 5 read as COMPLETE. That is the dead-lane inversion applied to PARTIAL
+// work, and it is worse, because a partial file does not look like a hole: the coverage line reads
+// 5/5 and every anomaly check passes.
+//
+// The prompt did try to guard it ("reporting a count that matches your verdict list when it does not
+// match the file defeats the check") — which is exactly the kind of instruction that does not work,
+// per this instrument's own founding measurement. The fix is structural: a CENSUS agent that counts
+// and does not grade, so no agent both sets the denominator and is measured against it. IT's
+// bug-hunt/verify-fixes.js never had this bug because it receives `findings` as an argument; the
+// doc-side verifier could not, since a workflow script has no filesystem access.
+//
+// `findings_per_hat` in args overrides the census entirely — a caller that counted mechanically
+// outside the workflow is a better source still, and skips the agent.
+const CENSUS = A.findings_per_hat && typeof A.findings_per_hat === 'object'
+  ? { counts: HATS.map(h => ({ hat: h, findings: Number(A.findings_per_hat[h]) })) }
+  : await agent(
+      `For EACH of these banked hat files under ${PILE}, read it with the Read tool and COUNT the ` +
+      `findings it contains: ${HATS.map(h => `${PILE}/${h}.md`).join(', ')}\n\n` +
+      `You are a CENSUS, not a judge. Do NOT evaluate, adjudicate, summarise or comment on any ` +
+      `finding — count them and stop. Hats do not share one heading style, so count the ENUMERATED ` +
+      `ITEMS the file presents as its findings (numbered headings, numbered list items, whatever the ` +
+      `file uses), and EXCLUDE any trailing section the file marks as candidates considered and ` +
+      `dropped, notes, or context — those are not findings. If a file is missing or unreadable, ` +
+      `return findings = -1 for it rather than guessing.`,
+      { label: 'census-findings-per-hat', model: 'sonnet',
+        schema: { type: 'object', additionalProperties: false,
+                  properties: { counts: { type: 'array', items: {
+                    type: 'object', additionalProperties: false,
+                    properties: { hat: { type: 'string' }, findings: { type: 'integer' } },
+                    required: ['hat', 'findings'] } } },
+                  required: ['counts'] } })
+
+const CENSUS_MAP = Object.fromEntries(
+  ((CENSUS && CENSUS.counts) || []).map(c => [c.hat, c.findings]))
+const missing_census = HATS.filter(h => typeof CENSUS_MAP[h] !== 'number' || CENSUS_MAP[h] < 0)
+if (missing_census.length) {
+  throw new Error(`census could not count ${JSON.stringify(missing_census)} — a verifier that does ` +
+                  `not know how many findings it should adjudicate cannot report coverage. Fix the ` +
+                  `pile or pass \`findings_per_hat\`.`)
+}
+log(`census: ${HATS.map(h => `${h}=${CENSUS_MAP[h]}`).join(' ')}`)
+
 const SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
@@ -138,6 +189,7 @@ HOW TO WORK:
 - Read your banked hat file FIRST, in full. Enumerate EVERY finding in it by number. You must return a verdict for EVERY ONE — no skipping, no merging, no "the rest look fine".
 - Return \`findings_in_file\` = how many findings that file CONTAINS (the count you enumerated), independently of how many you managed to adjudicate. The two are cross-checked: reporting a count that matches your verdict list when it does not match the file defeats the check and is the one thing you must not do. If you genuinely cannot adjudicate one, return PRESENT for it with the reason as evidence — that is the safe verdict — rather than dropping it.
 - The findings quote the RENDERED text. Ground truth is the SOURCE: the docstrings in ${REPO}/src/*.jl, the pages in ${REPO}/docs/src/, and ${REPO}/docs/ARCHITECTURE.md. The rendered build is at ${REPO}/docs/build (read it when the finding is about rendering — a dead link, a formula rendering as literal text, a table falling back to pipes).
+- SETTLED NON-DEFECTS: ${ADJUDICATED} lists findings the owner has ruled are NOT defects (extraction artifacts, closed design decisions). Read it FIRST. A finding that appears there is verdict NOT-A-DEFECT — it was deliberately left alone, and grading it ABSENT/PRESENT invites a fix pass at something already settled. Nothing merely FIXED belongs in that file, so its absence proves nothing.
 - ${REPO}/CLAUDE.md is the house rulebook. Consult it when a finding turns on house style, naming, or documentation policy — it tells you what the corpus is SUPPOSED to look like.
 - Note that names may have CHANGED since the finding was written. A finding about \`velocity_factor\` may now concern a renamed binding. Follow the concept, not the string: a defect that moved to a new name is PRESENT, not ABSENT.
 - Use grep/ripgrep aggressively. A single Read of one file is almost never enough to justify ABSENT.
@@ -175,7 +227,8 @@ for (let i = 0; i < HATS.length; i++) {
   const r = results[i]
   if (!r) { anomalies.push({ hat, kind: 'DEAD', detail: 'agent returned nothing (died, or was skipped)' }); continue }
   const n = (r.verdicts || []).length
-  const expected = r.findings_in_file
+  // The census is authoritative; the lane's own `findings_in_file` is kept only as a cross-check.
+  const expected = CENSUS_MAP[hat]
   if (n === 0) anomalies.push({ hat, kind: 'EMPTY', detail: 'returned zero verdicts — a dead agent, not a clean hat' })
   else if (typeof expected === 'number' && n < expected) {
     anomalies.push({ hat, kind: 'INCOMPLETE', detail: `adjudicated ${n} of ${expected} banked findings` })
@@ -190,8 +243,14 @@ for (let i = 0; i < HATS.length; i++) {
   if (!r) { log(`[${i + 1}/${HATS.length}] ${HATS[i]}: DEAD — no result returned`); continue }
   const c = {}
   for (const v of (r.verdicts || [])) c[v.verdict] = (c[v.verdict] || 0) + 1
-  const cov = typeof r.findings_in_file === 'number' ? `${(r.verdicts || []).length}/${r.findings_in_file}` : `${(r.verdicts || []).length}/?`
-  log(`[${i + 1}/${HATS.length}] ${HATS[i]}: ${cov} adjudicated — ${JSON.stringify(c)}`)
+  const expected = CENSUS_MAP[HATS[i]]
+  const cov = `${(r.verdicts || []).length}/${expected}`
+  // A self-report that disagrees with the census is itself a signal: the lane either miscounted the
+  // file or reported its own verdict count as the file's size — the exact substitution the census
+  // exists to detect. Surfaced, not silently overridden.
+  const selfrep = typeof r.findings_in_file === 'number' && r.findings_in_file !== expected
+    ? `  [self-reported ${r.findings_in_file} ≠ census ${expected}]` : ''
+  log(`[${i + 1}/${HATS.length}] ${HATS[i]}: ${cov} adjudicated${selfrep} — ${JSON.stringify(c)}`)
 }
 log(`TOTAL: ${JSON.stringify(tally)}`)
 

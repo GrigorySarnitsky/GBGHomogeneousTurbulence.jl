@@ -35,6 +35,10 @@ const A = typeof args === 'string' ? JSON.parse(args) : (args || {})
 const STRENGTH = A.strength === 'full' ? 'full' : 'economy'
 const PILE = A.pile
 const REPO = A.repo
+// Same guard as verify.js (PF, 2026-08-27): a finding the owner settled as NOT a defect was
+// deliberately not fixed, so an auditor that has not seen the list grades it UNDONE — the one
+// verdict indistinguishable from real neglect.
+const ADJUDICATED = A.adjudicated || `${A.repo}/.claude/doc-review-adjudicated.md`
 const RANGE = A.range
 // Findings are adjudicated in batches so each auditor holds a workable slice; batches are ranges of
 // finding numbers in the pile.
@@ -129,6 +133,11 @@ the strength of a quote, and you should prefer them when in doubt:
   UNDONE      — nothing was done.
   LAUNDERED   — the finding was closed by DECLARING it acceptable ("by design", "for symmetry", "for
                 consistency", "already recorded", "deliberate tradeoff") rather than fixed or escalated.
+
+BEFORE grading anything UNDONE, check ${ADJUDICATED} — the owner's list of findings ruled NOT to be
+defects. A finding on that list was deliberately left alone; grading it UNDONE is the one verdict
+that looks identical to real neglect, and acting on it sends the next pass to edit something already
+settled. Note the asymmetry: nothing merely FIXED is listed there, so absence from it proves nothing.
                 A close is only legitimate if the OWNER decided it — the pile records the owner's words,
                 so check them. An assistant-authored dismissal is LAUNDERED, however reasonable it reads.
 

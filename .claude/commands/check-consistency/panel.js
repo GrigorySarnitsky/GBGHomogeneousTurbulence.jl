@@ -47,6 +47,13 @@ const SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
     hat: { type: 'string' },
+    // MEASURED 2026-08-27 against the banked piles, prompted by PF making the same check: the
+    // 25-cap has NEVER BOUND in IT either. The largest banked hat is `logician` at 22 findings
+    // (2968 words), and that count includes non-finding sections, so the true maximum is lower.
+    // The PER-FINDING limits (<= 90 words of description, <= 20-word quotes) are what actually
+    // hold output down; 25 is a backstop behind them, not the active constraint. Recorded because
+    // the cap's justification on file was an assertion ("a hat that would exceed it is being
+    // insufficiently selective") and is now a measurement.
     candidates_considered: { type: 'integer', description: 'total distinct candidate findings weighed BEFORE the 25-finding cap — the truncation signal: a value above 25 means the tail was cut, and the consolidation must say so' },
     findings: { type: 'array', items: {
       type: 'object', additionalProperties: false,
