@@ -2,7 +2,7 @@
 #
 # Claim: `random_solenoidal_velocity_spectral!` documents that the seeded field is "rescaled so the
 # kinetic energy ... equals the requested `kinetic_energy`".  When the dealiasing cutoff
-# `max_wavenumber(domain)` falls at or below the grid's lowest nonzero wavenumber 2π/L, the dealias
+# `max_retained_wavenumber(domain)` falls at or below the grid's lowest nonzero wavenumber 2π/L, the dealias
 # kernel zeroes every surviving mode (the envelope already zeroes κ = 0), `current_energy` is exactly
 # 0, the `current_energy > 0` guard at src/State.jl:138 skips the rescale, and the function returns an
 # all-zero û — silently, while the `Simulation` derivation branch has already logged ν, ε and Re_λ
@@ -13,7 +13,7 @@
 
 using Test, Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence: FixedDomain, TwoThirds, max_wavenumber,
+using GBGIsotropicTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
                               random_solenoidal_velocity_spectral!, new_vector_field_spectral,
                               kinetic_energy, Simulation
 
@@ -25,8 +25,8 @@ using GBGIsotropicTurbulence: FixedDomain, TwoThirds, max_wavenumber,
 
     # Precondition of the claim: the band really is empty of nonzero modes.
     lowest_nonzero_wavenumber = 2π / L
-    @info "band" κ_max = max_wavenumber(domain) lowest_nonzero_wavenumber
-    @test max_wavenumber(domain) < lowest_nonzero_wavenumber   # setup check, not the defect
+    @info "band" κ_max = max_retained_wavenumber(domain) lowest_nonzero_wavenumber
+    @test max_retained_wavenumber(domain) < lowest_nonzero_wavenumber   # setup check, not the defect
 
     requested = 1.5
 

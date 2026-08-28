@@ -34,7 +34,7 @@ using GBGPeriodicFields
 using Random
 using ..Observables: kinetic_energy as measure_kinetic_energy,
                      scalar_variance as measure_scalar_variance
-using ..SimulationDomain: FixedDomain, max_wavenumber, new_vector_field_spectral, new_vector_field_physical,
+using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_vector_field_spectral, new_vector_field_physical,
                           new_scalar_field_spectral, new_scalar_field_physical, _real_type
 
 export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
@@ -45,7 +45,7 @@ export ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spect
 # what little survives, and the run starts from a field nothing like the envelope's shape. The
 # forcing-band warning's sibling (owner-ruled 2026-08-24).
 function _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
-  κ_max = max_wavenumber(domain)
+  κ_max = max_retained_wavenumber(domain)
   peak = envelope_wavenumber / sqrt(2)
   peak >= κ_max &&
     @warn "the seed's spectrum peak κ_p/√2 = $peak sits at or beyond the dealias cutoff " *

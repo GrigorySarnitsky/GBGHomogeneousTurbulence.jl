@@ -28,7 +28,7 @@ using Random
 
     η_canonical = kolmogorov_length(fp)                 # the definition every diagnostic means by η
     η_literal   = (ν^3 / ε)^(1 / 4)                     # test/simulation_run.jl:68's copy
-    κ_max       = max_wavenumber(sim.domain)
+    κ_max       = max_resolved_wavenumber(sim.domain)
 
     # The @info line's claim, measured through the canonical home rather than a fourth spelling.
     @test isapprox(κ_max * η_canonical, res; rtol = 1e-10)

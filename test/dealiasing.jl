@@ -59,7 +59,7 @@ using Test
     @test domain.dealiasing isa PhaseShift
     mask = real.(field_data(materialize_kernel(domain.dealias).field))
     @test all(m -> m == 0 || m == 1, mask)                          # a sharp spherical truncation
-    @test max_wavenumber(domain) ≈ (2 * sqrt(2) / 3) * (N / 2) * (2π / L)   # κ_max = √2·N/3·(2π/L)
+    @test max_retained_wavenumber(domain) ≈ (2 * sqrt(2) / 3) * (N / 2) * (2π / L)   # κ_max = √2·N/3·(2π/L)
     @test count(==(1), mask) > count(==(1), real.(field_data(materialize_kernel(FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = TwoThirds(), element_type = Float64, array_type = Array).dealias).field)))  # keeps more than 2/3
     rk3 = IFLowStorageRK3()
     base = recommended_cfl(rk3, FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = TwoThirds(), element_type = Float64, array_type = Array))

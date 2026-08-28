@@ -39,7 +39,7 @@ Observables.jl::derivative_skewness(û， domain),85,1,417
 Observables.jl::dissipation(ω， viscosity),75,1,307
 Observables.jl::energy_spectrum(û， domain),66,0,178
 Observables.jl::integral_scale(û， domain),65,0,229
-Observables.jl::kinetic_energy(u),67,0,154
+Observables.jl::kinetic_energy(u),67,0,156
 Observables.jl::kinetic_energy_and_dissipation(û， domain， viscosity),98,0,194
 Observables.jl::max_speed(u),47,2,305
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
@@ -93,11 +93,12 @@ Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
 Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,55,0,89
 SimulationDomain.jl::DealiasingStrategy,95,0,96
 SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,35,1,488
-SimulationDomain.jl::HouLi(; order = 36， strength = nothing),80,0,215
+SimulationDomain.jl::HouLi(; order = 36， strength = nothing),80,1,279
 SimulationDomain.jl::PhaseShift(),75,1,274
-SimulationDomain.jl::SimulationDomain,112,0,123
+SimulationDomain.jl::SimulationDomain,116,0,127
 SimulationDomain.jl::TwoThirds(),77,0,78
-SimulationDomain.jl::max_wavenumber(domain),109,0,162
+SimulationDomain.jl::max_resolved_wavenumber(domain),93,0,170
+SimulationDomain.jl::max_retained_wavenumber(domain),82,0,166
 SimulationDomain.jl::new_scalar_field_physical(domain),17,0,18
 SimulationDomain.jl::new_scalar_field_spectral(domain),17,0,18
 SimulationDomain.jl::new_tensor_field_physical(domain),18,0,19
@@ -107,7 +108,7 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,62,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2099
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2110
 SimulationRun.jl::SimulationRun,31,0,218
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false， min_turnovers = 5，,98,0,676
 SimulationRun.jl::advance!(sim; dt = nothing),53,0,99

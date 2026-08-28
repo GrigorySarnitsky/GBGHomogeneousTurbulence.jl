@@ -483,7 +483,8 @@ Over it:
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
   builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
   scheme. The viscosity is derived from the grid by default — the highest Reynolds number consistent with the
-  chosen resolution criterion `κ_max_η` (decision 20) — with a supplied `viscosity` the opt-in override.
+  chosen resolution criterion `κ_max_η` (decision 20; measured against the resolved cutoff, decision
+  82) — with a supplied `viscosity` the opt-in override.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -1047,8 +1048,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
     sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
     wavenumber), not ``\eta/\Delta x`` (geometric): the former is dealiasing-aware through
-    ``\kappa_{\max} = f \tfrac{N}{2}\tfrac{2\pi}{L}`` ([`max_wavenumber`](@ref)), which is correct because
-    accuracy itself depends on the dealiasing.
+    ``\kappa_{\max} = f \tfrac{N}{2}\tfrac{2\pi}{L}`` (then `max_wavenumber`), which is correct because
+    accuracy itself depends on the dealiasing. *(Refined by decision 82: the criterion's
+    ``\kappa_{\max}`` is now the **resolved** cutoff `max_resolved_wavenumber` — under `HouLi` the
+    ``4/5``-of-Nyquist crossover, not the retained Nyquist this entry's ``f`` implied.)*
 21. **(2026-07) The physics-first carving is checked against a formal structural model
     (`docs/architecture.als`).** The module carving and the Mori–Zwanzig role wiring were re-examined
     against an explicit relational-logic model (built and checked in Alloy) under an adversarial multi-lens
@@ -2434,6 +2437,27 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     pull of 76 was refused before being taken: it broke the invariant-4 witness at 896 B/step
     (upstream `reshape` wrappers, constant in rank and grid), was reported, fixed by PF the same
     day, and the bump landed only when the witness read zero.
+82. **(2026-08, user-directed) Retained vs resolved: two named band edges, and the resolution
+    criterion measures the resolved one.** A dealiasing strategy fixes two distinct wavenumbers that
+    decision 20's single `max_wavenumber` conflated: the **retained** cutoff (the highest mode kept
+    energetic — what the advective-CFL, the random-seed spectrum, and the empty-shell warnings must
+    see) and the **resolved** cutoff (the highest mode whose dynamics is genuine Navier–Stokes —
+    what the resolution criterion ``\kappa_{\max}\eta`` and the viscosity solve must see). For the
+    sharp strategies the two coincide; under `HouLi` they diverge, because the per-step filter is an
+    extra damping rate ``\mathrm{strength}\,(\kappa/\kappa_{\mathrm{Ny}})^{36}/\Delta t`` that
+    overtakes ``\nu\kappa^{2}`` at ``\kappa/\kappa_{\mathrm{Ny}} =
+    (\nu\kappa_{\mathrm{Ny}}^{2}\Delta t/\mathrm{strength})^{1/34} \approx 0.8`` — a crossover the
+    ``1/34`` power pins near ``0.8`` for any practical ``\nu``, ``\Delta t``, and strength, hence a
+    constant ``4/5`` convention (TurTLE's Python side uses the same ``0.8``) rather than a per-run
+    solve. Before this decision the criterion consumed the retained cutoff, so a `HouLi` run
+    requested at `κ_max_η = 1.5` effectively resolved only ``\approx 1.2`` — the criterion
+    over-credited the smooth filter by exactly the retained/resolved gap (surfaced by the TurTLE
+    comparison work, 2026-08-28). Now `max_retained_wavenumber` and `max_resolved_wavenumber`
+    replace `max_wavenumber` (no compatibility shim), the user's naming ruling being that the
+    distinction must live in the names; the viscosity solve and the scalar-resolution check consume
+    the resolved cutoff, everything energetic-band-facing the retained one, and `recommended_cfl`
+    keeps its retained-fraction pricing unchanged. Derived-``\nu`` `HouLi` runs get more viscous by
+    ``(5/4)^{4/3}`` accordingly; sharp-strategy runs are bit-identical.
 
 ## References
 

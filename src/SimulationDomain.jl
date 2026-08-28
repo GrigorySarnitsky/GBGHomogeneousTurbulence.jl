@@ -13,7 +13,8 @@ The discretized periodic box a run lives on — the reusable, read-only frame:
 - [`FixedDomain`](@ref) — the fixed, unsheared cubic box (grid, transform plans, spectral multipliers,
   and the lazy ``\\lvert\\boldsymbol{\\kappa}\\rvert^2`` and dealias kernels).
 - [`DealiasingStrategy`](@ref) — the aliasing-control strategy, [`TwoThirds`](@ref), [`HouLi`](@ref), or
-  [`PhaseShift`](@ref), and the cutoff it sets, [`max_wavenumber`](@ref).
+  [`PhaseShift`](@ref), and the two band edges it sets, [`max_retained_wavenumber`](@ref) and
+  [`max_resolved_wavenumber`](@ref).
 - [`new_vector_field_spectral`](@ref), [`new_vector_field_physical`](@ref),
   [`new_scalar_field_spectral`](@ref), [`new_scalar_field_physical`](@ref),
   [`new_tensor_field_spectral`](@ref), [`new_tensor_field_physical`](@ref) — the field allocators
@@ -31,7 +32,8 @@ using GBGPeriodicFields
 export FixedDomain,
        new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical,
        new_tensor_field_spectral, new_tensor_field_physical,
-       truncate_to_band!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift, max_wavenumber
+       truncate_to_band!, DealiasingStrategy, TwoThirds, HouLi, PhaseShift,
+       max_retained_wavenumber, max_resolved_wavenumber
 
 
 # ── Dealiasing strategies ────────────────────────────────────────────────────────────────────────
@@ -94,6 +96,15 @@ Because the filter retains energy out to the Nyquist wavenumber it takes a propo
 CFL step than the ``2/3`` rule — handled automatically by
 [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
+!!! note "Retained is not resolved"
+    The filter keeps every mode energetic ([`max_retained_wavenumber`](@ref) is the Nyquist), but
+    applying it every step adds a damping rate
+    ``\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}/\\Delta t`` that
+    overtakes the viscous rate ``\\nu\\kappa^{2}`` near ``0.8\\,\\kappa_{\\mathrm{Ny}}``; beyond
+    that, mode amplitudes are set by the filter, not by Navier–Stokes. The resolution criterion
+    ``\\kappa_{\\max}\\eta`` therefore uses [`max_resolved_wavenumber`](@ref), which is
+    ``\\tfrac{4}{5}\\,\\kappa_{\\mathrm{Ny}}`` under this strategy — not the Nyquist.
+
 # Fields
 The plain constructor `HouLi(order, strength)` takes the two fields directly:
 - `order` — the exponent of the spectral roll-off.
@@ -143,11 +154,23 @@ than the ``2/3`` rule — handled automatically by
 """
 struct PhaseShift <: DealiasingStrategy end
 
-# The fraction of the Nyquist wavenumber a strategy keeps energetic — sets κ_max for the advective-CFL.
+# The fraction of the Nyquist wavenumber a strategy keeps energetic — the retained band, which sets
+# κ_max for the advective-CFL and bounds where seeding/forcing can put energy.
 _retained_nyquist_fraction(::TwoThirds) = 2 // 3
 _retained_nyquist_fraction(::HouLi) = 1 // 1
 # Phase-shift keeps the spherical band to κ_max = √2·N/3·(2π/L) = (2√2/3)·κ_Ny (Rogallo).
 _retained_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
+
+# The fraction of the Nyquist wavenumber a strategy RESOLVES — the band whose dynamics is genuine
+# Navier–Stokes, the resolution criterion's κ_max (decision 82). For the sharp strategies the two
+# fractions coincide (inside a sharp cutoff nothing is damped). Hou–Li's per-step filter is an extra
+# damping rate strength·(κ/κ_Ny)^order/dt that crosses the viscous rate νκ² at
+# κ/κ_Ny = (νκ_Ny²dt/strength)^(1/(order-2)); the 1/34 power (order 36) pins that crossover near
+# 0.8 across any sane ν, dt, and strength — hence a constant 4/5 convention (also TurTLE's),
+# not a per-run solve.
+_resolved_nyquist_fraction(::TwoThirds) = 2 // 3
+_resolved_nyquist_fraction(::HouLi) = 4 // 5
+_resolved_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
 
 
 """
@@ -279,14 +302,19 @@ end
 # |κ|², evaluated per mode), so no strategy stores a field of coefficients.
 # Both sharp strategies keep a ball of radius (retained fraction)·κ_Ny. The fraction is read from
 # `_retained_nyquist_fraction` rather than re-spelled here, so the band this BUILDS and the cutoff
-# `max_wavenumber` REPORTS cannot drift apart.
+# `max_retained_wavenumber` REPORTS cannot drift apart.
 # The retained cutoff, in ONE expression and ONE element type. Computing it as
-# `T(fraction) * (N/2) * (2π/L)` here while `max_wavenumber` reported `fraction * (N/2) * (2π/L)` in
-# Float64 made the two disagree on a Float32 grid: rounding the fraction to Float32 FIRST lands
-# slightly above the exact 2/3, so the band actually built was wider than the cutoff advertised —
-# and κ_max·η, the resolution criterion a run is judged by, was computed from the advertised one.
+# `T(fraction) * (N/2) * (2π/L)` here while `max_retained_wavenumber` reported
+# `fraction * (N/2) * (2π/L)` in Float64 made the two disagree on a Float32 grid: rounding the
+# fraction to Float32 FIRST lands slightly above the exact 2/3, so the band actually built was wider
+# than the cutoff advertised — and κ_max·η, the resolution criterion a run is judged by, was
+# computed from the advertised one.
 _cutoff_wavenumber(strategy, N, L, ::Type{T}) where {T} =
   T(_retained_nyquist_fraction(strategy)) * T(N / 2) * T(2π / L)
+
+# The resolved cutoff, same one-expression/one-element-type discipline, from the resolved fraction.
+_resolved_wavenumber(strategy, N, L, ::Type{T}) where {T} =
+  T(_resolved_nyquist_fraction(strategy)) * T(N / 2) * T(2π / L)
 
 # Both sharp masks keep the CLOSED ball — boundary shell included — and that is EXACT for this
 # formulation, not an oversight. The textbook worry: at cutoff N/3, a product of two boundary modes
@@ -325,36 +353,67 @@ _real_type(domain::FixedDomain) = eltype(domain.grid.domain_size)
 
 
 """
-    max_wavenumber(domain)
+    max_retained_wavenumber(domain)
 
-The highest wavenumber magnitude `domain` (a [`FixedDomain`](@ref)) treats as resolved signal — the
-dealiasing cutoff
+The highest wavenumber magnitude `domain` (a [`FixedDomain`](@ref)) keeps energetic — the dealiasing
+cutoff, the edge of the **retained** band
 
 ```math
-\\kappa_{\\max} = f \\frac{N}{2} \\frac{2\\pi}{L},
+\\kappa_{\\max}^{\\mathrm{ret}} = f_{\\mathrm{ret}} \\frac{N}{2} \\frac{2\\pi}{L},
 ```
 
-with ``N`` the grid points per side, ``L`` the box side, ``f`` the retained-Nyquist fraction of the
-[`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`, ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`).
-For the sharp strategies the cutoff sits strictly **below** the grid Nyquist
-``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each step. `HouLi` is the exception
-its ``f = 1`` implies: its cutoff *is* the Nyquist, so there is no band above to zero, and it instead
-damps modes as they approach it (to machine epsilon at Nyquist) — so under `HouLi` every
-representable mode counts as resolved signal, and ``\\kappa_{\\max}`` bounds the representable band
-rather than separating kept from damped content.
+with ``N`` the grid points per side, ``L`` the box side, ``f_{\\mathrm{ret}}`` the retained-Nyquist
+fraction of the [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`,
+``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`). For the sharp strategies the cutoff sits strictly
+**below** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each
+step. `HouLi` is the exception its ``f_{\\mathrm{ret}} = 1`` implies: it zeroes nothing, damping
+modes progressively as they approach the Nyquist (to machine epsilon there), so its retained band is
+the whole representable band.
 
-The cutoff fixes both the advective-CFL step
-([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)) and the resolution
-criterion
-``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a run is set
-up to meet.
+Retained is not resolved: a mode can carry energy while its dynamics is dominated by the filter
+rather than by Navier–Stokes — [`max_resolved_wavenumber`](@ref) bounds the trusted band. The
+retained cutoff is the one for everything that must see every energetic mode: the advective-CFL
+step ([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)), the random-seed
+spectrum, and the empty-shell warnings of the forcing layer.
 """
-function max_wavenumber(domain::FixedDomain)
+function max_retained_wavenumber(domain::FixedDomain)
   N = physical_field_shape(domain.grid, Val(0))[1]
   L = domain.grid.domain_size[1]
   # Through the same expression, in the same element type, that `_build_dealias` truncates with —
   # so the number reported here is the band the domain actually keeps.
   return _cutoff_wavenumber(domain.dealiasing, N, L, typeof(L))
+end
+
+
+"""
+    max_resolved_wavenumber(domain)
+
+The highest wavenumber magnitude whose dynamics `domain` (a [`FixedDomain`](@ref)) resolves as
+genuine Navier–Stokes — the **resolved**-band edge
+
+```math
+\\kappa_{\\max}^{\\mathrm{res}} = f_{\\mathrm{res}} \\frac{N}{2} \\frac{2\\pi}{L},
+```
+
+with ``N`` the grid points per side, ``L`` the box side, ``f_{\\mathrm{res}}`` the resolved-Nyquist
+fraction of the [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``4/5`` for `HouLi`,
+``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`). This is the ``\\kappa_{\\max}`` of the resolution
+criterion ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a
+run is set up to meet.
+
+For the sharp strategies resolved and retained coincide: inside a sharp cutoff no mode is damped.
+Under `HouLi` they differ, because the filter applied every step acts as an extra damping rate
+``\\mathrm{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{36}/\\Delta t`` that overtakes the viscous
+rate ``\\nu\\kappa^{2}`` near ``0.8\\,\\kappa_{\\mathrm{Ny}}`` — beyond that crossover the dynamics
+is filter-dominated and the energy there is numerical residue, not resolved turbulence. The ``4/5``
+value is a convention, but a robust one: the crossover scales as the ``1/34``-th power of
+``\\nu\\,\\kappa_{\\mathrm{Ny}}^{2}\\,\\Delta t/\\mathrm{strength}``, so it stays near ``0.8`` for
+any practical viscosity, timestep, and filter strength.
+"""
+function max_resolved_wavenumber(domain::FixedDomain)
+  N = physical_field_shape(domain.grid, Val(0))[1]
+  L = domain.grid.domain_size[1]
+  return _resolved_wavenumber(domain.dealiasing, N, L, typeof(L))
 end
 
 

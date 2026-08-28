@@ -69,7 +69,7 @@ using Test
     ν = sim.generator.conditions.viscosity
     ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
-    @test isapprox(max_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
+    @test isapprox(max_resolved_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
     # Forced by default, and by the CONTROLLER since 2026-08-22: the default was `VarianceRescaling`,
     # a post-step projection, which is Lie–Trotter splitting and held every default run to first
     # order in time (measured 1.02 against 3.01). `VarianceController` holds the same quantity
@@ -267,7 +267,7 @@ end
     η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_design,
                                          rms_velocity = sqrt(2k / 3), integral_scale = 1.0,
                                          schmidt = 1.0))
-    @test max_wavenumber(sim.domain) * η ≈ target rtol = 1e-10
+    @test max_resolved_wavenumber(sim.domain) * η ≈ target rtol = 1e-10
   end
 
 

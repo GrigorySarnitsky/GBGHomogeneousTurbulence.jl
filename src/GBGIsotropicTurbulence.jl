@@ -86,7 +86,8 @@ using .SimulationDomain:
   TwoThirds,
   HouLi,
   PhaseShift,
-  max_wavenumber
+  max_retained_wavenumber,
+  max_resolved_wavenumber
 
 using .State:
   ResolvedFields,
@@ -196,7 +197,8 @@ export FixedDomain,
        TwoThirds,
        HouLi,
        PhaseShift,
-       max_wavenumber,
+       max_retained_wavenumber,
+       max_resolved_wavenumber,
        vorticity_physical!,
        ResolvedGenerator,
        prepare!,

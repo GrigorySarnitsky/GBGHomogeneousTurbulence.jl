@@ -43,7 +43,7 @@ module SimulationRun
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
-                          DealiasingStrategy, TwoThirds, max_wavenumber
+                          DealiasingStrategy, TwoThirds, max_resolved_wavenumber
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
 import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits,
@@ -116,18 +116,21 @@ there — and the viscosity is chosen from the grid rather than supplied:
     calibrated on, and a forcing moved higher invalidates it.
 
     Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
-    ``\\kappa_{\\max}`` the [`max_wavenumber`](@ref) and ``\\eta`` the Kolmogorov microscale. Since
-    ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the retained-Nyquist fraction,
-    `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default ``2/3`` rule.
+    ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta`` the Kolmogorov
+    microscale. Since ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the
+    resolved-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
+    ``2/3`` rule.
 
-    !!! note "The criterion is not equally strict across dealiasing strategies"
-        It treats the whole retained band as clean signal — exact for `TwoThirds` and
-        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift), approximate for
-        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), whose top of band is damped
-        rather than dealiased. The gap is not cosmetic: ``f = 1`` puts
-        ``\\eta \\approx 0.64\\Delta x`` at `κ_max_η = 2` against ``0.95\\Delta x`` for ``2/3``,
-        and since ``\\nu \\propto f^{-4/3}`` that hands `HouLi` a ``\\mathrm{Re}_\\lambda`` about 31%
-        higher on the same grid. Raise `κ_max_η` when comparing across strategies.
+    !!! note "The criterion measures the resolved band, strategy by strategy"
+        ``\\kappa_{\\max}`` here is each strategy's **resolved** cutoff — for
+        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) that is
+        ``\\tfrac{4}{5}\\kappa_{\\mathrm{Ny}}``, where its per-step damping overtakes viscosity,
+        not the Nyquist its energetic band reaches — so equal `κ_max_η` means equally trusted
+        dynamics across strategies. Strategies still reach different Reynolds numbers on the same
+        grid, but for the honest reason that their resolved bands differ: with
+        ``\\nu \\propto f^{-4/3}``, `HouLi` gives ``\\mathrm{Re}_\\lambda`` about 13% and
+        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) about 26% above the
+        ``2/3`` rule.
 
     The grid and `κ_max_η` together fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
     `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
@@ -161,7 +164,8 @@ The domain group:
 - `side_length = 2π` — the box side ``L``.
 - `element_type = Float64`, `array_type = Array` — the real element type and storage backend.
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
-  `PhaseShift`); it sets ``\\kappa_{\\max}`` and hence the CFL step.
+  `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
+  ``\\kappa_{\\max}`` of `κ_max_η`).
 
 The run group:
 
@@ -411,7 +415,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     # arithmetic stays here — but the two are pinned against each other by a round-trip test
     # (solve for ν, then measure η through `kolmogorov_length` and recover `resolution`), so neither
     # can drift from the other in silence.
-    ν = ε^(1//3) * (resolution / max_wavenumber(domain))^(4//3)
+    ν = ε^(1//3) * (resolution / max_resolved_wavenumber(domain))^(4//3)
     # Through the canonical reduction, not a second spelling of it: `integral_scale` does not enter
     # Re_λ, so any positive value serves — the measured-state bridge is what owns this formula.
     reλ = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = ε,
@@ -451,7 +455,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε,
                                          rms_velocity = sqrt(2 * kinetic_energy / 3),
                                          integral_scale = inv(envelope_wavenumber), schmidt))
-    κ_max_η = max_wavenumber(domain) * η
+    κ_max_η = max_resolved_wavenumber(domain) * η
     κ_max_η_B = κ_max_η / sqrt(schmidt)
     if κ_max_η_B < 1.5
       # The velocity clause must agree with the number it quotes: claim resolution only when the

@@ -1,6 +1,6 @@
 using Test
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, max_wavenumber
+using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber
 using GBGPeriodicFields: materialize_kernel, field_data
 
 
@@ -22,12 +22,12 @@ function wavenumber_magnitude(domain)
 end
 
 
-@testset "max_wavenumber reports exactly the band the domain builds" begin
+@testset "max_retained_wavenumber reports exactly the band the domain builds" begin
   for T in (Float64, Float32), N in (12, 24, 48, 96)
     domain = FixedDomain(; grid_points_per_axis = N, side_length = 2π,
                            dealiasing = TwoThirds(), element_type = T, array_type = Array)
     κ = wavenumber_magnitude(domain)
-    κmax = max_wavenumber(domain)
+    κmax = max_retained_wavenumber(domain)
     built = retained_band(domain)
     reported = κ .<= κmax
     mismatches = count(built .!= reported)

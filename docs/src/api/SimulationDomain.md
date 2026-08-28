@@ -27,11 +27,14 @@ HouLi
 PhaseShift
 ```
 
-The dealiasing cutoff it sets — the highest wavenumber the run treats as resolved signal, and the resolution
-criterion ``\kappa_{\max}\eta`` a run is built to meet.
+The two band edges it sets — the **retained** cutoff (the highest wavenumber kept energetic, which
+prices the advective-CFL step) and the **resolved** cutoff (the highest wavenumber whose dynamics is
+genuine Navier–Stokes — the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta`` a
+run is built to meet). The two coincide for the sharp strategies and differ under `HouLi`.
 
 ```@docs
-max_wavenumber
+max_retained_wavenumber
+max_resolved_wavenumber
 ```
 
 ## Scratch-field allocators

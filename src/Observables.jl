@@ -72,8 +72,8 @@ when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` — satisf
 rule, by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift)'s wider
 ``\\sqrt{2}N/3`` band, and by every narrower band.
 
-[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) keeps the full band
-``\\kappa_{\\max} = N/2``, where the only pairs that fold to zero are Nyquist modes its taper has
+[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) retains the full band out to the
+Nyquist ``N/2``, where the only pairs that fold to zero are Nyquist modes its taper has
 already damped to machine precision — alias-free in practice, not exactly.
 """
 kinetic_energy(u) = inner(u, u) / 2

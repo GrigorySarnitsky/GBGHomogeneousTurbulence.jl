@@ -74,7 +74,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, max_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type
+using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower,
@@ -298,7 +298,7 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
   # marginal band is a legitimate choice — but it cannot be silent, or a run decays with its forcing
   # apparently on. (An ADDITIVE forcing would genuinely inject there; re-adding `StochasticOU` must
   # keep this warning in front of it.)
-  κ_max = max_wavenumber(domain)
+  κ_max = max_retained_wavenumber(domain)
   if (lowest - 0.5) * k0 > κ_max
     @warn "the forcing band (shells $(lowest)–$(highest)) lies entirely above the dealias cutoff " *
           "(shell ≈ $(round(κ_max / k0, digits = 1))): those modes are held empty by the mask and " *

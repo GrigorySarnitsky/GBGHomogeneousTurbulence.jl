@@ -17,7 +17,7 @@
 using Test, Random, Logging
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Phenomenology: kolmogorov_length
-const κ_max = GBGIsotropicTurbulence.SimulationDomain.max_wavenumber
+const κ_max = GBGIsotropicTurbulence.SimulationDomain.max_resolved_wavenumber
 
 
 "Build a 32³ derived-viscosity run with `forcing`, spin it up, return (ν, measured κ_max·η)."
