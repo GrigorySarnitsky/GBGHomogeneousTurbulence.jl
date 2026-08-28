@@ -141,6 +141,38 @@ trajectory: the curves are indistinguishable through the entire physical decay, 
 differences (``\sim 2 \times 10^{-2}``) occur only beyond ``\tau \approx 10``, where ``\rho_u``
 itself is statistical noise of that size.
 
+### Robustness across forcings: the Linear (Lundgren) pair
+
+The whole comparison was repeated with a different forcing law — the band-limited **linear
+(Lundgren-type) forcing** ``\boldsymbol{f} = A\,\boldsymbol{u}`` on the same shells, with the
+**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2E_{\mathrm{band}}(t_0))``
+(this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
+the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, nothing
+here reads the state or pins the injection: energy and dissipation are entirely outputs.
+
+![Linear-forcing pair: TurTLE (solid) vs this package (dashed)](assets/comparison_overlay_linear.png)
+
+Three findings:
+
+- **Same agreement structure.** The solutions track to eight digits at ``t = 5`` and six at
+  ``t = 10`` (relative ``\lvert\Delta k\rvert`` ``1.6 \times 10^{-9}`` at ``t = 1``,
+  ``2 \times 10^{-8}`` at 5, ``3.7 \times 10^{-6}`` at 10), then separate at the Lyapunov rate.
+  The divergence seed is ``\sim 500\times`` the constant-power pair's, and identifiably so: this
+  package folds the steady ``A`` into its integrating factor (exact), TurTLE carries the term
+  explicitly through the Runge–Kutta stages — the same continuous physics along two discrete
+  routes, differing at that term's truncation level. ``\rho_u`` again overlays to
+  ``2 \times 10^{-10}`` at ``\tau = 0.5`` and ``8 \times 10^{-6}`` at ``\tau = 5``.
+- **The unanchored equilibrium wandered — identically in both codes.** With fixed ``A`` the band
+  self-amplifies until the cascade balances it: both codes migrated to a hotter state
+  (``\bar k \approx 3.4`` from 2.5, ``\bar\varepsilon \approx 1.6`` from 1.0), agreeing on the new
+  attractor's statistics to ``\sim 3\%`` — the larger scatter reflecting linear forcing's
+  well-known larger, slower energy fluctuations, visible in the ``k(t)`` panel.
+- **The amplitude estimate illustrates why anchored forcings exist.** ``A`` was chosen from the
+  *instantaneous* handoff band energy; the fixed-``A`` balance settled at a larger one
+  (``\bar E_{\mathrm{band}} \approx 1.87`` from 1.18), so ``\bar\varepsilon = 2A\bar
+  E_{\mathrm{band}} \approx 1.59`` rather than 1. Both codes agree precisely on this migration —
+  it is the physics of unanchored linear forcing, not a discrepancy.
+
 ### Deliberately not compared in this round
 
 Shell-averaged spectra ``E(\kappa)`` and the velocity-derivative skewness were not collected in
@@ -161,10 +193,14 @@ base=https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl/releases/down
 curl -LO $base/handoff_initial_state_iter100.h5
 curl -LO $base/turtle_reference_data.h5
 curl -LO $base/gbgit_reference_data.h5
+curl -LO $base/turtle_linear_reference_data.h5
+curl -LO $base/gbgit_linear_reference_data.h5
 sha256sum *.h5
-# handoff_initial_state_iter100.h5  02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
-# turtle_reference_data.h5          fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
-# gbgit_reference_data.h5           394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
+# handoff_initial_state_iter100.h5   02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
+# turtle_reference_data.h5           fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
+# gbgit_reference_data.h5            394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
+# turtle_linear_reference_data.h5    6b8d15e9944c3ec12b7a0a451805b62351623fd9830d98ea3aad303a205115cd
+# gbgit_linear_reference_data.h5     bd192fdcca3bbe75798818bf0193af17846286e7cb3cc00d95514dc6db6670c2
 ```
 
 Each reference file is self-describing: datasets `t`, `k`, `ε`, `τ`, `ρ_u`, with the definitions,

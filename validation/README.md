@@ -15,3 +15,7 @@ the two reference-data files); the page carries the download commands and the SH
   18,400 fixed steps collecting k, ε and the in-callback ρ_u, writes
   `gbgit_reference_data.h5`. Backend is `ROCArray`; substitute `CuArray` or `Array` to taste.
 - `overlay_plots.py` — the overlay figure (TurTLE solid, this package dashed).
+
+The `*_linear*` variants are the second pair — the same comparison under the band-limited
+linear (Lundgren) forcing with fixed rate `A = 0.42386263`: `lincollect_driver.py` /
+`lincollect_analysis.py` (TurTLE leg), `it_leg_linear.jl`, `overlay_plots_linear.py`.
