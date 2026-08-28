@@ -379,6 +379,7 @@ makedocs(
       "StructureFunctions" => "api/phenomenology/StructureFunctions.md",
       "Scalings"           => "api/phenomenology/Scalings.md",
     ],
+    "Validation" => "validation.md",
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",
       "Decision log"   => "decisions.md",
