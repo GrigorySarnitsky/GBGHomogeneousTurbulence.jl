@@ -346,3 +346,15 @@ end
   @test StationarityCriterion().monitor.gate_skewness == false
   @test StationarityCriterion(; gate_skewness = true).monitor.gate_skewness == true
 end
+
+
+@testset "run! forwards a fixed timestep to every advance!" begin
+  sim  = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(31))
+  sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(31))
+  run!(s -> current_step(s) < 4, sim; dt = 0.01)
+  for _ in 1:4
+    advance!(sim2; dt = 0.01)
+  end
+  @test current_time(sim) == current_time(sim2)   # 4 × 0.01, never the adaptive rule
+  @test field_data(sim.state.velocity_spectral) == field_data(sim2.state.velocity_spectral)
+end

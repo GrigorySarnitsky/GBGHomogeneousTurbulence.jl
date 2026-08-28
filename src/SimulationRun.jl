@@ -1,7 +1,7 @@
 # SimulationRun — the ergonomic run layer. A `Simulation` bundles the domain, buffers, the
 # generator (the equations of motion with their conditions and assembly scratch), the scheme, the
 # spectral state (û, φ̂), the observables cache, and any tracers;
-# `advance!`/`run!`/`warmup!` own the CFL-adaptive time loop. It holds no physics or numerics of its
+# `advance!`/`run!`/`warmup!` own the time loop (CFL-adaptive, or fixed-step via `dt`). It holds no physics or numerics of its
 # own — it wires the pieces of SimulationDomain/State/Generator/Observables/Forcing/Propagator/Particles
 # so a case is a few lines to set up and run, warm-up included, while every piece stays reachable for a
 # hand-run loop.
@@ -848,8 +848,8 @@ end
 
 
 """
-    run!(callback, sim)
-    run!(sim) do sim … end
+    run!(callback, sim; dt = nothing)
+    run!(sim; dt = nothing) do sim … end
 
 Observe and advance `sim` until the observation stops it.
 
@@ -870,6 +870,13 @@ observables it computes; spin-up to stationarity is the packaged [`StationarityC
 Whatever the callback needs beyond the cached observables it computes itself, at its own cadence,
 with the exported reductions and recoveries.
 
+The arguments are:
+- `callback` — the observation, called as `callback(sim)`; returns `true` to continue, `false` to
+  stop.
+- `sim` — the [`Simulation`](@ref) to observe and advance.
+- `dt = nothing` — pass a value to force that fixed timestep on every iteration (a code-to-code
+  comparison, a convergence study); `nothing` keeps the adaptive step, chosen anew each iteration.
+
 # Examples
 ```julia
 run!(sim) do s
@@ -887,14 +894,14 @@ run!(StationarityCriterion(), sim)               # spin up to statistical statio
 
 Returns `sim`.
 """
-function run!(callback, sim::Simulation)
+function run!(callback, sim::Simulation; dt = nothing)
   while true
     keep = callback(sim)
     keep isa Bool ||
       throw(ArgumentError("the observation callback must return a Bool — true to continue the " *
                           "run, false to stop it; it returned a $(typeof(keep))"))
     keep || break
-    advance!(sim)
+    advance!(sim; dt)
   end
   return sim
 end
@@ -1104,16 +1111,18 @@ end
 
 
 """
-    warmup!(sim; kwargs...)
+    warmup!(sim; dt = nothing, kwargs...)
 
-A one-line shorthand, and nothing more: `warmup!(sim; kwargs...)` is exactly
+A one-line shorthand, and nothing more: `warmup!(sim; dt, kwargs...)` is exactly
 
 ```julia
-run!(StationarityCriterion(; kwargs...), sim)
+run!(StationarityCriterion(; kwargs...), sim; dt)
 ```
 
 — it spins `sim` up to a statistically stationary state before measurement and returns it, by
-running the observation-first loop with the packaged stationarity observation. Every keyword is
+running the observation-first loop with the packaged stationarity observation. The `dt` keyword is
+[`run!`](@ref)'s — a value forces that fixed timestep, `nothing` keeps the adaptive step; every
+other keyword is
 passed through to [`StationarityCriterion`](@ref) untouched; its docstring is the home for what is
 detected (the flat dissipation, the scalar-variance and derivative-skewness gates, the give-up cap)
 and for every option. For a fixed spin-up budget, write the three-line budget callback instead
@@ -1127,7 +1136,8 @@ warmup!(sim; gate_skewness = true)   # also require a developed cascade (stricte
 
 Returns `sim`.
 """
-warmup!(sim::Simulation; kwargs...) = run!(StationarityCriterion(; kwargs...), sim)
+warmup!(sim::Simulation; dt = nothing, kwargs...) =
+  run!(StationarityCriterion(; kwargs...), sim; dt)
 
 
 
