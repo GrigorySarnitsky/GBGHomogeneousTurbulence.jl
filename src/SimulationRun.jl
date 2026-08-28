@@ -256,6 +256,17 @@ The run group:
   interpolation per step.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
+- `state = nothing` — an existing [`ResolvedFields`](@ref) to **adopt** as the run's state in
+  place of the random seed: its arrays become the run's own (no copy), which is how a run
+  continues from a stored or externally imported field. The state must live on the domain's grid
+  and storage backend and agree with `scalar`; `initial_spectrum` cannot be given with it. When
+  ``\\nu`` is derived, the constructor measures the adopted state's kinetic energy and warns if it
+  is not the `kinetic_energy` the calibration assumed.
+- `tracers = nothing` — an existing [`Tracers`](@ref) set to adopt in place of seeding
+  `number_of_particles` fresh ones. The interpolation scheme and the unwrapped record are then
+  properties of the given set, so `interpolation_scheme` and `unwrapped` cannot be given with it.
+  A multistep `particle_integration_scheme` starts from its bootstrap — restoring a stored sample
+  history alongside the positions is [`read_simulation`](@ref)'s job.
 
 # Examples
 The two ways in, and the two ways to set the Reynolds number:
@@ -318,6 +329,21 @@ _materialize_forcing(f::AbstractForcing, ::FixedDomain) = f
 _materialize_forcing(f, domain::FixedDomain) = f(domain)
 
 
+# The adopted-state sibling of the forcing check below: ν was derived assuming k =
+# `kinetic_energy`, and an injected state may hold something else entirely. Measured (one
+# reduction at construction, module scope so the `kinetic_energy` KEYWORD cannot shadow the
+# reduction), never trusted; the 10% tolerance leaves stationary fluctuations silent.
+function _warn_adopted_state_energy_mismatch(state::ResolvedFields, target)
+  k_state = kinetic_energy(state.velocity_spectral)
+  abs(k_state - target) <= 0.1 * target ||
+    @warn "Simulation (derived viscosity): ν was calibrated for k = $target (`kinetic_energy`), " *
+          "but the adopted `state` holds k = $(round(k_state, sigdigits = 4)). κ_max·η / Re_λ " *
+          "will not match the calibration. Pass the state's energy as `kinetic_energy`, or set " *
+          "`viscosity` yourself."
+  return nothing
+end
+
+
 # The ν derivation assumed the run HOLDS k = `kinetic_energy`. A hand-built forcing that holds a
 # different target, holds a band instead of the whole field, or holds nothing at all leaves that ν
 # calibrated against a state the run never reaches — the docstring names the precondition, and this
@@ -372,10 +398,51 @@ function Simulation(domain::FixedDomain;
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
                     envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
+                    state::Union{Nothing, ResolvedFields} = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = nothing,
                     unwrapped::Bool = false,
+                    tracers::Union{Nothing, Tracers} = nothing,
                     particle_integration_scheme::Union{Nothing, AbstractParticleIntegrator} = nothing,
                     rng = Random.default_rng())
+  # The injection door (decision 83): an existing state or tracer set is ADOPTED — its arrays
+  # become the run's own, no copy — so a continuation or an external import skips the seeding.
+  # Validated here, before anything is built from the settings the adoption overrides.
+  if state !== nothing
+    initial_spectrum === nothing ||
+      throw(ArgumentError("`initial_spectrum` and `state` are two ways to set the initial " *
+                          "condition — `initial_spectrum` shapes the random seed, `state` adopts " *
+                          "an existing field set. Pass one, not both."))
+    (state.scalar_spectral !== nothing) == scalar ||
+      throw(ArgumentError(scalar ?
+        "`scalar = true` but the given `state` carries no scalar: the run would advect a scalar " *
+        "the state does not hold. Build the state with a scalar, or drop `scalar`." :
+        "the given `state` carries a scalar but `scalar = false`: the run would silently ignore " *
+        "it. Pass `scalar = true`, or hand over a velocity-only state."))
+    state.velocity_spectral.grid == domain.grid ||
+      throw(ArgumentError("the given `state` lives on a different grid than `domain`: grid " *
+                          "size, box size, and element type must all agree for the state to be " *
+                          "adopted."))
+    state.velocity_spectral.fourier_coefficients isa domain.storage_family ||
+      throw(ArgumentError("the given `state` lives on a different storage backend than " *
+                          "`domain`: move it, or build the domain, on the matching backend."))
+  end
+  if tracers !== nothing
+    number_of_particles == 0 ||
+      throw(ArgumentError("`number_of_particles` and `tracers` are two ways to ask for " *
+                          "particles — the count seeds a fresh set, `tracers` adopts an " *
+                          "existing one. Pass one, not both."))
+    interpolation_scheme === nothing ||
+      throw(ArgumentError("`interpolation_scheme` was given together with `tracers`, but the " *
+                          "interpolation scheme is a property of the given tracer set. Drop " *
+                          "the setting."))
+    !unwrapped ||
+      throw(ArgumentError("`unwrapped = true` was given together with `tracers`, but the " *
+                          "unwrapped record is a property of the given tracer set. Drop the " *
+                          "setting."))
+    point_coordinates(tracers.positions) isa domain.storage_family ||
+      throw(ArgumentError("the given `tracers` live on a different storage backend than " *
+                          "`domain`: move them, or build the domain, on the matching backend."))
+  end
   # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
   # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
@@ -425,6 +492,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   else
     ν = Float64(viscosity)
   end
+  # An adopted state can void the derived-ν calibration the same way a hand-built forcing can:
+  # the stationary estimate assumed k = `kinetic_energy`, and the state handed over may hold
+  # something else. Measured, not trusted; explicit-ν runs stay silent.
+  viscosity === nothing && state !== nothing &&
+    _warn_adopted_state_energy_mismatch(state, kinetic_energy)
 
   buffers = allocate_buffers(field_integration_scheme, domain; scalar)
   # `nothing` means the default controller holding `kinetic_energy` — a sentinel rather than a
@@ -475,22 +547,24 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
 
 
-  state = ResolvedFields(domain; scalar)
-  ic_spectrum = nothing
-  if initial_spectrum isa EnergySpectrum       # a `Phenomenology` model → evaluate at the run's state
-    fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * kinetic_energy / 3),
-                        integral_scale = inv(envelope_wavenumber), schmidt)
-    ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
-  elseif !isnothing(initial_spectrum)
-    ic_spectrum = initial_spectrum             # a raw κ -> E(κ) function
+  if state === nothing
+    state = ResolvedFields(domain; scalar)
+    ic_spectrum = nothing
+    if initial_spectrum isa EnergySpectrum     # a `Phenomenology` model → evaluate at the run's state
+      fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * kinetic_energy / 3),
+                          integral_scale = inv(envelope_wavenumber), schmidt)
+      ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
+    elseif !isnothing(initial_spectrum)
+      ic_spectrum = initial_spectrum           # a raw κ -> E(κ) function
+    end
+    random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
+    scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
   end
-  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
-  scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
 
   # `nothing` sentinels, like `velocity_forcing`'s: a particle-only setting configured on a
   # particle-free run would be silently discarded, which is the quiet-wrong-configuration shape
   # `ResolvedGenerator` refuses for a scalar forcing without a scalar.
-  if number_of_particles == 0
+  if number_of_particles == 0 && tracers === nothing
     for (name, value) in (("interpolation_scheme", interpolation_scheme),
                           ("particle_integration_scheme", particle_integration_scheme))
       value === nothing ||
@@ -504,14 +578,15 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                           "drop the setting."))
   end
   pscheme = particle_integration_scheme === nothing ? Heun() : particle_integration_scheme
-  tracers = number_of_particles > 0 ?
+  tracers = tracers !== nothing ? tracers :
+            number_of_particles > 0 ?
     Tracers(domain; number_of_particles,
             interpolation_scheme = interpolation_scheme === nothing ? CatmullRom : interpolation_scheme,
             unwrapped, rng) : nothing
   # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar,
-                           number_of_particles = tracers === nothing ? 0 : Int(number_of_particles),
+                           number_of_particles = tracers === nothing ? 0 : npoints(tracers.positions),
                            history_depth = history_depth(pscheme))
   particle_buffers = tracers === nothing ? nothing :
                      allocate_buffers(pscheme, tracers, cache)

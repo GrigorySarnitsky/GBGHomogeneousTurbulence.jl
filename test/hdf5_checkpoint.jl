@@ -188,3 +188,57 @@ end
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
   rm(path)
 end
+
+
+@testset "an adopted state and tracer set continue a run bitwise (decision 83)" begin
+  path = tempname() * ".h5"
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+                   number_of_particles = 5, rng = MersenneTwister(21))
+  for _ in 1:3
+    advance!(sim; dt = 0.01)
+  end
+  h5open(path, "w") do io
+    io["s"] = sim.state
+    io["t"] = sim.tracers
+  end
+  st = h5open(io -> read_state(io, "s", sim.domain), path, "r")
+  tr = h5open(io -> read_tracers(io, "t", sim.domain), path, "r")
+  # Same physics settings, the evolved state and positions ADOPTED: from here the two runs are the
+  # same discrete system, so three more steps must agree bitwise (deterministic default forcing).
+  sim2 = Simulation(sim.domain; viscosity = 0.05, scalar = true, state = st, tracers = tr)
+  for _ in 1:3
+    advance!(sim; dt = 0.01)
+    advance!(sim2; dt = 0.01)
+  end
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+  @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
+  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
+  rm(path)
+end
+
+
+@testset "the injection door refuses conflicting or mismatched settings by name" begin
+  domain = make_domain()
+  st = ResolvedFields(domain)
+  st_scalar = ResolvedFields(domain; scalar = true)
+  tr = Tracers(domain; number_of_particles = 3, interpolation_scheme = CatmullRom,
+               rng = MersenneTwister(5))
+  # Two ways to set the same thing, and property-of-the-adopted-object settings:
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st,
+                                        initial_spectrum = κ -> κ^-2)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st, scalar = true)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st_scalar)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, tracers = tr,
+                                        number_of_particles = 3)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, tracers = tr,
+                                        interpolation_scheme = CatmullRom)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, tracers = tr, unwrapped = true)
+  # A state from a different grid is refused before anything is built from it.
+  bigger = FixedDomain(; grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                       array_type = Array, dealiasing = TwoThirds())
+  @test_throws ArgumentError Simulation(bigger; viscosity = 0.05, state = st)
+  # Derived ν + an adopted state whose energy is not the calibration's: warned, not silent.
+  seeded = Simulation(domain; viscosity = 0.05, rng = MersenneTwister(6))   # k = 1.5 by default
+  @test_logs (:warn, r"adopted `state` holds k") match_mode = :any Simulation(
+    domain; state = seeded.state, kinetic_energy = 15.0)
+end

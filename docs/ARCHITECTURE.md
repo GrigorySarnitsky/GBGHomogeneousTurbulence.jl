@@ -481,7 +481,8 @@ scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
 Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
-  builds every piece of §4.1–§4.6, seeds a divergence-free initial condition, and picks the default
+  builds every piece of §4.1–§4.6, seeds a divergence-free initial condition — or adopts an
+  existing state and tracer set outright (the injection door, decision 83) — and picks the default
   scheme. The viscosity is derived from the grid by default — the highest Reynolds number consistent with the
   chosen resolution criterion `κ_max_η` (decision 20; measured against the resolved cutoff, decision
   82) — with a supplied `viscosity` the opt-in override.
@@ -2458,6 +2459,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the resolved cutoff, everything energetic-band-facing the retained one, and `recommended_cfl`
     keeps its retained-fraction pricing unchanged. Derived-``\nu`` `HouLi` runs get more viscous by
     ``(5/4)^{4/3}`` accordingly; sharp-strategy runs are bit-identical.
+83. **(2026-08, user-directed) The injection door: `Simulation` adopts an existing state and
+    tracer set.** `Simulation` is immutable by design — reconfiguration is *rebuild around the
+    shared `FixedDomain`*, never mutation — but the constructor could until now only seed fresh
+    randomness, so "continue this evolved field under a new configuration" (a different scheme,
+    particles added after a warm-up, an externally imported state — the TurTLE comparison's exact
+    need) had no sanctioned path short of hand-overwriting arrays. Two keywords close it: `state`
+    (a `ResolvedFields`) and `tracers` (a `Tracers`) are ADOPTED — the arrays become the run's
+    own, no copy — skipping the seeding while the guards refuse, by name, every setting the
+    adoption overrides (`initial_spectrum` with `state`; `number_of_particles`,
+    `interpolation_scheme`, `unwrapped` with `tracers`), a `scalar` flag disagreeing with the
+    state's contents, and a grid or storage-backend mismatch with the domain. A derived ``\nu``
+    measures the adopted state's kinetic energy and warns when it voids the `kinetic_energy`
+    calibration — the adopted-state sibling of the hand-built-forcing check. The sample history of
+    a multistep particle scheme is deliberately NOT a constructor keyword: restoring it belongs to
+    `read_simulation` (which already does it fill-aware), and the state importer for external
+    checkpoints reuses that path. Pinned by a bitwise test: three steps, a `write_state` /
+    `write_tracers` round trip adopted into a fresh `Simulation`, three more steps — equal to the
+    uninterrupted run.
 
 ## References
 
