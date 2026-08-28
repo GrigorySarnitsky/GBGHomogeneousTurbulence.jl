@@ -166,6 +166,9 @@ The domain group:
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
   ``\\kappa_{\\max}`` of `κ_max_η`).
+- `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to the
+  [`FixedDomain`](@ref) being built (pass `FFTW.MEASURE` for a long CPU run — the planner note
+  there explains why; inert on a GPU backend).
 
 The run group:
 
@@ -599,8 +602,10 @@ end
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     element_type::Type = Float64, array_type = Array,
-                    dealiasing::DealiasingStrategy = TwoThirds(), kwargs...)
-  return Simulation(FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type, array_type); kwargs...)
+                    dealiasing::DealiasingStrategy = TwoThirds(),
+                    fft_flags = nothing, fft_timelimit::Real = Inf, kwargs...)
+  return Simulation(FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type,
+                                  array_type, fft_flags, fft_timelimit); kwargs...)
 end
 
 

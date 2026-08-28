@@ -171,3 +171,15 @@ using Test
     @test isfinite(scalar_variance(sim.state.scalar_spectral)) && scalar_variance(sim.state.scalar_spectral) > 0
   end
 end
+
+
+@testset "the FFT planner request forwards to the domain's transform plans" begin
+  # FFTW.MEASURE == UInt32(0): a timed plan search, requested here without an FFTW dependency.
+  # The plans are built on zero scratch BEFORE any state exists, so MEASURE's overwrite-while-
+  # planning behavior cannot clobber anything — and the run must work end to end regardless.
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, fft_flags = UInt32(0),
+                   rng = MersenneTwister(41))
+  advance!(sim; dt = 0.01)
+  @test isfinite(kinetic_energy(sim.state.velocity_spectral))
+  @test sim.domain.transform_plans.fft_flags == UInt32(0)
+end

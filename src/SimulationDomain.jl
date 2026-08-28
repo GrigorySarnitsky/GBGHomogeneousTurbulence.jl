@@ -194,6 +194,13 @@ All keyword, all required:
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
+- `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to
+  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans)
+  untouched. On the CPU the default is FFTW's instant `ESTIMATE` heuristic, which can badly
+  mis-plan single-precision transforms (measured 2–5× slow at ``256^3`` `Float32`; see the
+  planner warning on `FieldTransformPlans`); for a long CPU run pass `FFTW.MEASURE` — the
+  one-time timed plan search costs seconds. The GPU FFT libraries take no planner flag, so on a
+  GPU backend the setting is inert.
 
 # Examples
 
@@ -265,7 +272,8 @@ _unit_symbol(κ²) = one(κ²)
 function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
                        dealiasing::DealiasingStrategy,
                        element_type::Type{T},
-                       array_type) where {T<:AbstractFloat}
+                       array_type,
+                       fft_flags = nothing, fft_timelimit::Real = Inf) where {T<:AbstractFloat}
   N = Int(grid_points_per_axis)
   L = T(side_length)
   grid = Grid3D((N, N, N), (L, L, L))
@@ -282,7 +290,10 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # would do, and the scalar templates are already in hand. This retired IT decision 78's lazy
   # rank-2 memo: laziness solved the per-rank buffer multiplication, and upstream deleted the
   # multiplication itself (decision 81).
-  transform_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage)
+  # The templates are freshly allocated zero scratch, so a timed planner (`MEASURE`), which
+  # overwrites the arrays it plans against, cannot clobber anything here by construction.
+  transform_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage;
+                                        fft_flags, fft_timelimit = Float64(fft_timelimit))
   multipliers = FieldSpectralMultipliers(velocity_spectral)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
