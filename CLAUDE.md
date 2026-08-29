@@ -4,7 +4,7 @@ Julia package: a small, focused **pseudospectral direct numerical simulation (DN
 isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
 ``\varphi`` on a triple-periodic box, each optionally forced, advanced by interchangeable
 integrating-factor time-stepping, with Lagrangian particle tracking and field sampling along the
-trajectories (accumulating statistics over those values is the caller's analysis, not this package's). **GPU is the primary target**: the time loop is in-place and allocation-free over
+trajectories (accumulating statistics over those values is the caller's analysis, not this package's). **GPU is the primary target**: the time loop is in-place and field-scale-allocation-free over
 preallocated buffers, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
 
 Built on two sibling backends: **GBGPeriodicFields** ("PF", the field mathematics) and
@@ -78,7 +78,7 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
 3. **Deferred ≠ missing.** A recorded coverage gap or a deferred capability is a *decision*, not an
    omission; "for symmetry", "for completeness", or "it's convenient" is never a valid justification (a
    missing capability encodes a decision — the PF / SS discipline).
-4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free over the
+4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free AT FIELD SCALE over the
    preallocated buffers (the state, the integrator's `IntegratorBuffers`, the generator's assembly
    scratch, and the observables cache's slots); storage is generic
    `AbstractArray` (no scalar indexing of device arrays).

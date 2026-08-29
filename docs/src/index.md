@@ -9,7 +9,7 @@ tracking and field sampling.
 It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
 supplies every field operation — transforms, differential operators, convolution,
 interpolation, and reductions. The GPU is the primary target, so each time step is in-place and
-allocation-free over preallocated buffers (occasional diagnostics allocate per call).
+allocation-free at field scale over preallocated buffers (occasional diagnostics allocate per call; the threaded CPU path spawns small per-pass task transients).
 
 ## Installation
 

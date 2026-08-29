@@ -16,7 +16,8 @@ make_domain(; T = Float64, dealiasing = TwoThirds()) =
 
 @testset "write_domain / read_domain round-trip the defining parameters" begin
   path = tempname() * ".h5"
-  for dealiasing in (TwoThirds(), HouLi(order = 20, strength = 0.5), PhaseShift())
+  for dealiasing in (TwoThirds(), HouLi(order = 20, strength = 0.5),
+                    HouLi(order = 20, strength = 0.5, materialized = true), PhaseShift())
     domain = make_domain(; T = Float32, dealiasing)
     h5open(io -> (io["d"] = domain), path, "w")
     back = h5open(io -> read_domain(io, "d"), path, "r")

@@ -72,7 +72,7 @@ of the quadratic nonlinearity, with the narrowest retained band of the three and
 struct TwoThirds <: DealiasingStrategy end
 
 """
-    HouLi(; order = 36, strength = nothing)
+    HouLi(; order = 36, strength = nothing, materialized = false)
 
 The smooth spectral filter of Hou & Li (2007,
 [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014),
@@ -105,18 +105,32 @@ CFL step than the ``2/3`` rule — handled automatically by
     ``\\kappa_{\\max}\\eta`` therefore uses [`max_resolved_wavenumber`](@ref), which is
     ``\\tfrac{4}{5}\\,\\kappa_{\\mathrm{Ny}}`` under this strategy — not the Nyquist.
 
+The `materialized` keyword chooses how the filter is *applied* — a memory-for-compute choice
+with no effect on the numbers: `false` (the default) keeps the filter as a closed-form radial
+symbol re-evaluated per mode in every pass (zero resident storage — the minimal-footprint
+default), while `true` evaluates it once into a stored coefficient array the passes then merely
+read. The stored coefficients are the same expression evaluated once, so the two settings
+advance a run **bit-identically**; what changes is the cost profile — one resident complex
+spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``)
+against the per-mode ``\\exp`` and power chain (measured ``\\approx 14\\%`` of a ``128^3``
+GPU step at `order = 36`). Prefer `true` when compute is the scarce resource, `false` when
+memory is.
+
 # Fields
-The plain constructor `HouLi(order, strength)` takes the two fields directly:
+The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:
 - `order` — the exponent of the spectral roll-off.
 - `strength` — the damping at the Nyquist mode, or `nothing` for the element-type default described
   above.
+- `materialized` — whether the filter is stored coefficientwise rather than re-evaluated per mode.
 """
 struct HouLi <: DealiasingStrategy
   order::Int
   strength::Union{Float64, Nothing}
+  materialized::Bool
 end
-HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing) =
-  HouLi(Int(order), isnothing(strength) ? nothing : Float64(strength))
+HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing,
+        materialized::Bool = false) =
+  HouLi(Int(order), isnothing(strength) ? nothing : Float64(strength), materialized)
 
 """
     PhaseShift()
@@ -349,7 +363,11 @@ function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}
   inverse_nyquist = one(T) / T((N / 2) * (2π / L))
   strength = T(isnothing(strategy.strength) ? -log(eps(T)) : strategy.strength)
   order = strategy.order
-  return radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order), multipliers)
+  kernel = radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order), multipliers)
+  # `materialized` trades one resident spectral scalar for the per-mode exp/power chain every
+  # pass would otherwise re-evaluate (decision 84); the stored coefficients are the SAME closure
+  # evaluated once, so the two forms advance a run bit-identically.
+  return strategy.materialized ? materialize_kernel(kernel) : kernel
 end
 
 

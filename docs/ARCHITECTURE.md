@@ -2477,6 +2477,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     checkpoints reuses that path. Pinned by a bitwise test: three steps, a `write_state` /
     `write_tracers` round trip adopted into a fresh `Simulation`, three more steps — equal to the
     uninterrupted run.
+84. **(2026-08, user-directed) `HouLi(materialized = …)` — the filter's memory-for-compute axis
+    becomes the user's choice.** A GPU kernel census (rocprofv3, 2026-08-29) priced the
+    allocation-free radial-symbol design at the smooth filter: re-evaluating the
+    ``\exp``-and-power chain per mode in every fused pass costs ``\approx 14\%`` of a ``128^3``
+    `Float64` step (the fused dealias+projection kernel runs ``0.485`` ms where the identical
+    traversal without the symbol runs ``0.136``). That cost was the *deliberate* price of frame
+    floor 0 (decisions 36/63) — but a priced tradeoff with two defensible sides belongs to the
+    user, not to a default. `HouLi` now carries `materialized::Bool = false`: the default keeps
+    the closed-form symbol (zero resident storage, the minimal-footprint invariant's side);
+    `true` evaluates the same closure once into a `StoredKernel` (one resident complex spectral
+    scalar — ``\approx 17`` MiB at ``128^3`` `Float64`) that every pass then reads, converting
+    the eight filter-evaluating kernels per step to streaming. PF's uniform kernel protocol makes
+    the swap one branch in `_build_dealias`; every fused site (the `ProductKernel` compositions
+    with the integrating factor and the translation kernels) consumes either form unchanged.
+    Bit-identity between the two settings is pinned by test (same closure, evaluated once vs per
+    mode — five steps, `==` on the coefficients); the checkpoint schema writes the flag only when
+    set, so pre-flag files read back unchanged as the default. The frame ledger is untouched at
+    the default; a `materialized` domain adds exactly the one declared array.
 
 ## References
 

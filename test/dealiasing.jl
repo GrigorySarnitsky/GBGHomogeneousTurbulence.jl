@@ -3,7 +3,7 @@
 # active strategy (a strategy that keeps more modes takes a smaller step).
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data, materialize_kernel, to_physical!
+using GBGPeriodicFields: field_data, materialize_kernel, to_physical!, StoredKernel
 using Random
 using Test
 
@@ -182,4 +182,22 @@ end
   advance!(sim; dt = 0.01)
   @test isfinite(kinetic_energy(sim.state.velocity_spectral))
   @test sim.domain.transform_plans.fft_flags == UInt32(0)
+end
+
+
+@testset "a materialized HouLi filter advances bit-identically to the lazy symbol (decision 84)" begin
+  lazy = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                    dealiasing = HouLi(order = 36, strength = 30.0),
+                    rng = MersenneTwister(51))
+  stored = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                      dealiasing = HouLi(order = 36, strength = 30.0, materialized = true),
+                      rng = MersenneTwister(51))
+  @test stored.domain.dealias isa StoredKernel        # coefficients held, not re-evaluated
+  @test !(lazy.domain.dealias isa StoredKernel)       # the default keeps the closed-form symbol
+  for _ in 1:5
+    advance!(lazy; dt = 0.01)
+    advance!(stored; dt = 0.01)
+  end
+  # Same closure, evaluated once and stored vs per mode per pass: the runs must not differ by a bit.
+  @test field_data(lazy.state.velocity_spectral) == field_data(stored.state.velocity_spectral)
 end

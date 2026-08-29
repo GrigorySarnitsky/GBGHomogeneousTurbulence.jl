@@ -113,6 +113,9 @@ function write_domain(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
   if d isa HouLi
     a["dealiasing_order"] = d.order
     d.strength === nothing || (a["dealiasing_strength"] = d.strength)
+    # Written only when set: an absent attribute reads back as the default `false`, so files
+    # from before the flag existed stay readable unchanged.
+    d.materialized && (a["dealiasing_materialized"] = true)
   end
   return g
 end
@@ -125,7 +128,9 @@ function read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type 
                tag == "PhaseShift" ? PhaseShift() :
                tag == "HouLi" ? HouLi(order = Int(a["dealiasing_order"]),
                                       strength = haskey(a, "dealiasing_strength") ?
-                                                 a["dealiasing_strength"] : nothing) :
+                                                 a["dealiasing_strength"] : nothing,
+                                      materialized = haskey(a, "dealiasing_materialized") ?
+                                                     Bool(a["dealiasing_materialized"]) : false) :
                throw(ArgumentError("read_domain: unrecognized dealiasing tag \"$tag\" in group " *
                                    "\"$name\""))
   return FixedDomain(; grid_points_per_axis = Int(a["grid_points_per_axis"]),
