@@ -112,9 +112,11 @@ default), while `true` evaluates it once into a stored coefficient array the pas
 read. The stored coefficients are the same expression evaluated once, so the two settings
 advance a run **bit-identically**; what changes is the cost profile — one resident complex
 spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``)
-against the per-mode ``\\exp`` and power chain (measured ``\\approx 14\\%`` of a ``128^3``
-GPU step at `order = 36`). Prefer `true` when compute is the scarce resource, `false` when
-memory is.
+against the per-mode ``\\exp`` and power chain. Measured at ``128^3`` `Float64` on a GPU with
+`order = 36`: the on-the-fly evaluation costs ``\\approx 14\\%`` of the step, of which
+`materialized = true` recovers ``\\approx 7\\%`` — the filter factor becomes an array read,
+while the integrating factor's own exponential remains. Prefer `true` when compute is the
+scarce resource, `false` when memory is.
 
 # Fields
 The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:

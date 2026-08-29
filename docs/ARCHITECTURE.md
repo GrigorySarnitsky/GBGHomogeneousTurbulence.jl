@@ -2487,8 +2487,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     user, not to a default. `HouLi` now carries `materialized::Bool = false`: the default keeps
     the closed-form symbol (zero resident storage, the minimal-footprint invariant's side);
     `true` evaluates the same closure once into a `StoredKernel` (one resident complex spectral
-    scalar — ``\approx 17`` MiB at ``128^3`` `Float64`) that every pass then reads, converting
-    the eight filter-evaluating kernels per step to streaming. PF's uniform kernel protocol makes
+    scalar — ``\approx 17`` MiB at ``128^3`` `Float64`) that every pass then reads. Measured
+    payoff: ``0.96`` ms/step = ``7\%`` at ``128^3`` GPU — half the census's ``14\%``, because
+    materialization replaces only the *filter factor*: the integrating factor's own per-mode
+    exponential remains in the fused kernels, and the stored coefficients add read traffic. PF's uniform kernel protocol makes
     the swap one branch in `_build_dealias`; every fused site (the `ProductKernel` compositions
     with the integrating factor and the translation kernels) consumes either form unchanged.
     Bit-identity between the two settings is pinned by test (same closure, evaluated once vs per

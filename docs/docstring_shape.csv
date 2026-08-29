@@ -93,7 +93,7 @@ Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
 Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,55,0,89
 SimulationDomain.jl::DealiasingStrategy,95,0,96
 SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,35,1,566
-SimulationDomain.jl::HouLi(; order = 36， strength = nothing， materialized = false),129,1,426
+SimulationDomain.jl::HouLi(; order = 36， strength = nothing， materialized = false),160,1,457
 SimulationDomain.jl::PhaseShift(),75,1,274
 SimulationDomain.jl::SimulationDomain,116,0,127
 SimulationDomain.jl::TwoThirds(),77,0,78
