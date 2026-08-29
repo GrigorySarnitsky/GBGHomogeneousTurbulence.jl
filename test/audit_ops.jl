@@ -287,6 +287,33 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
 end
 
 
+# IFLowStorageRK4 (decision 85): the SAME 2N iteration as IFLowStorageRK3 — the shared
+# `_low_storage_2n_step!` loop in `step!` — carried to five stages with Carpenter–Kennedy's
+# coefficients. Two more stage bodies, nothing else.
+function rk4_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, closing::Bool = true)
+  ops = Op[]
+  ou && append!(ops, _ou_prepare())
+  append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
+  scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
+  append!(ops, _velocity_update(:nl; first = true))
+  scalar && append!(ops, _scalar_update(; first = true))
+  for i in 2:5
+    append!(ops, _recoveries(:û; scratch = :nl))
+    append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
+    scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; recover = true, sscratch = :sb_nl, phase_shift))
+    append!(ops, _velocity_update(:nl; last = i == 5))
+    scalar && append!(ops, _scalar_update(; last = i == 5))
+  end
+  push!(ops, Op("finalize", [:û], [:û]))
+  # The advanced state's re-projection (decision 61): one in-place pointwise pass pinning the
+  # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
+  # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
+  push!(ops, Op("state re-projection", [:û], [:û]))
+  closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
+  return ops
+end
+
+
 # IFSSPRK3 (Shu–Osher, TurTLE's arrangement) as one iteration: the state û holds t_n until the
 # final combination, the stage register `s` carries q⁽¹⁾ then q⁽²⁾, and `nl` doubles as the
 # right-hand-side register and (spent) recovery scratch — the same two registers as IFLowStorageRK3,
@@ -556,11 +583,12 @@ const DEALIASINGS = (:TwoThirds, :HouLi, :PhaseShift)
 
 _ops(scheme, dealiasing, scalar; ou = false) =
   scheme === :RK3 ? rk3_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift) :
+  scheme === :RK4 ? rk4_ops(scalar; ou, phase_shift = dealiasing === :PhaseShift) :
   scheme === :SSPRK3 ? ssprk3_ops(scalar; phase_shift = dealiasing === :PhaseShift) :
   rk2_ops(scalar; phase_shift = dealiasing === :PhaseShift)
 
-_evals(scheme)  = scheme === :RK2 ? 2 : 3     # right-hand-side evaluations per step
-_applies(scheme) = scheme === :RK3 ? 5 : scheme === :SSPRK3 ? 6 : 3
+_evals(scheme)  = scheme === :RK2 ? 2 : scheme === :RK4 ? 5 : 3     # right-hand-side evaluations per step
+_applies(scheme) = scheme === :RK3 ? 5 : scheme === :RK4 ? 9 : scheme === :SSPRK3 ? 6 : 3
                                               # fused-exponential applications per field per step
                                               # (RK3: 3 state updates + 2 accumulator rotations;
                                               #  SSPRK3: 3 stage updates + 3 single-operand

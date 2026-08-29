@@ -15,6 +15,7 @@ memory.
 ```@docs
 AbstractIntegrator
 IFLowStorageRK3
+IFLowStorageRK4
 IFSSPRK3
 IFHeun
 ```

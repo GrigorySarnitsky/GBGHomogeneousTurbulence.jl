@@ -243,3 +243,23 @@ end
   @test_logs (:warn, r"adopted `state` holds k") match_mode = :any Simulation(
     domain; state = seeded.state, kinetic_energy = 15.0)
 end
+
+
+@testset "an IFLowStorageRK4 run checkpoints, restores its scheme, and continues bitwise" begin
+  path = tempname() * ".h5"
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                   field_integration_scheme = IFLowStorageRK4(),
+                   rng = MersenneTwister(61))
+  for _ in 1:3
+    advance!(sim; dt = 0.01)
+  end
+  h5open(io -> (io["run"] = sim), path, "w")
+  sim2 = h5open(io -> read_simulation(io, "run"), path, "r")
+  @test sim2.field_integration_scheme isa IFLowStorageRK4
+  for _ in 1:3
+    advance!(sim; dt = 0.01)
+    advance!(sim2; dt = 0.01)
+  end
+  @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
+  rm(path)
+end

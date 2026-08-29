@@ -54,6 +54,14 @@ include("audit_ops.jl")     # the op model AND its cost model — shared with th
 # freshness contract, so no re-recovery exists).
 const TRANSFORMS_BASE = Dict(
   (:RK3, :TwoThirds,  false) => (c2r = 18, r2c = 9),
+  # IFLowStorageRK4 (decision 85): 5/3 of :RK3's stage-scaled transforms — the same iteration
+  # carried to five stages; the closing deposit's share is unchanged. AUDIT_PRINT-generated.
+  (:RK4, :TwoThirds,  false) => (c2r = 30, r2c = 15),
+  (:RK4, :TwoThirds,  true)  => (c2r = 35, r2c = 30),
+  (:RK4, :HouLi,      false) => (c2r = 30, r2c = 15),
+  (:RK4, :HouLi,      true)  => (c2r = 35, r2c = 30),
+  (:RK4, :PhaseShift, false) => (c2r = 60, r2c = 30),
+  (:RK4, :PhaseShift, true)  => (c2r = 70, r2c = 60),
   (:RK3, :TwoThirds,  true)  => (c2r = 21, r2c = 18),
   (:RK3, :HouLi,      false) => (c2r = 18, r2c = 9),
   (:RK3, :HouLi,      true)  => (c2r = 21, r2c = 18),
@@ -117,6 +125,13 @@ const PASSES_BASE = Dict(
   # Re-frozen 2026-08-23 (+2 spectral_vector everywhere): decision 61's state re-projection — one
   # in-place pointwise pass per step pinning the advanced state's divergence at roundoff.
   (:RK3, :TwoThirds,  false) => (spectral_vector = 41, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  # IFLowStorageRK4 (decision 85): the RK3 pass structure at five stages. AUDIT_PRINT-generated.
+  (:RK4, :TwoThirds,  false) => (spectral_vector = 69, physical_vector = 16, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :TwoThirds,  true)  => (spectral_vector = 74, physical_vector = 26, spectral_scalar = 52, physical_scalar = 5, real_spectral_scalar = 0),
+  (:RK4, :HouLi,      false) => (spectral_vector = 69, physical_vector = 16, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :HouLi,      true)  => (spectral_vector = 74, physical_vector = 26, spectral_scalar = 52, physical_scalar = 5, real_spectral_scalar = 0),
+  (:RK4, :PhaseShift, false) => (spectral_vector = 124, physical_vector = 31, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :PhaseShift, true)  => (spectral_vector = 134, physical_vector = 51, spectral_scalar = 92, physical_scalar = 10, real_spectral_scalar = 0),
   (:RK3, :TwoThirds,  true)  => (spectral_vector = 44, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
   (:RK3, :HouLi,      false) => (spectral_vector = 41, physical_vector = 10, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK3, :HouLi,      true)  => (spectral_vector = 44, physical_vector = 16, spectral_scalar = 30, physical_scalar = 3, real_spectral_scalar = 0),
@@ -228,7 +243,7 @@ const TRACER_PASS_DELTA = ZERO
 
 if get(ENV, "AUDIT_PRINT", "") == "1"
   println("— computed compute-ledger cells (review, then freeze) —")
-  for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
+  for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true)
     ops = _ops(scheme, dealiasing, scalar)
     t = _transforms(ops)
     println((scheme, dealiasing, scalar))
@@ -252,7 +267,7 @@ end
 @testset "compute audit" begin
   @testset "every op is priced" begin
     all_ops = vcat((_ops(scheme, dealiasing, scalar; ou)
-                    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true),
+                    for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in DEALIASINGS, scalar in (false, true),
                         ou in (false, true) if !(ou && scheme === :RK2))...)
     @test all(op -> haskey(OP_COST, op.name), all_ops)
     @test all(op -> all(v -> haskey(VALUE_CLASS, v), Iterators.flatten((op.reads, op.writes))), all_ops)
@@ -272,7 +287,7 @@ end
     end
     # PhaseShift's price for exact quadratic dealiasing at √2·N/3 modes: exactly double the mask
     # velocity transforms — the displaced evaluation is a full second pipeline.
-    for scheme in (:RK3, :SSPRK3, :RK2)
+    for scheme in (:RK3, :RK4, :SSPRK3, :RK2)
       mask = TRANSFORMS_BASE[(scheme, :TwoThirds, false)]
       @test TRANSFORMS_BASE[(scheme, :PhaseShift, false)] == (c2r = 2mask.c2r, r2c = 2mask.r2c)
     end

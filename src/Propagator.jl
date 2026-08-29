@@ -27,10 +27,11 @@ are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `field_integration_scheme` is chosen from.
-- [`IFLowStorageRK3`](@ref), [`IFSSPRK3`](@ref), [`IFHeun`](@ref) — the schemes (RK3 low-storage;
-  the Shu–Osher SSPRK3 in TurTLE's arrangement, for code-to-code comparison; IFHeun a
-  two-stage Heun — cheaper in transforms, dearer by one register per field, and
-  imaginary-axis unstable).
+- [`IFLowStorageRK3`](@ref), [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref), [`IFHeun`](@ref) — the
+  schemes (RK3 low-storage, the workhorse; the Carpenter–Kennedy fourth-order sibling at the same
+  two registers, for stability-limited runs; the Shu–Osher SSPRK3 in TurTLE's arrangement, for
+  code-to-code comparison; IFHeun a two-stage Heun — cheaper in transforms, dearer by one register
+  per field, and imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
 - [`deposit!`](@ref) — close the iteration: recover the observables into the cache at the new epoch.
@@ -50,7 +51,8 @@ using ..Cache: ObservablesCache, velocity_physical, vorticity_physical, scalar_p
                deposit_velocity!, deposit_vorticity!, deposit_scalar!, deposit_max_speed!
 using ..Observables: max_speed, vorticity_physical!
 
-export AbstractIntegrator, IFHeun, IFLowStorageRK3, IFSSPRK3, IntegratorBuffers, allocate_buffers, step!,
+export AbstractIntegrator, IFHeun, IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IntegratorBuffers,
+       allocate_buffers, step!,
        deposit!, recommended_cfl
 
 
@@ -269,19 +271,77 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
-  û, φ̂ = state.velocity_spectral, state.scalar_spectral
-  T = real(eltype(field_data(û)))
-  dt_T = T(dt)
+  T = real(eltype(field_data(state.velocity_spectral)))
   a = (zero(T), T(-5 // 9), T(-153 // 128))
   b = (T(1 // 3), T(15 // 16), T(8 // 15))
   d = (T(1 // 3), T(5 // 12), T(1 // 4))
+  return _low_storage_2n_step!(a, b, d, state, generator, domain, buffers, cache, dt)
+end
+
+
+"""
+    IFLowStorageRK4()
+
+Integrating-factor fourth-order low-storage Runge–Kutta of Carpenter & Kennedy (1994,
+*Fourth-order 2N-storage Runge–Kutta schemes*, NASA TM-109112): five stages in the same
+Williamson 2N form — and therefore the same two registers per field — as
+[`IFLowStorageRK3`](@ref), advancing the same shared stage loop with Carpenter & Kennedy's
+coefficients (stated in the technical memorandum as exact rationals; abscissae
+``c \\approx (0, 0.1497, 0.3704, 0.6223, 0.9583)``).
+
+Use it when the run is stability-limited and the transforms dominate: its stability function is
+``R(z) = \\sum_{k \\le 4} z^{k}/k! + z^{5}/200``, whose imaginary-axis stability limit is
+
+```math
+y_s = \\sqrt{\\tfrac{5(\\sqrt{2041} - 5)}{18}} \\approx 3.3407,
+```
+
+``1.93\\times`` [`IFLowStorageRK3`](@ref)'s ``\\sqrt{3}`` at ``5/3`` the nonlinear evaluations per
+step — measured on a ``128^3`` `Float64` GPU run: the step costs ``1.665\\times``
+`IFLowStorageRK3`'s (every per-stage cost scales with the five stages alike), so a
+stability-limited run advances ``\\approx 16\\%`` more physical time per unit compute — with
+fourth-order accuracy, which also lets an
+[`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`(order = 4)` tracer
+actually deliver fourth-order trajectories.
+"""
+struct IFLowStorageRK4 <: AbstractIntegrator end
+
+
+function step!(::IFLowStorageRK4, state::ResolvedFields, generator::ResolvedGenerator,
+               domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
+  T = real(eltype(field_data(state.velocity_spectral)))
+  # Carpenter & Kennedy's exact rationals; the node increments d are differences of the abscissae
+  # c = (0, B₁, …), rounded to T only after the exact subtraction is set up.
+  a = (zero(T), T(-567301805773 // 1357537059087), T(-2404267990393 // 2016746695238),
+       T(-3550918686646 // 2091501179385), T(-1275806237668 // 842570457699))
+  b = (T(1432997174477 // 9575080441755), T(5161836677717 // 13612068292357),
+       T(1720146321549 // 2090206949498), T(3134564353537 // 4481467310338),
+       T(2277821191437 // 14882151754819))
+  c₂ = T(1432997174477 // 9575080441755)
+  c₃ = T(2526269341429 // 6820363962896)
+  c₄ = T(2006345519317 // 3224310063776)
+  c₅ = T(2802321613138 // 2924317926251)
+  d = (c₂, c₃ - c₂, c₄ - c₃, c₅ - c₄, one(T) - c₅)
+  return _low_storage_2n_step!(a, b, d, state, generator, domain, buffers, cache, dt)
+end
+
+
+# The shared 2N (Williamson-form) loop both low-storage schemes instantiate: S stages over one
+# accumulator, the per-stage integrating-factor rotation skipped at the last stage. The op
+# sequence for S = 3 is bit-identical to the pre-refactor IFLowStorageRK3 body.
+function _low_storage_2n_step!(a::NTuple{S, T}, b::NTuple{S, T}, d::NTuple{S, T},
+                               state::ResolvedFields, generator::ResolvedGenerator,
+                               domain::FixedDomain, buffers::IntegratorBuffers,
+                               cache::ObservablesCache, dt::Real) where {S, T}
+  û, φ̂ = state.velocity_spectral, state.scalar_spectral
+  dt_T = T(dt)
   hu = buffers.stage1                                                             # velocity accumulator
   sb = buffers.scalar                                                             # ScalarBuffers, or nothing
   has_scalar = φ̂ !== nothing
 
   prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
-  for i in 1:3
+  for i in 1:S
     if i == 1
       u = velocity_physical(cache)                     # the deposited observables, deposited by the
       ω = vorticity_physical(cache)                    # previous iteration's closing deposit (never recomputed)
@@ -321,7 +381,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
     # evaluates E(dᵢΔt) per mode from the factor's parameters — nothing built, stored, or swept.
     ℰ = velocity_integrating_factor(generator, d[i] * dt)
     _exponential_update!(û, one(T), û, b[i], hu, domain, ℰ)                       # ûᵢ ← E_ν (ûᵢ + Bᵢ hu)
-    i < 3 && _exponential_rotate!(hu, domain, ℰ)
+    i < S && _exponential_rotate!(hu, domain, ℰ)
 
     # The passive scalar rides the same stages (skipped, with its buffers unallocated, when absent).
     if has_scalar
@@ -333,7 +393,7 @@ function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGene
       end
       ℰφ = scalar_integrating_factor(generator, d[i] * dt)
       _exponential_update!(φ̂, one(T), φ̂, b[i], hφ, domain, ℰφ)                    # φ̂ᵢ ← E_κ (φ̂ᵢ + Bᵢ hφ)
-      i < 3 && _exponential_rotate!(hφ, domain, ℰφ)
+      i < S && _exponential_rotate!(hφ, domain, ℰφ)
     end
   end
 
@@ -608,6 +668,7 @@ end
 ScalarBuffers(::IFLowStorageRK3, domain::FixedDomain) = ScalarBuffers(
   new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
 )
+ScalarBuffers(::IFLowStorageRK4, domain::FixedDomain) = ScalarBuffers(IFLowStorageRK3(), domain)
 ScalarBuffers(::IFSSPRK3, domain::FixedDomain) = ScalarBuffers(
   new_scalar_field_spectral(domain), nothing, nothing, new_scalar_field_spectral(domain),           # stage1, stage2, predictor_spectral, nonlinear
 )
@@ -621,6 +682,14 @@ allocate_buffers(::IFLowStorageRK3, domain::FixedDomain; scalar::Bool = false) =
   nothing,                                                # velocity_predictor_spectral (IFHeun only)
   new_vector_field_spectral(domain),                                # nonlinear
   scalar ? ScalarBuffers(IFLowStorageRK3(), domain) : nothing,
+)
+
+allocate_buffers(::IFLowStorageRK4, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
+  new_vector_field_spectral(domain),                                # stage1 — same 2N registers as RK3
+  nothing,
+  nothing,
+  new_vector_field_spectral(domain),                                # nonlinear
+  scalar ? ScalarBuffers(IFLowStorageRK4(), domain) : nothing,
 )
 
 allocate_buffers(::IFSSPRK3, domain::FixedDomain; scalar::Bool = false) = IntegratorBuffers(
@@ -803,6 +872,9 @@ _base_cfl(::IFLowStorageRK3) = 0.5
 # the SAME stability function R(z) = 1 + z + z²/2 + z³/6, so the imaginary-axis limit √3 is shared
 # and the advective ceiling with it.
 _base_cfl(::IFSSPRK3) = 0.5
+# Scaled from RK3's 0.5 by the imaginary-axis extents: 0.5 · y_s(CK)/√3 = 0.5 · 3.3407/1.7321,
+# rounded DOWN — the ceiling stays conservative the same way the others are.
+_base_cfl(::IFLowStorageRK4) = 0.96
 
 # Scale the base ceiling by the active dealiasing: factor = (2/3)/f, f the retained Nyquist fraction
 # (2/3 for TwoThirds ⇒ unchanged, 1 for HouLi ⇒ ×2/3, since it keeps modes to Nyquist).

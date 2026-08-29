@@ -108,6 +108,14 @@ const BASE = Dict(
   (:SSPRK3, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
   (:SSPRK3, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:SSPRK3, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
+  # IFLowStorageRK4 (decision 85): the SAME cells as :RK3 in every configuration — the
+  # Carpenter–Kennedy 2N pair adds stages, not registers; the equality IS the claim.
+  (:RK4, :TwoThirds,  false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :TwoThirds,  true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK4, :HouLi,      false) => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :HouLi,      true)  => (spectral_vector = 4, physical_vector = 2, spectral_scalar = 3, physical_scalar = 1, real_spectral_scalar = 0),
+  (:RK4, :PhaseShift, false) => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
+  (:RK4, :PhaseShift, true)  => (spectral_vector = 5, physical_vector = 4, spectral_scalar = 5, physical_scalar = 2, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
   (:RK2, :TwoThirds,  true)  => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 4, physical_scalar = 1, real_spectral_scalar = 0),
   (:RK2, :HouLi,      false) => (spectral_vector = 5, physical_vector = 2, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0),
@@ -167,7 +175,8 @@ _build_forcing(tag, domain) =
   tag === :controller ? VarianceController(domain; target = 0.5, turnover_time = 1.0) :
   StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
 
-_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : tag === :SSPRK3 ? IFSSPRK3() : IFHeun()
+_scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : tag === :RK4 ? IFLowStorageRK4() :
+               tag === :SSPRK3 ? IFSSPRK3() : IFHeun()
 const FORCING_TAGS = (:none, :band, :linear, :power, :controller, :ou)
 
 
@@ -415,7 +424,7 @@ const EPISODE_UNITS = [
     # scheme × dealiasing × scalar × velocity forcing × scalar forcing × tracers: every combination
     # must equal base + velocity-forcing delta + scalar-forcing delta + tracer delta. A cross-term
     # (a buffer whose existence depends on two axes at once) fails here and must be recorded.
-    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift), scalar in (false, true),
+    for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift), scalar in (false, true),
         vtag in FORCING_TAGS, stag in (scalar ? FORCING_TAGS : (:none,)), tracers in (false, true)
       domain = domains[dealiasing]
       counts = ledger(domain, _scheme(scheme), scalar,
@@ -481,7 +490,7 @@ const EPISODE_UNITS = [
     # observation cache, generator, scheme registers, tracers — and require the total to equal
     # frame + working set, cell by cell. A future buffer that neither table names fails here
     # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
-    for scheme in (:RK3, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
+    for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
                        velocity_forcing = NoForcing(), field_integration_scheme = _scheme(scheme),

@@ -2497,12 +2497,34 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     mode — five steps, `==` on the coefficients); the checkpoint schema writes the flag only when
     set, so pre-flag files read back unchanged as the default. The frame ledger is untouched at
     the default; a `materialized` domain adds exactly the one declared array.
+85. **(2026-08, user-directed) `IFLowStorageRK4` — Carpenter & Kennedy's fourth order at RK3's two
+    registers, for stability-limited runs.** The time-integration report's storage taxonomy
+    corrected a mis-belief this log should record being corrected: fourth order does NOT cost more
+    registers — Carpenter & Kennedy (1994, NASA TM-109112) reach it in five stages of the same
+    Williamson 2N form. The scheme's stability function was derived exactly from the published
+    rationals (the fifth coefficient collapses to ``z^{5}/200``), giving the imaginary-axis limit
+    ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407`` — ``1.93\times`` RK3's ``\sqrt{3}`` at
+    ``5/3`` the evaluations, hence ``\approx 16\%`` fewer transforms per unit time at the
+    stability limit — and MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
+    analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the ``\times
+    1.157`` transform-only projection; the per-stage non-transform costs scale with the stages
+    just as the transforms do, so nothing is eaten. Implementation: `step!`'s 2N loop was factored into one shared
+    `_low_storage_2n_step!` both schemes instantiate with their coefficient tuples — the S = 3
+    op sequence is bit-identical to the pre-refactor body — and the audit op model mirrors the
+    same factoring (`rk4_ops` = the RK3 iteration at five stages). All three audits extended:
+    memory cells equal :RK3's in every configuration (stages, not registers — the equality is
+    the claim), transform/pass cells AUDIT_PRINT-generated and frozen, the optimality floors
+    reflective. Fourth-order convergence pinned by test (ratio ≈ 16); `recommended_cfl` prices
+    the larger ceiling (base 0.96, rounded down from ``0.5 \cdot y_s/\sqrt{3}``); checkpoint
+    round-trips bitwise. A side effect worth naming: under a fourth-order field the existing
+    `AdamsBashforth(order = 4)` tracers deliver genuine fourth-order trajectories, closing the
+    order mismatch the particle suite's own test documents.
 
 ## References
 
-Cited author–year above; full entries here, each with its DOI where the work has one. Two do not,
-and the reason is stated with the entry rather than left to the reader to wonder about: a NASA
-technical memorandum and a CTR research brief sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
+Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,
+and the reason is stated with the entry rather than left to the reader to wonder about: two NASA
+technical memoranda and a CTR research brief sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
 is worse than none, since it silently sends the reader somewhere else.
 
 The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law carries its own
@@ -2564,6 +2586,9 @@ cites.
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
   cites the family rather than a numbered case.)*
+- Carpenter, M. H. & Kennedy, C. A. (1994). *Fourth-order 2N-storage Runge–Kutta schemes.*
+  NASA TM-109112. *(The five-stage, two-register fourth-order scheme `IFLowStorageRK4`
+  implements; a NASA technical memorandum, outside the DOI system.)*
 - Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471. *(The SSPRK3 tableau
   `IFSSPRK3` implements, in TurTLE's stage arrangement.)*
 - Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press. *(Notation; the

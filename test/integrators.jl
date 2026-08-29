@@ -158,3 +158,29 @@ end
     @test measured_order(VarianceRescaling(target = 1.5, over = :total)) < 1.5
   end
 end
+
+
+@testset "IFLowStorageRK4: fourth-order convergence at RK3's registers" begin
+  T = Float64
+  N = 32; L = 2π; ν = 0.02
+  domain = FixedDomain(; grid_points_per_axis = N, side_length = L, dealiasing = TwoThirds(),
+                       element_type = T, array_type = Array)
+  û0 = new_vector_field_spectral(domain)
+  random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
+                                       rng = MersenneTwister(7))
+  truncate_to_band!(û0, domain)
+  unforced = FlowConditions(viscosity = ν, schmidt = 1.0,
+                            velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
+  Tfinal = 0.5; n = 8
+  ck = IFLowStorageRK4()
+  u1 = integrate_fixed(ck, domain, û0, unforced, Tfinal / n, n)
+  u2 = integrate_fixed(ck, domain, û0, unforced, Tfinal / (2n), 2n)
+  u4 = integrate_fixed(ck, domain, û0, unforced, Tfinal / (4n), 4n)
+  ck_ratio = diffnorm(u1, u2) / diffnorm(u2, u4)
+  @test 10.0 < ck_ratio < 26.0    # fourth order ⇒ ≈ 16
+  # Same registers, higher ceiling: the CFL machinery must price the larger stability limit.
+  rk3 = IFLowStorageRK3()
+  @test recommended_cfl(ck, domain) > 1.8 * recommended_cfl(rk3, domain)
+  b3 = allocate_buffers(rk3, domain); b4 = allocate_buffers(ck, domain)
+  @test (b4.stage2 === nothing) == (b3.stage2 === nothing)   # 2N shape, no extra registers
+end
