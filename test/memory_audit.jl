@@ -24,7 +24,7 @@
 #     nothing can fall between them again. The gap that survives is not one of REACH — the walk
 #     recurses through any struct's fields and would descend into a transform plan's buffer — but
 #     one of BACKEND: every domain built below passes `array_type = Array`, and the plan buffers
-#     exist only on a GPU. See the named exclusion at the frame ledger, and open item G2.
+#     exist only on a GPU. See the named exclusion at the frame ledger; the once-open item G2 was closed by decision 79 (the DEVICE_FRAME leg below).
 #
 #  3. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
 #     from the step! bodies and the generator protocol, give every value a live range; the peak
