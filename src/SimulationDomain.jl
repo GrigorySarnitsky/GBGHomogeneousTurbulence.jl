@@ -106,17 +106,17 @@ CFL step than the ``2/3`` rule — handled automatically by
     ``\\tfrac{4}{5}\\,\\kappa_{\\mathrm{Ny}}`` under this strategy — not the Nyquist.
 
 The `materialized` keyword chooses how the filter is *applied* — a memory-for-compute choice
-with no effect on the numbers: `false` (the default) keeps the filter as a closed-form radial
-symbol re-evaluated per mode in every pass (zero resident storage — the minimal-footprint
-default), while `true` evaluates it once into a stored coefficient array the passes then merely
-read. The stored coefficients are the same expression evaluated once, so the two settings
-advance a run **bit-identically**; what changes is the cost profile — one resident complex
-spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``)
-against the per-mode ``\\exp`` and power chain. Measured at ``128^3`` `Float64` on a GPU with
-`order = 36`: the on-the-fly evaluation costs ``\\approx 14\\%`` of the step, of which
-`materialized = true` recovers ``\\approx 7\\%`` — the filter factor becomes an array read,
-while the integrating factor's own exponential remains. Prefer `true` when compute is the
-scarce resource, `false` when memory is.
+with no effect on the numbers. `false` (the default) keeps the filter as a closed-form radial
+symbol re-evaluated per mode in every pass: zero resident storage, the minimal-footprint side.
+`true` evaluates the same expression once into a stored coefficient array — one resident complex
+spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``) —
+that the passes then merely read. Because the coefficients are the same expression evaluated
+once, the two settings advance a run **bit-identically**.
+
+Measured at ``128^3`` `Float64` on a GPU with `order = 36`: the on-the-fly evaluation costs
+``\\approx 14\\%`` of the step, of which `materialized = true` recovers ``\\approx 7\\%`` — the
+filter factor becomes an array read, while the integrating factor's own exponential remains.
+Prefer `true` when compute is the scarce resource, `false` when memory is.
 
 # Fields
 The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:

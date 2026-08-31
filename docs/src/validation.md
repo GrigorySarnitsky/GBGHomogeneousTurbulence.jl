@@ -173,6 +173,34 @@ Three findings:
   E_{\mathrm{band}} \approx 1.59`` rather than 1. Both codes agree precisely on this migration —
   it is the physics of unanchored linear forcing, not a discrepancy.
 
+### Robustness across integrators: `IFLowStorageRK4` at its adaptive step
+
+The third repetition changes the *integration machinery* instead of the forcing: the same frozen
+handoff, the same ``10^4`` particles, the same constant-power forcing — but this package advances
+with [`IFLowStorageRK4`](@ref) (the Carpenter–Kennedy fourth-order low-storage scheme) under its
+**adaptive CFL controller** rather than the fixed matched timestep. TurTLE's leg is the original
+fixed-step reference. Trajectory-level identity is off the table by construction — the two runs
+share no time grid — so what this tests is statistical agreement under genuinely different
+discrete routes.
+
+![RK4-adaptive pair: TurTLE (fixed-step SSPRK3, solid) vs this package (IFLowStorageRK4, adaptive, dashed)](assets/comparison_overlay_rk4.png)
+
+- **The window took 6,739 adaptive steps at mean ``\\Delta t = 0.00546`` — ``2.73\\times`` the
+  reference legs' fixed ``2 \\times 10^{-3}``** (the fixed value was chosen for cross-code
+  matching, well inside even RK3's ceiling), completing the same 36.8 time units in 174 s against
+  the fixed-step leg's 265 s on the same GPU.
+- **Same agreement structure, with an instructive seed ladder.** ``k`` and ``\\varepsilon`` track
+  at ``10^{-6}``–``10^{-5}`` relative through ``t \\approx 5``, separating from a seed of
+  ``\\sim 6 \\times 10^{-7}`` at ``t = 1`` — the *truncation-level* difference of two tableaux on
+  two step sizes, against ``\\sim 10^{-12}`` for the matched-tableau pair: same physics reached by
+  discretizations of increasing unlikeness, separating at exactly the level each unlikeness
+  predicts. Window means agree to ``0.2\\%`` in ``\\bar\\varepsilon`` and ``3\\%`` in ``\\bar k``
+  (two 15-turnover realizations of the same statistics).
+- **``\\rho_u`` is again indistinguishable** through the physical decay: ``5 \\times 10^{-6}`` at
+  ``\\tau = 0.5``, ``2 \\times 10^{-6}`` at ``\\tau = 1``, ``10^{-5}`` at ``\\tau = 2`` — computed
+  in the run's callback on the *irregular* adaptive time grid, against TurTLE's fixed-grid
+  post-hoc curve.
+
 ### Deliberately not compared in this round
 
 Shell-averaged spectra ``E(\kappa)`` and the velocity-derivative skewness were not collected in
@@ -195,12 +223,14 @@ curl -LO $base/turtle_reference_data.h5
 curl -LO $base/gbgit_reference_data.h5
 curl -LO $base/turtle_linear_reference_data.h5
 curl -LO $base/gbgit_linear_reference_data.h5
+curl -LO $base/gbgit_rk4adaptive_reference_data.h5
 sha256sum *.h5
-# handoff_initial_state_iter100.h5   02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
-# turtle_reference_data.h5           fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
-# gbgit_reference_data.h5            394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
-# turtle_linear_reference_data.h5    6b8d15e9944c3ec12b7a0a451805b62351623fd9830d98ea3aad303a205115cd
-# gbgit_linear_reference_data.h5     bd192fdcca3bbe75798818bf0193af17846286e7cb3cc00d95514dc6db6670c2
+# handoff_initial_state_iter100.h5        02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
+# turtle_reference_data.h5                fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
+# gbgit_reference_data.h5                 394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
+# turtle_linear_reference_data.h5         6b8d15e9944c3ec12b7a0a451805b62351623fd9830d98ea3aad303a205115cd
+# gbgit_linear_reference_data.h5          bd192fdcca3bbe75798818bf0193af17846286e7cb3cc00d95514dc6db6670c2
+# gbgit_rk4adaptive_reference_data.h5     1629764125ab00230d9a6d32fe710242075bb57264aea828113a0fe258094ca9
 ```
 
 Each reference file is self-describing: datasets `t`, `k`, `ε`, `τ`, `ρ_u`, with the definitions,
