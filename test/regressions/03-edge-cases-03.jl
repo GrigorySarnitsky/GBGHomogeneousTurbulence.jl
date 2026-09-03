@@ -11,7 +11,7 @@
 # restart: `filled == 0`, and the next advance must be the startup `Heun` step.
 
 using Test, Random
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGIsotropicTurbulence
 
 const SEED = 11
@@ -40,7 +40,7 @@ end
   L = 2π
   X_new = L .* rand(MersenneTwister(99), Float64, NPART, 3)
   for sim in (ab, heun)
-    copyto!(point_coordinates(sim.tracers.positions), X_new)
+    copyto!(point_positions(sim.tracers.positions), X_new)
     particles_modified!(sim.cache)
     deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   end
@@ -51,7 +51,7 @@ end
   # ... and therefore the first post-reseed advance is a startup Heun step, so the two runs
   # must still agree on the tracer positions.
   advance!(ab); advance!(heun)
-  deviation = maximum(abs, point_coordinates(ab.tracers.positions) .- point_coordinates(heun.tracers.positions))
+  deviation = maximum(abs, point_positions(ab.tracers.positions) .- point_positions(heun.tracers.positions))
   println("max |X_AB4 - X_Heun| after one post-reseed step: ", deviation, "  (box side ", L, ")")
-  @test point_coordinates(ab.tracers.positions) ≈ point_coordinates(heun.tracers.positions) atol = 1e-10
+  @test point_positions(ab.tracers.positions) ≈ point_positions(heun.tracers.positions) atol = 1e-10
 end

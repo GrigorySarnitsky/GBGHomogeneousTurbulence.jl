@@ -1,11 +1,11 @@
 # Witness: the `AdamsBashforth` docstring promises "the same restart happens if the tracers are
-# reseeded" — after a hand-written reseed of `point_coordinates(tracers.positions)` (the pattern `particles_modified!`
+# reseeded" — after a hand-written reseed of `point_positions(tracers.positions)` (the pattern `particles_modified!`
 # sanctions: "a reseed, a hand-written correction, any direct write to the tracer storage"), the
 # scheme must fall back to the `Heun` startup instead of blending Lagrangian samples taken
 # along the *old*, pre-reseed trajectory into the *new* one.
 
 using Test
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 
@@ -56,13 +56,13 @@ end
   # `particles_modified!` is the announcement, and the sibling witness 03-state-machine-03 tests the
   # announced path. Adding the announcement here makes this test the contract rather than a stronger
   # claim no design satisfies.
-  copyto!(point_coordinates(tracers.positions), X1)
+  copyto!(point_positions(tracers.positions), X1)
   particles_modified!(cache)
   deposit!(cache, tracers, u0)
   @test cache.history_filled == 0                         # the promised restart: no history to reuse
 
   advect!(scheme, tracers, u1, domain, buffers, dt)
-  reseeded = copy(point_coordinates(tracers.positions))
+  reseeded = copy(point_positions(tracers.positions))
 
   # The behaviour the docstring promises: an `Heun` startup step from the new positions.
   reference = Tracers(domain; positions = PointSet(copy(X1)), interpolation_scheme = CatmullRom)
@@ -71,5 +71,5 @@ end
   deposit!(reference_cache, reference, u0)
   advect!(Heun(), reference, u1, domain, heun, dt)
 
-  @test reseeded ≈ point_coordinates(reference.positions)
+  @test reseeded ≈ point_positions(reference.positions)
 end

@@ -5,7 +5,7 @@
 # the fill-aware history restore.
 using Test, Random, HDF5
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_coordinates, point_values,
+using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_positions, point_values,
                          field_data, npoints
 
 
@@ -67,10 +67,10 @@ end
                     unwrapped = true, rng = MersenneTwister(4))
   h5open(io -> (io["t"] = tracers), path, "w")
   back = h5open(io -> read_tracers(io, "t", domain), path, "r")
-  @test point_coordinates(back.positions) == point_coordinates(tracers.positions)
+  @test point_positions(back.positions) == point_positions(tracers.positions)
   @test back.interpolation_scheme === tracers.interpolation_scheme
-  @test point_coordinates(unwrapped_positions(back)) ==
-        point_coordinates(unwrapped_positions(tracers))
+  @test point_positions(unwrapped_positions(back)) ==
+        point_positions(unwrapped_positions(tracers))
   # An untracked set stays untracked through the round trip.
   plain = Tracers(domain; number_of_particles = 3, interpolation_scheme = CatmullRom)
   h5open(io -> write_tracers(io, "p", plain), path, "w")
@@ -129,9 +129,9 @@ end
   @test current_step(sim2) == current_step(sim)
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
   @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
-  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
-  @test point_coordinates(unwrapped_positions(sim2.tracers)) ==
-        point_coordinates(unwrapped_positions(sim.tracers))
+  @test point_positions(sim2.tracers.positions) == point_positions(sim.tracers.positions)
+  @test point_positions(unwrapped_positions(sim2.tracers)) ==
+        point_positions(unwrapped_positions(sim.tracers))
   @test sim2.cache.history_filled == sim.cache.history_filled
   @test sim2.cache.history_steps == sim.cache.history_steps
   for j in 1:sim.cache.history_filled
@@ -151,9 +151,9 @@ end
   end
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
   @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
-  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
-  @test point_coordinates(unwrapped_positions(sim2.tracers)) ==
-        point_coordinates(unwrapped_positions(sim.tracers))
+  @test point_positions(sim2.tracers.positions) == point_positions(sim.tracers.positions)
+  @test point_positions(unwrapped_positions(sim2.tracers)) ==
+        point_positions(unwrapped_positions(sim.tracers))
 end
 
 
@@ -213,7 +213,7 @@ end
   end
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
   @test field_data(sim2.state.scalar_spectral) == field_data(sim.state.scalar_spectral)
-  @test point_coordinates(sim2.tracers.positions) == point_coordinates(sim.tracers.positions)
+  @test point_positions(sim2.tracers.positions) == point_positions(sim.tracers.positions)
   rm(path)
 end
 

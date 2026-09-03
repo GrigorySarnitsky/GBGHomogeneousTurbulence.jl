@@ -502,7 +502,7 @@ Over it:
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
-  `point_coordinates(sim.tracers.positions)` (decision 72: the raw view is `GBGPeriodicFields`'
+  `point_positions(sim.tracers.positions)` (decision 72: the raw view is `GBGPeriodicFields`'
   own accessor, not a forwarding method of this package). 
 - **`write_simulation` / `read_simulation`** — the HDF5 checkpoint (decision 75): one
   self-describing group fully restores the run, recursively composed of the per-object pairs

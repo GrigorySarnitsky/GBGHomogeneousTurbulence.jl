@@ -6,7 +6,7 @@
 # (ratio ≈ 2, not Heun's ≈ 4).
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, PointSet, CatmullRom
 using Test
 
@@ -40,7 +40,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, tracers, u_start)
       advect!(scheme, tracers, u_end, domain, buffers, dt)
     end
-    point_coordinates(tracers.positions)[1, 1]
+    point_positions(tracers.positions)[1, 1]
   end
 
   # (1) The trajectory IS the explicit forward-Euler recursion X_{n+1} = X_n + dt·u(t_n) —

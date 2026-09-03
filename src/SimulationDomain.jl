@@ -296,9 +296,9 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   layout = RealFourierLayout()
 
   velocity_physical = VectorFieldPhysical((x, y, z) -> (zero(T), zero(T), zero(T)), grid; array_type)
-  velocity_spectral = VectorFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(1))), grid)
+  velocity_spectral = VectorFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(1))), grid)
   scalar_physical_template = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
-  scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, spectral_field_shape(grid, layout, Val(0))), grid)
+  scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(0))), grid)
 
   # ONE plan pair serves every field since PF's decision 76 made the plans rank-blind: they
   # transform a single component and are applied per component, so the velocity (3), the scalar (1)
@@ -408,7 +408,7 @@ step ([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl
 spectrum, and the empty-shell warnings of the forcing layer.
 """
 function max_retained_wavenumber(domain::FixedDomain)
-  N = physical_field_shape(domain.grid, Val(0))[1]
+  N = field_physical_shape(domain.grid, Val(0))[1]
   L = domain.grid.domain_size[1]
   # Through the same expression, in the same element type, that `_build_dealias` truncates with —
   # so the number reported here is the band the domain actually keeps.
@@ -442,7 +442,7 @@ value is a convention, but a robust one: the crossover scales as the ``1/34``-th
 any practical viscosity, timestep, and filter strength.
 """
 function max_resolved_wavenumber(domain::FixedDomain)
-  N = physical_field_shape(domain.grid, Val(0))[1]
+  N = field_physical_shape(domain.grid, Val(0))[1]
   L = domain.grid.domain_size[1]
   return _resolved_wavenumber(domain.dealiasing, N, L, typeof(L))
 end

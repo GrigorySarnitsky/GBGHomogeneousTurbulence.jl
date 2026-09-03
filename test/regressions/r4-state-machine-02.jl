@@ -13,7 +13,7 @@
 #       the deposited positions — the closing deposit wrote it, it did not merely mark it.
 
 using Test, Random
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
 
@@ -26,7 +26,7 @@ build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
   before = copy(Array(velocity_at_particles(sim.cache)))
 
   L = sim.domain.grid.domain_size[1]
-  point_coordinates(sim.tracers.positions) .= mod.(point_coordinates(sim.tracers.positions) .+ 3.0, L)
+  point_positions(sim.tracers.positions) .= mod.(point_positions(sim.tracers.positions) .+ 3.0, L)
 
   # (a) The announcement alone: the sample belongs to the abandoned positions, so the read is refused.
   particles_modified!(sim.cache)

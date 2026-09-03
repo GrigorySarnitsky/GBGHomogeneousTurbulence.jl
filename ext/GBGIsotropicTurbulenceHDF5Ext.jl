@@ -10,7 +10,7 @@ module GBGIsotropicTurbulenceHDF5Ext
 
 using HDF5
 using GBGPeriodicFields: write_field, read_field, write_points, read_points, write_scheme,
-                         read_scheme, field_data, point_coordinates, point_values, npoints,
+                         read_scheme, field_data, point_positions, point_values, npoints,
                          PointSet
 using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
                                                _real_type
@@ -84,7 +84,7 @@ end
 # Read a stored point object's (M, 3) coordinates onto the domain's backend as a fresh PointSet.
 function _points_on_backend(domain::FixedDomain, host_points)
   T = _real_type(domain)
-  X_host = point_coordinates(host_points)
+  X_host = point_positions(host_points)
   eltype(X_host) == T || throw(ArgumentError(
     "the stored positions have element type $(eltype(X_host)), but the domain builds $T"))
   X = domain.storage_family{T}(undef, size(X_host)...)
@@ -397,11 +397,11 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
   scalar && _load_field!(sim.state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
   fields_modified!(sim)
   if has_tracers
-    copyto!(point_coordinates(sim.tracers.positions), point_coordinates(positions_host))
+    copyto!(point_positions(sim.tracers.positions), point_positions(positions_host))
     particles_modified!(sim)
     if haskey(tg, "unwrapped_positions")
-      copyto!(point_coordinates(sim.tracers.unwrapped_positions),
-              point_coordinates(read_points(tg, "unwrapped_positions")))
+      copyto!(point_positions(sim.tracers.unwrapped_positions),
+              point_positions(read_points(tg, "unwrapped_positions")))
     end
   end
   deposit!(sim)

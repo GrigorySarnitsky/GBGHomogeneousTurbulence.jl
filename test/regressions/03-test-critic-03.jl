@@ -14,7 +14,7 @@
 # the trajectory is the analytic ∫₀ᵀ cos(ωt) dt.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
@@ -50,7 +50,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, tracers, u_start)
       advect!(scheme, tracers, u_end, domain, buffers, dt)
     end
-    point_coordinates(tracers.positions)[1, 1]
+    point_positions(tracers.positions)[1, 1]
   end
 
   error_ratio(scheme, coarse, fine) = abs(final_x(scheme, coarse) - exact_x) /

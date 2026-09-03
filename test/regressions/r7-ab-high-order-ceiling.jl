@@ -4,7 +4,7 @@
 # now states "order = 4 is the practical ceiling"; this is its witness. Setup mirrors
 # 03-test-critic-03: uniform time-varying flow, interpolation exact, trajectory analytic.
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
@@ -34,7 +34,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, tracers, u_start)
       advect!(scheme, tracers, u_end, domain, buffers, dt)
     end
-    point_coordinates(tracers.positions)[1, 1]
+    point_positions(tracers.positions)[1, 1]
   end
 
   err(K, n) = abs(final_x(AdamsBashforth(order = K), n) - exact_x)

@@ -25,7 +25,7 @@
 # split applied, departure_reseed falls to 0.0372 and this file passes.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using Random
 using Test
 
@@ -41,10 +41,10 @@ fresh_sim() = Simulation(grid_points_per_axis = N, viscosity = 0.05, number_of_p
 # consistent trajectory integrator at a CFL-limited step.
 function euler_departure!(sim, h)
   L  = Float64(sim.domain.grid.domain_size[1])
-  X0 = copy(Array(point_coordinates(sim.tracers.positions)))
+  X0 = copy(Array(point_positions(sim.tracers.positions)))
   f0 = copy(Array(velocity_at_particles(sim.cache)))
   advance!(sim; dt = h)
-  d  = copy(Array(point_coordinates(sim.tracers.positions))) .- X0
+  d  = copy(Array(point_positions(sim.tracers.positions))) .- X0
   d .= d .- L .* round.(d ./ L)                    # undo the periodic wrap
   return maximum(abs.(d .- h .* f0)) / (h * maximum(abs.(f0)))
 end

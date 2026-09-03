@@ -103,7 +103,7 @@ iterations:
 sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
 advance!(sim)
 
-X = point_coordinates(sim.tracers.positions)   # the (M, 3) positions, via the field library
+X = point_positions(sim.tracers.positions)   # the (M, 3) positions, via the field library
 v = velocity_at_particles(sim.cache)          # u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
 
 out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
@@ -125,7 +125,7 @@ advect!(Heun(), tracers, u_end, domain, buffers, dt)
 
 Read the particle state straight off the struct's own fields — the positions are
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)s, and raw arrays and
-counts come from `GBGPeriodicFields`' `point_coordinates` and `npoints`, never from accessors of
+counts come from `GBGPeriodicFields`' `point_positions` and `npoints`, never from accessors of
 this package. Passing `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: read them from the
@@ -139,7 +139,7 @@ The particle integration scheme's own working storage is **not** here: it lives 
 # Fields
 - `positions` — the tracer positions, as the
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) every operation takes:
-  the one storage, always wrapped — the dynamical state. `GBGPeriodicFields`' `point_coordinates`
+  the one storage, always wrapped — the dynamical state. `GBGPeriodicFields`' `point_positions`
   serves its `(M, 3)` matrix view, with ``M`` the tracer count.
 - `interpolation_scheme` — the scheme used to evaluate a field at the tracer positions.
 - `unwrapped_positions` — the opt-in unwrapped positions (`unwrapped = true`) as a `PointSet`, advanced
@@ -172,7 +172,7 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
       throw(ArgumentError("`positions` must be a `GBGPeriodicFields` `PointSet` (wrap an (M, 3) " *
                           "array with `PointSet(array)`); got a $(typeof(positions)). Raw arrays " *
                           "cross into the package only through the `GBGPeriodicFields` point types."))
-    supplied = point_coordinates(positions)
+    supplied = point_positions(positions)
     pos = domain.storage_family{T}(undef, size(supplied)...)    # the domain's backend + element type
     copyto!(pos, supplied)
   end
@@ -309,7 +309,7 @@ function _allocate_particle_buffers(tracers::Tracers, cache::ObservablesCache, o
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set — the sample the push " *
                         "consumes is the cache's observable, not tracer state"))
-  predictor = similar(point_coordinates(tracers.positions))
+  predictor = similar(point_positions(tracers.positions))
   return ParticleIntegratorBuffers(predictor, PointSet(predictor),
                                    VectorPointValues(similar(predictor)), cache,
                                    zeros(Float64, order), zeros(Float64, order))
@@ -462,7 +462,7 @@ end
 
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real) where {K}
-  T = real(eltype(point_coordinates(tracers.positions)))
+  T = real(eltype(point_positions(tracers.positions)))
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
   # basis divides by the node differences — so the next warmed-up step divides by zero and returns
@@ -595,7 +595,7 @@ function advect! end
 
 function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
                  buffers::ParticleIntegratorBuffers, dt::Real)
-  Δt = real(eltype(point_coordinates(tracers.positions)))(dt)
+  Δt = real(eltype(point_positions(tracers.positions)))(dt)
   # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
   v₁ = buffers.cache.velocity_at_particles
   displace!(buffers.predictor_points, tracers.positions, domain.grid,
@@ -646,7 +646,7 @@ winding kept, each coordinate the literal sum of every displacement since seedin
 the periodic box. These are the positions a mean-square-displacement or dispersion diagnostic
 needs: those are functions of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped
 positions cannot supply across a crossing. Accumulating such statistics over them — on the raw
-`(M, 3)` array `GBGPeriodicFields`' `point_coordinates` extracts — is the caller's analysis.
+`(M, 3)` array `GBGPeriodicFields`' `point_positions` extracts — is the caller's analysis.
 
 The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading
 an untracked set throws an `ArgumentError` (which is why this checked read exists while the plain
@@ -673,7 +673,7 @@ Allocate a [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Poi
 shape `(M, 3)` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the velocity at the particle positions.
 """
-new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_coordinates(tracers.positions)))
+new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_positions(tracers.positions)))
 
 """
     new_scalar_point_values(tracers)
@@ -683,8 +683,8 @@ length ``M`` matching the tracer set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` at the particle positions.
 """
 new_scalar_point_values(tracers::Tracers) =
-  ScalarPointValues(similar(point_coordinates(tracers.positions),
-                            eltype(point_coordinates(tracers.positions)),
+  ScalarPointValues(similar(point_positions(tracers.positions),
+                            eltype(point_positions(tracers.positions)),
                             npoints(tracers.positions)))
 
 

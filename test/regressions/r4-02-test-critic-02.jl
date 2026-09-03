@@ -7,7 +7,7 @@
 # call in the suite before this file existed.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: CatmullRom, PointSet
 using Test
 
@@ -33,7 +33,7 @@ using Test
                                          interpolation_scheme = CatmullRom)
 
   # And the two legal forms still build, so the guard has not over-fired.
-  @test size(point_coordinates(Tracers(domain; positions = PointSet(zeros(4, 3)),
+  @test size(point_positions(Tracers(domain; positions = PointSet(zeros(4, 3)),
                                        interpolation_scheme = CatmullRom).positions)) == (4, 3)
   @test npoints(Tracers(domain; number_of_particles = 5,
                         interpolation_scheme = CatmullRom).positions) == 5

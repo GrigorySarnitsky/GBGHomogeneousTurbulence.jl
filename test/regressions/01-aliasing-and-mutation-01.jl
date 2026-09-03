@@ -16,7 +16,7 @@
 # must be identical.  `Heun`, which keeps no history, is the control.
 
 using Test, Random, GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: field_data
 
 const N = 16
@@ -28,7 +28,7 @@ make_sim(scheme) = Simulation(grid_points_per_axis = N, viscosity = 0.05, number
 
 # Announce + refill the trajectory-bound slot after a hand-written change of the tracer positions.
 function reseed!(sim, positions)
-  copyto!(point_coordinates(sim.tracers.positions), positions)
+  copyto!(point_positions(sim.tracers.positions), positions)
   particles_modified!(sim.cache)
   deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
   return sim
@@ -51,12 +51,12 @@ function positions_after_reseed(scheme)
   fresh = rand(MersenneTwister(11), M, 3) .* L
   reseed!(a, fresh)
   reseed!(b, fresh)
-  @test Array(point_coordinates(a.tracers.positions)) == Array(point_coordinates(b.tracers.positions))
+  @test Array(point_positions(a.tracers.positions)) == Array(point_positions(b.tracers.positions))
   @test Array(velocity_at_particles(a.cache)) == Array(velocity_at_particles(b.cache))
 
   advance!(a; dt = DT)
   advance!(b; dt = DT)
-  return Array(point_coordinates(a.tracers.positions)), Array(point_coordinates(b.tracers.positions))
+  return Array(point_positions(a.tracers.positions)), Array(point_positions(b.tracers.positions))
 end
 
 @testset "control — Heun, which keeps no history, is unaffected by a reseed" begin

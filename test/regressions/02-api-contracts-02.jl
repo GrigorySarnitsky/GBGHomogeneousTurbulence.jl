@@ -6,7 +6,7 @@
 # This file asserts the CORRECT behaviour: every returned coordinate is strictly less than L.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test
 
@@ -31,7 +31,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     set_uniform_x!(u, -1.0)
     deposit!(cache, tracers, u)
     advect!(Heun(), tracers, u, domain, buffers, dt)
-    X = point_coordinates(tracers.positions)
+    X = point_positions(tracers.positions)
     @test all(0 .<= X)
     @test all(X .< L)
   end
@@ -45,7 +45,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
     set_uniform_x!(u, -1.0e-20)
     deposit!(cache, tracers, u)
     advect!(Heun(), tracers, u, domain, buffers, dt)
-    X = point_coordinates(tracers.positions)
+    X = point_positions(tracers.positions)
     @test all(X .< L)
   end
 end

@@ -19,7 +19,7 @@
 # If (2) ever fails, the mid-iteration read really did consume a wrong value and the claim is real.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: point_values
 using Random
 using Test
@@ -61,5 +61,5 @@ end
 
   # The decisive assertion: the "stale" value consumed was the correct u(tₙ, X(tₙ)), so the
   # trajectories land exactly where the guarded run layer puts them.
-  @test point_coordinates(manual.tracers.positions) == point_coordinates(reference.tracers.positions)
+  @test point_positions(manual.tracers.positions) == point_positions(reference.tracers.positions)
 end

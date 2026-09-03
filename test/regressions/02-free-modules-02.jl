@@ -11,7 +11,7 @@
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet,
-                         PointSet, wrap!, point_coordinates
+                         PointSet, wrap!, point_positions
 using Test
 
 @testset "a non-finite tracer coordinate is never turned into a healthy 0.0" begin
@@ -64,6 +64,6 @@ using Test
       threw = true
     end
     # either the push refuses the non-finite state, or the corruption stays visible downstream
-    @test threw || !all(isfinite, point_coordinates(tracers.positions))
+    @test threw || !all(isfinite, point_positions(tracers.positions))
   end
 end

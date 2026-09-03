@@ -4,7 +4,7 @@
 # the trajectories; and the two-verb push (record + advect) allocates nothing per step.
 
 using GBGIsotropicTurbulence
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, field_data, to_physical, PointSet,
                          CatmullRom, LagrangeSpline, point_values
 using Random
@@ -33,7 +33,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, tracers, uniform)
       advect!(Heun(), tracers, uniform, domain, buffers, dt)
     end
-    X = point_coordinates(tracers.positions)
+    X = point_positions(tracers.positions)
     @test X[:, 1] ≈ mod.(X0[:, 1] .+ c * nsteps * dt, L)     # moved at constant speed
     @test X[:, 2] ≈ X0[:, 2]                                  # transverse components unchanged
     @test X[:, 3] ≈ X0[:, 3]
@@ -58,7 +58,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         deposit!(cache, tracers, u_start)
         advect!(Heun(), tracers, u_end, domain, buffers, dt)
       end
-      point_coordinates(tracers.positions)[1, 1]
+      point_positions(tracers.positions)[1, 1]
     end
 
     error_coarse = abs(final_x(8) - exact_x)
@@ -76,7 +76,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, tracers, uniform)
       advect!(Heun(), tracers, uniform, domain, buffers, 0.02)
     end
-    X = point_coordinates(tracers.positions)
+    X = point_positions(tracers.positions)
     @test all(0 .<= X .< L)                                    # wrapped, still in the box
   end
 
@@ -90,7 +90,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
         deposit!(cache, tracers, uniform)
         advect!(Heun(), tracers, uniform, domain, buffers, 0.01)
       end
-      X = point_coordinates(tracers.positions)
+      X = point_positions(tracers.positions)
       @test all(isfinite, X) && all(0 .<= X .< L)
     end
   end
@@ -127,7 +127,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
       deposit!(cache, state, domain, buffers)
       advect!(Heun(), tracers, velocity_physical(cache), domain, push_buffers, dt)   # u(tₙ₊₁), the closing deposit
     end
-    @test all(isfinite, point_coordinates(tracers.positions)) && all(0 .<= point_coordinates(tracers.positions) .< L)
+    @test all(isfinite, point_positions(tracers.positions)) && all(0 .<= point_positions(tracers.positions) .< L)
     @test all(isfinite, point_values(cache.velocity_at_particles))
 
     # allocation-free advection step — both verbs of the push
@@ -177,15 +177,15 @@ end
     # samples — no second call, and no reference from the cache to the scheme's registers.
     particles_modified!(sim.cache)
     @test sim.cache.history_filled == 0
-    @test all(isfinite, point_coordinates(sim.tracers.positions))
+    @test all(isfinite, point_positions(sim.tracers.positions))
   end
 
   @testset "positions stay in the box and tracers actually move" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
                      particle_integration_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(8))
-    X0 = copy(point_coordinates(sim.tracers.positions))
+    X0 = copy(point_positions(sim.tracers.positions))
     for _ in 1:5; advance!(sim); end
-    X = point_coordinates(sim.tracers.positions)
+    X = point_positions(sim.tracers.positions)
     @test !isapprox(X0, X)
     @test all(0 .<= X .< sim.domain.grid.domain_size[1])
   end

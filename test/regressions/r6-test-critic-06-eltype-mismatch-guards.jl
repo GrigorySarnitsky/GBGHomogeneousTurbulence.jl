@@ -11,7 +11,7 @@ if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2
   Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
 end
 using HDF5
-using GBGPeriodicFields: field_data, point_coordinates, LalescuSpline
+using GBGPeriodicFields: field_data, point_positions, LalescuSpline
 
 
 make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,

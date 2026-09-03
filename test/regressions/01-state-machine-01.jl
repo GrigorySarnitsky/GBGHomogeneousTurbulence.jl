@@ -9,7 +9,7 @@
 # exactly this read — must refuse to step on it.
 
 using Test, Random
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
 using GBGIsotropicTurbulence.SimulationRun: Simulation, advance!
@@ -30,7 +30,7 @@ end
     # An out-of-band reposition, announced exactly as the docstring prescribes, and NOT yet
     # completed with the particle `deposit!`.
     L = sim.domain.grid.domain_size[1]
-    point_coordinates(sim.tracers.positions) .= mod.(point_coordinates(sim.tracers.positions) .+ 0.3, L)
+    point_positions(sim.tracers.positions) .= mod.(point_positions(sim.tracers.positions) .+ 0.3, L)
     particles_modified!(sim.cache)
 
     # The sample now belongs to the abandoned positions: reading it must throw.
@@ -49,7 +49,7 @@ end
   @testset "advance! refuses to step on a sample stale in the particles epoch" begin
     sim = fresh_run()
     L = sim.domain.grid.domain_size[1]
-    point_coordinates(sim.tracers.positions) .= mod.(point_coordinates(sim.tracers.positions) .+ 0.3, L)
+    point_positions(sim.tracers.positions) .= mod.(point_positions(sim.tracers.positions) .+ 0.3, L)
     particles_modified!(sim)      # the run-level announcement, per its own docstring
 
     # advance!'s opening guard exists to refuse a step whose trajectory v₁ is stale.

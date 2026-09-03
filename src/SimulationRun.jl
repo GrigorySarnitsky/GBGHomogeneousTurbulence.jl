@@ -442,7 +442,7 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("`unwrapped = true` was given together with `tracers`, but the " *
                           "unwrapped record is a property of the given tracer set. Drop the " *
                           "setting."))
-    point_coordinates(tracers.positions) isa domain.storage_family ||
+    point_positions(tracers.positions) isa domain.storage_family ||
       throw(ArgumentError("the given `tracers` live on a different storage backend than " *
                           "`domain`: move them, or build the domain, on the matching backend."))
   end
@@ -806,7 +806,7 @@ function particles_modified!(sim::Simulation)
   # The unwrapped record restarts at the new positions: winding is a property of the trajectory
   # just abandoned, and a record continued across a reposition would splice two unrelated paths.
   sim.tracers === nothing || sim.tracers.unwrapped_positions === nothing ||
-    copyto!(point_coordinates(sim.tracers.unwrapped_positions), point_coordinates(sim.tracers.positions))
+    copyto!(point_positions(sim.tracers.unwrapped_positions), point_positions(sim.tracers.positions))
   return sim
 end
 

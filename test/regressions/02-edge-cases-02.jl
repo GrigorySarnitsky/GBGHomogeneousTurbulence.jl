@@ -12,7 +12,7 @@
 # the run dying inside the dependency's interpolation grid-locate (`InexactError: Int64(NaN)`).
 
 using Test, Random
-using GBGPeriodicFields: point_coordinates
+using GBGPeriodicFields: point_positions
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Particles: AdamsBashforth
 
@@ -34,7 +34,7 @@ function walk(sim, steps)
       return (:crash, err)
     end
   end
-  return (:ok, copy(Array(point_coordinates(sim.tracers.positions))))
+  return (:ok, copy(Array(point_positions(sim.tracers.positions))))
 end
 
 

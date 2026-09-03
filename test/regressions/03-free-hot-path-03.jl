@@ -15,7 +15,7 @@
 # the current outcome: silent, finite-looking zeros.
 
 using Test, Random
-using GBGPeriodicFields: point_coordinates, npoints
+using GBGPeriodicFields: point_positions, npoints
 using GBGIsotropicTurbulence
 using GBGIsotropicTurbulence.Particles: Heun, advect!
 using GBGIsotropicTurbulence.Propagator: allocate_buffers
@@ -40,7 +40,7 @@ function poisoned_step(poison)
   catch err
     return (:rejected, err)
   end
-  return (:ok, copy(Array(point_coordinates(tracers.positions))))
+  return (:ok, copy(Array(point_positions(tracers.positions))))
 end
 
 
@@ -66,7 +66,7 @@ end
     rejected = false
     try
       advance!(sim; dt = 0.01)
-      X = copy(Array(point_coordinates(sim.tracers.positions)))
+      X = copy(Array(point_positions(sim.tracers.positions)))
     catch err
       rejected = true
     end
