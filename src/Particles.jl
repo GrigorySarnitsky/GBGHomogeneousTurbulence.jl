@@ -207,7 +207,7 @@ and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
 
 The arguments are:
 
-- `domain` — the [`FixedDomain`](@ref) whose grid the tiles are laid over.
+- `domain` — the `FixedDomain` whose grid the tiles are laid over.
 - `tracers` — the [`Tracers`](@ref) whose positions are ordered; the order is sized to their count
   and built from their current positions.
 - `automatic = true` — whether a run rebuilds the order every iteration (`true`) or leaves the
@@ -328,14 +328,14 @@ hand-written correction, any direct write to the tracer storage. A one-step sche
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
 trajectory just abandoned, and integrating over those would blend the old path with the new one.
 This is an in-memory reset of one scheme's history, not a checkpoint verb — restoring a saved run
-is `read_simulation`'s job.
+is the job of [`read_simulation`](@ref GBGIsotropicTurbulence.SimulationRun.read_simulation).
 
 The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) form of
 [`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
 after announcing the reposition to the observables cache. Its bare-cache form clears only the
 sample history the cache itself holds and cannot dispatch here — so a hand-run loop that announces
-to the cache alone must also call this; a scheme's registers beyond that history are reached only
-this way.
+to the cache alone must also call this; a scheme's own per-step buffers beyond that history are
+reached only this way.
 """
 function restart! end
 
@@ -349,8 +349,8 @@ once, so advancing the tracers allocates nothing. Build it with
 which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
 
 This storage belongs to the scheme, not to the trajectory — which is why it lives here rather than
-in [`Tracers`](@ref). One type serves every scheme, because the register sets nest: a multistep
-scheme uses the predictor registers for its [`Heun`](@ref) starting steps only, and adds two
+in [`Tracers`](@ref). One type serves every scheme, because the storage sets nest: a multistep
+scheme uses the predictor arrays for its [`Heun`](@ref) starting steps only, and adds two
 `order`-element host vectors for its weight solve.
 
 The past Lagrangian samples a multistep scheme integrates over are **not** held here. They are
@@ -444,7 +444,7 @@ produce.
   high orders *worse*, not just useless: over a fixed window, `order = 6` and `order = 8` measure
   the same third-order convergence as `order = 4` with **larger** errors (measured ``1.0`` and
   ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `Heun` bootstrap
-  costs more than the extra history returns). `order = 4` is the practical ceiling.
+  costs more than the extra history returns). The practical ceiling is `order = 4`.
 
 !!! warning "The interpolant sets a floor no timestep can cross"
     Interpolating the velocity perturbs the field the tracers follow, and that perturbation does not
@@ -467,6 +467,7 @@ produce.
     [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006),
     *J. Comput. Phys.* **229**(17), 5862–5869).
 
+# Fields
 The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
 above is the only way to build one.
 """

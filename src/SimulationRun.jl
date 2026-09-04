@@ -170,7 +170,7 @@ The domain group:
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
   ``\\kappa_{\\max}`` of `κ_max_η`).
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to the
-  [`FixedDomain`](@ref) being built (pass `FFTW.MEASURE` for a long CPU run — the planner note
+  `FixedDomain` being built (pass `FFTW.MEASURE` for a long CPU run — the planner note
   there explains why; inert on a GPU backend).
 
 The run group:
@@ -231,7 +231,7 @@ The run group:
   built run and announcing the change with
   [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
 - `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
-  [`AbstractIntegrator`](@ref) scheme (`IFSSPRK3` and `IFHeun` are the alternatives) and its
+  [`AbstractIntegrator`](@ref) scheme (its docstring catalogues the alternatives) and its
   advective-CFL ceiling (adapts to `dealiasing`).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
@@ -242,8 +242,8 @@ The run group:
   decays first — and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
   annihilates every mode and the clock advances by a number that means nothing — and it is the
-  diffusive-decay bound that stops that, needing no constant from the caller. `max_dt` is for a
-  ceiling only the caller knows, since any *default* constant would be a claim about the velocity
+  diffusive-decay bound that stops that, needing no constant from the caller. The `max_dt`
+  setting is for a ceiling only the caller knows, since any *default* constant would be a claim about the velocity
   scale they happened to choose.
 - `number_of_particles = 0`, `interpolation_scheme = nothing`, `unwrapped = false` — the number
   of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions
@@ -265,7 +265,7 @@ The run group:
   memory-locality order of a
   [`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal). The order
   changes no value — a run with and without it is bitwise identical — only the time the gathers
-  take. `nothing` means `true` whenever the run carries tracers: the order is built at seeding and
+  take. The default `nothing` means `true` whenever the run carries tracers: the order is built at seeding and
   rebuilt from the start-of-step positions every iteration, a cost small against the gather it
   accelerates. `:manual` builds it and leaves every rebuild to the caller, through
   [`rebuild_traversal!`](@ref GBGIsotropicTurbulence.Particles.rebuild_traversal!) in the `run!`
@@ -276,13 +276,13 @@ The run group:
   restored positions.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
-- `state = nothing` — an existing [`ResolvedFields`](@ref) to **adopt** as the run's state in
+- `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in
   place of the random seed: its arrays become the run's own (no copy), which is how a run
   continues from a stored or externally imported field. The state must live on the domain's grid
   and storage backend and agree with `scalar`; `initial_spectrum` cannot be given with it. When
   ``\\nu`` is derived, the constructor measures the adopted state's kinetic energy and warns if it
   is not the `kinetic_energy` the calibration assumed.
-- `tracers = nothing` — an existing [`Tracers`](@ref) set to adopt in place of seeding
+- `tracers = nothing` — an existing `Tracers` set to adopt in place of seeding
   `number_of_particles` fresh ones. The interpolation scheme and the unwrapped record are then
   properties of the given set, so `interpolation_scheme` and `unwrapped` cannot be given with it.
   A multistep `particle_integration_scheme` starts from its bootstrap — restoring a stored sample
@@ -327,7 +327,8 @@ their contents as the scheme's business rather than the run's state.
   trajectories, that scheme's registers, and the `ParticleTraversal` the gathers visit the tracers
   in (`nothing` under `ordered_interpolation = false`). All `nothing` when the run carries no
   tracers.
-- `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
+- `cfl`, `max_dt`, `clock` — the advective-CFL coefficient, the caller's ceiling on the adaptive
+  step in the run's own time units (`Inf` when none), and the time/step counter.
 """
 struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB, PT}
   domain::DOM
@@ -1140,9 +1141,9 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 
 
 """
-    StationarityCriterion(; gate_scalar = true, gate_skewness = false, min_turnovers = 5,
-                            window_turnovers = 4, tol = 0.05, skew_floor = 0.1,
-                            max_turnovers = 60)
+    StationarityCriterion(; gate_scalar = true, gate_skewness = false,
+                            min_turnovers = 5, window_turnovers = 4, tol = 0.05,
+                            skew_floor = 0.1, max_turnovers = 60)
 
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
@@ -1170,9 +1171,10 @@ flatness would certify the forcing, not the flow.
   ``S \\approx -0.5``. It is **off by default**, and turning it on is the stricter spin-up: the
   ``\\varepsilon`` gate alone can be satisfied by a field whose cascade is not yet developed, so a
   run whose measurement depends on the small scales should set it. The cost is why it is not the
-  default — the skewness is the only observation here that transforms a rank-2 field, so it alone
-  builds the domain's rank-2 plans, and on a GPU backend those are the larger part of a run's plan
-  residency. When it is on, the skewness is measured on the criterion's own sampling interval — one
+  default — the skewness is the only observation here that transforms a rank-2 field, nine
+  component transforms and a per-call tensor allocation larger than the resident working set (see
+  [`derivative_skewness`](@ref GBGIsotropicTurbulence.Observables.derivative_skewness)). When it
+  is on, the skewness is measured on the criterion's own sampling interval — one
   sample per `window_turnovers / 40` of turnover time, giving about forty samples across the
   trailing window — rather than every iteration.
 - `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
@@ -1269,7 +1271,7 @@ other keyword is
 passed through to [`StationarityCriterion`](@ref) untouched; its docstring is the home for what is
 detected (the flat dissipation, the scalar-variance and derivative-skewness gates, the give-up cap)
 and for every option. For a fixed spin-up budget, write the three-line budget callback instead
-(see [`run!`](@ref)).
+(see `run!`).
 
 # Examples
 ```julia
@@ -1302,7 +1304,7 @@ self-describing HDF5 group — the domain's parameters, the state in spectral re
 tracer set, both forcing strategies, the Lagrangian sample history a multistep particle
 integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
 derivable is stored: the physical-representation observables, the current velocity sample, and
-every register and plan are recomputed on read. A stochastic forcing — none currently ships;
+every per-step buffer and transform plan are recomputed on read. A stochastic forcing — none currently ships;
 the one implementation is archived — has its evolving state deliberately not stored (its
 parameters are), so continuation is exact for deterministic forcings.
 

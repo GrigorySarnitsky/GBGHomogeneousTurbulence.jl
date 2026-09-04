@@ -92,7 +92,9 @@ and seeds one for you; a hand-assembled run constructs it here.
   including the current one. A hand-assembled run sets it to
   [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(scheme)` for its particle
   integration scheme. A one-step scheme needs 1 and stores no history; an `order`-step scheme needs
-  `order`, and the scheme's register allocation refuses a cache built too shallow.
+  `order`, and allocating the scheme's per-step buffers
+  ([`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)) refuses a cache
+  whose depth differs from it.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
   the velocity-at-particles slot (an ``M \\times 3`` point-value section) and its sample history.
 
@@ -394,7 +396,7 @@ trajectory-bound observable is stale and reads throw until the next deposit.
 
 It also discards the Lagrangian **sample history** this cache carries, so a multistep particle
 integration scheme starts over from the new positions rather than integrating across the abandoned path. That is
-why the history lives here and not in the scheme's own registers: the object that owns the epoch owns
+why the history lives here and not in the scheme's own per-step buffers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
 A sanctioned push never needs this verb:
@@ -405,8 +407,10 @@ A hand-run loop that repositions tracers itself calls this and then makes the pa
 `deposit!(cache, tracers, u)` — from the
 deposited velocity, so the slot is refilled at the new positions. A loop
 announcing to a bare cache rather than a `Simulation` must also call
-[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying its own
-registers: the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
+[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying per-step
+buffers of its own
+([`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers)):
+the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
 Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form to reach for when a run is what you are holding, mirroring

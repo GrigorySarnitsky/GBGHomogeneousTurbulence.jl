@@ -108,7 +108,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``\kappa_{\max}^{\mathrm{ret}}`` | retained-band edge — the highest wavenumber the `dealiasing` strategy keeps energetic (``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule, the Nyquist for `HouLi`, ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`); prices the advective-CFL step | [`max_retained_wavenumber`](@ref) |
 | ``\kappa_{\max}`` | resolved-band edge — the highest wavenumber whose dynamics is genuine Navier–Stokes, the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta``; equals the retained edge for the sharp strategies, ``\tfrac{4}{5}`` of Nyquist for `HouLi` | [`max_resolved_wavenumber`](@ref) |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGIsotropicTurbulence.Propagator.IFLowStorageRK3) |
-| ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3`; ``0`` for the imaginary-axis-unstable `IFHeun`) | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |
+| ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3` and `IFSSPRK3`; ``\approx 3.34`` for `IFLowStorageRK4`; ``0`` for the imaginary-axis-unstable `IFHeun`) | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |
 | ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
 
 ## Forcing

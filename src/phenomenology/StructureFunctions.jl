@@ -109,7 +109,8 @@ const _K62 = Reference("Kolmogorov (1962), *J. Fluid Mech.* **13**, 82. [doi:10.
     Kolmogorov1962(; μ = 0.25)
 
 The Kolmogorov (1962) log-normal (refined-similarity) intermittency model, proposed independently
-by Obukhov (1962, *J. Fluid Mech.* **13**, 77) in the same issue. Its
+by Obukhov (1962, *J. Fluid Mech.* **13**, 77,
+[doi:10.1017/S0022112062000506](https://doi.org/10.1017/S0022112062000506)) in the same issue. Its
 [`scaling_exponent`](@ref)`(law; order)` gives
 
 ```math

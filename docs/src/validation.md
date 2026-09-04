@@ -36,8 +36,8 @@ One forced, statistically stationary run of homogeneous isotropic turbulence:
 | window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the frozen handoff state |
 
 The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5``: under
-the smooth filter the resolved band ends at ``\kappa_{\mathrm{eff}} = 0.8\,\kappa_{\mathrm{Ny}} =
-51.2`` (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
+the smooth filter the resolved band ends at ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
+(the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
 ``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's own reported `kMeta` = 1.476 is the same
 convention with its cutoff normalized by ``N/2 - 1`` instead of ``N/2``.) Because the forcing
@@ -46,13 +46,13 @@ fixes the injection rate, ``\varepsilon`` is an *input*; the velocity scale ``u'
 
 ## Matching the smooth filter exactly
 
-Both codes damp each mode by ``\exp(-s\,(\kappa/\kappa_{M})^{36})``, but they normalize
+Both codes damp each mode by ``\exp(-s (\kappa/\kappa_{M})^{36})``, but they normalize
 differently: TurTLE by ``\kappa_{M} = (N/2 - 1)`` (its highest mode with a nonzero conjugate
 partner), this package by the Nyquist ``N/2``. The two filters are made *identical to machine
 precision* by choosing this package's strength as
 
 ```math
-s = 36\,\Bigl(1 - \frac{2}{N}\Bigr)^{-36},
+s = 36 \Bigl(1 - \frac{2}{N}\Bigr)^{-36},
 ```
 
 which at ``N = 128`` gives ``s = 63.463`` — the value the run uses with
@@ -68,7 +68,7 @@ representation, the tracer positions, and the four-slot history — was frozen a
 an axis permutation between the storage layouts, an amplitude rescale (TurTLE stores Fourier
 *mode amplitudes*; this package stores the unnormalized-transform convention — a factor
 ``N^{3}``), the inverse curl
-``\hat{\boldsymbol{u}} = \mathrm{i}\,\boldsymbol{\kappa} \times \hat{\boldsymbol{\omega}} / \lvert\boldsymbol{\kappa}\rvert^{2}``,
+``\hat{\boldsymbol{u}} = \mathrm{i} \boldsymbol{\kappa} \times \hat{\boldsymbol{\omega}} / \lvert\boldsymbol{\kappa}\rvert^{2}``,
 and the tracer positions and history into the particle integrator's registers.
 
 Every step of that import is witnessed, not assumed:
@@ -144,7 +144,7 @@ itself is statistical noise of that size.
 ### Robustness across forcings: the Linear (Lundgren) pair
 
 The whole comparison was repeated with a different forcing law — the band-limited **linear
-(Lundgren-type) forcing** ``\boldsymbol{f} = A\,\boldsymbol{u}`` on the same shells, with the
+(Lundgren-type) forcing** ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
 **fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2E_{\mathrm{band}}(t_0))``
 (this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
 the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, nothing
@@ -169,8 +169,9 @@ Three findings:
   well-known larger, slower energy fluctuations, visible in the ``k(t)`` panel.
 - **The amplitude estimate illustrates why anchored forcings exist.** ``A`` was chosen from the
   *instantaneous* handoff band energy; the fixed-``A`` balance settled at a larger one
-  (``\bar E_{\mathrm{band}} \approx 1.87`` from 1.18), so ``\bar\varepsilon = 2A\bar
-  E_{\mathrm{band}} \approx 1.59`` rather than 1. Both codes agree precisely on this migration —
+  (``\bar E_{\mathrm{band}} \approx 1.87`` from 1.18), so
+  ``\bar\varepsilon = 2A\bar E_{\mathrm{band}} \approx 1.59`` rather than 1. Both codes agree
+  precisely on this migration —
   it is the physics of unanchored linear forcing, not a discrepancy.
 
 ### Robustness across integrators: `IFLowStorageRK4` at its adaptive step

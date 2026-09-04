@@ -158,8 +158,8 @@ large_scale_length(::PopeLargeScale, fp::FlowParameters) =
 
 Pope's dissipation-range roll-off
 ``f_\\eta(\\kappa\\eta) = \\exp\\!\\Bigl(-\\beta\\bigl\\{\\bigl[(\\kappa\\eta)^4 + c_\\eta^4\\bigr]^{1/4} - c_\\eta\\bigr\\}\\Bigr)``,
-which tends to `1` in the inertial range and cuts the spectrum off near the Kolmogorov scale. `c_η` is
-set by the requirement that the spectrum yield the dissipation rate; `β` fixes the sharpness of the
+which tends to `1` in the inertial range and cuts the spectrum off near the Kolmogorov scale. The
+constant `c_η` is set by the requirement that the spectrum yield the dissipation rate; `β` fixes the sharpness of the
 cutoff (Pope 2000).
 
 # Fields
@@ -379,7 +379,7 @@ const _VONKARMAN1948 = Reference("von Kármán (1948), *Proc. Natl. Acad. Sci.* 
 The von Kármán (1948) energy spectrum — a preset [`ModelSpectrum`](@ref) with the
 [`VonKarmanLarge`](@ref) roll-off and no viscous cutoff ([`UnitDissipation`](@ref)):
 
-[`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is von Kármán's
+`ModelSpectrum`'s docstring carries the composed formula; here ``f_L`` is von Kármán's
 ``\\Bigl(\\frac{(\\kappa \\ell)^2}{(\\kappa \\ell)^2 + c_L}\\Bigr)^{17/6}`` and ``f_\\eta`` is unity. It is the
 classic interpolation between the ``\\kappa^{4}`` energy-containing range and the ``\\kappa^{-5/3}``
 inertial range, with no dissipation-range cutoff (use [`Pope2000`](@ref) when the cutoff matters).
@@ -404,7 +404,7 @@ const _PAO1965 = Reference("Pao (1965), *Phys. Fluids* **8**, 1063. [doi:10.1063
 The Pao (1965) energy spectrum — a preset [`ModelSpectrum`](@ref) with no energy-containing roll-off
 ([`UnitLargeScale`](@ref)) and the [`PaoDissipation`](@ref) cutoff:
 
-[`ModelSpectrum`](@ref)'s docstring carries the composed formula; here ``f_L`` is unity and
+`ModelSpectrum`'s docstring carries the composed formula; here ``f_L`` is unity and
 ``f_\\eta`` is Pao's ``\\exp\\!\\bigl(-\\tfrac{3}{2} C_K (\\kappa\\eta)^{4/3}\\bigr)``. It covers the
 inertial and dissipation ranges from the constant-cascade-timescale hypothesis — the Kolmogorov
 constant `C_K` appears in both the amplitude and the cutoff, so the cutoff carries no free constant
@@ -444,7 +444,7 @@ E_\\varphi(\\kappa) = C_{\\mathrm{OC}} \\varepsilon_\\varphi \\varepsilon^{-1/3}
 the Obukhov–Corrsin scalar analogue of the Kolmogorov ``-5/3`` law: for a Schmidt number of order one the scalar's
 inertial-convective range coincides with the velocity inertial range. `C_OC` is the Obukhov–Corrsin
 constant (``\\approx 0.67`` for the three-dimensional spectrum — the high-Reynolds-number value of
-Sreenivasan 1996, *Phys. Fluids* **8**, 189), quoted — unlike Yaglom's classical
+Sreenivasan 1996, *Phys. Fluids* **8**, 189, [doi:10.1063/1.868826](https://doi.org/10.1063/1.868826)), quoted — unlike Yaglom's classical
 ``4/3`` — for the *full*-variance scalar dissipation ``2\\varkappa\\langle\\lvert\\nabla\\varphi\\rvert^2\\rangle``,
 so it pairs directly with this package's full-variance ``\\varepsilon_\\varphi`` (`scalar_dissipation`)
 with no factor-of-two conversion (the constant is invariant so long as a source scales its scalar

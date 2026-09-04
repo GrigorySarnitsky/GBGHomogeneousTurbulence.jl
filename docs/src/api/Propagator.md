@@ -8,9 +8,10 @@ Order   = [:module]
 ## Integrator schemes
 
 The integrating-factor scheme supertype and its concretes — the third-order low-storage RK3; the
-third-order Shu–Osher SSPRK3 in TurTLE's stage arrangement, for code-to-code comparison at the same
-cost; then the second-order Heun, imaginary-axis unstable and cheaper in transforms but dearer in
-memory.
+fourth-order low-storage RK4 of Carpenter and Kennedy, five stages in the same two registers with
+a wider imaginary-axis stability limit; the third-order Shu–Osher SSPRK3 in TurTLE's stage
+arrangement, for code-to-code comparison at the same cost; then the second-order Heun,
+imaginary-axis unstable and cheaper in transforms but dearer in memory.
 
 ```@docs
 AbstractIntegrator
@@ -36,7 +37,7 @@ allocate_buffers
 ## Time stepping
 
 One in-place step of the coupled velocity and passive scalar together through the shared RK stages,
-and the closing deposit that closes the iteration.
+and the deposit that closes the iteration.
 
 ```@docs
 step!

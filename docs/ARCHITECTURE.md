@@ -77,9 +77,10 @@ iterations, ``n+1`` observations — the callback reads the run and decides whet
 (§11 decision 43).
 Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
 advances until the flow is statistically stationary, watching the running dissipation
-``\varepsilon(t)`` and the velocity-derivative skewness ``S(t)`` — the small-scale signals that
-settle last — rather than the kinetic energy a constant-energy forcing clamps flat; §4.7 gives the
-exact stopping test. A forced flow must reach statistical stationarity before a structure function
+``\varepsilon(t)`` — a small-scale signal that settles late — rather than the kinetic energy a
+constant-energy forcing clamps flat, with the velocity-derivative skewness ``S(t)`` an opt-in
+second gate (`gate_skewness`, off by default since decision 78); §4.7 gives the exact stopping
+test. A forced flow must reach statistical stationarity before a structure function
 or a PDF taken over it means anything.
 
 The composable pieces stay fully exposed: a study that needs to run the loop by hand, swap a stage, or
@@ -185,8 +186,11 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 
 - **`SimulationDomain`** provides the discretized periodic box the run lives on — the reusable,
   read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube. It bundles the
-  grid, the real–Fourier layout, and the real-to-complex transform plans — one each for the
-  velocity, the scalar, and the rank-2 strain tensor the skewness diagnostic needs. On top of those
+  grid, the real–Fourier layout, and the real-to-complex transform plans — one rank-blind pair
+  shared by every field, the velocity, the scalar, and the rank-2 strain tensor of the skewness
+  diagnostic alike (decision 81), planned under the caller's `fft_flags` / `fft_timelimit` request,
+  forwarded verbatim to the field library (a CPU lever — FFTW's default heuristic mis-plans
+  single-precision transforms; the GPU libraries take no flag). On top of those
   sit the per-mode symbols: the spectral multipliers;
   ``\lvert\boldsymbol{\kappa}\rvert^2`` as a lazy radial kernel, never materialized (in spectral
   space ``-\nabla^{2}`` is multiplication by it, evaluated per mode — decision 38); the constant-1
@@ -414,7 +418,12 @@ Method (§3).
   accumulator plus the assembly register). Williamson's own "2N" label counts differently — the
   state's array plus the accumulator, the assembly excluded as the solver's, not the scheme's (the
   `IFLowStorageRK3` docstring keeps that ledger); the two bookkeepings agree on the point that
-  matters, one register in `IFHeun`'s disfavor. The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
+  matters, one register in `IFHeun`'s disfavor. Two more schemes share `IFLowStorageRK3`'s two
+  registers: **`IFLowStorageRK4`** (Carpenter & Kennedy 1994) is fourth-order in five stages of the
+  same 2N form, its ``1.93\times`` wider imaginary-axis stability limit buying fewer transforms per
+  unit time on a stability-limited run (decision 85); **`IFSSPRK3`** is the Shu–Osher third-order
+  SSP scheme in TurTLE's stage arrangement, kept for code-to-code validation against that
+  reference (decision 80). The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
@@ -464,6 +473,10 @@ and its weight scratch in the shared `ParticleIntegratorBuffers`; decisions 57 a
 time limits a measurement — and the sampling-consistency axis, the interpolation scheme's order
 relative to the field's spectral accuracy (`CatmullRom` by default, higher-order `LalescuSpline` /
 `LagrangeSpline` available).
+The gathers themselves visit the tracers in a memory-locality order, the `ParticleTraversal` — a
+value-preserving accelerator (the interpolated values are bit-identical with or without it) that
+`Simulation` owns beside the tracer set and rebuilds every iteration by default, the
+`ordered_interpolation` setting choosing a manual cadence instead (decision 86).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same
 linear-exact move), while **orientation dynamics on the rotation group is a distinct geometric
@@ -477,7 +490,8 @@ needs): the `FixedDomain`, the `ResolvedFields` state (the
 fields ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``, in spectral representation, the generator acts on), the `ObservablesCache`
 observables cache, the `ResolvedGenerator` (carrying the `FlowConditions`), the `IntegratorBuffers`
 scheme registers, the chosen `AbstractIntegrator`, any `Tracers` with its own
-`AbstractParticleIntegrator` and `ParticleIntegratorBuffers`, a stored CFL ceiling, and a clock.
+`AbstractParticleIntegrator`, `ParticleIntegratorBuffers` and gather-order `ParticleTraversal`
+(decision 86), a stored CFL ceiling and step ceiling, and a clock.
 Over it:
 
 - **`Simulation(...)`** — the assemble-with-defaults constructor: from a grid size and a forcing it
@@ -494,11 +508,13 @@ Over it:
   observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
 - **`StationarityCriterion`** is the packaged spin-up observation, and **`warmup!(sim; ...)`** its
-  one-line sugar: stationarity detection on the running dissipation ``\varepsilon(t)`` and the
-  velocity-derivative skewness ``S(t)`` — a trailing-window flatness test that **gates** on
-  ``\varepsilon`` rather than on the clampable ``k(t)``, though ``k`` is still measured, to
-  normalize the eddy-turnover clock ``\Delta t \varepsilon/k``. When the scalar is forced,
-  ``\langle\varphi^2\rangle`` must settle too. A fixed budget is a three-line callback, not a run option.
+  one-line sugar: stationarity detection on the running dissipation ``\varepsilon(t)`` — a
+  trailing-window flatness test that **gates** on ``\varepsilon`` rather than on the clampable
+  ``k(t)``, though ``k`` is still measured, to normalize the eddy-turnover clock
+  ``\Delta t \varepsilon/k``. The velocity-derivative skewness ``S(t)`` is an opt-in second gate
+  (`gate_skewness = true`; off by default since decision 78, its rank-2 transforms being a per-call
+  cost the default path does not pay). When the scalar is forced, ``\langle\varphi^2\rangle`` must
+  settle too (`gate_scalar`, on by default). A fixed budget is a three-line callback, not a run option.
 - **A `Simulation` is a container, not a reading surface** (decision 49). The state is read through
   `sim.state` and the deposited observables through `sim.cache`, each by the accessor that owns it —
   `kinetic_energy(sim.state.velocity_spectral)`, `velocity_physical(sim.cache)`,
@@ -726,16 +742,6 @@ generalization is built for them until a second concrete case forces the abstrac
   stability CFL, would make temporal accuracy a studied fitness axis beside precision and footprint (§5).
   Deferred: HIT runs are typically stability-limited near the CFL ceiling, so a fixed step at the CFL is
   rarely the accuracy bottleneck.
-- **User-selectable FFT planner effort.** `GBGPeriodicFields` lets each transform plan carry a backend
-  planner flag and time limit — the `fft_flags` and `fft_timelimit` keywords of `FieldTransformPlans` —
-  yet `FixedDomain` (§4.1) builds its velocity, scalar, and tensor plans without them, so every run takes
-  the planner default (`FFTW.ESTIMATE` on the CPU path) and neither the domain nor the `Simulation`
-  constructor exposes an override. Closing it is a two-keyword passthrough, deferred on cost/benefit: the
-  transform is the dominant per-step cost, so a one-time `FFTW.MEASURE` / `FFTW.PATIENT` planning search
-  is a genuine performance lever beside the precision and footprint axes (§5) — but that search is an
-  FFTW planning concept that pays off on the **CPU** path, IT's development-and-small-run platform, not
-  the GPU-primary production target (invariant 4), where the plan is effectively fixed. It is wired when a
-  long CPU campaign makes the search worth the added `Simulation`-constructor surface.
 - **The ``\nu = 0`` truncated-Euler experiment — a scheme and dealiasing oracle.** At zero
   viscosity (accepted today; the integrating factor degenerates to the identity) the sharp-masked
   assembly is the exact Galerkin truncation of the Euler equations, which conserves kinetic energy in
@@ -2445,9 +2451,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     see) and the **resolved** cutoff (the highest mode whose dynamics is genuine Navier–Stokes —
     what the resolution criterion ``\kappa_{\max}\eta`` and the viscosity solve must see). For the
     sharp strategies the two coincide; under `HouLi` they diverge, because the per-step filter is an
-    extra damping rate ``\mathrm{strength}\,(\kappa/\kappa_{\mathrm{Ny}})^{36}/\Delta t`` that
-    overtakes ``\nu\kappa^{2}`` at ``\kappa/\kappa_{\mathrm{Ny}} =
-    (\nu\kappa_{\mathrm{Ny}}^{2}\Delta t/\mathrm{strength})^{1/34} \approx 0.8`` — a crossover the
+    extra damping rate ``\mathrm{strength} (\kappa/\kappa_{\mathrm{Ny}})^{36}/\Delta t`` that
+    overtakes ``\nu\kappa^{2}`` at
+    ``\kappa/\kappa_{\mathrm{Ny}} = (\nu\kappa_{\mathrm{Ny}}^{2}\Delta t/\mathrm{strength})^{1/34} \approx 0.8``
+    — a crossover the
     ``1/34`` power pins near ``0.8`` for any practical ``\nu``, ``\Delta t``, and strength, hence a
     constant ``4/5`` convention (TurTLE's Python side uses the same ``0.8``) rather than a per-run
     solve. Before this decision the criterion consumed the retained cutoff, so a `HouLi` run
@@ -2506,8 +2513,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407`` — ``1.93\times`` RK3's ``\sqrt{3}`` at
     ``5/3`` the evaluations, hence ``\approx 16\%`` fewer transforms per unit time at the
     stability limit — and MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
-    analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the ``\times
-    1.157`` transform-only projection; the per-stage non-transform costs scale with the stages
+    analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the
+    ``\times 1.157`` transform-only projection; the per-stage non-transform costs scale with the stages
     just as the transforms do, so nothing is eaten. Implementation: `step!`'s 2N loop was factored into one shared
     `_low_storage_2n_step!` both schemes instantiate with their coefficient tuples — the S = 3
     op sequence is bit-identical to the pre-refactor body — and the audit op model mirrors the
@@ -2518,7 +2525,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the larger ceiling (base 0.96, rounded down from ``0.5 \cdot y_s/\sqrt{3}``); checkpoint
     round-trips bitwise. A side effect worth naming: under a fourth-order field the existing
     `AdamsBashforth(order = 4)` tracers deliver genuine fourth-order trajectories, closing the
-    order mismatch the particle suite's own test documents.
+    order mismatch the particle suite's own test documents. *(Amended 2026-09-04: overstated.
+    The third-order cap that test measures is the tracer's own `Heun` bootstrap, on an analytic
+    velocity with no field scheme in play — a fourth-order field removes the field's time error
+    as a limit on the tracer, not the bootstrap's.)*
 86. **(2026-09, user-directed) The particle traversal order — a value-preserving accelerator the
     run owns, rebuilt every iteration by default, with cadence predicates for the run's
     callback.** PF's `point_traversal_order` sorts the tracers into a tile-major visiting order so
@@ -2575,7 +2585,7 @@ cites.
   `PhaseShift` strategy, §7, decision 27.)*
 - Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
 - Orszag, S. A. & Patterson, G. S. (1972). [*Numerical simulation of three-dimensional homogeneous isotropic turbulence*](https://doi.org/10.1103/PhysRevLett.28.76). *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
-- Rogallo, R. S. (1981). Numerical experiments in homogeneous turbulence. *NASA TM-81315.* *(No DOI;
+- Rogallo, R. S. (1981). *Numerical experiments in homogeneous turbulence.* NASA TM-81315. *(No DOI;
   a NASA technical memorandum. The sheared-frame scheme, §7; the spherical-truncation dealiasing of
   the `PhaseShift` strategy, decision 27.)*
 - Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014).

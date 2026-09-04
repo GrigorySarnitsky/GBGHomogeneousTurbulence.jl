@@ -48,7 +48,7 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
 - [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
   deterministic rescaling, at first order.
-- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, materialized once the
+- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, built into the concrete strategy once the
   [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
@@ -153,7 +153,7 @@ A deferred forcing. The operator-free keyword constructors
     VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
-`domain`-taking forms documented on each strategy; it is materialized into the concrete
+`domain`-taking forms documented on each strategy; it is built into the concrete
 `AbstractForcing` once the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain)
 exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)). A
 forcing argument
@@ -624,7 +624,8 @@ does not take.
   stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
   that sets ``\\nu`` explicitly against a very different regime should pass its own value. The
   derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
-  controller left at the default and handed to `FlowConditions` as a `scalar_forcing` with a
+  controller left at the default and handed to
+  [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) as a `scalar_forcing` with a
   positive gain is refused there — a scalar variance is not an energy, and the derived settling
   time would depend on the scalar's amplitude unit, breaking the scalar equation's exact
   linearity in ``\\varphi`` (at `gain = 0` the settling time never enters the dynamics and the
@@ -675,8 +676,8 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         "controller holds, and the rate divides by the band's own variance"))
   (isfinite(gain) && gain >= 0) ||
     throw(ArgumentError("`gain` must be finite and non-negative, got $gain: a negative gain makes " *
-                        "the restoring term push the variance AWAY from the target. `gain = 0` is " *
-                        "the bare marginal law — no restoring at all — and is allowed."))
+                        "the restoring term push the variance AWAY from the target. The value " *
+                        "`gain = 0` is the bare marginal law — no restoring at all — and is allowed."))
   band = _shell_band(domain, lowest_shell, highest_shell)
   # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
   # the same estimate the viscosity derivation uses, so the two agree on what "stationary" means.

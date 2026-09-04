@@ -85,6 +85,10 @@ function _docstring_shapes()
       for para in split(body, r"\n[ \t]*\n")
         t = strip(para)
         (isempty(t) || any(p -> startswith(t, p), ("-", "*", "!!!", "```", "#", "|"))) && continue
+        # A bulleted list led by its one-line "The arguments are:" sentence (the house idiom for
+        # three-plus arguments) is a list, not a paragraph: the cap measures prose run-ons, and a
+        # seven-entry argument list crossing it was the false positive that added this branch.
+        occursin(r"^[^\n]*:\n[ \t]*[-*] ", t) && continue
         longest = max(longest, length(split(t)))
       end
       shapes[key] = (longest, admonitions, length(split(body)))

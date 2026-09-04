@@ -96,17 +96,8 @@ Because the filter retains energy out to the Nyquist wavenumber it takes a propo
 CFL step than the ``2/3`` rule — handled automatically by
 [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 
-!!! note "Retained is not resolved"
-    The filter keeps every mode energetic ([`max_retained_wavenumber`](@ref) is the Nyquist), but
-    applying it every step adds a damping rate
-    ``\\texttt{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}/\\Delta t`` that
-    overtakes the viscous rate ``\\nu\\kappa^{2}`` near ``0.8\\,\\kappa_{\\mathrm{Ny}}``; beyond
-    that, mode amplitudes are set by the filter, not by Navier–Stokes. The resolution criterion
-    ``\\kappa_{\\max}\\eta`` therefore uses [`max_resolved_wavenumber`](@ref), which is
-    ``\\tfrac{4}{5}\\,\\kappa_{\\mathrm{Ny}}`` under this strategy — not the Nyquist.
-
 The `materialized` keyword chooses how the filter is *applied* — a memory-for-compute choice
-with no effect on the numbers. `false` (the default) keeps the filter as a closed-form radial
+with no effect on the numbers. The default `false` keeps the filter as a closed-form radial
 symbol re-evaluated per mode in every pass: zero resident storage, the minimal-footprint side.
 `true` evaluates the same expression once into a stored coefficient array — one resident complex
 spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``) —
@@ -117,6 +108,16 @@ Measured at ``128^3`` `Float64` on a GPU with `order = 36`: the on-the-fly evalu
 ``\\approx 14\\%`` of the step, of which `materialized = true` recovers ``\\approx 7\\%`` — the
 filter factor becomes an array read, while the integrating factor's own exponential remains.
 Prefer `true` when compute is the scarce resource, `false` when memory is.
+
+!!! note "Retained is not resolved"
+    The filter keeps every mode energetic ([`max_retained_wavenumber`](@ref) is the Nyquist), but
+    applying it every step adds a damping rate
+    ``\\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}/\\Delta t`` that
+    overtakes the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the
+    default `order`; beyond that, mode amplitudes are set by the filter, not by Navier–Stokes.
+    The resolution criterion ``\\kappa_{\\max}\\eta`` therefore uses
+    [`max_resolved_wavenumber`](@ref), which is ``\\tfrac{4}{5} \\kappa_{\\mathrm{Ny}}`` under
+    this strategy whatever the `order` — not the Nyquist (its docstring scopes the convention).
 
 # Fields
 The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:
@@ -190,15 +191,15 @@ _resolved_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
 
 
 """
-    FixedDomain(; grid_points_per_axis, side_length,
-                dealiasing, element_type, array_type)
+    FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type,
+                array_type, fft_flags = nothing, fft_timelimit = Inf)
 
 The discretized periodic box a run lives on — the reusable, read-only frame: a cube of side length
 `side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
 pseudospectral method needs on that box.
 
 # Arguments
-All keyword, all required:
+All keyword; the five naming the box are required:
 - `grid_points_per_axis` — grid points ``N`` along each axis (the box is ``N^{3}``).
 - `side_length` — the physical side length ``L`` (the box is ``[0,L)^{3}``).
 - `dealiasing` — the dealiasing strategy: [`TwoThirds`](@ref) (the sharp ``2/3`` rule) and [`HouLi`](@ref)
@@ -259,7 +260,7 @@ objects, each linked to its own documentation.
   once), since ``\\langle f, 1\\cdot f\\rangle`` is the mean square — the variance of a
   mean-zero field.
 - `storage_family` — the storage family (`Array` /
-  [`CuArray`](https://cuda.juliagpu.org/stable/) / `ROCArray`) the run's arrays live in — a type,
+  `CuArray` / `ROCArray`) the run's arrays live in — a type,
   not an array; the allocators hand it to `GBGPeriodicFields`' family-taking field constructors.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
   [`SpectralKernel`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.SpectralKernel), evaluated per
@@ -434,12 +435,17 @@ run is set up to meet.
 
 For the sharp strategies resolved and retained coincide: inside a sharp cutoff no mode is damped.
 Under `HouLi` they differ, because the filter applied every step acts as an extra damping rate
-``\\mathrm{strength}\\,(\\kappa/\\kappa_{\\mathrm{Ny}})^{36}/\\Delta t`` that overtakes the viscous
-rate ``\\nu\\kappa^{2}`` near ``0.8\\,\\kappa_{\\mathrm{Ny}}`` — beyond that crossover the dynamics
-is filter-dominated and the energy there is numerical residue, not resolved turbulence. The ``4/5``
-value is a convention, but a robust one: the crossover scales as the ``1/34``-th power of
-``\\nu\\,\\kappa_{\\mathrm{Ny}}^{2}\\,\\Delta t/\\mathrm{strength}``, so it stays near ``0.8`` for
-any practical viscosity, timestep, and filter strength.
+``\\mathrm{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\mathrm{order}}/\\Delta t`` that overtakes
+the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the default
+`order = 36` — beyond that crossover the dynamics is filter-dominated and the energy there is
+numerical residue, not resolved turbulence.
+
+The ``4/5`` value is a convention, but a robust one: the crossover scales as the
+``1/(\\mathrm{order} - 2)``-th power — the ``1/34``-th at the default — of
+``\\nu \\kappa_{\\mathrm{Ny}}^{2} \\Delta t/\\mathrm{strength}``, so it stays near ``0.8`` for
+any practical viscosity, timestep, and filter strength. The convention is pinned to the default
+order: a `HouLi` built with another `order` still reports ``\\tfrac{4}{5}``, which overstates the
+resolved range at a lower order (the crossover moves inward) and understates it at a higher one.
 """
 function max_resolved_wavenumber(domain::FixedDomain)
   N = field_physical_shape(domain.grid, Val(0))[1]

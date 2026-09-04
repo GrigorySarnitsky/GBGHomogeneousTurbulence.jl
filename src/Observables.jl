@@ -182,8 +182,9 @@ so no magnitude field is materialized.
 
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
-left it — the same quantity, measured once per iteration and served without a reduction (or a
-device readback); it throws an `ErrorException` when no deposit is current, like every cached read.
+left it — the same quantity, measured once per iteration (a step plus the deposit that closes it)
+and served without a reduction (or a device readback); it throws an `ErrorException` when no
+deposit is current, like every cached read.
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
@@ -314,10 +315,12 @@ invariant rather than an axis-dependent gradient.
 
 From the velocity field `û` in spectral representation, the strain is formed directly with
 `symmetric_gradient` and the wavenumber `multipliers` of the [`FixedDomain`](@ref) bundle `domain`
-(skipping the full nine-component velocity gradient), carried to physical space by its rank-2 tensor
-transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
+(skipping the full nine-component velocity gradient), carried to physical space component by
+component through the domain's transform plans, and reduced to ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle`` (`inner`) and
 ``\\langle\\det\\boldsymbol{S}\\rangle`` (the fused mapped mean over the pointwise determinant, which
-materializes no determinant field); `domain` also sizes the per-call tensor scratch.
+materializes no determinant field); `domain` also sizes the per-call tensor scratch. A field whose
+strain vanishes identically (``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = 0``) returns zero rather
+than dividing by it.
 
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
@@ -335,8 +338,9 @@ gate of the warm-up detector.
     The rank-2 strain tensor is allocated per call rather than kept resident — an occasional
     diagnostic should not hold field-scale storage for a whole run — but while it lives it is the
     biggest single memory episode a default configuration reaches, larger than the resident working
-    set. The [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) driver calls this every sampling interval, so a run near its memory ceiling
-    should size for the diagnostic rather than for the steady state.
+    set. The [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) driver calls this on its
+    sampling interval when its skewness gate is on (`gate_skewness = true`; off by default), so a
+    run near its memory ceiling should size for the diagnostic rather than for the steady state.
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
