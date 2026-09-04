@@ -305,6 +305,11 @@ domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing
 sim = Simulation(domain; viscosity = 1e-2)
 ```
 
+Displaying the run — a bare `sim` at the REPL, or the constructor without a trailing `;` in a
+notebook — prints its settings and then the reads available to a `run!` callback, each as the
+callback would write it: the state's spectral representations, the cache's checked reads, the
+clock, and the observables applied to the state.
+
 !!! note "The default drives the kinetic energy to a set value, so read it as a control target"
     `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
     scale of ``\\mathrm{Re}_\\lambda``. It does not *impose* the value step by step as a rescale
@@ -712,6 +717,49 @@ step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, a
 whether a cached value is still the right one.
 """
 current_step(sim::Simulation) = sim.clock.step
+
+
+# The REPL / notebook display of a run: the physics it was set up with, then what a callback may
+# read — the state's two representations-of-record and the cache's checked reads, each named as
+# the callback would write it. Names only: nothing here touches a device array, and nothing reads
+# a cache slot (a checked read could throw on a stale slot; the display must never).
+function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
+  domain = sim.domain
+  conditions = sim.generator.conditions
+  N = size(field_data(sim.cache.velocity_physical), 1)
+  L = domain.grid.domain_size[1]
+  storage = nameof(domain.storage_family)
+  has_scalar = !isnothing(sim.state.scalar_spectral)
+  has_tracers = !isnothing(sim.tracers)
+  name(x) = nameof(typeof(x))
+  print(io, "Simulation on a $(N)³ grid of side $(L), $(typeof(L)) in $(storage), ",
+        "$(name(domain.dealiasing)) dealiasing")
+  print(io, "\n  viscosity ν = $(conditions.viscosity), Sc = $(conditions.schmidt); ",
+        "velocity forcing $(name(conditions.velocity_forcing)), ",
+        has_scalar ? "scalar forcing $(name(conditions.scalar_forcing))" : "no scalar")
+  print(io, "\n  $(name(sim.field_integration_scheme)) with cfl = $(sim.cfl), max_dt = $(sim.max_dt); ",
+        has_tracers ? "$(npoints(sim.tracers.positions)) tracers by $(name(sim.particle_integration_scheme))" :
+                      "no tracers")
+  print(io, "\n  clock: t = $(current_time(sim)), step $(current_step(sim))")
+  print(io, "\nAvailable to a callback (its argument named `sim`):")
+  row(call, meaning) = print(io, "\n  ", rpad(call, 34), "  ", meaning)
+  row("sim.state.velocity_spectral", "û — the velocity in spectral representation, the source of truth")
+  row("sim.state.scalar_spectral", has_scalar ? "φ̂ — the scalar in spectral representation" :
+                                                "nothing (the run carries no scalar)")
+  row("velocity_physical(sim.cache)", "u — the velocity, deposited at the end of every iteration")
+  row("vorticity_physical(sim.cache)", "ω — the vorticity, likewise")
+  row("scalar_physical(sim.cache)", has_scalar ? "φ — the scalar, likewise" : "nothing")
+  row("max_speed(sim.cache)", "maxᵢ|uᵢ| over the box, a host number")
+  row("velocity_at_particles(sim.cache)", has_tracers ? "u at the tracers, an M × 3 array" : "nothing")
+  has_tracers && row("sim.tracers.positions", "the tracers' positions, a PointSet (read via point_positions)")
+  row("current_time(sim), current_step(sim)", "the clock")
+  row("flow_parameters(sim)", "ν, ε, u′, L₁₁, Sc, ε_φ measured from the state now (a FlowParameters)")
+  row("kinetic_energy(û), dissipation(û, sim.domain, ν), …", "the Observables, applied to the state")
+end
+
+Base.show(io::IO, sim::Simulation) =
+  print(io, "Simulation($(size(field_data(sim.cache.velocity_physical), 1))³, ",
+        "t = $(current_time(sim)), step $(current_step(sim)))")
 
 
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor

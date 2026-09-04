@@ -124,6 +124,31 @@ using Test
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
   end
 
+  @testset "the display lists the run's settings and every callback read, and touches no slot" begin
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = true,
+                     number_of_particles = 8, rng = MersenneTwister(6))
+    shown = sprint(show, MIME"text/plain"(), sim)
+    @test occursin("16³ grid", shown) && occursin("ν = 0.05", shown) && occursin("8 tracers", shown)
+    for read in ("sim.state.velocity_spectral", "sim.state.scalar_spectral",
+                 "velocity_physical(sim.cache)", "vorticity_physical(sim.cache)",
+                 "scalar_physical(sim.cache)", "max_speed(sim.cache)",
+                 "velocity_at_particles(sim.cache)", "sim.tracers.positions",
+                 "current_time(sim)", "flow_parameters(sim)")
+      @test occursin(read, shown)
+    end
+    @test occursin("φ̂ — the scalar", shown)
+    bare = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(6))
+    shown = sprint(show, MIME"text/plain"(), bare)
+    @test occursin("no scalar", shown) && occursin("no tracers", shown)
+    @test !occursin("sim.tracers.positions", shown)
+    # A slot taken as a producer's register mid-iteration makes its checked read throw; the
+    # display names the reads without performing them, so it must print regardless.
+    fields_modified!(bare.cache)
+    @test_throws ErrorException velocity_physical(bare.cache)
+    @test occursin("velocity_physical(sim.cache)", sprint(show, MIME"text/plain"(), bare))
+    @test sprint(show, bare) == "Simulation(16³, t = 0.0, step 0)"
+  end
+
   @testset "the observation must decide — a non-Bool return throws" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(5))
     @test_throws ArgumentError run!(s -> nothing, sim)     # recorded but did not decide
