@@ -50,7 +50,7 @@ gone?".
 """
 module Cache
 
-using GBGPeriodicFields: point_values, field_data, VectorPointValues
+using GBGPeriodicFields: point_values, field_data, VectorPointValues, npoints
 using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
@@ -428,6 +428,70 @@ particles_modified!(cache::ObservablesCache) =
 # cosmetic — the routine path was clearing the history on every step and the multistep scheme could
 # never leave its bootstrap.
 advance_particles_epoch!(cache::ObservablesCache) = (cache.particles_epoch += 1; cache)
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). The one line
+# carries what a consumer refuses on: the velocity slot (grid, element type, storage — the library's
+# spelling), the optional scalar and particle slots through their own displays — the particle one
+# carries the count a tracer set is matched on — and the history depth a multistep particle scheme
+# demands. An absent slot is said aloud as `no scalar` / `no particles`, the package's one spelling
+# of an absent companion. The REPL form adds each slot's standing, read off the epochs exactly as the
+# checked reads decide it — and reads nothing, so it prints where a read would throw.
+
+function Base.show(io::IO, cache::ObservablesCache)
+  print(io, "ObservablesCache(", cache.velocity_physical)
+  isnothing(cache.scalar_physical) ? print(io, ", no scalar") :
+    print(io, ", scalar_physical ", cache.scalar_physical)
+  if isnothing(cache.velocity_at_particles)
+    print(io, ", no particles")
+  else
+    print(io, ", velocity_at_particles ", cache.velocity_at_particles, ", history depth ",
+          length(cache.velocity_at_particles_history) + 1)
+  end
+  print(io, ")")
+end
+
+# The standing of a slot, in the words the checked read would refuse it with.
+function _standing(epoch::Int, current::Int)
+  epoch == current && return "current"
+  epoch == SCRATCH && return "a producer's scratch (mid-iteration)"
+  epoch == NEVER_DEPOSITED && return "never deposited"
+  return "stale (deposited at fields epoch $epoch)"
+end
+
+# The particle slot answers to two counters — the sample is a function of the state AND the
+# positions — so its standing names whichever has moved on, or both. The sentinels are tested first:
+# a never-deposited slot is not "advanced past", whatever the counters say.
+function _particle_standing(cache::ObservablesCache)
+  fields_epoch, particles_epoch = cache.velocity_at_particles_fields_epoch, cache.velocity_at_particles_particles_epoch
+  fields_epoch == SCRATCH && return "a producer's scratch (mid-iteration)"
+  fields_epoch == NEVER_DEPOSITED && return "never deposited"
+  fields_current, particles_current = fields_epoch == cache.fields_epoch, particles_epoch == cache.particles_epoch
+  fields_current && particles_current && return "current"
+  fields_current && return "stale (the tracer positions have advanced past the deposited sample)"
+  particles_current && return "stale (deposited at fields epoch $fields_epoch)"
+  return "stale (deposited at fields epoch $fields_epoch, and the tracer positions have advanced since)"
+end
+
+function Base.show(io::IO, ::MIME"text/plain", cache::ObservablesCache)
+  now = cache.fields_epoch
+  slot(name, value, standing) = print(io, "\n  ", rpad(name, 23), value, " — ", standing)
+  absent(name, why) = print(io, "\n  ", rpad(name, 23), "nothing (", why, ")")
+  print(io, "ObservablesCache (fields epoch ", now, ", particles epoch ", cache.particles_epoch, ")")
+  slot("velocity_physical", cache.velocity_physical, _standing(cache.velocity_epoch, now))
+  slot("vorticity_physical", cache.vorticity_physical, _standing(cache.vorticity_epoch, now))
+  isnothing(cache.scalar_physical) ? absent("scalar_physical", "no scalar") :
+    slot("scalar_physical", cache.scalar_physical, _standing(cache.scalar_epoch, now))
+  slot("max_speed", cache.max_speed, _standing(cache.max_speed_epoch, now))
+  if isnothing(cache.velocity_at_particles)
+    absent("velocity_at_particles", "no particles")
+  else
+    slot("velocity_at_particles", cache.velocity_at_particles, _particle_standing(cache))
+    depth = length(cache.velocity_at_particles_history) + 1
+    slot("history", "depth $depth", "$(cache.history_filled) of $(depth - 1) past samples filled")
+  end
+end
 
 
 end # module Cache

@@ -419,6 +419,43 @@ const Pao1965 = ModelSpectrum{UnitLargeScale, PaoDissipation}
 Pao1965(; C_K = 1.5) = ModelSpectrum(C_K, UnitLargeScale(), PaoDissipation(C_K))
 
 
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). A model
+# spectrum prints as the constructor call that rebuilds it — the preset's keyword form when its
+# factors are that preset's (only the keywords that depart from the defaults, `Pope2000()` at
+# them), the general three-argument form otherwise. The factors spell their own positional
+# constructors unqualified: the default display module-qualifies a name the reader has not
+# imported, and the qualified form ran a `Pope2000` to 157 characters. Each form round-trips under
+# the names its constructor takes.
+
+_show_factor(io::IO, factor) = print(io, nameof(typeof(factor)), "(", join(getfield.((factor,), fieldnames(typeof(factor))), ", "), ")")
+for F in (PopeLargeScale, PopeDissipation, VonKarmanLarge, PaoDissipation, ExponentialDissipation,
+          UnitLargeScale, UnitDissipation, SaffmanDissipation)
+  @eval Base.show(io::IO, factor::$F) = _show_factor(io, factor)
+end
+
+# The preset's keyword form, printing only what departs from the preset's defaults.
+function _show_preset(io::IO, name, pairs)
+  print(io, name, "(")
+  join(io, ("$k = $v" for (k, v, default) in pairs if v != default), ", ")
+  print(io, ")")
+end
+
+function Base.show(io::IO, spectrum::ModelSpectrum)
+  large_scale, dissipation = spectrum.large_scale, spectrum.dissipation
+  if spectrum isa Pope2000
+    _show_preset(io, "Pope2000", ((:C_K, spectrum.C_K, 1.5), (:c_L, large_scale.c_L, 6.78), (:p₀, large_scale.p₀, 2.0),
+                                  (:c_η, dissipation.c_η, 0.40), (:β, dissipation.β, 5.2)))
+  elseif spectrum isa VonKarman1948
+    _show_preset(io, "VonKarman1948", ((:C_K, spectrum.C_K, 1.5), (:c_L, large_scale.c_L, 1.0)))
+  elseif spectrum isa Pao1965 && dissipation.α == spectrum.C_K
+    _show_preset(io, "Pao1965", ((:C_K, spectrum.C_K, 1.5),))
+  else
+    print(io, "ModelSpectrum(", spectrum.C_K, ", ", large_scale, ", ", dissipation, ")")
+  end
+end
+
+
 """
     ScalarSpectrum <: TurbulenceLaw
 

@@ -18,6 +18,7 @@ module SimulationRunTests; include("simulation_run.jl"); end
 module PhenomenologyTests;  include("phenomenology.jl");  end
 module ValidationTests;     include("validation.jl");     end
 module HDF5CheckpointTests; include("hdf5_checkpoint.jl"); end
+module DisplayTests;        include("display.jl");        end
 
 # The /bug-hunt regression witnesses. Each file is the executable form of one confirmed defect: it
 # asserts the CORRECT behaviour and was observed to FAIL before its fix landed, so it is already a

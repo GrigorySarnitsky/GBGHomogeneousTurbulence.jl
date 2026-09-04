@@ -800,4 +800,36 @@ function _scalar_flux!(flux_spectral, u, φ, domain::FixedDomain)
 end
 
 
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). The conditions
+# print their two numbers and nest each forcing's own display; the generator prints its conditions,
+# its assembly scratch through the field library's `show` (the grid and storage it was built on),
+# and the two things a caller is refused on — whether it carries the displaced-grid scratch of
+# `PhaseShift` and whether that scratch extends to a scalar. The rate slots exist only under a
+# `Linear` forcing (`uses_steady_linear_rate`), so their absence is a fact of the conditions, not of
+# the moment. An optional part prints through its own display when present and as `no …` when not.
+
+Base.show(io::IO, conditions::FlowConditions) =
+  print(io, "FlowConditions(viscosity ", conditions.viscosity, ", schmidt ", conditions.schmidt,
+        ", velocity_forcing ", conditions.velocity_forcing, ", scalar_forcing ", conditions.scalar_forcing, ")")
+
+function Base.show(io::IO, buffers::PhaseShiftBuffers)
+  print(io, "PhaseShiftBuffers(", buffers.velocity_shifted)
+  isnothing(buffers.scalar_shifted) ? print(io, ", no scalar") :
+    print(io, ", scalar_shifted ", buffers.scalar_shifted)
+  print(io, ")")
+end
+
+_show_optional(io::IO, name, value, absent) =
+  isnothing(value) ? print(io, ", no ", absent) : print(io, ", ", name, " ", value)
+
+function Base.show(io::IO, generator::ResolvedGenerator)
+  print(io, "ResolvedGenerator(", generator.conditions, ", product_spectral ", generator.product_spectral)
+  _show_optional(io, "phase_shift", generator.phase_shift, "phase-shift scratch")
+  _show_optional(io, "velocity_rate", generator.velocity_rate, "velocity-rate slot")
+  _show_optional(io, "scalar_rate", generator.scalar_rate, "scalar-rate slot")
+  print(io, ")")
+end
+
+
 end # module Generator

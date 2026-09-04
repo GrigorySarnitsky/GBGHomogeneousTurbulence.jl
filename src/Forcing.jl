@@ -74,7 +74,8 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type
+using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type,
+                          _storage_family_name, _show_shape
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower,
@@ -938,6 +939,53 @@ StochasticOU(; variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
   DeferredForcing(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
 
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). A forcing is
+# its parameters and the shell band they act over, then the band kernel it built on the domain —
+# through the field library's own `show`, which spells the grid, element type, and storage the
+# kernel was derived on. The parameters print at full precision, never rounded.
+
+_show_shells(io::IO, forcing) = print(io, "shells ", forcing.lowest_shell, " to ", forcing.highest_shell)
+
+function Base.show(io::IO, forcing::ConstantPower)
+  print(io, "ConstantPower(injection_rate ", forcing.injection_rate, ", ")
+  _show_shells(io, forcing)
+  print(io, ", ", forcing.band, ")")
+end
+
+function Base.show(io::IO, forcing::Linear)
+  print(io, "Linear(rate ", forcing.rate, ", ")
+  _show_shells(io, forcing)
+  print(io, ", indicator ", _storage_family_name(forcing.indicator), "{", eltype(forcing.indicator), "} ")
+  _show_shape(io, size(forcing.indicator))
+  print(io, " coefficients)")
+end
+
+function Base.show(io::IO, forcing::VarianceRescaling)
+  print(io, "VarianceRescaling(target ", forcing.target, " over ", repr(forcing.over), ", ")
+  _show_shells(io, forcing)
+  print(io, ", ", forcing.band, ")")
+end
+
+function Base.show(io::IO, forcing::VarianceController)
+  print(io, "VarianceController(target ", forcing.target, ", gain ", forcing.gain, ", turnover_time ",
+        forcing.turnover_time, forcing.turnover_time_derived ? " (derived from the target)" : "", ", ")
+  _show_shells(io, forcing)
+  print(io, ", ", forcing.band, ")")
+end
+
+function Base.show(io::IO, forcing::StochasticOU)
+  print(io, "StochasticOU(variance ", forcing.variance, ", correlation_time ", forcing.correlation_time,
+        ", seed ", forcing.seed, ", ")
+  _show_shells(io, forcing)
+  print(io, ", ", forcing.band, isnothing(forcing.state) ? ", state unallocated" : ", state allocated", ")")
+end
+
+# The closure has no readable form; the display says what the value is waiting for.
+Base.show(io::IO, ::DeferredForcing) = print(io, "DeferredForcing(awaiting a domain)")
 
 
 

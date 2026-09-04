@@ -128,6 +128,17 @@ FlowParameters(; viscosity, dissipation, rms_velocity, integral_scale,
                  schmidt = 1.0, scalar_dissipation = NaN) =
   FlowParameters(viscosity, dissipation, rms_velocity, integral_scale, schmidt, scalar_dissipation)
 
+# Display: the keyword constructor call that rebuilds the record, at full precision, the unset
+# scalar dissipation (`NaN`, the keyword's default) left out. Every other record of this module
+# displays as its positional constructor call, which Julia's default already spells.
+function Base.show(io::IO, fp::FlowParameters)
+  print(io, "FlowParameters(viscosity = ", fp.viscosity, ", dissipation = ", fp.dissipation,
+        ", rms_velocity = ", fp.rms_velocity, ", integral_scale = ", fp.integral_scale,
+        ", schmidt = ", fp.schmidt)
+  isnan(fp.scalar_dissipation) || print(io, ", scalar_dissipation = ", fp.scalar_dissipation)
+  print(io, ")")
+end
+
 
 """
     kolmogorov_length(fp) -> Float64

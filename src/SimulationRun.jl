@@ -306,9 +306,9 @@ sim = Simulation(domain; viscosity = 1e-2)
 ```
 
 Displaying the run — a bare `sim` at the REPL, or the constructor without a trailing `;` in a
-notebook — prints its settings and then the reads available to a `run!` callback, each as the
-callback would write it: the state's spectral representations, the cache's checked reads, the
-clock, and the observables applied to the state.
+notebook — prints a row per keyword, then the reads a `run!` callback may make, each as the
+callback writes it: the state's spectral representations, the cache's checked reads, the clock,
+and the observables applied to the state.
 
 !!! note "The default drives the kinetic energy to a set value, so read it as a control target"
     `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
@@ -719,47 +719,52 @@ whether a cached value is still the right one.
 current_step(sim::Simulation) = sim.clock.step
 
 
-# The REPL / notebook display of a run: the physics it was set up with, then what a callback may
-# read — the state's two representations-of-record and the cache's checked reads, each named as
-# the callback would write it. Names only: nothing here touches a device array, and nothing reads
-# a cache slot (a checked read could throw on a stale slot; the display must never).
+# The REPL / notebook display of a run: the settings it was built with, one `name value` row per
+# constructor keyword with each part through its own display, then what a callback may read — the
+# state's two representations-of-record and the cache's checked reads, each named as the callback
+# would write it. Names only: nothing here touches a device array, and nothing reads a cache slot
+# (a checked read could throw on a stale slot; the display must never).
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
-  domain = sim.domain
   conditions = sim.generator.conditions
-  N = size(field_data(sim.cache.velocity_physical), 1)
-  L = domain.grid.domain_size[1]
-  storage = nameof(domain.storage_family)
   has_scalar = !isnothing(sim.state.scalar_spectral)
   has_tracers = !isnothing(sim.tracers)
-  name(x) = nameof(typeof(x))
-  print(io, "Simulation on a $(N)³ grid of side $(L), $(typeof(L)) in $(storage), ",
-        "$(name(domain.dealiasing)) dealiasing")
-  print(io, "\n  viscosity ν = $(conditions.viscosity), Sc = $(conditions.schmidt); ",
-        "velocity forcing $(name(conditions.velocity_forcing)), ",
-        has_scalar ? "scalar forcing $(name(conditions.scalar_forcing))" : "no scalar")
-  print(io, "\n  $(name(sim.field_integration_scheme)) with cfl = $(sim.cfl), max_dt = $(sim.max_dt); ",
-        has_tracers ? "$(npoints(sim.tracers.positions)) tracers by $(name(sim.particle_integration_scheme))" :
-                      "no tracers")
-  print(io, "\n  clock: t = $(current_time(sim)), step $(current_step(sim))")
+  setting(name, value) = print(io, "\n  ", rpad(name, 29), value)
+  print(io, "Simulation")
+  setting("domain", sim.domain)
+  setting("viscosity", conditions.viscosity)
+  setting("schmidt", conditions.schmidt)
+  setting("velocity_forcing", conditions.velocity_forcing)
+  setting("scalar_forcing", has_scalar ? conditions.scalar_forcing : "nothing (no scalar)")
+  setting("field_integration_scheme", sim.field_integration_scheme)
+  setting("cfl", sim.cfl)
+  setting("max_dt", sim.max_dt)
+  setting("tracers", has_tracers ? sim.tracers : "nothing (no particles)")
+  has_tracers && setting("particle_integration_scheme", sim.particle_integration_scheme)
+  setting("time", current_time(sim))
+  setting("step", current_step(sim))
   print(io, "\nAvailable to a callback (its argument named `sim`):")
   row(call, meaning) = print(io, "\n  ", rpad(call, 34), "  ", meaning)
   row("sim.state.velocity_spectral", "û — the velocity in spectral representation, the source of truth")
   row("sim.state.scalar_spectral", has_scalar ? "φ̂ — the scalar in spectral representation" :
-                                                "nothing (the run carries no scalar)")
+                                                "nothing (no scalar)")
   row("velocity_physical(sim.cache)", "u — the velocity, deposited at the end of every iteration")
   row("vorticity_physical(sim.cache)", "ω — the vorticity, likewise")
-  row("scalar_physical(sim.cache)", has_scalar ? "φ — the scalar, likewise" : "nothing")
+  row("scalar_physical(sim.cache)", has_scalar ? "φ — the scalar, likewise" : "nothing (no scalar)")
   row("max_speed(sim.cache)", "maxᵢ|uᵢ| over the box, a host number")
-  row("velocity_at_particles(sim.cache)", has_tracers ? "u at the tracers, an M × 3 array" : "nothing")
+  row("velocity_at_particles(sim.cache)", has_tracers ? "u at the tracers, an M × 3 array" : "nothing (no particles)")
   has_tracers && row("sim.tracers.positions", "the tracers' positions, a PointSet (read via point_positions)")
   row("current_time(sim), current_step(sim)", "the clock")
   row("flow_parameters(sim)", "ν, ε, u′, L₁₁, Sc, ε_φ measured from the state now (a FlowParameters)")
   row("kinetic_energy(û), dissipation(û, sim.domain, ν), …", "the Observables, applied to the state")
 end
 
-Base.show(io::IO, sim::Simulation) =
-  print(io, "Simulation($(size(field_data(sim.cache.velocity_physical), 1))³, ",
-        "t = $(current_time(sim)), step $(current_step(sim)))")
+# The one line: the grid in the field library's spelling, and the clock — what distinguishes two
+# runs a caller could confuse in a container.
+function Base.show(io::IO, sim::Simulation)
+  print(io, "Simulation(")
+  join(io, field_physical_shape(sim.domain.grid, Val(0)), "×")
+  print(io, " grid, time $(current_time(sim)), step $(current_step(sim)))")
+end
 
 
 # The advective-CFL timestep Δt = C·Δx/maxᵢ|uᵢ| for the current velocity (the integrating factor
@@ -1267,6 +1272,21 @@ function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool =
   monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
                                 gate_scalar, gate_skewness = gate_skewness, skew_floor)
   return StationarityCriterion(monitor, Float64(max_turnovers), gate_scalar, 0.0, NaN, false)
+end
+
+# Display (the convention is stated once, at `SimulationDomain`'s display section). The monitor's
+# sample histories grow with the run, so it prints its settings and the count of samples banked,
+# never the series; the criterion nests it and adds its own cap and progress.
+function Base.show(io::IO, monitor::StationarityMonitor)
+  print(io, "StationarityMonitor(min_turnovers ", monitor.min_turnovers, ", window_turnovers ",
+        monitor.window_turnovers, ", tol ", monitor.tol, ", gate_scalar ", monitor.gate_scalar,
+        ", gate_skewness ", monitor.gate_skewness, ", skew_floor ", monitor.skew_floor,
+        ", ", length(monitor.turn), " samples", monitor.converged ? ", converged" : "", ")")
+end
+
+function Base.show(io::IO, criterion::StationarityCriterion)
+  print(io, "StationarityCriterion(", criterion.monitor, ", max_turnovers ", criterion.max_turnovers)
+  print(io, criterion.started ? ", elapsed_turnovers $(criterion.elapsed_turn)" : ", not started", ")")
 end
 
 function (criterion::StationarityCriterion)(sim::Simulation)

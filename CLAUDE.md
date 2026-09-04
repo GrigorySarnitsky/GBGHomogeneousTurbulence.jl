@@ -94,6 +94,13 @@ Two-space indentation; two blank lines between top-level definitions; section ba
 moderately long lines are fine. When unsure about Base / stdlib / package behavior, check the official
 docs — don't guess. For a linear solve use `\` / factorizations / `ldiv!`, never an explicit matrix
 inverse. Operators and extended Base functions are imported before being extended; no type piracy.
+**Every concrete struct type carries a `Base.show`** in the field library's convention (decision 87,
+adopting PF's decision 82): a one-line self-delimiting `Type(body)` carrying what the package
+refuses on, a `MIME"text/plain"` form only where that line abbreviates, an optional part printed
+through its own display when present and as `no …` when absent, `name = value` reserved for a
+constructor call that round-trips, nothing reading an element. The gate is derived —
+`test/display.jl` enumerates the concrete types and fails on one without a display or a cited
+exemption — so a new type is caught by the suite, not by memory.
 
 **Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /

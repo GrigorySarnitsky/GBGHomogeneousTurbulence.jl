@@ -894,4 +894,26 @@ recommended_cfl(scheme::AbstractIntegrator, domain::FixedDomain) =
   _base_cfl(scheme) * (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)
 
 
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). A register set
+# is its leading register through the field library's `show` (grid, element type, storage), the
+# names of the registers it holds — the set is the scheme's signature, `stage1, nonlinear` for the
+# low-storage schemes against `stage1, stage2, velocity_predictor_spectral` for `IFHeun` — and the
+# scalar set riding along, through its own display, or `no scalar` — the closing deposit refuses a
+# scalar state whose buffers carry none.
+
+_registers(buffers, names) = join((String(n) for n in names if !isnothing(getfield(buffers, n))), ", ")
+
+Base.show(io::IO, buffers::ScalarBuffers) =
+  print(io, "ScalarBuffers(", buffers.stage1, ", registers ",
+        _registers(buffers, (:stage1, :stage2, :predictor_spectral, :nonlinear)), ")")
+
+function Base.show(io::IO, buffers::IntegratorBuffers)
+  print(io, "IntegratorBuffers(", buffers.stage1, ", registers ",
+        _registers(buffers, (:stage1, :stage2, :velocity_predictor_spectral, :nonlinear)))
+  isnothing(buffers.scalar) ? print(io, ", no scalar") : print(io, ", scalar ", buffers.scalar)
+  print(io, ")")
+end
+
+
 end # module Propagator

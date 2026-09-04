@@ -80,6 +80,21 @@ end
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
   ResolvedFields(new_vector_field_spectral(domain), scalar ? new_scalar_field_spectral(domain) : nothing)
 
+# Display (the convention is stated once, at `SimulationDomain`'s display section). The two
+# representations-of-record, each through the field library's own `show` — grid, element type,
+# storage — which is exactly what a run checks a state against; the scalar's absence is said aloud.
+function Base.show(io::IO, state::ResolvedFields)
+  print(io, "ResolvedFields(û ", state.velocity_spectral)
+  isnothing(state.scalar_spectral) ? print(io, ", no scalar") : print(io, ", φ̂ ", state.scalar_spectral)
+  print(io, ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", state::ResolvedFields)
+  print(io, "ResolvedFields")
+  print(io, "\n  velocity_spectral  û  ", state.velocity_spectral)
+  print(io, "\n  scalar_spectral    φ̂  ", something(state.scalar_spectral, "nothing (no scalar)"))
+end
+
 
 """
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,

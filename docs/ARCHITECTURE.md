@@ -243,7 +243,12 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   Each is preallocated, so a step allocates no field-sized memory (§9, invariant 4), and sized to
   the run — no scalar buffers when the run carries no scalar; GPU memory is tight. A `Simulation`
   composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in
-  place — each iteration a `step!` closed by the closing `deposit!`.
+  place — each iteration a `step!` closed by the closing `deposit!`. Every concrete type of the
+  package — the frame, the state, the cache, the forcings, the generator and its scratch, the
+  register sets, the tracers and their scheme, the run, the stationarity records, the
+  `Phenomenology` parameter records — carries a display in the field library's convention: one
+  self-delimiting line carrying what the package refuses on, a REPL form where that line
+  abbreviates, nothing reading an element (decision 87; the derived gate is `test/display.jl`).
 
 ### 4.2 `Generator` — the evolution, split reversible and irreversible
 
@@ -2566,6 +2571,67 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the traversal enters the checkpoint schema; `read_simulation` takes the same
     `ordered_interpolation` keyword and rebuilds. Bit-identity of the on / off / manual runs is
     pinned for both particle schemes, positions and Lagrangian samples alike.
+
+87. **(2026-09, user-directed) Every concrete struct type displays, in the field library's
+    convention — and the convention is the field library's decision 82, adopted whole.** Julia's
+    default struct display prints every field, and this package's objects are built of
+    field-sized arrays: the positions of a ``2\times 10^4``-tracer set print as ``1.13\times 10^6``
+    characters, the coefficients of one ``16^3`` velocity as ``1.16\times 10^5``, and a
+    `Simulation` holds a dozen such arrays. The visible half is the REPL flood; the half that
+    bites harder is what an exception carries once it interpolates such an object. PF closed the same hole on its side
+    the same day (decision 82 there), and its rules bind here unchanged, so that a nested PF
+    object — a field, a point set, a kernel, an interpolation scheme — prints through its own
+    `show` and the two packages spell one fact one way. **Two forms:** the two-argument `show` is
+    one self-delimiting line, `Type(body)`, for a container, a `$(...)` and an error message;
+    the three-argument `MIME"text/plain"` form is the REPL's and exists only where the line
+    abbreviates something — the cache's per-slot standing, read off the epochs exactly as the
+    checked reads decide it (`current`, `stale (deposited at fields epoch n)`, `never deposited`,
+    a producer's scratch; the particle slot names whichever of its two counters moved on, or
+    both), the domain's resolved wavenumber, the run's settings one `name value` row per
+    constructor keyword followed by the callback reads. **The body carries what the package
+    REFUSES on**, asserted over the refused pairs: a state on another grid, element type, or
+    storage family, or a box differing in the ninth decimal (`Simulation(domain; state)`); a
+    scalar state against a cache or buffers without a scalar (the closing `deposit!`); a
+    generator without the displaced-scalar scratch under `PhaseShift` (`scalar_rhs!`); a
+    particle scheme against buffers of another order or a cache of another history depth
+    (`allocate_buffers`, `advect!`); a tracer set without the unwrapped record
+    (`unwrapped_positions`). **One vocabulary for an optional part:** present, it prints through
+    its own display under its field name (`scalar_physical …`, `phase_shift …`,
+    `unwrapped_positions …`); absent, it prints as `no scalar`, `no particles`, `no phase-shift
+    scratch`, `no unwrapped positions` — a review of the first draft found the one fact "holds a
+    scalar companion" spelled four ways across four sibling containers (`no scalar` / `no scalar
+    slot` / `with scalar` / `scalar scratch`), and the run's REPL header, written a day earlier,
+    spelling the grid a third way (`16³ grid of side …`) beside the corpus's `16×16×16`. A REPL
+    row for an absent part reads `nothing (no scalar)`: the parenthesis is the aside that says
+    why, the ` — ` the cache's standing, and neither is used for the other. `name = value` is
+    reserved for a display that IS a constructor call and round-trips through the parser —
+    `HouLi(order = 24)`, `AdamsBashforth(order = 3)`, `FlowParameters(viscosity = …)`, the
+    `Phenomenology` presets `Pope2000(C_K = 1.6)` — printing only what departs from the defaults.
+    **Nothing reads an element**, measured on a ``32^3`` run with ``2\times 10^4`` tracers
+    against a floor of half a scalar field: the tracer count is chosen so the particle arrays sit
+    above the floor too, since a display copying a dozen tracers' positions would allocate a few
+    hundred bytes and pass a field-scale floor. **The gate is derived** in the field library's
+    shape: every concrete struct type of the fourteen modules must carry a package-owned `show` or
+    a cited exemption, checked both ways so a stale exemption fails. An empty *parametric* struct
+    is enumerated — its content lives in the type parameter (`AdamsBashforth{K}`), so the default
+    would print `Module.Name{3}()` — and only the true singletons are skipped; a planted
+    empty-but-parametric struct is shown to be caught, since the first draft skipped every empty
+    struct and covered `AdamsBashforth` by a hand-written line that no future type of the same
+    shape would inherit. Nine flat records are exempt: the private `Clock` and `EveryTime`, and
+    the `Phenomenology` records of numbers whose default is already their positional constructor
+    call, module-qualified when the name is not in scope and round-tripping either way. A record
+    *nesting* another package type is not exempt — the default qualifies every nested name, and
+    ran a `Pope2000` to 157 characters — so the model-spectrum family prints as its preset's
+    keyword call when its factors are that preset's and as the three-argument `ModelSpectrum`
+    call otherwise, the factors spelling their own positional constructors unqualified. Two
+    readings the review offered were declined with a reason: the tracer count reads `8 points`
+    inside a nested PF point set and `8 particles` nowhere in this package's own text any more —
+    the PF noun stays PF's, and this package's is *particle* (decision 51) — and the domain's REPL
+    form keeps `max_resolved_wavenumber` beside the grid and strategy it derives from, because it
+    is the one number the resolution checks (``\kappa_{\max}\eta``) read a strategy through,
+    and the REPL form's purpose is to carry what the line abbreviates. The private two-line copy
+    of PF's shape and storage-family helpers (`_show_shape`, `_storage_family_name`) is this
+    package's own: PF's are unexported, and the channel for a request is closed.
 
 ## References
 

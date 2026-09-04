@@ -536,6 +536,52 @@ truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.d
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display. Every concrete type of the package shows itself, on the field library's two-form
+# convention (PF decision 82): the two-argument `show` is ONE self-delimiting line, `Type(body)`,
+# the form containers, string interpolation, and error messages reach; the three-argument
+# `MIME"text/plain"` form is the REPL's and may spend lines. The body carries what a check REFUSES
+# on — two objects a constructor would reject together must render differently — in the one
+# vocabulary `name value`, spelling a size `32×32×32` and a count `500 points`; the `name = value`
+# form is reserved for a display that IS the constructor call (`HouLi(order = 24)`, which round-trips).
+# A nested field-library object prints through its own `show`, so a domain, a state, or a buffer
+# set never restates the grid the library already spells. NOTHING here reads an element: a display
+# holds under `allowscalar(false)`, and never touches a device array. The gate is `test/display.jl`.
+
+# The storage family of an array — `Array`, `CuArray`, `ROCArray` — through any wrapper, as a name.
+# The field library keeps its own copy private, so the two lines live here for the raw arrays the
+# package holds outside a field-library section (a forcing's materialized indicator, a predictor).
+_storage_family_name(array::AbstractArray) =
+  parent(array) === array ? nameof(Base.typename(typeof(array)).wrapper) : _storage_family_name(parent(array))
+_show_shape(io::IO, dims) = join(io, dims, "×")
+
+# The constructor call, printing only what departs from the defaults — `HouLi()` at the defaults.
+function Base.show(io::IO, strategy::HouLi)
+  default = HouLi()
+  parts = String[]
+  strategy.order == default.order || push!(parts, "order = $(strategy.order)")
+  strategy.strength === default.strength || push!(parts, "strength = $(strategy.strength)")
+  strategy.materialized == default.materialized || push!(parts, "materialized = $(strategy.materialized)")
+  print(io, "HouLi(", join(parts, ", "), ")")
+end
+
+# The grid (size, extent, element type — the library's spelling) and the storage family, which a run
+# checks a state against before adopting it (a tracer set against the storage family alone), and
+# the dealiasing strategy, which decides what assembly scratch a generator is built with. The REPL
+# form adds the resolved wavenumber the strategy leaves — the one number the resolution checks
+# (``\kappa_{\max}\eta``) read a strategy through — beside the grid and strategy it derives from.
+Base.show(io::IO, domain::FixedDomain) =
+  print(io, "FixedDomain(", domain.grid, ", ", domain.dealiasing, ", ", nameof(domain.storage_family), ")")
+
+function Base.show(io::IO, ::MIME"text/plain", domain::FixedDomain)
+  print(io, "FixedDomain")
+  print(io, "\n  grid        ", domain.grid)
+  print(io, "\n  dealiasing  ", domain.dealiasing, ", max_resolved_wavenumber ", max_resolved_wavenumber(domain))
+  print(io, "\n  storage     ", nameof(domain.storage_family))
+end
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
 # HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's

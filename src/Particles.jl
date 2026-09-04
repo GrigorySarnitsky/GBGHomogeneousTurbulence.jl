@@ -569,7 +569,9 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
                         "level is capped against the order of whichever call last advanced it, so " *
                         "mixing two orders over one history corrupts the bookkeeping in both."))
   # The weight scratch is sized at allocation; a mismatch means the buffers were built for another
-  # scheme, and the solve below would read past their end.
+  # scheme, and the solve below would read past their end. `allocate_buffers` ties the weights and
+  # the history depth to one order, so through it the guard above always fires first; this one
+  # stands for a hand-assembled `ParticleIntegratorBuffers`.
   length(buffers.weights) == K ||
     throw(ArgumentError("these buffers carry weight scratch for order $(length(buffers.weights)), " *
                         "not $K: they were built for a different scheme; allocate with " *
@@ -781,6 +783,40 @@ new_scalar_point_values(tracers::Tracers) =
                             eltype(point_positions(tracers.positions)),
                             npoints(tracers.positions)))
 
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# Display (the convention is stated once, at `SimulationDomain`'s display section). A tracer set
+# is its positions through the field library's `show` (count, element type, storage — what a run
+# refuses a tracer set on), its interpolation scheme, and the unwrapped record, which the unwrapped
+# read refuses on — through its own display when kept, `no unwrapped positions` when not. The
+# scheme prints as the constructor call that rebuilds it.
+# A register set is its predictor (the only display of the package still growing with the particle
+# count, so it leads) and its order — the depth of history it holds, which the cache is matched on.
+
+Base.show(io::IO, ::AdamsBashforth{K}) where {K} = print(io, "AdamsBashforth(order = ", K, ")")
+
+function Base.show(io::IO, tracers::Tracers)
+  print(io, "Tracers(", tracers.positions, ", ", tracers.interpolation_scheme)
+  isnothing(tracers.unwrapped_positions) ? print(io, ", no unwrapped positions") :
+    print(io, ", unwrapped_positions ", tracers.unwrapped_positions)
+  print(io, ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", tracers::Tracers)
+  row(name, value) = print(io, "\n  ", rpad(name, 22), value)
+  print(io, "Tracers")
+  row("positions", tracers.positions)
+  row("interpolation_scheme", tracers.interpolation_scheme)
+  row("unwrapped_positions", something(tracers.unwrapped_positions, "nothing (no unwrapped positions)"))
+end
+
+Base.show(io::IO, traversal::ParticleTraversal) =
+  print(io, "ParticleTraversal(", traversal.order, traversal.automatic ? ", automatic" : ", manual", ")")
+
+Base.show(io::IO, buffers::ParticleIntegratorBuffers) =
+  print(io, "ParticleIntegratorBuffers(", buffers.predictor_points,
+        isempty(buffers.weights) ? ", one-step" : ", order $(length(buffers.weights))", ")")
 
 
 
