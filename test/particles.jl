@@ -189,4 +189,83 @@ end
     @test !isapprox(X0, X)
     @test all(0 .<= X .< sim.domain.grid.domain_size[1])
   end
+
+  # Decision 86: the traversal order reorders the gathers' visits and changes no value, so a run
+  # with it must be BITWISE the run without it — the witness that the wiring passed the order to
+  # the right gathers and nothing else. Under `:manual` the order goes stale as the tracers move,
+  # which the field library documents as never wrong; the identical assertion holds unrebuilt.
+  @testset "the traversal order is a value-preserving accelerator (decision 86)" begin
+    function tracked(mode; scheme = nothing, steps = 6, M = 300)
+      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = M,
+                       unwrapped = true, particle_integration_scheme = scheme,
+                       ordered_interpolation = mode, rng = MersenneTwister(3))
+      for _ in 1:steps; advance!(sim); end
+      sim
+    end
+    for scheme in (nothing, AdamsBashforth(order = 3))
+      off = tracked(false; scheme)
+      for mode in (nothing, true, :manual)
+        on = tracked(mode; scheme)
+        @test point_positions(on.tracers.positions) == point_positions(off.tracers.positions)
+        @test point_positions(unwrapped_positions(on.tracers)) ==
+              point_positions(unwrapped_positions(off.tracers))
+        @test velocity_at_particles(on.cache) == velocity_at_particles(off.cache)
+        @test on.particle_traversal isa ParticleTraversal
+        @test on.particle_traversal.automatic == (mode !== :manual)
+      end
+      @test off.particle_traversal === nothing
+    end
+
+    # A caller's gather takes the same order, with the same values.
+    on = tracked(nothing); off = tracked(false)
+    a = new_vector_point_values(on.tracers); b = new_vector_point_values(off.tracers)
+    interpolate_at_particles!(a, velocity_physical(on.cache), on.tracers;
+                              traversal = on.particle_traversal.order)
+    interpolate_at_particles!(b, velocity_physical(off.cache), off.tracers)
+    @test point_values(a) == point_values(b)
+
+    # A rebuilt order agrees with a freshly built one from the same positions.
+    man = tracked(:manual)
+    rebuild_traversal!(man)
+    fresh = ParticleTraversal(man.domain, man.tracers)
+    @test Array(man.particle_traversal.order.indices) == Array(fresh.order.indices)
+    @test sort(Int.(Array(fresh.order.indices))) == 1:300
+
+    # A reposition then an advance still matches the run without an order: the automatic rebuild
+    # reads the start-of-step positions, so an announced reseed needs no traversal verb of its own.
+    on = tracked(nothing; steps = 2); off = tracked(false; steps = 2)
+    for s in (on, off)
+      copyto!(point_positions(s.tracers.positions),
+              s.domain.grid.domain_size[1] .* rand(MersenneTwister(11), 300, 3))
+      particles_modified!(s); deposit!(s); advance!(s)
+    end
+    @test point_positions(on.tracers.positions) == point_positions(off.tracers.positions)
+  end
+
+  @testset "the traversal order adds no per-step allocation that scales with M" begin
+    alloc(M) = (sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = M,
+                                 rng = MersenneTwister(1));
+                advance!(sim); advance!(sim); @allocated advance!(sim))
+    small, large = alloc(200), alloc(4000)
+    @test large <= small + 512               # constant launch bookkeeping, not an M-sized buffer
+  end
+
+  @testset "the traversal setting is refused by name where it cannot apply" begin
+    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                          ordered_interpolation = true)
+    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                          ordered_interpolation = :manual)
+    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                          number_of_particles = 8, ordered_interpolation = :sometimes)
+    @test_throws ArgumentError rebuild_traversal!(Simulation(grid_points_per_axis = 16, viscosity = 0.05))
+    @test_throws ArgumentError rebuild_traversal!(Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                                             number_of_particles = 8,
+                                                             ordered_interpolation = false))
+    # `false` on a tracer-free run is a non-`nothing` particle setting too, and is refused alike.
+    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                          ordered_interpolation = false)
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
+                     ordered_interpolation = :manual)
+    @test rebuild_traversal!(sim) === sim
+  end
 end

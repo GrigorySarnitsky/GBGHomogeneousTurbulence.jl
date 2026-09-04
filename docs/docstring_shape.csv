@@ -49,14 +49,16 @@ Particles.jl::AbstractParticleIntegrator,53,0,102
 Particles.jl::AdamsBashforth(; order = 4),100,1,689
 Particles.jl::Heun(),62,1,258
 Particles.jl::ParticleIntegratorBuffers,54,0,271
-Particles.jl::Particles,8,0,190
+Particles.jl::ParticleTraversal(domain， tracers; automatic = true),110,1,374
+Particles.jl::Particles,8,0,212
 Particles.jl::Tracers(domain; number_of_particles， interpolation_scheme， unwrapped = false，,85,0,656
-Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt) -> tracers,55,1,330
+Particles.jl::advect!(scheme， tracers， velocity_end， domain， buffers， dt;,84,1,362
 Particles.jl::history_depth(scheme) -> Int,28,0,47
-Particles.jl::interpolate_at_particles!(out， field， tracers) -> out,60,0,65
+Particles.jl::interpolate_at_particles!(out， field， tracers; traversal = nothing) -> out,92,0,100
 Particles.jl::new_scalar_point_values(tracers),29,0,30
 Particles.jl::new_vector_point_values(tracers),29,0,30
 Particles.jl::read_tracers(parent::HDF5.H5DataStore， name::AbstractString，,50,0,89
+Particles.jl::rebuild_traversal!(traversal， domain， tracers) -> traversal,72,0,120
 Particles.jl::restart!(scheme， buffers) -> buffers,81,0,166
 Particles.jl::unwrapped_positions(tracers),107,0,189
 Particles.jl::write_tracers(parent::HDF5.H5DataStore， name::AbstractString， tracers::Tracers),44,0,84
@@ -94,7 +96,7 @@ Scalings.jl::Sreenivasan1998(; asymptote = 0.5， correction = 0.0),67,0,136
 Scalings.jl::stationary_dissipation(law， kinetic_energy， side_length) -> Float64,55,0,89
 SimulationDomain.jl::DealiasingStrategy,95,0,96
 SimulationDomain.jl::FixedDomain(; grid_points_per_axis， side_length，,35,1,566
-SimulationDomain.jl::HouLi(; order = 36， strength = nothing， materialized = false),160,1,457
+SimulationDomain.jl::HouLi(; order = 36， strength = nothing， materialized = false),93,1,445
 SimulationDomain.jl::PhaseShift(),75,1,274
 SimulationDomain.jl::SimulationDomain,116,0,127
 SimulationDomain.jl::TwoThirds(),77,0,78
@@ -109,15 +111,17 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,62,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2292
-SimulationRun.jl::SimulationRun,31,0,218
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2474
+SimulationRun.jl::SimulationRun,31,0,229
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false， min_turnovers = 5，,98,0,676
-SimulationRun.jl::advance!(sim; dt = nothing),53,0,99
+SimulationRun.jl::advance!(sim; dt = nothing),55,0,124
 SimulationRun.jl::current_step(sim),85,0,100
 SimulationRun.jl::current_time(sim),6,0,7
+SimulationRun.jl::every_steps(n),43,0,98
+SimulationRun.jl::every_time(period),114,0,194
 SimulationRun.jl::flow_parameters(sim),96,0,97
-SimulationRun.jl::read_simulation(parent::HDF5.H5DataStore， name::AbstractString;,115,0,172
-SimulationRun.jl::run!(callback， sim; dt = nothing),66,0,295
+SimulationRun.jl::read_simulation(parent::HDF5.H5DataStore， name::AbstractString;,115,0,220
+SimulationRun.jl::run!(callback， sim; dt = nothing),75,0,304
 SimulationRun.jl::warmup!(sim; dt = nothing， kwargs...),88,0,137
 SimulationRun.jl::write_simulation(parent::HDF5.H5DataStore， name::AbstractString， sim::Simulation),100,0,162
 Spectra.jl::DissipationFactor,39,1,115

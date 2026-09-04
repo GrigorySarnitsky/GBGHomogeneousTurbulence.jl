@@ -358,3 +358,50 @@ end
   @test current_time(sim) == current_time(sim2)   # 4 × 0.01, never the adaptive rule
   @test field_data(sim.state.velocity_spectral) == field_data(sim2.state.velocity_spectral)
 end
+
+
+# The cadence predicates (decision 86): a `run!` callback observes every iteration, and these are
+# the tests it gates periodic work on — including the seeded state `run!` observes first.
+@testset "every_steps fires on the multiples of its period, from step 0" begin
+  fires = every_steps(3)
+  seen = Int[]
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(5))
+  run!(sim; dt = 0.01) do s
+    fires(s) && push!(seen, current_step(s))
+    current_step(s) < 10
+  end
+  @test seen == [0, 3, 6, 9]
+  @test every_steps(1)(sim)                          # every step, the current one included
+  @test_throws ArgumentError every_steps(0)
+  @test_throws ArgumentError every_steps(-2)
+end
+
+@testset "every_time fires once per crossed multiple, within a step past it, never before" begin
+  period = 0.05
+  fires = every_time(period)
+  seen = Float64[]
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(5))
+  dt = 0.02
+  run!(sim; dt) do s
+    fires(s) && push!(seen, current_time(s))
+    current_step(s) < 12
+  end
+  # t = 0, 0.02, …, 0.24: the multiples 0, 0.05, 0.1, 0.15, 0.2 are each crossed once.
+  @test length(seen) == 5
+  @test seen[1] == 0.0
+  for (k, t) in enumerate(seen[2:end])
+    @test (k * period) - 1e-12 <= t < (k * period) + dt   # at or past the multiple, within one step
+  end
+  # A step over two multiples fires once, and the next firing is at the NEXT multiple ahead.
+  jumper = every_time(period)
+  sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(5))
+  count = Ref(0)
+  run!(sim2; dt = 0.12) do s                        # t = 0, 0.12, 0.24: each crossing fires once
+    jumper(s) && (count[] += 1)
+    current_step(s) < 2
+  end
+  @test count[] == 3
+  @test jumper.next == 0.25                        # the smallest multiple past 0.24
+  @test_throws ArgumentError every_time(0.0)
+  @test_throws ArgumentError every_time(-1.0)
+end

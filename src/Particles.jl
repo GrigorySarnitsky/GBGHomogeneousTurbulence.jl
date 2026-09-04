@@ -35,6 +35,9 @@ Lagrangian particle tracking — today the massless tracer:
   [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
+- [`ParticleTraversal`](@ref) — the memory-locality order the gathers visit the tracers in, a
+  value-preserving accelerator; [`rebuild_traversal!`](@ref) refreshes it from the current
+  positions.
 - [`write_tracers`](@ref) / [`read_tracers`](@ref) — the tracer set's HDF5 persistence: positions,
   the opt-in unwrapped positions, and the interpolation scheme as one self-describing group
   (available once `HDF5` is loaded).
@@ -50,7 +53,7 @@ using ..Cache: ObservablesCache, deposit_velocity_at_particles!, advance_particl
 import ..Propagator: allocate_buffers, deposit!
 
 export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
-       ParticleIntegratorBuffers,
+       ParticleIntegratorBuffers, ParticleTraversal, rebuild_traversal!,
        advect!, restart!, history_depth, interpolate_at_particles!,
        unwrapped_positions, new_vector_point_values, new_scalar_point_values
 
@@ -181,6 +184,86 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
   # lift), so the two can never disagree on a step, only on the winding the wrap discards.
   return Tracers(PointSet(pos), interpolation_scheme,
                  unwrapped ? PointSet(copy(pos)) : nothing)
+end
+
+
+"""
+    ParticleTraversal(domain, tracers; automatic = true)
+
+The memory-locality order in which a field is gathered at the tracers — a
+[`PointTraversalOrder`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.PointTraversalOrder)
+over the tracer set `tracers` on the grid of `domain` (a [`FixedDomain`](@ref)), together with the
+scratch that lets it be rebuilt in place. Tracers seeded at random, or mixed by the flow, visit the
+grid in no order at all, so each interpolation stencil is a cache miss; visiting them
+tile-by-tile turns the gather into a sweep, and the field library's `interpolate!` accepts such an
+order through its `traversal` keyword. The order only reorders the visits — it changes no value,
+so a run with and without it produces bitwise-identical trajectories and samples.
+
+A run builds one for you: [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)'s
+`ordered_interpolation` keyword decides whether, and whether the run or the caller rebuilds it.
+Building it by hand belongs with a hand-run loop, where it is passed on to
+[`advect!`](@ref), the particle form of [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
+and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
+
+The arguments are:
+
+- `domain` — the [`FixedDomain`](@ref) whose grid the tiles are laid over.
+- `tracers` — the [`Tracers`](@ref) whose positions are ordered; the order is sized to their count
+  and built from their current positions.
+- `automatic = true` — whether a run rebuilds the order every iteration (`true`) or leaves the
+  rebuilding to the caller, through [`rebuild_traversal!`](@ref) (`false`). A rebuild costs a small
+  fraction of the gather it accelerates, so every iteration is the default; a stale order is never
+  wrong, only progressively less useful as the flow mixes the tracers away from it.
+
+!!! note "One order serves every gather of the step"
+    The field library accepts any same-length order for a point set of the same count, so the one
+    order built from the tracer positions is also passed to the gather at the predicted positions
+    a [`Heun`](@ref) step makes; those sit a step's displacement from the tracers, well inside the
+    tiles the order groups.
+
+# Fields
+- `order` — the `PointTraversalOrder`: one `Int32` index per tracer, a permutation of the visits.
+- `scratch` — the
+  [`PointTraversalOrderScratch`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.PointTraversalOrderScratch)
+  the in-place rebuild sorts in: the per-tracer tile keys and the per-tile counts and offsets.
+- `automatic` — whether a run rebuilds the order every iteration.
+"""
+struct ParticleTraversal{O, S}
+  order::O           # PointTraversalOrder — the Int32 permutation the gathers visit the tracers in
+  scratch::S         # PointTraversalOrderScratch — the counting-sort scratch of the in-place rebuild
+  automatic::Bool    # a run rebuilds every iteration (true), or the caller does through rebuild_traversal!
+end
+
+
+function ParticleTraversal(domain::FixedDomain, tracers::Tracers; automatic::Bool = true)
+  order = point_traversal_order(domain.grid, tracers.positions)
+  scratch = PointTraversalOrderScratch(domain.grid, tracers.positions)
+  return ParticleTraversal(order, scratch, automatic)
+end
+
+
+"""
+    rebuild_traversal!(traversal, domain, tracers) -> traversal
+    rebuild_traversal!(sim) -> sim
+
+Rebuild the tracer traversal order from the current tracer positions, in place — the
+[`ParticleTraversal`](@ref) `traversal` over the tracer set `tracers` on the grid of `domain` (a
+[`FixedDomain`](@ref)), or the one the run `sim` (a
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)) carries as
+`sim.particle_traversal`.
+
+Call it from a run's callback when the run was built with `ordered_interpolation = :manual`, at
+whatever cadence you choose — every so many steps with
+[`every_steps`](@ref GBGIsotropicTurbulence.SimulationRun.every_steps), or every so much time with
+[`every_time`](@ref GBGIsotropicTurbulence.SimulationRun.every_time). With the default automatic
+mode the run rebuilds every iteration and the call is never needed. The rebuild allocates nothing
+at the tracer scale; a run without a traversal order refuses the call with an `ArgumentError`.
+"""
+function rebuild_traversal! end
+
+function rebuild_traversal!(traversal::ParticleTraversal, domain::FixedDomain, tracers::Tracers)
+  point_traversal_order!(traversal.order, domain.grid, tracers.positions, traversal.scratch)
+  return traversal
 end
 
 
@@ -461,7 +544,7 @@ end
 
 
 function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, domain::FixedDomain,
-                 buffers::ParticleIntegratorBuffers, dt::Real) where {K}
+                 buffers::ParticleIntegratorBuffers, dt::Real; traversal = nothing) where {K}
   T = real(eltype(point_positions(tracers.positions)))
 
   # A non-positive step would enter the history as a repeated (or reversed) node, and the Lagrange
@@ -492,7 +575,7 @@ function advect!(scheme::AdamsBashforth{K}, tracers::Tracers, velocity_end, doma
                         "`allocate_buffers(AdamsBashforth(order = $K), tracers, cache)`"))
 
   if cache.history_filled < K - 1            # no history yet: start up on the one-step scheme
-    advect!(Heun(), tracers, velocity_end, domain, buffers, dt)
+    advect!(Heun(), tracers, velocity_end, domain, buffers, dt; traversal)
   else
     b = _adams_bashforth_weights(buffers.weights, buffers.nodes, Float64(dt), steps, K)
     # ONE fused K-term displacement, wrap included (PF decision 73): the K broadcast passes this
@@ -529,18 +612,20 @@ restart!(::AdamsBashforth, buffers::ParticleIntegratorBuffers) = (buffers.cache.
 # live in `Propagator`. This method interpolates and stamps in one act: it is the slot's only
 # producer of values, and the two counters it stamps against advance elsewhere (the step and the
 # push), so the deposit is the pure closing measurement of both.
-function deposit!(cache::ObservablesCache, tracers::Tracers, u)
+function deposit!(cache::ObservablesCache, tracers::Tracers, u; traversal = nothing)
   cache.velocity_at_particles === nothing &&
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set"))
-  interpolate!(cache.velocity_at_particles, u, tracers.positions, tracers.interpolation_scheme)
+  interpolate!(cache.velocity_at_particles, u, tracers.positions, tracers.interpolation_scheme;
+               traversal)
   deposit_velocity_at_particles!(cache)
   return cache
 end
 
 
 """
-    advect!(scheme, tracers, velocity_end, domain, buffers, dt) -> tracers
+    advect!(scheme, tracers, velocity_end, domain, buffers, dt;
+            traversal = nothing) -> tracers
 
 Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
 below), in place, under the particle integration scheme `scheme` (an
@@ -548,7 +633,9 @@ below), in place, under the particle integration scheme `scheme` (an
 [`ParticleIntegratorBuffers`](@ref) that
 [`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
 that scheme). The `domain` (a [`FixedDomain`](@ref))
-supplies the box side the positions are wrapped into.
+supplies the box side the positions are wrapped into. The keyword `traversal` takes the
+`PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order` field) to gather the velocity in
+memory-locality order; the default `nothing` gathers in tracer order, with identical values.
 
 Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
 step — the start-of-step values the previous iteration's closing particle deposit stored, and
@@ -594,7 +681,7 @@ pushes.
 function advect! end
 
 function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
-                 buffers::ParticleIntegratorBuffers, dt::Real)
+                 buffers::ParticleIntegratorBuffers, dt::Real; traversal = nothing)
   Δt = real(eltype(point_positions(tracers.positions)))(dt)
   # The predictor displacement, wrap fused (PF decision 73): X* = X + Δt·v₁, reduced to the box.
   v₁ = buffers.cache.velocity_at_particles
@@ -603,8 +690,11 @@ function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
   # v₂ is evaluated at the PREDICTOR positions and is a stage register, never the deposited velocity sample —
   # and it must never be reused as the next step's v₁: the two differ only at O(Δt²), but that reuse
   # would corrupt the recorded observable the Lagrangian statistics accumulate (never approximate
-  # the thing you measure).
-  interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points, tracers.interpolation_scheme)
+  # the thing you measure). The traversal order built over the tracers serves this gather too: the
+  # predictor positions sit one step's displacement from them, inside the tiles the order groups,
+  # and the field library admits any same-length order.
+  interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points,
+               tracers.interpolation_scheme; traversal)
   # The corrector: one fused two-term displacement, wrap included.
   displace!(tracers.positions, domain.grid,
             (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
@@ -622,17 +712,20 @@ end
 
 
 """
-    interpolate_at_particles!(out, field, tracers) -> out
+    interpolate_at_particles!(out, field, tracers; traversal = nothing) -> out
 
 Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
 [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
 velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
 for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. This is how
 a field is gathered along the trajectories; what is then accumulated over those values is the
-caller's own analysis.
+caller's own analysis. The keyword `traversal` takes the `PointTraversalOrder` of a
+[`ParticleTraversal`](@ref) (its `order` field) to gather in memory-locality order — on a run,
+`sim.particle_traversal.order`; the default `nothing` gathers in tracer order, with identical
+values.
 """
-function interpolate_at_particles!(out, field, tracers::Tracers)
-  interpolate!(out, field, tracers.positions, tracers.interpolation_scheme)
+function interpolate_at_particles!(out, field, tracers::Tracers; traversal = nothing)
+  interpolate!(out, field, tracers.positions, tracers.interpolation_scheme; traversal)
   return out
 end
 

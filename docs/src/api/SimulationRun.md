@@ -40,6 +40,17 @@ current_time
 current_step
 ```
 
+## Cadence predicates
+
+Callback helpers that fire on a schedule — every ``n`` steps, or once per crossed multiple of a
+simulation-time period — for the periodic actions a `run!` callback drives (a diagnostic, a
+checkpoint, a `rebuild_traversal!` on a manual cadence).
+
+```@docs
+every_steps
+every_time
+```
+
 ## Flow parameters
 
 Bridge the run's measured state to a [`Phenomenology`](../phenomenology.md) `FlowParameters`, so any

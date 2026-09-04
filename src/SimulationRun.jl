@@ -30,7 +30,9 @@ The run layer:
   iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
   observation, and `warmup!`, the one-line shorthand that runs it.
-- [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count.
+- [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count;
+  [`every_steps`](@ref), [`every_time`](@ref) — the cadence predicates a callback acts
+  periodically on.
 - [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
 - [`write_simulation`](@ref) / [`read_simulation`](@ref) — checkpoint and restore: the restartable
   run as one self-describing HDF5 group (available once `HDF5` is loaded).
@@ -57,13 +59,14 @@ using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, ste
                     recommended_cfl, IFLowStorageRK3
 import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
-                   restart!, history_depth
+                   restart!, history_depth, ParticleTraversal
+import ..Particles: rebuild_traversal!
 using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
-       current_time, current_step, flow_parameters
+       current_time, current_step, flow_parameters, every_steps, every_time
 
 
 mutable struct Clock
@@ -257,6 +260,20 @@ The run group:
   [`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`()` when trajectory
   accuracy in time limits a measurement: it costs one stored array per extra order and saves an
   interpolation per step.
+- `ordered_interpolation = nothing` — whether the gathers at the tracers (the velocity for the
+  advance and the Lagrangian sample, and any field the caller samples) visit them in the
+  memory-locality order of a
+  [`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal). The order
+  changes no value — a run with and without it is bitwise identical — only the time the gathers
+  take. `nothing` means `true` whenever the run carries tracers: the order is built at seeding and
+  rebuilt from the start-of-step positions every iteration, a cost small against the gather it
+  accelerates. `:manual` builds it and leaves every rebuild to the caller, through
+  [`rebuild_traversal!`](@ref GBGIsotropicTurbulence.Particles.rebuild_traversal!) in the `run!`
+  callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `false`
+  holds no order and gathers in tracer order. The order and its rebuild scratch hold three
+  integer or Boolean vectors of the tracer count and two of the tile count — small beside the
+  `(M, 3)` positions — and nothing of it is persisted: a restored run rebuilds it from the
+  restored positions.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
 - `state = nothing` — an existing [`ResolvedFields`](@ref) to **adopt** as the run's state in
@@ -305,11 +322,14 @@ their contents as the scheme's business rather than the run's state.
 - `domain`, `buffers`, `generator`, `field_integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
   the chosen scheme.
-- `tracers`, `particle_integration_scheme`, `particle_buffers` — the `Tracers` being advected along with the
-  fields, the scheme advancing them along their trajectories, and that scheme's registers. All `nothing` when the run carries no tracers.
+- `tracers`, `particle_integration_scheme`, `particle_buffers`, `particle_traversal` — the
+  `Tracers` being advected along with the fields, the scheme advancing them along their
+  trajectories, that scheme's registers, and the `ParticleTraversal` the gathers visit the tracers
+  in (`nothing` under `ordered_interpolation = false`). All `nothing` when the run carries no
+  tracers.
 - `cfl`, `clock` — the advective-CFL coefficient, and the time/step counter.
 """
-struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
+struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB, PT}
   domain::DOM
   buffers::FB
   generator::GN            # ResolvedGenerator: the equations of motion + conditions + assembly scratch
@@ -319,6 +339,7 @@ struct Simulation{DOM, FB, IG, GN<:ResolvedGenerator, RF, DF, TR, PI, PB}
   tracers::TR              # Tracers, or nothing — trajectory STATE only
   particle_integration_scheme::PI  # AbstractParticleIntegrator, or nothing
   particle_buffers::PB     # ParticleIntegratorBuffers for that scheme, or nothing
+  particle_traversal::PT   # ParticleTraversal — the gathers' memory-locality order — or nothing (decision 86)
   cfl::Float64
   max_dt::Float64          # a ceiling on the adaptive step, in the caller's own units; Inf = none
   clock::Clock
@@ -406,7 +427,13 @@ function Simulation(domain::FixedDomain;
                     unwrapped::Bool = false,
                     tracers::Union{Nothing, Tracers} = nothing,
                     particle_integration_scheme::Union{Nothing, AbstractParticleIntegrator} = nothing,
+                    ordered_interpolation::Union{Nothing, Bool, Symbol} = nothing,
                     rng = Random.default_rng())
+  # Validated first: the symbol form has exactly one admissible value, and a typo would otherwise
+  # be read as "resident, rebuilt by the caller" — a silently wrong mode.
+  ordered_interpolation in (nothing, true, false, :manual) ||
+    throw(ArgumentError("`ordered_interpolation` must be `nothing`, `true`, `false`, or `:manual`; " *
+                        "got $(repr(ordered_interpolation))"))
   # The injection door (decision 83): an existing state or tracer set is ADOPTED — its arrays
   # become the run's own, no copy — so a continuation or an external import skips the seeding.
   # Validated here, before anything is built from the settings the adoption overrides.
@@ -569,7 +596,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # `ResolvedGenerator` refuses for a scalar forcing without a scalar.
   if number_of_particles == 0 && tracers === nothing
     for (name, value) in (("interpolation_scheme", interpolation_scheme),
-                          ("particle_integration_scheme", particle_integration_scheme))
+                          ("particle_integration_scheme", particle_integration_scheme),
+                          ("ordered_interpolation", ordered_interpolation))
       value === nothing ||
         throw(ArgumentError("`$name` was given but `number_of_particles = 0`: the run advects no " *
                             "tracers, so the setting would be silently discarded. Ask for " *
@@ -593,12 +621,24 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                            history_depth = history_depth(pscheme))
   particle_buffers = tracers === nothing ? nothing :
                      allocate_buffers(pscheme, tracers, cache)
+  # The traversal order is on by default (decision 86): a value-preserving accelerator whose
+  # every-iteration rebuild costs a small fraction of the gather it speeds up. `:manual` keeps it
+  # resident and leaves the rebuild cadence to the caller's callback; `false` allocates nothing.
+  particle_traversal = (tracers === nothing || ordered_interpolation === false) ? nothing :
+                       ParticleTraversal(domain, tracers; automatic = ordered_interpolation !== :manual)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
-  tracers === nothing || deposit!(cache, tracers, velocity_physical(cache))
+  tracers === nothing ||
+    deposit!(cache, tracers, velocity_physical(cache); traversal = _traversal_order(particle_traversal))
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
-                    tracers, tracers === nothing ? nothing : pscheme, particle_buffers,
+                    tracers, tracers === nothing ? nothing : pscheme, particle_buffers, particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
+
+
+# The order the gathers take: the traversal's, or none. Keeping the `nothing` case here lets every
+# consuming site pass one keyword unconditionally.
+_traversal_order(::Nothing) = nothing
+_traversal_order(traversal::ParticleTraversal) = traversal.order
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     element_type::Type = Float64, array_type = Array,
@@ -621,7 +661,8 @@ function deposit!(sim::Simulation)
   # The velocity sample rides the same re-deposit: the positions are unchanged, so re-depositing
   # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache);
+             traversal = _traversal_order(sim.particle_traversal))
   return sim
 end
 
@@ -735,7 +776,10 @@ The arguments are:
 
 Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
 is readable when it returns. Advects the tracers, if any, under the run's chosen particle
-integration scheme, and updates the clock.
+integration scheme — first rebuilding the run's
+[`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal) from the
+start-of-step positions when the run was built with `ordered_interpolation = true` (the default
+with tracers) — and updates the clock.
 
 Returns `sim`.
 """
@@ -766,11 +810,17 @@ function advance!(sim::Simulation; dt = nothing)
   # positions from the same deposited field, completing the iteration's deposits.
   deposit!(sim.cache, sim.state, sim.domain, sim.buffers)
   if sim.tracers !== nothing
+    # The traversal order is rebuilt from the START-of-step positions, before the push: the
+    # predictor gather and the closing deposit at the pushed positions both read it, and a step's
+    # displacement stays inside the tiles it groups. Under `:manual` the callback owns the cadence.
+    traversal = sim.particle_traversal
+    (traversal !== nothing && traversal.automatic) && rebuild_traversal!(traversal, sim.domain, sim.tracers)
+    order = _traversal_order(traversal)
     advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
-            sim.particle_buffers, Δt)
+            sim.particle_buffers, Δt; traversal = order)
     # `advect!` announced the push itself (decision 76), so the previous sample already reads
     # stale; the closing particle deposit refreshes it at the new positions.
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache))
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal = order)
   end
   check_deposits(sim.cache)
 
@@ -851,6 +901,93 @@ function _check_reality(field, name)
 end
 
 
+# The run form of the rebuild verb (the docstring is the generic's, in `Particles`): the callback's
+# handle under `ordered_interpolation = :manual`. A run without an order refuses by name rather than
+# silently doing nothing — the caller asked for a cadence the run cannot honour.
+function rebuild_traversal!(sim::Simulation)
+  sim.particle_traversal === nothing &&
+    throw(ArgumentError("this run carries no particle traversal order to rebuild: it was built " *
+                        (sim.tracers === nothing ? "without tracers" :
+                         "with `ordered_interpolation = false`") *
+                        ". Build it with `ordered_interpolation = :manual` to rebuild by hand, " *
+                        "or leave the default, which rebuilds every iteration."))
+  rebuild_traversal!(sim.particle_traversal, sim.domain, sim.tracers)
+  return sim
+end
+
+
+"""
+    every_steps(n)
+
+A predicate on a run that is `true` on every `n`-th step — the cadence test a
+[`run!`](@ref) callback uses to do something periodically: rebuild the tracer traversal order under
+`ordered_interpolation = :manual`, record a spectrum, write a checkpoint.
+
+The argument `n` is the period in steps, a positive integer; the returned function `fires(sim)` is
+`true` when [`current_step`](@ref)`(sim)` is a multiple of `n` — including at step `0`, the seeded
+state `run!` observes first. For a cadence in simulation time use [`every_time`](@ref).
+
+```julia
+rebuild = every_steps(50)
+run!(sim) do s
+    rebuild(s) && rebuild_traversal!(s)
+    current_time(s) < 5.0
+end
+```
+"""
+function every_steps(n::Integer)
+  n >= 1 || throw(ArgumentError("`every_steps` needs a positive period in steps, got $n"))
+  period = Int(n)
+  return sim -> current_step(sim) % period == 0
+end
+
+
+"""
+    every_time(period)
+
+A predicate on a run that is `true` once each time the run crosses a multiple of `period` in
+simulation time — the cadence test a [`run!`](@ref) callback uses to do something at (roughly)
+fixed intervals of time under the adaptive step: sample a Lagrangian statistic every so much time,
+record a spectrum, rebuild the tracer traversal order under `ordered_interpolation = :manual`.
+
+The argument `period` is the interval in simulation time, positive. The returned function
+`fires(sim)` is `true` at the first observation at or past each multiple
+``0, \\Delta T, 2\\Delta T, \\ldots`` of the period ``\\Delta T`` — at the seeded state first, since
+it lies on ``0`` — so the firing instants land within one step past the multiples, never before
+them. A step that jumps over two
+multiples fires once, not twice, and the next firing is at the next multiple ahead. The predicate
+carries its own record of the next multiple to fire on, so it serves **one** run: make a fresh one
+per run. For a cadence in steps use [`every_steps`](@ref).
+
+```julia
+record = every_time(0.25)
+run!(sim) do s
+    record(s) && push!(spectra, energy_spectrum(s.state.velocity_spectral, s.domain))
+    current_time(s) < 5.0
+end
+```
+"""
+function every_time(period::Real)
+  period > 0 || throw(ArgumentError("`every_time` needs a positive period in simulation time, got $period"))
+  return EveryTime(Float64(period), 0.0)
+end
+
+# Stateful on purpose: the clock knows only the current time, so "did the run cross a multiple
+# since I last fired?" needs a record the predicate keeps itself. `next` is the smallest multiple
+# not yet fired on; after firing it jumps PAST the current time, so a step over several multiples
+# fires once.
+mutable struct EveryTime
+  period::Float64
+  next::Float64
+end
+
+function (fires::EveryTime)(sim::Simulation)
+  t = current_time(sim)
+  t >= fires.next || return false
+  fires.next = (floor(t / fires.period) + 1) * fires.period
+  return true
+end
+
 
 """
     run!(callback, sim; dt = nothing)
@@ -873,7 +1010,8 @@ time compares [`current_time`](@ref) against a target; a step budget compares
 [`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` from the
 observables it computes; spin-up to stationarity is the packaged [`StationarityCriterion`](@ref).
 Whatever the callback needs beyond the cached observables it computes itself, at its own cadence,
-with the exported reductions and recoveries.
+with the exported reductions and recoveries; [`every_steps`](@ref) and [`every_time`](@ref) are
+the cadence tests for that.
 
 The arguments are:
 - `callback` — the observation, called as `callback(sim)`; returns `true` to continue, `false` to
@@ -1183,7 +1321,7 @@ function write_simulation end
 
 """
     read_simulation(parent::HDF5.H5DataStore, name::AbstractString;
-                    array_type = Array) -> Simulation
+                    array_type = Array, ordered_interpolation = nothing) -> Simulation
 
 Restore a run from the group [`write_simulation`](@ref) wrote: rebuild the [`Simulation`](@ref)
 through its own constructor from the recorded parameters, overwrite the freshly seeded state and
@@ -1200,6 +1338,10 @@ The arguments are:
 - `name` — the group's name.
 - `array_type = Array` — the storage backend the restored run lives on; the reader names it, so a
   checkpoint written on one backend loads on any other.
+- `ordered_interpolation = nothing` — the tracer traversal-order setting of the restored run,
+  forwarded to `Simulation`. The order is a derived accelerator, not state: nothing of it is
+  stored, and the restored run rebuilds it from the restored positions under whatever setting the
+  reader names.
 """
 function read_simulation end
 

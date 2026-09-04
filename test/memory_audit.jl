@@ -532,6 +532,42 @@ const EPISODE_UNITS = [
                             fieldnames(Tracers)))
   end
 
+  @testset "the traversal order is O(M) + O(tiles), owned by the run's ParticleTraversal alone" begin
+    # Decision 86: the gathers' memory-locality order is a fourth owner, and its storage is bounded
+    # by the tracer count and the tile count, never the grid — three M-vectors (the Int32 order, the
+    # Int64 tile keys, the Bool validation mask) and two vectors of the tile count (the counting
+    # sort's counts and offsets, (N/4)³ + 2 entries each at the default tile size 4). No (M, 3)
+    # array joins the four above, and no field-scale array appears: the `FRAME + BASE + TRACER_DELTA`
+    # ledger over a tracked run holds with TRACER_DELTA still ZERO (asserted above).
+    M = 4
+    sim = Simulation(domains[:TwoThirds]; viscosity = 0.1, number_of_particles = M,
+                     rng = MersenneTwister(1))
+    traversal = sim.particle_traversal
+    @test traversal isa ParticleTraversal && traversal.automatic
+    _m_arrays(owner) = (acc = AbstractArray[];
+                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);
+                        [a for a in acc if length(a) >= M])
+    owned = _m_arrays(traversal)
+    tiles = ntuple(_ -> cld(N_AUDIT, 4), 3)
+    expected = ((Int32, (M,)), (Int64, (M,)), (Bool, (M,)),
+                (Int32, (prod(tiles) + 2,)), (Int32, (prod(tiles) + 2,)))
+    @test sort(map(a -> (string(eltype(a)), size(a)), owned)) ==
+          sort(map(t -> (string(t[1]), t[2]), collect(expected)))
+    @test any(a -> a === traversal.order.indices, owned)      # the order itself is among them
+    # The order is a permutation of the tracers — a stale order is never wrong, only less useful.
+    @test sort(Int.(Array(traversal.order.indices))) == 1:M
+    # No other owner reaches the traversal's arrays: the tracers, the cache, and the scheme's registers
+    # hold exactly the four (M, 3) arrays counted above and nothing of the order.
+    traversal_ids = Set(objectid.(owned))
+    for owner in (sim.tracers, sim.cache, sim.particle_buffers)
+      @test isempty([a for a in _m_arrays(owner) if objectid(a) in traversal_ids])
+    end
+    # Opted out, the run holds nothing of it.
+    off = Simulation(domains[:TwoThirds]; viscosity = 0.1, number_of_particles = M,
+                     ordered_interpolation = false, rng = MersenneTwister(1))
+    @test off.particle_traversal === nothing
+  end
+
   # The multistep scheme's extra storage is its SAMPLE HISTORY, and the history is a deposited
   # observable — so it is priced on the cache, not on the scheme's registers, and it scales with the
   # order rather than with the grid. Nothing else about the scheme costs storage: its weight solve

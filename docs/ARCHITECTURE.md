@@ -2519,6 +2519,43 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     round-trips bitwise. A side effect worth naming: under a fourth-order field the existing
     `AdamsBashforth(order = 4)` tracers deliver genuine fourth-order trajectories, closing the
     order mismatch the particle suite's own test documents.
+86. **(2026-09, user-directed) The particle traversal order — a value-preserving accelerator the
+    run owns, rebuilt every iteration by default, with cadence predicates for the run's
+    callback.** PF's `point_traversal_order` sorts the tracers into a tile-major visiting order so
+    the interpolation gathers read the field with memory locality: the gather at ``256^3`` /
+    ``10^6`` tracers fell from ``7.7`` to ``1.9`` ms on the device, while the result is
+    **bit-identical** to the unordered gather (PF visits the same points with the same stencil;
+    only the order changes). Three placements were weighed. The order is not trajectory *state*
+    (`Tracers`), because it carries no physics and nothing of it is persisted — a checkpoint
+    restores the tracers and the run rebuilds the order from their positions. It is not a
+    scheme register (`ParticleIntegratorBuffers`), because one order serves every gather of the
+    step — the closing deposit, the predictor and the corrector — and PF accepts any
+    same-length order, so the predictor points inherit the tracers' order without a second one.
+    It is not a cache slot, because it is never *read* as an observable. Hence a fourth owner,
+    `ParticleTraversal` (the order plus PF's rebuild scratch plus the automatic flag), held in
+    `Simulation.particle_traversal`. **Cadence:** the order decays as the tracers move — measured
+    good for ``60``–``175`` steps — and a rebuild costs ``\approx 0.27`` ms on the device against
+    a break-even of two to six steps, so the every-iteration rebuild sits within ``0.3\%`` of the
+    optimum, and that is the default (`ordered_interpolation = nothing` resolves to `true`
+    whenever the run carries tracers). A stale order is never wrong, only progressively less
+    useful, which is what makes a user-chosen cadence safe: `ordered_interpolation = :manual`
+    keeps the order resident and rebuilds it only through `rebuild_traversal!(sim)`, `false`
+    allocates nothing, and naming the setting on a tracer-free run is refused (the by-name
+    guard of decision 83, extended to one more setting). The verbs a caller drives directly take the same order
+    through `traversal = nothing` (`advect!`, `deposit!`, `interpolate_at_particles!`), so the
+    run layer and a hand-driven loop cannot diverge. **Cadence predicates:** the manual mode
+    needs a clean way to say *every* ``n`` *steps* or *every* ``\Delta T`` in a `run!` callback,
+    and the `Clock` holds only `time` and `step`, so `every_steps(n)` is a pure closure on the
+    step count and `every_time(period)` a stateful predicate (a mutable `next` threshold — one
+    firing per crossed multiple, a step jumping several multiples fires once); both fire at the
+    seeded state, matching `run!`'s step-0 callback. **Ledgers:** the traversal is ``O(M)`` plus
+    ``O(\text{tiles})`` — three vectors of the tracer count and two of the tile count — so the
+    tracer delta of the memory audit stays at zero; a new M-scale testset pins the exact
+    multiset and that no other owner shares the arrays. The step's allocation is a constant
+    ``\approx 1.2`` KiB of launch bookkeeping, independent of ``M`` (pinned by test). Nothing of
+    the traversal enters the checkpoint schema; `read_simulation` takes the same
+    `ordered_interpolation` keyword and rebuilds. Bit-identity of the on / off / manual runs is
+    pinned for both particle schemes, positions and Lagrangian samples alike.
 
 ## References
 

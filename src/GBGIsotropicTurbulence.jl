@@ -157,6 +157,8 @@ using .Particles:
   Heun,
   AdamsBashforth,
   ParticleIntegratorBuffers,
+  ParticleTraversal,
+  rebuild_traversal!,
   restart!,
   history_depth,
   advect!,
@@ -173,7 +175,9 @@ using .SimulationRun:
   StationarityCriterion,
   current_time,
   current_step,
-  flow_parameters
+  flow_parameters,
+  every_steps,
+  every_time
 
 
 export FixedDomain,
@@ -245,6 +249,8 @@ export FixedDomain,
        Heun,
        AdamsBashforth,
        ParticleIntegratorBuffers,
+       ParticleTraversal,
+       rebuild_traversal!,
        advect!,
        restart!,
        history_depth,
@@ -257,6 +263,8 @@ export FixedDomain,
        run!,
        warmup!,
        StationarityCriterion,
+       every_steps,
+       every_time,
        current_time,
        current_step,
        flow_parameters

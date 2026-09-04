@@ -54,6 +54,22 @@ history_depth
 interpolate_at_particles!
 ```
 
+## The traversal order
+
+The memory-locality order the gathers visit the tracers in — a value-preserving accelerator: the
+interpolated values are bit-identical with or without it, only the visiting order changes. A run
+builds and refreshes it for you (the `ordered_interpolation` setting of `Simulation`); the type and
+its rebuild verb are here for a caller driving the tracking loop by hand, or refreshing on a chosen
+cadence from a `run!` callback.
+
+```@docs
+ParticleTraversal
+```
+
+```@docs
+rebuild_traversal!
+```
+
 ## Point-value buffers
 
 Allocate the point-value `out` for `interpolate_at_particles!` — a

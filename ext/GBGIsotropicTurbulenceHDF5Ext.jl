@@ -350,7 +350,8 @@ function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::S
   return g
 end
 
-function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array)
+function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array,
+                         ordered_interpolation = nothing)
   g = _require_group(parent, name, "read_simulation")
   a = _require_tag(g, name, "read_simulation", "GBGIsotropicTurbulence.Simulation")
   domain = read_domain(g, "domain"; array_type)
@@ -380,11 +381,13 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
                      velocity_forcing, scalar_forcing, field_integration_scheme,
                      cfl = a["cfl"], max_dt = a["max_dt"],
                      number_of_particles = npoints(positions_host), interpolation_scheme,
-                     unwrapped, particle_integration_scheme)
+                     unwrapped, particle_integration_scheme, ordered_interpolation)
   else
+    # Forwarded here too, so a traversal setting on a tracer-free file meets the constructor's
+    # by-name refusal rather than being silently dropped.
     sim = Simulation(domain; viscosity = a["viscosity"], schmidt = a["schmidt"], scalar,
                      velocity_forcing, scalar_forcing, field_integration_scheme,
-                     cfl = a["cfl"], max_dt = a["max_dt"])
+                     cfl = a["cfl"], max_dt = a["max_dt"], ordered_interpolation)
   end
   # The seeded state gives way to the stored one; the announcements and the closing deposits then
   # replay the constructor's own seeding schedule over it, so every derived slot is recomputed
