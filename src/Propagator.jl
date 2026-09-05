@@ -409,6 +409,17 @@ function _low_storage_2n_step!(a::NTuple{S, T}, b::NTuple{S, T}, d::NTuple{S, T}
   # projection may alias destination and source) pins it at roundoff every step. Placed AFTER
   # finalize! so whatever a post-step forcing did to the state is covered too.
   helmholtz_projection!(û, û, domain.multipliers)
+  # …and onto real-field spectra (decision 88, the twin of decision 61 for the second linear
+  # constraint the discretisation does not hold by construction). The rfft layout stores both
+  # members of a conjugate pair on the folded axis's zero plane; their anti-Hermitian part is
+  # invisible to the inverse real transform — so the nonlinear term neither sees nor feeds it — is
+  # damped only by νκ² at κ ≈ 1, and is AMPLIFIED by every forcing proportional to the field with
+  # the same coefficient as the physical modes. From the transform's round-off floor it grew at
+  # ≈ 0.26 per time unit and held all of k by t ≈ 70 while the physical field died (six Float32 seeds
+  # at 96³). One O(N²) pass on one or two planes per field pins it at exactly zero every step; the
+  # nonlinear term is decoupled from it, so once per step suffices and a stage-wise pass buys nothing.
+  reality_projection!(û)
+  has_scalar && reality_projection!(φ̂)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
@@ -523,6 +534,17 @@ function step!(::IFHeun, state::ResolvedFields, generator::ResolvedGenerator,
   # projection may alias destination and source) pins it at roundoff every step. Placed AFTER
   # finalize! so whatever a post-step forcing did to the state is covered too.
   helmholtz_projection!(û, û, domain.multipliers)
+  # …and onto real-field spectra (decision 88, the twin of decision 61 for the second linear
+  # constraint the discretisation does not hold by construction). The rfft layout stores both
+  # members of a conjugate pair on the folded axis's zero plane; their anti-Hermitian part is
+  # invisible to the inverse real transform — so the nonlinear term neither sees nor feeds it — is
+  # damped only by νκ² at κ ≈ 1, and is AMPLIFIED by every forcing proportional to the field with
+  # the same coefficient as the physical modes. From the transform's round-off floor it grew at
+  # ≈ 0.26 per time unit and held all of k by t ≈ 70 while the physical field died (six Float32 seeds
+  # at 96³). One O(N²) pass on one or two planes per field pins it at exactly zero every step; the
+  # nonlinear term is decoupled from it, so once per step suffices and a stage-wise pass buys nothing.
+  reality_projection!(û)
+  has_scalar && reality_projection!(φ̂)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   # `state`, as the single home docstring says and as the in-place convention requires.
   # Both methods returned the bare `(û, φ̂)` tuple, so a hand-run loop written to the
@@ -660,6 +682,17 @@ function step!(::IFSSPRK3, state::ResolvedFields, generator::ResolvedGenerator,
   # Same rationale as IFLowStorageRK3 (decision 61): the stage tendencies are projected, the state's
   # own roundoff divergence is not, and it compounds — one in-place pass pins it every step.
   helmholtz_projection!(û, û, domain.multipliers)
+  # …and onto real-field spectra (decision 88, the twin of decision 61 for the second linear
+  # constraint the discretisation does not hold by construction). The rfft layout stores both
+  # members of a conjugate pair on the folded axis's zero plane; their anti-Hermitian part is
+  # invisible to the inverse real transform — so the nonlinear term neither sees nor feeds it — is
+  # damped only by νκ² at κ ≈ 1, and is AMPLIFIED by every forcing proportional to the field with
+  # the same coefficient as the physical modes. From the transform's round-off floor it grew at
+  # ≈ 0.26 per time unit and held all of k by t ≈ 70 while the physical field died (six Float32 seeds
+  # at 96³). One O(N²) pass on one or two planes per field pins it at exactly zero every step; the
+  # nonlinear term is decoupled from it, so once per step suffices and a stage-wise pass buys nothing.
+  reality_projection!(û)
+  has_scalar && reality_projection!(φ̂)
   advance_fields_epoch!(cache)                # the step advanced the fields — the cache goes stale
   return state
 end

@@ -954,9 +954,9 @@ function _check_reality(field, name)
                         "its Nyquist plane, for an even grid) stores both members of each " *
                         "conjugate pair, so hand-written coefficients must satisfy " *
                         "f̂(-κ) = conj(f̂(κ)) there; a violation makes every spectral diagnostic " *
-                        "silently disagree with the physical field. Repair by a physical round " *
-                        "trip — `to_physical` then `to_spectral` projects onto the nearest real " *
-                        "field's spectrum — or fix the write."))
+                        "silently disagree with the physical field. Repair with " *
+                        "`reality_projection!` — the field library's projector onto the nearest " *
+                        "real field's spectrum, one or two planes — or fix the write."))
   return nothing
 end
 

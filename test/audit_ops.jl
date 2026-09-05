@@ -282,6 +282,8 @@ function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
   # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
   # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
   push!(ops, Op("state re-projection", [:û], [:û]))
+  push!(ops, Op("reality projection", [:û], [:û]))
+  scalar && push!(ops, Op("scalar reality projection", [:φ̂], [:φ̂]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
@@ -309,6 +311,8 @@ function rk4_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, clos
   # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
   # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
   push!(ops, Op("state re-projection", [:û], [:û]))
+  push!(ops, Op("reality projection", [:û], [:û]))
+  scalar && push!(ops, Op("scalar reality projection", [:φ̂], [:φ̂]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
@@ -354,6 +358,8 @@ function ssprk3_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = tru
   push!(ops, Op("finalize", [:û], [:û]))
   # The advanced state's re-projection (decision 61), identical to the other schemes.
   push!(ops, Op("state re-projection", [:û], [:û]))
+  push!(ops, Op("reality projection", [:û], [:û]))
+  scalar && push!(ops, Op("scalar reality projection", [:φ̂], [:φ̂]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :nl, sscratch = :sb_nl))
   return ops
 end
@@ -394,6 +400,8 @@ function rk2_ops(scalar::Bool; phase_shift::Bool = false, closing::Bool = true)
   # state's divergence at roundoff — the stage tendencies are projected, the state was not, and its
   # residue compounds in Float32 (measured ×120 per 1500 steps before the pin).
   push!(ops, Op("state re-projection", [:û], [:û]))
+  push!(ops, Op("reality projection", [:û], [:û]))
+  scalar && push!(ops, Op("scalar reality projection", [:φ̂], [:φ̂]))
   closing && append!(ops, _closing_deposit(scalar; scratch = :stage2, sscratch = :sb_stage2))
   return ops
 end
@@ -468,6 +476,15 @@ const OP_COST = Dict(
   # the unforced finalize is a no-op (the forcing deltas price the real hooks)
   "finalize"           => _cost(:noop),
   "state re-projection" => _cost(:pointwise),
+  # The reality projection (decision 88) touches the folded axis's one or two self-conjugate planes
+  # per component — O(N²), 1/N of a field pass — and this ledger counts traffic in N³ units at
+  # leading order in 1/N, so it is priced below the ledger's resolution, like the O(1) mean-mode pin
+  # and the tracers' M×3 reads. It stays in the op lists because it is a real in-place read and
+  # write of the state (the liveness model sees it) and because a renamed or dropped op must fail
+  # here, not vanish. The pass count itself is pinned in the field library's pass audit: each stored
+  # plane element read once and written once, both arities.
+  "reality projection"        => _cost(:noop),
+  "scalar reality projection" => _cost(:noop),
 )
 # Plain pointwise ops — passes are their symbolic reads and writes alone. ("project noise" prices
 # the aliased-projection CONTRACT; that the aliased path allocates today is the episode ledger's

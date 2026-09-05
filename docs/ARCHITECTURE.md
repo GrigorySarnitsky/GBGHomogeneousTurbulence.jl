@@ -432,6 +432,13 @@ Method (§3).
   ``C_{\mathrm{CFL}}`` (for
   ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
+- **Two linear constraints are re-imposed on the advanced state at every step's exit**, after the
+  forcing's post-step hook: the divergence-free condition, by the field library's
+  `helmholtz_projection!` (decision 61), and the reality condition on the real-to-complex layout's
+  self-conjugate planes, by its `reality_projection!` (decision 88). Neither is held by the
+  discretisation by construction; both are seeded at round-off and, for the reality condition,
+  amplified by any forcing proportional to the field, so each is pinned at round-off — the reality
+  one at exactly zero — once per step rather than left to compound.
 - **`IntegratorBuffers`** is the scheme's own per-step scratch — the Runge–Kutta stage registers,
   and nothing in physical representation (the substage recoveries write into the cache's slots,
   decision 40) — built by `allocate_buffers` dispatching on the
@@ -2632,6 +2639,71 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     and the REPL form's purpose is to carry what the line abbreviates. The private two-line copy
     of PF's shape and storage-family helpers (`_show_shape`, `_storage_family_name`) is this
     package's own: PF's are unexported, and the channel for a request is closed.
+
+88. **(2026-09-05, user-directed) The advanced state is projected onto real-field spectra every
+    step — decision 61's twin for the second linear constraint the discretisation does not hold.**
+    An owner's ``96^3`` `Float32` run under the default `VarianceController` died at ``t \approx 65``:
+    the spectral kinetic energy held its target while ``\varepsilon``, the maximum speed and the
+    physical field's own ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` collapsed,
+    the dead state's ``\varepsilon = 0.027`` being exactly ``2\nu\kappa^2 k`` at ``\kappa = 1`` — all of
+    ``k`` sitting in the forced shells in a form the physical field cannot see. **Mechanism.** The
+    real-to-complex layout stores both members of a conjugate pair on the folded axis's zero plane
+    (and its Nyquist plane for an even axis). Their anti-Hermitian combination is invisible to the
+    inverse real transform, so the nonlinear term — formed from the physical fields — neither sees
+    nor feeds it; viscosity damps it at ``\nu\kappa^2``, next to nothing at ``\kappa \approx 1``;
+    and every forcing of the form ``\hat{\boldsymbol{N}} \mathrel{+}= A \chi_{\text{band}} \hat{\boldsymbol{u}}``, with ``\chi_{\text{band}}`` the band indicator,
+    (`VarianceController`, `ConstantPower`, `Linear` through the integrating factor, `VarianceRescaling`
+    through its rescale) amplifies it with the same ``A`` as the physical modes, which ``A`` must hold
+    positive on average to balance ``\varepsilon``. Net growth ``A - \nu\kappa^2 \approx 0.26`` per
+    time unit, seeded by the transform's own round-off on that plane — FFTW exactly Hermitian at
+    ``32^3``, ``64^3`` and ``128^3`` but ``1.5\times10^{-7}`` (`Float32`) at ``96^3`` and ``256^3``;
+    cuFFT and rocFFT at round-off everywhere — so the death time is seed-independent: six seeds at
+    ``t = 66``–``71``, RK3 and RK4, `TwoThirds` and `PhaseShift` alike, `Float64` at ``t = 142``
+    (a floor ``10^{-9}`` smaller, ``\ln 10^9/0.26 \approx 80`` time units later, as the rate
+    predicts). `reality_residual` traces it from ``4\times10^{-2}`` at ``t = 0`` to
+    ``1.3\times10^{6}`` at saturation. `StochasticOU` (additive) and decaying runs are unaffected —
+    and a ``32^3`` CPU run is unaffected by luck, FFTW being exact there, which is why the suite had
+    never seen it. Two consequences were the worst of it: every Parseval diagnostic (``k``,
+    ``\varepsilon``, the spectrum, `flow_parameters`) reported the ghost as energy, and the
+    stationarity criterion, reading those, would have certified a dead run as stationary.
+
+    **Prior art.** TurTLE's `symmetrize()` (the pair's arithmetic mean, after every step and every
+    forcing); Dedalus's `enforce_real_cadence` (a grid round trip every 100 steps, "decrease under
+    strong linear instabilities"); FFTW++'s `HermitianSymmetrizeX` (never evolve the redundant
+    half); and Wang & Rosa (2009), *A spurious evolution of turbulence originated from round-off
+    error in pseudo-spectral simulation*, Computers & Fluids **38**, 1943–1949 — the same shape on
+    the divergence-free constraint, round-off amplified over ``\approx 50`` turnovers, re-projection
+    per step as the remedy, which is decision 61 here. GHOST is immune by an additive forcing and
+    pair-aware operations; hit3d and Fluidsim carry the same multiplicative forcing unprotected and
+    survive only on the host transform's exactness.
+
+    **The fix.** PF's `reality_projection!` (its decision 83, requested with this evidence and shipped
+    the same day; decision 71's "by construction" clause corrected on it): on the stored
+    self-conjugate planes each pair becomes ``\tfrac{1}{2}(\hat f(k) + \overline{\hat f(-k)})`` and its
+    conjugate — the orthogonal projector onto real-field spectra, idempotent, commuting with every
+    per-mode multiplier ``m`` with ``m(-k) = \overline{m(k)}``, ``O(N^2)``, in place, nothing else
+    touched. Called once per step at each scheme's exit beside `helmholtz_projection!`, after
+    `finalize!`, for ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``. Once per step, not per stage: the
+    anti-Hermitian part is decoupled from the nonlinear term, so a stage-wise pass buys nothing.
+    Settled with the request and worth keeping settled: projection only (no Nyquist zeroing, a
+    dealiasing policy the truncation already enforces), no residual returned (`reality_residual`
+    stays the checker), nothing folded into the transforms. The physical round trip was measured
+    and rejected as the repair: it resets the residual only to the transform's floor, since the
+    forward transform reseeds it, and perturbs every mode by round-off; a time-cadenced round trip
+    did keep the ``96^3`` run alive to ``t = 100`` and stands recorded as the stopgap it was.
+
+    **Ledgers.** The pass touches one or two planes per component, ``1/N`` of a field pass, and the
+    compute ledger counts traffic in ``N^3`` units at leading order in ``1/N``; the op is in every
+    scheme's op list (a real in-place read and write of the state, which the liveness model sees,
+    and a renamed op fails the price table) and priced below the ledger's resolution, as the O(1)
+    mean-mode pin and the tracers' ``M \times 3`` reads are. Its pass count is pinned at the ideal
+    in the field library's pass audit. No memory. **Witness** (`test/regressions/r7-reality-projection-forced-run.jl`):
+    a planted ``2\times10^{-6}`` anti-Hermitian perturbation on the pair ``(0,\pm1,0)`` — planted,
+    because a witness waiting for the library's own seed passes vacuously wherever FFTW is exact —
+    is removed exactly by the next step, velocity and scalar; under the controller the residual is
+    exactly zero at every step and the spectral ``k`` equals ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle``
+    on the grid to round-off; `Float32` at ``48^3``, where the transform seeds, likewise. The
+    `fields_modified!` refusal now names `reality_projection!` as the repair.
 
 ## References
 

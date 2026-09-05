@@ -48,7 +48,10 @@ functions of state); **realization / infrastructure** concerns are named by thei
   The MZ *generator*.
 - `Forcing` — pluggable energy-injection strategies (`AbstractForcing`).
 - `Propagator` — pluggable integrating-factor schemes (`AbstractIntegrator`) and the per-step scratch
-  (`IntegratorBuffers`).
+  (`IntegratorBuffers`). Every scheme's exit re-imposes the two linear constraints the discretisation
+  does not hold by construction: divergence-free (`helmholtz_projection!`, decision 61) and the
+  reality condition on the self-conjugate planes (`reality_projection!`, decision 88 — a forcing
+  proportional to the field amplifies its round-off violation until the flow dies).
 - `Particles` — Lagrangian particle tracking: the trajectory state (`Tracers`) held apart from the
   pluggable trajectory integrator (`AbstractParticleIntegrator`: `EndpointHeun`, `AdamsBashforth`) and its per-scheme
   registers (`ParticleIntegratorBuffers`) — decision 50. *Particle* names anything true of the whole

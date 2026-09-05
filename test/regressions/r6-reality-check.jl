@@ -4,7 +4,7 @@
 # "it is not checked" and every spectral diagnostic silently disagreed with the physical images.
 # This is the witness the PF request promised: hand-corrupt the plane, and the violation is NAMED.
 using Test, GBGIsotropicTurbulence
-using GBGPeriodicFields: field_data, to_physical, to_spectral
+using GBGPeriodicFields: field_data, to_physical, to_spectral, reality_projection!
 using Random
 
 
@@ -22,8 +22,13 @@ using Random
   field_data(sim.state.velocity_spectral)[1, 2, 3, 1] += 1
   @test_throws ArgumentError fields_modified!(sim)
 
-  # The documented repair: the physical round trip projects onto the nearest real field's spectrum.
+  # The documented repair (decision 88): the field library's projector onto real-field spectra —
+  # exact, O(N²); the physical round trip it replaced projects only to the transform's own floor.
   û = sim.state.velocity_spectral
+  reality_projection!(û)
+  @test fields_modified!(sim) === sim
+  # …and the old repair still agrees with it to round-off, which is what decision 71 promised of it.
+  field_data(û)[1, 2, 3, 1] += 1
   field_data(û) .= field_data(to_spectral(to_physical(û, sim.domain.transform_plans),
                                           sim.domain.transform_plans))
   @test fields_modified!(sim) === sim
