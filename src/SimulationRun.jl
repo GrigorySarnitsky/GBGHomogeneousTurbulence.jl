@@ -306,9 +306,9 @@ sim = Simulation(domain; viscosity = 1e-2)
 ```
 
 Displaying the run — a bare `sim` at the REPL, or the constructor without a trailing `;` in a
-notebook — prints a row per keyword, then the reads a `run!` callback may make, each as the
-callback writes it: the state's spectral representations, the cache's checked reads, the clock,
-and the observables applied to the state.
+notebook — prints where each part lives, then what a `run!` callback may read without computing,
+each as the callback writes it: the state's spectral representations, the cache's deposited reads,
+and the tracer positions.
 
 !!! note "The default drives the kinetic energy to a set value, so read it as a control target"
     `VarianceController` restores ``k`` exponentially to `kinetic_energy`, pinning ``u'`` and the
@@ -524,13 +524,13 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     reλ = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = ε,
                                          rms_velocity = sqrt(2 * kinetic_energy / 3),
                                          integral_scale = one(ν), schmidt))
-    # The labels say which number is SET and which are MODELLED: ν is fixed here, while ε is the
-    # `Li2008` stationary estimate at the requested `kinetic_energy` — the seeded field dissipates
-    # less until the cascade fills in — and Re_λ follows from that estimate. A measurement of the
-    # state is `flow_parameters(sim)`.
-    @info "Simulation: grid-resolved at κ_max·η = $(resolution), against the Li et al. (2008) " *
-          "stationary dissipation at the requested `kinetic_energy` (a model estimate, not a " *
-          "measurement of the seeded field; `flow_parameters(sim)` measures)" viscosity=ν stationary_dissipation_estimate=ε expected_Re_λ=reλ
+    # One word for the three numbers that share one provenance: ν is SET here; the dissipation is
+    # the `Li2008` stationary estimate at the requested `kinetic_energy`, and Re_λ and the realized
+    # κ_max·η follow from it — all three are what the run is EXPECTED to reach once stationary under
+    # a forcing holding that energy, none a measurement (the seeded field dissipates less until the
+    # cascade fills in). `flow_parameters(sim)` measures; the docstring says so.
+    @info "Simulation: ν is set; κ_max·η ≈ $(resolution), ε and Re_λ are expected once stationary, " *
+          "not guaranteed" viscosity=ν expected_dissipation=ε expected_Re_λ=reλ
   else
     ν = Float64(viscosity)
   end
@@ -725,43 +725,43 @@ whether a cached value is still the right one.
 current_step(sim::Simulation) = sim.clock.step
 
 
-# The REPL / notebook display of a run: the settings it was built with, one `name value` row per
-# constructor keyword with each part through its own display, then what a callback may read — the
-# state's two representations-of-record and the cache's checked reads, each named as the callback
-# would write it. Names only: nothing here touches a device array, and nothing reads a cache slot
-# (a checked read could throw on a stale slot; the display must never).
+# The REPL / notebook display of a run. Every row is spelled as a callback would type it: first
+# where each part of the run lives — the domain, the flow conditions the viscosity and forcings are
+# stored in, the schemes, the step settings, the clock with its values — each part through its own
+# display; then what a `run!` callback may read WITHOUT computation: the state's representations of
+# record, the cache's deposited reads (served as the closing deposit left them, never recomputed),
+# and the tracer positions. Nothing that would compute (an observable, `flow_parameters`) is listed,
+# and a run without a scalar or without particles shows no row about them. Names only: nothing here
+# touches a device array, and nothing reads a cache slot (a checked read could throw on a stale slot;
+# the display must never).
 function Base.show(io::IO, ::MIME"text/plain", sim::Simulation)
   conditions = sim.generator.conditions
   has_scalar = !isnothing(sim.state.scalar_spectral)
   has_tracers = !isnothing(sim.tracers)
-  setting(name, value) = print(io, "\n  ", rpad(name, 29), value)
+  has_unwrapped = has_tracers && !isnothing(sim.tracers.unwrapped_positions)
+  row(name, value) = print(io, "\n  ", rpad(name, 43), value)
   print(io, "Simulation")
-  setting("domain", sim.domain)
-  setting("viscosity", conditions.viscosity)
-  setting("schmidt", conditions.schmidt)
-  setting("velocity_forcing", conditions.velocity_forcing)
-  setting("scalar_forcing", has_scalar ? conditions.scalar_forcing : "nothing (no scalar)")
-  setting("field_integration_scheme", sim.field_integration_scheme)
-  setting("cfl", sim.cfl)
-  setting("max_dt", sim.max_dt)
-  setting("tracers", has_tracers ? sim.tracers : "nothing (no particles)")
-  has_tracers && setting("particle_integration_scheme", sim.particle_integration_scheme)
-  setting("time", current_time(sim))
-  setting("step", current_step(sim))
-  print(io, "\nAvailable to a callback (its argument named `sim`):")
-  row(call, meaning) = print(io, "\n  ", rpad(call, 34), "  ", meaning)
+  row("sim.domain", sim.domain)
+  row("sim.generator.conditions.viscosity", conditions.viscosity)
+  has_scalar && row("sim.generator.conditions.schmidt", conditions.schmidt)
+  row("sim.generator.conditions.velocity_forcing", conditions.velocity_forcing)
+  has_scalar && row("sim.generator.conditions.scalar_forcing", conditions.scalar_forcing)
+  row("sim.field_integration_scheme", sim.field_integration_scheme)
+  row("sim.cfl", sim.cfl)
+  row("sim.max_dt", sim.max_dt)
+  has_tracers && row("sim.tracers", sim.tracers)
+  has_tracers && row("sim.particle_integration_scheme", sim.particle_integration_scheme)
+  row("current_time(sim), current_step(sim)", "$(current_time(sim)), $(current_step(sim))")
+  print(io, "\nReadable in a `run!` callback (its argument named `sim`) without computation:")
   row("sim.state.velocity_spectral", "û — the velocity in spectral representation, the source of truth")
-  row("sim.state.scalar_spectral", has_scalar ? "φ̂ — the scalar in spectral representation" :
-                                                "nothing (no scalar)")
-  row("velocity_physical(sim.cache)", "u — the velocity, deposited at the end of every iteration")
+  has_scalar && row("sim.state.scalar_spectral", "φ̂ — the scalar, likewise")
+  row("velocity_physical(sim.cache)", "u — the velocity, as deposited at the end of the last iteration")
   row("vorticity_physical(sim.cache)", "ω — the vorticity, likewise")
-  row("scalar_physical(sim.cache)", has_scalar ? "φ — the scalar, likewise" : "nothing (no scalar)")
-  row("max_speed(sim.cache)", "maxᵢ|uᵢ| over the box, a host number")
-  row("velocity_at_particles(sim.cache)", has_tracers ? "u at the tracers, an M × 3 array" : "nothing (no particles)")
+  has_scalar && row("scalar_physical(sim.cache)", "φ — the scalar, likewise")
+  row("max_speed(sim.cache)", "maxᵢ|uᵢ| over the box, a host number, likewise")
+  has_tracers && row("velocity_at_particles(sim.cache)", "u at the tracers, an M × 3 array, likewise")
   has_tracers && row("sim.tracers.positions", "the tracers' positions, a PointSet (read via point_positions)")
-  row("current_time(sim), current_step(sim)", "the clock")
-  row("flow_parameters(sim)", "ν, ε, u′, L₁₁, Sc, ε_φ measured from the state now (a FlowParameters)")
-  row("kinetic_energy(û), dissipation(û, sim.domain, ν), …", "the Observables, applied to the state")
+  has_unwrapped && row("unwrapped_positions(sim.tracers)", "the unwrapped positions, a PointSet")
 end
 
 # The one line: the grid in the field library's spelling, and the clock — what distinguishes two

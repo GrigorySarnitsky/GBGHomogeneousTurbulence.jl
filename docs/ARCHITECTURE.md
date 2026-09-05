@@ -2594,8 +2594,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     abbreviates something — the cache's per-slot standing, read off the epochs exactly as the
     checked reads decide it (`current`, `stale (deposited at fields epoch n)`, `never deposited`,
     a producer's scratch; the particle slot names whichever of its two counters moved on, or
-    both), the domain's resolved wavenumber, the run's settings one `name value` row per
-    constructor keyword followed by the callback reads. **The body carries what the package
+    both), the domain's resolved wavenumber, the run's parts each at the path a callback types
+    (`sim.generator.conditions.viscosity`, …) followed by what the callback may read without
+    computing — the state, the cache's deposited reads, the tracer positions — with no row for a
+    scalar or particles a run does not carry and no observable that would compute *(amended
+    2026-09-05 from "one row per constructor keyword", owner-directed: a display that offered
+    `flow_parameters(sim)` beside the cache reads blurred what is served from what is measured)*. **The body carries what the package
     REFUSES on**, asserted over the refused pairs: a state on another grid, element type, or
     storage family, or a box differing in the ninth decimal (`Simulation(domain; state)`); a
     scalar state against a cache or buffers without a scalar (the closing `deposit!`); a

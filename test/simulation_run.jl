@@ -129,20 +129,23 @@ using Test
                      number_of_particles = 8, rng = MersenneTwister(6))
     shown = sprint(show, MIME"text/plain"(), sim)
     @test occursin("16×16×16 cells", shown) && occursin("0.05", shown) && occursin("8 points", shown)
-    @test occursin("particle_integration_scheme", shown) && occursin("Heun()", shown)
+    @test occursin("sim.particle_integration_scheme", shown) && occursin("Heun()", shown)
+    @test occursin("sim.generator.conditions.viscosity", shown)  # where the flow parameters live
     for read in ("sim.state.velocity_spectral", "sim.state.scalar_spectral",
                  "velocity_physical(sim.cache)", "vorticity_physical(sim.cache)",
                  "scalar_physical(sim.cache)", "max_speed(sim.cache)",
                  "velocity_at_particles(sim.cache)", "sim.tracers.positions",
-                 "current_time(sim)", "flow_parameters(sim)")
+                 "current_time(sim)")
       @test occursin(read, shown)
     end
     @test occursin("φ̂ — the scalar", shown)
     bare = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(6))
     shown = sprint(show, MIME"text/plain"(), bare)
-    @test occursin("nothing (no scalar)", shown) && occursin("nothing (no particles)", shown)
-    @test !occursin("particle_integration_scheme", shown)
-    @test !occursin("sim.tracers.positions", shown)
+    # A run without a scalar or particles shows no row about them — no placeholders — and nothing
+    # that would compute is offered.
+    for absent in ("scalar", "schmidt", "particle", "tracers", "flow_parameters", "kinetic_energy")
+      @test !occursin(absent, shown)
+    end
     # A slot taken as a producer's register mid-iteration makes its checked read throw; the
     # display names the reads without performing them, so it must print regardless.
     fields_modified!(bare.cache)
