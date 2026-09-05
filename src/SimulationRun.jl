@@ -524,7 +524,13 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     reλ = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = ε,
                                          rms_velocity = sqrt(2 * kinetic_energy / 3),
                                          integral_scale = one(ν), schmidt))
-    @info "Simulation: grid-resolved at κ_max·η = $(resolution)" viscosity=ν dissipation=ε Re_λ=reλ
+    # The labels say which number is SET and which are MODELLED: ν is fixed here, while ε is the
+    # `Li2008` stationary estimate at the requested `kinetic_energy` — the seeded field dissipates
+    # less until the cascade fills in — and Re_λ follows from that estimate. A measurement of the
+    # state is `flow_parameters(sim)`.
+    @info "Simulation: grid-resolved at κ_max·η = $(resolution), against the Li et al. (2008) " *
+          "stationary dissipation at the requested `kinetic_energy` (a model estimate, not a " *
+          "measurement of the seeded field; `flow_parameters(sim)` measures)" viscosity=ν stationary_dissipation_estimate=ε expected_Re_λ=reλ
   else
     ν = Float64(viscosity)
   end
