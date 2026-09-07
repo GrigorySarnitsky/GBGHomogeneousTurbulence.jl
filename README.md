@@ -21,8 +21,19 @@ development took place.
 This is a private, unregistered package. To install it (you need access to the repository):
 
 ```julia
+]add https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl
+]add https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl
+```
+
+(the field-library backend first — both are unregistered, so Julia cannot resolve
+`GBGPeriodicFields` on its own — and Julia ≥ 1.12)
+
+or
+
+```julia
 using Pkg
 
+Pkg.add(url="https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl")
 Pkg.add(url="https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl")
 ```
 
