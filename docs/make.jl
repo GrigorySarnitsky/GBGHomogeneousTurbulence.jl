@@ -394,5 +394,5 @@ makedocs(
 
 deploydocs(
   repo      = "github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl",
-  devbranch = "main",
+  devbranch = "master",
 )

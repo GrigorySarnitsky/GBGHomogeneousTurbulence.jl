@@ -1,7 +1,7 @@
 # TurTLE code-to-code comparison — the working spec (2026-08-28)
 
 Written on Enteropia for the Aiporetne session to pick up: the owner is installing and running
-TurTLE at home. Everything code-side is pushed to `main`; this file (untracked, Dropbox-synced)
+TurTLE at home. Everything code-side is pushed to `master`; this file (untracked, Dropbox-synced)
 carries the run design, the traps, and what is NOT yet built. Transcripts do not sync — this file
 and the memory entry are the handoff.
 

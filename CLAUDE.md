@@ -387,8 +387,8 @@ with no notation that drifts across the pair.
 ## Working agreements
 
 - The API is not frozen; do not build backward-compatibility shims.
-- **Commit ⇒ push, on `main`.** This is a private repo in active development, synced through GitHub;
-  work is committed **directly on `main`** and **pushed in the same step**. End every commit message
+- **Commit ⇒ push, on `master`.** This is a private repo in active development, synced through GitHub;
+  work is committed **directly on `master`** and **pushed in the same step**. End every commit message
   with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; never use `[skip ci]`.
 - Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are **study-only,
   gitignored** — never copied into the package, only properly cited.
