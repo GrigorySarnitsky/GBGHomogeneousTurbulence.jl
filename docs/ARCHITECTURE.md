@@ -2709,6 +2709,37 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     on the grid to round-off; `Float32` at ``48^3``, where the transform seeds, likewise. The
     `fields_modified!` refusal now names `reality_projection!` as the repair.
 
+89. **(2026-09-17, user-directed) CUDA unified memory is inherited, not implemented; what a run needs
+    on a card is a page, and the suite holds that page to the code.** The field library made CUDA.jl's
+    `default_memory = "unified"` preference a supported configuration (its decision 84), prompted by
+    this package at ``768^3`` `Float64` on a 96 GiB GH200. **Inheritance.** The package allocates only
+    through `array_type{S}(undef, dims...)` in the domain's allocators and `similar` in the particle
+    code, and names no memory kind, so every array a run holds follows the preference with no code
+    change. Checked on the RTX 5070 Ti in two environments differing only in the preference: 29 of 29
+    arrays unified for a bare run, 36 of 36 with the scalar, 45 of 45 with the scalar and ``10^4``
+    tracers, 45 of 45 for a run restored by `read_simulation` — and none in the device-memory control.
+    **Placement.** A page (`docs/src/gpu.md`), linked from the landing page and from the `array_type`
+    bullets of `FixedDomain` and `Simulation`. The mechanism — the call, the two entries it writes, the
+    `[CUDACore]` spelling that leaves it silently off — stays on the field library's page and is linked,
+    never restated: belongs-in-PF holds for documentation too. What is this package's own is the
+    storage a run holds, that the preference reaches all of it, and the caveats. A docstring was
+    rejected as the table's home (it depends on four settings, none of them `array_type`), and so was
+    this log, which cannot correct a number in place. **The table is derived, not typed.** Storage is a
+    cubic polynomial in ``N`` for even ``N``, so `test/gpu_memory_page.jl` reads the table out of the page, fits each
+    row exactly at four sizes, requires a fifth to match byte for byte, and compares the leading
+    coefficient and the ``512^3``/``768^3``/``1024^3`` values; it classifies every exported integrator,
+    forcing and dealiasing strategy as leaving the table unchanged or adding storage, so a new one
+    fails until the page places it; and it pins the bytes per tracer. The device-side excess (the
+    transform workspace and the allocator's rounding, 5–38 bytes per point) is stated as measured
+    once, and marked unchecked. The derivation corrected the sizing behind the field library's
+    decision: ``768^3`` `Float64` holds 91.3 GiB under `PhaseShift` without the scalar (hence "short by
+    a few GiB" with the workspace and context on 96 GiB) and 114.9 GiB with it. The memory audit is
+    unaffected: its ledgers are static and never read `CUDA.used_memory`, which does not count unified
+    allocations. **Open, stated on the page rather than assumed away:** the package has no GPU test
+    lane of its own; unified arrays ignore `allowscalar(false)`, so a unified run cannot catch a stray
+    scalar index; and the cost of a time step in unified memory is unmeasured everywhere, GH200
+    included — no GH200 figure is written until one is measured on this package's step.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,

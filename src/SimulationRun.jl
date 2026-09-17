@@ -90,7 +90,7 @@ clock.
 
 The two forms differ only in where the `FixedDomain` comes from. The first is
 **domain-building**: from `grid_points_per_axis` and `side_length` it builds the domain and every
-piece above it with sensible defaults, seeds a divergence-free velocity (and, with `scalar = true`,
+piece above it, seeds a divergence-free velocity (and, with `scalar = true`,
 a mean-zero scalar ``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
 **domain-taking**: the same assembly on a `FixedDomain` you built yourself.
 
@@ -109,7 +109,7 @@ kinetic energy to the value given by the
 there — and the viscosity is chosen from the grid rather than supplied:
 
   * **Derived viscosity** (no `viscosity` passed explicitly): the constructor picks the highest
-    Reynolds number consistent with the resolution criterion `κ_max_η`, in two steps.
+    Reynolds number consistent with the resolution criterion `κ_max_η`.
 
     First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
     `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
@@ -135,7 +135,7 @@ there — and the viscosity is chosen from the grid rather than supplied:
         [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) about 26% above the
         ``2/3`` rule.
 
-    The grid and `κ_max_η` together fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
+    The grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
     `side_length` fix the units. The chosen ``\\nu``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda``
     are logged.
 
@@ -147,7 +147,7 @@ there — and the viscosity is chosen from the grid rather than supplied:
     longer matches the run.
 
   * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
-    passing both raises an `ArgumentError` rather than dropping one — for a decaying
+    passing both raises an `ArgumentError` — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. The derived viscosity is calibrated on a *stationary
     forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
@@ -165,7 +165,8 @@ The domain group:
   standing in for every other keyword of this group.
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
 - `side_length = 2π` — the box side ``L``.
-- `element_type = Float64`, `array_type = Array` — the real element type and storage backend.
+- `element_type = Float64`, `array_type = Array` — the real element type and storage backend
+  ([GPU memory](@ref) gives a run's memory on a card).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
   ``\\kappa_{\\max}`` of `κ_max_η`).

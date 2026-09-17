@@ -210,13 +210,14 @@ All keyword; the five naming the box are required:
   [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
-  [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU).
+  [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU);
+  [GPU memory](@ref) gives a run's memory on a card.
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to
-  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans)
-  untouched. On the CPU the default is FFTW's instant `ESTIMATE` heuristic, which can badly
+  [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans).
+  On the CPU the default is FFTW's instant `ESTIMATE` heuristic, which can
   mis-plan single-precision transforms (measured 2–5× slow at ``256^3`` `Float32`; see the
   planner warning on `FieldTransformPlans`); for a long CPU run pass `FFTW.MEASURE` — the
-  one-time timed plan search costs seconds. The GPU FFT libraries take no planner flag, so on a
+  one-time plan search costs seconds. The GPU FFT libraries take no planner flag, so on a
   GPU backend the setting is inert.
 
 # Examples
@@ -235,7 +236,7 @@ wide = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
     The grid, the box, the aliasing control, the precision and the storage backend are each a
     decision about the run; the
     [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) convenience constructor
-    supplies them for you when you do not want to make them.
+    supplies them when you would rather not.
 
 # Fields
 The machinery types below are [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl)
@@ -245,7 +246,7 @@ objects, each linked to its own documentation.
 - `transform_plans` — the real-to-complex
   [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans),
   one pair for every field whatever its tensor order: the plans transform one component and are
-  applied per component, so the velocity, the scalar, and the rank-2 strain tensor all go through
+  applied per component, so the velocity, the scalar, and the rank-2 strain tensor all use
   this one object.
 - `multipliers` — the
   [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers),

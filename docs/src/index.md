@@ -10,6 +10,8 @@ It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPerio
 supplies every field operation — transforms, differential operators, convolution,
 interpolation, and reductions. The GPU is the primary target, so each time step is in-place and
 allocation-free at field scale over preallocated buffers (occasional diagnostics allocate per call; the threaded CPU path spawns small per-pass task transients).
+[GPU memory](gpu.md) gives the memory a run needs on a card, and how CUDA's unified memory lets a
+run outgrow the card.
 
 ## Installation
 

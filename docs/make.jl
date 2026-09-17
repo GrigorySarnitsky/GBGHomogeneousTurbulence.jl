@@ -383,6 +383,7 @@ makedocs(
       "StructureFunctions" => "api/phenomenology/StructureFunctions.md",
       "Scalings"           => "api/phenomenology/Scalings.md",
     ],
+    "GPU memory" => "gpu.md",
     "Validation" => "validation.md",
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",
