@@ -160,7 +160,7 @@ A deferred forcing. The operator-free keyword constructors
     ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
     VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
-    StochasticOU(; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 0)
+    StochasticOU(; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 42)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is built into the concrete
@@ -833,7 +833,7 @@ end
 
 """
     StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
-                 highest_shell = 2, seed = 0)
+                 highest_shell = 2, seed = 42)
 
 The stochastic forcing of Eswaran & Pope (1988,
 [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
@@ -882,7 +882,7 @@ The arguments are:
 - `correlation_time` — the correlation time ``T_L`` of each amplitude.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff.
-- `seed = 0` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
+- `seed = 42` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
   independent streams.
 
 The process lives in the run's state record, not in this strategy: a run keeps a
@@ -977,7 +977,7 @@ end
 
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
-                      lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0)
+                      lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42)
   # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
   # documented non-negative: every draw is scaled by the variance's square root, so a negative one
   # surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the caller had typed.
@@ -1017,7 +1017,7 @@ function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Rea
   return StochasticOU(variance, correlation_time, Int(seed), Int(lowest_shell), Int(highest_shell),
                       companion, spectral_band(companion.multipliers, low, high),
                       _ou_slots(companion, modes, Val(1)), _ou_slots(companion, modes, Val(0)),
-                      Xoshiro(0))
+                      Xoshiro(42))
 end
 
 
@@ -1103,7 +1103,7 @@ VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
                                                lowest_shell, highest_shell))
 
 StochasticOU(; variance::Real, correlation_time::Real,
-             lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0) =
+             lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42) =
   DeferredForcing(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
 
 

@@ -327,8 +327,9 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
   elseif tag == "GBGIsotropicTurbulence.StochasticOU"
     return StochasticOU(domain; variance = a["variance"],
                         correlation_time = a["correlation_time"],
-                        # A checkpoint written before the seed was persisted carries no attribute;
-                        # the constructor default 0 reproduces exactly what such a file restored to.
+                        # A checkpoint written before the seed was persisted carries no attribute.
+                        # The fallback is the constructor default OF THAT TIME, not today's: it must
+                        # reproduce what such a file restored to, and the default has since changed.
                         seed = haskey(a, "seed") ? a["seed"] : 0,
                         lowest_shell = lo, highest_shell = hi)
   else
