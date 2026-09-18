@@ -230,7 +230,7 @@ end
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The forcings: a strategy IS its parameters (the shell bounds included, stored on the struct for
 # exactly this reason); the band kernel or indicator is rebuilt by the ordinary constructor. The
-# stochastic forcing's process is state, not a parameter: it is stored with the state record.
+# stochastic forcing's process is state, not a parameter: it is stored with the run's state.
 
 function _forcing_group(parent, name, tag)
   g = create_group(parent, name)
@@ -285,7 +285,7 @@ function write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::
   a["correlation_time"] = forcing.correlation_time
   # The seed is a defining parameter (it fixes the stream, so a forced run is reproducible). The
   # process's evolving amplitudes and its position in the stream are state, not parameters: they
-  # live in the state record and are stored with it (`write_state`).
+  # live in the run's state and are stored with it (`write_state`).
   a["seed"] = forcing.seed
   a["lowest_shell"] = forcing.lowest_shell
   a["highest_shell"] = forcing.highest_shell

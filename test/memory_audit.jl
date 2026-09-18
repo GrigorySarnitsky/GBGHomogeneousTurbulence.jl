@@ -56,7 +56,7 @@ const N_AUDIT = 8
 
 # ---------------------------------------------------------------- the working-set ledger
 
-# Build one combination's working set and measure it. The state record carries each forcing's started
+# Build one combination's working set and measure it. The run's state carries each forcing's started
 # state, as a run's does, so a forcing's state is walked wherever it lives.
 function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)

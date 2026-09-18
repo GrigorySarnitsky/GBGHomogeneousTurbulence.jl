@@ -36,7 +36,7 @@ GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, fi
 
 
 # A forcing written to the prepare hook's pre-2026-09-17 four-argument form, before the forcing's
-# evolving state moved into the run's state record. Also silently ignored, so also refused.
+# evolving state moved into the run's state. Also silently ignored, so also refused.
 struct StalePrepareForcing <: AbstractForcing end
 GBGIsotropicTurbulence.Forcing.prepare_forcing!(::StalePrepareForcing, field, domain, dt) = nothing
 

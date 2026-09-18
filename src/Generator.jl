@@ -375,7 +375,7 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   # the very field the shift was taken of — a flag says "fresh" just as readily about a different
   # stage's velocity, and the mismatch is silent.
   displaced_velocity_source::Any
-  # Each forcing's evolving state for the step `prepare!` opened, taken from the state record so the
+  # Each forcing's evolving state for the step `prepare!` opened, taken from the run's state so the
   # per-stage source hook can read it: the right-hand-side verbs are handed a stage FIELD, not the
   # record it came from. Refreshed every step beside the scratch above, and `nothing` for a strategy
   # with no state of its own.
@@ -395,7 +395,7 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                         "`scalar = true`, or leave `scalar_forcing` at `NoForcing()`."))
   # The source hook gained the stage field and the diffusivity when state-dependent forcings moved
   # onto it, and the prepare hook the forcing's evolving state when that state moved into the run's
-  # state record. A strategy still written to an old form defines a method the run never calls —
+  # state. A strategy still written to an old form defines a method the run never calls —
   # dispatch simply falls through to the do-nothing default — so the forcing goes silently
   # unapplied, exactly the failure the rate guard above exists to prevent. Refuse at construction.
   for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)
@@ -403,7 +403,7 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
       throw(ArgumentError("$(nameof(typeof(forcing))) defines prepare_forcing! with fewer than " *
                           "five arguments. The hook is now " *
                           "`prepare_forcing!(forcing, forcing_state, field, domain, dt)` — it is " *
-                          "handed the forcing's evolving state, which the run's state record keeps " *
+                          "handed the forcing's evolving state, which the run's `ResolvedFields` keeps " *
                           "(see `initial_forcing_state`). A method written to the old form is never " *
                           "called, so the forcing would be silently ignored."))
     _defines_stale_hook(add_forcing_source!, forcing, 6) &&
@@ -428,7 +428,7 @@ end
 """
     prepare!(generator, state, domain, dt)
 
-Open a step of the generator: advance each forcing's evolving state, kept in the state record, once
+Open a step of the generator: advance each forcing's evolving state, kept in the run's state, once
 (its per-step [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
 per-mode linear forcing rates — fill them, so the factor verbs return them instead of `nothing`
 (its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook, written

@@ -656,8 +656,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 end
 
 
-# The state record carries each forcing's evolving state (decision 23(c)). A fresh record is given one
-# started by its forcing; an adopted record keeps the one it carries when that state fits the forcing
+# The run's state carries each forcing's evolving state (decision 23(c)). A fresh one is given the
+# state its forcing starts; an adopted one keeps the state it carries when that state fits the forcing
 # — the continuation a checkpoint exists for — and is refused by name when it does not, since a
 # process silently restarted or silently misapplied is a different run. The fields are never copied.
 function _with_forcing_states(state::ResolvedFields, conditions::FlowConditions, domain::FixedDomain)
@@ -1422,7 +1422,7 @@ tracer set, both forcing strategies, the Lagrangian sample history a multistep p
 integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
 derivable is stored: the physical-representation observables, the current velocity sample, and
 every per-step buffer and transform plan are recomputed on read. A stochastic forcing's evolving
-state is part of the state record and is stored with it, so continuation is exact for every forcing.
+state is part of the run's state and is stored with it, so continuation is exact for every forcing.
 
 Available once the `HDF5` package is loaded; opening and closing the file is the caller's job,
 and `parent[name] = sim` is equivalent sugar.

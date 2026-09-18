@@ -27,7 +27,7 @@
 #
 # The additive stochastic (Ornstein–Uhlenbeck / Eswaran–Pope) forcing — which adds a time-correlated
 # force field to the RHS — is a separate mechanism (`StochasticOU`): its process is advanced once per
-# step and lives in the run's state record, not in the strategy (decision 23(c)).
+# step and lives in the run's state, not in the strategy (decision 23(c)).
 
 """
     Forcing
@@ -121,7 +121,7 @@ them in one fixed order:
 
 - [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
   such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
-  and the run's state record holds it.
+  and the run's [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holds it.
 - [`set_forcing_rate!`](@ref) — once, before the stages: fill a per-mode rate that stays fixed for the
   whole step, which the scheme folds exactly into the integrating factor. A strategy that implements
   this hook **must** also declare [`uses_steady_linear_rate`](@ref), or it is never handed a rate
@@ -155,7 +155,7 @@ arguments they are given.
     or their bookkeeping is conflated;
     [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) throws an
     `ArgumentError` rather than let that happen. Every strategy here may be shared: none carries
-    anything from one call to the next, since what a strategy evolves lives in the state record, one
+    anything from one call to the next, since what a strategy evolves lives in the run's state, one
     entry per field, and its scratch is overwritten before each use.
 """
 abstract type AbstractForcing end
@@ -271,11 +271,10 @@ Returns `nothing` for a strategy that evolves no state of its own: the default, 
 strategy but [`StochasticOU`](@ref), which returns a
 [`StochasticOUState`](@ref) holding its random process.
 
-A run calls this once per forced field, keeps what it returns in its state record — the `modeled`
-entry of [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) — and hands that value
-to [`prepare_forcing!`](@ref) every step, which advances it in place. The strategy itself holds only
-its parameters and its scratch, so a checkpoint of the state record is enough to resume a forced run
-exactly.
+A run calls this once per forced field, keeps what it returns as the `modeled` entry of its
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields), and hands that value to
+[`prepare_forcing!`](@ref) every step, which advances it in place. The strategy itself holds only its
+parameters and its scratch, so a checkpoint of the state is enough to resume a forced run exactly.
 """
 initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 
@@ -922,17 +921,17 @@ The arguments are:
 - `seed = 42` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
   independent streams.
 
-The process lives in the run's state record, not in this strategy. A run keeps it as a
+The process lives in the run's state, not in this strategy. A run keeps it as a
 [`StochasticOUState`](@ref) — the `modeled` entry of its
 [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) — held on a small grid of its own
 over the same box, large enough to carry the band and no larger, so the whole forcing costs a few
-kilobytes and runs no transform at the resolution of the run. A checkpoint of the state record
-therefore resumes the same realization. This strategy holds its parameters and the scratch of one
+kilobytes and runs no transform at the resolution of the run. A checkpoint of the state therefore
+resumes the same realization. This strategy holds its parameters and the scratch of one
 draw, so one instance may drive both fields.
 
-A state record built by hand that carries no state for this forcing is refused: preparing it throws an
-`ArgumentError` rather than leave the run unforced without saying so. A `Simulation` builds the record
-for you.
+A `ResolvedFields` built by hand that carries no state for this forcing is refused: preparing it
+throws an `ArgumentError` rather than leave the run unforced without saying so. A `Simulation` builds
+it for you.
 
 !!! warning "The band must lie inside the dealias cutoff"
     A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes
@@ -972,7 +971,7 @@ end
 A [`StochasticOU`](@ref) forcing's evolving state holds two things: the force itself, as a field in
 spectral representation on the forcing's companion grid, and the number of increments drawn so far.
 [`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
-and a run keeps it in its state record as the `modeled` entry of
+and a run keeps it as the `modeled` entry of
 [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for the forced field. There is no
 reason to build one by hand.
 
@@ -1105,13 +1104,13 @@ function initial_forcing_state(ou::StochasticOU{T}, field, domain::FixedDomain) 
 end
 
 
-# A state record built by hand without the forcing's state would hand `nothing` here, and the generic
+# A `ResolvedFields` built by hand without the forcing's state would hand `nothing` here, and the generic
 # do-nothing method would then leave the force at zero for the whole run — refused instead.
 prepare_forcing!(::StochasticOU, ::Nothing, field, domain::FixedDomain, dt::Real) =
-  throw(ArgumentError("a StochasticOU was prepared with no forcing state: the state record's " *
-                      "`modeled` entry for this field is `nothing`. Start one with " *
+  throw(ArgumentError("a StochasticOU was prepared with no forcing state: this field's `modeled` " *
+                      "entry in the `ResolvedFields` is `nothing`. Start one with " *
                       "`initial_forcing_state(forcing, field, domain)` and pass it in the " *
-                      "`ResolvedFields`, or let `Simulation` build the record."))
+                      "`ResolvedFields`, or let `Simulation` build them."))
 
 function prepare_forcing!(ou::StochasticOU{T}, state::StochasticOUState, field, domain::FixedDomain,
                           dt::Real) where {T}
@@ -1225,7 +1224,7 @@ export write_forcing, read_forcing
 Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
 self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
 indicator array) is rebuilt from them on read. What a strategy evolves is not a parameter: the
-process of a [`StochasticOU`](@ref) lives in the run's state record and is stored by
+process of a [`StochasticOU`](@ref) lives in the run's state and is stored by
 [`write_state`](@ref GBGIsotropicTurbulence.State.write_state), so a reloaded strategy continues the
 same realization when the state is restored with it. A
 [`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`

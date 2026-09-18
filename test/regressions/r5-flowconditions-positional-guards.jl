@@ -22,7 +22,7 @@
 # The hazard the guard exists for was real and reachable when this witness was written: the archived
 # `StochasticOU` was mutable and allocated its per-field scratch lazily, keyed on the first field it
 # was handed, so a shared instance surfaced as a `MethodError` inside GBGPeriodicFields. The shipped
-# `StochasticOU` keeps its state in the run's state record and may be shared; the guard still covers
+# `StochasticOU` keeps its state in the run's state and may be shared; the guard still covers
 # any strategy with mutable per-field bookkeeping, which the local `PerFieldCounter` stands in for.
 #
 # The repair is a validating inner constructor (plus the outer wrapper that keeps the documented

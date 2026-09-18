@@ -329,7 +329,7 @@ export write_state, read_state
 
 Write the [`ResolvedFields`](@ref) `state` under `parent` as one self-describing HDF5 group — the
 velocity, and the scalar when the run carries one, each a nested field group in spectral
-representation, and each forcing state the record carries. The spectral representation is the single
+representation, and each forcing state it carries. The spectral representation is the single
 source of truth, so no physical representation is stored. Available once the `HDF5` package is loaded;
 the caller owns the file.
 

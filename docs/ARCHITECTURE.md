@@ -367,7 +367,7 @@ step through a small interface of four per-step methods, plus `initial_forcing_s
 the state the first of them advances; each defaults to doing nothing:
 
 - `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
-  a state `initial_forcing_state` starts and the state record keeps;
+  a state `initial_forcing_state` starts and the run's `ResolvedFields` keeps;
 - `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
@@ -378,7 +378,7 @@ The four hooks form one per-step lifecycle with a fixed order — `prepare_forci
 completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
 hooks need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
-scratch: it lives in the `modeled` slot of `ResolvedFields`, so the state record is the whole
+scratch: it lives in the `modeled` slot of `ResolvedFields`, so that one record is the whole
 evolving state of the run (§8's open-systems reading; §11 decisions 23 and 90).
 
 Which hook a strategy uses is not an implementation detail: it decides whether the strategy preserves
@@ -716,11 +716,11 @@ generalization is built for them until a second concrete case forces the abstrac
   mean-gradient mixing System named in §3. A forcing-strategy slice, not a frame change.
 - **Stochastic (Eswaran–Pope OU) forcing — DELIVERED (decision 90).** Archived while its dense form
   drew a field of noise on the host every step; returned as a coarse companion field, with its process
-  in the state record.
+  in the run's state.
 - **Checkpoint / exact restart to HDF5 — DELIVERED (decisions 75, 90).** Five writer/reader pairs,
   composed recursively on the field library's persistence groups, restore a run that continues
   bitwise (§4.7), a stochastically forced run included: its process and its position in the stream
-  are part of the stored state record.
+  are part of the stored state.
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).

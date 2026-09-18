@@ -4,7 +4,7 @@
 # rejection (`_materialize_forcing` is the identity on an already-built `AbstractForcing`).
 #
 # Written against the archived, mutable `StochasticOU`. The shipped one keeps its evolving state in
-# the run's state record and its scratch per field, so it is immutable and one instance may drive
+# the run's state and its scratch per field, so it is immutable and one instance may drive
 # both fields — which the last block pins, together with the independence of the two streams.
 
 using GBGIsotropicTurbulence
