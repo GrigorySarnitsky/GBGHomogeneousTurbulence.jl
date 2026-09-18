@@ -2851,8 +2851,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     today — a stored tag is normalized to the current spelling on read, so those files still load and
     nothing rewrites them. **Fleet.** The three sibling sessions were told before the rename, since a
     Dropbox working copy and their `inspiration/` clones point at the old path; two of them held
-    tables keyed on the old name that would have degraded to silence, and both fixed the class rather
-    than the entry.
+    tables keyed on the old name that would degrade to silence rather than fail. *(Corrected the same
+    day: this entry first said both had fixed the class. One of those fixes was made without its
+    owner's authorization and was reverted, and the claim should not have been written here from
+    another session's report. What is verified is the exposure, not any repair — and that GitHub
+    redirects a renamed repository URL but not its Pages URL, so a stale link in a sibling's table
+    breaks outright.)*
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,
