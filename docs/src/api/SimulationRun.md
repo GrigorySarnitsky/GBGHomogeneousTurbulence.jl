@@ -1,7 +1,7 @@
 # SimulationRun
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.SimulationRun]
+Modules = [GBGHomogeneousTurbulence.SimulationRun]
 Order   = [:module]
 ```
 

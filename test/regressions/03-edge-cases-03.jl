@@ -12,7 +12,7 @@
 
 using Test, Random
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 const SEED = 11
 const NPART = 24

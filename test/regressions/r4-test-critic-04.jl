@@ -10,9 +10,9 @@
 # numerics put it, not one off).
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Particles: AdamsBashforth
-const AB = GBGIsotropicTurbulence.Particles
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Particles: AdamsBashforth
+const AB = GBGHomogeneousTurbulence.Particles
 
 # Exact Adams–Bashforth weights in rational arithmetic, on the same node layout the scheme uses:
 # τ_j = -(j-1) (unit steps going backwards), b_j = ∫_0^1 L_j(t) dt.

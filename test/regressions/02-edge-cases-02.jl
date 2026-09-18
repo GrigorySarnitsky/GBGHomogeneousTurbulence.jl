@@ -13,8 +13,8 @@
 
 using Test, Random
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Particles: AdamsBashforth
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Particles: AdamsBashforth
 
 const N = 16
 const M = 4

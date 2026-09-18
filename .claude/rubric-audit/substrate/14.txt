@@ -120,7 +120,7 @@ Two examples from this codebase: the derivative-skewness "divergence" bug (a rep
 pure representation recovery no preservation copy is needed. Returns `ω`.
 
 The deposited value is read back with
-[`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical), which serves the
+[`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical), which serves the
 iteration's deposit or throws — measure with this function, read with that one.
 """
 function vorticity_physical!(ω, û, domain::FixedDomain, spectral_scratch)

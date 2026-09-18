@@ -22,7 +22,7 @@
 using Test
 using GBGPeriodicFields: point_positions
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 
 @testset "velocity_at_particles is checked against BOTH epochs, so advance!'s guard fires after a reposition" begin
@@ -48,7 +48,7 @@ using GBGIsotropicTurbulence
 
   # (2) The cache already agrees the slot is not current — on the identical state, its own
   #     completeness check rejects it. A serving read above is the cache contradicting itself.
-  @test_throws ErrorException GBGIsotropicTurbulence.Cache.check_deposits(sim.cache)
+  @test_throws ErrorException GBGHomogeneousTurbulence.Cache.check_deposits(sim.cache)
 
   # (3) The hot-path consequence: `advance!`'s opening guard is that same read, so the advance must
   #     refuse to integrate the trajectory on a v₁ measured at the abandoned positions.

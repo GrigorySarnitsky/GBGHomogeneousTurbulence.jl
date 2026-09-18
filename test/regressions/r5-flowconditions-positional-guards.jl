@@ -31,10 +31,10 @@
 # convention of advertising this type's plain constructor, say they are.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: AbstractForcing, NoForcing
-using GBGIsotropicTurbulence.Generator: FlowConditions, prepare!
-import GBGIsotropicTurbulence.Forcing: prepare_forcing!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Forcing: AbstractForcing, NoForcing
+using GBGHomogeneousTurbulence.Generator: FlowConditions, prepare!
+import GBGHomogeneousTurbulence.Forcing: prepare_forcing!
 
 
 # A strategy with mutable per-field bookkeeping: it remembers the first field's tensor order and
@@ -43,7 +43,7 @@ mutable struct PerFieldCounter <: AbstractForcing
   order::Int
 end
 function prepare_forcing!(f::PerFieldCounter, forcing_state, field, domain, dt::Real)
-  order = ndims(GBGIsotropicTurbulence.SimulationRun.field_data(field)) - 3
+  order = ndims(GBGHomogeneousTurbulence.SimulationRun.field_data(field)) - 3
   f.order < 0 && (f.order = order)
   f.order == order || throw(MethodError(prepare_forcing!, (f, forcing_state, field, domain, dt)))
   return nothing

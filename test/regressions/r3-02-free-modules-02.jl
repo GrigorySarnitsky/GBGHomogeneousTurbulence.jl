@@ -11,9 +11,9 @@
 #
 # The CUDA block runs only where a device is present; the bitstype assertions run everywhere.
 
-using Test, GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters
-using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948, spectrum
+using Test, GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters
+using GBGHomogeneousTurbulence.Phenomenology.Spectra: VonKarman1948, spectrum
 import Random
 
 const HAVE_CUDA = try

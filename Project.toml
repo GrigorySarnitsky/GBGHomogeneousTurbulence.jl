@@ -1,4 +1,4 @@
-name = "GBGIsotropicTurbulence"
+name = "GBGHomogeneousTurbulence"
 uuid = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
 version = "0.1.0"
 authors = ["Grigory Sarnitsky <grigory@sarnitsky.se>"]
@@ -12,7 +12,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 
 [extensions]
-GBGIsotropicTurbulenceHDF5Ext = "HDF5"
+GBGHomogeneousTurbulenceHDF5Ext = "HDF5"
 
 [compat]
 GBGPeriodicFields = "0.1.0"

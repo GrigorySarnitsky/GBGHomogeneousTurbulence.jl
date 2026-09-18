@@ -1,5 +1,5 @@
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using Test: collect_test_logs
 
 # Hunter's claim: the scalar under-resolution warning asserts "The grid resolves the velocity

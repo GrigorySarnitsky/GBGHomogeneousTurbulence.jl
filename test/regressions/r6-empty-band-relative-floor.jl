@@ -5,8 +5,8 @@
 # subtracted band). The floor is back as a RELATIVE one (10·eps of the whole-field observable),
 # riding the same fused traversal, so it is scale-invariant (the round-4 concern that removed the
 # absolute floor) and costs no extra crossing.
-using Test, GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: add_forcing_source!
+using Test, GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Forcing: add_forcing_source!
 using GBGPeriodicFields: field_data, convolve!, weighted_inner, l2norm, to_physical, to_spectral
 using Random
 

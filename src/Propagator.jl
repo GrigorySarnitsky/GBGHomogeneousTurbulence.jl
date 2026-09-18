@@ -22,7 +22,7 @@
     Propagator
 
 The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
-the `field_integration_scheme` of its [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation). All
+the `field_integration_scheme` of its [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation). All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
 
@@ -94,7 +94,7 @@ field is meaningful only between iterations.
 
 There are deliberately **no physical-representation registers** here: the substage velocity,
 vorticity, and scalar recoveries write into the run's
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) slots, taken as scratch
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) slots, taken as scratch
 mid-iteration and re-deposited at the iteration's end by [`deposit!`](@ref) — a slot IS its producer's register.
 Likewise there is **no integrating-factor register**: the exact linear subflow is applied by the
 backend's fused exponential convolution
@@ -102,7 +102,7 @@ backend's fused exponential convolution
 evaluated per mode from the factor's parameters, so no
 kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
 products, the phase-shift buffers, the forcing-rate fields) lives with the generator, on the
-[`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) — the buffers here
+[`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) — the buffers here
 are
 only the scheme's own spectral stage registers.
 
@@ -156,12 +156,12 @@ end
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
 here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
-a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation).
+a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation).
 
 The arguments are:
 - `scheme` — the concrete scheme dispatched on: an [`AbstractIntegrator`](@ref) in the field form,
   an
-  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator)
+  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator)
   in the particle form.
 - `domain` — field form: the [`FixedDomain`](@ref), which fixes the grid, precision, and storage
   backend of every register.
@@ -169,7 +169,7 @@ The arguments are:
   scheme.
 - `tracers` — particle form: the tracer set the registers are sized to.
 - `cache` — particle form: the
-  [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) whose
+  [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) whose
   velocity-at-particles slot the scheme consumes and — for a multistep scheme — whose sample
   history it integrates over.
 
@@ -177,7 +177,7 @@ The first form builds the [`IntegratorBuffers`](@ref) the scheme needs:
 [`IFLowStorageRK3`](@ref), [`IFLowStorageRK4`](@ref) and [`IFSSPRK3`](@ref) allocate `stage1` and
 `nonlinear`; [`IFHeun`](@ref) allocates `stage1`, `stage2`, and `velocity_predictor_spectral`. The
 second form builds the
-[`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers).
+[`ParticleIntegratorBuffers`](@ref GBGHomogeneousTurbulence.Particles.ParticleIntegratorBuffers).
 One generic covers both because it is one concept, and because every side keeps the same
 separation: the evolving state holds no scheme's scratch.
 """
@@ -193,19 +193,19 @@ catalogued under [`AbstractIntegrator`](@ref)).
 
 The arguments are:
 - `scheme` — the stateless dispatch tag naming the scheme.
-- `state` — the [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) this call
+- `state` — the [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) this call
   mutates: the fields in spectral representation.
-- `generator` — the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator):
+- `generator` — the [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator):
   the equations of motion, their conditions, and their assembly scratch.
 - `domain` — the [`FixedDomain`](@ref).
 - `buffers` — the scheme's [`IntegratorBuffers`](@ref).
-- `cache` — the run's [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+- `cache` — the run's [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 - `dt` — the timestep.
 
 A scheme does only stage arithmetic: it opens the step with the generator's
-[`prepare!`](@ref GBGIsotropicTurbulence.Generator.prepare!), evaluates the right-hand sides and
+[`prepare!`](@ref GBGHomogeneousTurbulence.Generator.prepare!), evaluates the right-hand sides and
 exact linear factors through the generator protocol at each stage, and closes with the generator's
-[`finalize!`](@ref GBGIsotropicTurbulence.Generator.finalize!) — it never assembles the physics
+[`finalize!`](@ref GBGHomogeneousTurbulence.Generator.finalize!) — it never assembles the physics
 itself.
 
 The first stage reads the deposited velocity, vorticity, and scalar in physical representation from
@@ -224,7 +224,7 @@ Returns `state`.
 !!! note "A step alone leaves the cache mid-iteration"
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
     the iteration with `deposit!`, which re-fills every slot, at the new epoch, from the advanced
-    state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) does both.
+    state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) does both.
 """
 function step! end
 
@@ -241,8 +241,8 @@ unlike [`IFHeun`](@ref).
 The diffusive integrating factor ``\\mathcal{E}_D(\\tau)`` over a substep interval ``\\tau``
 (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) takes its
 parameters from the generator's
-[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
-[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) and
+[`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor) and
 is applied per mode by the backend's fused exponential convolution, never built as a field. With
 ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state ``\\hat q``
 and a single accumulator ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
@@ -304,8 +304,8 @@ evaluations per step — measured on a ``128^3`` `Float64` GPU run: the step cos
 ``1.665`` more than `IFLowStorageRK3`'s (every per-stage cost scales with the five stages alike), so a
 stability-limited run advances ``\\approx 16\\%`` more physical time per unit compute — with
 fourth-order accuracy, which removes the field's own time error as the limit on an
-[`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`(order = 4)` tracer —
-whose [`Heun`](@ref GBGIsotropicTurbulence.Particles.Heun) bootstrap still caps its measured
+[`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)`(order = 4)` tracer —
+whose [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) bootstrap still caps its measured
 convergence near third order, as its docstring records.
 """
 struct IFLowStorageRK4 <: AbstractIntegrator end
@@ -434,8 +434,8 @@ end
 
 Integrating-factor Heun — the two-stage, second-order Runge–Kutta. With the velocity and scalar integrating
 factors ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa`` (the generator's
-[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
-[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) at ``D = \\nu`` and
+[`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor) at ``D = \\nu`` and
 ``D = \\varkappa = \\nu/\\mathrm{Sc}`` over the step
 ``\\Delta t``) and ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a
 field ``\\hat q`` with
@@ -568,8 +568,8 @@ stability function ``R(z) = 1 + z + z^2/2 + z^3/6``, imaginary-axis limit ``\\sq
 only in the nonlinear error constants.
 
 With ``\\mathcal{E}(\\tau)`` the diffusive integrating factor over a span ``\\tau`` (from the generator's
-[`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor) /
-[`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor);
+[`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
+[`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor);
 applied per mode by the fused exponential convolution, never built as a field) and
 ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, one step of a field ``\\hat q`` is the
 Shu–Osher convex-combination form, each term transported to its stage's time:
@@ -762,28 +762,28 @@ _recovery_scratch(sb::ScalarBuffers) =
 
 Close a producer's advance by depositing the observables it has just made measurable: compute them
 from the arguments, write them into `cache` (an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache)), and record each slot at
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache)), and record each slot at
 the current epoch (the cache's freshness counter). One generic serves both sides of the run because
 it is one concept — each dynamical factor's advance is followed by its own deposit, so an iteration
 closes as `step!` then `deposit!`, then
-[`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) then `deposit!` again.
+[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) then `deposit!` again.
 
 The arguments are:
 - `cache` — every form's destination: the cache whose slots receive the deposits.
-- `state` — field form: the [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)
+- `state` — field form: the [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields)
   the step has just produced.
 - `domain` — field form: the [`FixedDomain`](@ref) whose plans run the recoveries.
 - `buffers` — field form: the scheme's [`IntegratorBuffers`](@ref), one spectral stage register of
   which — dead at the iteration's end — is the recovery scratch.
-- `tracers` — particle form: the [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers) whose
+- `tracers` — particle form: the [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) whose
   current positions are sampled, with the set's own interpolation scheme.
 - `u` — particle form: the velocity field in physical representation to interpolate — normally the
   field form's own fresh deposit.
 - `traversal = nothing` — particle form: the visiting order of a
-  [`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal) (its `order`
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) (its `order`
   field) for the gather, or `nothing` for the tracers' own order; the values are identical either
   way.
-- `sim` — `sim` form: the [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) to
+- `sim` — `sim` form: the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to
   unpack.
 
 The **field form** deposits the field-derived slots — the velocity, vorticity and, when the run
@@ -805,12 +805,12 @@ reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint f
 ``N^{3} \\times 3``.
 
 Every iteration ends with these deposits: the run layer's
-[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) performs them for you, the
+[`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
 `Simulation` constructor makes the seeding
 deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
 each form itself after the advance it closes. After mutating the state or the positions out of
-band, announce it — [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!) /
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) — and re-deposit
+band, announce it — [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) /
+[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) — and re-deposit
 with the **`sim` form**, which performs every deposit the run's configuration carries.
 
 Returns `cache` (or `sim`).
@@ -866,7 +866,7 @@ step, which once ``\\Delta t`` is substituted is ``C_{\\mathrm{CFL}} \\kappa_{\\
 stay inside the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, a pure number.
 
 Two loosenesses sit in that estimate and they pull in **opposite** directions. The speed in the
-denominator is [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed), a maximum over grid
+denominator is [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed), a maximum over grid
 points, so the continuum supremum between them can be larger — making the computed step too long.
 Against it, the eigenvalue bound over-estimates the true spectral radius, since not every mode
 carries the peak speed — making the ceiling too small. They are independent, so the second is not
@@ -883,12 +883,12 @@ damping), which makes the formula degenerate: its ``0.25`` is an empirical margi
 computed limit.
 
 The base is then scaled by the domain's dealiasing: a strategy that keeps modes to a higher
-``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi), out to the
+``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi), out to the
 Nyquist wavenumber) takes a proportionally smaller step,
 ``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to every scheme's base,
 `IFHeun`'s empirical one included: for a computed base it is the geometry of the retained band; for
 the empirical base it is an extrapolation in the same proportion, not a derived limit — and the
-scaled value is only as trustworthy as its base. This is the value [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) uses;
+scaled value is only as trustworthy as its base. This is the value [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses;
 override `cfl` for a specific run.
 
 !!! warning "The IFHeun margin does not know the viscosity"

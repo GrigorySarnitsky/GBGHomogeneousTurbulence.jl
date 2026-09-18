@@ -7,10 +7,10 @@
 # the run's state and its scratch per field, so it is immutable and one instance may drive
 # both fields — which the last block pins, together with the independence of the two streams.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using Random
 using Test
-import GBGIsotropicTurbulence.Forcing: prepare_forcing!
+import GBGHomogeneousTurbulence.Forcing: prepare_forcing!
 
 mutable struct SharedCounter <: AbstractForcing
   calls::Int
@@ -53,6 +53,6 @@ prepare_forcing!(f::SharedCounter, forcing_state, field, domain, dt::Real) = (f.
   end
   v, s = sim.state.modeled.velocity_forcing, sim.state.modeled.scalar_forcing
   @test v !== s && v.draws == 4 && s.draws == 4
-  @test GBGIsotropicTurbulence.SimulationRun.field_data(s.process) !=
-        GBGIsotropicTurbulence.SimulationRun.field_data(v.process)[:, :, :, 1]
+  @test GBGHomogeneousTurbulence.SimulationRun.field_data(s.process) !=
+        GBGHomogeneousTurbulence.SimulationRun.field_data(v.process)[:, :, :, 1]
 end

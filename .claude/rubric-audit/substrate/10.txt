@@ -23,9 +23,9 @@ in the state's place) of
 [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the inverse
 transform consumes the coefficients it runs from (a property of the FFT backends), so the recovery
 copies into scratch and the state survives every recovery — and the vorticity with
-[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!); the recovered
+[`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!); the recovered
 values are deposited into the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 """
 module State
 

@@ -11,7 +11,7 @@
 # — before any branch on `viscosity` — and throws `DomainError` from `Phenomenology.Scalings`,
 # two modules from the argument that caused it and naming neither the keyword nor the precondition.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
 @testset "a negative `kinetic_energy` is rejected by `Simulation` with an ArgumentError naming it" begin
   # Explicit-viscosity mode: ε is never read on this path, yet it is computed eagerly.

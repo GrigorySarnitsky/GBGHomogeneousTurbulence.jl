@@ -16,13 +16,13 @@
 # What IS runnable is the claim that the spellings agree TODAY — i.e. that the finding is
 # duplication of a definition, not a present numeric divergence.
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters, taylor_reynolds
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, taylor_reynolds
 
 @testset "u' = √(2k/3): the constructor's two copies and the flow_parameters home agree" begin
   # (1) No named conversion exists for the three sites to route through: neither the umbrella nor
   #     Phenomenology exposes one, which is why each site re-spells the coefficient by hand.
-  names_all = vcat(names(GBGIsotropicTurbulence), names(GBGIsotropicTurbulence.Phenomenology))
+  names_all = vcat(names(GBGHomogeneousTurbulence), names(GBGHomogeneousTurbulence.Phenomenology))
   @test !any(n -> occursin("rms", lowercase(String(n))), names_all)
 
   for (N, L, k) in ((16, 2π, 1.5), (16, 2π, 0.75), (24, 4π, 3.0))

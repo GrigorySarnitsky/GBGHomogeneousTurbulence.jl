@@ -6,8 +6,8 @@
 # branch PF's three-argument `divergence!` takes no weights, so α is accepted and discarded.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Generator: _scalar_flux_divergence!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Generator: _scalar_flux_divergence!
 using GBGPeriodicFields: field_data
 using Random
 

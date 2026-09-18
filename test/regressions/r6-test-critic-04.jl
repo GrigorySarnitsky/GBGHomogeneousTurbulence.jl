@@ -5,9 +5,9 @@
 # (peak ≈ 8.49) must warn, envelope_wavenumber = 2 must stay silent, and the initial_spectrum
 # branch must stay silent regardless (the guard is gated on the default-envelope branch only).
 
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.State: random_solenoidal_velocity_spectral!, random_scalar_spectral!
-using GBGIsotropicTurbulence.SimulationDomain: new_vector_field_spectral, new_scalar_field_spectral
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.State: random_solenoidal_velocity_spectral!, random_scalar_spectral!
+using GBGHomogeneousTurbulence.SimulationDomain: new_vector_field_spectral, new_scalar_field_spectral
 using Logging
 using Random
 using Test

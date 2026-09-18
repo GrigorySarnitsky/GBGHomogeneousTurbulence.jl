@@ -3,8 +3,8 @@
 # Observables module docstring promises "Each returns the field's own real element type rather than a
 # fixed Float64, so a `Float32` run measures in `Float32`."
 
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: deposit_max_speed!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: deposit_max_speed!
 using Random
 using Test
 

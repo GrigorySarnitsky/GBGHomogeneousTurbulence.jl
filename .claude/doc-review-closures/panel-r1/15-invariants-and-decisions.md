@@ -4,7 +4,7 @@
 
 **VERDICT: PARTIAL**
 
-**Evidence:** The primary defect is fixed: `src/GBGIsotropicTurbulence.jl`'s "Module layout" comment
+**Evidence:** The primary defect is fixed: `src/GBGHomogeneousTurbulence.jl`'s "Module layout" comment
 (lines 11–24) now lists `Forcing` before `Generator` and explicitly says "Included BEFORE Generator:
 decision 23(a) earned the Generator → Forcing edge, so Forcing's types must exist first" — matching the
 actual `include()` order at lines 62–63 (`include("Forcing.jl")` then `include("Generator.jl")`).

@@ -18,7 +18,7 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, to_physical!, combine!
 
 @testset "scalar_rhs! is value-independent of the generator's cached displaced velocity" begin

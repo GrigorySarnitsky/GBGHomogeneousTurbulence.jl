@@ -10,12 +10,12 @@
 # The sibling axis states the opposite discipline explicitly, in Propagator.jl:578:
 #   "NO `::AbstractIntegrator` FALLBACK, matching `allocate_buffers` on the same supertype: a
 #    scheme that has not declared its stability limit gets a hard error, not a number."
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds,
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds,
                                                _retained_nyquist_fraction, _build_dealias,
                                                spectral_cutoff
-using GBGIsotropicTurbulence.Generator: _velocity_nonlinear!, _scalar_nonlinear!
-using GBGIsotropicTurbulence.SimulationRun: Simulation, advance!
+using GBGHomogeneousTurbulence.Generator: _velocity_nonlinear!, _scalar_nonlinear!
+using GBGHomogeneousTurbulence.SimulationRun: Simulation, advance!
 
 # (1) A brand-new strategy that has declared NOTHING — which hooks answer for it anyway?
 struct ProbeBare <: DealiasingStrategy end
@@ -32,8 +32,8 @@ end
 # (2) The maintenance consequence: an author adding a padding (3/2-rule) strategy supplies the
 #     two hooks that HARD-ERROR at them, and never learns the assembly needed one too.
 struct ProbePad <: DealiasingStrategy end
-GBGIsotropicTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
-GBGIsotropicTurbulence.SimulationDomain._build_dealias(::ProbePad, reference, multipliers, N, L, ::Type{T}) where {T} =
+GBGHomogeneousTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
+GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, reference, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
 println()
@@ -51,7 +51,7 @@ println("  assembly reached = ", hasmethod(_velocity_nonlinear!,
 # (3) The sibling axis, for contrast: the SAME shape of undeclared subtype hard-errors.
 println()
 println("=== the sibling axis (Propagator), for contrast ===")
-using GBGIsotropicTurbulence.Propagator: AbstractIntegrator, recommended_cfl, allocate_buffers
+using GBGHomogeneousTurbulence.Propagator: AbstractIntegrator, recommended_cfl, allocate_buffers
 struct ProbeScheme <: AbstractIntegrator end
 for (name, f) in (("recommended_cfl",  () -> recommended_cfl(ProbeScheme(), domain)),
                   ("allocate_buffers", () -> allocate_buffers(ProbeScheme(), domain)))

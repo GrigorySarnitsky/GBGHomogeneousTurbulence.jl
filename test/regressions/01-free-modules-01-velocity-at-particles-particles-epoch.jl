@@ -16,7 +16,7 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 @testset "velocity_at_particles(cache) throws after an announced reposition (both epochs checked)" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
@@ -38,5 +38,5 @@ using GBGIsotropicTurbulence
 
   # The cache's own completeness check agrees the slot is not current on this identical state —
   # so a passing read above is the cache contradicting itself.
-  @test_throws ErrorException GBGIsotropicTurbulence.Cache.check_deposits(sim.cache)
+  @test_throws ErrorException GBGHomogeneousTurbulence.Cache.check_deposits(sim.cache)
 end

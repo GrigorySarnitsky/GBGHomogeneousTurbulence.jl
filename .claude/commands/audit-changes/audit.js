@@ -64,7 +64,7 @@ const SCHEMA = {
   required: ['lane', 'verdict', 'checked', 'candidates_found', 'findings'],
 }
 
-const PREAMBLE = `You are auditing a large set of edits to GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence. The edits were made by an automated defect hunt over five rounds: 605 lines inserted, 129 deleted, across 11 source files.
+const PREAMBLE = `You are auditing a large set of edits to GBGHomogeneousTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence. The edits were made by an automated defect hunt over five rounds: 605 lines inserted, 129 deleted, across 11 source files.
 
 THE DIFF: ${DIFF}   (base ${BASE} → head ${HEAD || 'HEAD'}) — src/, test/ AND docs/
 THE CODE: ${REPO}/src   — read the current files, not only the diff

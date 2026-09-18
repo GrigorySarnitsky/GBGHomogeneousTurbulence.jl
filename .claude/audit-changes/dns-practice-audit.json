@@ -1,0 +1,555 @@
+{
+ "lanes": [
+  {
+   "items": [
+    {
+     "concern": "The \u03ba=0 (mean) mode of velocity and scalar: conserved, damped, or pinned",
+     "reference_practice": "TurTLE pins it by redundant mechanisms. Every RHS projection ends by zero-filling the \u03ba=0 mode on the owning rank: cpp/kspace.cpp:693-698 \"if (this->layout->myrank == this->layout->rank[0][0]) { std::fill_n((rnumber*)(xa), 2, 0.0); ... }\" \u2014 \u2119 is defined as zero at \u03ba=0, not identity. The velocity recovered from vorticity is mean-zeroed every stage: cpp/vorticity_equation.cpp:237-238 \"if (this->kk->layout->myrank == 0) std::fill_n((rnumber*)this->u->get_cdata(), 6, 0.0);\". symmetrize() forces the 0 mode real (cpp/field.cpp:1197-1200 \"// make 0 mode real ... cdata[cc][1] = 0.0;\"), an impose_zero_mode() utility exists (cpp/field.hpp:274-281), forcing bands test \"(k2 > 0) && (this->fk0 <= knorm)\" (cpp/vorticity_equation.cpp:360-363), and the random IC fills only \"if (k2 > 0)\" (cpp/field.cpp:2445).",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:416-418 `_zero_mean_mode!(f) = (_zero_mean_mode_data!(field_data(f)); f)` with `fill!(view(data, 1:1, 1:1, 1:1), zero(T))`, applied in `velocity_rhs!` (src/Generator.jl:479) and `scalar_rhs!` (src/Generator.jl:632); the comment at 405-415 records the mechanism (\"Every reference DNS pins this mode\") and deliberately places the zeroing BETWEEN the nonlinear assembly and the forcing source so a mean-driving forcing stays expressible. The IC mean is zeroed at the source: src/State.jl:121-124 \"The envelope vanishes at \u03ba = 0, which IS the mean removal\" (scalar twin at 210-212). One scoped difference from TurTLE: we pin the advective RHS and conserve the state's zero mean exactly (exp(0)=1 integrating factor), where TurTLE also re-zeroes the state each stage \u2014 a mean injected out-of-band into our state persists undamped by design.",
+     "consequence_if_missing": "The discrete \u27e8u\u00d7\u03c9\u27e9 residual (nonzero only to roundoff plus aliasing) is integrated with no restoring term and grows at the Lyapunov rate \u2014 the src comment records 3% of u\u2032 after 3000 Float32 steps: a spurious uniform sweep that pollutes Lagrangian statistics and the CFL speed. This was the trigger finding; the fix is in the tree.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Division by k\u00b2=0 inside the Leray/pressure projection",
+     "reference_practice": "The projection loop simply skips the singular mode: cpp/kspace.cpp:645 and 714 \"if (k2 > 0)\" wrap the entire tval = (k\u00b7\u00fb)/k2 computation, so no division at \u03ba=0 ever happens; the mode is then zero-filled (kspace.cpp:693-698). The Biot\u2013Savart recovery guards it separately: cpp/vorticity_equation.cpp:223 \"const double kk2 = (k2 > 0) ? k2 : 1.;\".",
+     "our_status": "present",
+     "our_evidence": "Our projection is the backend's `helmholtz_projection!`, called at src/Generator.jl:523-524; the backend forms the denominator as `ifelse(iszero(squared), one(squared), squared)` (PF clone, inspiration/GBGPeriodicFields/src/DifferentialOperators.jl:268), so \u03ba=0 is division-safe. Note the guarded projection acts as the IDENTITY at \u03ba=0 (longitudinal part evaluates to 0, source passes through) \u2014 which is exactly why the separate `_zero_mean_mode!` pin of the item above is load-bearing on our side where TurTLE's zero-fill makes \u2119(\u03ba=0)=0.",
+     "consequence_if_missing": "A 0/0 at the single \u03ba=0 mode NaNs the projected term, and one transform later the NaN is dense in every field \u2014 instant, total corruption on the first step.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Hermitian (conjugate) symmetry of the spectral state \u2014 enforcement vs construction",
+     "reference_practice": "TurTLE actively re-imposes it: field::symmetrize() (cpp/field.cpp:1189-1233) makes the 0 mode real, zeroes all three Nyquist planes (\"// put kx = nx/2 modes to 0\"), and reconciles the conjugate pairs of the kx=0 plane line by line with MPI exchanges; it is called after every nonlinear assembly, projection, forcing and step (cpp/vorticity_equation.cpp:207, 239, 556, 588, 669) and on the generated IC (field.cpp:2487 \"output_field->symmetrize()\").",
+     "our_status": "different-by-design",
+     "our_evidence": "Symmetry holds by construction, with no re-enforcement pass (searched src/ for symmetrize/hermitian/conj \u2014 none exists). Every stochastic input enters spectral space through an r2c transform of a real physical field, which is Hermitian exactly: the velocity/scalar seeds at src/State.jl:113 and 204 \"copyto!(field_data(noise), randn(rng, T, physical_field_shape(...)))\" then `to_spectral!`; the OU forcing noise at src/Forcing.jl:747 \"randn!(ou.rng, field_data(noise_physical))\" then `to_spectral!` (751). Every subsequent operation \u2014 real even per-mode multipliers (dealias, integrating factor, projection with real wavenumbers), real linear combinations, and nonlinear terms that round-trip through r2c (src/Generator.jl:521 `to_spectral!(product_spectral, \u03c9, domain.velocity_plans)`) \u2014 preserves the symmetry to the bit.",
+     "consequence_if_missing": "Not missing, but unguarded at the boundary: a user hand-writing spectral coefficients (the `fields_modified!` escape hatch) can introduce a non-Hermitian component that nothing ever removes; spectral diagnostics and the c2r physical images would then silently disagree. TurTLE's symmetrize() would scrub it; ours documents the state as the single source of truth instead.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Nyquist / oddball wavenumber treatment (the unpaired mode of even-N real FFTs)",
+     "reference_practice": "TurTLE zeroes the Nyquist planes outright, every symmetrize() call (cpp/field.cpp:1202-1233), and additionally keeps every dealias cutoff below them \u2014 the SMOOTH-mode comment cpp/kspace.cpp:93-105 is explicit: \"Here 'kM' = 'highest wavemode that has nonzero amplitude' ... generically kM = N/2 - 1\". Its per-axis wavenumber arrays carry an unpaired +N/2 entry, harmless because the modes are always zero.",
+     "our_status": "present",
+     "our_evidence": "Two complementary mechanisms. (a) For TwoThirds/PhaseShift the cutoff is strictly below Nyquist \u2014 src/SimulationDomain.jl:144-147 `_retained_nyquist_fraction(::TwoThirds) = 2 // 3` etc., built into the mask at 265-269 \u2014 so the planes are removed from every assembled RHS and from the IC (src/State.jl:140 folds `domain.dealias` into the seed). (b) HouLi retains the planes damped to machine epsilon (src/SimulationDomain.jl:273-277 `strength = T(isnothing(strategy.strength) ? -log(eps(T)) : ...)`), and the backend's stated convention covers the derivative side: PF clone DifferentialOperators.jl:26-27 \"first-derivative wavenumbers are zeroed at the Nyquist frequency on even-length axes, while squared wavenumbers keep the true squared wavenumber\" \u2014 no sign-ambiguous derivative content can be produced, while viscous decay at Nyquist stays physical.",
+     "consequence_if_missing": "An unpaired Nyquist mode differentiated with a signed wavenumber produces a spurious imaginary (non-real-field) contribution, and Nyquist content in products aliases with the wrong sign \u2014 a slow, silent asymmetry of the physical field.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Sharp-mask boundary shell: is the |\u03ba| = N/3 shell inside the 2/3 mask when 3 divides N?",
+     "reference_practice": "TurTLE excludes the boundary twice over: the TWO_THIRDS cutoff is set one mode short \u2014 cpp/kspace.cpp:88-90 \"this->kMx = this->dkx*(int(2*(int(this->layout->sizes[2])-1)/3)-1);\" (i.e. (N/3 \u2212 1)\u00b7dk) \u2014 and low_pass removes the boundary itself: cpp/kspace.cpp:286 \"if (k2 >= km2) std::fill_n(...)\" zeroes k = kM too.",
+     "our_status": "partial",
+     "our_evidence": "src/SimulationDomain.jl:265-266 keeps the CLOSED ball: `_cutoff_wavenumber` = T(2/3)\u00b7T(N/2)\u00b7T(2\u03c0/L) fed to PF's `spectral_cutoff`, whose band test is inclusive (`low_squared <= squared <= high_squared`, PF clone Convolution.jl `spectral_band`). When 3 | N the shell at exactly N/3 can receive alias images of boundary-mode products (2\u00b7(N/3) \u2212 N = \u2212N/3 lands back on the retained boundary), so exact dealiasing holds only strictly below it. Whether that shell is actually inside our mask turns on element-type rounding of the fraction: the code's own comment (src/SimulationDomain.jl:258-263) records that Float32's 2/3 \"lands slightly above the exact 2/3\" (boundary included) while Float64's lands below (boundary excluded by accident of rounding).",
+     "consequence_if_missing": "A thin, weak alias contamination confined to the single outermost retained shell on 3|N grids in Float32 \u2014 visible as a spectrum blip at the cutoff, not a stability threat.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Energy-spectrum shell-binning conventions at the first and last shell",
+     "reference_practice": "TurTLE floor-bins \u2014 cpp/kspace.cpp:856-864 \"if (k2 <= this->kM2) { const int tmp_int = int(std::sqrt(k2) / this->dk)...\" \u2014 restricted to the dealiased band, weights the rfft half-spectrum by nxmodes (1 on the kx=0 plane, 2 otherwise; the six-argument CLOOP in kspace.hpp), and records per-shell mode counts and mean |k| with a guarded division (kspace.cpp:148-152 \"if (k2 < this->kM2) ... nshell_local_thread...\"; 199-201 \"if (this->nshell[n] > 0) this->kshell[n] /= this->nshell[n];\").",
+     "our_status": "different-by-design",
+     "our_evidence": "Ours round-bins to CENTERED shells over all modes out to the corner: PF clone Reductions.jl:1076 \"shell = round(Int, sqrt(squared) / fundamental)\" with the rfft weight 1 on the folded axis's zero and even-Nyquist planes, 2 otherwise (Reductions.jl:1077-1079 and `_parseval_weight` 926-934 \u2014 TurTLE's nxmodes convention exactly), documented to refine the inner product exactly (\u2211 shells = \u27e8f,f\u27e9) with ties-to-even at half-integer boundaries. Consumed at src/Observables.jl:327-329: `energy_spectrum` returns the per-shell energy E_n = P/2, documented as per-shell energy vs density (docstring at 305-325).",
+     "consequence_if_missing": "Half-bin abscissa shifts and first/last-shell distortion when comparing against a floor-binned reference spectrum; both sides are internally consistent, so the risk is only cross-code comparison done without noting the convention.",
+     "severity": "minor"
+    },
+    {
+     "concern": "CFL handling: who chooses \u0394t and what guards the choice",
+     "reference_practice": "TurTLE takes dt as a fixed input parameter (cpp/full_code/NSVE.cpp:231 reads \"parameters/dt\") and only MONITORS the CFL velocity as a per-snapshot diagnostic: compute_CFL_velocity() takes the grid max of |u1|+|u2|+|u3| (cpp/field.cpp:199-236) and NSVE::do_stats writes it as a time series (NSVE.cpp:209-216). No adaptivity, no in-run stability enforcement.",
+     "our_status": "different-by-design",
+     "our_evidence": "Ours is adaptive and guarded: \u0394t = C\u00b7\u0394x/max|u| with the ceiling C declared per scheme and NO silent fallback (src/Propagator.jl:600-605 \"_base_cfl(::IFRK2) = 0.25; _base_cfl(::IFLowStorageRK3) = 0.5\" \u2014 the comment records the deleted 0.3 fallback), corrected for the retained dealias band (Propagator.jl:610-611 `* (2 // 3) / _retained_nyquist_fraction(domain.dealiasing)`), floored against the decaying-flow step runaway by a resolution bound 1/(D\u00b7\u03ba_min\u00b2) and a caller max_dt (src/SimulationRun.jl:514-520), and the \u0394t > 0 invariant checked on both routes (SimulationRun.jl:547-549). One convention difference: TurTLE's monitored speed is the per-point L1 component sum (stricter by up to \u221a3 than our per-point Euclidean max, src/Observables.jl:177 `max_speed(u) = maximum(norm, u)`); our C is the calibrated ceiling for that convention, so the pair is internally consistent.",
+     "consequence_if_missing": "With a fixed dt and no monitor, a transient that raises u_max past the stability boundary blows the run up silently; with adaptivity but no runaway floor, a decaying flow drives \u0394t \u2192 ~1e15 and the integrating factor annihilates the state (the measured failure recorded in the src comment).",
+     "severity": "notable"
+    },
+    {
+     "concern": "Forcing normalization when the forced band is (near-)empty",
+     "reference_practice": "An explicit epsilon floor before the divide: cpp/vorticity_equation.cpp:385-386 \"if (energy_in_shell < 10*std::numeric_limits<rnumber>::epsilon()) energy_in_shell = 1;\" \u2014 the fixed-injection amplitude injection_rate/energy_in_shell can then never diverge (the same pattern guards the fixed_energy rescale).",
+     "our_status": "present",
+     "our_evidence": "A scale-free positivity guard instead of an absolute floor: src/Forcing.jl:89 \"_band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_value))\", applied by ConstantPower (Forcing.jl:645 \"return _band_is_empty(band_observable) ? 0.0 : injection_rate / (2 * band_observable)\"), VarianceController (618), and VarianceRescaling (385 \"nothing in the band yet\"). The comment at 78-88 argues the design: the scalar equation is exactly linear in \u03c6, so any constant floor breaks the \u03c6 \u2192 s\u03c6 symmetry and silently switches the forcing off for small-amplitude (especially Float32) runs \u2014 the empty band is left alone rather than floored to an arbitrary scale, and the docstring warns to seed content in the band (Forcing.jl:478-482).",
+     "consequence_if_missing": "Division by a ~0 band energy hands the forcing an unbounded amplitude \u2014 one step from an empty band to a blown-up run; TurTLE floors it, we zero it, both prevent the kick.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Forcing must never reach the \u03ba=0 mode",
+     "reference_practice": "Every band membership test excludes it explicitly: cpp/vorticity_equation.cpp:360-363 \"if ((k2 > 0) && (this->fk0 <= knorm) && (this->fk1 >= knorm))\" for the injection-rate normalization, and 440 \"if (k2 > 0)\" inside impose_forcing's energy sums.",
+     "our_status": "present",
+     "our_evidence": "Bands are annuli from (lowest_shell \u2212 \u00bd)\u00b72\u03c0/L with lowest_shell defaulting to 1 (src/Forcing.jl:266-268 `_shell_band` \u2192 `spectral_band(..., (lowest - 0.5) * k0, (highest + 0.5) * k0)`), so \u03ba=0 sits outside every default band; a lowest_shell = 0 attempt cannot slip through because the backend band constructor rejects a negative lower edge (PF clone Convolution.jl, `spectral_band`: \"band edges must satisfy 0 <= low <= high\"). The OU noise's own \u03ba=0 component (physical randn has a nonzero mean) is removed by the same band convolve (src/Forcing.jl:749 `convolve!(noise_spectral, noise_spectral, ou.band)`).",
+     "consequence_if_missing": "A forcing that touches \u03ba=0 pumps a uniform momentum the integrating factor conserves forever (exp(0)=1) \u2014 the same undamped-mean pathology as the trigger bug, but actively driven.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Blow-up / non-finite state detection during the run",
+     "reference_practice": "TurTLE has no field-level NaN check in the time loop; the only asserts are debug-build particle checks \u2014 cpp/particles/particles_system.hpp:546-555 \"void checkNan() const { // TODO remove ... assert(std::isnan(my_particles_positions[...]) == false);\" \u2014 and divergence surfaces post-hoc through the recorded statistics (histogram bounds set by max_velocity_estimate, NSVE.cpp:207).",
+     "our_status": "present",
+     "our_evidence": "Every advance! hard-fails on the state it just produced, after the closing deposit: src/SimulationRun.jl:579-588 \"isfinite(max_speed(sim.cache)) || error(\\\"non-finite velocity at step ... the run appears to have blown up\\\")\" plus the separate scalar check (\"a passive scalar cannot feed back into the velocity, so a scalar that has gone non-finite leaves the guarded quantity perfectly finite\" \u2014 checked at 586-588); the adaptive path re-checks at src/SimulationRun.jl:483.",
+     "consequence_if_missing": "A run that blows up keeps stepping on NaNs \u2014 wasted GPU hours and a poisoned statistics stream, discovered only at analysis time. We exceed the reference here.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Checkpoint / exact-restart and mid-run reproducibility",
+     "reference_practice": "TurTLE checkpoints the full spectral state per checkpoint file and stores the INTEGER iteration and checkpoint counters in HDF5, re-read on startup (cpp/full_code/direct_numerical_simulation.cpp:53-121 read_iteration/write_iteration; NSVE.cpp:140-144 write_checkpoint \u2192 io_checkpoint); all forcing time-dependence is derived from the integer counter \u2014 cpp/vorticity_equation.cpp:605 \"this->omega_nonlin(0, this->iteration*dt);\" \u2014 so a restarted run replays the identical trajectory with no accumulated-float ambiguity.",
+     "our_status": "absent",
+     "our_evidence": "Searched src/ for restart, checkpoint, save, write, serialize, JLD, HDF5: no state-serialization surface exists \u2014 the only `restart!` is the particle scheme's history clear (src/SimulationRun.jl:602, src/Particles.jl:247). The clock accumulates Float64 time (src/SimulationRun.jl:589 `sim.clock.time += \u0394t` \u2014 inherent to the adaptive step, unlike TurTLE's fixed-dt integer clock), and StochasticOU carries a private MersenneTwister plus an OU state field (src/Forcing.jl:726) with no capture/restore offered. Reproducibility from t=0 IS provided (the `seed` keyword, Forcing.jl:698 \"The `seed` (default 0) fixes the random stream, so a forced run is reproducible\"; the Simulation `rng` keyword, SimulationRun.jl:176-177) \u2014 but a long run cannot be resumed exactly, or at all, without the caller inventing their own serialization of state + clock + forcing internals + tracer positions.",
+     "consequence_if_missing": "A multi-day run lost to a crash restarts from t=0; a stochastic-forced or particle-carrying run cannot be split across sessions with a defensible claim of statistical continuity. No wrong physics \u2014 an operational gap.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Initial-condition sanitization before the first step (solenoidal, band-limited, symmetric, mean-free)",
+     "reference_practice": "The generated IC is passed through the full scrub before step 1: cpp/full_code/NSVE.cpp:103-119 \u2014 make_gaussian_random_field (amplitudes only at \"if (k2 > 0)\", field.cpp:2445), then \"this->fs->kk->template project_divfree<rnumber>(...); compute_curl(...); this->fs->kk->template low_pass<rnumber, THREE>(..., this->fs->kk->kM); this->fs->cvorticity->symmetrize();\".",
+     "our_status": "present",
+     "our_evidence": "The seed pipeline applies the same invariants in one pass each: src/State.jl:113 (real physical noise \u2192 r2c, Hermitian by construction), 138-141 \u2014 the envelope (zero at \u03ba=0, the mean removal, 121-124) is composed with the dealias kernel in a single convolve \"convolve!(\u00fb, \u00fb, convolve(envelope, domain.dealias))\" then \"helmholtz_projection!(\u00fb, \u00fb, domain.multipliers)\" \u2014 followed by the energy rescale that THROWS if the band was annihilated (State.jl:147-151 \"the seeded velocity has no energy to rescale...\") instead of silently returning a zero field.",
+     "consequence_if_missing": "A non-solenoidal or above-band IC injects divergence and alias content the first RHS then propagates; a mean-carrying seed sweeps every tracer (the src comment records 13.5% of the seeded energy landing in the mean without the \u03ba=0 guard).",
+     "severity": "serious"
+    },
+    {
+     "concern": "Keeping the evolving state itself inside the dealiased band (state truncation each stage vs by induction)",
+     "reference_practice": "TurTLE re-truncates the state at every stage: each step's CLOOP writes only \"if (k2 <= this->kk->kM2)\" with the destination pre-zeroed (cpp/vorticity_equation.cpp:594-607, and the *this->v[1] = 0.0 at 599), and compute_vorticity/compute_velocity zero everything beyond the band (cpp/vorticity_equation.cpp:203-204, 233-234 \"else std::fill_n(..., 6, 0.0);\").",
+     "our_status": "different-by-design",
+     "our_evidence": "The truncation is applied to the assembled nonlinear term inside the projection's own pass (src/Generator.jl:523-524, the kernel-composed `helmholtz_projection!(out, product_spectral, domain.multipliers, kernel)`) and to the IC (src/State.jl:140); the state then stays in-band by induction \u2014 the integrating factor is diagonal decay and every RHS is truncated \u2014 with no per-step state sweep (deliberately one pass fewer; the comments at Generator.jl:466-475 record the fold). HouLi legitimately carries damped near-Nyquist state content, so a hard state sweep would be wrong for it anyway.",
+     "consequence_if_missing": "The induction has one unguarded edge: content hand-written above the band (through the `fields_modified!` escape hatch) is only viscously damped, never removed, and PhaseShift's exactness argument presumes no state content above its cutoff. In the normal loop the invariant provably holds.",
+     "severity": "minor"
+    }
+   ],
+   "lane": "turtle",
+   "mean_mode": "TurTLE never lets the \u03ba=0 velocity mode evolve, through layered, redundant mechanisms rather than one. (1) The Leray projection is DEFINED as zero at \u03ba=0, not identity: project_divfree skips the singular mode in the loop (cpp/kspace.cpp:645 and 714 \"if (k2 > 0)\") and then explicitly zero-fills it on the rank that owns it \u2014 cpp/kspace.cpp:693-698 \"if (this->layout->myrank == this->layout->rank[0][0]) { std::fill_n((rnumber*)(xa), 2, 0.0); std::fill_n((rnumber*)(ya), 2, 0.0); std::fill_n((rnumber*)(za), 2, 0.0); }\". Since force_divfree wraps this (kspace.hpp:300-302) and is called after every nonlinear assembly and every RK substage (vorticity_equation.cpp:555, 587, 622, 644, 668; NSE.cpp:369, 487, 509), the RHS mean is scrubbed every evaluation and the advanced state's mean every substep. (2) In the primary (vorticity-form) solver the mean velocity is not even part of the state: the velocity is recovered from vorticity each stage with the Biot\u2013Savart division guarded (\"const double kk2 = (k2 > 0) ? k2 : 1.;\", vorticity_equation.cpp:223) and the \u03ba=0 mode zero-filled outright (vorticity_equation.cpp:237-238 \"if (this->kk->layout->myrank == 0) std::fill_n((rnumber*)this->u->get_cdata(), 6, 0.0);\"). (3) field::symmetrize(), called after every assembly/step, forces the 0 mode real (field.cpp:1196-1200 \"// make 0 mode real ... cdata[cc][1] = 0.0;\"), and a dedicated impose_zero_mode() utility exists (field.hpp:274-281, zeroing the mode's 2*ncomp reals; wrapped by vorticity_equation::impose_zero_modes(), vorticity_equation.cpp:36-42). (4) Nothing feeds the mode: the random IC fills amplitudes only \"if (k2 > 0)\" (field.cpp:2445), and every forcing band test excludes it, e.g. vorticity_equation.cpp:360-363 \"if ((k2 > 0) && (this->fk0 <= knorm) && (this->fk1 >= knorm))\". TurTLE's mainline solvers carry no passive scalar, so it exhibits no scalar-mean practice; the velocity mechanism is the transferable one. Net effect: the mean starts exactly zero and is re-zeroed multiple times per step, so no roundoff/aliasing residual of the nonlinear term can ever accumulate there \u2014 the exact failure our trigger bug exhibited, now pinned on our side at the RHS (src/Generator.jl:416-418, applied at 479 and 632)."
+  },
+  {
+   "items": [
+    {
+     "concern": "The \u03ba=0 (mean) velocity mode: neither conserved nor damped by the dynamics",
+     "reference_practice": "GHOST pins the mean velocity to zero at every RK substep, at state level: the update loop runs only where the mask holds \u2014 include/hd_rkstep2.f90:18 \"IF ((kn2(k,j,i).le.kmax).and.(kn2(k,j,i).ge.tiny)) THEN\" \u2014 and every mode outside it, \u03ba=0 included, is hard-zeroed each substep (lines 26\u201328 \"vx(k,j,i) = 0.0_GP\" etc.). The lower gate `tiny = min(1e-5, .1/nmax\u00b2)` is set at main3D.fpp:1736 under the comment \"tiny: minimum truncation for dealiasing\" (line 1725). The pin is unconditional \u2014 even a forcing with a mean component could not accumulate one.",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:405\u2013418: \"The \u03ba = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY \u2026 Every reference DNS pins this mode\" \u2014 `_zero_mean_mode!` (line 416) zeroes the [1,1,1] modes, applied inside `velocity_rhs!` at Generator.jl:475 between the nonlinear assembly and the forcing source. Mechanism differs from GHOST: we pin the RHS's mean (conserving \u27e8u\u27e9, normally zero from the seed \u2014 State.jl:121\u2013125 zeroes the envelope at \u03ba=0) rather than zeroing the state, deliberately so \"a forcing that deliberately drives a mean remains expressible\" (Generator.jl:412\u2013413). A caller who does force the mean gets no damping (\u2130 = exp(0) = 1), which GHOST's state-pin makes impossible.",
+     "consequence_if_missing": "The discrete \u27e8u\u00d7\u03c9\u27e9 residual (roundoff-level per step) integrates undamped and grows at the Lyapunov rate \u2014 measured in this code at 3% of u\u2032 after 3000 Float32 steps \u2014 silently adding a uniform sweep that inflates u\u2032, the CFL speed, and every tracer trajectory.",
+     "severity": "serious"
+    },
+    {
+     "concern": "The \u03ba=0 (mean) scalar mode: conserved, not zeroed",
+     "reference_practice": "GHOST treats the scalar mean differently from the velocity mean \u2014 it is frozen, not zeroed: include/phd_rkstep2.f90:37\u201341 \"ELSE IF (kn2(k,j,i).lt.tiny) THEN \u2026 th(k,j,i) = C20(k,j,i)\" (C20 is the scalar's start-of-substep copy), while the same branch zeroes vx,vy,vz. The scalar mean is a conserved quantity of advection\u2013diffusion and GHOST enforces exactly that.",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:586 (scalar_rhs! docstring): the divergence \"form conserves the scalar mean exactly: the divergence has no \u03ba=0\" content \u2014 plus the same `_zero_mean_mode!(N\u0302)` pin at Generator.jl:624 killing the roundoff residual of the discrete divergence; the seed is mean-zero by construction (State.jl:210\u2013212, envelope zeroed at \u03ba=0, \"that mode's coefficient IS the spatial mean\").",
+     "consequence_if_missing": "A drifting scalar mean corrupts `scalar_variance` (documented \"for a mean-zero \u03c6\", src/Observables.jl:203) and every variance-targeting forcing (VarianceRescaling, VarianceController) then chases a target contaminated by the square of the mean.",
+     "severity": "serious"
+    },
+    {
+     "concern": "The pressure/Leray projection's division by |\u03ba|\u00b2 at \u03ba=0",
+     "reference_practice": "GHOST never evaluates the 0/0: nonlhd3 special-cases, for each output component, the whole plane where that component's own wavenumber vanishes \u2014 pseudospec3D_hd.f90:439 \"g(k,j,1) = -a(k,j,1)\" for the kx=0 plane of the x-component (no /kk2 term at all), the general formula \"\u2026+kx(i)*(\u2026)/kk2(k,j,i)\" (line 448) running only from i=2; likewise j=1 for y (line ~473) and k=1 for z (line ~497).",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:519\u2013520 delegates to PF's `helmholtz_projection!`; the backend guards the mode explicitly (inspiration/GBGPeriodicFields/src/DifferentialOperators.jl:207\u2013209: \"longitudinal = (\u2026) / ifelse(iszero(squared), one(squared), squared)\" \u2014 \u2119 acts as identity at \u03ba=0), and our own comment states the consequence we rely on: \"the Leray projection legitimately keeps constants (\u2119(0) = I)\" (src/Generator.jl:408\u2013409).",
+     "consequence_if_missing": "A 0/0 at the mean mode produces NaN in the projected nonlinear term on the first step; the NaN propagates to every mode through the next transform pair and the run dies (or, worse, Float32 flushes it to garbage that survives).",
+     "severity": "serious"
+    },
+    {
+     "concern": "Nyquist (unpaired even-N rfft) mode: inside or outside the dealias mask",
+     "reference_practice": "GHOST's spherical mask ends far below Nyquist: main3D.fpp:1727+1731 \"kmax = 1.0/9.0 \u2026 kmax = kmax*real(nx)**2\" \u2014 i.e. \u03ba\u00b2 \u2264 (N/3)\u00b2, so the \u00b1N/2 planes are outside and are hard-zeroed at every substep by the `kn2 \u2264 kmax` gate (include/hd_rkstep2.f90:18); the Nyquist mode never carries signal and its unpaired-mode pathologies never arise.",
+     "our_status": "present",
+     "our_evidence": "src/SimulationDomain.jl:157\u2013161 `_retained_nyquist_fraction`: 2/3 (TwoThirds) and 2\u221a2/3 \u2248 0.94 (PhaseShift) \u2014 both < 1, so the sharp masks built by `_build_dealias` (lines 259\u2013261, spherical `spectral_cutoff` at `_cutoff_wavenumber`) exclude the Nyquist plane; HouLi alone keeps it but by construction damps it \"to that precision's machine epsilon\" via strength = -log(eps(T)) (SimulationDomain.jl:96\u201399 and 263\u2013270). PhaseShift's docstring additionally records the half-cell-shift Nyquist caveat and why the cutoff makes it moot (SimulationDomain.jl:146\u2013150).",
+     "consequence_if_missing": "Energy aliases onto the unpaired Nyquist mode, which has no conjugate partner to keep the physical field real under generic spectral manipulation, and the 2/3-rule's exactness claim fails at the band edge.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Where dealiasing is enforced: on the state every substep, or on the assembled term only",
+     "reference_practice": "GHOST enforces the band on the STATE inside every RK substep \u2014 the update loop's ELSE branch zeroes vx,vy,vz wherever kn2 > kmax (include/hd_rkstep2.f90:18\u201328) \u2014 so out-of-band content can never persist regardless of its source (a restart file, a hand-written IC, roundoff), because the invariant is re-imposed 3\u00d7 per step.",
+     "our_status": "different-by-design",
+     "our_evidence": "We truncate the ASSEMBLED term (the dealias kernel folded into the projection pass, src/Generator.jl:481\u2013486) and the seed (src/State.jl:140 \"convolve!(\u00fb, \u00fb, convolve(envelope, domain.dealias))\"), never the state: band-limitedness holds by induction \u2014 the IF update \u00fb \u2190 \u2130(\u00fb + b\u00b7hu) (src/Propagator.jl:307\u2013309) is per-mode, so out-of-band modes that start zero stay zero exactly.",
+     "consequence_if_missing": "Nothing in a normal run; but content written out-of-band by an out-of-band writer (a hand edit of `state.velocity_spectral`, a future forcing that skips the band) persists \u2014 decaying only viscously \u2014 and no runtime check enforces the invariant the induction assumes.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Hermitian (conjugate) symmetry of random initial conditions and stochastic forcing",
+     "reference_practice": "GHOST builds random spectral data with explicit conjugate mirroring on the self-conjugate kx=0 plane \u2014 examples/initialfv.f90_random:19\u201324: \"C1(1,j,1) = (COS(phase)+im*SIN(phase))*dump; C1(1,ny-j+2,1) = conjg(C1(1,j,1))\" with \"C1(1,1,1) = 0.\" (line 18) \u2014 and its phaseshift subroutine multiplies half that plane by cdump and the mirror half by conjg(cdump), with the comment that the planes \"must be dealt with care to keep the Fourier transform of 'a' real\" (pseudospec3D_hd.f90:2088\u20132092, 2110\u20132124).",
+     "our_status": "present",
+     "our_evidence": "Present by construction \u2014 the failure is unrepresentable: every random field is drawn in PHYSICAL space and carried to spectral by the r2c transform, which produces exact Hermitian symmetry. Velocity/scalar seeds: src/State.jl:113\u2013114 \"copyto!(field_data(noise), randn(rng, T, \u2026)); to_spectral!(\u00fb, noise, domain.velocity_plans)\"; the OU forcing noise likewise: src/Forcing.jl:747\u2013748 \"randn!(ou.rng, field_data(noise_physical)); to_spectral!(noise_spectral, noise_physical, plans)\". All subsequent spectral operations are per-mode multiplications by real radial symbols or r2c products, which preserve the symmetry exactly \u2014 no code path writes half-planes by hand.",
+     "consequence_if_missing": "A symmetry-broken spectral field has a complex inverse transform; the c2r silently discards the imaginary part, so energy leaks and every quadratic diagnostic is wrong with no error raised.",
+     "severity": "notable"
+    },
+    {
+     "concern": "rfft half-spectrum Parseval weighting (factor 2 vs 1) in energy reductions",
+     "reference_practice": "GHOST weights the folded axis explicitly in every reduction: energy counts the kx=0 plane once and every i \u2265 2 plane twice \u2014 pseudospec3D_hd.f90:556\u2013563: the ista=1 plane accumulates \"(abs(a)**2+\u2026)*tmp\" and the i=2,iend loop \"2*(abs(a)**2+\u2026)*tmp\"; the same 1-vs-2 split runs through spectrumc, hdcheck's divergence sum, and helicity.",
+     "our_status": "present",
+     "our_evidence": "src/Observables.jl:76 \"kinetic_energy(u) = inner(u, u) / 2\" delegates to PF's `inner`, which applies the weighting exactly \u2014 including the case GHOST elides: inspiration/GBGPeriodicFields/src/Reductions.jl:828\u2013832: each mode counts \"twice \u2014 except the folded axis's zero plane and \u2014 when it is even \u2014 its Nyquist plane, which count once (decision 41)\". (GHOST's uniform factor 2 for i \u2265 2 would double-count a populated Nyquist plane; benign there only because its mask keeps that plane empty.)",
+     "consequence_if_missing": "Every energy, dissipation, and variance is wrong by up to a factor ~2 (or subtly wrong at the folded planes) \u2014 silently, since the totals still look plausible.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Energy-spectrum shell binning: the \u03ba=0 shell and the first/last shell edges",
+     "reference_practice": "GHOST bins round-to-nearest with a boundary nudge and drops the mean mode: pseudospec3D_hd.f90:1249\u20131250 \"kmn = int(sqrt(kk2(k,j,1))/Dkk+.501); IF ((kmn.gt.0).and.(kmn.le.nmax/2+1))\" \u2014 shell m collects |\u03ba| within \u00b1\u0394\u03ba/2 of m\u0394\u03ba, \u03ba=0 is excluded by kmn>0, and the shell list caps at nmax/2+1. Output is a density, E(\u03ba)=\u00bdEk/Dkk at abscissa Dkk\u00b7i (lines 1160\u20131163).",
+     "our_status": "different-by-design",
+     "our_evidence": "src/Observables.jl:328 delegates to PF `radial_spectrum`: same round-to-nearest centred shells (PF Reductions.jl: \"shell m collects |k| within \u00b1\u0394\u03ba/2 of m\u0394\u03ba\", ties-to-even documented), but the \u03ba=0 shell is KEPT (shells run from 0) so the sum exactly refines `inner`, and the return is a per-shell ENERGY, not a density \u2014 the distinction is documented against the Phenomenology density convention (src/Observables.jl:346\u2013352: \"the two differ by the shell width \u0394\u03ba = 2\u03c0/L and are not interchangeable\"). The one consumer for which the \u03ba=0 shell would be poison guards it explicitly: `integral_scale` excludes it in both sums and throws on an energy-free field (src/Observables.jl:373\u2013384).",
+     "consequence_if_missing": "A mean-mode contribution silently biases the lowest shell (exactly where the integral-scale ratio weights most), and a first/last-shell edge convention mismatch corrupts comparisons against reference spectra.",
+     "severity": "notable"
+    },
+    {
+     "concern": "CFL and viscous-stability handling",
+     "reference_practice": "GHOST runs a FIXED dt read from parameter.inp (main3D.fpp:459 NAMELIST \"parameter / dt,step,\u2026\", with only a uniform mult refinement at line 865 \"dt = dt/real(mult)\"); its viscous term is explicit inside RK (include/hd_rkstep2.f90:21 \"dt*(nu*vx(k,j,i)+\u2026)\"), so stability is entirely the user's dt choice, and the safeguard is monitoring: include/hd_global.f90 writes max|\u03c9| to maximum.txt every cstep (\"CALL maxabs(vx,vy,vz,rmp,0)\") for the user to judge the Courant number offline.",
+     "our_status": "present",
+     "our_evidence": "Stronger than the reference on both halves. Advective: adaptive \u0394t = min(advective CFL, resolution bound, max_dt) \u2014 src/SimulationRun.jl:514\u2013520 \"advective = speed > 0 ? sim.cfl * \u0394x / speed : \u2026; resolution = 1 / (diffusivity * \u03ba_min^2); return min(advective, resolution, sim.max_dt)\" \u2014 with the per-scheme ceiling scaled by the dealias band (src/Propagator.jl:605\u2013612, `_base_cfl` per scheme, no silent fallback). Viscous: exact by the integrating factor, so no viscous stability limit exists at all (src/Generator.jl:6\u20138). Blow-up monitoring is in-loop, not offline: non-finite velocity AND scalar guards after every step (src/SimulationRun.jl:579\u2013588).",
+     "consequence_if_missing": "A dt chosen once and outgrown by the flow (or a decaying flow's runaway adaptive step) blows the run up or freezes it \u2014 both failure modes are documented and guarded in cfl_timestep's comment block (SimulationRun.jl:483\u2013512).",
+     "severity": "serious"
+    },
+    {
+     "concern": "Always-on conservation/balance ledger (energy, enstrophy, injection; divergence drift)",
+     "reference_practice": "GHOST writes an unconditional running ledger: hdcheck (pseudospec3D_hd.f90:984\u20131105) appends time, \u27e8v\u00b2\u27e9, \u27e8\u03c9\u00b2\u27e9 and the injection rate to balance.txt every cstep (\"OPEN(1,file='balance.txt',position='append')\"), with an optional \u27e8(\u2207\u00b7v)\u00b2\u27e9 divergence check (chk=1) and the scalar twin pscheck \u2192 scalar.txt (pseudospec3D_phd.f90:286\u2013332); the HD solver calls it every cstep from include/hd_global.f90:3.",
+     "our_status": "different-by-design",
+     "our_evidence": "Every ledger ingredient exists as an observable \u2014 `kinetic_energy`, `dissipation`, `scalar_variance`, injection via `flow_parameters` (src/SimulationRun.jl:440\u2013448) \u2014 but nothing records them unless asked: the run layer's contract is \"the callback *is* the observation\" (src/SimulationRun.jl:23), and accumulating statistics is the caller's analysis by the package's own scope statement (CLAUDE.md/module docstrings). Solenoidality is exact by construction (PF's \u2119 \"exactly annihilates the discrete divergence at every mode\", PF DifferentialOperators.jl:197\u2013199), so GHOST's optional divergence monitor has no drift to catch here.",
+     "consequence_if_missing": "A slow budget drift (forcing bug, integrator defect) that a default balance file would expose in one glance goes unnoticed in any run whose caller did not wire a callback for it.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Restart / exact continuation (fields, forcing state, schedule counters)",
+     "reference_practice": "GHOST restarts a run bit-consistently from binary output: main3D.fpp:2145\u20132176 \u2014 \"IF stat.ne.0 a previous run is continued\": fields re-read (io_read of vx,vy,vz then r2c), the forcing schedule counter rebuilt in phase (\"timef = int(modulo(float(ini-1),float(fstep)))\", line 2156), and for the slowly-varying forcing (rand=2) the fxnew/fxold target arrays are themselves written and re-read so the forcing resumes mid-ramp (lines 2175+).",
+     "our_status": "absent",
+     "our_evidence": "Searched src/ for restart|checkpoint|io_write|serialize|save: the only hit is `Particles.restart!` (src/Particles.jl:247), a particle-scheme history reset, not a run continuation. No field I/O, no checkpoint format, no RNG-state capture contract exists (StochasticOU holds its MersenneTwister in-struct, src/Forcing.jl:727; seeding uses Random.default_rng(), src/SimulationRun.jl:292). A caller can Serialization.serialize a whole Simulation, but nothing promises that round-trips exactly (GPU arrays, transform plans).",
+     "consequence_if_missing": "A long production run cannot survive a crash or a queue limit without replaying from t=0, and a stochastic-forcing run cannot be continued reproducibly \u2014 the OU state and its RNG stream are lost with the process.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Parameter / configuration compatibility validation before the run",
+     "reference_practice": "GHOST validates before integrating: main3D.fpp:1719 \"INCLUDE SOLVERCHECK_\" under the comment \"we verify that all parameters and compilation options are compatible with the SOLVER being used\" (per-solver *_validate.f90 files), and IC/forcing files STOP on incompatible geometry \u2014 initialfv.f90:17\u201321: \"IF ( abs(Lx-Ly).gt.tiny ) \u2026 PRINT *,'TG forcing require at least Lx=Ly'; STOP\".",
+     "our_status": "present",
+     "our_evidence": "Constructor-time guards throughout: cfl > 0 and max_dt > 0 with physical explanations (src/SimulationRun.jl:302\u2013306), forcing-parameter checks (src/Forcing.jl:370\u2013377 VarianceRescaling, 563\u2013578 VarianceController, 719\u2013724 StochasticOU), timestep positivity on both adaptive and fixed routes (src/SimulationRun.jl:549\u2013551), and a physics-level compatibility warning the reference has no analogue of \u2014 the scalar under-resolution warning when \u03ba_max\u00b7\u03b7_B falls below the well-resolved floor (src/SimulationRun.jl:360\u2013366: \"will measure a truncated field. Raise \u03ba_max_\u03b7 by \u221aSc\u2026\").",
+     "consequence_if_missing": "A mis-specified run burns its whole budget before the incompatibility surfaces as a blow-up or a silently truncated measurement.",
+     "severity": "minor"
+    }
+   ],
+   "lane": "ghost",
+   "mean_mode": "GHOST handles \u03ba=0 at STATE level, inside every RK substep, with different rules for velocity and scalar. The update loop runs only inside the band gate \u2014 include/hd_rkstep2.f90:18: \"IF ((kn2(k,j,i).le.kmax).and.(kn2(k,j,i).ge.tiny)) THEN\" \u2014 where `tiny = min(1e-5_GP, .1_GP/(real(nmax)**2))` (main3D.fpp:1736, commented \"tiny: minimum truncation for dealiasing\" at line 1725) is a strictly-positive floor that only the \u03ba=0 mode falls below. VELOCITY: every mode outside the gate, the mean included, is hard-zeroed each substep \u2014 hd_rkstep2.f90:26\u201328 \"vx(k,j,i) = 0.0_GP; vy(k,j,i) = 0.0_GP; vz(k,j,i) = 0.0_GP\" \u2014 an unconditional pin of \u27e8u\u27e9 = 0 three times per step, immune to roundoff accumulation and to any forcing with a spurious mean. SCALAR: the mean is CONSERVED, not zeroed \u2014 the passive-scalar solver splits the ELSE into two branches, include/phd_rkstep2.f90:37\u201341: \"ELSE IF (kn2(k,j,i).lt.tiny) THEN \u2026 th(k,j,i) = C20(k,j,i)\" (C20 holds the start-of-substep scalar), freezing \u27e8\u03c6\u27e9 at its initial value while still zeroing the velocity mean in the same branch. Complementarily, the Leray projection never divides at \u03ba=0: nonlhd3 special-cases, per output component, the whole plane where that component's wavenumber vanishes \u2014 pseudospec3D_hd.f90:439 \"g(k,j,1) = -a(k,j,1)\" (no /kk2 term on the kx=0 plane for the x-component; the divided formula at line 448 starts at i=2) \u2014 so the 0/0 is never evaluated rather than being guarded by an epsilon. Random forcings zero the mean explicitly at generation (examples/initialfv.f90_random:18 \"C1(1,1,1) = 0.\")."
+  },
+  {
+   "items": [
+    {
+     "concern": "Conservation of the \u03ba=0 (mean) velocity mode \u2014 the trigger concern",
+     "reference_practice": "hit3d makes the mean mode's RHS identically zero by construction: the divergence-form convective term carries an explicit wavenumber factor on every term \u2014 rhs_velocity.f90:89\u201394 \"t1(1) = - ( akx(i) * wrk(i,j,k,1) + aky(k) * wrk(i,j,k,2) + akz(j) * wrk(i,j,k,3) )\" and \"t1(4) = - nu * ( akx(i)**2 + aky(k)**2 + akz(j)**2 )\" \u2014 so at k=0 (akx=aky=akz=0) both convection and diffusion vanish exactly. The IC zeroes shell 0 (init_velocity.f90:130\u2013142 \"if (n_shell .gt. 0 .and. n_shell .le. kmax) \u2026 else wrk(i:i+1,j,k,4:6) = zip\") and the forcing books only n_shell>0 nodes (m_force.f90:41). The mean is conserved at exactly zero with no damping needed.",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:405\u2013418 (uncommitted working-tree fix, landed during this audit \u2014 the concern WAS absent, confirmed as the trigger): \"# The \u03ba = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY. \u2026 the residual is integrated undamped and, the flow being chaotic, grows at the Lyapunov rate: measured 3% of u\u2032 after 3000 Float32 steps.\" `_zero_mean_mode!(N\u0302)` is wired between nonlinear assembly and forcing source at Generator.jl:480 (velocity) \u2014 our rotational form needs the explicit pin because \u27e8u\u00d7\u03c9\u27e9=0 holds only to roundoff discretely, unlike hit3d's structural i\u00b7k zero.",
+     "consequence_if_missing": "The roundoff residual of \u27e8u\u00d7\u03c9\u27e9 passes the Leray projection unchanged (identity at k=0), meets integrating factor exp(0)=1, and integrates undamped: a spurious uniform mean flow grows at the Lyapunov rate (measured 3% of u\u2032 after 3000 Float32 steps), Galilean-drifting every tracer and inflating u\u2032 and the CFL speed.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Conservation of the \u03ba=0 mean of the passive scalar",
+     "reference_practice": "Structural, as for velocity: every convective term in rhs_scalars.f90:110\u2013116 carries akx/aky/akz factors, zero at k=0. Additionally the physical-space scalar ICs zero the mean coefficient by hand \u2014 init_scalars.f90:350\u2013351: \"! making sure that the mean is ero\" / \"if (iammaster) fields(1,1,1,3+n_scalar) = zip\" (also :323), and the double-delta construction re-zeroes n_shell==0 after its sign() step re-introduces a mean (init_scalars.f90:255).",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:625\u2013633: the conservative form \u2212\u2207\u00b7(u\u03c6) has no \u03ba=0 component (docstring: \"The conservative form conserves the scalar mean exactly: the divergence has no \u03ba=0 component\"), now belt-and-braces pinned by `_zero_mean_mode!(N\u0302)` at Generator.jl:633; the seeder zeroes the mode at IC \u2014 src/State.jl:210\u2013212: \"The envelope vanishes at \u03ba = 0, which IS the mean removal\".",
+     "consequence_if_missing": "A drifting \u27e8\u03c6\u27e9 offsets every scalar moment; with variance-holding forcings normalizing against \u27e8\u03c6\u00b2\u27e9 the mean would silently absorb part of the held budget.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Leray/pressure projection's division at k=0",
+     "reference_practice": "pressure.f90:28\u201329 substitutes a huge benign denominator before dividing: \"if (lapl1.eq.0.d0) lapl1 = 9e20\" / \"if (lapl2.eq.0.d0) lapl2 = 9e20\", so p(k=0) \u2248 0 and the mean velocity passes through the pressure correction unchanged.",
+     "our_status": "present",
+     "our_evidence": "Reached from src/Generator.jl:523\u2013524 (`helmholtz_projection!(out, product_spectral, domain.multipliers, \u2026)`); the guard lives in the PF backend (inspiration clone DifferentialOperators.jl:267\u2013268: `ifelse(iszero(squared), one(squared), squared)`), documented as \"the zero Fourier mode left unchanged\" \u2014 \u2119 is the identity at k=0. Note this identity convention is exactly why item 1 needed the explicit pin in rotational form.",
+     "consequence_if_missing": "0/0 at the first mode NaNs the projected term and poisons the whole field within one step \u2014 immediate, total blow-up.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Nyquist (oddball) mode treatment and where the Nyquist plane sits relative to the dealias mask",
+     "reference_practice": "hit3d's cubical mask purges every mode with any |k_i| > N/3 on every RHS assembly \u2014 ialias built at x_fftw.f90:302\u2013311 (\"ialias is just the number of wavenumbers at (i,j,k) that have their magnitude higher than nx/3\"), applied at rhs_velocity.f90:121\u2013123 (\"wrk(i,j,k,1:3) = zip\") \u2014 and N/2 > N/3, so the unpaired Nyquist plane is always inside the purge and never carries signal; the spectrum loops also stop at i = nx, skipping the kx-Nyquist plane entirely (m_stats.f90:215).",
+     "our_status": "present",
+     "our_evidence": "src/SimulationDomain.jl:265\u2013269: the spherical cutoff `T(_retained_nyquist_fraction(strategy)) * T(N / 2) * T(2\u03c0 / L)` sits strictly below Nyquist for TwoThirds (2/3) and PhaseShift (2\u221a2/3 \u2248 0.94); HouLi keeps Nyquist but damps it to machine epsilon by default (SimulationDomain.jl:85\u201389 and 274\u2013278). The oddball-derivative hazard is handled in the PF backend: the first-derivative wavenumber is zeroed at the Nyquist mode \"so that derivatives of real fields stay real\" while the squared family keeps the true k\u00b2 (PF clone Fields.jl:1433, 1450\u20131451).",
+     "consequence_if_missing": "A live unpaired Nyquist mode makes odd spectral derivatives complex-leak into real fields and accumulates un-dealiased energy at the band edge \u2014 slow contamination or sawtooth instability.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Hermitian symmetry of random initial conditions and stochastic forcing",
+     "reference_practice": "hit3d never touches spectral coefficients directly for random data: Gaussian noise is generated in physical space and pushed through the r2c FFT, so conjugate symmetry holds by construction \u2014 init_velocity.f90:113\u2013119: \"wrk(:,:,:,1:3) = sqrt(-two*log(\u2026)) * sin(TWO_PI*\u2026)\" then \"call xFFT3d(1,n)\"; the spectrum shaping then multiplies modes by real radial factors only, which preserves the symmetry.",
+     "our_status": "present",
+     "our_evidence": "Same mechanism: src/State.jl:112\u2013114 fills a physical field with `randn` and calls `to_spectral!`; src/Forcing.jl:745\u2013750 (StochasticOU) does `randn!(ou.rng, field_data(noise_physical)); to_spectral!(\u2026)` \u2014 docstring at Forcing.jl:680\u2013682: \"generated as a real physical field, transformed, and band-limited \u2014 guaranteeing a valid real field with no Hermitian-symmetry bookkeeping\".",
+     "consequence_if_missing": "A non-Hermitian seed or forcing puts imaginary garbage in physical space; the c2r transform silently discards or aliases it, so the run computes on a field that is not the one the statistics assume.",
+     "severity": "minor"
+    },
+    {
+     "concern": "The initial condition confined to the dealiased band before the first step",
+     "reference_practice": "hit3d truncates the state once at startup \u2014 main.f90:75\u201376: \"! need to dealias the fields at the beginning / if (task.eq.'hydro') call dealias_all\" \u2014 and init_scalars.f90:30\u201336 purges every scalar mode with ialias > 0 right after generation, so no out-of-band content enters the first nonlinear product.",
+     "our_status": "present",
+     "our_evidence": "src/State.jl:140: `convolve!(\u00fb, \u00fb, convolve(envelope, domain.dealias))` \u2014 the dealias truncation is composed into the seeding envelope itself (comment: \"The truncation rides in the envelope rather than as a second sweep\"); scalar twin at State.jl:223 (\"truncation folded in, as for the velocity\").",
+     "consequence_if_missing": "Out-of-band IC content is never fed by the band-limited RHS but decays only viscously, polluting early spectra and the first nonlinear products under HouLi where the mask does not remove it.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Energy-spectrum shell binning: first/last shell conventions and the r2c conjugate-pair weight",
+     "reference_practice": "hit3d bins by n_shell = nint(|k|) over shells 1..kmax only, half-weights the kx=0 plane for the missing conjugates \u2014 m_stats.f90:222: \"if (akx(i).eq.0.d0) fac2 = 0.5d0 * fac2\" \u2014 skips the kx-Nyquist plane (loop to nx), clamps the first shell's inner radius (velocity_rescale.f90:88: \"if (k.eq.1) sc_rad2 = 0.d0\") and doubles the scalar spectrum back (m_stats.f90:419\u2013420: \"multiplying by two because we summed only half\").",
+     "our_status": "different-by-design",
+     "our_evidence": "src/Observables.jl:327\u2013329 delegates to PF's `radial_spectrum` and halves it; the backend bins ALL modes into shells 0..corner with exact per-mode Parseval weights so the shell total equals `inner` exactly (PF clone Reductions.jl:1183: \"Shells run from 0 to the corner wavenumber, so the sum covers *all* modes (an exact `inner` refinement)\"), with a documented ties-to-even boundary convention; the \u03ba=0 shell is excluded where it must be \u2014 src/Observables.jl:379\u2013380: `sum(broadcast((k, e) -> k > 0 ? e : zero(e), \u03ba, E))`.",
+     "consequence_if_missing": "Wrong conjugate weighting or shell edges skews E(\u03ba) at the first shells \u2014 exactly where the integral scale and model-spectrum fits weight most \u2014 and makes \u03a3 E_n \u2260 k, a broken diagnostic invariant.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Forcing normalization over a near-empty band (division by the band's own energy)",
+     "reference_practice": "hit3d itself does NOT guard it: m_force.f90:161 \"fac = FAMP / energy\" divides by the summed band energy with no floor or emptiness test \u2014 an unbounded kick if the band is empty. The guard practice comes from TurTLE (cited in our source): substitute a benign denominator below a machine-epsilon-relative floor.",
+     "our_status": "present",
+     "our_evidence": "src/Forcing.jl:89: `_band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_value))` \u2014 a scale-free positivity test (the comment explains why no constant floor: it would break the scalar equation's exact scaling symmetry); applied at Forcing.jl:385 (VarianceRescaling: \"nothing in the band yet\"), :618 (VarianceController), :643\u2013645 (ConstantPower, with the TurTLE citation \"if (energy_in_shell < 10*eps) energy_in_shell = 1\"), and the OU noise-variance guard at :757.",
+     "consequence_if_missing": "A band emptied by seeding or by a :total rescale receives an unbounded (or NaN) amplitude on the next step \u2014 instant blow-up from the forcing itself, as hit3d's own unguarded division would.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Adaptive-timestep control: per-step Courant measurement, change limiting, and a hard ceiling",
+     "reference_practice": "hit3d measures the Courant number every step from the componentwise speed \u2014 rhs_velocity.f90:31\u201338: \"wrk(:,:,:,4) = abs(wrk(\u2026,1)) + abs(wrk(\u2026,2)) + abs(wrk(\u2026,3))\" \u2026 \"courant = courant * dt / dx\" \u2014 and my_dt.f90:14\u201319 nudges dt multiplicatively with a growth limiter and a hard cap: \"if (courant.lt.courant_max) then DT = DT * 1.01d0; DT = min(DT,0.01) else DT = DT/1.05d0\".",
+     "our_status": "different-by-design",
+     "our_evidence": "src/SimulationRun.jl:480\u2013520: `cfl_timestep` takes the minimum of the advective step (\u0394t = C\u00b7\u0394x/u_max from the cache's deposited max_speed), a derived resolution bound `1/(D\u00b7\u03ba_min\u00b2)` that stops the decaying-flow runaway, and the caller's `max_dt`; the ceiling C itself is derived from the scheme's imaginary-axis stability limit and rescaled by the retained dealias band (src/Propagator.jl:605\u2013611). The choice NOT to use hit3d's limiter is recorded in-code: \"hit3d nudges \u0394t multiplicatively with a 1% growth limiter and a hard min(DT, 0.01) \u2026 this route was taken instead because it needs no constant at all\" (SimulationRun.jl, cfl_timestep comment). The L2 speed is consistent with our spherical mask (|u\u00b7\u03ba| \u2264 |u|\u03ba_max is sharp), where hit3d's L1 speed matches its cubical mask.",
+     "consequence_if_missing": "An unbounded adaptive step diverges as a decaying flow approaches rest (our comment records \u0394t reaching ~1e15, the integrating factor then annihilating every mode), or an unlimited upward jump after a lull overshoots the stability region.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Viscous/diffusive stability, including the Schmidt-number scaling of the scalar's limit",
+     "reference_practice": "hit3d advances diffusion explicitly (AB2), so it must bound dt by the diffusive limit: my_dt.f90:22\u201330 \u2014 \"make sure DT is appropriate for scalars / DT < 0.09 * dx^2*Pe\" and \"DT = min(DT,DT*courant_max/courant/sc(n))\" \u2014 tightening the step for every scalar with Sc > \u2026 plus the hard cap min(DT, 0.01).",
+     "our_status": "different-by-design",
+     "our_evidence": "The diffusive stability limit does not exist for us: viscosity and diffusivity are advanced exactly by the integrating factor \u2014 src/Generator.jl velocity_integrating_factor docstring: \"advances its viscous (and linear-forcing) part exactly \u2014 machine-exact, with no stability restriction\"; the scalar's faster diffusivity still enters the timestep through the resolution bound \u2014 src/SimulationRun.jl:513\u2013515: `diffusivity = \u2026 max(conditions.viscosity, conditions.viscosity / conditions.schmidt)` \u2014 as an accuracy bound, not a stability one.",
+     "consequence_if_missing": "For an explicit-diffusion code, a step above the diffusive limit is a hard blow-up at the highest wavenumbers; for us the exact factor removes the failure mode entirely, which must be (and is) compensated by the accuracy-motivated resolution bound.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Checkpoint/restart of a long run (state + clock + timestep), with a defined post-restart protocol",
+     "reference_practice": "hit3d writes a parallel MPI-IO restart file carrying the spectral fields plus TIME and DT (restart_io.f90:297: \"call MPI_FILE_WRITE(fh, DT, count, MPI_REAL8, \u2026)\"; read back at :379: \"read(91) nx1, ny1, nz1, nums1, nles1, TIME, DT\") and defines a degraded-order restart: the AB2 history is not saved, so the first step is Euler with dt halved \u2014 begin_restart.f90:27\u201338: \"After the restart, the first timestep is done using a simple Euler scheme \u2026 we need to start with the timestep which is smaller than the last\" (dt = half * dt). Its IC RNG is wall-clock seeded (init_velocity.f90:55\u201358), so the guarded invariant is resumability, not bit-reproducibility.",
+     "our_status": "absent",
+     "our_evidence": "Searched src/ for restart, checkpoint, serialize, save/load, HDF5, JLD, MPI/file writes of the state: the only hit is Particles' `restart!` (Particles.jl:247), which resets a trajectory scheme's multistep history \u2014 no checkpoint of the spectral state, clock, forcing state, or RNG stream exists anywhere. Fresh-run reproducibility IS present (State.jl:110 `rng` keyword; Forcing.jl StochasticOU `seed = 0` \"fixes the random stream, so a forced run is reproducible\"), but a crashed or wall-clock-limited run cannot resume.",
+     "consequence_if_missing": "Any interruption loses the entire run \u2014 at production resolutions that is days of GPU time \u2014 and no statistically-converged long run can be split across job allocations; our RK schemes are self-starting, so unlike hit3d only the state, clock, forcing internal state, and RNG position would need saving.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Out-of-band state mutation invalidates dependent history and cached values",
+     "reference_practice": "After the mid-run spectral rescale mutates the fields outside the dynamics, hit3d discards the multistep history that no longer describes the state \u2014 main.f90:116\u2013118: \"call velocity_rescale / ! after rescaling, the time-sceping needs to be first order / fov = .true.; fos = .true.\" \u2014 forcing the next step to Euler rather than combining an AB2 pair across the discontinuity.",
+     "our_status": "present",
+     "our_evidence": "The same invariant, generalized: src/Cache.jl:364 `fields_modified!` advances the fields epoch so every cached observable read throws rather than serving a stale value after an announced mutation; src/Particles.jl:247/505 `restart!` \"discards a scheme's history after an out-of-band reposition\" (`buffers.cache.history_filled = 0` for AdamsBashforth). The field integrators are single-step RK, so they carry no history to poison.",
+     "consequence_if_missing": "A multistep combination or a cached diagnostic straddling the mutation silently mixes two inconsistent states \u2014 first-order-wrong dynamics or wrong reported observables with nothing failing.",
+     "severity": "notable"
+    }
+   ],
+   "lane": "hit3d",
+   "mean_mode": "hit3d never damps the mean mode \u2014 it guarantees the mean's RHS is identically zero, starts it at zero, and excludes shell 0 from every intervention. Four mechanisms: (1) STRUCTURAL RHS ZERO: the divergence-form convective term carries an explicit wavenumber factor on every term \u2014 rhs_velocity.f90:89\u201394: \"t1(1) = - ( akx(i) * wrk(i,j,k,1) + aky(k) * wrk(i,j,k,2) + akz(j) * wrk(i,j,k,3) )\" and \"t1(4) = - nu * ( akx(i)**2 + aky(k)**2 + akz(j)**2 )\" \u2014 at k=0 all of akx, aky, akz vanish, so convection AND diffusion of the mean are exactly zero; identically for the scalar (rhs_scalars.f90:110\u2013116). (2) PRESSURE GUARD: the k=0 division in the pressure solve is defused by a huge denominator \u2014 pressure.f90:28\u201329: \"if (lapl1.eq.0.d0) lapl1 = 9e20\" \u2014 so p(0) \u2248 0 and the mean passes through the projection unchanged. (3) IC AND RESCALE EXCLUDE SHELL 0: init_velocity.f90:130\u2013142 gates on \"if (n_shell .gt. 0 .and. n_shell .le. kmax)\" else \"wrk(i:i+1,j,k,4:6) = zip\"; velocity_rescale.f90:141\u2013146 zeroes every mode outside shells 1..kmax including the mean; physical-space scalar ICs zero the mean coefficient by hand \u2014 init_scalars.f90:350\u2013351: \"! making sure that the mean is ero\" / \"if (iammaster) fields(1,1,1,3+n_scalar) = zip\". (4) FORCING EXCLUDES SHELL 0: only nodes with \"n_shell .gt. 0 .and. n_shell .le. kfmax\" are booked as forced (m_force.f90:41). Net: mean velocity and scalar are conserved at exactly zero for the whole run \u2014 by structure of the divergence form, not by damping. This is precisely the guarantee our rotational form lacked: \u2119(u\u00d7\u03c9) at k=0 is \u27e8u\u00d7\u03c9\u27e9, zero only analytically, and PF's projection is deliberately the identity there \u2014 which is why our fix (landed in the working tree during this audit as Generator.jl's `_zero_mean_mode!`, pinning the advective term's \u03ba=0 mode between assembly and forcing source) is the explicit counterpart of hit3d's structural zero."
+  },
+  {
+   "lane": "fluidsim",
+   "mean_mode": "Fluidsim keeps the k=0 velocity/scalar mode EMPTY BY CONSTRUCTION rather than pinning it per step. (1) Initial conditions zero it explicitly: solvers/ns3d/init_fields.py:129-131 \"if mpi.rank == 0: field_fft[0, 0, 0] = 0.0\" (each scalar-like field of the noise IC) and :173 \"vv_fft[ii][0, 0, 0] = 0.0\" in compute_solenoidal_noise_fft, before the Leray projection and dealiasing. (2) Forcing can never reach it: the forced set is K in [kmin_forcing, kmax_forcing] with default nkmin_forcing=4 (base/forcing/base.py:192 '{\"nkmax_forcing\": 5, \"nkmin_forcing\": 4}'; base/forcing/specific.py:278 \"COND_NO_F = np.logical_or(K > self.kmax_forcing, K < self.kmin_forcing)\"), so k=0 (K=0 < kmin) is always in COND_NO_F and zeroed (specific.py:775 \"f_fft[self.COND_NO_F] = 0.0\"). (3) The projection is the identity there via an epsilon floor, never a 0/0: operators/operators3d.py:292-294 \"K2_not0 = np.copy(self.K2); ... K2_not0[0, 0, 0] = 1e-14\" and the recurring idiom :771-773 \"K_square_nozero[K_square_nozero == 0] = 1e-14\". (4) When hypo-viscosity is on, the k=0 mode is explicitly DAMPED by a special case rather than divided by zero: base/solvers/pseudo_spect.py:176-186 \"f_d_hypo = self.params.nu_m4 / self.oper.K2_not0**2  # mode K2 = 0 !  ... f_d_hypo[0, 0, 0] = f_d_hypo[0, 0, 1]\" \u2014 the mean mode inherits the first mode's damping rate. (5) There is NO per-step zeroing of the k=0 nonlinear tendency: tendencies are projected and dealiased (solver.py:242-244), but neither touches k=0; with the default 2/3 cubic mask no aliases fold onto k=0, so the residual is roundoff-only, and it is left undamped unless nu_m4 is set. An adjacent optional guard exists for the whole kz=0 plane of vz (\"no_vz_kz0\", solver.py:277-284 dealiasing_variable(vz_fft, self.where_kz_0)) and for the shear modes kh=0 (operators3d.py:268-277 NO_SHEAR_MODES folds \"Kx**2 + Ky**2 == 0\" into where_dealiased) \u2014 both anisotropy-motivated, off by default. OUR side: now stronger than the reference \u2014 src/Generator.jl:416-418 `_zero_mean_mode!` pins the assembled advective term's k=0 to exactly zero on every RHS evaluation (velocity at :479, scalar at :632), placed between the nonlinear assembly and the forcing source so a deliberate mean-driving forcing stays expressible; the ICs zero it via the envelope (\"The envelope vanishes at \u03ba = 0, which IS the mean removal\", src/State.jl:121-127 and :210-214); the OU forcing band starts at (lowest_shell\u22120.5)\u00b7k0 \u2265 0.5\u00b7k0 so k=0 is never forced (src/Forcing.jl:266-268).",
+   "items": [
+    {
+     "concern": "Division by |k|\u00b2=0 in the Leray/pressure projection (and any inverse-Laplacian) at the mean mode",
+     "reference_practice": "Fluidsim floors the denominator with an epsilon so the projection is finite and acts as the identity at k=0: operators/operators3d.py:292-294 \"K2_not0 = np.copy(self.K2); if sum(self.seq_indices_first_K) == 0: K2_not0[0, 0, 0] = 1e-14\", and the same idiom wherever 1/K\u00b2 is formed, e.g. :771-773 \"K_square_nozero[K_square_nozero == 0] = 1e-14; inv_K_square_nozero = 1.0 / K_square_nozero\".",
+     "our_status": "present",
+     "our_evidence": "Our src never divides \u2014 the projection is delegated: src/Generator.jl:523-524 \"helmholtz_projection!(out, product_spectral, domain.multipliers, kernel)\". The guard lives in the PF backend (study clone verified: inspiration/GBGPeriodicFields/src/DifferentialOperators.jl:208 \"ifelse(iszero(squared), one(squared), squared)\" \u2014 an exact identity at k=0, cleaner than an epsilon floor); the inverse-Laplacian analog is guarded at :157 \"ifelse.(squared_wavenumber .== zero(T), zero(T), inv.(squared_wavenumber))\".",
+     "consequence_if_missing": "A 0/0 at k=0 makes the projection NaN the mean mode on the first RHS evaluation; the NaN then propagates through every convolution and transform and destroys the whole field within a step.",
+     "severity": "serious"
+    },
+    {
+     "concern": "The \u03ba=0 mean mode of velocity and scalar (RHS, forcing, IC)",
+     "reference_practice": "Kept empty by construction, never restored per step: IC zeroed (init_fields.py:129-131, :173 \"vv_fft[ii][0, 0, 0] = 0.0\"), forcing band excludes it (specific.py:278 with default nkmin_forcing=4, base.py:192), hypo-viscosity special-cases it to a finite damping (pseudo_spect.py:179-186 \"# mode K2 = 0 !\"); no per-step pinning of the k=0 tendency \u2014 roundoff drift is accepted (see mean_mode).",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:416-418 `_zero_mean_mode!` writes the k=0 fiber of the assembled advective term to exactly zero, applied in velocity_rhs! (:479) and scalar_rhs! (:632); rationale comment at :405-415 (\"the residual is integrated undamped and ... grows at the Lyapunov rate: measured 3% of u\u2032 after 3000 Float32 steps\"). ICs: src/State.jl:121-127 envelope \"vanishes at \u03ba = 0, which IS the mean removal\"; forcing band excludes k=0 (src/Forcing.jl:266-268, lower edge (lowest_shell\u22120.5)\u00b7k0).",
+     "consequence_if_missing": "This was the trigger bug: the k=0 mode has no viscous damping (exp(0)=1) and no restoring term, so the roundoff mean of the pseudospectral u\u00d7\u03c9 integrates undamped and a spurious uniform mean flow grows \u2014 sweeping tracers and biasing u\u2032 and the CFL \u2014 silently.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Per-step re-projection and re-dealiasing of the advanced STATE (solenoidality / band-content drift guard)",
+     "reference_practice": "Fluidsim applies the Leray projection and the dealiasing mask to the STATE after every completed time step, not only to the tendencies: solvers/ns3d/time_stepping.py:13-16 \"self._time_step_RK(); self.sim.project_state_spect(state_spect); self.sim.oper.dealiasing(state_spect)\". This annihilates, every step, the divergence and out-of-band residue that roundoff (or a mis-set forcing) puts into the state.",
+     "our_status": "absent",
+     "our_evidence": "Searched Propagator.jl and SimulationRun.jl for helmholtz_projection/truncate_to_band applied to state.velocity_spectral \u2014 none exist; projection and truncation act only inside the tendency assembly (src/Generator.jl:523, :479). The state is advanced by integrating-factor multiplies and stage combinations of projected tendencies only.",
+     "consequence_if_missing": "Divergence residue injected at roundoff each step is damped only by exp(\u2212\u03bd\u03ba\u00b2\u0394t), so its steady level is amplified by ~1/(\u03bd\u03ba\u00b2\u0394t) at the largest scales \u2014 several orders above machine epsilon at low \u03bd, worst in Float32 (the \u03ba=0 extreme of this same series was the trigger bug). Under HouLi, out-of-band content in the state is likewise only damped, never removed. Cheap to guard, silent when it drifts.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Per-step blow-up (NaN) detection in the time loop",
+     "reference_practice": "Every completed step is NaN-checked and the run aborted with the step and time named: solvers/ns3d/time_stepping.py:18-20 \"# np.isnan(np.sum seems to be really fast; if np.isnan(np.sum(state_spect[0])): raise ValueError(f'nan at it = {self.it}, t = {self.t:.4f}')\" (same in base/time_stepping/pseudo_spect.py:257-259).",
+     "our_status": "present",
+     "our_evidence": "src/SimulationRun.jl:579-580 \"isfinite(max_speed(sim.cache)) || error(\\\"non-finite velocity at step ... the run appears to have blown up\\\")\" after the closing deposit, plus the scalar twin at :585-587 (a passive scalar cannot feed back, so it is checked separately), and the comment at :574-578 recording why the guard sits after the deposit on every path including hand-fixed dt.",
+     "consequence_if_missing": "A blown-up run marches on producing NaN fields for hours of GPU time, and downstream statistics silently ingest them.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Advective CFL: norm convention, scheme-dependent coefficient, timestep cap, zero-velocity fallback, dt-change hysteresis",
+     "reference_practice": "Fluidsim bounds dt by the ADDITIVE per-axis bound: base/time_stepping/base.py:364 \"tmp = max_ux / self.sim.oper.deltax + max_uy / self.sim.oper.deltay ...\" (3-D form :331-336), with a scheme-dependent coefficient (:258-260, CFL=0.4 for RK2/Euler, 1.0 for RK4), a hard cap deltat_max default 0.2 (:42) that is also the zero-velocity fallback (:346-350 \"if tmp > 0: deltat_CFL = self.CFL / tmp else: deltat_CFL = self.deltat_max\"), and a 2% hysteresis so the materialized exp(\u2212dt\u00b7f_lin) arrays are not rebuilt needlessly (:353 \"if normalize_diff > 0.02\", pseudo_spect.py:151-156).",
+     "our_status": "different-by-design",
+     "our_evidence": "src/SimulationRun.jl:514 \"advective = speed > 0 ? sim.cfl * \u0394x / speed : sim.cfl * \u0394x\" uses the Euclidean pointwise maximum (src/Observables.jl:177 \"max_speed(u) = maximum(norm, u)\") \u2014 up to \u221a3 less conservative than the additive bound, compensated by conservative per-scheme bases (src/Propagator.jl:605-606, IFRK2 0.25 / RK3 0.5, vs the imaginary-axis-derived 0.83) scaled by the dealias band (:610-611); the cap is the derived resolution bound min(advective, resolution, max_dt) (SimulationRun.jl:520, with the runaway-\u0394t derivation at :481-513 explicitly comparing \"fluidsim caps at a deltat_max parameter (default 0.2)\"); no hysteresis needed since the integrating factor is evaluated lazily per mode, never materialized.",
+     "consequence_if_missing": "An unconservative CFL norm with an aggressive coefficient destabilizes the advective term; an uncapped dt runs away on a decaying flow (measured in our code reaching ~1e15 before the resolution bound was added).",
+     "severity": "minor"
+    },
+    {
+     "concern": "Hermitian (conjugate) symmetry of stochastically generated forcing fields",
+     "reference_practice": "The random spectral forcing is explicitly projected onto the space of real fields after generation: base/forcing/specific.py:774-776 \"f_fft = self.oper_coarse.create_arrayK_random(...); f_fft[self.COND_NO_F] = 0.0; f_fft = self.oper_coarse.project_fft_on_realX(f_fft)\" \u2014 in 3-D an fft(ifft(f)) roundtrip (operators/operators3d.py:1051-1052), in 2-D an explicit conjugate symmetrization of the kx=0 and Nyquist columns (operators2d.py:223-260).",
+     "our_status": "present",
+     "our_evidence": "Our OU increment is drawn in PHYSICAL representation and forward-transformed, so Hermitian symmetry holds by construction: src/Forcing.jl:747-749 \"randn!(ou.rng, field_data(noise_physical)); to_spectral!(noise_spectral, noise_physical, plans); convolve!(noise_spectral, noise_spectral, ou.band)\"; the docstring records the intent at :680-682 (\"generated as a real physical field, transformed, and band-limited \u2014 guaranteeing a valid real field with no Hermitian-symmetry bookkeeping\").",
+     "consequence_if_missing": "A non-Hermitian force drives conjugate-asymmetric content; with an r2c layout the unstored half is implied conjugate, so the force actually applied differs from the one drawn \u2014 wrong injected power and spurious phase correlations, silently.",
+     "severity": "serious"
+    },
+    {
+     "concern": "The forced-mode set excludes the Nyquist planes, and the forcing configuration is validated against the resolution",
+     "reference_practice": "Fluidsim hard-excludes the unpaired Nyquist planes and the last rfft index from the forceable set \u2014 base/forcing/specific.py:284-288 \"COND_NO_F[nkzc // 2, :, :] = True; COND_NO_F[:, nkyc // 2, :] = True; COND_NO_F[:, :, nkxc - 1] = True\" \u2014 and refuses a forcing band the grid cannot host: :200-206 \"raise NotImplementedError('The resolution is too small for the required forcing: ...')\".",
+     "our_status": "partial",
+     "our_evidence": "The default band (shells 1\u20132) sits far below both Nyquist and the dealias cutoff by construction: src/Forcing.jl:266-268 `_shell_band` builds an annulus (lowest\u22120.5)\u00b7k0 to (highest+0.5)\u00b7k0. But there is NO validation of a user-set `highest_shell` against the dealias cutoff or Nyquist \u2014 searched Forcing.jl for any shell-bound check (only variance/correlation_time/target/gain are checked, e.g. :718-724); none exists.",
+     "consequence_if_missing": "A band set above the dealias cutoff injects modes the truncation never removes (the mask is applied to tendencies inside the assembly, before the forcing source is added, and the state is never re-truncated \u2014 see the state-re-dealiasing item), so out-of-band energy accumulates and re-enters the quadratic product where the 2/3 mask no longer cancels its aliases: silently corrupted physics on a plausible misconfiguration.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Forcing normalization against a near-empty or empty band (division by ~0 band energy)",
+     "reference_practice": "Fluidsim fails construction when the band holds no modes: base/forcing/specific.py:212-216 \"self.nb_forced_modes = COND_NO_F.size \u2212 sum(...); if not self.nb_forced_modes: raise ValueError('0 modes forced.')\"; the quadratic normalization also returns 0.0 when np.roots fails (:715-717).",
+     "our_status": "present",
+     "our_evidence": "src/Forcing.jl:89 \"_band_is_empty(band_value) = !(isfinite(band_value) && band_value > zero(band_value))\", applied before every amplitude division: :642-645 `_injection_amplitude` returns 0.0 on an empty band (comment cites TurTLE's \"if (energy_in_shell < 10*eps) energy_in_shell = 1\" analog), :618 and :620-621 the same for VarianceController/VarianceRescaling (\"an empty band is left alone, not driven infinitely hard\", :476-481).",
+     "consequence_if_missing": "The amplitude A = P/(2E_band) diverges as the band empties \u2014 an unbounded kick that blows the run up from a state that merely started with nothing in the forced shells.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Injection-rate normalization accounts for the discrete-step self-injection of a step-frozen force",
+     "reference_practice": "Fluidsim solves a quadratic for the forcing amplitude R so the injection over the step, INCLUDING the O(\u0394t) self-term |f|\u00b2\u0394t/2, equals the requested rate: base/forcing/specific.py:687-692 \"a = deltat / 2 * oper_c.sum_wavenumbers(abs(fvc_fft) ** 2); b = oper_c.sum_wavenumbers((vc_fft.conj() * fvc_fft).real); c = -self.forcing_rate\" (derivation in the docstring :602-670); plus a printed check verify_injection_rate (:305-320).",
+     "our_status": "different-by-design",
+     "our_evidence": "Our amplitude is re-evaluated AT EACH RK STAGE from the stage field, so the injection integrates at the scheme's order instead of being corrected for a step-frozen force: src/Forcing.jl:648-660 add_forcing_source! computes \"band_observable ... # at the STAGE state\" and :631-638 records the measured proof (\"uses_steady_linear_rate(::ConstantPower) = false\" \u2014 folding it into the integrating factor \"collapses the whole iteration to first order however good the scheme is. Measured ...: IFLowStorageRK3 gave 1.02 ... against 2.995 unforced\").",
+     "consequence_if_missing": "A first-order normalization under a frozen force makes the realized injection rate differ from the nominal one by O(\u0394t), biasing the stationary energy level and every \u03b5-normalized diagnostic.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Exact-restart reproducibility: RNG seeds and forcing state persisted with the run",
+     "reference_practice": "The time-correlated random forcing stores its two seeds and the last-change time in the simulation's persisted state and reloads them on restart, so the force history continues bit-exactly: base/forcing/specific.py:846-853 \"self._seed0 = np.random.randint(0, 2**31); ... np.random.seed(self._seed0); self.forcing0 = self.compute_forcingc_raw()\" with _update_sim_state at :888-892 \"p_forcing.seed0 = self._seed0 ...\" (plus legacy _forcing_state.txt loading, :820-845); the noise IC uses a fixed seed per rank (init_fields.py:153, :164 \"np.random.seed(seed + mpi.rank)\" with seed=42, comment \"to compute always the same field\").",
+     "our_status": "partial",
+     "our_evidence": "Seeds are fixable \u2014 src/Forcing.jl:726 \"MersenneTwister(seed)\" (default seed = 0, docstring: \"fixes the random stream, so a forced run is reproducible\") and the IC takes an `rng` keyword (src/State.jl:109) \u2014 but the package has no checkpoint/save/load of the state, clock, OU force field, or RNG stream at all: searched src/ for HDF5/JLD2/Serialization/open/checkpoint \u2014 the only `restart!` is the particle-scheme history reset (src/Particles.jl:247). A run is reproducible from t=0 only.",
+     "consequence_if_missing": "A multi-day forced GPU run that crashes cannot be resumed; restarting from a saved field re-randomizes the force history, so the continued run is a different realization and long-window statistics cannot be stitched.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Initial-condition hygiene: the seeded state is projected and dealiased before the first step",
+     "reference_practice": "Every ns3d IC path routes through init_state_from_fieldsfft, which Leray-projects the freshly built state (solvers/ns3d/init_fields.py:23-27 \"self.sim.state.init_statespect_from(**fields); self.sim.project_state_spect(...)\"), and the solenoidal noise builder projects AND dealiases before spectrum shaping (:176-183 \"oper.project_perpk3d(*vv_fft); oper.dealiasing(*vv_fft)\").",
+     "our_status": "present",
+     "our_evidence": "src/State.jl:140-141 \"convolve!(\u00fb, \u00fb, convolve(envelope, domain.dealias)); helmholtz_projection!(\u00fb, \u00fb, domain.multipliers)\" \u2014 the dealias kernel is composed into the envelope pass and the projection follows; the scalar twin dealiases at :219 (mean-zero by the envelope, no projection needed for a scalar).",
+     "consequence_if_missing": "An unprojected IC starts with O(1) divergence the dynamics never fully removes between projected-tendency updates; an undealiased IC carries content beyond the cutoff into the first quadratic product, where the mask assumptions fail and aliases fold back as spurious energy.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Nyquist / oddball wavenumber treatment (the unpaired mode of even-N real FFTs) in masks and derivative operators",
+     "reference_practice": "Fluidsim removes Nyquist from the dynamics via the mask \u2014 default coef_dealiasing 2/3 (operators3d.py:158) and the spherical option \"self.K2 >= kmax**2\" (operators/base.py:79-82) both exclude it \u2014 and explicitly bars it from forcing on the coarse (UNdealiased, coef 1.0, specific.py:241) operator: specific.py:284-288 zeroes the ky/kz Nyquist planes and the last kx index of the forceable set.",
+     "our_status": "present",
+     "our_evidence": "The two sharp strategies truncate at f\u00b7\u03ba_Ny with f = 2/3 or 2\u221a2/3 < 1 (src/SimulationDomain.jl:265-269 `_cutoff_wavenumber`/`spectral_cutoff`), so Nyquist never survives a step; HouLi keeps it but damps to machine epsilon by construction (:275 \"strength = T(isnothing(strategy.strength) ? -log(eps(T)) : ...)\", docstring: Nyquist multiplied by e^-strength = eps). The unpaired-mode arithmetic itself is the PF backend's contract (clone verified: Fields.jl:1450-1451 zeroes the derivative-family wavenumber at Nyquist so derivatives of real fields stay real, while the squared family keeps true k\u00b2 for the Laplacian; Parseval weights 1 on the folded axis's zero and Nyquist planes, 2 elsewhere \u2014 Reductions.jl radial_spectrum docstring).",
+     "consequence_if_missing": "An unhandled Nyquist mode makes spectral derivatives of real fields complex (an imaginary residue that r2c transforms silently fold into the field), double- or half-counts energy in reductions, and cannot be consistently phase-shifted or forced.",
+     "severity": "notable"
+    }
+   ]
+  },
+  {
+   "items": [
+    {
+     "concern": "The \u03ba=0 velocity mode (mean momentum) must be pinned \u2014 it has no viscous damping and no restoring term",
+     "reference_practice": "Rogallo 1981 (NASA TM-81315) formulates homogeneous turbulence in the zero-mean-velocity frame and seeds \u00fb(0)=0; Canuto, Hussaini, Quarteroni & Zang, Spectral Methods \u2014 Evolution to Complex Geometries (2007), \u00a73.3 Fourier\u2013Galerkin NSE: the k=0 momentum/pressure mode is set aside (the mean flow is a free Galilean parameter, conventionally zero); Pope 2000 \u00a79.1 (DNS in the zero-mean frame). Universal code practice: hard-zero \u00fb(0) every step, because the analytic identity \u27e8u\u00d7\u03c9\u27e9=0 (Lamb vector = gradient + divergence on a periodic box) holds discretely only to roundoff.",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:405\u2013418 and 480 \u2014 landed mid-audit as the fix for this very finding: \"The \u03ba = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY \u2026 the residual is integrated undamped and, the flow being chaotic, grows at the Lyapunov rate: measured 3% of u\u2032 after 3000 Float32 steps. Every reference DNS pins this mode.\"; velocity_rhs! now calls `_zero_mean_mode!(N\u0302);` (line 480) between the nonlinear assembly and the forcing source, so a forcing that deliberately drives a mean stays expressible.",
+     "consequence_if_missing": "The roundoff residual of the discrete \u27e8u\u00d7\u03c9\u27e9 is integrated with exp(0)=1 each step and grows chaotically: a spurious uniform sweep of the whole box (measured 3% of u\u2032 after 3000 Float32 steps) that inflates u\u2032 and the CFL speed, advects every tracer, and biases every Galilean-noninvariant statistic \u2014 silently, since nothing goes NaN.",
+     "severity": "serious"
+    },
+    {
+     "concern": "The \u03ba=0 scalar mode (scalar mean) must be conserved by the advection term",
+     "reference_practice": "Standard result (Canuto et al. 2007, conservation forms of the advection term; Pope 2000 \u00a712.4 mean-scalar conservation): the conservative form \u2207\u00b7(u\u03c6) has identically zero spatial mean on a periodic box \u2014 its spectral image is i\u03ba\u00b7(u\u03c6)^, which vanishes at \u03ba=0 \u2014 so a divergence-form pseudospectral scalar conserves \u27e8\u03c6\u27e9 exactly; codes seed \u27e8\u03c6\u27e9=0 and keep it.",
+     "our_status": "present",
+     "our_evidence": "src/Generator.jl:590\u2013592 (scalar_rhs! docstring): \"The conservative form conserves the scalar mean exactly: the divergence has no \u03ba=0 component, and the dealias kernel \u2026 leaves that mode untouched\"; the roundoff residue is now also pinned \u2014 `_zero_mean_mode!(N\u0302);` at Generator.jl:633. The diffusive integrating factor is exp(\u2212\u03f0\u00b70\u00b7\u03c4)=1 there (Generator.jl:547\u2013556), and the seeder zeroes the mean (State.jl:210\u2013212: \"killing that mode leaves \u27e8\u03c6\u27e9 = 0\").",
+     "consequence_if_missing": "\u27e8\u03c6\u27e9 drifts; a nonzero mean leaks into scalar_variance (computed as \u27e8\u03c6,\u03c6\u27e9 assuming mean-zero, Observables.jl:210) and into every mixing diagnostic \u2014 wrong diagnostics with no symptom.",
+     "severity": "notable"
+    },
+    {
+     "concern": "The Leray/pressure projection's division by |\u03ba|\u00b2 at \u03ba=0",
+     "reference_practice": "Canuto et al. 2007 \u00a73.3: the pressure Poisson solve |k|\u00b2p\u0302 = ik\u00b7N\u0302 is singular at k=0 (compatibility condition); every spectral code special-cases the k=0 mode of the projector \u2119 = I \u2212 \u03ba\u03ba\u1d40/|\u03ba|\u00b2 \u2014 skipped in the mode loop or the denominator substituted \u2014 since evaluating it naively is 0/0.",
+     "our_status": "present",
+     "our_evidence": "Our call sites src/Generator.jl:524\u2013525 (`helmholtz_projection!(out, product_spectral, domain.multipliers[, kernel])`); the mechanism is in the PF backend (verified in the study clone, inspiration/GBGPeriodicFields/src/DifferentialOperators.jl:207\u2013208): `longitudinal = (\u2026)/ifelse(iszero(squared), one(squared), squared)` \u2014 at \u03ba=0 the denominator becomes 1 and longitudinal 0, so \u2119 acts as the identity there, never NaN. The identity-passthrough (\u2119 keeps constants, which is mathematically correct) is completed by the RHS mean-mode pinning of Generator.jl:480.",
+     "consequence_if_missing": "0/0 at the very first projection puts NaN in mode 0; the next inverse transform spreads it to every grid point \u2014 instant, total blow-up on step 1.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Nyquist (oddball) treatment of the first-derivative multiplier on an even-N real FFT",
+     "reference_practice": "Canuto et al. 2007 \u00a72.1.2 and Trefethen, Spectral Methods in MATLAB, ch. 3: the unpaired Nyquist mode of an even-length real transform has no consistent sign for an odd-order derivative, so the first-derivative wavenumber is set to zero there (derivatives of real fields stay real), while even-order operators (the Laplacian) keep the true k\u00b2.",
+     "our_status": "present",
+     "our_evidence": "We build the multipliers at src/SimulationDomain.jl:245 (`multipliers = FieldSpectralMultipliers(velocity_spectral)`); the backend carries exactly the textbook split (PF clone, inspiration/GBGPeriodicFields/src/Fields.jl:1433: \"On even-length axes the derivative wavenumber is zeroed at the Nyquist mode (so derivatives of real fields stay real) while the squared wavenumber keeps the true k\u00b2 (correct Laplacian) \u2014 the deliberate Nyquist split\"; the zero write at Fields.jl:1450\u20131451). The projection denominator squares the derivative family, making \u2119 exactly idempotent on Nyquist planes too (DifferentialOperators.jl:197\u2013200).",
+     "consequence_if_missing": "Curl, divergence and gradient of real fields acquire spurious imaginary/asymmetric Nyquist content \u2014 under HouLi (which retains the Nyquist band) the vorticity, dissipation and the whole rotational-form RHS would be polluted at the grid scale.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Dealiasing-mask geometry: is the Nyquist plane inside or outside the retained band",
+     "reference_practice": "Orszag 1971 (J. Atmos. Sci. 28, 1074): sharp 2/3 truncation, Nyquist modes zeroed; Rogallo 1981: phase-shift with spherical truncation at \u221a2N/3, also strictly below Nyquist; Hou & Li 2007: retain to Nyquist but damp it to machine precision with a high-order exponential filter.",
+     "our_status": "present",
+     "our_evidence": "src/SimulationDomain.jl:144\u2013147: retained fractions 2/3 (TwoThirds), 1 (HouLi), 2\u221a2/3 (PhaseShift); lines 265\u2013269 build the spherical cutoff kernel from one shared expression \u2014 both sharp strategies keep \u03ba \u2264 f\u00b7\u03ba_Ny < \u03ba_Ny, so the Nyquist plane is outside and zeroed. HouLi's default strength is \u2212log(eps(T)) \"so the Nyquist mode always damps to that precision's machine epsilon\" (lines 84\u201389, 275). PhaseShift's docstring guards the corner case explicitly (lines 135\u2013139: a half-cell shift cannot translate Nyquist; the spherical cutoff leaves no Nyquist content to mistranslate). The cutoff is computed in ONE element type so a Float32 grid's built band cannot disagree with the advertised \u03ba_max (lines 259\u2013266).",
+     "consequence_if_missing": "Aliased energy at and near the Nyquist plane accumulates uncontrolled \u2014 the classic pile-up at the spectrum tail, then blow-up; or a Float32 band silently wider than the \u03ba_max\u00b7\u03b7 criterion the run is judged by.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Hermitian (conjugate) symmetry of the random initial condition and of the stochastic forcing",
+     "reference_practice": "Rogallo 1981, appendix: random-phase initial fields must be constructed with explicit conjugate symmetry \u00fb(\u2212k)=\u00fb*(k) or the physical field is not real \u2014 a classic pitfall; the same applies to the Eswaran & Pope 1988 stochastic forcing's complex mode processes.",
+     "our_status": "present",
+     "our_evidence": "Present by construction \u2014 both noise sources are drawn in physical space and transformed, which makes the symmetry exact with no bookkeeping: src/State.jl:112\u2013114 (`noise = new_vector_field_physical(domain); copyto!(field_data(noise), randn(\u2026)); to_spectral!(\u00fb, noise, \u2026)`, same for the scalar at 203\u2013205), and src/Forcing.jl:747\u2013748 (`randn!(ou.rng, field_data(noise_physical)); to_spectral!(\u2026)`) with the docstring stating the intent at Forcing.jl:680\u2013682: \"generated as a real physical field, transformed, and band-limited \u2014 guaranteeing a valid real field with no Hermitian-symmetry bookkeeping\".",
+     "consequence_if_missing": "A non-Hermitian spectrum means the nominal physical field is complex; an r2c inverse silently takes the Hermitian part, giving a field whose spectrum is not the one prescribed \u2014 wrong initial statistics and forcing statistics with no error raised.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Conjugate-symmetry (reality) drift of the evolving state over long runs",
+     "reference_practice": "Codes that store the full complex cube re-enforce symmetry periodically or zero the oddball each step (GHOST and hit3d carry such special cases; the concern is noted in Canuto et al.'s treatment of real transforms). With half-spectrum (r2c) storage the constraint survives only inside the kx=0 and kx=Nyquist planes and must not be broken by any per-mode operation.",
+     "our_status": "different-by-design",
+     "our_evidence": "The state lives only in spectral representation (src/State.jl:58\u201361) and is advanced exclusively by (a) real radial symbols via `exponential_convolve!` (Propagator.jl:130\u2013146), (b) linear combinations with real coefficients, and (c) RHS terms produced by `to_spectral!` of real physical-space products (Generator.jl:521\u2013523, 675\u2013678); the PhaseShift translation symbol e^{i\u03ba\u00b7\u03b4} is conjugate-symmetric. No operation can break the planes' internal symmetry beyond roundoff, and every nonlinear assembly passes through real physical space, so there is no re-symmetrization pass and none is needed.",
+     "consequence_if_missing": "In a full-complex code, symmetry drift makes the field effectively complex and diagnostics quietly wrong; here the storage layout plus symbol discipline closes the channel structurally.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Advective CFL ceiling derived from the scheme's imaginary-axis stability limit and the retained band",
+     "reference_practice": "Pope 2000 \u00a79.2 (Courant number \u2272 0.5\u20131 for pseudospectral DNS); the standard estimate \u0394t\u00b7\u03ba_max\u00b7u_max \u2264 y_s with y_s the scheme's imaginary-axis limit (\u221a3 for the Williamson RK3 family) \u2014 Canuto et al. 2007, stability of RK time discretizations; codes scale the ceiling by the dealiasing cutoff since \u03ba_max sets the largest advective eigenvalue.",
+     "our_status": "present",
+     "our_evidence": "src/Propagator.jl:598\u2013608: `_base_cfl(::IFLowStorageRK3) = 0.5` (derived from y_s = \u221a3, taken conservatively; docstring lines 560\u2013585 derive it), `_base_cfl(::IFRK2) = 0.25` (documented as empirical since IFRK2 is imaginary-axis unstable), and `recommended_cfl(scheme, domain) = _base_cfl(scheme) * (2//3) / _retained_nyquist_fraction(domain.dealiasing)` \u2014 the ceiling shrinks automatically for HouLi/PhaseShift's wider bands. Adaptive \u0394t = C\u00b7\u0394x/u_max at src/SimulationRun.jl:516 from the cached max_speed; no `::AbstractIntegrator` fallback, so a new scheme must declare its limit (comment at 592\u2013597).",
+     "consequence_if_missing": "An advectively unstable step: energy piles at the truncation wavenumber and the run blows up, or \u2014 with a fallback constant \u2014 a new scheme is silently handed too large a step.",
+     "severity": "serious"
+    },
+    {
+     "concern": "Viscous/diffusive stability limit, and the timestep runaway of a decaying flow",
+     "reference_practice": "Rogallo 1981 removes the viscous limit exactly with the integrating-factor transformation exp(\u03bdk\u00b2t) \u2014 the standard IF/ETD treatment (Canuto et al. 2007 on integrating factors); for the dt runaway as u_max\u21920, reference codes use ad-hoc caps: hit3d limits dt growth to 1% per step with a hard min(DT, 0.01), Fluidsim caps at deltat_max.",
+     "our_status": "present",
+     "our_evidence": "The diffusive part is advanced machine-exactly per mode \u2014 src/Generator.jl:539\u2013545: E(\u03ba) = exp((A(\u03ba) \u2212 \u03bd|\u03ba|\u00b2)\u03c4), \"machine-exact, with no stability restriction\" \u2014 so no viscous dt bound exists to enforce. The runaway is bounded by a constant-free resolution bound: src/SimulationRun.jl:493\u2013519, `resolution = 1 / (diffusivity * \u03ba_min^2)` with the comment deriving it (a step longer than 1/(D\u00b7\u03ba_min\u00b2) e-folds the slowest mode in one step) and explicitly comparing hit3d's and fluidsim's caps; plus the caller's `max_dt` ceiling.",
+     "consequence_if_missing": "Either a viscous instability (in an explicit-diffusion code) or, in decay, \u0394t \u2192 ~1e15 (measured, per the comment) where the integrating factor annihilates every mode and the clock advances meaninglessly.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Blow-up (non-finite field) detection every iteration, for the scalar as well as the velocity",
+     "reference_practice": "Not a textbook theorem but universal reference-code practice (hit3d and TurTLE both abort on non-finite diagnostics/courant checks): detect NaN/Inf promptly so a diverged run fails loudly instead of marching garbage.",
+     "our_status": "present",
+     "our_evidence": "src/SimulationRun.jl:579\u2013587: after the closing deposit, `isfinite(max_speed(sim.cache)) || error(\"non-finite velocity at step \u2026\")` and \u2014 because a passive scalar cannot feed back into the guarded velocity \u2014 a separate `isfinite(scalar_variance(...)) || error(\"non-finite scalar \u2026\")`, with the comment naming exactly that one-way-coupling hole; the adaptive path also guards in cfl_timestep (line 486).",
+     "consequence_if_missing": "A blown-up run keeps stepping (NaN velocities still give finite-looking control flow), wasting the whole allocation and, worse, a NaN scalar under a finite velocity reports success on a ruined field.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Forcing-amplitude normalization when the forced band is empty or near-empty",
+     "reference_practice": "Band forcings normalize by the band's own energy (Eswaran & Pope 1988 lineage), so the division needs a floor: TurTLE guards it with `if (energy_in_shell < 10*eps) energy_in_shell = 1` \u2014 an epsilon-relative substitute denominator.",
+     "our_status": "present",
+     "our_evidence": "src/Forcing.jl:641\u2013646: `_injection_amplitude` returns amplitude 0 on an empty band, with the comment quoting TurTLE's guard verbatim; the emptiness test `_band_is_empty` (Forcing.jl:88\u201397) is deliberately scale-free (positivity + finiteness, no absolute floor \u2014 the comment explains a constant floor breaks the scalar's exact scaling symmetry, especially in Float32); VarianceRescaling returns the field untouched on an empty band (line 385) and its docstring documents the `:total` band-zeroing extreme; VarianceController zeroes its amplitude the same way (line 620).",
+     "consequence_if_missing": "Division by ~0 hands the band an unbounded kick \u2014 immediate blow-up from an innocent configuration (a scalar seeded outside the forced shells, or the step after a :total rescale zeroed the band).",
+     "severity": "serious"
+    },
+    {
+     "concern": "Forcing bands structurally exclude the \u03ba=0 mode",
+     "reference_practice": "Eswaran & Pope 1988 (and all band-forcing descendants) force shells 0 < |k| \u2264 K_F; reference implementations start their shell loops at 1, so the mean mode is unreachable by construction.",
+     "our_status": "partial",
+     "our_evidence": "src/Forcing.jl:266\u2013270: `_shell_band(domain, lowest, highest)` builds the band [(lowest\u22120.5)\u00b7k0, (highest+0.5)\u00b7k0], so the default `lowest_shell = 1` excludes \u03ba=0 (lower edge 0.5\u00b7k0) \u2014 but `lowest_shell = 0` is accepted by every constructor with no guard, which puts \u03ba=0 inside the band; and the additive-source hook runs after the mean-mode zeroing by deliberate design (Generator.jl:411\u2013414: \"a forcing that deliberately drives a mean remains expressible and honest\"). For `Linear`, a shell-0 band folds a positive rate on the mean mode into the integrating factor (Forcing.jl:478\u2013482) \u2014 exponential growth of \u00fb(0) with nothing damping it.",
+     "consequence_if_missing": "A one-character misconfiguration (lowest_shell = 0) silently drives a uniform mean flow \u2014 for Linear, exponentially \u2014 reproducing exactly the pathology the mean-mode pinning was landed to remove, through a channel the pinning deliberately does not cover.",
+     "severity": "minor"
+    },
+    {
+     "concern": "Energy-spectrum shell-binning conventions at the first and last shell",
+     "reference_practice": "The standard convention (Kaneda\u2013Ishihara-style DNS reporting; Pope 2000 \u00a76.5 distinguishes the continuous density E(\u03ba) from discrete shell sums): shells of width 2\u03c0/L centered on integer multiples, shell m collecting |\u03ba| \u2208 [m\u2212\u00bd, m+\u00bd); shell 0 holds only the mean mode; completeness \u2014 the shell sums must reproduce the total energy; the mean shell is excluded from scale integrals.",
+     "our_status": "present",
+     "our_evidence": "The binning is PF's (clone, inspiration/GBGPeriodicFields/src/Reductions.jl:1092\u20131093: \"shells run 0\u2026corner at the box-fundamental width, so \u2211 over shells = the spectral inner exactly\"; shell = round(|k|/fundamental) at 1076). Our layer documents the convention and its trap explicitly \u2014 src/Observables.jl:320\u2013325: per-shell energy E_n with k = \u03a3E_n, \"differ by the shell width \u0394\u03ba = 2\u03c0/L and are not interchangeable\" from a density; `integral_scale` excludes the \u03ba=0 shell in both sums with a comment on why (Observables.jl:374\u2013380) and throws on a zero-energy spectrum rather than returning NaN (383\u2013387). All retained shells are complete spheres since every cutoff \u2264 \u03ba_Ny stays inside the cube for \u03ba \u2264 (2/3)\u03ba_Ny and PhaseShift's 2\u221a2/3\u00b7\u03ba_Ny ball still fits the corner (\u221a2\u00b7N/3 < \u221a3\u00b7N/2).",
+     "consequence_if_missing": "Mean-mode energy contaminates the low shells and the L11 integral (which weights them most); a shell/density confusion mis-scales every comparison against a model spectrum by \u0394\u03ba.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Checkpoint / bit-exact restart, including RNG state",
+     "reference_practice": "Universal production-DNS practice since the Rogallo era: periodic restart files carrying the full spectral state, the clock, and the forcing's stochastic state so a run resumes bit-exactly (TurTLE checkpoints fields + particle state to HDF5; hit3d writes restart dumps).",
+     "our_status": "absent",
+     "our_evidence": "Searched src/*.jl for checkpoint|serialize|save|resume|restart|JLD|HDF5: the only hits are Particles.restart! (a history discard after reseeding, Particles.jl:230\u2013247) and the reproducibility seeds \u2014 `rng` keywords threaded through seeding (SimulationRun.jl:281, State.jl:110) and StochasticOU's `seed = 0` MersenneTwister (Forcing.jl:697\u2013698, \"so a forced run is reproducible\"). Seeded reproducibility of a fresh run is present; persisting and resuming a running case (state + clock + OU state + RNG position + cache epochs) has no code path and no documentation.",
+     "consequence_if_missing": "A crash or wall-clock limit loses the whole spin-up; a stochastically forced run cannot be continued reproducibly; long-run studies (the package's stated purpose includes accumulating Lagrangian statistics over long horizons) must re-warm from scratch. Possibly caller-side by design (the package leaves analysis/I-O to the caller), but nothing records that decision or tests that Julia-level serialization round-trips a live Simulation.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Multistep (Adams\u2013Bashforth) coefficients under an adaptive, non-uniform timestep",
+     "reference_practice": "Hairer, N\u00f8rsett & Wanner, Solving ODEs I, \u00a7III.5: variable-step multistep methods must recompute their coefficients from the actual step history; classical fixed-step AB weights applied to varying steps silently lose order. (TurTLE sidesteps it by running AB4 at fixed dt.)",
+     "our_status": "present",
+     "our_evidence": "src/Particles.jl:303\u2013305 (AdamsBashforth docstring): \"The steps are **not** assumed uniform: the advective-CFL loop changes \u0394t every iteration, which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each step from the actual step history.\" The weight quadrature's exactness bound is enforced as an order \u2264 8 cap rather than documented (Particles.jl:346\u2013353), and a cache too shallow for the order is a construction error (Particles.jl:392\u2013397).",
+     "consequence_if_missing": "Silently wrong tracer trajectories at reduced order under the default adaptive-CFL loop \u2014 no symptom, since every position stays plausible.",
+     "severity": "notable"
+    },
+    {
+     "concern": "Initial condition: divergence-free, dealiased, mean-zero, with a realizable target spectrum",
+     "reference_practice": "Rogallo 1981 \u00a73: random initial fields are constructed divergence-free (via the projection tensor), band-limited to the resolved/dealiased band, with \u00fb(0)=0 and a prescribed radial spectrum; the amplitude is then normalized to the target energy.",
+     "our_status": "present",
+     "our_evidence": "src/State.jl: the envelope vanishes at \u03ba=0 \u2014 \"which IS the mean removal \u2026 Without the guard the Gaussian is exp(0) = 1 there and the seed carries a uniform mean flow \u2014 measured at 13.5% of the seeded energy\" (121\u2013127, both spectrum branches and the scalar twin guard); the dealias kernel is composed into the envelope (140: `convolve!(\u00fb, \u00fb, convolve(envelope, domain.dealias))`); then `helmholtz_projection!` enforces \u2207\u00b7u = 0 (141); the energy rescale refuses a fully annihilated seed instead of silently returning zero (149\u2013153).",
+     "consequence_if_missing": "A seeded mean flow (13.5% of the energy, measured) that nothing would remove; an un-dealiased seed puts content above the cutoff that the first RHS assembly aliases; a non-solenoidal seed breaks the dissipation observable's divergence-free precondition (Observables.jl:121\u2013126).",
+     "severity": "notable"
+    }
+   ],
+   "lane": "first-principles",
+   "mean_mode": "Textbook treatment of \u03ba=0: the mode is a free Galilean parameter that the equations themselves neither damp (viscous term \u03bd|\u03ba|\u00b2\u00fb vanishes) nor determine (the pressure Poisson solve |k|\u00b2p\u0302 = ik\u00b7N\u0302 is singular there \u2014 Canuto, Hussaini, Quarteroni & Zang 2007, \u00a73.3), so homogeneous-turbulence DNS is formulated in the zero-mean frame (Pope 2000 \u00a79.1; Rogallo 1981, NASA TM-81315, whose moving-frame formulation and random ICs carry \u00fb(0)=0) and the mode is hard-zeroed or skipped every step; analytically \u27e8u\u00d7\u03c9\u27e9 = 0 on a periodic box (Lamb vector = divergence + gradient), but discretely only to roundoff, and the undamped residual random-walks. The scalar mean is conserved exactly by the conservative form (\u2207\u00b7(u\u03c6) has no \u03ba=0 component), so codes seed \u27e8\u03c6\u27e9=0 and rely on the divergence multiplier being exactly zero there. OUR code, as of a fix landed mid-audit in response to this very finding: src/Generator.jl:405\u2013418 defines `_zero_mean_mode!(f)` (\\\"The \u03ba = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY \u2026 measured 3% of u\u2032 after 3000 Float32 steps. Every reference DNS pins this mode.\\\"), called in velocity_rhs! at Generator.jl:480 and scalar_rhs! at Generator.jl:633, deliberately BETWEEN the nonlinear assembly and the additive forcing source so a mean-driving forcing stays expressible. The supporting cast: the PF projection is a guarded identity at \u03ba=0 (ifelse-substituted denominator, no NaN \u2014 clone DifferentialOperators.jl:207\u2013208), the integrating factor is exp(0)=1 there (Generator.jl:539\u2013545), the ICs zero the mode via the envelope (State.jl:121\u2013127, 210\u2013212), and every default forcing band starts at shell 1, lower edge 0.5\u00b7(2\u03c0/L) (Forcing.jl:266\u2013270) \u2014 the residual gap being that lowest_shell = 0 is accepted unguarded and its source is added after the pinning."
+  }
+ ],
+ "dead": 0
+}

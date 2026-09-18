@@ -12,9 +12,9 @@
 # not independent of what it guards. This script asserts the relation the code SHOULD hold —
 # routed through the canonical home — and demonstrates it holds today.
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
-using GBGIsotropicTurbulence.Phenomenology.Scalings: stationary_dissipation, Li2008
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
+using GBGHomogeneousTurbulence.Phenomenology.Scalings: stationary_dissipation, Li2008
 using Random
 
 @testset "the derived ν solves `kolmogorov_length`'s relation, measured by that function" begin

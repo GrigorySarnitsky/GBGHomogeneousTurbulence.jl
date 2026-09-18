@@ -26,9 +26,9 @@ which is a property of the FFT backends rather than a choice, so a naive recover
 state it read. Recovery therefore goes through the four-argument
 [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!), whose extra
 argument is a scratch field the transform consumes in the state's place; the vorticity comes from
-[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) instead. The
+[`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) instead. The
 recovered values are deposited into the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 """
 module State
 
@@ -67,11 +67,11 @@ source of truth — and the evolving state of any forcing that carries one. The 
 scalar in physical representation are recoveries of the fields, not part of the record — since it
 holds no derived copies, nothing in it can fall out of date. Each **iteration** — one advance of the
 run, a step plus the deposit that closes it — recovers the physical representations at its end into
-the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 
 Build it on `domain`, a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar. The
 positional form wraps existing fields without copying them, which is how a state is handed to
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) to adopt. Both forms leave
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to adopt. Both forms leave
 `modeled` empty; a `Simulation` fills it from its forcings, starting any forcing state the record
 does not already carry.
 
@@ -81,11 +81,11 @@ does not already carry.
   run carries no passive scalar.
 - `modeled` — each forcing's evolving state, as it stands now:
   `(velocity_forcing = …, scalar_forcing = …)`. A forcing's
-  [`initial_forcing_state`](@ref GBGIsotropicTurbulence.Forcing.initial_forcing_state) creates the
-  entry and its [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) advances it
+  [`initial_forcing_state`](@ref GBGHomogeneousTurbulence.Forcing.initial_forcing_state) creates the
+  entry and its [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) advances it
   once per step; it is `nothing` for a forcing without one, which is every strategy but
-  [`StochasticOU`](@ref GBGIsotropicTurbulence.Forcing.StochasticOU), whose entry is a
-  [`StochasticOUState`](@ref GBGIsotropicTurbulence.Forcing.StochasticOUState). A stochastic forcing's
+  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU), whose entry is a
+  [`StochasticOUState`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOUState). A stochastic forcing's
   process lives here rather than in the forcing, so this record is the whole evolving state of the
   run: saving it saves everything that advances.
 """
@@ -157,8 +157,8 @@ pre-rescale seed into shells the mask holds empty, and the seeder warns when the
 
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy
 spectrum, to seed that shape instead — e.g. a von Kármán or Pope form from the
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) submodule's model spectra, which the run
-layer can wire in for you ([`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) forwards its `initial_spectrum` keyword here). Each mode is
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) submodule's model spectra, which the run
+layer can wire in for you ([`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) forwards its `initial_spectrum` keyword here). Each mode is
 scaled by ``\\sqrt{E(\\kappa)}/\\kappa``, so the shell-summed spectrum is
 ``\\propto \\kappa^{2}(\\sqrt{E}/\\kappa)^{2} = E(\\kappa)`` and the overall amplitude is fixed by
 the `kinetic_energy` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
@@ -169,10 +169,10 @@ Returns `û`.
 !!! note "Seeding a running simulation invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
-    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
+    [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
     fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
     values, then restore the cache with
-    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
+    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again. The
     interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
@@ -259,7 +259,7 @@ of the pre-rescale seed into masked shells, and the seeder warns when the peak
 
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
 scalar-variance spectrum, to seed that shape instead — e.g. an Obukhov–Corrsin form from
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology). Each mode is scaled by
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology). Each mode is scaled by
 ``\\sqrt{E_\\varphi(\\kappa)}/\\kappa`` (the same construction the velocity uses), so the
 shell-summed spectrum is ``\\propto E_\\varphi(\\kappa)`` and the amplitude is fixed by the
 `scalar_variance` rescaling. In this branch `envelope_wavenumber` has no effect: the spectrum
@@ -270,10 +270,10 @@ Returns `φ̂`.
 !!! note "Seeding a running simulation invalidates the observables cache"
     The cache holds what the last deposit left, so a seed written into a live run makes every cached
     observable wrong. Announce the change with
-    [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!), which advances the
+    [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
     fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
     values, then restore the cache with
-    [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again. The
+    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again. The
     interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain;
@@ -317,7 +317,7 @@ end
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
-# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# HDF5 in the environment; the methods live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
 # persistence pairs established).
 

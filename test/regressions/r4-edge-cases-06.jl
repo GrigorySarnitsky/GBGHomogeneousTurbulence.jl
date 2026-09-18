@@ -15,9 +15,9 @@
 # and the log line reports that design target rather than a measured state.
 
 using Test, Random, Logging
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology: kolmogorov_length
-const κ_max = GBGIsotropicTurbulence.SimulationDomain.max_resolved_wavenumber
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology: kolmogorov_length
+const κ_max = GBGHomogeneousTurbulence.SimulationDomain.max_resolved_wavenumber
 
 
 "Build a 32³ derived-viscosity run with `forcing`, spin it up, return (ν, measured κ_max·η)."

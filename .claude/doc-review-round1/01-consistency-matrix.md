@@ -1,6 +1,6 @@
 # Consistency Matrix — findings (hat: consistency-matrix)
 
-Systematic cross-page audit of the rendered GBGIsotropicTurbulence documentation
+Systematic cross-page audit of the rendered GBGHomogeneousTurbulence documentation
 (`manuscript-full.md`, all 18 pages incl. Architecture). Each recurring entity —
 physical quantity, symbol, formula, normalization, code name, numerical constant,
 citation — was collected across every page and diffed. Divergences below.

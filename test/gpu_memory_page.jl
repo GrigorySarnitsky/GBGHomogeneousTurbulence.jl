@@ -16,14 +16,14 @@
 # `GPU_MEMORY_PRINT=1` prints the table as the page should carry it, for a deliberate update.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Propagator: AbstractIntegrator
-using GBGIsotropicTurbulence.Forcing: AbstractForcing
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Propagator: AbstractIntegrator
+using GBGHomogeneousTurbulence.Forcing: AbstractForcing
 using Random: MersenneTwister
 using Logging: NullLogger, with_logger
 
 
-const PAGE = joinpath(pkgdir(GBGIsotropicTurbulence), "docs", "src", "gpu.md")
+const PAGE = joinpath(pkgdir(GBGHomogeneousTurbulence), "docs", "src", "gpu.md")
 const FIT_SIZES = (32, 40, 48, 56)
 const CHECK_SIZE = 64
 
@@ -80,8 +80,8 @@ end
 @testset "GPU memory page: which settings the table covers" begin
   reference = resident_polynomial().leading   # `TwoThirds()`, `Float64`, no scalar: the defaults
   # The exported non-abstract types under each abstract type (parametric ones included) — what a user can pass.
-  exported(A) = Set(n for n in names(GBGIsotropicTurbulence)
-                    if (T = getfield(GBGIsotropicTurbulence, n)) isa Type && T <: A && !isabstracttype(Base.unwrap_unionall(T)))
+  exported(A) = Set(n for n in names(GBGHomogeneousTurbulence)
+                    if (T = getfield(GBGHomogeneousTurbulence, n)) isa Type && T <: A && !isabstracttype(Base.unwrap_unionall(T)))
 
   # Keyed by type name: a forcing's keyword form returns a wrapper awaiting the domain, so the value
   # does not carry the name the page uses.
@@ -99,7 +99,7 @@ end
 
   strategies = [:HouLi => (HouLi(), :same), Symbol("HouLi(materialized = true)") => (HouLi(materialized = true), :more)]
   @test Set([:TwoThirds, :PhaseShift, :HouLi]) ==   # the table's two strategies, and `HouLi` above
-        exported(GBGIsotropicTurbulence.DealiasingStrategy)
+        exported(GBGHomogeneousTurbulence.DealiasingStrategy)
 
   page = read(PAGE, String)
   for (name, (_, verdict)) in [integrators; forcings; strategies]

@@ -7,7 +7,7 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "IFHeun keeps second order under every rate/source-routed forcing" begin

@@ -18,8 +18,8 @@
 # convolve!(::Nothing, …)` thrown from inside GBGPeriodicFields, naming nothing a caller could act on.
 
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Propagator: deposit!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Propagator: deposit!
 using GBGPeriodicFields: field_data
 
 

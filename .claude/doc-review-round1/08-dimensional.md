@@ -1,4 +1,4 @@
-# Dimensional-Analysis & Normalization audit — GBGIsotropicTurbulence rendered docs
+# Dimensional-Analysis & Normalization audit — GBGHomogeneousTurbulence rendered docs
 
 Hat: **DIMENSIONAL-ANALYSIS & NORMALIZATION specialist**. I mechanically checked every
 formula for dimensional consistency and every normalization factor (the ½ in kinetic

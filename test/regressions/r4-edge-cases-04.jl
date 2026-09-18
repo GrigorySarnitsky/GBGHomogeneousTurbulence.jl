@@ -12,10 +12,10 @@
 # as correct; only "accepted and never invoked" fails.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: AbstractForcing, ConstantPower, NoForcing
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain
-import GBGIsotropicTurbulence.Forcing: prepare_forcing!, project_forcing!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Forcing: AbstractForcing, ConstantPower, NoForcing
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain
+import GBGHomogeneousTurbulence.Forcing: prepare_forcing!, project_forcing!
 
 # A forcing that only records whether the generator ever reached it.
 mutable struct HookSpy <: AbstractForcing

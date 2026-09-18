@@ -18,7 +18,7 @@
 #       nothing was silently corrupted.
 # If (2) ever fails, the mid-iteration read really did consume a wrong value and the claim is real.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: point_values
 using Random

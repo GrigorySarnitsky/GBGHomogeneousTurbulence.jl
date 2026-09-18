@@ -1,7 +1,7 @@
 # Observables
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Observables]
+Modules = [GBGHomogeneousTurbulence.Observables]
 Order   = [:module]
 ```
 

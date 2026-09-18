@@ -1,4 +1,4 @@
-# CLAUDE.md — GBGIsotropicTurbulence
+# CLAUDE.md — GBGHomogeneousTurbulence
 
 Julia package: a small, focused **pseudospectral direct numerical simulation (DNS) of homogeneous
 isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
@@ -18,7 +18,7 @@ Before any structural or design change, read `docs/ARCHITECTURE.md` — it expla
 architecture is the way it is (the System × Model × Method framing, the Mori–Zwanzig reading, the
 thin-physics / rich-numerics split). Do not re-litigate a recorded decision (its §11 decision log)
 without the user. The conceptual model and the writing conventions are recorded once — in
-`docs/ARCHITECTURE.md` and this file; the umbrella module `src/GBGIsotropicTurbulence.jl` only points
+`docs/ARCHITECTURE.md` and this file; the umbrella module `src/GBGHomogeneousTurbulence.jl` only points
 there.
 
 ## Modules and wiring
@@ -364,7 +364,7 @@ with no notation that drifts across the pair.
 
 ## Verification workflow
 
-- Load: `julia --project -e 'using GBGIsotropicTurbulence'`.
+- Load: `julia --project -e 'using GBGHomogeneousTurbulence'`.
 - Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green. The suite includes three
   audits over the shared op model in `test/audit_ops.jl` (which owns the op lists, the cost model,
   and the shape-class decomposition with its reflective counter): `test/memory_audit.jl` and

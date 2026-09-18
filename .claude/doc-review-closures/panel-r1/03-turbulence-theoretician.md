@@ -93,7 +93,7 @@ fixed budget instead." Scoped to forced runs exactly as the resolution hint requ
 ## Finding 10 — deposit_sample! required but undocumented
 **VERDICT: ABSENT**
 
-Evidence: `src/GBGIsotropicTurbulence.jl:99,178` — `deposit_sample!` now exported; `src/Cache.jl:262-278`
+Evidence: `src/GBGHomogeneousTurbulence.jl:99,178` — `deposit_sample!` now exported; `src/Cache.jl:262-278`
 carries its own docstring; `docs/src/api/Cache.md:17` lists it in a `@docs` block. No longer an
 undocumented mandatory call.
 

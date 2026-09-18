@@ -17,11 +17,11 @@ remaining "Two of these" text anywhere in `src/`, `docs/src/`, or `docs/build/`.
 
 **Verdict:** ABSENT
 
-**Evidence:** `deposit_sample!` is now exported (`src/GBGIsotropicTurbulence.jl:99,178`), has its
+**Evidence:** `deposit_sample!` is now exported (`src/GBGHomogeneousTurbulence.jl:99,178`), has its
 own docstring in `src/Cache.jl:262-278`, and is listed under `docs/src/api/Cache.md`'s `@docs`
 block alongside `ObservablesCache`/`fields_modified!`/`particles_modified!`. `src/Particles.jl:234`
 now names it explicitly with an `@ref`. Confirmed present in built
-`docs/build/api/GBGIsotropicTurbulence/index.html` and `docs/build/api/Cache/index.html`.
+`docs/build/api/GBGHomogeneousTurbulence/index.html` and `docs/build/api/Cache/index.html`.
 
 ---
 

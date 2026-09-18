@@ -39,7 +39,7 @@
 # physical_vector = 3, spectral_scalar ≈ 1+1/N, physical_scalar = 1,
 # real_spectral_scalar ≈ ½·(1+1/N) — the shape |κ|², the de-alias mask and a forcing rate all share.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: field_data, CatmullRom
 using Random
@@ -609,8 +609,8 @@ const EPISODE_UNITS = [
     # The physical product register is gone (decision 41): the Lamb vector forms over the vorticity
     # slot and the scalar flux over the velocity slot — in place, alias-safe.
     @test !(:product_physical in fieldnames(ResolvedGenerator))
-    IB = GBGIsotropicTurbulence.Propagator.IntegratorBuffers
-    SB = GBGIsotropicTurbulence.Propagator.ScalarBuffers
+    IB = GBGHomogeneousTurbulence.Propagator.IntegratorBuffers
+    SB = GBGHomogeneousTurbulence.Propagator.ScalarBuffers
     @test all(f -> f in fieldnames(IB), (:stage1, :stage2, :velocity_predictor_spectral, :nonlinear))
     # The integrating factor has NO register (decision 39), and the physical-representation
     # registers moved onto the cache slots (decision 40) — a step recovers INTO the charts it takes.

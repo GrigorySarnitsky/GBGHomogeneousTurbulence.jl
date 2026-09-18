@@ -20,7 +20,7 @@
 # then degenerates honestly (0/0) and hits the existing throw, and the mixed field below stops being
 # rescaled by energy the numerator never saw.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 const N = 8

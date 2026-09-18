@@ -37,7 +37,7 @@ const SCHEMA = {
 phase('Audit')
 
 const out = await parallel(FINDINGS.map((f, i) => () => agent(
-`You are auditing ONE claimed fix to an architecture defect in GBGIsotropicTurbulence at ${REPO}. You are not the person who made it and you owe it no benefit of the doubt.
+`You are auditing ONE claimed fix to an architecture defect in GBGHomogeneousTurbulence at ${REPO}. You are not the person who made it and you owe it no benefit of the doubt.
 
   finding:      ${f.title}
   location:     ${f.file}${f.second_location ? '   and   ' + f.second_location : ''}

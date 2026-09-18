@@ -55,7 +55,7 @@
 # nothing to measure dynamically; what is checked here is the schedule, which is where the count is
 # decided.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: field_data, materialize_kernel
 using Test

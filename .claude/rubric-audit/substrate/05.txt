@@ -86,11 +86,11 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 The largest velocity component in absolute value, ``\\max_i\\lvert u_i\\rvert``, of the velocity field `u`
 in physical representation — an allocation-free reduction used to set the advective-CFL timestep. It
 is within a factor ``\\sqrt{3}`` of the true ``\\sup\\lvert\\boldsymbol{u}\\rvert``, a gap absorbed by the
-conservative [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) ceiling (whose
+conservative [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) ceiling (whose
 eigenvalue bound over-estimates the true spectral radius).
 
 The second form reads the number back from an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), where the closing deposit
 left it — the same quantity, measured once per iteration and served without a reduction (or a
 device readback); it throws when no deposit is current, like every cached read. The third form
 reads a `Simulation`'s cache.
@@ -112,7 +112,7 @@ physical representation by the [`FixedDomain`](@ref) `domain`'s plans; `û` is o
 pure representation recovery no preservation copy is needed. Returns `ω`.
 
 The deposited value is read back with
-[`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical), which serves the
+[`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical), which serves the
 iteration's deposit or throws — measure with this function, read with that one.
 """
 

@@ -34,7 +34,7 @@ the order the step fires them):
 The strategies are [`NoForcing`](@ref), [`BandRescaling`](@ref), [`Linear`](@ref), and
 [`ConstantPower`](@ref); one implementation serves both the velocity (a vector field) and the scalar (a
 scalar field), through tensor-order-generic field operators. The velocity and scalar are forced
-**independently**: [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) takes a separate `velocity_forcing` and `scalar_forcing`
+**independently**: [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) takes a separate `velocity_forcing` and `scalar_forcing`
 (each an `AbstractForcing`), so a run can force the velocity while the scalar decays freely, force both, or
 leave either unforced.
 

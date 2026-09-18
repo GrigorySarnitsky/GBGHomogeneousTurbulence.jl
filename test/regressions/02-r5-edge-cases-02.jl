@@ -8,7 +8,7 @@
 # (the sibling-guard shape), or keep the scheme the caller asked for. It fails only on the
 # third, silent outcome — scheme dropped, nothing said.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using Random
 
 @testset "a particle_integration_scheme requested through Simulation is never silently discarded" begin

@@ -1,6 +1,6 @@
-# GBGIsotropicTurbulence.jl
+# GBGHomogeneousTurbulence.jl
 
-`GBGIsotropicTurbulence.jl` is a small, focused pseudospectral direct-numerical-simulation (DNS)
+`GBGHomogeneousTurbulence.jl` is a small, focused pseudospectral direct-numerical-simulation (DNS)
 package for homogeneous isotropic turbulence on a three-dimensional periodic domain: an incompressible
 velocity field ``\boldsymbol{u}`` together with a single passive scalar ``\varphi``, each optionally
 forced, advanced by a choice of integrating-factor time-stepping scheme, with Lagrangian particle
@@ -19,7 +19,7 @@ This is a private, unregistered package. With repository access:
 
 ```julia
 ]add https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl
-]add https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl
+]add https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl
 ```
 
 (the field-library backend first — both are unregistered, so Julia cannot resolve
@@ -31,13 +31,13 @@ or
 using Pkg
 
 Pkg.add(url="https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl")
-Pkg.add(url="https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl")
+Pkg.add(url="https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl")
 ```
 
 Then:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 ```
 
 ## Quick start
@@ -46,7 +46,7 @@ Build a case with the `Simulation` constructor, which builds every component for
 you — spin it up to stationarity, and advance it:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 sim = Simulation(grid_points_per_axis = 64)
 # A 64³ forced-stationary run; ν is set so the grid captures the dissipation scale.

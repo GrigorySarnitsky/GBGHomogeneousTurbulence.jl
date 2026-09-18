@@ -2,7 +2,7 @@
 # The default constructor is the only form the suite exercises; this pins the custom branch of
 # `_build_dealias(::HouLi, …)` — the explicit-`strength` arm of the ternary and the `order` exponent.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, materialize_kernel
 using Test
 

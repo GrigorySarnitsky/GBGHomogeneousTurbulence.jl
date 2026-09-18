@@ -11,7 +11,7 @@
 # round-off-Hermitian at others (96³, 256³; cuFFT and rocFFT everywhere), so a witness that waits
 # for the library's own seed can pass vacuously on the very machine that runs the suite. Planted at
 # 2e-6 relative, the controller grew it ×360 in 27 time units before the fix; NoForcing damped it ×0.4.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, reality_residual
 using Random
 

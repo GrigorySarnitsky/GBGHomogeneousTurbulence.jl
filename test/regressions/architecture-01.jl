@@ -3,7 +3,7 @@
 # spelled a second time. This script demonstrates the two spellings agree numerically today —
 # i.e. the finding is duplication of a definition, not a present numeric divergence.
 using Test
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters, taylor_reynolds
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, taylor_reynolds
 
 inline_reλ(k, ε, ν) = (2 * k / 3) * sqrt(15 / (ε * ν))          # copy of SimulationRun.jl:284
 

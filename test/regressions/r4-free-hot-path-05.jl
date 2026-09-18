@@ -7,7 +7,7 @@
 # reaches the guard: the iteration closes normally, deposits a non-finite `scalar_physical`, and
 # every scalar statistic a caller accumulates from then on is silently NaN.
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "an iteration does not report success on a state whose scalar it has made non-finite" begin

@@ -4,7 +4,7 @@
 # `promote(float(target), …)` fixes the strategy's type parameter at Float64 — the leak the
 # test/forcing.jl "preserves a Float32 run's element type" testset states but never exercises
 # through the default Simulation path.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
 @testset "Simulation's default velocity forcing carries the run's element type" begin
   for T in (Float32, Float64)

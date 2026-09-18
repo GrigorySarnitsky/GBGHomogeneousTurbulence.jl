@@ -5,7 +5,7 @@
 # ×120 per 1500 steps to 800×eps by step 2000. The discriminating half injects a LARGE divergent
 # component by hand (the fields_modified! escape hatch): one step must scrub it to roundoff,
 # which no viscous decay could fake.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data, gradient!
 using Random
 

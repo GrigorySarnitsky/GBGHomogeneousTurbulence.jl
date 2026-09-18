@@ -9,10 +9,10 @@
 # ("default (adaptive dt, VarianceRescaling :total)", achieved = 3 = 1 max-speed + band + total).
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, new_scalar_field_spectral
-using GBGIsotropicTurbulence.Forcing: VarianceRescaling, ConstantPower, project_forcing!, set_forcing_rate!
-using GBGIsotropicTurbulence.State: random_solenoidal_velocity_spectral!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, new_scalar_field_spectral
+using GBGHomogeneousTurbulence.Forcing: VarianceRescaling, ConstantPower, project_forcing!, set_forcing_rate!
+using GBGHomogeneousTurbulence.State: random_solenoidal_velocity_spectral!
 using GBGPeriodicFields
 using Random
 
@@ -49,7 +49,7 @@ domain = FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
                      dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
 
 function seeded_field()
-  û = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
+  û = GBGHomogeneousTurbulence.SimulationDomain.new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.0,
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(20260821))
   return CountingField(û)

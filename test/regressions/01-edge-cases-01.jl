@@ -11,7 +11,7 @@
 # iterations (either by converging or by the `max_turnovers` warning). The loop below is `run!`'s
 # own loop with a hard step cap, so the witness itself cannot hang.
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 "Drive `criterion` exactly as `run!` does, but abort after `cap` iterations. Returns the number of
 iterations taken and whether the criterion stopped the run itself."

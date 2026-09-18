@@ -121,7 +121,7 @@ Refinement ladder, ConstantPower: n=8 2.5857, n=16 2.0607, n=32 2.0160, n=64 2.0
 - witness: `03-r5-free-hot-path-03.jl`
 - evidence: Test Failed at .../03-r5-free-hot-path-03.jl:54
   Expression: !(outcome isa MethodError)
-   Evaluated: !(MethodError(GBGIsotropicTurbulence.Propagator._recovery_scratch, (nothing,), …) isa MethodError)
+   Evaluated: !(MethodError(GBGHomogeneousTurbulence.Propagator._recovery_scratch, (nothing,), …) isa MethodError)
 Test Failed at :55
   Expression: outcome === nothing || outcome isa ArgumentError
 Control (state scalar, cache scalar-free) passed: @test_throws ArgumentError deposit!. Summary: 2 passed, 2 failed.

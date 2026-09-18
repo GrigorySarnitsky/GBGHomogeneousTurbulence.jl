@@ -9,7 +9,7 @@
 # formula, or a `convolve!` α/β misuse would show up as a band value away from `target`.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: convolve!, field_data
 using Random
 

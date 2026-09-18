@@ -22,12 +22,12 @@ Lagrangian particle tracking — today the massless tracer:
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)), a selectable
   interpolation scheme, and opt-in unwrapped positions read by [`unwrapped_positions`](@ref). The
   velocity at the particles is read from the run's observables cache through
-  [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles).
+  [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles).
 - [`AbstractParticleIntegrator`](@ref) — the particle integration schemes,
   [`Heun`](@ref) and [`AdamsBashforth`](@ref); [`ParticleIntegratorBuffers`](@ref) the
   per-step storage a scheme needs, and [`history_depth`](@ref) the length of the
   velocity-at-particles history a scheme requires.
-- [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) — this module adds the particle
+- [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — this module adds the particle
   method: interpolate the flow velocity at the tracers' current positions and deposit it in the
   observables cache. One value, two consumers: the Lagrangian statistics a caller accumulates,
   and the next advance, which reads it as its start-of-step velocity.
@@ -77,7 +77,7 @@ array in place of the `PointSet`: coordinates cross into the package only throug
 The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate the velocity — and any
 sampled field — at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1``
-choice and [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)'s default; it is a ready-made value rather than a type, so it is passed
+choice and [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)'s default; it is a ready-made value rather than a type, so it is passed
 bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
 and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
 offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
@@ -98,7 +98,7 @@ smoothness parameters.
 # Examples
 
 A run carries tracers when `Simulation` is given a count;
-[`advance!`](@ref GBGIsotropicTurbulence.SimulationRun.advance!) then advances them with the
+[`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) then advances them with the
 fields and records the Lagrangian velocity each iteration, so both reads below are current between
 iterations:
 
@@ -133,7 +133,7 @@ this package. Passing `unwrapped = true` additionally tracks the winding-preserv
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: read them from the
 run's observables cache through
-[`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles), where the
+[`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles), where the
 iteration's closing deposit leaves them.
 
 The particle integration scheme's own working storage is **not** here: it lives in a
@@ -199,10 +199,10 @@ tile-by-tile turns the gather into a sweep, and the field library's `interpolate
 order through its `traversal` keyword. The order only reorders the visits — it changes no value,
 so a run with and without it produces bitwise-identical trajectories and samples.
 
-A run builds one for you: [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)'s
+A run builds one for you: [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)'s
 `ordered_interpolation` keyword decides whether, and whether the run or the caller rebuilds it.
 Building it by hand belongs with a hand-run loop, where it is passed on to
-[`advect!`](@ref), the particle form of [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
+[`advect!`](@ref), the particle form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
 and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
 
 The arguments are:
@@ -249,13 +249,13 @@ end
 Rebuild the tracer traversal order from the current tracer positions, in place — the
 [`ParticleTraversal`](@ref) `traversal` over the tracer set `tracers` on the grid of `domain` (a
 [`FixedDomain`](@ref)), or the one the run `sim` (a
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)) carries as
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)) carries as
 `sim.particle_traversal`.
 
 Call it from a run's callback when the run was built with `ordered_interpolation = :manual`, at
 whatever cadence you choose — every so many steps with
-[`every_steps`](@ref GBGIsotropicTurbulence.SimulationRun.every_steps), or every so much time with
-[`every_time`](@ref GBGIsotropicTurbulence.SimulationRun.every_time). With the default automatic
+[`every_steps`](@ref GBGHomogeneousTurbulence.SimulationRun.every_steps), or every so much time with
+[`every_time`](@ref GBGHomogeneousTurbulence.SimulationRun.every_time). With the default automatic
 mode the run rebuilds every iteration and the call is never needed. The rebuild allocates nothing
 at the tracer scale; a run without a traversal order refuses the call with an `ArgumentError`.
 """
@@ -272,9 +272,9 @@ end
 
 The supertype of the particle integration schemes — how the tracer positions are advanced
 over one step, the Lagrangian counterpart of the field side's
-[`AbstractIntegrator`](@ref GBGIsotropicTurbulence.Propagator.AbstractIntegrator). A scheme is a
+[`AbstractIntegrator`](@ref GBGHomogeneousTurbulence.Propagator.AbstractIntegrator). A scheme is a
 value (`Heun()`), passed to [`advect!`](@ref) and to
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which builds exactly
+[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which builds exactly
 the working storage that scheme needs.
 
 Two members today: [`Heun`](@ref), a one-step method that buys second order with a second
@@ -291,7 +291,7 @@ abstract type AbstractParticleIntegrator end
 Second-order Heun-in-time on the velocity at the two **ends** of the step — the particle
 integration scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
 velocity the previous iteration's closing particle
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) left in the cache and the
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) left in the cache and the
 end-of-step velocity field the solver has just produced, so it needs nothing from inside the field
 scheme's stages.
 
@@ -328,10 +328,10 @@ hand-written correction, any direct write to the tracer storage. A one-step sche
 history and this does nothing; a multistep scheme carries Lagrangian samples taken along the
 trajectory just abandoned, and integrating over those would blend the old path with the new one.
 This is an in-memory reset of one scheme's history, not a checkpoint verb — restoring a saved run
-is the job of [`read_simulation`](@ref GBGIsotropicTurbulence.SimulationRun.read_simulation).
+is the job of [`read_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.read_simulation).
 
-The [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) form of
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) calls this for you,
+The [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) form of
+[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) calls this for you,
 after announcing the reposition to the observables cache. Its bare-cache form clears only the
 sample history the cache itself holds and cannot dispatch here — so a hand-run loop that announces
 to the cache alone must also call this; a scheme's own per-step buffers beyond that history are
@@ -345,7 +345,7 @@ function restart! end
 
 The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated
 once, so advancing the tracers allocates nothing. Build it with
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)`(scheme, tracers, cache)`,
+[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)`(scheme, tracers, cache)`,
 which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
 
 This storage belongs to the scheme, not to the trajectory — which is why it lives here rather than
@@ -355,9 +355,9 @@ scheme uses the predictor arrays for its [`Heun`](@ref) starting steps only, and
 
 The past Lagrangian samples a multistep scheme integrates over are **not** held here. They are
 deposited observables — measurements of the velocity along the trajectory — so they live in the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) beside the current sample
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) beside the current sample
 they extend, which is what lets
-[`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) invalidate the whole
+[`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) invalidate the whole
 history when the tracers are repositioned.
 
 # Fields
@@ -368,7 +368,7 @@ history when the tracers are repositioned.
   counterpart of the field schemes' `velocity_predictor_spectral`). It is reachable like
   any field of this type, but it is a scheme intermediate rather than a sample of the flow at any
   instant, so nothing in the package offers it as one: read
-  [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles) for the Lagrangian
+  [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) for the Lagrangian
   sample.
 - `cache` — the run's `ObservablesCache`: the start-of-step sample and any multistep history are
   its slots.
@@ -505,7 +505,7 @@ end
 How many Lagrangian samples `scheme` must be able to look back over, counting the current one.
 
 A run reads this to size the sample history its
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) carries. A one-step scheme
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) carries. A one-step scheme
 answers `1` and needs no history stored; an `order`-step method answers `order`.
 """
 function history_depth end
@@ -634,7 +634,7 @@ Advance the positions of the tracer set `tracers` by one step of size `dt` (writ
 below), in place, under the particle integration scheme `scheme` (an
 [`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (the
 [`ParticleIntegratorBuffers`](@ref) that
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers) builds for
+[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for
 that scheme). The `domain` (a [`FixedDomain`](@ref))
 supplies the box side the positions are wrapped into. The keyword `traversal` takes the
 `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order` field) to gather the velocity in
@@ -677,7 +677,7 @@ pushes.
 !!! note "The start-of-step velocity is read, never recomputed"
     ``\\boldsymbol{v}_1`` is read from the cache's velocity-at-particles slot, not recomputed
     here: it must hold ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
-    form of [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) at the previous
+    form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) at the previous
     iteration's end. The run layer reads it checked before each advance; a hand-run loop must make
     that deposit itself between advances.
 """
@@ -750,7 +750,7 @@ state is read straight off the struct's fields). The wrapped positions remain th
 way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
 absolute floating-point resolution, while the unwrapped positions only ever feed differences,
 whose *relative* accuracy the growth does not touch. An announced reposition
-([`particles_modified!`](@ref GBGIsotropicTurbulence.Cache.particles_modified!) on a run) restarts
+([`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) on a run) restarts
 the unwrapped positions at the wrapped ones: winding is a property of the trajectory just abandoned.
 """
 function unwrapped_positions(tracers::Tracers)
@@ -822,7 +822,7 @@ Base.show(io::IO, buffers::ParticleIntegratorBuffers) =
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
-# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# HDF5 in the environment; the methods live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
 # persistence pairs established).
 

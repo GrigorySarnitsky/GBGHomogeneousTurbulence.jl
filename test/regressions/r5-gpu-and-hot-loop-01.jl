@@ -2,7 +2,7 @@
 # preallocated buffers". This asserts the invariant literally: a warmed-up `step!` on a preallocated
 # state / buffers / cache must allocate nothing, for every scheme, with NoForcing and no tracers.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
 using Test

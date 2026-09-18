@@ -310,17 +310,17 @@ lint_review_closure()
 
 using Documenter
 using DocumenterInterLinks
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 # Phenomenology is deliberately not re-exported by the umbrella (ARCHITECTURE §4.7); bring its
 # submodule names into scope here so the docs pages can reference them by bare name, as the DNS API is.
-using GBGIsotropicTurbulence.Phenomenology
-using GBGIsotropicTurbulence.Phenomenology.Spectra
-using GBGIsotropicTurbulence.Phenomenology.StructureFunctions
-using GBGIsotropicTurbulence.Phenomenology.Scalings
+using GBGHomogeneousTurbulence.Phenomenology
+using GBGHomogeneousTurbulence.Phenomenology.Spectra
+using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions
+using GBGHomogeneousTurbulence.Phenomenology.Scalings
 
-# Make `using GBGIsotropicTurbulence` available to any `jldoctest` examples (recursive covers the
+# Make `using GBGHomogeneousTurbulence` available to any `jldoctest` examples (recursive covers the
 # submodules). Doctests are off for now (no runnable examples yet); flip `doctest = true` once added.
-DocMeta.setdocmeta!(GBGIsotropicTurbulence, :DocTestSetup, :(using GBGIsotropicTurbulence); recursive = true)
+DocMeta.setdocmeta!(GBGHomogeneousTurbulence, :DocTestSetup, :(using GBGHomogeneousTurbulence); recursive = true)
 
 
 # Cross-package clickable references (DocumenterInterLinks): a backticked external object is linked to
@@ -336,25 +336,25 @@ links = InterLinks(
 
 
 makedocs(
-  sitename = "GBGIsotropicTurbulence.jl",
+  sitename = "GBGHomogeneousTurbulence.jl",
   modules  = [
-    GBGIsotropicTurbulence,
-    GBGIsotropicTurbulence.SimulationDomain,
-    GBGIsotropicTurbulence.State,
-    GBGIsotropicTurbulence.Observables,
-    GBGIsotropicTurbulence.Cache,
-    GBGIsotropicTurbulence.Forcing,
-    GBGIsotropicTurbulence.Generator,
-    GBGIsotropicTurbulence.Propagator,
-    GBGIsotropicTurbulence.Particles,
-    GBGIsotropicTurbulence.SimulationRun,
-    GBGIsotropicTurbulence.Phenomenology,
-    GBGIsotropicTurbulence.Phenomenology.Spectra,
-    GBGIsotropicTurbulence.Phenomenology.StructureFunctions,
-    GBGIsotropicTurbulence.Phenomenology.Scalings,
+    GBGHomogeneousTurbulence,
+    GBGHomogeneousTurbulence.SimulationDomain,
+    GBGHomogeneousTurbulence.State,
+    GBGHomogeneousTurbulence.Observables,
+    GBGHomogeneousTurbulence.Cache,
+    GBGHomogeneousTurbulence.Forcing,
+    GBGHomogeneousTurbulence.Generator,
+    GBGHomogeneousTurbulence.Propagator,
+    GBGHomogeneousTurbulence.Particles,
+    GBGHomogeneousTurbulence.SimulationRun,
+    GBGHomogeneousTurbulence.Phenomenology,
+    GBGHomogeneousTurbulence.Phenomenology.Spectra,
+    GBGHomogeneousTurbulence.Phenomenology.StructureFunctions,
+    GBGHomogeneousTurbulence.Phenomenology.Scalings,
   ],
   format = Documenter.HTML(
-    canonical     = "https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/stable",
+    canonical     = "https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/stable",
     collapselevel = 1,
     # The decision log is exempt from the page-size limit rather than split again. It is append-only
     # history read by search and by direct link, and it crossed 200 KiB at decision 90; splitting it
@@ -371,7 +371,7 @@ makedocs(
     "Notation"          => "notation.md",
     "API"  => Any[
       "Overview"               => "api.md",
-      "GBGIsotropicTurbulence" => "api/GBGIsotropicTurbulence.md",
+      "GBGHomogeneousTurbulence" => "api/GBGHomogeneousTurbulence.md",
       "SimulationRun"          => "api/SimulationRun.md",
       "SimulationDomain"       => "api/SimulationDomain.md",
       "State"                  => "api/State.md",
@@ -399,6 +399,6 @@ makedocs(
 )
 
 deploydocs(
-  repo      = "github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl",
+  repo      = "github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl",
   devbranch = "master",
 )

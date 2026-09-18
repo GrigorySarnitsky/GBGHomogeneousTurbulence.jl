@@ -1,5 +1,5 @@
 # Architecture witness (informational, not a failing test): the two N-routes agree TODAY.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_physical_shape, field_data
 
 sim = Simulation(grid_points_per_axis = 8, scalar = false)

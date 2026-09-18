@@ -3,8 +3,8 @@
 # end); `fields_modified!` announces an out-of-band mutation and `deposit!` restores the
 # deposits; the completeness check refuses an iteration that left a slot undeposited.
 
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: take_velocity!, check_deposits
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: take_velocity!, check_deposits
 using GBGPeriodicFields: field_data, to_physical!
 using Random
 using Test

@@ -93,16 +93,16 @@ version = "3.3.12+0"
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
 
-[[deps.GBGIsotropicTurbulence]]
+[[deps.GBGHomogeneousTurbulence]]
 deps = ["GBGPeriodicFields", "Random", "Statistics"]
 path = "."
 uuid = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
 version = "0.1.0"
 
-    [deps.GBGIsotropicTurbulence.extensions]
-    GBGIsotropicTurbulenceHDF5Ext = "HDF5"
+    [deps.GBGHomogeneousTurbulence.extensions]
+    GBGHomogeneousTurbulenceHDF5Ext = "HDF5"
 
-    [deps.GBGIsotropicTurbulence.weakdeps]
+    [deps.GBGHomogeneousTurbulence.weakdeps]
     HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 
 [[deps.GBGPeriodicFields]]

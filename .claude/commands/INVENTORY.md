@@ -12,7 +12,7 @@ is not re-derived. Nothing here is a commitment by IT.
 ## Sizes
 
 IT: 33 files, 4583 lines. PF: 17 files, 1977. Second column is lines naming the package
-specifically — grep over `GBGIsotropicTurbulence`, `ARCHITECTURE.md`, turbulence/pseudospectral/
+specifically — grep over `GBGHomogeneousTurbulence`, `ARCHITECTURE.md`, turbulence/pseudospectral/
 dealias/forcing/tracer/vorticity/varphi/kappa/integrating-factor, IT module names, `decision N`,
 `invariant N`.
 

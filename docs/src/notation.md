@@ -29,14 +29,14 @@ The **Code** column gives the name each symbol carries in the package.
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
-| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical) (the cached field; [`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) recovers it) |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the cached field; [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
-| ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) |
-| ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGIsotropicTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
+| ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) |
+| ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`velocity_at_particles`](@ref GBGIsotropicTurbulence.Cache.velocity_at_particles) |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the instant ``t_n`` between iterations | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
 | ``M`` | the number of tracer particles | `npoints(tracers.positions)` |
 
 ## Parameters
@@ -61,22 +61,22 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 | ``\mathcal{F}``, ``\mathcal{F}^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
 | ``\mathbb{P}`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
-| ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor), [`scalar_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.scalar_integrating_factor) |
+| ``\mathcal{E}(\boldsymbol{\kappa})`` | the diffusive integrating factor ``\exp\!\bigl((A(\boldsymbol{\kappa})-D\lvert\boldsymbol{\kappa}\rvert^2)\tau\bigr)`` over an interval ``\tau`` — a Runge–Kutta stage substep ``d_i\Delta t``, or the whole step ``\Delta t`` (``D`` the diffusivity — ``\nu`` for the velocity, ``\varkappa`` for the scalar; ``A(\boldsymbol{\kappa})`` the linear forcing rate) | [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor), [`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor) |
 | ``\star`` | periodic convolution (the dealias/band/envelope kernels) | [`convolve`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.convolve) |
-| ``\widehat{N}`` (``\widehat{\boldsymbol{N}}`` for the velocity) | a field's assembled explicit right-hand side — the dealiased nonlinear term plus any additive forcing source — in spectral representation | [`velocity_rhs!`](@ref GBGIsotropicTurbulence.Generator.velocity_rhs!), [`scalar_rhs!`](@ref GBGIsotropicTurbulence.Generator.scalar_rhs!) |
+| ``\widehat{N}`` (``\widehat{\boldsymbol{N}}`` for the velocity) | a field's assembled explicit right-hand side — the dealiased nonlinear term plus any additive forcing source — in spectral representation | [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!), [`scalar_rhs!`](@ref GBGHomogeneousTurbulence.Generator.scalar_rhs!) |
 
 ## Diagnostics
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) |
-| ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation) |
-| ``E_\varphi(\kappa)`` | the scalar-variance spectral density, integrating to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.spectrum) on a [`ScalarSpectrum`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.ScalarSpectrum) |
-| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the one form both the measured spectrum and the `Phenomenology` models use | [`spectrum`](@ref GBGIsotropicTurbulence.Phenomenology.spectrum) |
-| ``E(\kappa_n)`` | the **measured** spectral density at shell ``n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGIsotropicTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
-| ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance) |
-| ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) |
-| ``S`` | the velocity-derivative skewness — the developed-cascade marker, ``\approx -0.5`` for developed turbulence | [`derivative_skewness`](@ref GBGIsotropicTurbulence.Observables.derivative_skewness) |
+| ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy) |
+| ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGHomogeneousTurbulence.Observables.dissipation) |
+| ``E_\varphi(\kappa)`` | the scalar-variance spectral density, integrating to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | [`spectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.spectrum) on a [`ScalarSpectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.ScalarSpectrum) |
+| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the one form both the measured spectrum and the `Phenomenology` models use | [`spectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.spectrum) |
+| ``E(\kappa_n)`` | the **measured** spectral density at shell ``n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGHomogeneousTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
+| ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGHomogeneousTurbulence.Observables.scalar_variance) |
+| ``\varepsilon_\varphi`` | scalar dissipation rate ``2\varkappa\langle\lvert\nabla\varphi\rvert^2\rangle`` | [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation) |
+| ``S`` | the velocity-derivative skewness — the developed-cascade marker, ``\approx -0.5`` for developed turbulence | [`derivative_skewness`](@ref GBGHomogeneousTurbulence.Observables.derivative_skewness) |
 
 ## Derived scales
 
@@ -84,16 +84,16 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGIsotropicTurbulence.SimulationRun.flow_parameters) |
-| ``\ell`` | the length a large-scale roll-off is evaluated against (``L_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra.large_scale_length) |
-| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGIsotropicTurbulence.Observables.integral_scale) |
-| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_length) |
-| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGIsotropicTurbulence.Phenomenology.kolmogorov_time) |
-| ``G`` | two unrelated constants wear this glyph, each bound at its site: the box-normalized dissipation group of `Li2008` (``\approx 0.9``), and [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController)'s dimensionless gain | — |
-| ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the run layer's unit of progress (warm-up budgets and stationarity windows accumulate ``\Delta t \varepsilon/k``). Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the generator protocol's argument | [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) |
-| ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = \tfrac{2}{3}\tau``, a different quantity from ``\tau`` despite the shared name in the literature | [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) |
-| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu``, measured from the flow state | [`taylor_reynolds`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_reynolds) |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGIsotropicTurbulence.Phenomenology.taylor_microscale) |
+| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGHomogeneousTurbulence.SimulationRun.flow_parameters) |
+| ``\ell`` | the length a large-scale roll-off is evaluated against (``L_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.large_scale_length) |
+| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
+| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length) |
+| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_time) |
+| ``G`` | two unrelated constants wear this glyph, each bound at its site: the box-normalized dissipation group of `Li2008` (``\approx 0.9``), and [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)'s dimensionless gain | — |
+| ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the run layer's unit of progress (warm-up budgets and stationarity windows accumulate ``\Delta t \varepsilon/k``). Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the generator protocol's argument | [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) |
+| ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = \tfrac{2}{3}\tau``, a different quantity from ``\tau`` despite the shared name in the literature | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) |
+| ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu``, measured from the flow state | [`taylor_reynolds`](@ref GBGHomogeneousTurbulence.Phenomenology.taylor_reynolds) |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGHomogeneousTurbulence.Phenomenology.taylor_microscale) |
 
 ## Numerics
 
@@ -102,20 +102,20 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``N`` | grid points per side | `grid_points_per_axis` |
 | ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
 | ``\Delta t`` | timestep | `dt` |
-| ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |
+| ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) |
 | ``\kappa_{\mathrm{Ny}}`` | the grid Nyquist wavenumber ``\tfrac{N}{2}\tfrac{2\pi}{L}`` — the highest a grid can represent, before dealiasing | — |
 | ``\kappa_p`` | the envelope wavenumber of the default random initial condition (the shell-summed spectrum peaks at ``\kappa_p/\sqrt{2}``) | `envelope_wavenumber` |
 | ``\kappa_{\max}^{\mathrm{ret}}`` | retained-band edge — the highest wavenumber the `dealiasing` strategy keeps energetic (``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule, the Nyquist for `HouLi`, ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`); prices the advective-CFL step | [`max_retained_wavenumber`](@ref) |
 | ``\kappa_{\max}`` | resolved-band edge — the highest wavenumber whose dynamics is genuine Navier–Stokes, the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta``; equals the retained edge for the sharp strategies, ``\tfrac{4}{5}`` of Nyquist for `HouLi` | [`max_resolved_wavenumber`](@ref) |
-| ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGIsotropicTurbulence.Propagator.IFLowStorageRK3) |
-| ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3` and `IFSSPRK3`; ``\approx 3.34`` for `IFLowStorageRK4`; ``0`` for the imaginary-axis-unstable `IFHeun`) | [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) |
+| ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3) |
+| ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3` and `IFSSPRK3`; ``\approx 3.34`` for `IFLowStorageRK4`; ``0`` for the imaginary-axis-unstable `IFHeun`) | [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) |
 | ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
 
 ## Forcing
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
+| ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGHomogeneousTurbulence.Forcing.set_forcing_rate!) |
 | ``\varepsilon_{\mathrm{target}}`` | the injection rate a `ConstantPower` holds: energy for the velocity, scalar variance for the scalar | `ConstantPower(injection_rate=…)` |
 | ``\sigma^{2}`` | the stationary mean square of the term a stochastic forcing ADDS — an acceleration for the velocity, a rate of change of ``\varphi`` for the scalar. Not the variance of the field, which is what a `VarianceController` holds | `StochasticOU(forcing_variance=…)` |
 | ``T_L`` | the correlation time of that term: each forced mode's amplitude decays by ``e^{-\Delta t/T_L}`` per step. Short against the eddy-turnover time ``\tau``, the mean injection is close to ``\sigma^{2} T_L`` | `StochasticOU(correlation_time=…)` |
@@ -128,14 +128,14 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 
 | Term | Meaning |
 |:---|:---|
-| **iteration** | one advance of the run, in this order: choose the timestep, [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) the fields, [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) to close them, then advance any tracers and record their sample — the tracers come last because their second velocity sample is interpolated from the field the deposit just made current. Wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
-| **deposit** | to write an observable into the cache and mark the moment it belongs to, in one act — each dynamical factor's advance is closed by its own [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) form, the field form after the step and the particle form after the tracer push, inside the same iteration. Nothing is ever written to the cache on a read. |
-| **slot** | one storage place in the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache) — an array or a number, together with the epoch its value belongs to. |
+| **iteration** | one advance of the run, in this order: choose the timestep, [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) the fields, [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) to close them, then advance any tracers and record their sample — the tracers come last because their second velocity sample is interpolated from the field the deposit just made current. Wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
+| **deposit** | to write an observable into the cache and mark the moment it belongs to, in one act — each dynamical factor's advance is closed by its own [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) form, the field form after the step and the particle form after the tracer push, inside the same iteration. Nothing is ever written to the cache on a read. |
+| **slot** | one storage place in the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) — an array or a number, together with the epoch its value belongs to. |
 | **epoch** | a counter of *changes to the state*, one per dynamical factor (the fields, the tracer positions) — and, for a slot, the value that counter held when the slot was filled. A slot is readable exactly while the epoch it records still equals the counter it depends on. Not an iteration number: an announced out-of-band mutation advances an epoch without advancing the clock. |
 | **register** | storage a component computes one value into and overwrites at the next use, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
-| **scratch** | working storage a component owns for its intermediate results — a register, or a named bundle of them (the generator's assembly scratch, a scheme's [`IntegratorBuffers`](@ref GBGIsotropicTurbulence.Propagator.IntegratorBuffers)). |
-| **push** | one advance of the tracer positions — the particle half of an iteration, performed by [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!). |
-| **front door** | the historical name — kept by the decision log — for what current docs call the **domain-building** [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor: the form that builds every component from a few keywords, as against handing it a pre-built domain. The architecture's §4.7 heading also wears it in a wider entry-point sense — `SimulationRun` as the layer a user enters the package through. |
+| **scratch** | working storage a component owns for its intermediate results — a register, or a named bundle of them (the generator's assembly scratch, a scheme's [`IntegratorBuffers`](@ref GBGHomogeneousTurbulence.Propagator.IntegratorBuffers)). |
+| **push** | one advance of the tracer positions — the particle half of an iteration, performed by [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!). |
+| **front door** | the historical name — kept by the decision log — for what current docs call the **domain-building** [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor: the form that builds every component from a few keywords, as against handing it a pre-built domain. The architecture's §4.7 heading also wears it in a wider entry-point sense — `SimulationRun` as the layer a user enters the package through. |
 | **observation** | the callback a run is driven by: it reads the run once at the start and once after every iteration — ``n+1`` readings over a run of ``n`` iterations — and its return decides whether to continue. By extension the *occasion* — "computed at an observation" means computed in that callback, between iterations, from what the run already holds. |
 | **holder** | in the optimality audit: the named owner of a gap between an achieved cost and its floor — every residual distance must carry one, and closing the gap retires it in the same commit. |
 | **ledger** | a frozen table of measured costs (memory, transforms, passes, synchronizations) the test suite holds the code to; a deliberate change re-freezes it consciously, citing its decision. |

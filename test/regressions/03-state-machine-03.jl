@@ -6,7 +6,7 @@
 # trajectory; after a reposition announced through `particles_modified!` those samples belong to a
 # different trajectory and must not enter the next position update.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: PointSet, point_values
 using Random

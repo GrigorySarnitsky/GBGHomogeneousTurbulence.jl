@@ -97,7 +97,7 @@ const VERDICT_SCHEMA = {
 // The free lanes' preamble. It carries the EVIDENCE discipline (which is what makes a finding
 // admissible) and deliberately carries no taxonomy: naming classes here would recreate, one level
 // down, exactly the blind spot these lanes exist to cover.
-const FREE_PREAMBLE = `You are reading the code of GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden. The rulebook is ${REPO}/CLAUDE.md; the code is ${REPO}/src; the tests are ${REPO}/test.
+const FREE_PREAMBLE = `You are reading the code of GBGHomogeneousTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden. The rulebook is ${REPO}/CLAUDE.md; the code is ${REPO}/src; the tests are ${REPO}/test.
 
 YOUR BRIEF IS TO FIND WHAT IS WRONG WITH THIS CODE. That is the whole brief.
 
@@ -128,7 +128,7 @@ Report files_read honestly; it is cross-checked against the tree.
 
 Cap: your 6 most substantial candidates.`
 
-const HUNT_PREAMBLE = `You are hunting DEFECTS IN THE CODE of GBGIsotropicTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden.
+const HUNT_PREAMBLE = `You are hunting DEFECTS IN THE CODE of GBGHomogeneousTurbulence, a Julia pseudospectral DNS of homogeneous isotropic turbulence (velocity + passive scalar on a triple-periodic box, integrating-factor time stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers). GPU-primary: the time loop is in-place and allocation-free over preallocated buffers, storage is generic AbstractArray, and scalar indexing of device arrays is forbidden.
 
 THE RULEBOOK IS ${REPO}/CLAUDE.md — read its "Core invariants" and "Style" sections first. THE CODE IS ${REPO}/src/*.jl and ${REPO}/src/phenomenology/*.jl. The tests are ${REPO}/test/*.jl and tell you what is already pinned.
 
@@ -211,7 +211,7 @@ Return the structured object with lane="${lane.key}".`,
   (found, lane) => {
     if (!found || !found.candidates || !found.candidates.length) return { lane: lane.key, verdicts: [], files_read: (found && found.files_read) || [] }
     return parallel(found.candidates.map((c, i) => () =>
-      agent(`You are the REPRODUCER for one candidate defect in GBGIsotropicTurbulence (Julia, at ${REPO}). A hunter claims the following. Your job is NOT to agree with it.
+      agent(`You are the REPRODUCER for one candidate defect in GBGHomogeneousTurbulence (Julia, at ${REPO}). A hunter claims the following. Your job is NOT to agree with it.
 
   kind:      ${c.kind}
   severity:  ${c.severity}
@@ -227,7 +227,7 @@ HOW TO PROVE IT, by kind:
 
 * kind = "runtime" — Write a SELF-CONTAINED Julia file that asserts the CORRECT behaviour and therefore FAILS on the current tree. Use this shape:
 
-      using Test, GBGIsotropicTurbulence     # plus whatever else it needs
+      using Test, GBGHomogeneousTurbulence     # plus whatever else it needs
       @testset "<the claim, as a sentence>" begin
         # minimal setup — small N, few tracers, fixed rng
         @test <what SHOULD hold>

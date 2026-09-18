@@ -46,13 +46,13 @@ export FixedDomain,
 
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
-[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl), the advective-CFL
+[`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl), the advective-CFL
 ceiling. They come in two families: a **mask** strategy
 acts on the assembled product alone, while a **shift** strategy also changes how that product is
 evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The
-[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) constructor that builds a whole
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor that builds a whole
 run from a few keywords defaults to `TwoThirds`.
 """
 abstract type DealiasingStrategy end
@@ -94,7 +94,7 @@ precision's machine epsilon; pass an explicit `strength` to override.
 
 Because the filter retains energy out to the Nyquist wavenumber it takes a proportionally smaller
 CFL step than the ``2/3`` rule — handled automatically by
-[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
+[`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 
 The `materialized` keyword chooses how the filter is *applied* — a memory-for-compute choice
 with no effect on the numbers. The default `false` keeps the filter as a closed-form radial
@@ -161,7 +161,7 @@ per stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a 
 spectral-representation buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step
 than the ``2/3`` rule — handled automatically by
-[`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
+[`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 
 !!! note "A half-cell shift attenuates the Nyquist mode"
     A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
@@ -207,7 +207,7 @@ All keyword; the five naming the box are required:
   [`PhaseShift`](@ref) averages a half-cell-displaced evaluation (exact, keeping a fuller band at
   ``2\\times`` the transforms). It controls the aliasing of the quadratic nonlinearity and sets the
   advective-CFL ceiling through
-  [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl).
+  [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU);
@@ -235,7 +235,7 @@ wide = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
 !!! note "Nothing here defaults"
     The grid, the box, the aliasing control, the precision and the storage backend are each a
     decision about the run; the
-    [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) convenience constructor
+    [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) convenience constructor
     supplies them when you would rather not.
 
 # Fields
@@ -406,7 +406,7 @@ the whole representable band.
 Retained is not resolved: a mode can carry energy while its dynamics is dominated by the filter
 rather than by Navier–Stokes — [`max_resolved_wavenumber`](@ref) bounds the trusted band. The
 retained cutoff is the one for everything that must see every energetic mode: the advective-CFL
-step ([`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl)), the random-seed
+step ([`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl)), the random-seed
 spectrum, and the empty-shell warnings of the forcing layer.
 """
 function max_retained_wavenumber(domain::FixedDomain)
@@ -584,7 +584,7 @@ end
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
-# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# HDF5 in the environment; the methods live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
 # persistence pairs established).
 

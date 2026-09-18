@@ -7,7 +7,7 @@
 # keyword, and the boundary value 0 — a physically valid zero-variance scalar — is accepted, so
 # that a later `>` -for- `>=` slip cannot pass in silence.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "`Simulation` rejects a negative `scalar_variance` and accepts the zero boundary" begin

@@ -4,14 +4,14 @@
 # NEITHER reading: the user's configured seed is silently discarded, and two runs checkpointed with
 # different seeds (independent ensemble members) restore to bitwise-identical forcing noise.
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 # Under the gate's `julia --project` the main env has no HDF5 (it is a weak dep); the pile keeps a
 # dedicated env with the package dev'd + HDF5, located through `pkgdir` so the file works from any
 # depth. Promoted into test/regressions/ this branch is dead: Pkg.test's merged env already
 # resolves HDF5, so the activation never fires there.
 if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"), "HDF5")) === nothing
   import Pkg
-  Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
+  Pkg.activate(joinpath(pkgdir(GBGHomogeneousTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
 end
 using HDF5
 
@@ -36,7 +36,7 @@ using HDF5
   # forcing makes is the observable test of what was restored. (Rewritten 2026-09-17 for the shipped
   # StochasticOU, whose generator is scratch reseeded before every draw.)
   û = new_vector_field_spectral(domain)
-  draw(f) = copy(GBGIsotropicTurbulence.SimulationRun.field_data(initial_forcing_state(f, û, domain).process))
+  draw(f) = copy(GBGHomogeneousTurbulence.SimulationRun.field_data(initial_forcing_state(f, û, domain).process))
 
   # Two restored forcings from differently-seeded runs must not produce bitwise-identical noise…
   @test draw(read_a) != draw(read_b)

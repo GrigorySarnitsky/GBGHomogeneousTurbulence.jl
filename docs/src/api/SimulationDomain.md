@@ -1,7 +1,7 @@
 # SimulationDomain
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.SimulationDomain]
+Modules = [GBGHomogeneousTurbulence.SimulationDomain]
 Order   = [:module]
 ```
 

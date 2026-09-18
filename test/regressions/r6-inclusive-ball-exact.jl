@@ -9,10 +9,10 @@
 # annihilates exactly. The test therefore populates EVERY stored boundary mode with random
 # solenoidal content (the adversarial configuration: any surviving wrap would show) and holds the
 # N-grid projected term against a 2N zero-padded oracle, on and below the boundary shell.
-using Test, GBGIsotropicTurbulence, Random
+using Test, GBGHomogeneousTurbulence, Random
 using GBGPeriodicFields: field_data, to_physical!
-const SD6 = GBGIsotropicTurbulence.SimulationDomain
-const GEN6 = GBGIsotropicTurbulence.Generator
+const SD6 = GBGHomogeneousTurbulence.SimulationDomain
+const GEN6 = GBGHomogeneousTurbulence.Generator
 
 
 @testset "the inclusive 2/3 ball is exact on a 3|N grid, boundary shell populated" begin

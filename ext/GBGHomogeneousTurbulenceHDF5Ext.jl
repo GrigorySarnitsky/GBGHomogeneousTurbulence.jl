@@ -1,33 +1,33 @@
 # The HDF5 persistence extension: the methods behind the write/read pairs whose generics and
-# docstrings live in the core modules. Loaded automatically when both GBGIsotropicTurbulence and
+# docstrings live in the core modules. Loaded automatically when both GBGHomogeneousTurbulence and
 # HDF5 are present (a Julia package extension). The design (decision 75) composes the field
 # library's own persistence — `write_field`/`write_points`/`write_scheme` groups as the leaves —
 # and stores nothing derivable: physical charts, the current velocity sample, kernels, plans and
 # every register are recomputed on read. Each group is self-describing (a type tag and a schema
 # version, checked on read), the file is opened and closed by the caller, and the storage backend
 # is the READER's choice — a checkpoint written on one backend loads on any other.
-module GBGIsotropicTurbulenceHDF5Ext
+module GBGHomogeneousTurbulenceHDF5Ext
 
 using HDF5
 using GBGPeriodicFields: write_field, read_field, write_points, read_points, write_scheme,
                          read_scheme, field_data, field_grid, field_tensor_order,
                          point_positions, point_values, npoints,
                          PointSet
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
                                                _real_type
-import GBGIsotropicTurbulence.SimulationDomain: write_domain, read_domain
-using GBGIsotropicTurbulence.State: ResolvedFields
-import GBGIsotropicTurbulence.State: write_state, read_state
-using GBGIsotropicTurbulence.Particles: Tracers, Heun, AdamsBashforth, history_depth
-import GBGIsotropicTurbulence.Particles: write_tracers, read_tracers
-using GBGIsotropicTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForcing, Linear,
+import GBGHomogeneousTurbulence.SimulationDomain: write_domain, read_domain
+using GBGHomogeneousTurbulence.State: ResolvedFields
+import GBGHomogeneousTurbulence.State: write_state, read_state
+using GBGHomogeneousTurbulence.Particles: Tracers, Heun, AdamsBashforth, history_depth
+import GBGHomogeneousTurbulence.Particles: write_tracers, read_tracers
+using GBGHomogeneousTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForcing, Linear,
                                       ConstantPower, VarianceRescaling, VarianceController,
                                       StochasticOU, StochasticOUState
-import GBGIsotropicTurbulence.Forcing: write_forcing, read_forcing
-using GBGIsotropicTurbulence.Cache: fields_modified!, particles_modified!
-using GBGIsotropicTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
-using GBGIsotropicTurbulence.SimulationRun: Simulation
-import GBGIsotropicTurbulence.SimulationRun: write_simulation, read_simulation
+import GBGHomogeneousTurbulence.Forcing: write_forcing, read_forcing
+using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
+using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
+using GBGHomogeneousTurbulence.SimulationRun: Simulation
+import GBGHomogeneousTurbulence.SimulationRun: write_simulation, read_simulation
 
 const SCHEMA_VERSION = 2
 
@@ -45,11 +45,17 @@ function _require_group(parent, name::AbstractString, who::String)
   return g
 end
 
+# A file written before the package was renamed (2026-09-18) carries the old name in its `type`
+# attributes, and those files are still readable: a stored tag is normalized to the current spelling
+# before it is compared or dispatched on. Nothing re-writes them — a tag names what wrote the group.
+_current_tag(stored::AbstractString) =
+  replace(stored, "GBGIsotropicTurbulence." => "GBGHomogeneousTurbulence.")
+
 function _require_tag(g, name::AbstractString, who::String, tag::String)
   a = attrs(g)
   haskey(a, "type") || throw(ArgumentError(
     "$who: group \"$name\" has no `type` attribute — it was not written by this pair's writer"))
-  a["type"] == tag || throw(ArgumentError(
+  _current_tag(a["type"]) == tag || throw(ArgumentError(
     "$who: group \"$name\" holds a \"$(a["type"])\", not a \"$tag\""))
   if haskey(a, "version")
     v = Int(a["version"])
@@ -104,7 +110,7 @@ _dealiasing_tag(::PhaseShift) = "PhaseShift"
 function write_domain(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain)
   g = create_group(parent, name)
   a = attrs(g)
-  a["type"] = "GBGIsotropicTurbulence.FixedDomain"
+  a["type"] = "GBGHomogeneousTurbulence.FixedDomain"
   a["version"] = SCHEMA_VERSION
   a["grid_points_per_axis"] = Int(domain.grid.grid_size[1])
   a["side_length"] = Float64(domain.grid.domain_size[1])
@@ -123,7 +129,7 @@ end
 
 function read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array)
   g = _require_group(parent, name, "read_domain")
-  a = _require_tag(g, name, "read_domain", "GBGIsotropicTurbulence.FixedDomain")
+  a = _require_tag(g, name, "read_domain", "GBGHomogeneousTurbulence.FixedDomain")
   tag = a["dealiasing"]
   dealiasing = tag == "TwoThirds" ? TwoThirds() :
                tag == "PhaseShift" ? PhaseShift() :
@@ -157,7 +163,7 @@ _write_forcing_state(g, key, ::Nothing) = nothing
 function _write_forcing_state(g, key, state::StochasticOUState)
   sg = create_group(g, key)
   a = attrs(sg)
-  a["type"] = "GBGIsotropicTurbulence.StochasticOUState"
+  a["type"] = "GBGHomogeneousTurbulence.StochasticOUState"
   a["version"] = SCHEMA_VERSION
   a["draws"] = state.draws
   write_field(sg, "process", state.process)
@@ -169,14 +175,14 @@ end
 function _read_forcing_state(g, key, who)
   haskey(g, key) || return nothing
   sg = g[key]
-  a = _require_tag(sg, key, who, "GBGIsotropicTurbulence.StochasticOUState")
+  a = _require_tag(sg, key, who, "GBGHomogeneousTurbulence.StochasticOUState")
   return StochasticOUState(read_field(sg, "process"), Int(a["draws"]))
 end
 
 function write_state(parent::HDF5.H5DataStore, name::AbstractString, state::ResolvedFields)
   g = create_group(parent, name)
   a = attrs(g)
-  a["type"] = "GBGIsotropicTurbulence.ResolvedFields"
+  a["type"] = "GBGHomogeneousTurbulence.ResolvedFields"
   a["version"] = SCHEMA_VERSION
   a["scalar"] = state.scalar_spectral !== nothing
   write_field(g, "velocity_spectral", state.velocity_spectral)
@@ -189,7 +195,7 @@ end
 
 function read_state(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain)
   g = _require_group(parent, name, "read_state")
-  a = _require_tag(g, name, "read_state", "GBGIsotropicTurbulence.ResolvedFields")
+  a = _require_tag(g, name, "read_state", "GBGHomogeneousTurbulence.ResolvedFields")
   scalar = Bool(a["scalar"])
   fields = ResolvedFields(domain; scalar)
   _load_field!(fields.velocity_spectral, g, "velocity_spectral", "read_state")
@@ -207,7 +213,7 @@ end
 function write_tracers(parent::HDF5.H5DataStore, name::AbstractString, tracers::Tracers)
   g = create_group(parent, name)
   a = attrs(g)
-  a["type"] = "GBGIsotropicTurbulence.Tracers"
+  a["type"] = "GBGHomogeneousTurbulence.Tracers"
   a["version"] = SCHEMA_VERSION
   write_points(g, "positions", tracers.positions)
   write_scheme(g, "interpolation_scheme", tracers.interpolation_scheme)
@@ -218,7 +224,7 @@ end
 
 function read_tracers(parent::HDF5.H5DataStore, name::AbstractString, domain::FixedDomain)
   g = _require_group(parent, name, "read_tracers")
-  _require_tag(g, name, "read_tracers", "GBGIsotropicTurbulence.Tracers")
+  _require_tag(g, name, "read_tracers", "GBGHomogeneousTurbulence.Tracers")
   positions = _points_on_backend(domain, read_points(g, "positions"))
   scheme = read_scheme(g, "interpolation_scheme")
   unwrapped = haskey(g, "unwrapped_positions") ?
@@ -235,7 +241,7 @@ end
 function _forcing_group(parent, name, tag)
   g = create_group(parent, name)
   a = attrs(g)
-  a["type"] = "GBGIsotropicTurbulence.$tag"
+  a["type"] = "GBGHomogeneousTurbulence.$tag"
   a["version"] = SCHEMA_VERSION
   return g, a
 end
@@ -301,20 +307,20 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
   a = attrs(g)
   haskey(a, "type") || throw(ArgumentError(
     "read_forcing: group \"$name\" has no `type` attribute — it was not written by write_forcing"))
-  tag = a["type"]
+  tag = _current_tag(a["type"])
   _require_tag(g, name, "read_forcing", tag)          # version check under the group's own tag
-  tag == "GBGIsotropicTurbulence.NoForcing" && return NoForcing()
+  tag == "GBGHomogeneousTurbulence.NoForcing" && return NoForcing()
   lo = haskey(a, "lowest_shell") ? Int(a["lowest_shell"]) : 1
   hi = haskey(a, "highest_shell") ? Int(a["highest_shell"]) : 2
-  if tag == "GBGIsotropicTurbulence.Linear"
+  if tag == "GBGHomogeneousTurbulence.Linear"
     return Linear(domain; rate = a["rate"], lowest_shell = lo, highest_shell = hi)
-  elseif tag == "GBGIsotropicTurbulence.ConstantPower"
+  elseif tag == "GBGHomogeneousTurbulence.ConstantPower"
     return ConstantPower(domain; injection_rate = a["injection_rate"],
                          lowest_shell = lo, highest_shell = hi)
-  elseif tag == "GBGIsotropicTurbulence.VarianceRescaling"
+  elseif tag == "GBGHomogeneousTurbulence.VarianceRescaling"
     return VarianceRescaling(domain; target = a["target"], over = Symbol(a["over"]),
                              lowest_shell = lo, highest_shell = hi)
-  elseif tag == "GBGIsotropicTurbulence.VarianceController"
+  elseif tag == "GBGHomogeneousTurbulence.VarianceController"
     # A derived settling time is reconstructed by re-deriving (turnover_time = nothing): the
     # default is a pure function of the stored target and the box side, so the value is
     # bit-identical — and the provenance survives the round-trip, which the scalar-binding guard
@@ -324,7 +330,7 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
     return VarianceController(domain; target = a["target"], gain = a["gain"],
                               turnover_time = derived ? nothing : a["turnover_time"],
                               lowest_shell = lo, highest_shell = hi)
-  elseif tag == "GBGIsotropicTurbulence.StochasticOU"
+  elseif tag == "GBGHomogeneousTurbulence.StochasticOU"
     return StochasticOU(domain;
                         # A schema-1 file spells it `variance`, the name this keyword had before the
                         # owner's 2026-09-18 ruling; both are the same σ².
@@ -356,7 +362,7 @@ _particle_scheme_tag(::AdamsBashforth) = "AdamsBashforth"
 function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::Simulation)
   g = create_group(parent, name)
   a = attrs(g)
-  a["type"] = "GBGIsotropicTurbulence.Simulation"
+  a["type"] = "GBGHomogeneousTurbulence.Simulation"
   a["version"] = SCHEMA_VERSION
   a["time"] = sim.clock.time
   a["step"] = sim.clock.step
@@ -392,7 +398,7 @@ end
 function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array,
                          ordered_interpolation = nothing)
   g = _require_group(parent, name, "read_simulation")
-  a = _require_tag(g, name, "read_simulation", "GBGIsotropicTurbulence.Simulation")
+  a = _require_tag(g, name, "read_simulation", "GBGHomogeneousTurbulence.Simulation")
   domain = read_domain(g, "domain"; array_type)
   scalar = Bool(a["scalar"])
   velocity_forcing = read_forcing(g, "velocity_forcing", domain)
@@ -434,7 +440,7 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
   # the wrapped positions, so the stored unwrapped positions are copied AFTER it — and it discards
   # the sample history, so the stored history is restored after it too.
   sg = _require_group(g, "state", "read_simulation")
-  _require_tag(sg, "state", "read_simulation", "GBGIsotropicTurbulence.ResolvedFields")
+  _require_tag(sg, "state", "read_simulation", "GBGHomogeneousTurbulence.ResolvedFields")
   _load_field!(sim.state.velocity_spectral, sg, "velocity_spectral", "read_simulation")
   scalar && _load_field!(sim.state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
   # The forcing states continue where they were written. The constructor started fresh ones on the
@@ -492,4 +498,4 @@ for (T, writer) in ((:FixedDomain, :write_domain), (:ResolvedFields, :write_stat
   end
 end
 
-end # module GBGIsotropicTurbulenceHDF5Ext
+end # module GBGHomogeneousTurbulenceHDF5Ext

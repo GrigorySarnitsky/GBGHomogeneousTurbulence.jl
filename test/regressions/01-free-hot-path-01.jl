@@ -6,9 +6,9 @@
 # epoch and nothing else" and cannot restart a multistep trajectory history.  A user who follows
 # that instruction after reseeding tracers must not get a `MethodError`.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence.Cache: particles_modified!
+using GBGHomogeneousTurbulence.Cache: particles_modified!
 using Random
 using Test
 

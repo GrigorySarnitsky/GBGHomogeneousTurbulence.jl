@@ -6,7 +6,7 @@
 # non-finite — the guarantee its own guard comment claims, honoured for the velocity.
 
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "negative control — the velocity twin does raise" begin

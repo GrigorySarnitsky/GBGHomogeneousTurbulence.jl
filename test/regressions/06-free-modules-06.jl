@@ -2,7 +2,7 @@
 # particle integration scheme". Not a pass/fail regression test: it prints the per-particle residency the
 # audits pin (four (M, 3) arrays, Heun) beside what a front-door `AdamsBashforth` run
 # actually holds, using the audits' own reflective walk.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: CatmullRom
 using Random
@@ -12,7 +12,7 @@ using Random
 # .claude/bug-hunt/witnesses/ and PROMOTED into test/regressions/, so a fixed number of `..` hops
 # resolves outside the repository once it moves. (Walking up to the first Project.toml is also wrong
 # here — `test/` carries one of its own, so the walk stops a level early.)
-include(joinpath((let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGIsotropicTurbulence.jl")); d = dirname(d); end; d end), "test", "audit_ops.jl"))
+include(joinpath((let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGHomogeneousTurbulence.jl")); d = dirname(d); end; d end), "test", "audit_ops.jl"))
 
 M = 4
 domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,

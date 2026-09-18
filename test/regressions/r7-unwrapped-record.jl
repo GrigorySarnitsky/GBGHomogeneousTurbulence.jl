@@ -6,7 +6,7 @@
 # the record (winding belongs to the abandoned trajectory), and an untracked set refuses the read.
 using Test, Random
 using GBGPeriodicFields: point_positions, npoints
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 
 

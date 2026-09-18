@@ -12,7 +12,7 @@
 # exp(−ν|κ|²τ) = 1 there gives that mode zero damping. The residual is therefore integrated with no
 # restoring term, and — because the flow is chaotic — is amplified at the Lyapunov rate rather than
 # merely random-walking.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, to_physical!
 using Random
 

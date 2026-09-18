@@ -1,4 +1,4 @@
-# GBGIsotropicTurbulence — umbrella module: it sets the include order and assembles the public API.
+# GBGHomogeneousTurbulence — umbrella module: it sets the include order and assembles the public API.
 #
 # This package is a small, focused pseudospectral DNS of homogeneous isotropic turbulence —
 # a velocity field plus a single passive scalar on a periodic box — built on GBGPeriodicFields,
@@ -32,7 +32,7 @@
 
 
 """
-    GBGIsotropicTurbulence
+    GBGHomogeneousTurbulence
 
 Tools for simulating homogeneous isotropic turbulence on three-dimensional periodic
 domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
@@ -52,14 +52,14 @@ Built on `GBGPeriodicFields`.
 The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary
 development took place.
 """
-module GBGIsotropicTurbulence
+module GBGHomogeneousTurbulence
 
 using GBGPeriodicFields
 
 
 # Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.8): it is
 # deliberately NOT re-exported below — reach the reference laws opt-in through the submodule namespace,
-# e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra`.
+# e.g. `using GBGHomogeneousTurbulence.Phenomenology.Spectra`.
 include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
@@ -277,7 +277,7 @@ export FixedDomain,
 
 
 
-# The HDF5 persistence pairs (methods in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# The HDF5 persistence pairs (methods in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded alongside the HDF5 package).
 using .SimulationDomain: write_domain, read_domain
 using .State: write_state, read_state
@@ -287,4 +287,4 @@ using .SimulationRun: write_simulation, read_simulation
 export write_domain, read_domain, write_state, read_state, write_tracers, read_tracers,
        write_forcing, read_forcing, write_simulation, read_simulation
 
-end # module GBGIsotropicTurbulence
+end # module GBGHomogeneousTurbulence

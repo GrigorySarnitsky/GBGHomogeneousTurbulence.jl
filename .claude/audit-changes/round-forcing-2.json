@@ -1,0 +1,691 @@
+{
+ "bySeverity": {
+  "serious": 19,
+  "notable": 33,
+  "minor": 16
+ },
+ "findings": [
+  {
+   "severity": "serious",
+   "title": "VarianceController silently drops Float32 precision through a bare Float64 literal, on the path every default Simulation now takes",
+   "file": "src/Forcing.jl",
+   "before": "(no prior code \u2014 VarianceController is new in this round)",
+   "after": "const _DISSIPATION_GROUP = 0.9\n_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 / 2) / L\n...\n  t\u2113 = turnover_time === nothing ?\n       2 * float(target) / (3 * _stationary_dissipation_estimate(float(target), domain.grid.domain_size[1])) :\n       float(turnover_time)\n...\n  return VarianceController(band, promote(float(target), float(gain), t\u2113)...)",
+   "why_it_matters": "Verified by direct execution: VarianceController(domain; target = Float32(1.5)) on a Float32 FixedDomain \u2014 and, since this struct is now the default velocity_forcing, a plain Simulation(domain) on a Float32 domain \u2014 yields VarianceController{K, Float64} (target/gain/relaxation_time all promoted to Float64), because _DISSIPATION_GROUP = 0.9 is a bare Float64 literal that the turnover_time===nothing default path always divides by, and promote(...) then upcasts the whole struct once any one component is Float64. This happens even with an explicit gain = Float32(1.0) \u2014 only supplying turnover_time explicitly avoids it. It is exactly the defect class test/regressions/r4-free-modules-04-target-factor-float64.jl exists to catch elsewhere (\"A Float64 literal breaks that match on a Float32 run\"), and the very same file's own _target_factor comment states the house rule this violates: use an Int/Rational, never a floating literal, \"off a Float32 run's element type ... which the rest of the observable surface is pinned to preserve.\" No test in this round exercises VarianceController on a Float32 domain, so the regression is unnoticed by the suite. It doesn't crash \u2014 the amplitude is cast back to T before touching any array \u2014 but it silently violates the project's own stated precision-as-fitness-axis invariant on the strategy that is now the default for every run.",
+   "justified": "no",
+   "lane": "free-reader"
+  },
+  {
+   "severity": "notable",
+   "title": "The run layer's DEFAULT forcing changed from an exact per-step clamp to a soft feedback controller, changing the numeric behavior of every prior default-configured Simulation",
+   "file": "src/SimulationRun.jl",
+   "before": "velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),",
+   "after": "velocity_forcing = d -> VarianceController(d; target = kinetic_energy),",
+   "why_it_matters": "BandRescaling(over=:total) deterministically forced the whole-field kinetic energy to equal kinetic_energy at the end of every single step (an algebraic constraint); VarianceController only relaxes toward it exponentially with a settling time t_\u2113/G, leaving a genuine, gain-dependent fluctuation around the target. Any caller who built a Simulation(...) without an explicit velocity_forcing \u2014 the documented, front-door default \u2014 now gets a different trajectory and a k that is no longer pinned exactly to the requested value (the accompanying test in test/simulation_run.jl was loosened from an implicit exact hold to rtol = 0.05/0.1 checks). This is presented, tested and reasoned as an order-of-accuracy fix (the old default silently ran at first order on a third-order scheme) and decision 58 records it as user-directed, but it is nonetheless the highest-blast-radius behavior change in the round: it silently redefines what \"forced and stationary by default\" delivers for every existing caller of the unmodified front door.",
+   "justified": "yes",
+   "lane": "free-reader"
+  },
+  {
+   "severity": "notable",
+   "title": "ConstantPower's rate-application route changed, altering the computed trajectory of every existing ConstantPower-forced run",
+   "file": "src/Forcing.jl",
+   "before": "function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)\n  T = field_scalar_type(rate)\n  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)  # KE_band or variance_band (fused)\n  amplitude = _band_is_empty(band_observable) ? 0.0 :\n              forcing.injection_rate / (2 * band_observable)\n  rate .= T(amplitude) .* forcing.indicator\n  return rate\nend\nuses_linear_rate(::ConstantPower) = true",
+   "after": "function add_forcing_source!(forcing::ConstantPower, N\u0302, field, domain::FixedDomain,\n                             diffusivity::Real)\n  T = field_scalar_type(N\u0302)\n  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)   # at the STAGE state\n  amplitude = _injection_amplitude(forcing.injection_rate, band_observable)\n  convolve!(N\u0302, field, forcing.band, T(amplitude), one(T))\n  return N\u0302\nend\nuses_steady_linear_rate(::ConstantPower) = false",
+   "why_it_matters": "ConstantPower used to fold a rate frozen at the step's start into the exact integrating factor; it now re-evaluates the rate at every Runge\u2013Kutta stage as an additive source. For the same injection_rate, RNG seed and grid, an existing simulation built with ConstantPower now integrates a numerically different trajectory step-by-step (only converging to the same continuum limit as \u0394t\u21920). The change is well-motivated (the old route silently collapsed the scheme to first order) and is heavily tested, but it is a silent change to a computed result for input that previously ran and produced specific numbers \u2014 worth flagging as exactly the kind of alteration the audit is watching for, independent of whether the new numbers are \"more correct.\"",
+   "justified": "yes",
+   "lane": "free-reader"
+  },
+  {
+   "severity": "minor",
+   "title": "The accuracy fix triples-plus the default configuration's per-step host-readback cost, and the round defers rather than closes the resulting gap",
+   "file": "test/optimality_audit.jl",
+   "before": "(name = \"default (adaptive dt, BandRescaling :total)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),",
+   "after": "(name = \"default (adaptive dt, VarianceController, 3-stage)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),",
+   "why_it_matters": "The default run's blocking device\u2192host synchronization count per step jumps from 3 (against a floor of 1) to 10 \u2014 the \"largest gap in this ledger,\" per the added comment, which the round explicitly leaves open (\"held, not accepted: the three per-stage reductions are one fused multi-weight reduction away\") rather than closing in the same commit. This rides on the pre-existing generic HOST_SIDE_FORCING_SCALARS holder rather than being weighed on its own: a >3x increase on precisely the synchronization axis the package's GPU-primary invariant (\"minimal footprint trumps compute cost\") foregrounds is a real cost being paid for the correctness fix, and CLAUDE.md's own self-guard warns against treating a recorded-but-unbounded cost as thereby acceptable. Not a defect in the fix itself, but the round trades one invariant (temporal order) for pressure on another (GPU-primary minimal synchronization) without narrowing that new gap or asking whether 3 separate per-stage reductions were the cheapest way to get the corrected physics.",
+   "justified": "unclear",
+   "lane": "free-reader"
+  },
+  {
+   "severity": "serious",
+   "title": "The decision-log entry that records the fix states the formula it says was the bug",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "The same diff writes the CORRECT law into src/Forcing.jl, twice \u2014 docstring: `A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\ell}{2k_f(t)}`, and code: `restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time` with `whole_variance = factor * inner(field, field)   # k, the quantity held`.",
+   "after": "Decision 58, docs/ARCHITECTURE.md:1907 \u2014 `+    Moin (2016, Eq. 20): ``A = [\\varepsilon - G(k_f - k_\\infty)/t_\\ell]/(2k_f)``, whose marginal term` `+    ``\\varepsilon/2k_f`` reinjects exactly what dissipation removes and whose proportional term gives` `+    ``\\mathrm dk/\\mathrm dt = -G(k - k_\\infty)/t_\\ell``` \u2014 k_f, the BAND variance, in the restoring term.",
+   "why_it_matters": "The same entry's own postscript says: 'The first implementation put the *band* variance in both places of that formula \u2014 normalizing by ``k_f`` (right) and restoring toward ``k_f`` (wrong)\u2026 the run held the band at 1.5 and let k settle about 30% above it, silently breaking the grid-mode \u03bd calibration.' The formula the entry publishes is that wrong version, and it is self-inconsistent: with k_f in the numerator the stated consequence dk/dt = \u2212G(k\u2212k_\u221e)/t_\u2113 does not follow. I verified the code is right (measured dk/dt vs \u2212G(k\u2212k_\u221e)/t_\u2113 agree to ratio 1.00000), so this is the authoritative record \u2014 the append-only decision log the project forbids re-litigating \u2014 carrying the defect a reader would reimplement from it.",
+   "justified": "no",
+   "lane": "executing"
+  },
+  {
+   "severity": "serious",
+   "title": "The default forcing was swapped, so every previously valid default run now computes different numbers and `kinetic_energy` is no longer an exact invariant",
+   "file": "src/SimulationRun.jl",
+   "before": "`-                    velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),`",
+   "after": "`+                    velocity_forcing = d -> VarianceController(d; target = kinetic_energy),`",
+   "why_it_matters": "Measured, 400 default steps at 32^3 seeded identically: at base k\u22121.5 is exactly 0.0 at steps 1/5/20 and \u00b12.2e\u221216 at 100/400; at head it is \u22125.4e\u22127 \u2192 \u22122.5e\u22125 and monotonically growing, and the two final velocity fields differ from byte 1. Anyone with a default `Simulation(...)` gets a different trajectory and a different meaning for the `kinetic_energy` keyword \u2014 an exact per-step clamp became an exponential attractor with a 2.9-time-unit settling time. The defect actually demonstrated was ConstantPower's *routing* (uses_linear_rate on a state-dependent rate); swapping the front-door default and adding a whole new strategy is a strictly larger change riding along with it. It is disclosed in the docstring and pinned by a new test, which is why I mark it unclear rather than unjustified \u2014 but the diff nowhere states that the default's numerical output changes for existing users.",
+   "justified": "unclear",
+   "lane": "executing"
+  },
+  {
+   "severity": "notable",
+   "title": "The default step got 28.5% slower and issues 10 device readbacks where it issued 3 \u2014 and the ledger that measures that was re-baselined in the same commit onto an untouched holder",
+   "file": "test/optimality_audit.jl",
+   "before": "`-  (name = \"default (adaptive dt, BandRescaling :total)\",` `-   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),`",
+   "after": "`+  (name = \"default (adaptive dt, VarianceController, 3-stage)\",` `+   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),` \u2014 with the comment `+ Ten crossings against a floor of one is the largest gap in this ledger, and it is held, not accepted`.",
+   "why_it_matters": "Measured at 64^3: default 35.35 \u2192 45.44 ms/step (+28.5%); per-step `step!` allocation 2080 \u2192 6336 B (3.05x, against a stated invariant that the hot loop is allocation-free over preallocated buffers); the compute ledger's forcing cell went from 3 spectral-vector passes per step to 6*3 = 18. On a GPU-primary package a 3\u219210 blocking readback jump in the DEFAULT hot loop is the headline cost of this change, and it is absorbed entirely by the pre-existing `HOST_SIDE_FORCING_SCALARS` holder whose text this diff does not touch \u2014 no new `:DESIGN` holder citing decision 58, and `OPEN_LOCAL_WINS` still empty. The project's own rule is that a recorded cost with no lower bound held against it is an unexamined cost; here the record was widened to fit the new number.",
+   "justified": "unclear",
+   "lane": "executing"
+  },
+  {
+   "severity": "notable",
+   "title": "The `VarianceRescaling` order claim is quantified over 'every other forcing in the module'; StochasticOU measures 0.126",
+   "file": "src/Forcing.jl",
+   "before": "`-!!! note \"It costs two host readbacks per step on a GPU\"` `-    Sizing the rescale means reducing the field to a number\u2026 `ConstantPower` pays one; an unforced run pays none.` (the base docstring made no order claim at all)",
+   "after": "`+    is first-order however good the scheme is. Measured on the third-order `IFLowStorageRK3`: **1.02**` `+    here against **3.01** for every other forcing in the module.`",
+   "why_it_matters": "I re-ran the ladder over every forcing the module defines. NoForcing 3.006, Linear 3.005, ConstantPower 3.006, VarianceController 3.005 \u2014 and StochasticOU 0.126, which is also 'in the module' (defined, docstringed, and carried in docs/docstring_shape.csv, merely un-exported). The claim is a universally quantified measurement published in a user-facing docstring, and it is false for one of the five members; a reader takes it as licence to assume any non-rescaling forcing preserves the scheme's order. The house rule is that quantifiers must be true and precise; 'every forcing that supplies a rate or a deterministic source' would have been.",
+   "justified": "no",
+   "lane": "executing"
+  },
+  {
+   "severity": "notable",
+   "title": "The new `VarianceController` documents a constructor that cannot produce the object its own `# Fields` section describes",
+   "file": "src/Forcing.jl",
+   "before": "Every sibling strategy documents the domain-taking form, e.g. `VarianceRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)`, and `DeferredForcing`'s docstring lists the operator-free forms: `Linear(; rate, \u2026)` / `ConstantPower(; injection_rate, \u2026)` / `+    VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)`.",
+   "after": "`+    VarianceController(; target, gain = 1.0, turnover_time = nothing,` `+                       lowest_shell = 1, highest_shell = 2)` \u2026 `+# Fields` `+- `band` \u2014 the band-pass kernel, lazy; \u2026` `+- `target`, `gain`, `relaxation_time` \u2014 ``k_\\infty``, ``G`` and ``t_\\ell``.` \u2014 attached to `+struct VarianceController{K, T} <: AbstractForcing`.",
+   "why_it_matters": "I ran the documented call verbatim. `VarianceController(; target = 1.5, gain = 1.0, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)` returns a `DeferredForcing`, and `.band`, `.target`, `.gain`, `.relaxation_time` each throw `FieldError: type DeferredForcing has no field \u2026, available fields: build`. The docstring is the only surface a user reads (`?VarianceController`, the API page), it is the one strategy in the module whose header shows the deferred form, and the `domain` form the sim actually builds is documented nowhere \u2014 `domain` is also absent from its `# Arguments` list, which every sibling includes. `DeferredForcing`'s own catalogue of operator-free constructors was extended for the rename but not for the new strategy.",
+   "justified": "no",
+   "lane": "executing"
+  },
+  {
+   "severity": "notable",
+   "title": "The rename of `apply_forcing!` and `BandRescaling`, and the 3\u21925 arity change on the source hook, break third-party code beyond what the defect required",
+   "file": "src/GBGIsotropicTurbulence.jl",
+   "before": "`-  BandRescaling,` `-  uses_linear_rate,` `-  apply_forcing!,`",
+   "after": "`+  VarianceRescaling,` `+  VarianceController,` `+  uses_steady_linear_rate,` `+  project_forcing!,`",
+   "why_it_matters": "Executed at HEAD: `BandRescaling`, `apply_forcing!` and `uses_linear_rate` are all `UndefVarError`, and a base-era user forcing defining the old three-argument hook now makes `ResolvedGenerator` throw. Only one of these is argued from the defect: `uses_linear_rate` \u2192 `uses_steady_linear_rate` carries the load-bearing property the bug was about. `apply_forcing!` \u2192 `project_forcing!` and `BandRescaling` \u2192 `VarianceRescaling` are naming preferences bundled into an accuracy fix, and the arity change forces every implementer to rewrite even where both new arguments are ignored \u2014 the diff's own `StochasticOU` method is `add_forcing_source!(ou, N\u0302, field, domain, diffusivity) = add!(N\u0302, N\u0302, ou.state)   # the increment was drawn once per step; the stage field is not needed`. The package allows breaking changes, so this is a proportionality point, not a violation: four public breaks landed where one was demonstrated.",
+   "justified": "unclear",
+   "lane": "executing"
+  },
+  {
+   "severity": "notable",
+   "title": "The two instruments that would have priced this change were themselves edited by it \u2014 one self-admittedly, one left pointing at the retired path",
+   "file": "test/regressions/r4-free-hot-path-02.jl",
+   "before": "`-const POWER = measure(ConstantPower(DOMAIN; injection_rate = 1.0),        :rate)` `-vector_passes(c) = c.inner + c.weighted_inner + 2 * c.convolve` `-  return c`",
+   "after": "`+const POWER      = measure(ConstantPower(DOMAIN; injection_rate = 1.0),            :source)` `+source_passes(m)  = readbacks(m) + 3 * m.out.convolve` `+  # That is exactly how this test went vacuous when the state-dependent forcings moved to the source` `+  # hook (2026-08-22): the term it was written to measure quietly stopped being measured.`",
+   "why_it_matters": "The forcing-traffic witness returned only the input double, so after the move its `convolve` counter read zero and the pass comparison balanced at 0 == 0; the same commit that caused that repaired it and added its own 'the measurement is not vacuous' guard. That is the self-certifying shape: the oracle was corrected by the party it was auditing, and only its author's diligence, not the harness, closed it. Worse, the one frozen *allocation* budget in the suite (test/regressions/05-test-critic-05.jl, the `step! + deposit!` bytes guard) received a pure rename \u2014 `-velocity_forcing = BandRescaling(domain; target = 0.6, over = :band,` \u2192 `+velocity_forcing = VarianceRescaling(domain; \u2026` \u2014 and so still exercises the retired forcing. I measured what it therefore never sees: the new default allocates 6336 B/step at 64^3 against 2080 B for the forcing the witness does test.",
+   "justified": "unclear",
+   "lane": "executing"
+  },
+  {
+   "severity": "minor",
+   "title": "The quoted 'measured' convergence orders do not reproduce to the digits given",
+   "file": "src/Forcing.jl",
+   "before": "(new comment block; the base file carried no measurement)",
+   "after": "`+# Measured on IFLowStorageRK3 (third order), refinement ladder: NoForcing 2.995, Linear 2.987,` `+# ConstantPower 1.018 and VarianceRescaling 1.023 BEFORE this split` \u2014 echoed in test/integrators.jl (`ConstantPower 1.018, the front-door default 1.023, against 2.995 unforced`), test/memory_audit.jl (`measured 1.018 against 2.995 unforced`) and test/optimality_audit.jl (`measured collapsing IFLowStorageRK3 from 2.995 to 1.018`).",
+   "why_it_matters": "I checked out the base commit and re-ran the ladder the diff's own `measured_order` helper defines (16^3, \u03bd=0.05, T=0.2, n=1024/32/64, MersenneTwister(7)): NoForcing 3.006, Linear 3.005, ConstantPower 1.045, BandRescaling(:total) 1.047, front-door default 1.047. The finding is fully confirmed in direction and magnitude \u2014 third order collapses to first \u2014 but none of the four published figures reproduces, so they were taken from some other configuration that the diff does not state. Four separate source and test files now carry these unreproducible numbers as the recorded evidence for the change, and a later reader re-measuring will not land on them.",
+   "justified": "unclear",
+   "lane": "executing"
+  },
+  {
+   "severity": "serious",
+   "title": "The rate predicate's meaning was widened from a checkable property to an unchecked one; the guard that enforces it was not extended",
+   "file": "src/Forcing.jl",
+   "before": "`uses_linear_rate(::AbstractForcing) = false` \u2014 \"Whether `forcing` drives its field through a linear per-mode rate \u2014 that is, whether it implements [`set_forcing_rate!`](@ref). The default is `false`; a forcing that does implement the hook **must** declare it `true`.\"",
+   "after": "`uses_steady_linear_rate(::AbstractForcing) = false` \u2014 \"Whether `forcing` drives its field through a per-mode rate that is **constant in time** \u2026 *Steady*, not merely linear, is the load-bearing word: a per-mode rate re-solved from the state each step must **not** declare this.\"  `_overrides_rate_hook` in src/Generator.jl is unchanged and still asks only \"does it define a method?\"",
+   "why_it_matters": "At base the predicate was purely mechanical (\"implements the hook\"), and `_overrides_rate_hook` checked it in both directions, so the declaration could not lie. Head adds a second, semantic conjunct \u2014 steadiness in time \u2014 and adds a guard for the *other* hook's arity (`_defines_stale_source_hook`), but nothing checks the new conjunct. I built the witness: a user strategy `MyPower` that is literally the pre-fix `ConstantPower` (state-dependent A, `uses_steady_linear_rate(::MyPower) = true`). `Simulation(...; velocity_forcing = d -> MyPower(d; injection_rate = 0.2))` constructs without complaint, `generator.velocity_rate !== nothing` (it is handed a rate array and rides the integrating factor), and the measured temporal order is **1.045** against **3.006** for the shipped `ConstantPower` on the same 16\u00b3 grid, \u03bd = 0.05, IFLowStorageRK3, seed 7. That is the exact defect this round removed from the package, still reachable by any user strategy, and silent \u2014 the run completes and reports nothing wrong. The docstring even writes the rule as a **must**; the code enforces nothing.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "serious",
+   "title": "The docstring accretion ratchet was reset in the same commit as the growth, and a rename bypasses its hard cap entirely",
+   "file": "docs/docstring_shape.csv",
+   "before": "`Forcing.jl::add_forcing_source!(forcing\uff0c N\u0302\uff0c domain) -> N\u0302,39,0,44`  /  `Forcing.jl::BandRescaling(domain; target\uff0c over\uff0c lowest_shell = 1\uff0c highest_shell = 2),54,3,600`  /  `Forcing.jl::uses_linear_rate(forcing) -> Bool,72,0,107`  /  `Forcing.jl::ConstantPower(\u2026),91,1,376`  /  `SimulationRun.jl::Simulation(\u2026),77,1,1688`",
+   "after": "`Forcing.jl::add_forcing_source!(forcing\uff0c N\u0302\uff0c field\uff0c domain\uff0c diffusivity) -> N\u0302,122,1,187`  /  `Forcing.jl::VarianceRescaling(\u2026),86,1,679`  /  `Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,166`  /  `Forcing.jl::ConstantPower(\u2026),67,1,382`  /  `SimulationRun.jl::Simulation(\u2026),77,1,1705`",
+   "why_it_matters": "`lint_docstring_shape()` (docs/make.jl 126\u2013135) applies the growth ratchet only when `haskey(base, key)` and the hard caps `SHAPE_NEW_PARAGRAPH_CAP = 120` / `SHAPE_NEW_ADMONITION_CAP = 3` only when it does not. Two holes are exercised here at once. (a) `add_forcing_source!`'s longest paragraph went 39 \u2192 **122 words, above the 120-word hard cap for a new docstring** \u2014 it passes only because the CSV was regenerated in the same commit, which turns the new key into a known one and skips the cap branch forever. (b) The ratchet is keyed on the signature string, so every rename resets it: `BandRescaling` (600 words \u2014 the very docstring CLAUDE.md and docs/make.jl name as the cautionary example, cut down from 861) reappears as `VarianceRescaling` at **679**, +13%, with no baseline to fail against; `uses_linear_rate` 107 \u2192 `uses_steady_linear_rate` **166**, +55%. And three keys that did *not* change name grew anyway (ConstantPower 376\u2192382, Linear 161\u2192171, Simulation 1688\u21921705) and would each have failed `words > bw` \u2014 the wholesale re-baseline banked all of it. docs/make.jl's own instruction is \"when a docstring legitimately grows, rewrite it whole rather than raise its number; when it *shrinks*, re-baseline\". This re-baselined in the direction the guard exists to prevent.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "The frozen sync ledger for the default run was re-baselined from 3 to 10 readbacks under a pre-existing holder, while ARCHITECTURE.md still records three",
+   "file": "test/optimality_audit.jl",
+   "before": "`(name = \"default (adaptive dt, BandRescaling :total)\",\\n   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),`",
+   "after": "`(name = \"default (adaptive dt, VarianceController, 3-stage)\",\\n   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),`  \u2014 and `ALL_HOLDERS` / `OPEN_LOCAL_WINS = ()` are untouched",
+   "why_it_matters": "On the GPU-primary target the default configuration's blocking device-to-host readbacks per step went 3 \u2192 10 against an unchanged floor of 1 \u2014 the largest gap in the ledger, a 3.3\u00d7 regression on the hot loop \u2014 and the suite accepts it because the no-unclaimed-gap test (line 394: `@test s.floor > 0 || (s.holder !== nothing && s.holder in ALL_HOLDERS)`) only requires *a* holder to exist, and `HOST_SIDE_FORCING_SCALARS` already did. No new holder, no new `:FIX` entry, no `OPEN_LOCAL_WINS` addition. CLAUDE.md requires a deliberate step-schedule change to update the frozen ledgers \"citing the decision\", and decision 58 does not mention the readback cost at all. Worse, the same commit renamed but did not correct docs/ARCHITECTURE.md:1365, which still reads \"the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables \u2014 against a floor of **one**\", naming a forcing that is no longer the default. The architecture record and the ledger in one commit disagree by 3.3\u00d7, and the commit titled \"the docs still described the defect, not the fix\" left it.",
+   "justified": "unclear",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "decision 58 records the wrong formula \u2014 the exact category error its own postscript says was the shipped bug",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(same entry, added in the same commit) \"The first implementation put the *band* variance in both places of that formula \u2014 normalizing by ``k_f`` (right) and restoring toward ``k_f`` (wrong). \u2026 the run held the band at ``1.5`` and let ``k`` settle about 30% above it\"",
+   "after": "(line 1907) \"Moin (2016, Eq. 20): ``A = [\\\\varepsilon - G(k_f - k_\\\\infty)/t_\\\\ell]/(2k_f)``, whose marginal term ``\\\\varepsilon/2k_f`` reinjects exactly what dissipation removes and whose proportional term gives ``\\\\mathrm dk/\\\\mathrm dt = -G(k - k_\\\\infty)/t_\\\\ell``\"",
+   "why_it_matters": "The code is right \u2014 `restoring = gain * (whole_variance - target) / relaxation_time` with `whole_variance = factor * inner(field, field)` (src/Forcing.jl:593\u2013600) \u2014 and so is the Forcing.jl docstring's display formula, which reads ``[\\\\varepsilon(t) - G[k(t) - k_\\\\infty]/t_\\\\ell]/(2k_f(t))``. But \u00a711 decision 58, the normative record a future reader is told not to re-litigate, states the restoring term over ``k_f``, which is the wrong physics the postscript three paragraphs later describes as having nearly shipped; the ``dk/dt`` identity quoted immediately after does not follow from the formula as written. The same slip recurs in the docstring's own identity sentence: \"The rate is the marginal law ``A = \\\\varepsilon/2k``\" (src/Forcing.jl:495) where the code and the display block use ``2k_f``. Of the three places this commit wrote the k / k_f distinction, one is right, one is wrong, and one is ambiguous \u2014 for a distinction the same commit says is invisible to the test suite and worth 30% in the held quantity.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "The sync model gained a `stages` parameter whose default silently under-prices exactly the forcings that changed",
+   "file": "test/optimality_audit.jl",
+   "before": "`function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,\\n                  turnover_budget::Bool = false, monitor::Symbol = :none)`",
+   "after": "`function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::Symbol = :none,\\n                  turnover_budget::Bool = false, monitor::Symbol = :none, stages::Int = 1)` \u2014 with the ledger comment \"`stages` is not optional here \u2014 a state-dependent forcing is evaluated at every stage, and a row that omits it silently prices the forcing as if it were armed once per step, which is the arrangement this whole round replaced.\"",
+   "why_it_matters": "The comment states the hazard precisely and then leaves the default at 1 with nothing enforcing it. A future SYNC_LEDGER row written `velocity_forcing = :controller` without `stages` freezes 4 crossings instead of 10 and the whole suite is content \u2014 the same shape of drift (\"a cell that prices a per-stage cost as a per-step one\") that this round was written to remove. Contrast the compute model, which has no such escape: `_forcing_pass_delta` hard-codes `6 * _evals(scheme)` inside the branch, so the stage count cannot be omitted. The two instruments over the same change were given opposite defaults, and only the strict one is safe.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "The one test that ties the sync model to executed code was rewritten to compare at stages = 1, leaving the 3\u00d7 multiplier \u2014 the entire ledger change \u2014 verified by nothing",
+   "file": "test/regressions/r4-free-hot-path-02.jl",
+   "before": "`model_syncs(tag) = count(s -> occursin(\"(velocity)\", s.site),\\n                         OptModel._syncs(; adaptive_dt = false, velocity_forcing = tag))`  \u2026  `@test model_syncs(:power)      == readbacks(POWER)`",
+   "after": "`model_syncs(tag; stages = 1) = count(\u2026, OptModel._syncs(; adaptive_dt = false, velocity_forcing = tag, stages))`  \u2026  `# ONE stage's worth, which is what \\`measure\\` exercises; the model multiplies by the stage count.`  `@test model_syncs(:power;      stages = 1) == readbacks(POWER)`  `@test model_syncs(:controller; stages = 1) == readbacks(CONTROLLER)`",
+   "why_it_matters": "This file exists precisely to stop the frozen models drifting from what the hooks do \u2014 its own header says the models \"report FEWER host readbacks \u2026 than the code performs\". Base asserted the model's number against measured reductions, and the model's number was the ledger's number. Head pins the model at `stages = 1` while the ledger row it certifies uses `stages = 3`, so the per-stage shape is checked and the multiplier that took the default from 3 to 10 is not checked at all. The sibling assertion in the same testset shows it could have been done: `@test model_vector_passes(:power) == EVALS_RK3 * source_passes(POWER)` does carry the multiplier. The author's own comment in this file \u2014 \"That is exactly how this test went vacuous when the state-dependent forcings moved to the source hook\" \u2014 describes the failure mode the edit half-reintroduces.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "Two sibling tests were left calling a deleted method and now silently measure nothing; only the one the author noticed was fixed",
+   "file": "test/regressions/r4-free-modules-01.jl",
+   "before": "src/Forcing.jl deleted `uses_linear_rate(::ConstantPower) = true` and `function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain) \u2026 rate .= T(amplitude) .* forcing.indicator; return rate; end`",
+   "after": "the test still reads `set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)` \u2026 `@info \"measured: ConstantPower\" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1` \u2014 the call now resolves to the do-nothing fallback `set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate`",
+   "why_it_matters": "The measurement block reports 0 reductions against `ledger_crossings = 1`, reading as though the ledger over-prices `ConstantPower` when in fact nothing ran. It is `@info` rather than `@test`, so nothing fails \u2014 a diagnostic that now lies in the direction of 'the instrument is too strict', which is the worst direction for an audit surface. The same class sits in test/regressions/r4-aliasing-and-mutation-01.jl, whose header still asserts \"a `scalar_forcing` that declares `uses_steady_linear_rate` (`ConstantPower`, `Linear`) and the forcing's ONLY hook, `set_forcing_rate!`, is never called\" \u2014 false for `ConstantPower` on both counts now, and its `wired` / `mismatched` arms both instantiate `ConstantPower`, so the witness no longer exercises the rate-gate path it was written for. The author noticed and repaired exactly this vacuity in r4-free-hot-path-02.jl, commenting on it at length, and did not sweep the two files that call the same deleted method.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "minor",
+   "title": "The new compute-audit guard is advertised as covering the drift this round found, and is satisfiable by any wrong number",
+   "file": "test/compute_audit.jl",
+   "before": "`elseif tag === :power`  `return slot === :velocity ? _ex(spectral_vector = 1, spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1) : _ex(spectral_scalar = 2 + _applies(scheme), real_spectral_scalar = 1)`",
+   "after": "`elseif tag === :power`  `return slot === :velocity ? _ex(spectral_vector = 4 * _evals(scheme)) : _ex(spectral_scalar = 4 * _evals(scheme))`  plus the new guard `# Every tag must be MODELLED, not fall through to the OU catch-all. An unlisted tag silently priced as a stochastic forcing is the exact drift this round found in the \\`:power\\` cell.`  `for tag in (:band, :linear, :power, :controller)`  `  @test _forcing_pass_delta(tag, :velocity, :RK3) != _forcing_pass_delta(:ou, :velocity, :RK3)`  `end`",
+   "why_it_matters": "The comment claims the guard catches \"the exact drift this round found in the `:power` cell\", but the `:power` cell was never unlisted \u2014 it had its own branch and returned a value already unequal to the OU catch-all, so the base's now-wrong cell (off by 12\u00d7 in spectral_vector once the route changed) passes this new test unchanged. The guard detects only a *missing* branch, never a *wrong* one, which is the failure that actually occurred. A test whose stated purpose is one class and whose reach is another is worse than none here, because it is cited as the reason the class is now covered. The genuine tie exists elsewhere (r4-free-hot-path-02.jl compares the cell to measured traffic), so the real coverage does not come from this line.",
+   "justified": "no",
+   "lane": "under-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "Simulation()'s new default forcing multiplies per-step host-device sync ~3x for every ordinary run",
+   "file": "src/SimulationRun.jl",
+   "before": "velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),   # 3 blocking readbacks/step (test/optimality_audit.jl SYNC_LEDGER: achieved=3, floor=1)",
+   "after": "velocity_forcing = d -> VarianceController(d; target = kinetic_energy),   # now 10 blocking readbacks/step (SYNC_LEDGER: name = \"default (adaptive dt, VarianceController, 3-stage)\", achieved = 10, floor = 1)",
+   "why_it_matters": "This package is GPU-primary and every plain `Simulation(...)` call \u2014 the input every ordinary user relies on \u2014 now issues roughly 3x more blocking device-to-host synchronizations per step than before, because the new default forcing's amplitude is recomputed from 3 field reductions at every Runge-Kutta stage (3 stages x 3 reductions = 9, plus the 1 CFL readback = 10) instead of once per step. The correctness motivation (fixing a first-order accuracy bug in the old default) is real and the cost is honestly re-ledgered with a 'held, not accepted' holder \u2014 but the change silently alters the performance/portability profile of the single most common call in the package (no keyword change signals it), and the gap it now records (10 vs a floor of 1) is the largest in that ledger.",
+   "justified": "unclear",
+   "lane": "backend-portability"
+  },
+  {
+   "severity": "minor",
+   "title": "VarianceController's Float64 defaults/estimate silently upcast a Float32 target at construction",
+   "file": "src/Forcing.jl",
+   "before": "ConstantPower's rate fill used weighted_inner(field, forcing.band) whose factor _target_factor(field) is an Int/Rational specifically to avoid promoting a Float32 run's element type (guarded by test/regressions/r4-free-modules-04-target-factor-float64.jl).",
+   "after": "function VarianceController(domain; target::Real, gain::Real = 1.0, turnover_time = nothing, ...)\n  t\u2113 = turnover_time === nothing ? 2 * float(target) / (3 * _stationary_dissipation_estimate(float(target), ...)) : float(turnover_time)\n  return VarianceController(band, promote(float(target), float(gain), t\u2113)...)\nend\n# _stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3/2) / L   with const _DISSIPATION_GROUP = 0.9 (a Float64 literal)",
+   "why_it_matters": "gain defaults to the Float64 literal 1.0, and _DISSIPATION_GROUP = 0.9 forces the default turnover-time computation to Float64 even when target is Float32; promote(...) then upcasts ALL THREE stored fields (target, gain, relaxation_time) to Float64 for any Float32 run that does not explicitly pass gain::Float32. The package has an established regression class for exactly this (r4-free-modules-04-target-factor-float64.jl guards ConstantPower/VarianceRescaling), but no equivalent test exists for VarianceController, and the final T(amplitude) narrowing at the per-stage call site masks the numeric consequence rather than fixing the type purity the rest of the module enforces.",
+   "justified": "no",
+   "lane": "backend-portability"
+  },
+  {
+   "severity": "minor",
+   "title": "The construction-time stale-hook guard is a Base.unwrap_unionall reflection probe added to every ResolvedGenerator build",
+   "file": "src/Generator.jl",
+   "before": "(no equivalent check existed for add_forcing_source!'s arity)",
+   "after": "function _defines_stale_source_hook(forcing)\n  for m in methods(add_forcing_source!, Tuple{typeof(forcing), Vararg{Any}})\n    signature = Base.unwrap_unionall(m.sig)\n    ...\n  end\nend",
+   "why_it_matters": "Purely host-side Julia reflection run once at ResolvedGenerator construction (not the per-step hot loop), so it is backend-neutral and does not break on CuArray/ROCArray storage; flagged here only to record that it was checked and found NOT to be a portability concern, since a metaprogramming probe over method tables is exactly the shape that can accidentally assume something about argument types that later trips on a device-specific dispatch path (it does not, in this case: the check is keyed on the forcing type and its own signature width, never on the array backend).",
+   "justified": "yes",
+   "lane": "backend-portability"
+  },
+  {
+   "severity": "serious",
+   "title": "The default forcing model was swapped, so every default `Simulation` now integrates different physics \u2014 and the exact k-hold the grid-mode \u03bd calibration depends on became an asymptotic one, while the docs kept asserting it",
+   "file": "src/SimulationRun.jl",
+   "before": "velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),   ...  !!! note \"The default holds the kinetic energy fixed, so it is not a measurable of the default run\"  /  `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic energy at the target **value**  ...  One precondition: the choice is self-consistent only if the run really holds ``k`` at `kinetic_energy`, which the front door's `BandRescaling(over = :total)` guarantees and `:band` does not.",
+   "after": "velocity_forcing = d -> VarianceController(d; target = kinetic_energy),   ...  !!! note \"The default drives the kinetic energy to a set value, so read it as a control target\"  /  `VarianceController` restores ``k`` exponentially to `kinetic_energy`  ...  The default `VarianceController` does \u2014 its restoring term measures the whole-field ``k`` \u2014 which is what makes this calibration legitimate.",
+   "why_it_matters": "Any script that calls `Simulation(grid_points_per_axis = N)` and takes the default forcing now runs a different physical model: a Bassenne feedback controller (with two new author-defaulted parameters, `gain = 1.0` and a derived `turnover_time`) instead of a per-step rescale. Under the old default the whole-field k was equal to `kinetic_energy` exactly after every step; now it only relaxes toward it with settling time t_\u2113/G, and the change set's own new test accepts `rtol = 0.05` after 200 steps. Grid mode solves \u03bd from the ASSUMED k, so the resolution criterion \u03ba_max\u00b7\u03b7 that was exactly self-consistent is now self-consistent to within the controller's fluctuation (a 5% error in k propagates as ~7.5% in \u03b5 and ~2% in \u03b7). Trajectories, spectra, Re_\u03bb and every fluctuation statistic of k differ from the previous default for identical inputs and seeds. The order defect that motivates the swap is real (a post-step rescale is Lie\u2013Trotter and cannot be third order), but the docstring was rewritten from a guarantee (\"guarantees\") to a weaker mechanism while still being presented as making the calibration \"legitimate\" \u2014 the contract was restated to match the new behaviour rather than the loss being called out.",
+   "justified": "unclear",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "serious",
+   "title": "`ConstantPower` moved from the integrating factor to the per-stage source: every existing ConstantPower run computes a different trajectory, at 3\u00d7 the host readbacks and 12\u00d7 the field passes on that axis",
+   "file": "src/Forcing.jl",
+   "before": "uses_linear_rate(::ConstantPower) = true\n\nfunction set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain)\n  T = field_scalar_type(rate)\n  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)\n  amplitude = _band_is_empty(band_observable) ? 0.0 : forcing.injection_rate / (2 * band_observable)\n  rate .= T(amplitude) .* forcing.indicator\n  return rate\nend",
+   "after": "uses_steady_linear_rate(::ConstantPower) = false\n\nfunction add_forcing_source!(forcing::ConstantPower, N\u0302, field, domain::FixedDomain,\n                             diffusivity::Real)\n  T = field_scalar_type(N\u0302)\n  band_observable = _target_factor(field) * weighted_inner(field, forcing.band)   # at the STAGE state\n  amplitude = _injection_amplitude(forcing.injection_rate, band_observable)\n  convolve!(N\u0302, field, forcing.band, T(amplitude), one(T))\n  return N\u0302\nend",
+   "why_it_matters": "A user with an existing `ConstantPower` run gets different numbers: the forcing was applied through the exact exponential `exp((A \u2212 D|\u03ba|\u00b2)\u03c4)` with A frozen at the step start, and is now an explicit additive term evaluated afresh at each Runge\u2013Kutta stage. The injected-power identity \u27e8u\u00b7f\u27e9 = \u03b5_target is preserved (verified algebraically), but the discrete trajectory is not. The cost moved with it: the change set's own re-frozen ledgers price the velocity slot at `_ex(spectral_vector = 4 * _evals(scheme))` = 12 field-scale vector passes per RK3 step where the base priced `_ex(spectral_vector = 1, \u2026)`, and the sync ledger row goes `achieved = 2` \u2192 `achieved = 4`. The underlying order defect is genuine, but the narrower fix \u2014 re-arming the rate at each stage, keeping the exponential and one reduction per stage \u2014 is not considered or recorded anywhere in the change set, so no bound was produced showing the chosen route is the cheapest correct one.",
+   "justified": "yes",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "notable",
+   "title": "Both frozen audit ledgers were re-baselined in the same commit that caused the regression they would have flagged: the default run's blocking host readbacks go 3 \u2192 10 per step on a GPU-primary package",
+   "file": "test/optimality_audit.jl",
+   "before": "const SYNC_LEDGER = (\n  (name = \"default (adaptive dt, BandRescaling :total)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),\n  ...\n  (name = \"adaptive dt, ConstantPower\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :power),                      achieved = 2, floor = 1),",
+   "after": "  (name = \"default (adaptive dt, VarianceController, 3-stage)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),\n  ...\n  (name = \"adaptive dt, ConstantPower, 3-stage\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :power, stages = 3),          achieved = 4, floor = 1),",
+   "why_it_matters": "The optimality audit exists to BOUND, not merely measure, and its own comment now concedes \"Ten crossings against a floor of one is the largest gap in this ledger\". The default configuration on the package's primary target (GPU) now blocks on a device-to-host transfer ten times per step instead of three \u2014 three reductions per stage times three stages, plus the CFL bound \u2014 a 3.3\u00d7 wall-clock synchronization cost on every default run, and the compute audit's `:power` cell was re-derived from 1 to 12 spectral-vector passes in the same commit. The gap is named (\"one fused multi-weight reduction away\") but no lower bound is offered showing three per-stage reductions are necessary, which is exactly the \"a frozen audit cell measures what is, not what should be\" pattern CLAUDE.md records as a self-guard. The ledger and the code that changed it were written by the same pass, so nothing independent measured the regression.",
+   "justified": "unclear",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "notable",
+   "title": "Five public API breaks with no shim, only one of which the defect required: the strategy type itself was renamed for taxonomy, not for correctness",
+   "file": "src/Forcing.jl",
+   "before": "export AbstractForcing, DeferredForcing, NoForcing, BandRescaling, Linear, ConstantPower,\n       set_forcing_rate!, uses_linear_rate, apply_forcing!, prepare_forcing!, add_forcing_source!\n...\nadd_forcing_source!(::AbstractForcing, N\u0302, domain::FixedDomain) = N\u0302\n...\nstruct ConstantPower{K, I, T} <: AbstractForcing",
+   "after": "export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,\n       Linear, ConstantPower,\n       set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!, add_forcing_source!\n...\nadd_forcing_source!(::AbstractForcing, N\u0302, field, domain::FixedDomain, diffusivity::Real) = N\u0302\n...\nstruct ConstantPower{K, T} <: AbstractForcing",
+   "why_it_matters": "Every user script naming `BandRescaling`, `apply_forcing!`, `uses_linear_rate`, or the 3-argument `add_forcing_source!` fails at load or dispatch, and any code parameterized on `ConstantPower{K,I,T}` no longer matches. The hook renames carry real information (steadiness in time is the load-bearing property, and `project_forcing!` names the splitting), and the arity change is required by the fix. The type rename `BandRescaling` \u2192 `VarianceRescaling` is not: the defect was routing, and the strategy's behaviour is byte-for-byte unchanged (`project_forcing!(forcing::VarianceRescaling, \u2026)` is the old body verbatim). It is a taxonomy change bundled into a correctness commit, and it is the single most-referenced name in the change set \u2014 it touches 13 test files and 4 doc pages. CLAUDE.md does say the API is not frozen, so this is policy-compatible, but the audit question is proportionality and this one is wider than the defect.",
+   "justified": "no",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "notable",
+   "title": "`ResolvedGenerator` now refuses to construct around a forcing that previously constructed fine",
+   "file": "src/Generator.jl",
+   "before": "(no such check; a forcing defining `add_forcing_source!(::MyForcing, N\u0302, domain)` constructed a ResolvedGenerator and was called every stage)",
+   "after": "  for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)\n    _defines_stale_source_hook(forcing) &&\n      throw(ArgumentError(\"$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than \" *\n                          \"five arguments. ...\"))\n  end",
+   "why_it_matters": "Any third-party or user-written `AbstractForcing` implementing the old three-argument source hook now throws an `ArgumentError` at generator construction \u2014 code that ran correctly before this window stops running. The rejection is the right call given the arity change (dispatch would otherwise fall through to the do-nothing default and the forcing would be silently dropped), and the message names the new signature, so this is a loud break rather than a quiet one. It is recorded here because it is a hard rejection of previously valid input, introduced by an edit whose stated purpose was an accuracy fix: the accuracy fix did not need a new hook signature, the choice to hand the source hook the stage field and the diffusivity did, and that choice is what makes the rejection necessary.",
+   "justified": "yes",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "minor",
+   "title": "A phenomenological fit constant was hard-copied into `Forcing`, where it now silently sets the transient of every default run",
+   "file": "src/Forcing.jl",
+   "before": "function ConstantPower(domain::FixedDomain; injection_rate::Real, ...)\n  band = _shell_band(domain, lowest_shell, highest_shell)\n  indicator = real.(field_data(materialize_kernel(band).field))\n  return ConstantPower(band, indicator, float(injection_rate))\nend    # \u2014 the module carried no phenomenological constant and consulted no stationarity estimate",
+   "after": "const _DISSIPATION_GROUP = 0.9\n_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 / 2) / L\n...\n  t\u2113 = turnover_time === nothing ?\n       2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),\n                                                                 domain.grid.domain_size[1])) :\n       float(turnover_time)",
+   "why_it_matters": "The default `turnover_time`, hence the controller's settling time t_\u2113/G, hence how fast every default run reaches its target k and how strongly it is driven during the transient, is now fixed by a literal `0.9` duplicated from `Scalings.Li2008`'s default field value. `Li2008` is a parameter record whose group is user-settable (`Li2008(; dissipation_group = 0.9)`); the copy tracks only the default, and the new pin in test/forcing.jl compares `local_estimate(k, L)` against `stationary_dissipation(Li2008(), k, L)` \u2014 the default-constructed law \u2014 so a user who reasons with a different group value has no way to reach the forcing and no test would notice the divergence. The extraction-bound-leaf rule genuinely forbids the dependency, so the duplication itself is defensible; what is new and unbounded is that a fit constant now feeds the dynamics of the default configuration rather than only the \u03bd solve.",
+   "justified": "unclear",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "minor",
+   "title": "The decision-log entry recording the fix states the buggy formula, not the fixed one",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(no entry \u2014 decision 58 is new in this window)",
+   "after": "    Moin (2016, Eq. 20): ``A = [\\varepsilon - G(k_f - k_\\infty)/t_\\ell]/(2k_f)``, whose marginal term  ...  **A postscript, because the round nearly shipped the wrong physics.** The first implementation put the *band* variance in both places of that formula \u2014 normalizing by ``k_f`` (right) and restoring toward ``k_f`` (wrong).",
+   "why_it_matters": "Decision 58 line 1907 writes the restoring term as `G(k_f \u2212 k_\u221e)/t_\u2113` \u2014 the band variance \u2014 which is precisely the category error its own postscript three paragraphs later says was caught and fixed. The code uses the whole-field variance (`restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time`) and the `VarianceController` docstring writes it correctly as `G[k(t) - k_\\infty]`. ARCHITECTURE.md's decision log is the authoritative, do-not-relitigate record; a reader who reimplements from it reproduces the ~30% k overshoot the entry describes as the defect. It is a recorded-contract-vs-code mismatch in the one document the project treats as binding.",
+   "justified": "no",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "minor",
+   "title": "A witness went vacuous in the same change that made it vacuous, and its surrounding claim is now false",
+   "file": "test/regressions/r4-free-modules-01.jl",
+   "before": "# makes EVERY BandRescaling and ConstantPower call reduce the WHOLE field ...\nlet cf = seeded_field()\n  rate = new_scalar_field_spectral(domain)\n  reset_counts!()\n  set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)\n  @info \"measured: ConstantPower\" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1\nend",
+   "after": "# makes EVERY VarianceRescaling and ConstantPower call reduce the WHOLE field ...\nlet cf = seeded_field()\n  rate = new_scalar_field_spectral(domain)\n  reset_counts!()\n  set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)\n  @info \"measured: ConstantPower\" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1\nend",
+   "why_it_matters": "`ConstantPower` no longer defines `set_forcing_rate!`, so this call now resolves to the do-nothing `AbstractForcing` fallback and the probe reports `inner = 0, weighted_inner = 0` \u2014 it measures the fallback, not the forcing. Nothing fails, because the block is an `@info` survey rather than an assertion; the surrounding comment, which the same pass edited (`BandRescaling` \u2192 `VarianceRescaling`) without re-reading, still asserts that every `ConstantPower` call reduces the whole field. The sibling witness r4-free-hot-path-02 was correctly repaired for exactly this hazard (its own comment says \"That is exactly how this test went vacuous when the state-dependent forcings moved to the source hook\"), so the class was identified and the sweep still missed this instance \u2014 a live example of the fix-the-instance-not-the-class risk CLAUDE.md records.",
+   "justified": "no",
+   "lane": "behaviour-change"
+  },
+  {
+   "severity": "serious",
+   "title": "The new stale-hook guard rejects third-party forcings the run can call correctly \u2014 verified, twice, against the real package",
+   "file": "src/Generator.jl",
+   "before": "base 8826e1e had no such check; `ResolvedGenerator` guarded only the rate hook. The source hook was `add_forcing_source!(::AbstractForcing, N\u0302, domain::FixedDomain) = N\u0302` (base src/Forcing.jl:215).",
+   "after": "`function _defines_stale_source_hook(forcing) \u2026 m.isva || length(signature.parameters) >= 6 || return true` (src/Generator.jl:174\u2013186), reached from `for forcing in (conditions.velocity_forcing, conditions.scalar_forcing); _defines_stale_source_hook(forcing) && throw(ArgumentError(\"$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than five arguments\u2026\"))` (src/Generator.jl:300\u2013309).",
+   "why_it_matters": "The guard tests the ARITY OF EVERY METHOD in the table, not whether a callable five-argument method exists \u2014 so it condemns forcings that work. I ran two against the package (8\u00b3 domain, julia --project): (a) `add_forcing_source!(::OptArgForcing, N\u0302, field, domain::FixedDomain, diffusivity::Real = 0.0)` \u2014 an idiomatic Julia optional trailing argument, for which Julia auto-generates a four-argument stub; (b) `KeptLegacy`, which defines the correct five-argument method AND retains an old three-argument one for its own harness. Both dispatch correctly on the run-shaped call (I invoked it and checked the buffer was written), and BOTH are rejected at construction: \"run-shaped 5-arg call works: true   construction: REJECTED\". A physicist keeping a legacy convenience overload during migration, or writing a defaulted argument, is locked out of building a generator at all. The defect being fixed was silent non-application, which `applicable(add_forcing_source!, forcing, N\u0302, field, domain, diffusivity)` plus a check that the resolved method is not the `AbstractForcing` fallback answers exactly \u2014 the sibling `_overrides_rate_hook` needed the table walk because it asks a different question (does an override EXIST), and that reason was copied to a question it does not fit.",
+   "justified": "no",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "`VarianceController` refuses `gain = 0`, foreclosing the marginal-law limit its own docstring describes",
+   "file": "src/Forcing.jl",
+   "before": "no such type at base; the guard is new: (nothing at 8826e1e)",
+   "after": "`(isfinite(gain) && gain > 0) || throw(ArgumentError(\"`gain` must be finite and positive, got $gain: a non-positive gain makes the restoring term push the variance AWAY from the target\"))` (src/Forcing.jl:552\u2013555); and `(isfinite(target) && target > 0) || throw(\u2026)` (550).",
+   "why_it_matters": "`gain = 0` is not \"pushing away from the target\" \u2014 it is exactly zero restoring term, i.e. the marginal constant-energetics law `A = \u03b5/2k_f` that the docstring itself sets up and discusses (\"Without the restoring term the marginal law makes every ``k`` an equilibrium and the variance random-walks\"). Running that limit is how a physicist reproduces the published marginal forcing and demonstrates the random-walk the entry claims; the guard makes it unreachable and forces the user to fake it with a huge `turnover_time`. `> 0` is the wrong relation for the stated hazard (`>= 0` rejects the genuine hazard, negative gain). Separately, `target > 0` is over-strict: I verified `VarianceController(dom; target = 0.0, turnover_time = 1.0)` is rejected even though the only thing zero `target` breaks is the DEFAULT turnover-time formula `2*float(target)/(3*_stationary_dissipation_estimate(...))` (line 559), which is bypassed when `turnover_time` is supplied \u2014 and that case is already caught by the `isfinite(t\u2113)` guard two lines later. Both verified by execution.",
+   "justified": "no",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "`BandRescaling` \u2192 `VarianceRescaling` is a pure rename of an unchanged type, breaking every existing caller for no defect",
+   "file": "src/Forcing.jl",
+   "before": "`struct BandRescaling{K, T} <: AbstractForcing` / `function BandRescaling(domain::FixedDomain; target::Real, over::Symbol, \u2026)`; exported as `BandRescaling` from `src/GBGIsotropicTurbulence.jl`.",
+   "after": "`struct VarianceRescaling{K, T} <: AbstractForcing` / `function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol, \u2026)`; the export list now reads `NoForcing, VarianceRescaling, VarianceController,` with `BandRescaling` removed and no alias.",
+   "why_it_matters": "The type's fields, constructor, keywords, defaults, arithmetic and edge-case branches are byte-identical \u2014 the diff for it is the identifier and prose. The defect this round claims (a state-dependent rate folded into the integrating factor) lives in `ConstantPower`; `BandRescaling` never took the rate route. So every saved script, notebook or run configuration naming `BandRescaling` now dies with `UndefVarError` for a name change whose only content is prefix-matching the new `VarianceController`. The package policy permits API churn (\"the API is not frozen\"), which is why this is notable rather than serious \u2014 but the churn is not attributable to the defect, and the same commit renamed two more exported names (`apply_forcing!` \u2192 `project_forcing!`, `uses_linear_rate` \u2192 `uses_steady_linear_rate`). Only the last of those three carries real semantic content (the predicate's meaning genuinely narrowed to steadiness-in-time).",
+   "justified": "unclear",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "The default run's disclosed device-sync cost tripled in a re-baselined ledger, while the prose contract edited in the same commit still states the old number",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "`(name = \"default (adaptive dt, BandRescaling :total)\", cfg = (; adaptive_dt = true, velocity_forcing = :band_total), achieved = 3, floor = 1)` (test/optimality_audit.jl), and ARCHITECTURE.md: \"the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `BandRescaling`'s band and whole-field observables \u2014 against a floor of **one**.\"",
+   "after": "`(name = \"default (adaptive dt, VarianceController, 3-stage)\", cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3), achieved = 10, floor = 1)` \u2014 while ARCHITECTURE.md:1365\u20131368 now reads \"the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables \u2014 against a floor of **one**.\"",
+   "why_it_matters": "On the GPU-primary target the default step now blocks on ten device-to-host transfers instead of three (1 max-speed + 3 reductions \u00d7 3 RK stages), a 3.3\u00d7 regression in the configuration every user gets by default. The ledger row was re-baselined in the same commit as the change it prices \u2014 the self-certifying shape \u2014 and that is defensible only because the holder is recorded. What is not defensible: the ARCHITECTURE sentence stating the cost was TOUCHED in this very diff (the author changed `BandRescaling` to `VarianceRescaling` inside it) and left saying \"three\", attributed to a forcing that is no longer the default and to observables the default no longer computes. A reader budgeting a GPU run from the architecture document is told a third of the true cost, by a sentence the same commit had its hands on.",
+   "justified": "unclear",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "`set_forcing_rate!` on `ConstantPower` silently became a no-op \u2014 the loud guard was added only in the mirror-image direction",
+   "file": "src/Forcing.jl",
+   "before": "`uses_linear_rate(::ConstantPower) = true` and `function set_forcing_rate!(forcing::ConstantPower, rate, field, domain::FixedDomain) \u2026 rate .= T(amplitude) .* forcing.indicator; return rate; end`",
+   "after": "`uses_steady_linear_rate(::ConstantPower) = false` \u2014 and no `set_forcing_rate!` method for `ConstantPower` at all, so the exported generic falls through to `set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate`.",
+   "why_it_matters": "`set_forcing_rate!` and `ConstantPower` are both exported. A user who calls `set_forcing_rate!(ConstantPower(domain; injection_rate = 0.3), rate, \u00fb, domain)` \u2014 the exact call the base test suite made \u2014 now receives an untouched (all-zero) rate array and no complaint whatever. The round's whole thesis is that a hook that silently does nothing is intolerable: it added a construction-time `ArgumentError` for a forcing whose source hook the run cannot call, and it kept the pre-existing `ArgumentError` for a forcing that fills a rate without declaring one. The reverse direction \u2014 a caller invoking a hook the strategy has abandoned \u2014 was left silent. The package's own surviving witness demonstrates it: test/regressions/r4-free-modules-01.jl still runs `set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)` and logs `@info \"measured: ConstantPower\" \u2026 ledger_crossings = 1`, which now reports zeros against a ledger figure that is itself stale (the model prices `:power` at 4 passes \u00d7 3 stages).",
+   "justified": "unclear",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "notable",
+   "title": "The recorded decision states the controller law with the band variance in the restoring term \u2014 the exact formula its own postscript calls the bug",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "no decision 58 at base.",
+   "after": "line 1907: \"``A = [\\varepsilon - G(k_f - k_\\infty)/t_\\ell]/(2k_f)``\" \u2014 while lines 1926\u201327 of the same entry read \"The first implementation put the *band* variance in both places of that formula \u2014 normalizing by ``k_f`` (right) and restoring toward ``k_f`` (wrong)\", and the code computes `restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time` with `whole_variance = factor * inner(field, field)`.",
+   "why_it_matters": "The decision log is the package's authority on why the code is the way it is, and this entry records as the design the precise category error it was written to document the removal of. The two variances are not interchangeable \u2014 that is the entry's own point, and the difference measured ~30% in the held k. A reader implementing the controller from the decision log, or checking the code against it, reproduces the defect and concludes the code is wrong. The commit titled \"the docs still described the defect, not the fix\" left the defect in the paragraph that describes the fix.",
+   "justified": "no",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "minor",
+   "title": "The source-hook signature change breaks every third-party forcing written to the documented contract, and one of the two new arguments serves a single strategy",
+   "file": "src/Forcing.jl",
+   "before": "`add_forcing_source!(::AbstractForcing, N\u0302, domain::FixedDomain) = N\u0302` (base:215), documented as \"Add the strategy `forcing`'s additive source to the assembled right-hand side `N\u0302` at each Runge\u2013Kutta stage (the source is held fixed over the step, so it integrates at the scheme's order)\".",
+   "after": "`add_forcing_source!(::AbstractForcing, N\u0302, field, domain::FixedDomain, diffusivity::Real) = N\u0302`, with call sites `add_forcing_source!(generator.conditions.velocity_forcing, N\u0302, \u00fb, domain, generator.conditions.viscosity)` and `\u2026 \u03c6\u0302, domain, generator.conditions.viscosity / generator.conditions.schmidt)`.",
+   "why_it_matters": "Every out-of-package `AbstractForcing` implementing the documented three-argument hook is now a hard construction-time error (by the guard above) with no deprecation window \u2014 the archived `StochasticOU` inside the package needed the same edit, and its new signature ignores both added arguments (`add_forcing_source!(ou::StochasticOU, N\u0302, field, domain, diffusivity) = add!(N\u0302, N\u0302, ou.state)   # \u2026 the stage field is not needed`). `field` is genuinely required by the fix. `diffusivity` is consumed by exactly one strategy, `VarianceController`, for its stage-state \u03b5; widening a protocol every implementer must satisfy in order to hand one strategy a scalar it could have captured at construction (both \u03bd and Sc are fixed for the run's lifetime, and the forcing is materialized against the domain already) is the widest available answer to that need.",
+   "justified": "unclear",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "minor",
+   "title": "`ConstantPower`'s public type parameters and positional-constructor arity changed",
+   "file": "src/Forcing.jl",
+   "before": "`struct ConstantPower{K, I, T} <: AbstractForcing` with `band::K`, `indicator::I`, `injection_rate::T` (base:430), the `indicator` field documented under `# Fields`.",
+   "after": "`struct ConstantPower{K, T} <: AbstractForcing` with `band::K`, `injection_rate::T` (head:478).",
+   "why_it_matters": "`ConstantPower` is exported. Any user code dispatching or annotating on `ConstantPower{K, I, T}`, or constructing one positionally, stops compiling; the type's arity is part of its public surface even though the docstring policy declines to advertise the positional form. Deleting the field is right \u2014 it existed only to fill the rate array the strategy no longer uses, and the memory ledger correctly records the reduction (`tag === :power ? ZERO`). This is reported only so the surface change is on the record alongside the renames, not as a defect in the removal.",
+   "justified": "yes",
+   "lane": "over-rejection"
+  },
+  {
+   "severity": "serious",
+   "title": "Simulation(domain)'s default forcing mechanism replaced, changing computed trajectories for every default-configured run",
+   "file": "src/SimulationRun.jl",
+   "before": "velocity_forcing = d -> BandRescaling(d; target = kinetic_energy, over = :total),",
+   "after": "velocity_forcing = d -> VarianceController(d; target = kinetic_energy),",
+   "why_it_matters": "Any caller who wrote `Simulation(domain)` (or `Simulation(; ...)`) without an explicit `velocity_forcing` \u2014 the front-door, idiomatic path the whole README and index.md example uses \u2014 now gets a materially different dynamical system: a post-step deterministic energy clamp (BandRescaling/VarianceRescaling: k pinned exactly to `target` every step) replaced by a feedback-controlled RHS term (VarianceController: k relaxes exponentially toward `target` with a settling time, and genuinely fluctuates around it). No exception is thrown; the run just produces different numbers for identical input. This is exactly the 'silently alter what the package does for input that was previously valid' case the audit is built to catch \u2014 the fix is well-justified (the old default measurably ran at first order, 1.02 vs the scheme's advertised 3.01) and the change IS documented (decision 58, the rewritten docstring note, and test/simulation_run.jl's updated `isa VarianceController` assertion), so it is announced rather than covert, but it remains the single widest computed-result change in the round and deserves being named as such rather than absorbed into a rename sweep.",
+   "justified": "yes",
+   "lane": "public-contract"
+  },
+  {
+   "severity": "serious",
+   "title": "add_forcing_source! arity widened from 3 to 5 required positional arguments (exported generic function)",
+   "file": "src/Forcing.jl",
+   "before": "add_forcing_source!(::AbstractForcing, N\u0302, domain::FixedDomain) = N\u0302",
+   "after": "add_forcing_source!(::AbstractForcing, N\u0302, field, domain::FixedDomain, diffusivity::Real) = N\u0302",
+   "why_it_matters": "`add_forcing_source!` is exported and part of the documented `AbstractForcing` extension protocol (\"a strategy may implement any of ... add_forcing_source!\"). Any user-defined forcing type that implemented the old 3-argument form now has a method the run never calls at all: `step!` calls the new 5-argument signature, dispatch falls through to the new do-nothing default, and the user's forcing silently stops firing \u2014 precisely the failure mode the package's own doc policy calls out ('a wrong quiet run'). The round does mitigate this: `ResolvedGenerator`'s constructor gained `_defines_stale_source_hook`, which enumerates the method table and throws an `ArgumentError` naming the offending type if it finds an old-arity override, so in practice the break is loud rather than silent. Still, this is a genuine arity change to a public generic with no back-compat shim, worth recording as a public-contract event even though it is guarded.",
+   "justified": "yes",
+   "lane": "public-contract"
+  },
+  {
+   "severity": "notable",
+   "title": "Four exported public names removed outright, with no deprecation alias, across a comprehensive rename sweep",
+   "file": "src/GBGIsotropicTurbulence.jl",
+   "before": "BandRescaling,\n...\n       set_forcing_rate!,\n       uses_linear_rate,\n       apply_forcing!,",
+   "after": "VarianceRescaling,\n       VarianceController,\n...\n       set_forcing_rate!,\n       uses_steady_linear_rate,\n       project_forcing!,",
+   "why_it_matters": "`BandRescaling`, `apply_forcing!`, and `uses_linear_rate` are removed from the umbrella's `using`/`export` lists entirely and replaced by `VarianceRescaling`/`VarianceController`, `project_forcing!`, `uses_steady_linear_rate`. Existing user code that referenced any of the three old names (constructing `BandRescaling(...)`, calling `apply_forcing!` from a hand-rolled step loop, or declaring `uses_linear_rate(::MyForcing) = true` on a custom forcing) now fails with `UndefVarError`/no matching method \u2014 a loud break, not a silent one, and one the project's own CLAUDE.md sanctions ('the API is not frozen; do not build backward-compatibility shims'). Reported here only because the lens asks for every export added/removed/renamed to be named explicitly; the renames are semantically motivated (the old names asserted 'linear' where 'steady' was the load-bearing property) and are swept consistently through docs/ARCHITECTURE.md, docs/src/api/Forcing.md, docs/src/index.md and every test file that used them.",
+   "justified": "yes",
+   "lane": "public-contract"
+  },
+  {
+   "severity": "minor",
+   "title": "ConstantPower's struct field count and positional-constructor arity changed (3 fields \u2192 2)",
+   "file": "src/Forcing.jl",
+   "before": "struct ConstantPower{K, I, T} <: AbstractForcing\n  band::K\n  indicator::I         # the band indicator as a real array \u2014 the rate fill's factor\n  injection_rate::T\nend",
+   "after": "struct ConstantPower{K, T} <: AbstractForcing\n  band::K\n  injection_rate::T    # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation\nend",
+   "why_it_matters": "`ConstantPower` is an exported type; removing its `indicator` field changes `fieldnames(ConstantPower)` and the arity of its plain positional constructor `ConstantPower(band, indicator, injection_rate)` \u2192 `ConstantPower(band, injection_rate)`. Any external code that built the struct positionally (rather than through the documented `ConstantPower(domain; injection_rate, ...)` keyword form) would break. Severity is kept low because a repo-wide grep found no positional use anywhere in src/, test/, or docs/ \u2014 the constructor was never advertised for direct positional use per the project's own doc policy ('name the plain positional constructor only where a reader might reasonably call it') \u2014 and the removal is a real simplification (the lazy band kernel is now convolved against directly, eliminating a materialized array), not gratuitous.",
+   "justified": "yes",
+   "lane": "public-contract"
+  },
+  {
+   "severity": "serious",
+   "title": "The new default forcing (VarianceController) triples per-step device synchronization and 6x's compute passes versus the old default, and the decision log recording the change never mentions this cost",
+   "file": "test/optimality_audit.jl (SYNC_LEDGER), test/compute_audit.jl (_forcing_pass_delta), docs/ARCHITECTURE.md (decision 58), src/SimulationRun.jl (Simulation default)",
+   "before": "(name = \"default (adaptive dt, BandRescaling :total)\", cfg = (; adaptive_dt = true, velocity_forcing = :band_total), achieved = 3, floor = 1) \u2014 and compute model `tag === :band` -> `_ex(spectral_vector = 3)` (a flat, once-per-step cost)",
+   "after": "(name = \"default (adaptive dt, VarianceController, 3-stage)\", cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3), achieved = 10, floor = 1) \u2014 and compute model `tag === :controller` -> `_ex(spectral_vector = 6 * _evals(scheme))` = 18 passes/step on IFLowStorageRK3. `velocity_forcing = d -> VarianceController(d; target = kinetic_energy)` is now what every bare `Simulation()` call gets.",
+   "why_it_matters": "Every user who calls the front-door `Simulation(grid_points_per_axis = ...)` with no forcing keyword \u2014 the package's own documented one-liner example \u2014 now pays 10 blocking device-to-host synchronizations and 18 field-scale reduction/convolution passes per step for the velocity forcing alone, versus 3 and 3 before: on the GPU-primary target this is exactly the axis invariant 4 (\"minimal memory footprint trumps compute cost\", GPU-primary) is written to protect, and it moved sharply worse for the zero-configuration case. Decision 58 in docs/ARCHITECTURE.md \u2014 the narrative record of \"why VarianceController is now the default\" \u2014 discusses only the numerical-order motivation (1.02 to 3.01) at length and never once mentions synchronization count, pass count, or GPU cost; the only place this cost is disclosed is in code comments inside two test files, not where a reader consulting the decision log to understand the tradeoff would look.",
+   "justified": "unclear",
+   "lane": "invariants"
+  },
+  {
+   "severity": "notable",
+   "title": "Decision 58's own quoted formula for the \"replacement\" controller is the pre-fix, buggy formula its own postscript says nearly shipped",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(the bug the postscript describes): \"put the *band* variance in both places of that formula \u2014 normalizing by k_f (right) and restoring toward k_f (wrong)\"",
+   "after": "the same entry states the fix as: \"A = [\\varepsilon - G(k_f - k_\\infty)/t_\\ell]/(2k_f)\" \u2014 still restoring toward k_f, not k \u2014 while the src/Forcing.jl home docstring correctly gives \"A(\u03ba,t) = (\u03b5(t) - G[k(t) - k_\u221e]/t_\u2113)/(2k_f(t))\" and the actual code computes `restoring = forcing.gain * (whole_variance - forcing.target) / forcing.relaxation_time` using `whole_variance = factor * inner(field, field)`, not the band value",
+   "why_it_matters": "A reader who takes decision 58 (rather than the Forcing.jl docstring) as the reference formula for VarianceController would reproduce the exact category-error bug \u2014 restoring toward the forced band instead of the whole field \u2014 that the same paragraph's own postscript says was caught and fixed. This is a live self-contradiction inside one diff: the decision log's LaTeX was not updated when the code/docstring were corrected, which is precisely the class of defect the project's own doc policy singles out (\"a plausible 'X is just Y' equivalence... false until the expansion matches\").",
+   "justified": "no",
+   "lane": "invariants"
+  },
+  {
+   "severity": "notable",
+   "title": "ConstantPower's per-step synchronization/compute cost also grew several-fold as a side effect of the same routing fix, compounding across every state-dependent forcing in the module",
+   "file": "test/optimality_audit.jl, test/compute_audit.jl",
+   "before": "(name = \"adaptive dt, ConstantPower\", cfg = (; adaptive_dt = true, velocity_forcing = :power), achieved = 2, floor = 1); pass model `_ex(spectral_vector = 0, spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1)`",
+   "after": "(name = \"adaptive dt, ConstantPower, 3-stage\", cfg = (; adaptive_dt = true, velocity_forcing = :power, stages = 3), achieved = 4, floor = 1); pass model `_ex(spectral_vector = 4 * _evals(scheme))` = 12 passes/step on RK3",
+   "why_it_matters": "This one is inherent to the correctness fix (a state-dependent rate must be evaluated at every RK stage to preserve the scheme's order, not gratuitous), so it is not itself a defect \u2014 but it shows the cost increase is a pattern across the whole module rather than isolated to the new default: any run that already used `ConstantPower` before this round now runs measurably more device synchronizations and compute passes per step than it did, purely from the routing fix, with no separate accounting of whether a cheaper per-stage formulation was possible.",
+   "justified": "yes",
+   "lane": "invariants"
+  },
+  {
+   "severity": "serious",
+   "title": "ARCHITECTURE.md decision 58 still displays the pre-fix (buggy) VarianceController formula, as 'the replacement'",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(e39242a, first commit) \"A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k_f(t) - k_\\infty]/t_\\ell}{2k_f(t)}\" \u2014 k_f used in BOTH the restoring term and the normalization, the exact category error f9c5c14 later fixed in the code.",
+   "after": "(HEAD, after both f9c5c14 and 86db910 \u2014 the commit explicitly titled \"Close the audit's notable tier: the docs still described the defect, not the fix\") line 1907 is UNCHANGED: \"The replacement is `VarianceController`... A = [\\varepsilon - G(k_f - k_\\infty)/t_\\ell]/(2k_f)\", two sentences before its own derived consequence at line 1909 uses k (not k_f): \"\\mathrm dk/\\mathrm dt = -G(k - k_\\infty)/t_\\ell\" \u2014 the entry is now internally self-contradictory, and a 'postscript' was appended right after (lines 1925-1927) that narrates the exact bug in prose without correcting the formula display two paragraphs above it.",
+   "why_it_matters": "The third commit's entire claim was closing the gap where 'the docs still described the defect, not the fix' \u2014 it fixed the VarianceController docstring in src/Forcing.jl but missed the sibling copy of the identical formula in ARCHITECTURE.md's own decision-58 entry, the permanent design-decision record. A reader who trusts the decision log over the docstring is handed the wrong equation as 'the replacement', with a postscript admitting the bug three lines later without fixing the formula it is a postscript to.",
+   "justified": "no",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "notable",
+   "title": "Regression test still names ConstantPower as an example of a forcing that 'declares uses_steady_linear_rate' \u2014 the routing change this round made false",
+   "file": "test/regressions/r4-aliasing-and-mutation-01.jl",
+   "before": "(base, before rename) \"...with a scalar-carrying `ResolvedFields` and a `scalar_forcing` that declares `uses_linear_rate` (`ConstantPower`, `Linear`) and the forcing's ONLY hook, `set_forcing_rate!`, is never called...\"",
+   "after": "(HEAD \u2014 mechanically renamed by this round's own sweep) \"...that declares `uses_steady_linear_rate` (`ConstantPower`, `Linear`) and the forcing's ONLY hook, `set_forcing_rate!`, is never called...\" \u2014 but src/Forcing.jl now reads `uses_steady_linear_rate(::ConstantPower) = false`, and ConstantPower no longer implements `set_forcing_rate!` at all (it moved to `add_forcing_source!`).",
+   "why_it_matters": "The rename tool touched this exact line (uses_linear_rate\u2192uses_steady_linear_rate) but did not check the sentence's truth against the very same round's routing change that stripped ConstantPower of that predicate and that hook. A maintainer reading this witness's own comment is told something about ConstantPower's dispatch that is no longer true of the code the round shipped.",
+   "justified": "no",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "notable",
+   "title": "A ConstantPower 'measurement' survey now silently calls the do-nothing default hook and reports zero \u2014 the exact vacuous-witness class this round explicitly found and fixed elsewhere, left standing in a sibling file",
+   "file": "test/regressions/r4-free-modules-01.jl",
+   "before": "n/a \u2014 this specific block (lines 69-74) was not touched by any of the three commits.",
+   "after": "(HEAD, unchanged) `set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)` followed by `@info \"measured: ConstantPower\" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1` \u2014 but ConstantPower no longer overrides `set_forcing_rate!` (removed in e39242a), so this call now dispatches to the do-nothing fallback `set_forcing_rate!(::AbstractForcing, rate, field, domain) = rate`, touching neither `inner` nor `weighted_inner`, so COUNTS stay 0/0 and the printed 'ledger_crossings = 1' claim is now false.",
+   "why_it_matters": "f9c5c14's own commit message names precisely this failure mode elsewhere: \"r4-free-hot-path-02 passed vacuously \u2014 the source hook accumulates into a different field than it reduces... the term the witness exists to measure was always zero,\" and that file was fixed. This sibling survey in r4-free-modules-01.jl performs the identical stale measurement of ConstantPower via the now-defunct rate hook and was not caught by the same audit, even though it sits in a file the round's tooling had reason to touch (it renamed BandRescaling\u2192VarianceRescaling three lines above this exact block). Being an `@info`, not an assertion, it fails silently rather than failing the suite \u2014 worse than a red test, since nothing signals the drift. (test/forcing.jl's top-of-file module comment, lines 1-5, has the same residue: it still describes ConstantPower as one of 'the linear (rate-folded-into-integrating-factor) strategies' despite that file being edited in all three commits.)",
+   "justified": "no",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "notable",
+   "title": "ARCHITECTURE.md's synchronization-axis claim ('the default configuration issues three blocking readbacks') was renamed but not fact-checked against this round's own default-forcing change",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(base) \"On the synchronization axis the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `BandRescaling`'s band and whole-field observables \u2014 against a floor of **one**.\"",
+   "after": "(HEAD, mechanically renamed only) \"...against `VarianceRescaling`'s band and whole-field observables \u2014 against a floor of **one**.\" \u2014 but the actual default velocity forcing is now `VarianceController`, and this same round's own SYNC_LEDGER fix (f9c5c14, test/optimality_audit.jl) records the true default row as achieved = **10**, floor = 1, explicitly because it is \"the largest gap in this ledger.\"",
+   "why_it_matters": "A reader of the architecture doc is told the default run costs 3 readbacks against a floor of 1, when the round's own test suite \u2014 landed in the same three-commit sequence \u2014 asserts the true number is 10. The rename sweep touched this sentence's forcing name but did not update its now-false numeric claim about \"the default configuration,\" nor add a superseding annotation of the kind decision 54's entry got two paragraphs earlier in the same file.",
+   "justified": "no",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "minor",
+   "title": "A permanently-recorded 'verified' claim (k0=2.6\u21921.5) has no persisted witness; only its mirror (k0=0.4\u21921.5) does",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "n/a (claim first appears in e39242a).",
+   "after": "e39242a's commit message and ARCHITECTURE.md decision 58 both assert, as an established fact: \"The controller was verified to converge on its target from both sides (``k_0 = 0.4`` and ``k_0 = 2.6`` toward ``1.5``).\" 86db910 added a regression test (test/simulation_run.jl) for the climb-from-below case only \u2014 seeded at k\u22480.4, forcing target 1.5 \u2014 and separately tests k_target in (1.5, 0.8) reached from the default IC. No test anywhere in `test/` exercises k0 = 2.6 settling downward toward 1.5 (grepped repo-wide).",
+   "why_it_matters": "The decision log states a bidirectional verification as fact, but only one direction is a reproducible, checked-in witness; the other side rests on an unrecorded manual run. Given this same round's own finding that an un-witnessed physics claim ('the same constant... pinned against each other by a test that did not exist') was exactly the shape of the `_stationary_dissipation_estimate` defect, an equivalent unwitnessed claim was left standing in the same commit sequence.",
+   "justified": "unclear",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "minor",
+   "title": "Unclaimed drive-by notation edit in SimulationRun.jl (correct per house style, but not mentioned by any commit message)",
+   "file": "src/SimulationRun.jl",
+   "before": "``\\eta \\approx 0.64\\,\\Delta x`` at `\u03ba_max_\u03b7 = 2` against ``0.96\\,\\Delta x`` for ``2/3``,",
+   "after": "``\\eta \\approx 0.64\\Delta x`` at `\u03ba_max_\u03b7 = 2` against ``0.96\\Delta x`` for ``2/3``,",
+   "why_it_matters": "Removing the thin space between a plain numeral and `\\Delta x` is consistent with CLAUDE.md's TeX-idiom rule ('the thin space `\\,` reserved for the differential... never between plain factors'), so the change is arguably correct \u2014 but none of the three commit messages mention any notation/TeX cleanup, so this is an unaccounted-for drive-by edit riding along inside a routing-focused commit.",
+   "justified": "yes",
+   "lane": "claim-versus-edit"
+  },
+  {
+   "severity": "serious",
+   "title": "ARCHITECTURE decision 35's synchronization figure was renamed, not corrected \u2014 it understates the new default by 3.3\u00d7 and names a strategy that is no longer the default",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "the default configuration issues **three** blocking readbacks per\n    step \u2014 the CFL speed bound, and `BandRescaling`'s band and whole-field observables \u2014 against a\n    floor of **one**.",
+   "after": "the default configuration issues **three** blocking readbacks per\n    step \u2014 the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables \u2014 against a\n    floor of **one**.  (docs/ARCHITECTURE.md:1365\u20131367 at HEAD)",
+   "why_it_matters": "The only edit to this sentence was the rename. But `VarianceRescaling` is no longer what the front door builds \u2014 src/SimulationRun.jl:272 now reads `velocity_forcing = d -> VarianceController(d; target = kinetic_energy)` \u2014 and the controller issues three reductions per Runge-Kutta stage (src/Forcing.jl:594\u2013597: `inner(field, field)`, `weighted_inner(field, forcing.band)`, `weighted_inner(field, domain.squared_wavenumber_kernel)`). The same commit's own ledger prices it accordingly: test/optimality_audit.jl:223 `achieved = 10, floor = 1`. So the published architecture record for the device-synchronization axis states 3 where the instrument in the same commit says 10, and attributes the cost to a strategy the default no longer uses. On a package whose invariant 4 is GPU-primary, this is the one number a reader consults for the default hot loop.",
+   "justified": "no",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "serious",
+   "title": "The AbstractForcing extension contract still states the criterion this whole change set declares was the defect",
+   "file": "src/Forcing.jl",
+   "before": "(a linear forcing rate folded into the integrating factor \u2014 a strategy implementing it **must** also\ndeclare [`uses_linear_rate`](@ref), \u2026)  \u2026 The linear rate and the additive source are two channels of **one** forcing term \u2014 the part linear\nin the field is folded exactly into the integrating factor, the remainder is added at the stages",
+   "after": "(a linear forcing rate folded into the integrating factor \u2014 a strategy implementing it **must** also\ndeclare [`uses_steady_linear_rate`](@ref), \u2026)  \u2026 The linear rate and the additive source are two channels of **one** forcing term \u2014 the part linear\nin the field is folded exactly into the integrating factor, the remainder is added at the stages   (src/Forcing.jl:96\u2013107; only the @ref token changed)",
+   "why_it_matters": "`AbstractForcing`'s docstring is the contract a third party reads to write a strategy. Decision 58 states the load-bearing property is steadiness in time, not linearity in the field: \"the old name asserted linearity in the *field*, and the load-bearing property is steadiness in *time*\". `ConstantPower` and `VarianceController` are both exactly linear in the field, and both are now forbidden the integrating factor for that reason (src/Forcing.jl:625 `uses_steady_linear_rate(::ConstantPower) = false`). The rename swept the cross-reference on the same line and left the two sentences that state the rule, so the supertype still tells an implementer that linearity is the discriminator \u2014 the precise mistake that put a third-order default at first order. The one docstring guaranteed to be read by the person most able to repeat the defect was the one not updated.",
+   "justified": "no",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "serious",
+   "title": "The host-readback caveat was deleted exactly as the cost tripled and moved onto the default path, leaving the docstrings pointing at the wrong strategy as expensive",
+   "file": "src/Forcing.jl",
+   "before": "!!! note \"It costs two host readbacks per step on a GPU\"\n    Sizing the rescale means reducing the field to a number and comparing it to `target`, so each\n    step blocks on a device-to-host transfer \u2014 two under `over = :total`, which measures the band and\n    the whole field. `ConstantPower` pays one; an unforced run pays none.   (base 8826e1e:src/Forcing.jl:297\u2013300)",
+   "after": "Sizing the rescale means reducing the field to a number and comparing it to `target`, so each step\nblocks on a device-to-host transfer \u2014 two under `:total`, which measures the band and the whole field.   (src/Forcing.jl:321\u2013322 \u2014 demoted from an admonition, and the cross-strategy sentence deleted)",
+   "why_it_matters": "The deleted sentence was the only place a user could compare the sync cost of the strategies. After the change `ConstantPower` pays not one readback per step but one per stage (src/Forcing.jl:635, called from velocity_rhs! at every RK stage), and `VarianceController` \u2014 the new default \u2014 pays three per stage, nine per step. Neither docstring mentions device synchronization at all, while `Linear` GAINED the boast \"which makes it the cheapest forcing here, at no per-stage reduction and no host readback\" (src/Forcing.jl:399) and `VarianceRescaling` kept its two-readback sentence. A user comparing the rendered docs now concludes the non-default rescale is the expensive one on the sync axis, when the ledger in the same commit prices the default at 10 against the rescale's 3. A caveat did not merely go stale \u2014 it was removed from the surface where it became most true.",
+   "justified": "no",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "notable",
+   "title": "A residency claim in decision 39 was falsified by this commit and left standing one line below a line the commit edited",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "the same re-freeze: every band forcing's kernel is lazy (`BandRescaling` and `StochasticOU` store\n    none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill),",
+   "after": "the same re-freeze: every band forcing's kernel is lazy (`VarianceRescaling` and `StochasticOU` store\n    none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill),   (docs/ARCHITECTURE.md:1472\u20131473 at HEAD)",
+   "why_it_matters": "Line 1472 was edited in this diff; line 1473 was not, and this commit made it false. `ConstantPower` lost its indicator entirely \u2014 the struct went from `ConstantPower{K, I, T}` with `indicator::I` to `ConstantPower{K, T}`, and the constructor comment now reads \"No materialized indicator: it existed only to fill the integrating-factor rate array, and this forcing no longer uses that route\". The commit's own memory ledger agrees: test/memory_audit.jl changed `tag === :power ?` from `(\u2026 spectral_scalar = 1, \u2026 real_spectral_scalar = 1)` to `ZERO`. So the frozen ledger and the architecture record now contradict each other on a residency fact, and the contradiction is one line from an edit the author made.",
+   "justified": "no",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "notable",
+   "title": "The new default forcing carries neither of the two caveats its siblings carry, including the empty-band guard its own code implements",
+   "file": "src/Forcing.jl",
+   "before": "!!! note \"An empty band is left alone, not driven infinitely hard\"\n    The rate ``A`` diverges as the band's own value goes to zero \u2026 Below a small floor on\n    ``E_{\\\\mathrm{band}}`` the amplitude is set to zero, so an empty band stays empty rather than\n    taking an unbounded kick   (src/Forcing.jl:466\u2013472, retained on ConstantPower; VarianceRescaling carries the same warning at 336\u2013348)",
+   "after": "!!! note \"The settling time, not the gain, is the physical parameter\"   (src/Forcing.jl:527 \u2014 the only admonition on VarianceController)",
+   "why_it_matters": "`VarianceController` implements the identical guard \u2014 src/Forcing.jl:599 `amplitude = _band_is_empty(band_variance) ? 0.0 : (dissipation - restoring) / (2 * band_variance)` \u2014 so the same silent switch-off is reachable, and it is now reachable on the path every default run takes. Its docstring says nothing about it, while the run layer promises in the same commit that \"The default `VarianceController` does\" hold k (src/SimulationRun.jl:204). The consequence is a default run that can stop controlling with no user-facing statement anywhere that it can. Related omission in the same file: the `DeferredForcing` docstring (src/Forcing.jl:127\u2013131) still enumerates only `Linear`, `ConstantPower` and `VarianceRescaling` as the operator-free keyword forms, though this commit added `VarianceController(; target, gain, turnover_time, \u2026)` as one and made it the default.",
+   "justified": "no",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "notable",
+   "title": "The grid-mode calibration precondition lost its guarantee word without gaining the tolerance that replaced it",
+   "file": "src/SimulationRun.jl",
+   "before": "One precondition: the choice is self-consistent only if the run really holds ``k`` at\n    `kinetic_energy`, which the front door's `BandRescaling(over = :total)` guarantees and `:band`\n    does not.   (base 8826e1e:src/SimulationRun.jl:203\u2013205)",
+   "after": "One precondition: the choice is self-consistent only if the run really holds ``k`` at\n    `kinetic_energy`. The default `VarianceController` does \u2014 its restoring term measures the\n    whole-field ``k`` \u2014 which is what makes this calibration legitimate.   (src/SimulationRun.jl:203\u2013205)",
+   "why_it_matters": "\"Guarantees\" described an exact per-step projection; \"does\" is asserted of a mechanism that only relaxes exponentially, and the strength of the claim is unchanged in the reader's eye. The commit's own oracle shows the difference is material: test/simulation_run.jl asserts `isapprox(k, k_target; rtol = 0.05)` only after 200 steps, and needs 600 steps to reach `rtol = 0.1` when started from k\u2080 = 0.4. The qualification exists \u2014 decision 58's amendment to decision 15 says \"the controller holds it to a tolerance rather than exactly\" \u2014 but it was written into the decision log and not onto the user-facing surface where the precondition for \u03ba_max\u00b7\u03b7 self-consistency is stated. A user calibrating a run reads the docstring, not \u00a711.",
+   "justified": "unclear",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "notable",
+   "title": "The optimality ledger's default row was re-baselined from 3 to 10 crossings with the holder register untouched",
+   "file": "test/optimality_audit.jl",
+   "before": "(name = \"default (adaptive dt, BandRescaling :total)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :band_total),                 achieved = 3, floor = 1),",
+   "after": "(name = \"default (adaptive dt, VarianceController, 3-stage)\",\n   cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3),     achieved = 10, floor = 1),   (test/optimality_audit.jl:222\u2013223)",
+   "why_it_matters": "The audit exists to bound, not to record: \"every unit of residual distance must be CLAIMED by a named holder\", and a `:FIX` holder is \"a local win recorded as OPEN, never as accepted\". Nine excess crossings on the default path are absorbed by the pre-existing `HOST_SIDE_FORCING_SCALARS` holder, whose text was not touched and describes a single scalar per forcing \u2014 \"A forcing reduces its band observable (or the noise variance) to a Julia scalar, branches on it, and feeds it back to a kernel as a coefficient\" \u2014 not three reductions at every stage. `ALL_HOLDERS` and `OPEN_LOCAL_WINS = ()` are byte-identical to base. So the largest gap in the ledger was created and simultaneously certified by widening an existing claim rather than writing a holder for it, which is the shape the register's two-directional rule was built to catch. Whether the 3.3\u00d7 default-path sync cost is an acceptable price for the order restoration is a user decision; the instrument was adjusted so the question is never asked.",
+   "justified": "unclear",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "minor",
+   "title": "A measurement instrument was left calling a method that no longer exists, still printing its old caption and its old ledger number",
+   "file": "test/regressions/r4-free-modules-01.jl",
+   "before": "  set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)\n  @info \"measured: ConstantPower\" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1",
+   "after": "unchanged \u2014 the same two lines stand at test/regressions/r4-free-modules-01.jl:72\u201373, while src/Forcing.jl no longer defines `set_forcing_rate!(::ConstantPower, \u2026)`",
+   "why_it_matters": "With `uses_steady_linear_rate(::ConstantPower) = false` and the method deleted, this call now dispatches to the do-nothing `AbstractForcing` fallback (src/Forcing.jl:198 `set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate`), so the survey reports zero reductions under the caption \"measured: ConstantPower \u2026 ledger_crossings = 1\" \u2014 a number that is now 3 per step in any case. The same file's surviving assertion comment still calls `VarianceRescaling(:total)` \"the frozen SYNC_LEDGER's default row\", which it no longer is. This exact vacuity was found and repaired in `r4-free-hot-path-02` by the same commit (\"That is exactly how this test went vacuous when the state-dependent forcings moved to the source hook\"), so the class was known and this instance was not swept; the same rename-without-correction sits at test/memory_audit.jl:88 and test/forcing.jl:172, both of which still call the rescale \"the default\".",
+   "justified": "unclear",
+   "lane": "contract-drift"
+  },
+  {
+   "severity": "serious",
+   "title": "ARCHITECTURE.md's synchronization-axis claim states the wrong readback count for the new default, in the same commit that changed the default",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "On the synchronization axis the default configuration issues **three** blocking readbacks per\n    step \u2014 the CFL speed bound, and `BandRescaling`'s band and whole-field observables \u2014 against a\n    floor of **one**.",
+   "after": "On the synchronization axis the default configuration issues **three** blocking readbacks per\n    step \u2014 the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables \u2014 against a\n    floor of **one**.",
+   "why_it_matters": "The rename swept the identifier but not the substance. Decision 58, added later in this very file, makes `VarianceController` the default velocity forcing, evaluated at every Runge-Kutta stage (three reductions x 3 stages = 9, plus the CFL read = 10). The diff's own test/optimality_audit.jl SYNC_LEDGER, edited in the same commit, records the new default row as `achieved = 10, floor = 1` \u2014 directly contradicting the 'three... against a floor of one' claim that sits a few hundred lines above it in the same document describing 'the default configuration'. A reader of ARCHITECTURE.md is told a false, much-too-low synchronization cost for the shipped default.",
+   "justified": "no",
+   "lane": "sweep-completeness"
+  },
+  {
+   "severity": "serious",
+   "title": "The identical stale claim survives verbatim in test/optimality_audit.jl, three lines above the corrected ledger it introduces",
+   "file": "test/optimality_audit.jl",
+   "before": "# The frozen synchronization ledger: (achieved, floor) per step. The default run configuration is\n# the first row \u2014 an adaptive timestep and a whole-field BandRescaling \u2014 and it issues three\n# blocking readbacks per step where one is irreducible.\nconst SYNC_LEDGER = (\n  (name = \"default (adaptive dt, BandRescaling :total)\", ... achieved = 3, floor = 1),",
+   "after": "# The frozen synchronization ledger: (achieved, floor) per step. The default run configuration is\n# the first row \u2014 an adaptive timestep and a whole-field VarianceRescaling \u2014 and it issues three\n# blocking readbacks per step where one is irreducible.\nconst SYNC_LEDGER = (\n  # The DEFAULT run: VarianceController on the three-stage IFLowStorageRK3. ...\n  (name = \"default (adaptive dt, VarianceController, 3-stage)\", cfg = ..., achieved = 10, floor = 1),\n  (name = \"adaptive dt, VarianceRescaling :total\", cfg = ..., achieved = 3, floor = 1),",
+   "why_it_matters": "The renamer edited BandRescaling->VarianceRescaling inside this header comment while completely restructuring the table two lines below it (moving VarianceRescaling to the second row and inserting a new first row with achieved = 10). The header still asserts 'the default run configuration is the first row ... and it issues three blocking readbacks', which is now false of the actual first row in the same file. This is the sharpest instance of the class: a class-rename touched only the token, not the sentence's truth value, immediately adjacent to the very code that falsifies it.",
+   "justified": "no",
+   "lane": "sweep-completeness"
+  },
+  {
+   "severity": "notable",
+   "title": "docs/make.jl repeats the identical 'Measured 2026-08-19' historical anecdote with the old type name, while CLAUDE.md's twin copy was updated",
+   "file": "docs/make.jl",
+   "before": "(unchanged by this diff)",
+   "after": "# A docstring can satisfy every template rule in CLAUDE.md and still be unreadable, because a review\n# round edits clauses and never re-reads the whole. Measured 2026-08-19, after five rounds of\n# patches: `BandRescaling` had reached 861 words with four scattered admonitions, `# Arguments`\n# mid-docstring and a caveat after `# Fields`; ...",
+   "why_it_matters": "CLAUDE.md's mirror sentence describing the same 2026-08-19 measurement was edited in this diff (BandRescaling -> VarianceRescaling), but the type in question was renamed in this very round of work, so the historical anecdote in docs/make.jl \u2014 read by anyone auditing the build-lint machinery \u2014 now names a type that no longer exists under that name, while the canonical CLAUDE.md text calls the same historical docstring VarianceRescaling. The two authoritative descriptions of one event disagree.",
+   "justified": "no",
+   "lane": "sweep-completeness"
+  },
+  {
+   "severity": "minor",
+   "title": "Decision 58's own text never states the fixed default's actual new synchronization cost, leaving the increase undocumented anywhere in ARCHITECTURE.md's prose",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "(no equivalent claim existed before decision 58 was added)",
+   "after": "58. ... Measured after the change: unforced, `Linear`, `ConstantPower`, `VarianceController` and the default `Simulation` all converge at 3.01; `VarianceRescaling` at 1.02. ... (no mention of the 3x-per-stage host-readback cost this default now carries)",
+   "why_it_matters": "Decision 58 is thorough about the accuracy fix (order restored 1.02->3.01) but silent about the synchronization-axis regression the same change caused (default readbacks per step rose from 3 to 10, per the diff's own SYNC_LEDGER). A reader relying on decision 58 as the record of what changed would not learn that the new default is a 3x-worse GPU-sync default than the one it replaced \u2014 the fact is buried only in a test-file comment, not in the decision log entry whose job is to record exactly this kind of trade-off.",
+   "justified": "no",
+   "lane": "sweep-completeness"
+  },
+  {
+   "severity": "serious",
+   "title": "ARCHITECTURE.md's synchronization-axis claim for 'the default configuration' is now false, and the diff only renamed the type inside a stale sentence",
+   "file": "docs/ARCHITECTURE.md",
+   "before": "On the synchronization axis the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `BandRescaling`'s band and whole-field observables \u2014 against a floor of **one**.",
+   "after": "On the synchronization axis the default configuration issues **three** blocking readbacks per step \u2014 the CFL speed bound, and `VarianceRescaling`'s band and whole-field observables \u2014 against a floor of **one**.",
+   "why_it_matters": "The only edit here was a mechanical BandRescaling\u2192VarianceRescaling substitution; the substance was left untouched even though decision 58, landed in this very round, changed the front door's default velocity forcing to `VarianceController` and moved its reductions from once-per-step to once-per-Runge\u2013Kutta-stage. The diff's own test/optimality_audit.jl adds the honest number for the same default configuration: `(name = \"default (adaptive dt, VarianceController, 3-stage)\", cfg = (; adaptive_dt = true, velocity_forcing = :controller, stages = 3), achieved = 10, floor = 1)`. A reader of ARCHITECTURE.md \u2014 the document CLAUDE.md tells contributors to read before any structural change \u2014 comes away believing the default run costs 3 blocking device-to-host readbacks per step, when the same commit's own frozen ledger says 10. Nowhere else in the diff (decision 58's own entry included) is this paragraph corrected or cross-referenced.",
+   "justified": "no",
+   "lane": "reader-consequence"
+  },
+  {
+   "severity": "serious",
+   "title": "The Simulation docstring both admits and denies that the default forcing 'really holds' k, three paragraphs apart",
+   "file": "src/SimulationRun.jl",
+   "before": "!!! note \"The default holds the kinetic energy fixed, so it is not a measurable of the default run\"\n    `BandRescaling` is a deterministic clamp: it rescales the band every step to hold the kinetic\n    energy at the target **value** \u2026 One precondition: the choice is self-consistent only if the run really holds ``k`` at `kinetic_energy`, which the front door's `BandRescaling(over = :total)` guarantees and `:band` does not.",
+   "after": "!!! note \"The default drives the kinetic energy to a set value, so read it as a control target\"\n    `VarianceController` restores ``k`` exponentially to `kinetic_energy` \u2026 It does not *impose* the value step by step as a rescale does, so the fluctuation it leaves is genuine \u2014 but it is a controlled variable's fluctuation, with the gain setting its amplitude. \u2026 One precondition: the choice is self-consistent only if the run really holds ``k`` at `kinetic_energy`. The default `VarianceController` does \u2014 its restoring term measures the whole-field ``k`` \u2014 which is what makes this calibration legitimate.",
+   "why_it_matters": "The note admonition (correctly, honestly) says the controller leaves a genuine fluctuation and does not impose the value \u2014 i.e. k is not exactly held. Three sentences later, in the same docstring, the grid-mode precondition asserts flatly that the run 'really holds k' and that this 'makes the calibration legitimate', dropping the fluctuation/tolerance caveat entirely. This directly contradicts ARCHITECTURE.md's own decision-58 postscript to decision 15, added in this same round: 'the controller holds it to a tolerance rather than exactly.' The identical overclaim ('the default forcing holds k at that value') is repeated verbatim in docs/src/index.md's quick-start comment (was: 'the default forcing is a deterministic clamp on k'). A grid-mode user reading only the constructor docstring \u2014 the natural, and likely only, place they look \u2014 is told the \u03ba_max_\u03b7 self-consistency guarantee is exact, as it genuinely was under the old `BandRescaling(:total)` default, when under the new default it is only an approximate, gain-and-turnover-time-dependent control-loop steady state.",
+   "justified": "no",
+   "lane": "reader-consequence"
+  },
+  {
+   "severity": "notable",
+   "title": "VarianceController's new docstring omits the empty-band zero-amplitude caveat its sibling ConstantPower documents for the identical hazard",
+   "file": "src/Forcing.jl",
+   "before": "(no prior docstring; `VarianceController` is new in this diff)",
+   "after": "VarianceController(; target, gain = 1.0, turnover_time = nothing, lowest_shell = 1, highest_shell = 2) \u2026 [no note on band emptiness anywhere in its docstring, though its `add_forcing_source!` contains: `amplitude = _band_is_empty(band_variance) ? 0.0 : (dissipation - restoring) / (2 * band_variance)`]",
+   "why_it_matters": "ConstantPower's docstring (same file, same round) carries the admonition '!!! note \"An empty band is left alone, not driven infinitely hard\" \u2026 a scalar seeded with nothing in the forced shells \u2026 the rate is set to zero instead, so an empty band stays empty rather than receiving an unbounded kick.' VarianceController's `add_forcing_source!` implements the exact same `_band_is_empty` guard against the same divide-by-zero, but its docstring \u2014 the one a reader consults to pick a forcing, and the package's new default \u2014 says nothing about it. A user forcing a passive scalar with `VarianceController` from a zero-initial-variance state (a real configuration per the project's own warm-up research memory) gets silent zero forcing with no documented explanation, exactly the 'silent NaN/silent no-op' failure mode the rest of the codebase is careful to call out.",
+   "justified": "no",
+   "lane": "reader-consequence"
+  },
+  {
+   "severity": "minor",
+   "title": "docs/make.jl's build-lint comment still names the retired type BandRescaling, now inconsistent with CLAUDE.md's copy of the same anecdote",
+   "file": "docs/make.jl",
+   "before": "(git history: CLAUDE.md at base also read 'BandRescaling reached 861 words\u2026', consistent with make.jl at the time)",
+   "after": "# patches: `BandRescaling` had reached 861 words with four scattered admonitions, `# Arguments`\n# mid-docstring and a caveat after `# Fields`; \u2026",
+   "why_it_matters": "docs/make.jl was not touched anywhere in this diff, but CLAUDE.md's identical sentence describing the same 2026-08-19 measurement was updated elsewhere in the same working window to read `VarianceRescaling` (confirmed via `git show HEAD:CLAUDE.md` vs the base commit). The two copies of one historical anecdote now name the subject type differently, and `BandRescaling` no longer exists anywhere in `src/` after this round's rename. A developer reading the build script's own lint rationale hits a dead type reference \u2014 the exact 'sweep that skips its own surfaces' failure pattern CLAUDE.md's 'Known weaknesses' section already names.",
+   "justified": "unclear",
+   "lane": "reader-consequence"
+  }
+ ],
+ "dead": 0,
+ "complete": true
+}

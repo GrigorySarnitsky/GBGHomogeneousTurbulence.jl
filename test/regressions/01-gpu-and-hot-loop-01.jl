@@ -6,7 +6,7 @@
 
 using Test
 using GBGPeriodicFields: point_positions, npoints
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 
 

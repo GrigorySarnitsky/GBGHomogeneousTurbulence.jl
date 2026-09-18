@@ -4,7 +4,7 @@
 **VERDICT: ABSENT**
 
 `src/SimulationRun.jl:370-371` — `advance!`'s docstring now reads: "Closes the iteration with
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so the cache is readable when it
 returns." The exact fact the finding said was missing is now stated in `advance!`'s own home.
 
 ---

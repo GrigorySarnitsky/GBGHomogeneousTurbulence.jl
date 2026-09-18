@@ -10,7 +10,7 @@
 # below fails (the failure then surfaces as a MethodError/BoundsError from library internals, or as
 # a silent wrong construction, neither of which is an ArgumentError naming the missing slot).
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "a cache built without number_of_particles is refused by name at allocate_buffers and at the particle deposit!" begin

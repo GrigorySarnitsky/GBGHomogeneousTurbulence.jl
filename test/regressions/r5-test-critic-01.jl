@@ -7,7 +7,7 @@
 # CORRECT behaviour — `advance!` refuses to report success on a state it has just made non-finite,
 # names the offending field, and leaves the clock untouched.
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "advance! refuses a non-finite velocity, naming it, without advancing the clock" begin

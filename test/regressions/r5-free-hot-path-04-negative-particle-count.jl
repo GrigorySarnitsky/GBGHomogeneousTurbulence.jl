@@ -14,7 +14,7 @@
 # later as `ArgumentError("this run advects no tracers, …")` from `velocity_at_particles(sim.cache)`
 # — a message naming a configuration the user never asked for, and not naming the keyword at fault.
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 
 @testset "a negative `number_of_particles` is rejected at construction, not read as zero" begin

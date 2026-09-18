@@ -25,7 +25,7 @@ Forcing.jl::read_forcing(parent::HDF5.H5DataStore， name::AbstractString，,54,
 Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,113,0,119
 Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,165
 Forcing.jl::write_forcing(parent::HDF5.H5DataStore， name::AbstractString，,97,0,137
-GBGIsotropicTurbulence.jl::GBGIsotropicTurbulence,39,0,118
+GBGHomogeneousTurbulence.jl::GBGHomogeneousTurbulence,39,0,118
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),76,2,311
 Generator.jl::Generator,37,0,184
 Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,593

@@ -7,7 +7,7 @@
 # state. This file asserts the DOCUMENTED contract, for both schemes and both scalar modes.
 
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 @testset "step! returns `state`, as its protocol docstring promises" begin
 

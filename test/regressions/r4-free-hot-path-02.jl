@@ -13,23 +13,23 @@
 # proxy dispatches) and holds the audit models against the measurement. It fails on the tree as of
 # f557311 and passes once the models are re-derived (or the guard's reduction is fused away).
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields
 using Random
 const PF = GBGPeriodicFields
-const F = GBGIsotropicTurbulence.Forcing
+const F = GBGHomogeneousTurbulence.Forcing
 
 # The audit models under test (each include runs its own testsets once, which pass).
 #
 # The package root is recomputed INSIDE each module, self-contained. It cannot be a shared top-level
 # constant: these includes live in nested `module` blocks, which do not see the file's top-level
-# bindings. It cannot be `pkgdir(GBGIsotropicTurbulence)` for the same reason. And it cannot count
+# bindings. It cannot be `pkgdir(GBGHomogeneousTurbulence)` for the same reason. And it cannot count
 # `..` hops, because this witness is authored under .claude/bug-hunt/witnesses/ and promoted into
 # test/regressions/, at different depths. `@__DIR__` is valid in any scope, and the marker is the
 # source file itself — `Project.toml` would stop a level early, since `test/` carries one.
 module OptModel
   const ROOT = let d = @__DIR__
-    while !isfile(joinpath(d, "src", "GBGIsotropicTurbulence.jl")); d = dirname(d) end
+    while !isfile(joinpath(d, "src", "GBGHomogeneousTurbulence.jl")); d = dirname(d) end
     d
   end
   include(joinpath(ROOT, "test", "optimality_audit.jl"))
@@ -37,7 +37,7 @@ end
 
 module PassModel
   const ROOT = let d = @__DIR__
-    while !isfile(joinpath(d, "src", "GBGIsotropicTurbulence.jl")); d = dirname(d) end
+    while !isfile(joinpath(d, "src", "GBGHomogeneousTurbulence.jl")); d = dirname(d) end
     d
   end
   include(joinpath(ROOT, "test", "compute_audit.jl"))

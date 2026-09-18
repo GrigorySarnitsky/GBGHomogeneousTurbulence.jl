@@ -4,7 +4,7 @@
 # its closing deposit! allocate less than a single field's worth of bytes, on both the velocity-only
 # and the velocity+scalar path (the scalar branch carries the extra predictor/stage registers).
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
 using Test

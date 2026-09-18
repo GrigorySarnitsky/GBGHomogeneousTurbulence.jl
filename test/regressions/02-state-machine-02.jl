@@ -24,7 +24,7 @@
 # `advance_particles_epoch!` / `particles_modified!` (src/Cache.jl:388-397).  Verified: with that
 # split applied, departure_reseed falls to 0.0372 and this file passes.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 using Random
 using Test

@@ -1,6 +1,6 @@
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber
 using GBGPeriodicFields: materialize_kernel, field_data
 
 

@@ -1,14 +1,14 @@
 # API overview
 
-The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules. Its
+The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules. Its
 **re-exported** submodules build on one another in the order `SimulationDomain` → `Observables` →
 `State` → `Cache` → `Forcing` → `Generator` → `Propagator` → `Particles` → `SimulationRun`; the
 extraction-bound `Phenomenology` leaf leads the include order but is **not** re-exported (reach it
 opt-in). **The pages below are ordered for reading, not by that dependency**: `SimulationRun` comes
 first because a run is what a user builds first, and the pieces it composes follow. The umbrella re-exports the public
-surface of the listed submodules, so `using GBGIsotropicTurbulence` brings everything into scope.
+surface of the listed submodules, so `using GBGHomogeneousTurbulence` brings everything into scope.
 
-- [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
+- [GBGHomogeneousTurbulence](api/GBGHomogeneousTurbulence.md): the top-level module and public re-export surface.
 - [SimulationRun](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!`, `run!`, `warmup!`) that drives it. Read a run's state through `sim.state` and its deposited observables through `sim.cache`.
 - [SimulationDomain](api/SimulationDomain.md): the discretized periodic box a run lives on — the `FixedDomain` (with its choice of `DealiasingStrategy`), the scratch-field allocators, and the two band edges, `max_retained_wavenumber` and `max_resolved_wavenumber`.
 - [State](api/State.md): the evolving state (`ResolvedFields` — the velocity and scalar in spectral representation, the single source of truth) and the random initial conditions that seed it — a divergence-free velocity and a mean-zero scalar.
@@ -22,7 +22,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 
 ```@contents
 Pages = [
-  "api/GBGIsotropicTurbulence.md",
+  "api/GBGHomogeneousTurbulence.md",
   "api/SimulationRun.md",
   "api/SimulationDomain.md",
   "api/State.md",

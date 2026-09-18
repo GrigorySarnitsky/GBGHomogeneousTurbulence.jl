@@ -6,7 +6,7 @@
 #     third order for IFLowStorageRK3.
 #  3. Mean conservation: the conservative form -∇·(uφ) leaves the k = 0 (mean) mode untouched.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, gradient!, to_physical!, inner
 using Random
 using Test

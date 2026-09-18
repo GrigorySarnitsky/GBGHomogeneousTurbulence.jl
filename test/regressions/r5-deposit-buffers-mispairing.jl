@@ -19,8 +19,8 @@
 # current outcome — a `MethodError` from a private helper.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Propagator: deposit!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Propagator: deposit!
 
 
 small_domain() = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(),

@@ -1,9 +1,9 @@
 # Probe for the hunter's claimed "one rule": that `to_physical!` MUST run before
 # `vorticity_physical!` when they share a spectral scratch. If the rule exists, swapping the two
 # calls must change the result. It does not.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: to_physical!, field_data
-using GBGIsotropicTurbulence.Observables: vorticity_physical!
+using GBGHomogeneousTurbulence.Observables: vorticity_physical!
 
 @testset "the two recovery calls are order-independent on a shared scratch" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,

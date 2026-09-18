@@ -3,8 +3,8 @@
 # — most of the pre-rescale seed would land in masked shells), and the empty-band floor names
 # itself once (maxlog = 1) when it clamps a forcing to inert, instead of going silent forever.
 using Test, Random, Logging
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: add_forcing_source!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Forcing: add_forcing_source!
 using GBGPeriodicFields: field_data, convolve!, to_physical, to_spectral
 
 

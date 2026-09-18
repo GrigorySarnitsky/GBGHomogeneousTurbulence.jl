@@ -1,7 +1,7 @@
 # Reference laws — the interface
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Phenomenology]
+Modules = [GBGHomogeneousTurbulence.Phenomenology]
 Order   = [:module]
 ```
 

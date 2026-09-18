@@ -1,4 +1,4 @@
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: field_data, CatmullRom
 

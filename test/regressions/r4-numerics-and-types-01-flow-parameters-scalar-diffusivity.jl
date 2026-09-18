@@ -2,7 +2,7 @@
 # Claim under test: SimulationRun.flow_parameters passes viscosity * schmidt to
 # scalar_dissipation, so the reported ε_φ would be Sc² too large whenever Sc ≠ 1.
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 @testset "flow_parameters reports the scalar dissipation at ϰ = ν/Sc, not ν·Sc" begin
   ν  = 0.05
@@ -27,5 +27,5 @@ using GBGIsotropicTurbulence
   @test fp.scalar_dissipation ≈ correct rtol = 1e-10
 
   # And the FlowParameters bridge itself must agree on the diffusivity.
-  @test GBGIsotropicTurbulence.Phenomenology.scalar_diffusivity(fp) ≈ ν / Sc rtol = 1e-12
+  @test GBGHomogeneousTurbulence.Phenomenology.scalar_diffusivity(fp) ≈ ν / Sc rtol = 1e-12
 end

@@ -1,5 +1,5 @@
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, max_wavenumber
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, max_wavenumber
 using GBGPeriodicFields: field_data
 
 for (T, N, L) in ((Float32, 33, 2π), (Float32, 64, 2π), (Float64, 33, 2π))

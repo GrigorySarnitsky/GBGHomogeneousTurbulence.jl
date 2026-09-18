@@ -1,5 +1,5 @@
-using Test, GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particles_modified!
+using Test, GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: particles_modified!
 
 @testset "particles_modified!(sim) — the form the docstring says to prefer — is callable" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,

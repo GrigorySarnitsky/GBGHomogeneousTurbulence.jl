@@ -1,7 +1,7 @@
 # Cache
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Cache]
+Modules = [GBGHomogeneousTurbulence.Cache]
 Order   = [:module]
 ```
 

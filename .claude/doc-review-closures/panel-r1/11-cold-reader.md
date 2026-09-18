@@ -7,14 +7,14 @@
 pages below are ordered for reading, not by that dependency**: `SimulationRun` comes first because a
 run is what a user builds first, and the pieces it composes follow." The actual site sidebar nav
 (confirmed from `docs/build/api/index.html`'s `<nav class="docs-sidebar">`) does follow this:
-`GBGIsotropicTurbulence, SimulationRun, SimulationDomain, State, Observables, Cache, Forcing,
+`GBGHomogeneousTurbulence, SimulationRun, SimulationDomain, State, Observables, Cache, Forcing,
 Generator, Propagator, Particles` — so the original "Concretely" example (Cache leaning on
 `FixedDomain` before `FixedDomain`'s home page) is now fixed: `SimulationDomain` (banner 3) precedes
 `Cache` (banner 6).
 
 But the bulleted list immediately following that sentence — "the pages below" it explicitly refers
 to — and the `@contents` block further down on the *same page*, both still list `SimulationRun`
-**last**, after `Particles`: `GBGIsotropicTurbulence, SimulationDomain, State, Observables, Cache,
+**last**, after `Particles`: `GBGHomogeneousTurbulence, SimulationDomain, State, Observables, Cache,
 Forcing, Generator, Propagator, Particles, SimulationRun`. This is a live, self-contained
 contradiction introduced by the fix: the prose's claim ("`SimulationRun` comes first... pages below")
 is false against the very list it points to, verified in both `docs/src/api.md` lines 4-19 and the
@@ -38,9 +38,9 @@ the run evolves" (`docs/src/api.md:12`) — the bare disclaimed word is gone. Th
 
 `src/Cache.jl:262-281` now carries a full docstring for `deposit_sample!` ("`deposit_sample!(cache) ->
 particle velocities`", with usage/rationale prose), it is exported (`src/Cache.jl:57`,
-`src/GBGIsotropicTurbulence.jl:99,178`), and it appears in the rendered `docs/build/api/Cache/index.html`
-docstring block and is linked from `docs/build/api/GBGIsotropicTurbulence/index.html`'s Index
-(`href="../Cache/#GBGIsotropicTurbulence.Cache.deposit_sample!"`).
+`src/GBGHomogeneousTurbulence.jl:99,178`), and it appears in the rendered `docs/build/api/Cache/index.html`
+docstring block and is linked from `docs/build/api/GBGHomogeneousTurbulence/index.html`'s Index
+(`href="../Cache/#GBGHomogeneousTurbulence.Cache.deposit_sample!"`).
 
 ---
 

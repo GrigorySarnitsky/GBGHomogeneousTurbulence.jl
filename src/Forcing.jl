@@ -54,7 +54,7 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
   (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
 - [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, built into the concrete strategy once the
-  [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain; a
+  [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
@@ -72,7 +72,7 @@ mask holds those modes empty — so construction warns about it; the additive `S
 inject there instead, and refuses such a band.
 
 The two fields are forced **independently**:
-[`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) — the `Generator`
+[`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) — the `Generator`
 parameter record bundling the viscosity, the Schmidt number, and the two forcings — takes a
 separate `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
 
@@ -121,7 +121,7 @@ them in one fixed order:
 
 - [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
   such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
-  and the run's [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) holds it.
+  and the run's [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
 - [`set_forcing_rate!`](@ref) — once, before the stages: fill a per-mode rate that stays fixed for the
   whole step, which the scheme folds exactly into the integrating factor. A strategy that implements
   this hook **must** also declare [`uses_steady_linear_rate`](@ref), or it is never handed a rate
@@ -153,7 +153,7 @@ arguments they are given.
 !!! warning "One instance per forced field, for a strategy with mutable bookkeeping"
     A strategy that mutates its own fields as it runs must not drive both fields from one instance,
     or their bookkeeping is conflated;
-    [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) throws an
+    [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) throws an
     `ArgumentError` rather than let that happen. Every strategy here may be shared: none carries
     anything from one call to the next, since what a strategy evolves lives in the run's state, one
     entry per field, and its scratch is overwritten before each use.
@@ -174,8 +174,8 @@ A deferred forcing. The operator-free keyword constructors
 
 each returns a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is built into the concrete
-`AbstractForcing` once the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain)
-exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)). A
+`AbstractForcing` once the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain)
+exists (done for you by [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)). A
 forcing argument
 therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
 `DeferredForcing`.
@@ -212,7 +212,7 @@ For a strategy `forcing` whose rate is linear in the field **and constant in tim
 [`uses_steady_linear_rate`](@ref) declaration), fill the per-mode rate `rate` — a scalar field in spectral
 representation holding real values — with ``A(\\boldsymbol{\\kappa})``
 (the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
-integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGIsotropicTurbulence.Generator.velocity_integrating_factor)), so the
+integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor)), so the
 forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
 (``D`` the field's diffusivity). Only a forcing declaring `uses_steady_linear_rate` is ever handed
 a rate array, so the default method is never reached in a run; it returns `rate` untouched. The
@@ -239,7 +239,7 @@ The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only
 declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
 storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`: a forcing
 that fills a rate without declaring one is never given an array to fill, and
-the [`ResolvedGenerator`](@ref GBGIsotropicTurbulence.Generator.ResolvedGenerator) constructor
+the [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) constructor
 rejects
 it rather than let the forcing go silently unapplied.
 """
@@ -272,7 +272,7 @@ strategy but [`StochasticOU`](@ref), which returns a
 [`StochasticOUState`](@ref) holding its random process.
 
 A run calls this once per forced field, keeps what it returns as the `modeled` entry of its
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields), and hands that value to
+[`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), and hands that value to
 [`prepare_forcing!`](@ref) every step, which advances it in place. The strategy itself holds only its
 parameters and its scratch, so a checkpoint of the state is enough to resume a forced run exactly.
 """
@@ -414,9 +414,9 @@ what is wanted.
 
 Which observable is held follows from the field, chosen to agree with the diagnostics: the **kinetic
 energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
-([`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy)), the **scalar variance**
+([`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy)), the **scalar variance**
 ``\\langle\\varphi^{2}\\rangle`` for the scalar
-([`scalar_variance`](@ref GBGIsotropicTurbulence.Observables.scalar_variance)) — each the field's
+([`scalar_variance`](@ref GBGHomogeneousTurbulence.Observables.scalar_variance)) — each the field's
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
 to the field being a vector.
 
@@ -433,7 +433,7 @@ modes differ in which quantity a run may no longer measure:
     sets and the band is free.
 
 Neither is a default, because the right answer depends on what the run is calibrated against.
-A [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
+A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
 calibration stops holding. Where nothing calibrates against it, `:band` is the gentler clamp.
 
@@ -445,7 +445,7 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     the rescale is applied *after* the step, which is Lie–Trotter operator splitting — the step's
     map and the rescale's map composed one after the other, a composition whose error is
     ``O(\\Delta t)`` regardless of how accurate either map is alone — so it
-    is first-order however good the scheme is. Measured on the third-order [`IFLowStorageRK3`](@ref GBGIsotropicTurbulence.Propagator.IFLowStorageRK3): **1.02**
+    is first-order however good the scheme is. Measured on the third-order [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3): **1.02**
     here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
     (A stochastic forcing is outside that comparison — it has no classical order to lose.)
     Molecular dynamics reached the same
@@ -583,9 +583,9 @@ A = \\frac{\\texttt{injection\\_rate}}{2 E_{\\mathrm{band}}}.
 In stationarity the injection balances dissipation, so `injection_rate` is the value ``\\varepsilon``
 relaxes to in the stationary mean — chosen to agree with the diagnostics —
 the rate ``\\varepsilon`` for the velocity (measured by
-[`dissipation`](@ref GBGIsotropicTurbulence.Observables.dissipation)) and
+[`dissipation`](@ref GBGHomogeneousTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
-[`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation)). The keyword
+[`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation)). The keyword
 names the kind of quantity it is — a **rate**, where `VarianceRescaling`'s `target` is an
 **amplitude**.
 
@@ -689,7 +689,7 @@ does not take.
   that sets ``\\nu`` explicitly against a very different regime should pass its own value. The
   derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
   controller left at the default and handed to
-  [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) as a `scalar_forcing` with a
+  [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) as a `scalar_forcing` with a
   positive gain is refused there — a scalar variance is not an energy, and the derived settling
   time would depend on the scalar's amplitude unit, breaking the scalar equation's exact
   linearity in ``\\varphi`` (at `gain = 0` the settling time never enters the dynamics and the
@@ -923,7 +923,7 @@ The arguments are:
 
 The process lives in the run's state, not in this strategy. A run keeps it as a
 [`StochasticOUState`](@ref) — the `modeled` entry of its
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) — held on a small grid of its own
+[`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) — held on a small grid of its own
 over the same box, large enough to carry the band and no larger, so the whole forcing costs a few
 kilobytes and runs no transform at the resolution of the run. A checkpoint of the state therefore
 resumes the same realization. This strategy holds its parameters and the scratch of one
@@ -972,7 +972,7 @@ A [`StochasticOU`](@ref) forcing's evolving state holds two things: the force it
 spectral representation on the forcing's companion grid, and the number of increments drawn so far.
 [`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
 and a run keeps it as the `modeled` entry of
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for the forced field. There is no
+[`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) for the forced field. There is no
 reason to build one by hand.
 
 Holding the force as an ordinary field is what keeps the rest simple. The draw is made real-valued and
@@ -1210,7 +1210,7 @@ Base.show(io::IO, ::DeferredForcing) = print(io, "DeferredForcing(awaiting a dom
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
-# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# HDF5 in the environment; the methods live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
 # persistence pairs established).
 
@@ -1225,7 +1225,7 @@ Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `paren
 self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
 indicator array) is rebuilt from them on read. What a strategy evolves is not a parameter: the
 process of a [`StochasticOU`](@ref) lives in the run's state and is stored by
-[`write_state`](@ref GBGIsotropicTurbulence.State.write_state), so a reloaded strategy continues the
+[`write_state`](@ref GBGHomogeneousTurbulence.State.write_state), so a reloaded strategy continues the
 same realization when the state is restored with it. A
 [`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`
 package is loaded; the caller owns the file.

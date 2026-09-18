@@ -10,9 +10,9 @@
 # TRIAGE scan, not must-be-empty: an inner positional constructor deliberately omitted from the
 # docstring (the who-builds-this rule), an extended Base function whose other methods live
 # elsewhere, and a `kwargs...` passthrough all produce legitimate asymmetries. Count first, read all.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
-const PKG = GBGIsotropicTurbulence
+const PKG = GBGHomogeneousTurbulence
 
 # ---- collect displayed signatures: (name => Set of arg names) per docstring signature block ----
 displayed = Dict{Symbol, Set{Symbol}}()
@@ -99,7 +99,7 @@ function defined_sets(name)
                               # displayed name standing in for it (`scheme`, `forcing`) is the
                               # convention, not a phantom
   for m in methods(f)
-    startswith(String(m.file), pkgroot) || occursin("GBGIsotropicTurbulence", String(m.file)) || continue
+    startswith(String(m.file), pkgroot) || occursin("GBGHomogeneousTurbulence", String(m.file)) || continue
     for a in Base.method_argnames(m)[2:end]
       if a === Symbol("#unused#") || a === Symbol("")
         unnamed = true

@@ -11,7 +11,7 @@
 # These tests assert the CORRECT behaviour, at a Schmidt number away from 1 so that ν/Sc, ν·Sc and ν
 # are three distinct numbers and the assertion actually discriminates between them.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using Random
 using Test
 
@@ -47,5 +47,5 @@ using Test
   @test !isapprox(fp.scalar_dissipation, scalar_dissipation(sim.state.scalar_spectral, sim.domain, ν);      rtol = 1e-3)
 
   # The Phenomenology bridge reads the same diffusivity back out of the record.
-  @test GBGIsotropicTurbulence.Phenomenology.scalar_diffusivity(fp) ≈ ν / Sc
+  @test GBGHomogeneousTurbulence.Phenomenology.scalar_diffusivity(fp) ≈ ν / Sc
 end

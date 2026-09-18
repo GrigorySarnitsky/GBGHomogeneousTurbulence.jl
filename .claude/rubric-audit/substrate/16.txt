@@ -49,7 +49,7 @@ wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (b
 occasional diagnostic; positional destructuring `κ, E = energy_spectrum(û, domain)` also works). It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
-multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
+multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model
 spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
@@ -63,7 +63,7 @@ wavenumber magnitudes ``\\kappa`` and the energy ``E(\\kappa)`` in each shell (b
 occasional diagnostic; positional destructuring `κ, E = energy_spectrum(û, domain)` also works). It is the `GBGPeriodicFields` radial
 spectrum of `û` halved — the field reduction sums ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` while the
 kinetic energy carries the ``\\tfrac{1}{2}``. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
-multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model
+multipliers. This is the measured counterpart of a [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model
 spectrum, for validation.
 """
 function energy_spectrum(û, domain::FixedDomain)
@@ -83,7 +83,7 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 ```
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum needs that the
 small scales do not fix. The integrals above are the idealized continuous definition; they are evaluated
 as sums over the measured `energy_spectrum` shells (whose per-shell energy makes the shell width
 cancel in the ratio). The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
@@ -139,7 +139,7 @@ end
     validate_spectrum(sim, model)
 
 Compare the measured energy spectrum of `sim` against a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum `model` (an
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum `model` (an
 `EnergySpectrum`, e.g. `Pope2000()`), evaluated at the run's [`flow_parameters`](@ref). The measured
 [`energy_spectrum`](@ref) is a per-shell energy (``k = \\sum_\\kappa E(\\kappa)``) while the model is a
 spectral density (``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``), so the density is multiplied by the

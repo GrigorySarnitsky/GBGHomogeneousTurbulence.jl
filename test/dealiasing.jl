@@ -2,7 +2,7 @@
 # `PhaseShift` (checked against a zero-padded oracle) kernels, and the CFL ceiling auto-scaling to the
 # active strategy (a strategy that keeps more modes takes a smaller step).
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, materialize_kernel, to_physical!, StoredKernel
 using Random
 using Test
@@ -73,8 +73,8 @@ using Test
     Np = 12
     dps = FixedDomain(grid_points_per_axis = Np, side_length = L, dealiasing = PhaseShift(), element_type = Float64, array_type = Array)
     d2  = FixedDomain(grid_points_per_axis = 2Np, side_length = L, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)                                        # 2N oracle grid (raw product, no dealias)
-    SD  = GBGIsotropicTurbulence.SimulationDomain
-    GEN = GBGIsotropicTurbulence.Generator
+    SD  = GBGHomogeneousTurbulence.SimulationDomain
+    GEN = GBGHomogeneousTurbulence.Generator
     û = SD.new_vector_field_spectral(dps)
     random_solenoidal_velocity_spectral!(û, dps; kinetic_energy = 0.5, envelope_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
     half = Np ÷ 2
@@ -120,9 +120,9 @@ using Test
     # assembly after the velocity update degrades the scalar to first order (ratio ≈ 2, not ≈ 8).
     Nc = 16
     domain = FixedDomain(grid_points_per_axis = Nc, side_length = L, element_type = Float64, dealiasing = PhaseShift(), array_type = Array)
-    û0 = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
+    û0 = GBGHomogeneousTurbulence.SimulationDomain.new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂0 = GBGIsotropicTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
+    φ̂0 = GBGHomogeneousTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
     random_scalar_spectral!(φ̂0, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
@@ -131,8 +131,8 @@ using Test
       b = allocate_buffers(scheme, domain; scalar = true)
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       cache = ObservablesCache(domain; scalar = true)
-      û = GBGIsotropicTurbulence.SimulationDomain.new_vector_field_spectral(domain)
-      φ̂ = GBGIsotropicTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
+      û = GBGHomogeneousTurbulence.SimulationDomain.new_vector_field_spectral(domain)
+      φ̂ = GBGHomogeneousTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
       copyto!(field_data(û), field_data(û0))
       copyto!(field_data(φ̂), field_data(φ̂0))
       state = ResolvedFields(û, φ̂)

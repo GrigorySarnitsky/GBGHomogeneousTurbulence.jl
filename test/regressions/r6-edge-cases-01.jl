@@ -2,7 +2,7 @@
 # When `turnover_time` is omitted, the constructor derives tℓ = 2k/(3ε_∞); for a tiny `target`
 # the dissipation estimate underflows to 0.0, tℓ = Inf, and the guard on Forcing.jl:666 fires —
 # but the message interpolates the ORIGINAL keyword (`nothing`), not the derived tℓ it checked.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
 @testset "VarianceController's turnover_time guard reports the checked derived value, not `nothing`" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,

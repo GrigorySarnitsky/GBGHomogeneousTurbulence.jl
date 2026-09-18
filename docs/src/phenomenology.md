@@ -16,8 +16,8 @@ specialization carrying their roll-off factors, rather than a separate wrapper. 
 choosing the preset — the published fit is the default, and any coefficient can be overridden to re-fit:
 
 ```julia
-using GBGIsotropicTurbulence.Phenomenology         # FlowParameters, spectrum, …
-using GBGIsotropicTurbulence.Phenomenology.Spectra  # the model presets (Pope2000, …)
+using GBGHomogeneousTurbulence.Phenomenology         # FlowParameters, spectrum, …
+using GBGHomogeneousTurbulence.Phenomenology.Spectra  # the model presets (Pope2000, …)
 
 fp = FlowParameters(viscosity = 1e-3, dissipation = 0.5, rms_velocity = 1.0,
                     integral_scale = 1.0)
@@ -31,8 +31,8 @@ submodule ([`Spectra`](api/phenomenology/Spectra.md) versus
 existing `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5 laws) and a spectrum counterpart — a
 `Spectra.Kolmogorov1941`, were one added — would be distinct, separated by the submodule alone.
 
-**Opt-in namespace.** `using GBGIsotropicTurbulence` brings the DNS API only; the laws are reached
-through the submodule namespace, e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra` (this module
+**Opt-in namespace.** `using GBGHomogeneousTurbulence` brings the DNS API only; the laws are reached
+through the submodule namespace, e.g. `using GBGHomogeneousTurbulence.Phenomenology.Spectra` (this module
 is [designed to be extractable](architecture.md) into a standalone package).
 
 ## Pages

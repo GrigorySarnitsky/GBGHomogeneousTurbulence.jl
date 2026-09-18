@@ -9,7 +9,7 @@
 # Either resolution is acceptable; a silent NaN is not. The test below therefore passes if
 # integral_scale returns a finite number OR throws, and fails only on the silent NaN.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
 const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
                            dealiasing = TwoThirds(), element_type = Float64,

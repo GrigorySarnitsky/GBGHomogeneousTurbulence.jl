@@ -5,7 +5,7 @@
 # end-to-end: the exact Euler recursion, the unread endpoint, and first-order convergence
 # (ratio ≈ 2, not Heun's ≈ 4).
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, PointSet, CatmullRom
 using Test

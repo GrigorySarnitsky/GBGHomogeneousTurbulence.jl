@@ -13,7 +13,7 @@
 # the velocity-convention (½) contamination gives a DIFFERENT number here, so the test cannot be
 # satisfied by a formula that quietly applies the kinetic-energy factor to the scalar.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, convolve!, inner, weighted_inner
 using Random
 using Test

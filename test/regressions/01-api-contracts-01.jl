@@ -9,13 +9,13 @@
 # argument and the probe falls through to the `AbstractForcing` fallback — reporting "no override".
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: ScalarFieldSpectral, field_data
 
 # Same mistake as test/forcing.jl's `UndeclaredRateForcing` — implements the hook, forgets the
 # declaration — differing only in that `rate` carries its natural type.
 struct TypedUndeclaredRateForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::TypedUndeclaredRateForcing,
+GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(::TypedUndeclaredRateForcing,
                                                  rate::ScalarFieldSpectral, field,
                                                  domain::FixedDomain) = (rate .= 1; rate)
 

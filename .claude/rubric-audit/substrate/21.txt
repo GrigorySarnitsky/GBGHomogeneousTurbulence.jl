@@ -28,7 +28,7 @@ can be refused rather than served stale. The cache's operations:
 - [`particle_velocities`](@ref) — the checked read of the particle velocities
   ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, the velocity sampled along each trajectory.
 
-The solver's side of the contract is [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)
+The solver's side of the contract is [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
 — homed in `Propagator`, with the iteration it closes — which fills and stamps every slot at the
 iteration's end; internal per-slot deposit and take verbs move the individual stamps. A caller
 reads through the accessors and never deposits.

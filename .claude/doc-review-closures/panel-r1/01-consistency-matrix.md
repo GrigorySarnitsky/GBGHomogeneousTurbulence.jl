@@ -14,9 +14,9 @@ src/*.jl, CLAUDE.md — no remaining overclaim found.
 ## Finding 2 — `deposit_sample!` unnamed in sibling docstring / absent from index
 **VERDICT: ABSENT**
 Evidence: src/Particles.jl:234, `record_particle_velocities!`'s docstring now names it explicitly:
-"the slot becomes readable once [`deposit_sample!`](@ref GBGIsotropicTurbulence.Cache.deposit_sample!)
-records them as current." It is exported (src/GBGIsotropicTurbulence.jl:99, :178) and appears in the
-rendered `docs/build/api/GBGIsotropicTurbulence/index.html` and `docs/build/api/Cache/index.html`.
+"the slot becomes readable once [`deposit_sample!`](@ref GBGHomogeneousTurbulence.Cache.deposit_sample!)
+records them as current." It is exported (src/GBGHomogeneousTurbulence.jl:99, :178) and appears in the
+rendered `docs/build/api/GBGHomogeneousTurbulence/index.html` and `docs/build/api/Cache/index.html`.
 Both sibling docstrings (Cache.jl:337, Particles.jl:234) now name it consistently.
 
 ---

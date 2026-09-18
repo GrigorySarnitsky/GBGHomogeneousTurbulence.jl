@@ -12,7 +12,7 @@
 # construction — the seeders must REFUSE the request with a descriptive `ArgumentError`, never hand
 # back a zero or NaN-bearing field whose energy/variance is not the one asked for.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
 using Test

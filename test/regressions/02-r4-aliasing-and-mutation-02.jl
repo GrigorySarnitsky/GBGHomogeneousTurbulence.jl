@@ -13,12 +13,12 @@
 # is what this witness pins down. Left unflagged, the mismatch surfaces one `step!` later as
 # `ArgumentError: this run carries no passive scalar` — a claim that is factually false about the run.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
 using Test
 
-const CacheModule = GBGIsotropicTurbulence.Cache
+const CacheModule = GBGHomogeneousTurbulence.Cache
 
 
 function seeded_state(domain, rng; scalar::Bool)

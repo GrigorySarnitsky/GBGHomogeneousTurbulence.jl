@@ -9,9 +9,9 @@
 # unit steps the nodes are the integers 0, −1, …, −(k−1), so each L_j has exact rational
 # coefficients and ∫_0^1 L_j is an exact rational number. No quadrature is involved on this side.
 
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
-const AB = GBGIsotropicTurbulence.Particles
+const AB = GBGHomogeneousTurbulence.Particles
 
 "Exact ∫_0^1 L_j(t) dt for the Lagrange basis on nodes τ, in exact rational arithmetic."
 function exact_weights(τ::Vector{Rational{BigInt}})

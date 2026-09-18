@@ -17,8 +17,8 @@
 # flow_parameters bridge's u' must be the same number. They are — i.e. the finding is duplication
 # of a definition, not a present numeric divergence.
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters, taylor_reynolds
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, taylor_reynolds
 
 @testset "u' = √(2k/3): the constructor's spelling and the flow_parameters bridge agree" begin
   for (N, L, k) in ((16, 2π, 1.5), (16, 2π, 0.75), (24, 4π, 3.0))

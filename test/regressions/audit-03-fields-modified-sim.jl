@@ -2,7 +2,7 @@
 # added beside `particles_modified!(sim)` is a SECOND, unimported generic. It throws on the exact call
 # its own comment describes, in both directions: the outer call finds no ::Simulation method on the
 # exported binding, and its body's inner call finds no ::ObservablesCache method on the local one.
-using Test, GBGIsotropicTurbulence, Random
+using Test, GBGHomogeneousTurbulence, Random
 
 @testset "fields_modified!(sim) works on the call its own documentation describes" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,

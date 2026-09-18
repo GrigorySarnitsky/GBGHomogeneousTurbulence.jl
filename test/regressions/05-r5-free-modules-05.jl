@@ -4,7 +4,7 @@
 
 using Test, Random
 using GBGPeriodicFields: npoints
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, CatmullRom, point_values
 
 @testset "advect! refuses a scheme order that its buffers were not built for" begin

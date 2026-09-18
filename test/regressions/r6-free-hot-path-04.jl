@@ -7,7 +7,7 @@
 # avoid exactly this. The assertion below states the CORRECT behaviour (no "  " run in the
 # emitted message) and therefore fails on the current tree.
 
-using Test, Random, Logging, GBGIsotropicTurbulence
+using Test, Random, Logging, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "the ε ≤ 0 warning of StationarityCriterion carries no embedded multi-space runs" begin

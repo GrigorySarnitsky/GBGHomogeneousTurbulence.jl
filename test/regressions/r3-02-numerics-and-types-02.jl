@@ -11,7 +11,7 @@
 # fixed floor fires and the forcing silently switches off, even though the band observable is still
 # reproduced to ~15 significant digits (asserted below), i.e. is nowhere near numerically empty.
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, weighted_inner, spectral_band, inner
 using Random
 

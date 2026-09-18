@@ -13,7 +13,7 @@
 # time-varying velocity u = cos(ωt) x̂, so interpolation is exact and the only error is temporal, and
 # the trajectory is the analytic ∫₀ᵀ cos(ωt) dt.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test

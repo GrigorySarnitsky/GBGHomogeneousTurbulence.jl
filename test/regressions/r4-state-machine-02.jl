@@ -14,8 +14,8 @@
 
 using Test, Random
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: particles_modified!, velocity_at_particles
 
 build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
                      number_of_particles = 8, rng = MersenneTwister(1))

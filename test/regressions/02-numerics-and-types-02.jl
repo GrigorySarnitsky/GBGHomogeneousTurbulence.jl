@@ -2,10 +2,10 @@
 # including the degenerate-strain guard (⟨S:S⟩ ≤ 0), which the existing regression test in
 # test/validation.jl never reaches because it only feeds a randomly-seeded (hence ⟨S:S⟩ > 0) field.
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds,
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds,
                                                new_vector_field_spectral
-using GBGIsotropicTurbulence.Observables: derivative_skewness
+using GBGHomogeneousTurbulence.Observables: derivative_skewness
 
 @testset "derivative_skewness returns the field's element type on the degenerate-strain branch" begin
   for T in (Float32, Float64)

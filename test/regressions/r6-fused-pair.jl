@@ -7,7 +7,7 @@
 # fixed tree, while the fused pass is serial — the sums associate differently at roundoff. So k is
 # pinned bitwise against its own weighted route, and against `kinetic_energy` only to a few ulp
 # (still far tighter than any operand swap could survive).
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: weighted_inner
 using Random
 

@@ -8,8 +8,8 @@
 # exactly, and a resting unforced flow is a fixed point, so the answer must not depend on the step.
 # Each test states a property a correct time-stepper must have; a real defect makes one of them fail.
 
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.SimulationRun: cfl_timestep
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.SimulationRun: cfl_timestep
 using GBGPeriodicFields: field_data
 using Random
 using Test

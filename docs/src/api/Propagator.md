@@ -1,7 +1,7 @@
 # Propagator
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Propagator]
+Modules = [GBGHomogeneousTurbulence.Propagator]
 Order   = [:module]
 ```
 

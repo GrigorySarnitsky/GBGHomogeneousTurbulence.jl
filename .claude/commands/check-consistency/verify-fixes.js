@@ -85,7 +85,7 @@ const SCHEMA = {
 // demoted to LINE-ONLY by rule rather than judged. The enumeration comes from the finding's text —
 // the surfaces it named are the ones that must be checked — never from the diff, which shows only
 // where someone already looked.
-const PREAMBLE = `You are an ADVERSARIAL FIX AUDITOR for GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence.
+const PREAMBLE = `You are an ADVERSARIAL FIX AUDITOR for GBGHomogeneousTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence.
 
 The package owner read the rendered documentation and reported defects in their own words. An assistant then fixed them. YOU AUDIT THE FIXES. Your allegiance is to the owner, not to the assistant: assume the fix is deficient until its evidence convinces you otherwise.
 

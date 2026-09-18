@@ -5,7 +5,7 @@
 # Its neighbours `kinetic_energy` and `scalar_variance` are guarded with named
 # `ArgumentError`s precisely so a bad value cannot surface far downstream; the
 # same guard is owed here.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 # A derived-viscosity run whose ν came out non-positive or non-finite is not a DNS.
 build(v) = Simulation(grid_points_per_axis = 8, κ_max_η = v, rng = MersenneTwister(1))

@@ -27,8 +27,8 @@ retired in favor of "the cache" / `ObservablesCache` as the finding's resolution
 
 `deposit_sample!` now has its own docstring at `src/Cache.jl:262-278` ("Record the particle
 velocities already written into `cache`..."), is exported (`src/Cache.jl:57`,
-`src/GBGIsotropicTurbulence.jl:178`), listed in the module docstring
-(`src/GBGIsotropicTurbulence.jl:99`), and appears in the `@docs` block of
+`src/GBGHomogeneousTurbulence.jl:178`), listed in the module docstring
+(`src/GBGHomogeneousTurbulence.jl:99`), and appears in the `@docs` block of
 `docs/src/api/Cache.md:17` (under "## The observables cache"). Confirmed present in the built HTML
 at `docs/build/api/Cache/index.html`.
 

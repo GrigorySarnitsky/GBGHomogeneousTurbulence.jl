@@ -3,7 +3,7 @@
 # beyond roundoff. Before the check, a corrupted k_x = 0 plane was undetectable — the docstring said
 # "it is not checked" and every spectral diagnostic silently disagreed with the physical images.
 # This is the witness the PF request promised: hand-corrupt the plane, and the violation is NAMED.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, to_physical, to_spectral, reality_projection!
 using Random
 

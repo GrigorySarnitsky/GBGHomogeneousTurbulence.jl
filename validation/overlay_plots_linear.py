@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Overlay of the two comparison legs: TurTLE solid, GBGIsotropicTurbulence dashed.
+# Overlay of the two comparison legs: TurTLE solid, GBGHomogeneousTurbulence dashed.
 import h5py
 import numpy as np
 import matplotlib
@@ -17,7 +17,7 @@ uG, rG = G['τ'][()], G['ρ_u'][()]
 
 fig, ax = plt.subplots(1, 3, figsize=(12.5, 3.6))
 ax[0].plot(tT, kT, '-',  color='#1f77b4', lw=1.6, label='TurTLE')
-ax[0].plot(tG, kG, '--', color='#d62728', lw=1.4, label='GBGIsotropicTurbulence')
+ax[0].plot(tG, kG, '--', color='#d62728', lw=1.4, label='GBGHomogeneousTurbulence')
 ax[0].set_xlabel('t'); ax[0].set_title('k(t)'); ax[0].legend(fontsize=8)
 
 ax[1].plot(tT, eT, '-',  color='#1f77b4', lw=1.6)

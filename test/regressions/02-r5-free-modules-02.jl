@@ -8,8 +8,8 @@
 # The correct behaviour asserted here: an adaptive step must stay bounded by a physical time scale of
 # the problem, and a run that reports success must actually be integrating something.
 
-using Test, Random, GBGIsotropicTurbulence
-const IT = GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
+const IT = GBGHomogeneousTurbulence
 
 @testset "an unforced decaying run keeps a bounded timestep and a meaningful clock" begin
   ν = 0.02

@@ -6,7 +6,7 @@
 #   W1 scaling+layout: k and ε of the converted state match TurTLE's t₀ statistics sample.
 #   W2 round trip:     curl(inverse_curl(ω̂)) == ω̂ to machine precision.
 #   W3 interpolation:  IT's own u(t₀, X₀) sample matches TurTLE's stored velocity/100.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields
 using GBGPeriodicFields: inverse_curl!, point_values, PointSet, CatmullRom,
                          VectorFieldSpectral, FieldSpectralMultipliers, field_data
@@ -132,7 +132,7 @@ println("== writing gbgit_rk4adaptive_reference_data.h5")
 h5open(joinpath(DIR, "gbgit_rk4adaptive_reference_data.h5"), "w") do io
   io["t"] = ts; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
   a = attributes(io)
-  a["code"] = "GBGIsotropicTurbulence (IFLowStorageRK4, ADAPTIVE CFL step, HouLi order 36 strength 63.463), Float64, ROCm GPU"
+  a["code"] = "GBGHomogeneousTurbulence (IFLowStorageRK4, ADAPTIVE CFL step, HouLi order 36 strength 63.463), Float64, ROCm GPU"
   a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, ConstantPower ε_inj = 1 shells 1–2; " *
              "adaptive CFL stepping (recommended ceiling for IFLowStorageRK4) to t = 36.8 from the same frozen handoff; " *
              "same 10^4 tracers, AB4 warm-started from TurTLE's history, Catmull–Rom interpolation"

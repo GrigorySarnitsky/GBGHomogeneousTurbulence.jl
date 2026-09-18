@@ -10,9 +10,9 @@
 
 using Test, Random
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: particles_modified!, velocity_at_particles
-using GBGIsotropicTurbulence.SimulationRun: Simulation, advance!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: particles_modified!, velocity_at_particles
+using GBGHomogeneousTurbulence.SimulationRun: Simulation, advance!
 
 function fresh_run()
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,

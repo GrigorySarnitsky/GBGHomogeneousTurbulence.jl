@@ -3,7 +3,7 @@
 # errors are LARGER (the longer bootstrap costs more than the extra history returns). The docstring
 # now states "order = 4 is the practical ceiling"; this is its witness. Setup mirrors
 # 03-test-critic-03: uniform time-varying flow, interpolation exact, trajectory analytic.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test

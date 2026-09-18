@@ -12,7 +12,7 @@
    "severity": "serious",
    "title": "StochasticOU checkpoint read now hard-requires a `seed` HDF5 attribute that older checkpoint files do not have, with no fallback and no schema bump",
    "lane": "free-reader",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -33,7 +33,7 @@
    "severity": "notable",
    "title": "Every StochasticOU checkpoint written before this window is now unreadable, failing with a raw KeyError",
    "lane": "executing",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -89,7 +89,7 @@
    "severity": "notable",
    "title": "read_forcing(StochasticOU) now requires a seed attribute \u2014 checkpoints written before this commit fail to read",
    "lane": "behaviour-change",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -110,7 +110,7 @@
    "severity": "notable",
    "title": "read_forcing(StochasticOU) now rejects every checkpoint file written before this commit",
    "lane": "over-rejection",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -145,7 +145,7 @@
    "severity": "serious",
    "title": "StochasticOU HDF5 checkpoints: seed made required-on-read with no version bump or fallback, breaking pre-existing files",
    "lane": "public-contract",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -180,7 +180,7 @@
    "severity": "serious",
    "title": "StochasticOU checkpoint fix silently breaks reading of pre-fix files, undisclosed by the claim",
    "lane": "claim-versus-edit",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (ca34e55): read_forcing falls back to seed = 0 via haskey when the attribute is absent, restoring pre-fix files to exactly their base behaviour; no schema bump needed since old files stay readable."
   },
   {
@@ -201,7 +201,7 @@
    "severity": "serious",
    "title": "The new guard does not survive an HDF5 checkpoint round-trip",
    "lane": "free-reader",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
   },
   {
@@ -229,7 +229,7 @@
    "severity": "notable",
    "title": "The new guard is bypassed by an HDF5 checkpoint round-trip \u2014 executed and confirmed",
    "lane": "executing",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
   },
   {
@@ -271,7 +271,7 @@
    "severity": "notable",
    "title": "New invariant silently not enforced across the checkpoint boundary; flag does not round-trip",
    "lane": "behaviour-change",
-   "file": "ext/GBGIsotropicTurbulenceHDF5Ext.jl",
+   "file": "ext/GBGHomogeneousTurbulenceHDF5Ext.jl",
    "disposition": "fixed (8f2ef75): write_forcing stores turnover_time_derived; read_forcing re-derives when the flag says derived (bit-identical, a pure function of the stored target and box side) so provenance survives the round-trip; pre-flag files read as explicit; the round-trip test pins the flag."
   },
   {

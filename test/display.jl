@@ -7,20 +7,20 @@
 # requires a package-owned `show` or a cited exemption, checked in both directions — a hand-written
 # list would go stale the moment a type is added, which is exactly when the check has something to say.
 
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence: SimulationDomain, State, Observables, Cache, Forcing, Generator,
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence: SimulationDomain, State, Observables, Cache, Forcing, Generator,
                               Propagator, Particles, SimulationRun, Phenomenology
-using GBGIsotropicTurbulence.Phenomenology: Spectra, StructureFunctions, Scalings, FlowParameters, Reference
-using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
-using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008
-using GBGIsotropicTurbulence.Phenomenology.StructureFunctions: Kolmogorov1941
-using GBGIsotropicTurbulence.Particles: advect!, unwrapped_positions
+using GBGHomogeneousTurbulence.Phenomenology: Spectra, StructureFunctions, Scalings, FlowParameters, Reference
+using GBGHomogeneousTurbulence.Phenomenology.Spectra: Pope2000
+using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008
+using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions: Kolmogorov1941
+using GBGHomogeneousTurbulence.Particles: advect!, unwrapped_positions
 using GBGPeriodicFields: field_data, point_positions, npoints, LalescuSpline
 using Random
 using Test
 
 
-const MODULES = Set(Any[GBGIsotropicTurbulence, SimulationDomain, State, Observables, Cache, Forcing,
+const MODULES = Set(Any[GBGHomogeneousTurbulence, SimulationDomain, State, Observables, Cache, Forcing,
                         Generator, Propagator, Particles, SimulationRun, Phenomenology, Spectra,
                         StructureFunctions, Scalings])
 

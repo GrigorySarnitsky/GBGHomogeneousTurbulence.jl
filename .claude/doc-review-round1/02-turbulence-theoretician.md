@@ -1,6 +1,6 @@
 # Turbulence Theoretician — findings
 
-Auditing the rendered GBGIsotropicTurbulence documentation (full site incl. Architecture)
+Auditing the rendered GBGHomogeneousTurbulence documentation (full site incl. Architecture)
 for physical correctness and internal consistency of every definition, conservation law,
 scaling law, and dimensionless constant.
 

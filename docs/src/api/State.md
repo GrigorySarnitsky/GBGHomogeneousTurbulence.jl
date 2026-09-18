@@ -1,7 +1,7 @@
 # State
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.State]
+Modules = [GBGHomogeneousTurbulence.State]
 Order   = [:module]
 ```
 

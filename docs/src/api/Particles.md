@@ -1,7 +1,7 @@
 # Particles
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Particles]
+Modules = [GBGHomogeneousTurbulence.Particles]
 Order   = [:module]
 ```
 
@@ -26,7 +26,7 @@ How the positions are advanced over one step — the Lagrangian counterpart of t
 `Heun` reaches second order with a second interpolation per step; `AdamsBashforth` reaches
 further by reusing the Lagrangian samples already deposited, at no extra interpolation. Each
 scheme's storage is allocated by
-[`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers), which a run calls for
+[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which a run calls for
 you.
 
 ```@docs

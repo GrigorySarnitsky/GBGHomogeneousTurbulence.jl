@@ -6,7 +6,7 @@
 # integrating factor becomes exp(+ν|κ|²|Δt|) and the step is an unconditionally unstable backward
 # heat solve; the clock also runs backwards.
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 @testset "advance! rejects a non-positive dt for every particle integration scheme, not only AdamsBashforth" begin
 

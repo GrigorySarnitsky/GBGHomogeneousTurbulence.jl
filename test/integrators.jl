@@ -4,7 +4,7 @@
 # ‖u(Δt/2)−u(Δt/4)‖ ≈ 2^p for order p (≈8 for RK3, ≈4 for RK2). Plus RK3 forced-HIT invariants and
 # the per-scheme CFL. (Velocity-only: the scalar is carried inert at zero.)
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data
 using Random
 using Test

@@ -1,7 +1,7 @@
 # StructureFunctions
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Phenomenology.StructureFunctions]
+Modules = [GBGHomogeneousTurbulence.Phenomenology.StructureFunctions]
 Order   = [:module]
 ```
 
@@ -22,12 +22,12 @@ Lundgren2002
 ## References
 
 The published provenance of each law on this page, read from its
-[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)`; a source cited inline
+[`provenance`](@ref GBGHomogeneousTurbulence.Phenomenology.provenance)`(law)`; a source cited inline
 for an individual coefficient or a comparison is cited in place and not repeated here.
 
 ```@eval
-import GBGIsotropicTurbulence.Phenomenology as Phen
-import GBGIsotropicTurbulence.Phenomenology.StructureFunctions as SF
+import GBGHomogeneousTurbulence.Phenomenology as Phen
+import GBGHomogeneousTurbulence.Phenomenology.StructureFunctions as SF
 import Markdown
 laws = [SF.Kolmogorov1941(), SF.Kolmogorov1962(), SF.SheLeveque1994(), SF.Yaglom1949(), SF.Lundgren2002()]
 cites = unique([Phen.provenance(l).citation for l in laws])

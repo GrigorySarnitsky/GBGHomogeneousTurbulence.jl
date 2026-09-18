@@ -10,9 +10,9 @@
 # was silently handed too large a timestep.
 
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Propagator: AbstractIntegrator, allocate_buffers, recommended_cfl
-using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Propagator: AbstractIntegrator, allocate_buffers, recommended_cfl
+using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds
 
 struct ProbeScheme <: AbstractIntegrator end
 

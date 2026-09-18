@@ -218,7 +218,7 @@ threads on a 12-core CPU) and this package **265 seconds** on a single AMD RX 79
 The three published files (release assets; verify the hashes):
 
 ```
-base=https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl/releases/download/turtle-comparison-v1
+base=https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl/releases/download/turtle-comparison-v1
 curl -LO $base/handoff_initial_state_iter100.h5
 curl -LO $base/turtle_reference_data.h5
 curl -LO $base/gbgit_reference_data.h5
@@ -244,7 +244,7 @@ the witnesses above, and the instrumented run; the storage backend is one consta
 `overlay_plots.py` (the figure). This package's leg in outline:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 sim = Simulation(domain; viscosity = 9.032e-3,
                  velocity_forcing = ConstantPower(injection_rate = 1.0,
                                                   lowest_shell = 1, highest_shell = 2),

@@ -1,7 +1,7 @@
 # Spectra
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Phenomenology.Spectra]
+Modules = [GBGHomogeneousTurbulence.Phenomenology.Spectra]
 Order   = [:module]
 ```
 
@@ -62,12 +62,12 @@ ObukhovCorrsin1949
 ## References
 
 The published provenance of each law on this page, read from its
-[`provenance`](@ref GBGIsotropicTurbulence.Phenomenology.provenance)`(law)`; a source cited inline
+[`provenance`](@ref GBGHomogeneousTurbulence.Phenomenology.provenance)`(law)`; a source cited inline
 for an individual coefficient or a comparison is cited in place and not repeated here.
 
 ```@eval
-import GBGIsotropicTurbulence.Phenomenology as Phen
-import GBGIsotropicTurbulence.Phenomenology.Spectra as Spec
+import GBGHomogeneousTurbulence.Phenomenology as Phen
+import GBGHomogeneousTurbulence.Phenomenology.Spectra as Spec
 import Markdown
 laws = [Spec.Pope2000(), Spec.VonKarman1948(), Spec.Pao1965(), Spec.ObukhovCorrsin1949()]
 cites = unique([Phen.provenance(l).citation for l in laws])

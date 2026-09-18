@@ -5,7 +5,7 @@
 # two spellings agree. They do not: the velocity copy `0.5 * inner(û, û)` promotes a Float32 field's
 # energy to Float64 (the literal `0.5` is Float64), where the canonical `inner(u, u) / 2` keeps
 # Float32 — a divergence that already exists between the two copies, before any future edit.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: inner
 
 @testset "State.jl's seeding rescale agrees with the canonical Observables formulas" begin

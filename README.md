@@ -1,4 +1,4 @@
-# GBGIsotropicTurbulence.jl
+# GBGHomogeneousTurbulence.jl
 
 A small, focused pseudospectral DNS of homogeneous isotropic turbulence on three-dimensional periodic
 domains: an incompressible velocity field and a single passive scalar, each optionally forced,
@@ -22,7 +22,7 @@ This is a private, unregistered package. To install it (you need access to the r
 
 ```julia
 ]add https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl
-]add https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl
+]add https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl
 ```
 
 (the field-library backend first — both are unregistered, so Julia cannot resolve
@@ -34,16 +34,16 @@ or
 using Pkg
 
 Pkg.add(url="https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl")
-Pkg.add(url="https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl")
+Pkg.add(url="https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl")
 ```
 
 Then:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 ```
 
 ## Documentation
 
 Documentation with the full API reference is available at
-[https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/](https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/).
+[https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/](https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/).

@@ -9,7 +9,7 @@
 
 using Test, Random
 using GBGPeriodicFields: npoints
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "a cache too shallow for an AdamsBashforth scheme is refused at allocate_buffers, not by a later BoundsError" begin

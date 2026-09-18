@@ -8,7 +8,7 @@
 # — documented as the stationary ⟨|f|²⟩ = σ², which cannot be negative — carried no such guard, and
 # every draw scales by sqrt(variance), so a negative value reached `sqrt` downstream.
 # `VarianceRescaling`'s `target` (an exported, front-door forcing) is the same shape via `project_forcing!`.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 @testset "forcing amplitudes documented non-negative are guarded at construction" begin
 

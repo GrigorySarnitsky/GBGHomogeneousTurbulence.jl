@@ -5,7 +5,7 @@
 # drain toward nothing, the restoring term does the lifting); from above BOTH the restoring term
 # and the cascade drain k, and the risk asserted-but-unwitnessed was overshoot/undershoot of the
 # discrete update. This pins both directions of the restoring dynamics.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 using Random
 
 

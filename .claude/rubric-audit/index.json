@@ -21,7 +21,7 @@
    "src/Cache.jl:17",
    "docs/src/index.md:94",
    "src/Cache.jl:1",
-   "src/GBGIsotropicTurbulence.jl:18",
+   "src/GBGHomogeneousTurbulence.jl:18",
    "src/State.jl:44",
    "src/SimulationRun.jl:192",
    "docs/ARCHITECTURE.md:202",
@@ -42,7 +42,7 @@
   "id": 4,
   "title": "\"The forthcoming Eulerian + Lagrangian statistics\" \u2014 wrong owner, on four surfaces",
   "locations": [
-   "src/GBGIsotropicTurbulence.jl:35",
+   "src/GBGHomogeneousTurbulence.jl:35",
    "README.md:6",
    "docs/src/index.md:82",
    "src/Particles.jl:177",

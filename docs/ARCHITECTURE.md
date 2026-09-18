@@ -1,6 +1,6 @@
 # Architecture
 
-This is the design document for `GBGIsotropicTurbulence` — what the package is, how it is organized,
+This is the design document for `GBGHomogeneousTurbulence` — what the package is, how it is organized,
 and *why* it is shaped the way it is. It is the spec: read it before any structural change, and do not
 re-litigate a recorded decision (§11) without the user. `CLAUDE.md` is the terse working copy and defers
 here; the rendered symbol glossary is [`docs/src/notation.md`](notation.md).
@@ -15,7 +15,7 @@ reference for turbulence notation (§References).
 
 ## 1. Identity
 
-> `GBGIsotropicTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS) of
+> `GBGHomogeneousTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS) of
 > homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol{u}`` and one passive
 > scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable integrating-factor
 > time-stepping, with Lagrangian particle probes and field sampling along their trajectories. It is a **library
@@ -33,7 +33,7 @@ reference for turbulence notation (§References).
 
 The package inverts the richness of its sibling consumer
 [`GBGCloudPhysics`](https://grigorysarnitsky.github.io/GBGCloudPhysics.jl): where Cloud carries a rich
-constitutive physics over a thin numerical core, `GBGIsotropicTurbulence` carries a **thin fixed physics
+constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carries a **thin fixed physics
 over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains most
 of what follows.
 
@@ -46,7 +46,7 @@ The primary measure of this library's quality is how easily one sets up and runs
 therefore a thin run layer that assembles the machinery with sensible defaults and owns the time loop:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 # Assemble a forced case. Everything the run needs — the domain, buffers, physics,
 # scheme, state, and initial condition — is built with defaults from a few numbers.
@@ -174,7 +174,7 @@ practices the comparison internally).
 ## 4. Modules
 
 Each concern is its own module, included in dependency order by the umbrella
-`src/GBGIsotropicTurbulence.jl`. The four Mori–Zwanzig roles carry their role names — `State`, `Generator`,
+`src/GBGHomogeneousTurbulence.jl`. The four Mori–Zwanzig roles carry their role names — `State`, `Generator`,
 `Observables`, `Propagator`; the System's forcing, the discretized frame, the Lagrangian instruments, the
 run layer, and the reference laws are named by their job. The rule is that **a role recurring at every
 rung of the ladder wears its role name, while a concrete mechanism wears its job** — so the load-bearing
@@ -544,7 +544,7 @@ Over it:
   (`write_domain`, `write_state`, `write_tracers`, `write_forcing`) with the field library's
   `write_field`/`write_points`/`write_scheme` groups as the leaves. Nothing derivable is stored —
   the reader rebuilds through the constructor and replays the seeding deposits — and the methods
-  live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency extension, so the surface exists
+  live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency extension, so the surface exists
   only when `HDF5` is loaded.
 - **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) are
@@ -629,7 +629,7 @@ path that extracted `GBGStreamingStatistics`. The requirement constrains the des
 **dependency-light leaf**, depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no field
 math) *nor* `GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor* this
 package's dynamics — first in the include order, importing nothing turbulence-dynamical. And it is a
-**self-contained namespace**: the umbrella does *not* re-export it (`using GBGIsotropicTurbulence` brings
+**self-contained namespace**: the umbrella does *not* re-export it (`using GBGHomogeneousTurbulence` brings
 the DNS API only; the laws are reached opt-in through `Phenomenology`), and its notation and API pages form
 their own group, separable from the DNS surface. Extract when a second consumer appears; until then the
 seam is real but uncrossed (decision 18).
@@ -648,7 +648,7 @@ is deferred (§7).
 
 ## 5. The consumer boundary — what belongs here, and what does not
 
-`GBGIsotropicTurbulence` owns the turbulence-specific glue and delegates everything domain-neutral. The
+`GBGHomogeneousTurbulence` owns the turbulence-specific glue and delegates everything domain-neutral. The
 dividing line is **domain-neutrality**, not "thinness":
 
 - **To `GBGPeriodicFields`** — every field operation: the transforms, `curl!` / `cross!` / `divergence!`,
@@ -2828,6 +2828,31 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     to two — one of which is the adaptive timestep's, the other the scalar run's NaN guard.
     **Not done:** no code-to-code comparison exists — TurTLE has no Ornstein–Uhlenbeck forcing — so the
     process rests on the statistical tests above.
+
+91. **(2026-09-18, user-directed) The package is `GBGHomogeneousTurbulence`.** Renamed before the
+    first release, when a rename is still cheap. **Why the old name was wrong.** A triple-periodic
+    pseudospectral box enforces *homogeneity*; isotropy is only what the default forcing and initial
+    condition choose — nothing in the domain, the generator, the propagator or the transforms knows
+    about it. Naming the package for a property of its default configuration rather than for its
+    invariant is the same category slip the doc policy warns about, and §7 already defers flows the
+    old name excluded: the sheared frame (Rogallo) and the uniform-mean-gradient scalar source are
+    homogeneous and anisotropic. Sagaut & Cambon's *Homogeneous Turbulence Dynamics* (2nd ed.) puts
+    the scope plainly: chapter 4 is homogeneous isotropic turbulence, chapters 7–12 are rotation,
+    strain, shear, buoyancy, coupled cases and MHD — every one homogeneous, every one reachable from
+    this machinery with extra generator terms or a moving frame. The old name covered one chapter of
+    the fourteen. **The boundary, stated rather than implied.** Their chapters 13–14 are compressible
+    homogeneous turbulence, which this package does **not** reach: the incompressible Leray
+    projection is structural here, not a setting. Compressible homogeneous turbulence is out of
+    scope, as §3 records for the Model. **Mechanics.** Repository `GBGHomogeneousTurbulence.jl`,
+    module and extension renamed, every current-state surface swept by hand — the sibling-link
+    tooling cannot catch a rename, since a table keyed on a package's spelling goes quiet rather than
+    failing. Two things deliberately keep the old spelling: this log, which records what the package
+    was called when each decision was made, and the `type` attributes of checkpoints written before
+    today — a stored tag is normalized to the current spelling on read, so those files still load and
+    nothing rewrites them. **Fleet.** The three sibling sessions were told before the rename, since a
+    Dropbox working copy and their `inspiration/` clones point at the old path; two of them held
+    tables keyed on the old name that would have degraded to silence, and both fixed the class rather
+    than the entry.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,

@@ -1,7 +1,7 @@
 # Witness r5-edge-cases-03 — a negative `number_of_particles` must be rejected at construction,
 # the way every sibling non-negative keyword of this constructor already is (`kinetic_energy`,
 # `scalar_variance`, `κ_max_η`), instead of being silently routed to the tracer-free branch.
-using Test, GBGIsotropicTurbulence
+using Test, GBGHomogeneousTurbulence
 
 @testset "Simulation rejects a negative `number_of_particles` instead of silently dropping tracers" begin
   # The legitimate tracer-free request keeps working: zero means "no tracers".

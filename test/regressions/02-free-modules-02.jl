@@ -8,7 +8,7 @@
 # pins that contract AT IT'S BOUNDARY — the surface `advect!` actually calls — so a PF regression
 # on either half fails here, not just in PF's own suite.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet,
                          PointSet, wrap!, point_positions

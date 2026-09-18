@@ -63,5 +63,5 @@ different argument name.
 **Verdict:** PRESENT
 **Evidence:** Verb is unchanged: `finalize!` still exported and used throughout
 (`src/Generator.jl:30,48,184,274,284`; `src/Propagator.jl:41,185,320,421`;
-`src/GBGIsotropicTurbulence.jl:106,196`). ARCHITECTURE.md:1155 still flags it as "a recorded deviation
+`src/GBGHomogeneousTurbulence.jl:106,196`). ARCHITECTURE.md:1155 still flags it as "a recorded deviation
 from the solver-library precedent." No rename to a physics-facing verb occurred.

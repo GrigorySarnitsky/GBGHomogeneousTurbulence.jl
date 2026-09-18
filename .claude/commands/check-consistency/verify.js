@@ -164,7 +164,7 @@ const SCHEMA = {
   required: ['hat', 'findings_in_file', 'verdicts'],
 }
 
-const PREAMBLE = `You are an ADVERSARIAL CLOSURE AUDITOR for GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (velocity field and passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers).
+const PREAMBLE = `You are an ADVERSARIAL CLOSURE AUDITOR for GBGHomogeneousTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (velocity field and passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian tracers).
 
 Some time ago an expert panel audited this package's documentation and banked its findings. A fix pass then ran. YOUR JOB IS NOT TO REVIEW THE FIX PASS — you are deliberately not shown it, and you must not go looking for it.
 

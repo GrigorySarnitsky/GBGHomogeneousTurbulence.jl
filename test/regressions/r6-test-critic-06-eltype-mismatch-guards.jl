@@ -3,12 +3,12 @@
 # of the SAME grid size (and vice versa for state) — the branch the suite's domain-mismatch test
 # (grid-size only, Float64 throughout) never exercises.
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 # Under `julia --project` the main env has no HDF5 (a weak dep); the pile keeps a dedicated env
 # with the package dev'd + HDF5, located through `pkgdir`. Under Pkg.test this branch is dead.
 if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"), "HDF5")) === nothing
   import Pkg
-  Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
+  Pkg.activate(joinpath(pkgdir(GBGHomogeneousTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
 end
 using HDF5
 using GBGPeriodicFields: field_data, point_positions, LalescuSpline
@@ -24,7 +24,7 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
 
   # ——— state: written Float64, read against a Float32 domain of the same grid ———
   path = tempname() * ".h5"
-  state = GBGIsotropicTurbulence.State.ResolvedFields(domain64; scalar = true)
+  state = GBGHomogeneousTurbulence.State.ResolvedFields(domain64; scalar = true)
   rng = MersenneTwister(11)
   copyto!(field_data(state.velocity_spectral),
           randn(rng, ComplexF64, size(field_data(state.velocity_spectral))))
@@ -46,7 +46,7 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
 
   # ——— state, the other direction: written Float32, read against a Float64 domain ———
   path2 = tempname() * ".h5"
-  state32 = GBGIsotropicTurbulence.State.ResolvedFields(domain32; scalar = false)
+  state32 = GBGHomogeneousTurbulence.State.ResolvedFields(domain32; scalar = false)
   copyto!(field_data(state32.velocity_spectral),
           randn(rng, ComplexF32, size(field_data(state32.velocity_spectral))))
   h5open(io -> write_state(io, "s", state32), path2, "w")

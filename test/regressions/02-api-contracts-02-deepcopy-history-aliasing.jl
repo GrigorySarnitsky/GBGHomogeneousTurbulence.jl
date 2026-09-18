@@ -15,7 +15,7 @@
 
 using Test, Random
 using GBGPeriodicFields: npoints
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
 
 @testset "the Lagrangian sample history owns independent storage per slot" begin

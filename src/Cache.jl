@@ -17,16 +17,16 @@ from the values the run has already computed.
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
 - [`fields_modified!`](@ref), [`particles_modified!`](@ref) — announce a mutation of the state or
-  of the [`Tracers`](@ref GBGIsotropicTurbulence.Particles.Tracers) the run advects
+  of the [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) the run advects
   made outside the iteration, so the affected slots go stale and reads throw until the next deposit.
 - [`velocity_physical`](@ref), [`vorticity_physical`](@ref), [`scalar_physical`](@ref) — the checked
   reads of the cached fields (the velocity, vorticity, and scalar in physical representation).
-- [`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) — the cached largest flow speed,
+- [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) — the cached largest flow speed,
   the number the timestep choice reads (one generic with the field reduction in `Observables`, whose
   docstring is the home).
 - [`velocity_at_particles`](@ref) — the checked read of the velocity sampled along each trajectory.
 
-The field slots are filled by [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), which
+The field slots are filled by [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), which
 `Propagator` owns rather than this module because it needs the scheme's scratch to recover the
 fields. Each slot carries the value **and** the epoch that value belongs to, so a read can be refused
 rather than served stale.
@@ -42,10 +42,10 @@ The cache keeps one epoch counter per dynamical factor — the resolved fields, 
 and a slot is readable exactly when its own epoch equals the counter it depends on.
 
 An epoch counts *changes to the state*, not advances of the run: a completed
-[`step!`](@ref GBGIsotropicTurbulence.Propagator.step!) advances the fields epoch, but so does any
+[`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) advances the fields epoch, but so does any
 announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value still the
 right one?"; the clock's
-[`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step) answers "how far has the run
+[`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) answers "how far has the run
 gone?".
 """
 module Cache
@@ -72,7 +72,7 @@ The observables cache of a run — the storage where each iteration deposits, at
 observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vorticity
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
 representation when the run carries one, the fastest flow speed on the grid (the
-[`max_speed`](@ref GBGIsotropicTurbulence.Observables.max_speed) number the next timestep choice
+[`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) number the next timestep choice
 reads), and — when the run advects tracers — the flow velocity at the particle positions,
 ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
 
@@ -82,7 +82,7 @@ The cache allocates and owns every slot, the velocity at the particles included 
 observable of the flow, not particle state (a tracer has no velocity of its own), so its storage
 lives here and the tracer push writes into it exactly as the step writes into the field slots.
 
-Build it on a [`FixedDomain`](@ref) `domain`. [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) builds, wires,
+Build it on a [`FixedDomain`](@ref) `domain`. [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds, wires,
 and seeds one for you; a hand-assembled run constructs it here.
 
 # Arguments
@@ -90,10 +90,10 @@ and seeds one for you; a hand-assembled run constructs it here.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
   including the current one. A hand-assembled run sets it to
-  [`history_depth`](@ref GBGIsotropicTurbulence.Particles.history_depth)`(scheme)` for its particle
+  [`history_depth`](@ref GBGHomogeneousTurbulence.Particles.history_depth)`(scheme)` for its particle
   integration scheme. A one-step scheme needs 1 and stores no history; an `order`-step scheme needs
   `order`, and allocating the scheme's per-step buffers
-  ([`allocate_buffers`](@ref GBGIsotropicTurbulence.Propagator.allocate_buffers)) refuses a cache
+  ([`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)) refuses a cache
   whose depth differs from it.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
   the velocity-at-particles slot (an ``M \\times 3`` point-value section) and its sample history.
@@ -132,10 +132,10 @@ depends on.
   **both** counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
   [`fields_modified!`](@ref), so it runs ahead of
-  [`current_step`](@ref GBGIsotropicTurbulence.SimulationRun.current_step). A
+  [`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step). A
   field-derived slot is readable exactly when its epoch equals this.
 - `particles_epoch` — the tracer positions' counter, advanced by every
-  [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) push — the push announces itself —
+  [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) push — the push announces itself —
   and by [`particles_modified!`](@ref) for a reposition made outside the push.
 """
 mutable struct ObservablesCache{PV, PS, TS, T <: AbstractFloat}
@@ -225,7 +225,7 @@ The vorticity in physical representation
 at the current epoch — the checked read of the [`ObservablesCache`](@ref) `cache`'s vorticity
 slot, with exactly [`velocity_physical`](@ref)'s contract (the deposited field or a throw; never a
 recomputation; read-only). The deposited value is produced by
-[`vorticity_physical!`](@ref GBGIsotropicTurbulence.Observables.vorticity_physical!) — measure with
+[`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) — measure with
 that function, read with this one.
 """
 function vorticity_physical(cache::ObservablesCache)
@@ -347,10 +347,10 @@ were changed outside the iteration (a re-seeded velocity, any direct write to th
 Advances the fields epoch of `cache` (an [`ObservablesCache`](@ref)), so every cached observable is stale and reads throw until
 the next deposit; that interval belongs to whoever made the change.
 
-This verb is only for out-of-band changes — [`step!`](@ref GBGIsotropicTurbulence.Propagator.step!)
+This verb is only for out-of-band changes — [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!)
 advances the epoch itself, and the closing deposit restores the cache. After a hand-made mutation,
 re-deposit with the
-`Propagator`'s [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!) before advancing again —
+`Propagator`'s [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again —
 the timestep choice reads the cached maximum speed.
 
 Coefficients written by hand must respect the real-field layout's conjugate symmetry — a violation
@@ -359,7 +359,7 @@ this: it measures the conjugate-symmetry residual on the planes that store both 
 and throws on an inconsistency beyond roundoff. The `cache` form cannot see the fields and trusts
 the caller; the package's own seeders satisfy the constraint by construction.
 
-Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
+Given a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form to reach for when a run is what you are holding
 (`particles_modified!` offers the same pair of forms).
 
@@ -400,21 +400,21 @@ why the history lives here and not in the scheme's own per-step buffers: the obj
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
 A sanctioned push never needs this verb:
-[`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!) moves the particles epoch itself, a
+[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) moves the particles epoch itself, a
 history-keeping announcement — the push *extends* the history this verb discards.
 
 A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
 `deposit!(cache, tracers, u)` — from the
 deposited velocity, so the slot is refilled at the new positions. A loop
 announcing to a bare cache rather than a `Simulation` must also call
-[`restart!`](@ref GBGIsotropicTurbulence.Particles.restart!) itself, for a scheme carrying per-step
+[`restart!`](@ref GBGHomogeneousTurbulence.Particles.restart!) itself, for a scheme carrying per-step
 buffers of its own
-([`ParticleIntegratorBuffers`](@ref GBGIsotropicTurbulence.Particles.ParticleIntegratorBuffers)):
+([`ParticleIntegratorBuffers`](@ref GBGHomogeneousTurbulence.Particles.ParticleIntegratorBuffers)):
 the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
-Given a [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) it announces the change
+Given a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) it announces the change
 to that run's cache — the form to reach for when a run is what you are holding, mirroring
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!)'s own `sim` form.
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)'s own `sim` form.
 
 Returns its argument.
 """

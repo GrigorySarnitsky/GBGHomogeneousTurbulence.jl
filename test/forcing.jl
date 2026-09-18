@@ -4,11 +4,11 @@
 # effect — Linear injects energy, scalar Linear builds variance; (3) the forced velocity stays
 # divergence-free (the linear rate, folded into E_ν, preserves solenoidality).
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type,
                          reality_residual, VectorFieldSpectral
-using GBGIsotropicTurbulence.Forcing: add_forcing_source!
-using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+using GBGHomogeneousTurbulence.Forcing: add_forcing_source!
+using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using Logging
 
 
@@ -16,7 +16,7 @@ using Logging
 # reached for, so the witness cannot be satisfied by reusing the code under test.
 inner_band(f, band) = weighted_inner(f, band)
 inner_kappa2(f, domain) = weighted_inner(f, domain.squared_wavenumber_kernel)
-_probe_band(domain) = getfield(GBGIsotropicTurbulence.Forcing, :_shell_band)(domain, 1, 2)
+_probe_band(domain) = getfield(GBGHomogeneousTurbulence.Forcing, :_shell_band)(domain, 1, 2)
 using Random
 using Test
 
@@ -24,7 +24,7 @@ using Test
 # A forcing that implements the rate hook but forgets to declare it — the mistake the constructor
 # guard exists to catch (defined at top level: a struct cannot be declared inside a testset body).
 struct UndeclaredRateForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, field,
+GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, field,
                                                  domain::FixedDomain) = (rate .= 1; true)
 
 
@@ -32,25 +32,25 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
 # evolving state reached it. Dispatch would fall straight through to the do-nothing default, so the
 # forcing would be silently ignored.
 struct StaleSourceForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, field, domain, diffusivity) = N̂
+GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, field, domain, diffusivity) = N̂
 
 
 # A forcing written to the prepare hook's pre-2026-09-17 four-argument form, before the forcing's
 # evolving state moved into the run's state. Also silently ignored, so also refused.
 struct StalePrepareForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.prepare_forcing!(::StalePrepareForcing, field, domain, dt) = nothing
+GBGHomogeneousTurbulence.Forcing.prepare_forcing!(::StalePrepareForcing, field, domain, dt) = nothing
 
 
 # The two shapes the arity guard must NOT reject: an idiomatic optional trailing argument (Julia
 # auto-generates a short stub alongside the real method) and a strategy keeping a legacy overload for
 # its own harness. Both dispatch correctly on the run-shaped five-argument call.
 struct OptionalArgForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::OptionalArgForcing, forcing_state, N̂, field,
+GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::OptionalArgForcing, forcing_state, N̂, field,
                                                    domain, diffusivity = 0.0) = N̂
 struct KeptLegacyForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, forcing_state, N̂, field,
+GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, forcing_state, N̂, field,
                                                    domain, diffusivity) = N̂
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain, diffusivity) = N̂
+GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain, diffusivity) = N̂
 
 
 # A forcing whose rate tracks the state — the pre-2026-08-22 `ConstantPower` — but which declares it
@@ -64,9 +64,9 @@ end
 
 # Declares the steady rate and never implements the hook — the run would be silently unforced.
 struct DeclaredNotImplementedForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate(::DeclaredNotImplementedForcing) = true
-GBGIsotropicTurbulence.Forcing.uses_steady_linear_rate(::LyingRateForcing) = true
-function GBGIsotropicTurbulence.Forcing.set_forcing_rate!(forcing::LyingRateForcing, rate, field,
+GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate(::DeclaredNotImplementedForcing) = true
+GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate(::LyingRateForcing) = true
+function GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(forcing::LyingRateForcing, rate, field,
                                                           domain::FixedDomain)
   amplitude = 0.1 / (2 * max(weighted_inner(field, forcing.band), 1e-30))
   field_data(rate) .= field_scalar_type(rate)(amplitude)
@@ -384,7 +384,7 @@ end
     # the controller's default relaxation time and the viscosity derivation must agree on what
     # "stationary for this box" means, or the run is driven toward a target on one clock and
     # resolved on another. They disagreed by a factor of 2.68 when the copy was written by hand.
-    local_estimate = getfield(GBGIsotropicTurbulence.Forcing, :_stationary_dissipation_estimate)
+    local_estimate = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
     for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)
       @test local_estimate(k, L) ≈ stationary_dissipation(Li2008(), k, L)
     end

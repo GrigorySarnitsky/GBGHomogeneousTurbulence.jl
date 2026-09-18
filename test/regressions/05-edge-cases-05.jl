@@ -12,8 +12,8 @@
 # or at minimum a warning) that it was not.  Both are asserted below.
 
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
                               random_solenoidal_velocity_spectral!, new_vector_field_spectral,
                               kinetic_energy, Simulation
 

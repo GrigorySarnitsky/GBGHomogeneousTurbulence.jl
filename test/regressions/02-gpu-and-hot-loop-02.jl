@@ -10,7 +10,7 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 @testset "StochasticOU.prepare_forcing! allocates nothing at field scale" begin
   T = Float64

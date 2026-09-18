@@ -10,7 +10,7 @@
 #   * VarianceRescaling:  after the post-step rescale, ⟨φ²⟩_band = target  (over = :band)
 #   * VarianceRescaling:  after the post-step rescale, ⟨φ²⟩_total = target (over = :total)
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, spectral_band, convolve!, inner
 using Random
 using Test

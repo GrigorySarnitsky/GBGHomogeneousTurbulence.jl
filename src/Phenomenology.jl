@@ -22,13 +22,13 @@ The module's contents:
   [`taylor_reynolds`](@ref), and [`scalar_diffusivity`](@ref) as helpers.
 - [`provenance`](@ref) — a law's citation and validity range (a [`Reference`](@ref)); [`fit`](@ref)
   is the (future) seam for fitting a parametrization to measured data.
-- [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra) — model velocity and scalar
+- [`Spectra`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra) — model velocity and scalar
   spectra, functions of
   wavenumber, evaluated by [`spectrum`](@ref).
-- [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions) — the
+- [`StructureFunctions`](@ref GBGHomogeneousTurbulence.Phenomenology.StructureFunctions) — the
   inertial-range laws and their
   intermittency exponents, evaluated by [`structure_function`](@ref) and [`scaling_exponent`](@ref).
-- [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) — the dimensionless constants and
+- [`Scalings`](@ref GBGHomogeneousTurbulence.Phenomenology.Scalings) — the dimensionless constants and
   their Reynolds-number
   trends, evaluated by [`scaling`](@ref).
 
@@ -41,10 +41,10 @@ holds either way. Choosing a law is choosing the preset; a name is disambiguated
 collision).
 
 !!! note "Extraction-bound"
-    Built inside `GBGIsotropicTurbulence` but designed to be cut into a standalone
+    Built inside `GBGHomogeneousTurbulence` but designed to be cut into a standalone
     `GBGTurbulencePhenomenology` with no rewrite: it takes no field/statistics/dynamics dependency, and
     the umbrella does not re-export it — reach the laws opt-in through `Phenomenology`
-    (`using GBGIsotropicTurbulence.Phenomenology.Spectra`).
+    (`using GBGHomogeneousTurbulence.Phenomenology.Spectra`).
 """
 module Phenomenology
 
@@ -174,7 +174,7 @@ taylor_microscale(fp::FlowParameters) =
 
 The Taylor-scale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of the state `fp` (a
 [`FlowParameters`](@ref)) — the standard measure of how developed the turbulence is, and the argument
-of every [`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings) trend. Equivalently
+of every [`Scalings`](@ref GBGHomogeneousTurbulence.Phenomenology.Scalings) trend. Equivalently
 ``\\mathrm{Re}_\\lambda = u'^2\\sqrt{15/(\\nu\\varepsilon)}``.
 """
 taylor_reynolds(fp::FlowParameters) = fp.rms_velocity * taylor_microscale(fp) / fp.viscosity
@@ -235,7 +235,7 @@ The arguments are:
 - `κ` — the wavenumber it is evaluated at.
 - `fp` — the flow state, a [`FlowParameters`](@ref).
 
-Its home and the composed form are in [`Spectra`](@ref GBGIsotropicTurbulence.Phenomenology.Spectra).
+Its home and the composed form are in [`Spectra`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra).
 """
 function spectrum end
 
@@ -251,7 +251,7 @@ The arguments are:
 - `law` — the `StructureFunction` law evaluated.
 - `order` — the moment order ``p``.
 
-Its home is [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+Its home is [`StructureFunctions`](@ref GBGHomogeneousTurbulence.Phenomenology.StructureFunctions).
 """
 function scaling_exponent end
 
@@ -267,13 +267,13 @@ of scalar variance.
 
 The arguments are:
 - `law` — the
-  [`StructureFunction`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions.StructureFunction)
+  [`StructureFunction`](@ref GBGHomogeneousTurbulence.Phenomenology.StructureFunctions.StructureFunction)
   law evaluated.
 - `r` — the separation distance.
 - `fp` — the flow state, a [`FlowParameters`](@ref).
 - `order` — the moment order ``p``.
 
-Its home is [`StructureFunctions`](@ref GBGIsotropicTurbulence.Phenomenology.StructureFunctions).
+Its home is [`StructureFunctions`](@ref GBGHomogeneousTurbulence.Phenomenology.StructureFunctions).
 """
 function structure_function end
 
@@ -284,7 +284,7 @@ function structure_function end
 The reference dimensionless constant predicted by a scaling `law` (a `ScalingLaw`) for the state `fp`
 (a [`FlowParameters`](@ref)) — a single number or its Reynolds-number trend (e.g. the normalized
 dissipation ``C_\\varepsilon`` or the Kolmogorov constant ``C_K``). Its home is
-[`Scalings`](@ref GBGIsotropicTurbulence.Phenomenology.Scalings).
+[`Scalings`](@ref GBGHomogeneousTurbulence.Phenomenology.Scalings).
 """
 function scaling end
 

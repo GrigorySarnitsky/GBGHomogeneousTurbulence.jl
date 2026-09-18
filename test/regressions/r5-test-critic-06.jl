@@ -17,7 +17,7 @@
 # the `weighted_inner` route `project_forcing!` uses itself.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: convolve!, field_data, divergence, l2norm
 using Random
 

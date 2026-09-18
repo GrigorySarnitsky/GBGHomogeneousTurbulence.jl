@@ -1,5 +1,5 @@
 // ============================================================================
-// GBGIsotropicTurbulence — physics-first architecture, Alloy spec v4.
+// GBGHomogeneousTurbulence — physics-first architecture, Alloy spec v4.
 //
 // Fourth pass (the bounded objects->morphisms completion the nine lenses asked
 // for). v3 landed the STRUCTURAL arrows (Projection coverage, the metriplectic

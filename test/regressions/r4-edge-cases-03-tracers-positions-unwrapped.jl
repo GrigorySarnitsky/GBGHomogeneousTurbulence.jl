@@ -6,7 +6,7 @@
 # see the same interpolated velocity as one placed at the point itself, exactly as `_wrap!` guarantees
 # for every position that reaches the boundary through `advect!`.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, point_values, PointSet
 using Test

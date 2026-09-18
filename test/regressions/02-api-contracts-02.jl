@@ -5,7 +5,7 @@
 #
 # This file asserts the CORRECT behaviour: every returned coordinate is strictly less than L.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, field_data, CatmullRom, PointSet
 using Test

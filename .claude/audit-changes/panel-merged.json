@@ -1,0 +1,1595 @@
+[
+ {
+  "sev": "blocker",
+  "title": "Architecture says one trajectory scheme exists; AdamsBashforth is fully built and wired",
+  "loc": [
+   "PAGE: architecture \u00a74.6: \"the trajectory scheme \u2014 today the single second-order `EndpointHeun`, with higher-order schemes the studied future axis\"",
+   "PAGE: api / Particles module docstring lists only `EndpointHeun`, omitting `AdamsBashforth`, `MultistepBuffers`, `restart!`, `history_depth`"
+  ],
+  "desc": "Architecture prose was not updated after AdamsBashforth landed; the Particles module docstring's curated summary independently missed the same sweep, even though the auto-generated umbrella Index correctly lists AdamsBashforth, MultistepBuffers, restart!, and history_depth as current exports.",
+  "hint": "",
+  "hats": [
+   "api-user",
+   "cold-reader",
+   "consistency-matrix",
+   "dimensional",
+   "existence-auditor",
+   "fossil-and-drift",
+   "free-reader-a",
+   "free-reader-b",
+   "invariants-and-decisions",
+   "logician",
+   "plain-sense",
+   "quantifier-auditor",
+   "software-architect",
+   "structure-consistency",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 49
+ },
+ {
+  "sev": "blocker",
+  "title": "\"Four strategies are provided\" enumerates five",
+  "loc": [
+   "PAGE: architecture \u00a74.4: \"Four strategies are provided. `NoForcing`... `Linear`... `ConstantPower`... `VarianceController`... `VarianceRescaling`...\"",
+   "PAGE: architecture \u00a74.4 (same paragraph): \"because these four methods are written through tensor-order-generic field operators\""
+  ],
+  "desc": "The set is the built, non-archived forcing strategies. Architecture \u00a74.4 states cardinality 'Four' twice, then itself enumerates five (StochasticOU is explicitly archived, so it cannot be the missing fifth). Almost certainly a stale count left from before VarianceController was added as a strategy (per the decision log, it later became the default). 5 of 5 enumerated members contradict the stated count of 4.",
+  "hint": "",
+  "hats": [
+   "api-user",
+   "dimensional",
+   "doc-policy",
+   "existence-auditor",
+   "free-reader-a",
+   "invariants-and-decisions",
+   "naming-policy",
+   "plain-sense",
+   "quantifier-auditor",
+   "structure-consistency",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 19
+ },
+ {
+  "sev": "blocker",
+  "title": "Module include order stated three different ways",
+  "loc": [
+   "Architecture \u00a74.9 'Layout summary': \"SimulationDomain \u2192 Observables \u2192 State \u2192 Cache \u2192 Forcing \u2192 Generator \u2192 Propagator \u2192 Particles \u2192 SimulationRun.\"",
+   "api page (API overview): \"the order SimulationDomain \u2192 State \u2192 Observables \u2192 Cache \u2192 Forcing \u2192 Generator \u2192 Propagator \u2192 Particles \u2192 SimulationRun\""
+  ],
+  "desc": "A basic architectural fact (module include order) is stated backwards in Architecture's own designated current-state 'Layout summary' relative to four other sources in the same manuscript, including the decision log entry that explicitly narrates the change to 'State \u2192 Observables'. \u00a74.9 appears never to have been updated.",
+  "hint": "",
+  "hats": [
+   "cold-reader",
+   "consistency-matrix",
+   "free-reader-a",
+   "logician",
+   "structure-consistency"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 7
+ },
+ {
+  "sev": "blocker",
+  "title": "`particles_modified!` says the run's own tracer advance both is and is not announced",
+  "loc": [
+   "PAGE: api / Cache, `particles_modified!`: \"The run's own tracer advance is not such a change and keeps its history.\"",
+   "PAGE: api / Cache, same docstring, next paragraph: \"the run layer announces its own tracer advance (`advect!` followed by `record_particle_velocities!`, both inside `advance!`)\""
+  ],
+  "desc": "PARAPHRASE fails: the two sentences cannot both be restated truly. Either the run layer calls this verb on every push \u2014 and then the history it discards is the history a multistep scheme needs \u2014 or it does not, and the \"sanctioned mutator\" sentence names the wrong call. A reader wiring a hand-run loop cannot tell which.",
+  "hint": "REWRITE: say once who calls it, and name what `advance!` actually does instead.",
+  "hats": [
+   "cold-reader",
+   "free-reader-a",
+   "free-reader-b",
+   "plain-sense"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 6
+ },
+ {
+  "sev": "blocker",
+  "title": "ConstantPower's band-kernel storage contradicts itself across pages",
+  "loc": [
+   "PAGE api / Forcing, ConstantPower Fields: \"band \u2014 the band-pass kernel, lazy: ... so no indicator array is stored.\"",
+   "PAGE decisions, 2026-08 entry: \"Linear and ConstantPower keep one materialized real indicator each for the rate fill.\""
+  ],
+  "desc": "A reader takes ConstantPower's own docstring at face value (lazy, nothing stored), then the decision log's supposedly-final word on frame compression asserts the opposite for the same type. One of the two is wrong about the current code, and there is no way for a first-time reader to know which.",
+  "hint": "",
+  "hats": [
+   "cold-reader"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Two different \"eddy-turnover times\" in one corpus \u2014 k/\u03b5 and 2k/3\u03b5",
+  "loc": [
+   "PAGE: api / Forcing, `VarianceController`: \"the large-eddy turnover time $t_\\ell$. When omitted it is taken as $2k_\\infty/3\\varepsilon_\\infty$\"",
+   "PAGE: api / SimulationRun, `StationarityCriterion`: \"which normalizes the eddy-turnover clock $\\Delta t \\varepsilon/k$ it accumulates\""
+  ],
+  "desc": "Both are dimensionally times, but they are not the same time. A user reading `min_turnovers = 5` (clock units \u03b5/k) and then setting `gain` / `turnover_time` against \"the large-eddy turnover time\" is working in units that differ by 50%. Nothing on either surface flags the difference, and the controller's settling time t_l/G is quoted in the second convention while warmup!'s budget is quoted in the first.",
+  "hint": "Name the controller's parameter for its own convention (u'^2/\u03b5 = two-thirds of the k/\u03b5 turnover the run's clock counts), or align the two.",
+  "hats": [
+   "cold-reader",
+   "consistency-matrix",
+   "dimensional",
+   "free-reader-a",
+   "free-reader-b",
+   "latex-typesetter",
+   "logician",
+   "plain-sense",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 24
+ },
+ {
+  "sev": "major",
+  "title": "Three incompatible conventions for documenting a mutator's return value",
+  "loc": [
+   "PAGE: api / Forcing \u2014 `set_forcing_rate!(...) -> rate`, `add_forcing_source!(...) -> N\u0302`, `project_forcing!(...) -> advanced_field` (arrow, no trailing sentence)",
+   "PAGE: api / Particles \u2014 `record_particle_velocities!(...) -> tracers`, `advect!(...) -> tracers` (arrow, no sentence) vs. `restart!(scheme, buffers) -> buffers` plus \"Returns `buffers`.\" (both)"
+  ],
+  "desc": "The same shape of function \u2014 a `!` verb mutating and returning one argument \u2014 is documented via three different, module-specific conventions, and `restart!` alone combines two of them redundantly.",
+  "hint": "",
+  "hats": [
+   "api-user",
+   "plain-sense",
+   "software-architect",
+   "structure-consistency"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 10
+ },
+ {
+  "sev": "major",
+  "title": "observables_cache.md's content table/cost analysis omit the Lagrangian sample-history slots",
+  "loc": [
+   "PAGE observables_cache \u00a72.4: \"The table below lists the observables of this system, one row each.\" (no history row)",
+   "PAGE observables_cache \u00a71.2\u2013\u00a71.4: derives cache contents/cost assuming single-valued deposits only"
+  ],
+  "desc": "The design page purports to be the exhaustive statement of cache contents (\u00a71\u2013\u00a72, not marked provisional) but predates the multistep trajectory scheme and was never updated when the cache grew a bounded ring buffer of past Lagrangian samples for AdamsBashforth. A reader reasoning about cache footprint or contents from this page misses an entire class of resident storage.",
+  "hint": "",
+  "hats": [
+   "consistency-matrix",
+   "dimensional",
+   "logician",
+   "plain-sense",
+   "quantifier-auditor"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 8
+ },
+ {
+  "sev": "major",
+  "title": "ObservablesCache's shown constructor signature omits its own documented history_depth keyword",
+  "loc": [
+   "PAGE api/Cache: \"ObservablesCache(domain; scalar = false, particle_velocities = nothing)\"",
+   "PAGE api/Cache, Arguments: \"history_depth = 1 \u2014 how many Lagrangian samples the run must be able to look back over\""
+  ],
+  "desc": "The printed call signature for ObservablesCache shows only two keywords, but the Arguments section immediately below documents a third, history_depth, with its own default and rationale for multistep tracer schemes. A reader who copies the shown signature would not know this keyword exists.",
+  "hint": "Add history_depth to the shown signature.",
+  "hats": [
+   "consistency-matrix",
+   "plain-sense",
+   "software-architect",
+   "style-editor"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 4
+ },
+ {
+  "sev": "major",
+  "title": "Which call completes the particle-velocity deposit",
+  "loc": [
+   "Architecture \u00a74.6: \"record_particle_velocities! records the new sample at the new positions from the same deposited field, completing the iteration's deposits\"",
+   "api/Cache, deposit_sample!: \"record_particle_velocities! writes, this call records ... since the write alone leaves the slot stale\""
+  ],
+  "desc": "A reader following Architecture's summary would believe one call suffices to close the particle-velocity deposit; the API docs for both modules that define the two verbs say a second call (deposit_sample!) is required or reads throw.",
+  "hint": "",
+  "hats": [
+   "conceptual-clarity",
+   "consistency-matrix",
+   "naming-policy"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 4
+ },
+ {
+  "sev": "major",
+  "title": "The glossary defines \"resolved\" as reification; the architecture defines it as resolved-versus-filtered",
+  "loc": [
+   "PAGE: notation, Vocabulary: \"resolved | in ResolvedFields and ResolvedGenerator, made concrete as one value.\"",
+   "PAGE: decisions: \"`ResolvedFields` \u2194 `ResolvedGenerator`, resolved against filtered, with `FilteredGenerator` \u2026 the eventual LES sibling\""
+  ],
+  "desc": "The glossary is the page a reader consults for exactly this word and gives the wrong sense: \"made concrete as one value\" is *reified*, whereas the names encode the Mori\u2013Zwanzig resolved/filtered axis. The entry then warns about a third (numerical) reading, so the reader leaves with two senses, neither the intended one.",
+  "hint": "REWRITE the glossary entry to the resolved/filtered axis; reification is a separate fact about the types.",
+  "hats": [
+   "naming-policy",
+   "plain-sense"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 3
+ },
+ {
+  "sev": "major",
+  "title": "`recommended_cfl` refers to \"the same scaling\" before the scaling is introduced",
+  "loc": [
+   "PAGE: api / Propagator, `recommended_cfl`: \"The same $1/\\kappa_{\\max}$ scaling is applied to both schemes' bases, including `IFRK2`'s empirical one\"",
+   "PAGE: api / Propagator, next paragraph: \"It scales that base by the domain's dealiasing: \u2026 $C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}$.\""
+  ],
+  "desc": "The paragraph qualifying the rule stands before the paragraph stating it, so \"the same scaling\" points forward at nothing, and \"It\" opens the later paragraph with no nearer antecedent than two paragraphs back. Read in order, the qualification is unreadable and the rule then arrives as repetition.",
+  "hint": "REWRITE: state the scaling, then the caveat about IFRK2's base.",
+  "hats": [
+   "logician",
+   "plain-sense"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 3
+ },
+ {
+  "sev": "major",
+  "title": "INCONSISTENT RULE PAIR: three incompatible mechanisms guard the PhaseShift displaced-velocity reuse",
+  "loc": [
+   "PAGE: decisions, decision 56 \u2014 \"`prepare!` opens every step with the mark cleared\" / \"not load-bearing for correctness\"",
+   "PAGE: api / Generator, `ResolvedGenerator` \u2014 \"recorded as the identity of the `\u00fb` it was taken of rather than either signature\""
+  ],
+  "desc": "If the generator records the source \u00fb and rebuilds on mismatch, the keyword discriminates nothing. If the keyword decides, the record is inert under its false default and a caller passing true wrongly is silently wrong \u2014 contradicting decision 56's \"not load-bearing for correctness\" and scalar_rhs!'s own \"is what makes an unpaired call correct rather than quietly wrong\". At most one of the three can be the contract.",
+  "hint": "Pick one mechanism and delete the other two descriptions.",
+  "hats": [
+   "logician",
+   "software-architect"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "major",
+  "title": "Module's own identity says \"tracer\" where the naming rule requires \"particle\"",
+  "loc": [
+   "PAGE: Home, \u00a7Components \u2014 \"`Particles`: Lagrangian tracer tracking \u2014 second-order advection and field sampling along trajectories\u2026\"",
+   "PAGE: api (overview) \u2014 \"Particles: Lagrangian tracer tracking \u2014 `Tracers`, second-order `advect!`\u2026\""
+  ],
+  "desc": "A reader meeting the Home page, the API overview, or the module docstring first (the three most prominent entry points) will conclude the module is specifically about tracers, exactly inverting the stated purpose of naming it `Particles` rather than `Tracers`. The rule was applied to the accessor renames but not re-applied to the module's own identity sentence.",
+  "hint": "",
+  "hats": [
+   "api-user",
+   "conceptual-clarity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "major",
+  "title": "allocate_buffers documented with two methods; a three-argument call used elsewhere",
+  "loc": [
+   "api/Propagator, allocate_buffers: shows only allocate_buffers(scheme, domain; scalar=false) -> IntegratorBuffers and allocate_buffers(scheme, tracers) -> ParticleIntegratorBuffers",
+   "api/Particles, MultistepBuffers: \"Build it with allocate_buffers(scheme, tracers, cache); a run builds it for you.\""
+  ],
+  "desc": "A reader consulting allocate_buffers to learn how to build any of its return types has no way to discover the three-argument overload needed for MultistepBuffers.",
+  "hint": "",
+  "hats": [
+   "consistency-matrix",
+   "dimensional"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "major",
+  "title": "EQUIVOCATION: `ConstantPower`'s rate is re-solved \"each step\" and \"at every stage\" in one docstring",
+  "loc": [
+   "PAGE: api / Forcing, `ConstantPower` \u2014 \"whose rate $A$ is set each step so the field's injection rate holds the `injection_rate`\"",
+   "PAGE: api / Forcing, `ConstantPower` \u2014 \"it enters the right-hand side at every stage rather than the integrating factor\""
+  ],
+  "desc": "Decision 58's whole point is that a per-step rate is the first-order routing and a per-stage source the order-preserving one. The identity sentence still says \"set each step\" \u2014 precisely the retired behaviour \u2014 while the paragraph below and the module map say stage. A reader deciding whether ConstantPower costs the scheme its order gets both answers from one docstring.",
+  "hint": "Change the identity sentence to \"re-solved at every stage\".",
+  "hats": [
+   "logician",
+   "plain-sense"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "major",
+  "title": "Same DOI, two different paper titles for the Lalescu et al. (2022) citation",
+  "loc": [
+   "api / Particles, AdamsBashforth docstring: \"Lalescu et al. 2022, TurTLE: a fast and scalable code for turbulence, Comput. Phys. Commun. 278, 108406, doi:10.1016/j.cpc.2022.108406\"",
+   "architecture, \u00a7References: \"Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence. Comput. Phys. Commun. 278, 108406.\""
+  ],
+  "desc": "CLAUDE.md requires the inline docstring copy of a reference to be verbatim-consistent with its \u00a7References entry. This DOI appears with two different titles in two places, so one of them misnames the paper \u2014 a reader following either citation to check the bibliography finds an apparent mismatch.",
+  "hint": "",
+  "hats": [
+   "citations-integrity",
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "major",
+  "title": "Phenomenology's roll-off-factor pieces are positional-only, contradicting the module's stated 'every preset is keyword' rule",
+  "loc": [
+   "PAGE: api / phenomenology / Spectra, module docstring \u2014 \"Every preset is a type with a keyword constructor, invoked as Name(; \u2026).\"",
+   "PAGE: api / phenomenology / Spectra \u2014 \"PopeLargeScale(c_L, p\u2080)\", \"PopeDissipation(c_\u03b7, \u03b2)\", \"VonKarmanLarge(c_L)\", \"PaoDissipation(\u03b1)\", \"ExponentialDissipation(\u03b2)\" \u2014 each shown only as a bare positional signature, no keyword form, no defaults"
+  ],
+  "desc": "Every named law in Scalings, StructureFunctions, and the EnergySpectrum/ScalarSpectrum presets (Sreenivasan1998, Kolmogorov1941, Pope2000, ObukhovCorrsin1949, ...) is keyword-constructed with defaults, matching the module's blanket claim. The five roll-off-factor pieces those presets are literally composed from (their fitted coefficients are the exact numbers a one-level-up preset exposes as defaulted keywords) are documented with only a positional constructor and no defaults at all \u2014 an arity split between two families in the same module with no stated rule, and no way to override one coefficient without naming the others positionally in order.",
+  "hint": "Either give the roll-off factors keyword forms with defaults, or state explicitly why 'preset' excludes them and the positional convention is deliberate.",
+  "hats": [
+   "existence-auditor"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "energy_spectrum (measured) and EnergySpectrum (predicted) share a name for non-interchangeable objects",
+  "loc": [
+   "PAGE: api / Observables \u2014 'What is returned is a per-shell energy E_n ... a model spectrum E(\u03ba) from Phenomenology is instead a density per unit wavenumber ... not interchangeable.'",
+   "PAGE: api / phenomenology / Spectra \u2014 'EnergySpectrum <: TurbulenceLaw \u2014 Supertype of the velocity energy-spectrum models \u2014 parametrizations of E(\u03ba).'"
+  ],
+  "desc": "Observables.energy_spectrum (a shell-summed E_n) and Phenomenology.Spectra.EnergySpectrum (a density E(\u03ba)) carry the identical English name for two quantities the docs explicitly warn are not interchangeable \u2014 exactly the spectral-density-vs-energy category error the corpus's own doc policy guards against, here surfacing as a shared naming term across sibling modules.",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "\"chart\" is given two incompatible identity conditions for vorticity",
+  "loc": [
+   "PAGE: notation, \u00a7Vocabulary \u2014 \"chart | a physical-representation view of the spectral state \u2014 the velocity, vorticity or scalar recovered from it.\"",
+   "PAGE: architecture, \u00a711 decision log (2026-08, user-directed) \u2014 \"What remains a package verb is the one recovery that is not a chart: vorticity_physical!\""
+  ],
+  "desc": "The document never gives a single identity criterion for 'is X a chart' \u2014 the answer for vorticity flips depending which page is consulted. This is load-bearing: 'chart' organizes the cache's field-slot design and the in-place reuse story (decision 47), so a reader relying on the Notation glossary will misclassify vorticity's status relative to the rest of the corpus.",
+  "hint": "",
+  "hats": [
+   "conceptual-clarity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Subjectless sentence in `max_wavenumber`",
+  "loc": [
+   "PAGE: api / SimulationDomain, `max_wavenumber`: \"For the two sharp strategies sits strictly below the grid Nyquist $\\tfrac{N}{2}\\tfrac{2\\pi}{L}$ \u2014 they zero the modes above it each step.\""
+  ],
+  "desc": "The sentence has no subject; the reader must reconstruct \"it\" (the cutoff) from the previous sentence. It reads as a copy-edit casualty and stops a first-pass read. Failed LOAD-BEARING SUBJECT.",
+  "hint": "REWRITE: \"For the two sharp strategies the cutoff sits strictly below \u2026\".",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "UNFALSIFIABILITY: decision 40 re-admits the chart-liveness tautology decision 37 retired",
+  "loc": [
+   "PAGE: decisions, decision 37 \u2014 \"Extending those and then reporting the result as the bound made the physical-vector cell a tautology\"",
+   "PAGE: decisions, decision 40 \u2014 \"`DYNAMICS_LIVE` absorbs the charts as facts of the deposit-persistence contract\""
+  ],
+  "desc": "Decision 37 rules that design-chosen liveness may never enter a lower bound. Decision 40 re-admits the charts into DYNAMICS_LIVE, relabelling the deposit-persistence contract a fact. But the cache page says contents change when the solver's storage decisions change \u2014 it is a design choice under a new name. achieved == bound is again true by construction: any schedule releasing the charts would also delete the slots the ledger counts. What observation refutes it? None.",
+  "hint": "Either hold the deposit-persistence extension as a named holder, or state what run would make achieved > bound.",
+  "hats": [
+   "logician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Quick start: \"drives k to that value\" \u2014 \"that value\" has no antecedent",
+  "loc": [
+   "PAGE: Home, Quick start: \"# (the default forcing drives k to that value \u2014\"",
+   "PAGE: Home, Quick start, preceding comment: \"# \u03bd is set so the grid captures the dissipation scale\""
+  ],
+  "desc": "The deictic points at a value the visible code never shows: `kinetic_energy` is not passed, and the preceding comment is about \u03bd. On the package's front page, the first sentence about forcing is unresolvable without leaving the page.",
+  "hint": "REWRITE: name the default, e.g. \"drives k to the default 1.5 (u\u2032 = 1)\".",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Decision 46 states the include order backwards vs. \u00a74.9, CLAUDE.md, and the actual source",
+  "loc": [
+   "ARCHITECTURE.md decision 46: \"The include order becomes `State \u2192 Observables \u2192 Cache`\""
+  ],
+  "desc": "Decision 46's headline (\"Observables precedes Cache\") is correct, but the arrow inside the entry has State before Observables \u2014 the reverse of every other current-state surface and the shipped code. This is a directional error in the entry describing the very reorganization whose result is Observables-before-State everywhere else, not a case of exempt historical vocabulary.",
+  "hint": "Fix decision 46's arrow to Observables \u2192 State \u2192 Cache.",
+  "hats": [
+   "invariants-and-decisions"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Front-page quick start: \"that value\" has no antecedent",
+  "loc": [
+   "PAGE: Home, \"Quick start\": \"warmup!(sim)   # spin up to statistical stationarity \u2026 (the default forcing drives k to that value \u2014 see VarianceController before measuring k itself)\""
+  ],
+  "desc": "No value is named anywhere in the snippet \u2014 the only prior comments concern the grid and $\\nu$. The reader meets a demonstrative pointing at nothing in the package's first code example. \"see VarianceController before measuring k itself\" then issues an instruction without saying what would be learned there. Failed PARAPHRASE (ambiguous pronoun).",
+  "hint": "REWRITE: name the value (\"drives $k$ to the default `kinetic_energy = 1.5`\").",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "\"One piece of prior art is excluded by name\" \u2014 and no name follows",
+  "loc": [
+   "PAGE: architecture, \u00a78 Lenses and prior art: \"One piece of prior art is excluded by name.\"",
+   "PAGE: architecture, \u00a78, same paragraph: \"The direction of the GBG packages is to replace it entirely, because it was problematic\""
+  ],
+  "desc": "The sentence promises a name and the paragraph gives none \u2014 the object is identified only as \"the previous generation of this work \u2014 kept privately, outside the package\". A reader cannot check or reason about an unnamed thing, so six sentences arguing that nothing may be justified by continuity with it defend against a confusion this document cannot create. \"because it was problematic\" asserts nothing falsifiable. Failed NON-VACUITY and UNPROVOKED DEFENCE.",
+  "hint": "CUT to one sentence, or name the artifact.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "\"epoch\" used unglossed on the very first page of the site",
+  "loc": [
+   "PAGE Home, Quick start comment: \"each recorded against the epoch of the state it came from.\"",
+   "PAGE notation, Vocabulary: \"epoch | a counter of changes to the state...\" (first actual definition)"
+  ],
+  "desc": "\"Epoch\" is package-specific and load-bearing for the whole cache/staleness story, yet it first appears with zero gloss in the very first code example a newcomer reads. The Notation page's Vocabulary entry that defines it does not arrive until three pages later, and the full Cache explanation not until six pages later.",
+  "hint": "",
+  "hats": [
+   "cold-reader"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "The Decision log page precedes the glossary that defines its own vocabulary",
+  "loc": [
+   "PAGE decisions (page 3): \"epoch-dated, memoized charts,\" \"the armed-rate pin,\" \"a slot doubles as its producer's register\" \u2014 all unglossed here.",
+   "PAGE notation (page 4), Vocabulary section: where epoch/chart/register/slot/deposit/iteration are actually defined."
+  ],
+  "desc": "Read top-to-bottom as instructed, a newcomer hits the dense decision log \u2014 full of chart, epoch, register, armed, holder, reified \u2014 a full page before the one glossary that defines any of them. Audit-register jargon (holder, FIX, PF-RAISE, ledger, floor) is never defined anywhere on the user-facing site at all, glossary included.",
+  "hint": "",
+  "hats": [
+   "cold-reader"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "Admonition-title rule: PF unconditional, IT conditional",
+  "loc": [
+   "IT CLAUDE.md Template conventions: 'stays a bare `!!! note` when it is a general aside'",
+   "PF CLAUDE.md docstring rubric (3): 'Every `!!!` block carries a custom descriptive title... never a bare `!!! warning`'"
+  ],
+  "desc": "PF's rule bans bare admonitions unconditionally; IT's explicitly permits them for general asides. A real split in an otherwise near-verbatim shared rule, with no decision recorded for the loosening.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "PF has a consent gate for expensive verification lanes; IT has none",
+  "loc": [
+   "PF CLAUDE.md: 'Consent gate (user-directed 2026-08-04) \u2014 unasked, run ONLY Pkg.test()'",
+   "IT CLAUDE.md 'Verification workflow' section (no gating language)"
+  ],
+  "desc": "PF requires explicit user consent before any expensive lane (exhaustive survey, benchmarks, GPU suites, /check-docs, /check-consistency). IT bundles three audits into its default Pkg.test() gate and has its own expensive multi-agent lanes (/check-docs, /check-consistency) with no equivalent consent language anywhere in CLAUDE.md.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "major",
+  "title": "IT's type-docstring template is richer (constructor-first, Examples policy) than PF's minimal fields-only rule",
+  "loc": [
+   "PF CLAUDE.md: 'A type... documents them under `The fields are`... prose is reserved for the one-sentence identity above that list' (the only type rule stated)",
+   "IT CLAUDE.md: 'Type docstring = home, constructor-first... (3) an example where the construction is non-obvious...'"
+  ],
+  "desc": "PF's rulebook never codifies a constructor-first order, an Examples-section policy, or a positional-constructor-naming rule, though PF's own Grid3D docstring practice already gestures toward it. Good candidate to port IT's richer template back into PF.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "The glossary gives E_\u03c6(\u03ba) no code object, though `spectrum` evaluates it",
+  "loc": [
+   "PAGE: notation, Diagnostics \u2014 \"$E_\\varphi(\\kappa)$ | the scalar-variance spectrum \u2026 | \u2014\"",
+   "PAGE: api / phenomenology / Phenomenology, `spectrum` \u2014 \"or the scalar spectrum $E_\\varphi(\\kappa)$ for a `ScalarSpectrum`\""
+  ],
+  "desc": "The dash reads as \"not built\", yet one generic serves both spectra and `ObukhovCorrsin1949` is shipped; `random_scalar_spectral!`'s `initial_spectrum` keyword also takes a \u03ba \u21a6 E_\u03c6(\u03ba) target, so the symbol has two live code homes.",
+  "hint": "Fill the Code cell with `spectrum` (ScalarSpectrum) and cross-reference the seeder keyword.",
+  "hats": [
+   "dimensional",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 5
+ },
+ {
+  "sev": "minor",
+  "title": "L reused for the roll-off length, against its glossary binding as the box side",
+  "loc": [
+   "PAGE: notation \u2014 Numerics: \"$L$ | box side ($\\Omega = [0,L)^3$)\"",
+   "PAGE: api / phenomenology / Spectra \u2014 large_scale_length: \"($\\int E\\,\\mathrm d\\kappa \\propto L^{2/3}$)\""
+  ],
+  "desc": "LargeScaleFactor gets this right (\"$\\ell$ \u2026 not the box side $L$\"), but ModelSpectrum and large_scale_length then call the roll-off length L. The claim \u222bE d\u03ba \u221d L^{2/3} is true of \u2113 and false of the box side, so the reuse turns a correct scaling into a wrong-looking one.",
+  "hint": "Use \u2113 in both places, as ModelSpectrum's own display formula f_L(\u03ba\u2113) already does.",
+  "hats": [
+   "dimensional",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 5
+ },
+ {
+  "sev": "minor",
+  "title": "Load-bearing caveat left as plain prose instead of an admonition; Returns trails it",
+  "loc": [
+   "src/Cache.jl, fields_modified!: 'It also discards the Lagrangian sample history this cache carries\u2026 would blend the old field into the new one.' then, only after, 'Returns `cache`.'",
+   "src/Cache.jl, particles_modified!: the same shape, ending 'Returns its argument.'"
+  ],
+  "desc": "CLAUDE.md's function-docstring order lists caveats 'as a !!! warning / !!! note where load-bearing' \u2014 silently discarding a multistep trajectory scheme's sample history is exactly load-bearing (compare ObservablesCache's own sibling caveat on cache-array reuse, which IS an admonition here). Separately, the Doc-edit checklist places 'Returns x.' before any caveat admonition; here Returns is the final line, after the (un-admonitioned) caveat.",
+  "hint": "Promote the discard-of-history sentence to !!! warning and move the Returns sentence ahead of it.",
+  "hats": [
+   "consistency-matrix",
+   "doc-policy",
+   "existence-auditor",
+   "software-architect"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 4
+ },
+ {
+  "sev": "minor",
+  "title": "Two measured CatmullRom interpolation floors that the stated \u0394x^(d+1) scaling cannot reconcile",
+  "loc": [
+   "PAGE: api / Particles, EndpointHeun \u2014 \"a degree-$d$ interpolant's trajectory floor falls as $\\Delta x^{d+1}$ \u2026 at $N = 128$, floor $1\\times10^{-5}$\"",
+   "PAGE: decisions, the Adams\u2013Bashforth entry \u2014 \"Measured on a frozen ABC flow at $64^3$, $T = 1$: `CatmullRom` ($C^1$, degree 2) floors at $1.2\\times10^{-5}$\""
+  ],
+  "desc": "The two measurements use different test fields (a frozen ABC flow versus \"a band-limited field\"), which may explain the gap, but neither page says so. As rendered, the pair reads as contradicting the scaling law both cite, and a reader sizing an interpolation choice from these numbers would draw opposite conclusions depending on which page they landed on.",
+  "hint": "Name the test field beside each number, or quote both floors from one study.",
+  "hats": [
+   "dimensional",
+   "dns-practitioner",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 4
+ },
+ {
+  "sev": "minor",
+  "title": "The IFRK2-vs-RK3 register count does not decompose as the architecture claims",
+  "loc": [
+   "PAGE: architecture \u00a74.5: \"three spectral registers per field against the low-storage scheme's two, counting the same way on both sides: the scheme's own registers plus the dealiasing seam's assembly register\"",
+   "PAGE: architecture \u00a79: \"an `IFLowStorageRK3` run carries neither of the two registers `IFRK2` adds\""
+  ],
+  "desc": "By the field lists RK2 = {stage1, stage2, velocity_predictor_spectral} and RK3 = {stage1, nonlinear}: RK2 gains two and loses one, so \"the two registers IFRK2 adds\" over-counts and 3-vs-2 cannot follow from it. The \"own registers + one assembly register\" decomposition also fails for RK2, which carries no assembly register \u2014 its third slot is the predictor.",
+  "hint": "State the two sets and their difference rather than an \"adds\" relation.",
+  "hats": [
+   "dimensional",
+   "dns-practitioner"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 3
+ },
+ {
+  "sev": "minor",
+  "title": "EQUIVOCATION: `set_forcing_rate!` is gated by linearity in one docstring and steadiness in its neighbours",
+  "loc": [
+   "PAGE: api / Forcing, `set_forcing_rate!` \u2014 \"For a strategy `forcing` linear in the field, fill the per-mode rate\"",
+   "PAGE: api / Forcing, `AbstractForcing` \u2014 \"decided by steadiness in time, not linearity in the field\""
+  ],
+  "desc": "Two neighbouring docstrings state incompatible admission criteria for one hook. ConstantPower is linear in the field and must not use set_forcing_rate!, so the identity sentence's stated condition is satisfied by a strategy the other two docstrings bar from the hook. The exactness argument then trades silently on the two senses.",
+  "hint": "Open set_forcing_rate! with \"For a strategy whose per-mode rate is steady in time\".",
+  "hats": [
+   "logician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "minor",
+  "title": "NON SEQUITUR: `Kolmogorov1941`'s order guard is justified by a universality its own bullet denies",
+  "loc": [
+   "PAGE: api / phenomenology / StructureFunctions, `Kolmogorov1941` \u2014 \"any other `order` throws an `ArgumentError` (K41 fixes only these two longitudinal moments universally)\"",
+   "PAGE: api / phenomenology / StructureFunctions, `Kolmogorov1941` \u2014 \"the constant $C_2 \\approx 2.0$ is empirical\""
+  ],
+  "desc": "The guard's reason is that K41 universally fixes only orders 2 and 3. But the order-2 amplitude is explicitly empirical, so it is not universally fixed, and the same law's scaling_exponent is unrestricted in p. The real discriminator is known amplitudes, not universality; as written the reason neither supports admitting order 2 nor explains why the exponents escape the restriction.",
+  "hint": "Say the law carries amplitudes only at these two orders, and that exponents are given at every p.",
+  "hats": [
+   "existence-auditor",
+   "logician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "minor",
+  "title": "FlowConditions and FlowParameters are a naming-collision risk the docs must explicitly defuse",
+  "loc": [
+   "PAGE api/Generator, FlowConditions docstring: \"Not to be confused with Phenomenology's FlowParameters, which shares two field names\""
+  ],
+  "desc": "FlowConditions (what a run is configured with) and FlowParameters (what a run has been measured to have) sit one word apart, in modules a user crosses between routinely via flow_parameters(sim), and share field names. That the docs must spend a sentence warning readers not to confuse the two is itself evidence of a naming smell, even though the underlying conceptual distinction is sound.",
+  "hint": "Consider a more distinct name for one of the pair.",
+  "hats": [
+   "naming-policy",
+   "software-architect"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "minor",
+  "title": "EQUIVOCATION: `Li2008` is an author-year handle for a fit the docstring says is not theirs",
+  "loc": [
+   "PAGE: api / phenomenology / Scalings, `Li2008` \u2014 \"The value is this package's own reduction of the Johns Hopkins Turbulence Database (JHTDB)\"",
+   "PAGE: architecture \u00a74.8 \u2014 \"the paper is the author-year handle (`Pope2000`, first author's surname \u2026)\""
+  ],
+  "desc": "Under the stated three-level convention Li2008 asserts that Li et al. (2008) published this parametrization; the docstring says the number is our own reduction of their dataset. The architecture insists our own fits sit beside the literature on equal footing, so an own-fit deserves an own handle. As it stands one name carries two provenances, and a reader checking G \u2248 0.9 against Li et al. will not find it there.",
+  "hint": "Rename to our own author-year handle, citing JHTDB as the data source.",
+  "hats": [
+   "logician",
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "minor",
+  "title": "current_step used at the Cache page before its own definition",
+  "loc": [
+   "PAGE api / Cache, ObservablesCache docstring: \"the clock's current_step answers 'how far has the run gone?'\"",
+   "PAGE api / SimulationRun, Clock accessors: \"current_step(sim) \u2014 The number of steps sim has taken.\" (first actual documentation)"
+  ],
+  "desc": "The Cache page leans on current_step to explain the epoch/clock distinction before the reader has seen current_step documented anywhere. The name is self-explanatory enough not to derail a reader, but it is still a forward reference in a corpus that is otherwise careful to gloss inline.",
+  "hint": "",
+  "hats": [
+   "cold-reader",
+   "plain-sense"
+  ],
+  "arms": [
+   "A",
+   "B"
+  ],
+  "n": 2
+ },
+ {
+  "sev": "minor",
+  "title": "IT built a docstring-growth/shape lint; PF's build lints lack an equivalent despite the same bloat history",
+  "loc": [
+   "IT CLAUDE.md: 'lint_docstring_shape() fails on a docstring that grew since docstring_shape.csv was last written'",
+   "PF CLAUDE.md names only lint_inline_math(), lint_notation_variants(), lint_retired_claims()"
+  ],
+  "desc": "A genuine tooling asymmetry; PF's own file documents the identical multi-round-patch bloat failure mode in prose without a build guard for it \u2014 a plausible forward-transfer candidate.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Architecture run-on sentences: 110 words and five clauses in one breath",
+  "loc": [
+   "PAGE: architecture, \u00a74.1: \"Its concrete type is the `FixedDomain`, the fixed, unsheared cube, realized by the grid, the real\u2013Fourier layout, \u2026\" (\u2248110 words)",
+   "PAGE: architecture, \u00a78: \"The composite system factors as a tower \u2026 so the flow is a skew product and `advance!` is its Gauss\u2013Seidel sweep in topological order\" (\u224890 words)"
+  ],
+  "desc": "Both sentences carry six or more listed items, each with its own aside, under a single main verb. Nothing in either is wrong; the shape fails \u2014 a reader cannot hold the enumeration open that long, and the \u00a74.1 sentence buries its load-bearing \"never materialized\" claim mid-list.",
+  "hint": "REWRITE each as a lead sentence plus a bulleted list.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "u_consumed / \u03c9_consumed name the argument for an implementation side effect, and inconsistently across siblings",
+  "loc": [
+   "PAGE: api / Generator \u2014 'velocity_rhs!(N\u0302, generator, \u00fb, u, \u03c9_consumed, domain)'",
+   "PAGE: api / Generator \u2014 'scalar_rhs!(N\u0302, generator, \u00fb, \u03c6\u0302, u_consumed, \u03c6, domain; ...)'"
+  ],
+  "desc": "The `_consumed` suffix documents a backend aliasing side effect (the pointwise product overwrites the array) rather than what the argument physically is \u2014 naming for machinery/fate rather than meaning, a deliberate but rule-breaking choice per rule (a).",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "'Uniform-mean-gradient scalar mixing' named as a built System with no visible implementing mechanism",
+  "loc": [
+   "PAGE: architecture \u00a73: \"The System: \u2026 forced homogeneous isotropic turbulence, freely decaying turbulence, uniform-mean-gradient scalar mixing, and (a deferred frame, \u00a77) homogeneous shear.\""
+  ],
+  "desc": "In the same sentence, homogeneous shear is explicitly flagged deferred with a \u00a77 pointer; uniform-mean-gradient scalar mixing carries no such flag, reading as already available. No mean-gradient production term appears anywhere else (scalar_rhs! is only advection + diffusion + forcing source; FlowConditions carries no gradient parameter; none of the five Forcing strategies mention one). If it is aspirational, it should carry the same deferred marker as homogeneous shear.",
+  "hint": "",
+  "hats": [
+   "free-reader-a"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "VACUOUS DISCRIMINATION: the `valid_Re\u03bb` guard excludes nothing by default and no shipped consumer enforces it",
+  "loc": [
+   "PAGE: api / phenomenology / Phenomenology, `Reference` \u2014 \"`Reference(citation; valid_Re\u03bb = (0.0, Inf))`\"",
+   "PAGE: api / phenomenology / Phenomenology, `Reference` \u2014 \"A comparison reads `valid_Re\u03bb` so a law is not judged outside its stated domain\""
+  ],
+  "desc": "The default range admits every Re_\u03bb, so for any law that does not override it the guard is a no-op. The protection is also stated conditionally (\"a comparison that honours valid_Re\u03bb\") while the package's only comparer was moved to the test suite. Lundgren2002's sign-flip hazard is therefore guarded by a convention no shipped code applies.",
+  "hint": "Say plainly that the range is advisory metadata, and note where enforcement lives.",
+  "hats": [
+   "logician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "AdamsBashforth stores a field but has no # Fields section",
+  "loc": [
+   "PAGE: api / Particles, `AdamsBashforth(; order = 4)` \u2014 docstring ends after the caveat and Reference line with no # Fields"
+  ],
+  "desc": "Every other single/few-field preset type documents its field under # Fields with the \"plain constructor takes the field(s) directly\" sentence (Kolmogorov1941(C\u2082), Sreenivasan1998, PaoDissipation(\u03b1), HouLi); AdamsBashforth skips it despite order plainly being a stored field.",
+  "hint": "",
+  "hats": [
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Named-tuple return shape stated two different ways",
+  "loc": [
+   "PAGE: api / Observables, `energy_spectrum` \u2014 dedicated closing sentence \"Returns a named tuple `(; wavenumbers, energy)`\"",
+   "PAGE: api / Generator, `velocity_integrating_factor` \u2014 named-tuple fields (coefficient, offset_scale, offset) stated only mid-paragraph, no analogous trailing sentence"
+  ],
+  "desc": "Both return a named tuple whose shape the corpus's own rule says must be stated explicitly, but the two do it in different forms and positions.",
+  "hint": "",
+  "hats": [
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "ModelSpectrum's Fields sentence duplicates its own top signature verbatim",
+  "loc": [
+   "PAGE: api / phenomenology / Spectra, `ModelSpectrum(C_K, large_scale, dissipation)` shown as the sole top signature; # Fields opens \"The plain constructor `ModelSpectrum(C_K, large_scale, dissipation)` takes the three fields directly\""
+  ],
+  "desc": "Elsewhere the Fields \"plain constructor\" sentence demotes an alternate positional form distinct from a keyword form shown at top (e.g. HouLi); here there is no keyword form to demote from, so the sentence restates rather than adds information.",
+  "hint": "",
+  "hats": [
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "`IFLowStorageRK3` denies two symbol collisions it alone introduces",
+  "loc": [
+   "PAGE: api / Propagator, `IFLowStorageRK3`: \"unrelated to the forcing rate $A(\\boldsymbol{\\kappa})$ of the `Forcing` page\"",
+   "PAGE: api / Propagator, `IFLowStorageRK3`: \"not the grid points $N$ of the rest of the documentation\""
+  ],
+  "desc": "Two defensive asides in one docstring, each naming a symbol from another page purely to deny it. Neither confusion is created here \u2014 the forcing rate never otherwise appears in this docstring \u2014 so both first introduce the reading they refuse. Struck, nothing is lost. Failed UNPROVOKED DEFENCE and DELETE TEST.",
+  "hint": "CUT both; a symbol clash is settled on the notation page.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "particles_modified!(sim)'s effect on the particle scheme's own registers is asserted on one page, absent from its home docstring",
+  "loc": [
+   "PAGE: api / Cache, particles_modified!: describes discarding the cache's own sample history and says the Simulation form 'announces the change to that run's cache' \u2014 no mention of the scheme's own buffers",
+   "PAGE: api / Particles, restart!: 'The Simulation form of particles_modified! calls this for you, after announcing the reposition to the observables cache'"
+  ],
+  "desc": "A reader who opens only Cache.particles_modified! (the natural place to look) cannot learn that the Simulation-form call also resets the trajectory scheme's own registers (e.g. an AdamsBashforth multistep history) via restart! \u2014 that fact appears only on the Particles page.",
+  "hint": "",
+  "hats": [
+   "free-reader-b"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "The Sc = O(1) restriction is a load-bearing invariant absent from the architecture's own Invariants catalogue",
+  "loc": [
+   "PAGE: api / SimulationRun, Simulation's schmidt argument: 'This package targets Sc = O(1) and carries no Batchelor-range machinery... Nothing enforces this \u2014 the value is accepted as given'",
+   "PAGE: architecture, \u00a79 'Invariants \u2014 the deliberate absences': lists no-units, no-reimplemented-ops, no-privileged-precision, allocation-free, GPU-first, no-baked-in-closure, library-not-framework, phi-naming, deferred-futures \u2014 nothing about a Schmidt-number range"
+  ],
+  "desc": "Section 9 is explicitly where invariants are catalogued so a reader can trust the list is complete. The Sc-range restriction is exactly this kind of silent, unenforced invariant capable of quietly under-resolving a scalar field, yet it surfaces only inside the schmidt keyword's docstring prose, not in the dedicated invariants section a reader would check first.",
+  "hint": "",
+  "hats": [
+   "free-reader-b"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "VarianceRescaling summarized as holding \"a band's amplitude\", which over = :total does not do",
+  "loc": [
+   "PAGE: api / Forcing, module map \u2014 \"`VarianceRescaling` \u2014 hold a band's amplitude by deterministic rescaling, at first order.\"",
+   "PAGE: api / Forcing, VarianceRescaling \u2014 \"`:total` rescales the band to absorb the whole-field deficit, so the whole-field value equals `target`\""
+  ],
+  "desc": "The one-liner states as fact the very thing the type refuses to default, and the distinction is load-bearing: the docstring says over \"decides which quantity a run may no longer measure\", and grid-mode calibration depends on the whole-field reading. Linear's one-liner (\"a fixed linear rate on a band\") is the right shape \u2014 name the mechanism, not one of the two possible targets.",
+  "hint": "\"Hold a band's or the whole field's L\u00b2 observable by deterministic rescaling of the band, at first order.\"",
+  "hats": [
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "VarianceRescaling's `over` keyword is explained twice at different granularities",
+  "loc": [
+   "PAGE: api / Forcing, `VarianceRescaling` \u2014 full bulleted `:band`/`:total` breakdown in prose before Arguments, then a terse restatement inside Arguments"
+  ],
+  "desc": "No sibling forcing double-documents one of its keywords this way; comparable enumerable settings elsewhere are explained exactly once, inside Arguments.",
+  "hint": "",
+  "hats": [
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Three house-reserved glyphs (\u03b5, L, T) reused, undisclosed, in one admonition",
+  "loc": [
+   "src/Particles.jl:321-325 \u2014 \"for a perturbation ``\\epsilon`` and Lipschitz constant ``L``, Gr\u00f6nwall bounds the trajectory error by ``\\epsilon(\\mathrm{e}^{LT} - 1)/L``\""
+  ],
+  "desc": "L and T are reused verbatim for a Lipschitz constant and a time span in a self-contained AdamsBashforth admonition, colliding with the same bare glyphs the rest of the package binds to box side length and element type; \\epsilon (rather than \\varepsilon) at least avoids literally colliding with the dissipation rate, but the other two are unremarked reuses in a corpus that elsewhere discloses this kind of clash (see the G finding's contrast with Propagator.jl's A/A_i and N/N call-outs).",
+  "hint": "",
+  "hats": [
+   "latex-typesetter"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Named methods (Nos\u00e9\u2013Hoover; 'Kaneda's' result) invoked with no citation",
+  "loc": [
+   "api / Forcing, VarianceController docstring: \"is the Nos\u00e9\u2013Hoover move. A gain-limited relaxation ... is Berendsen weak coupling (Berendsen et al. 1984, doi:10.1063/1.448118)\"",
+   "api / phenomenology / Spectra, ExponentialDissipation docstring: \"consistently predict (Sagaut & Cambon 2018 ...; the closure result is originally Kaneda's)\""
+  ],
+  "desc": "In both cases a named eponymous method sits beside another named method in the same sentence that does carry a full author-year/DOI citation (Berendsen 1984; Sagaut & Cambon 2018), while Nos\u00e9\u2013Hoover and 'Kaneda's' result get no year, reference, or \u00a7References entry anywhere in the manuscript \u2014 inconsistent citation hygiene for named/published methods.",
+  "hint": "",
+  "hats": [
+   "citations-integrity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "IntegratorBuffers.stage1 denotes different objects per scheme",
+  "loc": [
+   "PAGE: api / Propagator \u2014 '`stage1` \u2014 the first Runge\u2013Kutta stage register, allocated by every scheme (the accumulator for IFLowStorageRK3, the first stage for IFRK2).'"
+  ],
+  "desc": "One storage-slot name means 'the low-storage accumulator h' under IFLowStorageRK3 and 'the literal first RK stage value' under IFRK2 \u2014 two different conceptual roles under one field name, violating rule (b)'s precision requirement for storage names.",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "kinetic_energy names both a measuring function and a configured target",
+  "loc": [
+   "PAGE: api / Observables \u2014 'kinetic_energy(u) / kinetic_energy(\u00fb) \u2014 The turbulent kinetic energy ... of the velocity field.'",
+   "PAGE: api / SimulationRun \u2014 'kinetic_energy = 1.5 \u2014 the initial, and when forced the held, kinetic energy k.'"
+  ],
+  "desc": "The exported Observables.kinetic_energy is a pure measurement of current state; Simulation's kinetic_energy keyword is a target/setpoint fed to the IC and the default controller. One identifier spans a diagnostic and a configuration input \u2014 the category conflation (measured value vs. configured target) the corpus's own doc policy warns against, here as a naming collision.",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Caveat admonition is not the docstring's last substantive block",
+  "loc": [
+   "src/Observables.jl, derivative_skewness: after `!!! note \"This is the run's largest transient allocation\"`, a further un-admonitioned caveat about residual cubic-invariant aliasing, then a closing explanatory paragraph, both follow",
+   "src/Propagator.jl, recommended_cfl: after `!!! warning \"The IFRK2 margin does not know the viscosity\"`, two more substantive paragraphs follow (the shared 1/\u03ba_max scaling, and the dealiasing-strategy scaling with a fresh Simulation cross-reference)"
+  ],
+  "desc": "CLAUDE.md's Template conventions state plainly: 'A caveat admonition is the last substantive block of a docstring, before # Fields \u2014 in a function docstring as in a type's.' In both instances real explanatory (and in recommended_cfl's case caveat-grade) content trails after the admonition instead of the admonition closing the docstring \u2014 exactly the shape the rule guards against, since a skimming reader stops at the admonition.",
+  "hint": "Fold the trailing caveats into (or ahead of) their admonitions so the admonition closes each docstring.",
+  "hats": [
+   "doc-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "The same staleness recurs on the Home and api-overview pages",
+  "loc": [
+   "PAGE Home, Components: \"second-order advection and field sampling along trajectories\"",
+   "PAGE api (overview): \"second-order advect! (Heun-in-time)\""
+  ],
+  "desc": "Both pages still frame particle tracking as strictly second-order, with no mention of the higher-order AdamsBashforth alternative documented elsewhere on the site \u2014 the same staleness class as Finding about Particles's module docstring, recurring across three separate pages, suggesting the addition of the second trajectory scheme swept type/function docstrings but not summary prose.",
+  "hint": "Update the summary prose on both pages alongside the module docstring fix.",
+  "hats": [
+   "software-architect"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "IFRK2's CFL margin is an unguarded, Reynolds-number-blind constant",
+  "loc": [
+   "PAGE: api / Propagator, recommended_cfl: \"its 0.25 is an empirical margin rather than a computed limit... The same 0.25 is returned at every Reynolds number while the viscous damping it rests on weakens as \u03bd falls, and there is no code-level guard for this.\""
+  ],
+  "desc": "Already disclosed, not hidden, so not a documentation defect per se \u2014 flagged only because a performance/stability-focused reviewer would want on record that IFRK2 at high Reynolds number with the default cfl is a documented but entirely unguarded footgun (no runtime check backs the user-facing warning).",
+  "hint": "",
+  "hats": [
+   "dns-practitioner"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Obukhov's (1962) co-discovery of Kolmogorov1962 cited inline but absent from the page's References list",
+  "loc": [
+   "api / phenomenology / StructureFunctions, Kolmogorov1962 docstring: \"proposed independently by Obukhov (1962, J. Fluid Mech. 13, 77) in the same issue\"",
+   "api / phenomenology / StructureFunctions, \u00a7References: lists Kolmogorov (1941), Kolmogorov (1962), She & L\u00e9v\u00eaque (1994), Yaglom (1949), Lundgren (2002) \u2014 no Obukhov entry"
+  ],
+  "desc": "Every other multi-author law on this page (She\u2013L\u00e9v\u00eaque, Yaglom) gets its own full References entry, but Obukhov's independently-published co-attribution for the Kolmogorov1962 law itself \u2014 given inline with a full journal/volume/page \u2014 does not, unlike incidental-coefficient citations the page explicitly exempts (e.g. Sagaut & Cambon). Possibly covered by that exemption, possibly a genuine gap since it names a co-author of the law itself; flagged at low confidence.",
+  "hint": "",
+  "hats": [
+   "citations-integrity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Subject-verb disagreement: \"Bassenne report O(1-10)\"",
+  "loc": [
+   "api/Forcing, VarianceController Arguments: \"Larger relaxes faster; Bassenne report $O(1-10)$.\" (verified in docs/build/api/Forcing/index.html, not an extraction artifact)"
+  ],
+  "desc": "\"Bassenne\" (a singular proper noun/citation) is paired with the plural verb \"report\" with no expressed plural subject \u2014 contrast the same page's correctly formed \"Bassenne, Urzay, Park & Moin (2016, Eq. 20)\" and elsewhere \"Sreenivasan (1995) found\" (singular verb with singular author). Reads as a dropped \"et al.\" or a missing final \"s\" (\"Bassenne reports\"). This is the one clear violation of the corpus's own grammatical-prose rule found on a close pass.",
+  "hint": "Change to \"Bassenne et al. report\" or \"Bassenne reports\".",
+  "hats": [
+   "style-editor"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Three different \"no DOI\" formats inside Phenomenology's own reference lists",
+  "loc": [
+   "StructureFunctions References: \"...30, 301\u2013305 (the 2/3 law) and 32, 16\u201318 (the exact 4/5 law); no DOI, the 1941 Doklady notes predate the system\" \u2014 bare trailing clause, no parens at all",
+   "StructureFunctions References, next entry: \"Yaglom (1949), Dokl. Akad. Nauk SSSR 69, 743 (no DOI: a 1949 Doklady note)\" \u2014 explained parenthetical"
+  ],
+  "desc": "The same fact (citation predates the DOI system) is expressed as an unparenthesized trailing clause, an explained parenthetical, and a bare unexplained parenthetical, all within the self-contained Phenomenology leaf's own bibliography lists, which are supposed to be internally uniform.",
+  "hint": "",
+  "hats": [
+   "style-editor"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Phenomenology's page-level References sections use the labelled DOI link form, not the bare-autolink form assigned to a References surface",
+  "loc": [
+   "decisions page (carries ARCHITECTURE's Sec-References): renders as bare autolink, link text = the URL itself, e.g. <a href=\"https://doi.org/10.1017/S0022112056000317\">https://doi.org/10.1017/S0022112056000317</a>",
+   "api/phenomenology/Scalings (and Spectra, StructureFunctions) '## References' sections: render with the labelled form instead, e.g. <a href=\"https://doi.org/10.1063/1.869575\">doi:10.1063/1.869575</a>"
+  ],
+  "desc": "Plausibly by design (a Reference value is rendered once and reused for both the inline citation and the page-level roundup, so it can only carry one format, whereas ARCHITECTURE.md's entries are hand-authored twice) but the stated rule as written does not carve out this case, and the visual inconsistency is real in the rendered site.",
+  "hint": "Either state the carve-out once in CLAUDE.md's rule, or render Phenomenology's References list with the bare-autolink form to match the other surface.",
+  "hats": [
+   "style-editor"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Top-level Observables summaries omit max_speed",
+  "loc": [
+   "PAGE Home, Observables bullet lists diagnostics, skewness, spectrum scales, vorticity recovery \u2014 no max_speed.",
+   "PAGE api, Observables bullet: identical omission."
+  ],
+  "desc": "Both top-level summaries of Observables describe it as having four kinds of content and silently drop max_speed, which is present and explained at length on the module's own page. A reader who only skims the summaries would not know the CFL-setting reduction lives in this module at all.",
+  "hint": "",
+  "hats": [
+   "cold-reader"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Three names in circulation for one cached quantity",
+  "loc": [
+   "PAGE: api / Particles \u2014 'the trajectory velocities are read from the run's observables cache through particle_velocities \u2014 the same quantity the docs also call the Lagrangian velocity or the trajectory velocity.'"
+  ],
+  "desc": "The module docstring itself admits three names circulate for one quantity: the code identifier particle_velocities, plus the prose synonyms 'the Lagrangian velocity' and 'the trajectory velocity' \u2014 the code stays singular but the surrounding vocabulary does not, against rule (d).",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "The longitudinal integral scale wears two glyphs, L11 and \u211311",
+  "loc": [
+   "PAGE: notation, Derived scales \u2014 \"$L_{11}$ | longitudinal (parallel) integral length scale\"",
+   "PAGE: notation, Derived scales \u2014 \"$\\ell$ | the length a large-scale roll-off is evaluated against ($\\ell_{11}$, or Pope's $\\ell_0$\u2026)\""
+  ],
+  "desc": "The same length appears as L11 and as \u211311 inside a single docstring and inside the glossary table whose stated job is one-symbol-one-concept.",
+  "hint": "Keep L11 for the scale; reserve \u2113 for \"the length this roll-off was fitted against\", writing \u2113 = L11 where they coincide.",
+  "hats": [
+   "turbulence-theoretician"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "`DeferredForcing`'s example is introduced by editorial housekeeping",
+  "loc": [
+   "PAGE: api / Forcing, `DeferredForcing` \u2192 Examples: \"The two-form construction is the non-obvious part of this module, so the example lives here; the strategies themselves are built by the forms shown below.\""
+  ],
+  "desc": "The first clause explains why the documentation is laid out as it is \u2014 a fact about the docs, not the code. The second points at \"the forms shown below\", where what follows is the example itself and then `# Fields`, so the reader looks for a list that is not there. Failed NON-VACUITY (first clause) and PARAPHRASE (second).",
+  "hint": "CUT.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "\"close\" spans two nested scopes (step vs. iteration) without signposting",
+  "loc": [
+   "PAGE: api / Generator \u2014 \"finalize! \u2014 close a step: apply the post-step forcing projections to the advanced state.\"",
+   "PAGE: api / Propagator \u2014 \"Close an iteration: deposit the field observables\u2026\" (deposit!)"
+  ],
+  "desc": "The Vocabulary page states iteration strictly contains step, but 'close' is applied to both (finalize! closes a step from inside the running step!; deposit! closes the iteration afterward) without ever saying, at either site, that the two closings are nested rather than the same event. Each individual sentence is precise; the pairing across pages is not signposted, so a reader assembling the two independently must infer the nesting from the noun alone.",
+  "hint": "",
+  "hats": [
+   "conceptual-clarity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Citation link form: PF one titled form everywhere; IT two different forms by surface",
+  "loc": [
+   "PF CLAUDE.md: 'Every reference carries a clickable DOI on its title \u2014 [*Title*](https://doi.org/\u2026)... verbatim-identical in the \u00a7References list and every inline docstring copy'",
+   "IT CLAUDE.md: '\u00a7References entry ends in a bare autolink... inline docstring cite uses the labelled [doi:10.\u2026](https://doi.org/\u2026)'"
+  ],
+  "desc": "PF's inline citation always keeps the paper title; IT's inline form drops it in favour of a bare DOI label, verified only by decoded-identifier match rather than literal identity. Adjudicated as fine within IT; named here as a genuine cross-package architecture split.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "PF codifies an author-count truncation rule for citations; IT's rulebook never states one",
+  "loc": [
+   "PF CLAUDE.md: 'Name up to three authors... four or more \u2192 First et al.'",
+   "IT CLAUDE.md documentation-policy paragraph (no author-count rule stated anywhere)"
+  ],
+  "desc": "IT's practice matches PF's unwritten convention (et al. in-text, full names in the bibliography even at 8-9 authors), but the rule itself is absent from IT's CLAUDE.md \u2014 a documentation-completeness gap.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "Citation placement: PF places it last in the docstring template, IT lets it open the identity sentence",
+  "loc": [
+   "PF CLAUDE.md: citation is order-item (6) of 7, after the formula, before cross-links",
+   "IT CLAUDE.md: 'may open the identity sentence when the citation names the method (\"the smooth spectral filter of Hou & Li (2007) \u2026\")'"
+  ],
+  "desc": "A real template-order divergence, plausibly a deliberate physics-prose adaptation rather than a defect; already adjudicated as fine within IT alone.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "IT bans \\mathbf outright (build-enforced); PF has no such ban and uses it deliberately",
+  "loc": [
+   "IT CLAUDE.md: 'never upright \\mathbf (build-enforced)'",
+   "PF CLAUDE.md: 'for the indicator/identity write \\mathbf{1}...' and 'the example's bold \\mathbf{k} stays'"
+  ],
+  "desc": "Likely a sound adaptation (IT's vectors are uniformly boldsymbol, no indicator-matrix apparatus), but a genuine, not merely apparent, notation-rule divergence between the two rulebooks.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "minor",
+  "title": "`fit` restates its own first sentence",
+  "loc": [
+   "PAGE: api / phenomenology / Phenomenology, `fit`: \"No methods are defined yet; it is the recorded extension point for fitting a run's own measurements to a parametrization.\""
+  ],
+  "desc": "The trailing clause repeats the opening sentence (\"the seam by which a run's own measurements become a parametrization sitting beside the literature\") with the words re-ordered. Only \"No methods are defined yet\" carries new information. Failed DELETE TEST.",
+  "hint": "CUT the trailing clause.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "The \"resolution bound\" on \u0394t is a lowest-mode diffusive-decay cap",
+  "loc": [
+   "PAGE: api / SimulationRun \u2014 Simulation, max_dt: \"a resolution bound $1/(D\\kappa_{\\min}^{2})$ built from the run's own diffusivity and box\""
+  ],
+  "desc": "Dimensionally sound (D\u03ba\u00b2 is a rate) and \u03ba_min is the right choice for the stated purpose \u2014 stopping the integrating factor annihilating every mode. But \"resolution bound\" names the opposite intuition: every other resolution statement on the site is about \u03ba_max (\u03ba_max \u03b7, max_wavenumber), so a reader will read this as a small-scale criterion built from the wrong wavenumber.",
+  "hint": "Name it for what it bounds, e.g. \"a lowest-mode diffusive-decay bound\".",
+  "hats": [
+   "dimensional"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "A few caveats read as continuous prose rather than a titled aside",
+  "loc": [
+   "PAGE: api / SimulationDomain, `FixedDomain` \u2014 \"Nothing here defaults: \u2026\" placed like a caveat before # Fields but without the short-title-then-body shape most caveats elsewhere show"
+  ],
+  "desc": "Possibly an extraction artifact of how this manuscript glues an admonition's title onto its body; worth checking the built HTML to see whether this paragraph is actually a titled !!! note.",
+  "hint": "",
+  "hats": [
+   "structure-consistency"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "Elliptical \"Larger relaxes faster\" compounds the awkwardness of the adjacent grammar slip",
+  "loc": [
+   "api/Forcing, VarianceController Arguments: 'Larger relaxes faster; Bassenne report O(1-10).'"
+  ],
+  "desc": "The elided-subject construction ('a larger gain' -> 'Larger') matches an established house idiom used correctly elsewhere (e.g. kappa_max_eta's 'higher trades Reynolds number for margin'), so on its own it is not a defect. Flagged only because it sits in the same sentence as the Bassenne subject-verb error, compounding that bullet's awkwardness; low confidence this needs independent action beyond fixing the grammar error.",
+  "hint": "",
+  "hats": [
+   "style-editor"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "\"band\" used repeatedly before any definition of the concept",
+  "loc": [
+   "PAGE api / Forcing, module map: \"Linear \u2014 a fixed linear rate on a band.\" (first use, undefined)"
+  ],
+  "desc": "Inferable from the lowest_shell/highest_shell keywords a few lines later and the earlier \"shell\" glossary entry, so severity is low \u2014 but \"band\" itself (a contiguous range of shells) never gets its own stated definition, unlike \"shell,\" which has a Notation entry.",
+  "hint": "",
+  "hats": [
+   "cold-reader"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "VarianceController's default gain=1 sits at the low edge of its own cited O(1-10) range with no stated reason",
+  "loc": [
+   "PAGE: api / Forcing, `VarianceController` Arguments: \"gain = 1 \u2014 the dimensionless gain G. Larger relaxes faster; Bassenne report O(1-10).\""
+  ],
+  "desc": "Not a contradiction, but every other default choice in this corpus gets a one-clause justification (over's calibration argument, HouLi's machine-epsilon derivation); this one default sits at the extreme low end of a cited range with no stated reason for that placement, which may simply mirror the source paper's own default (undocumented either way).",
+  "hint": "",
+  "hats": [
+   "free-reader-b"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "`ScalingLaw`: a trailing modifier with nothing to modify",
+  "loc": [
+   "PAGE: api / phenomenology / Scalings, `ScalingLaw`: \"\u2014 here the normalized dissipation $C_\\varepsilon$, the Kolmogorov constant $C_K$, and the box-normalized dissipation group $G$ \u2014 possibly Reynolds-number-dependent.\""
+  ],
+  "desc": "Three em-dash asides in one sentence, the last a bare adjective phrase that could attach to $G$, to the list, or to \"a pure number characterizing developed turbulence\" 30 words earlier \u2014 and read as attaching to the nearest noun it sits oddly against \"a pure number\". Failed PARAPHRASE (dangling modifier).",
+  "hint": "REWRITE as its own sentence: \"Each may carry a Reynolds-number trend.\"",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "B"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "\\mathrm d bracing drifts across the corpus for the identical differential",
+  "loc": [
+   "src/Forcing.jl:197 \u2014 ``\\int A\\,\\mathrm dt`` (unbraced)",
+   "src/phenomenology/Spectra.jl:104 \u2014 ``\\int_0^\\infty E(\\kappa)\\,\\mathrm d\\kappa = k`` (unbraced)"
+  ],
+  "desc": "Three sites spell the differential as \\mathrm dt / \\mathrm d\\kappa (no braces around the d), while six sites spell the same differential as \\mathrm{d}t / \\mathrm{d}\\kappa. Both render identically since \\mathrm binds only the next token either way, which is why the drift went unnoticed, but it is a genuine source-level inconsistency in an idiom the house style otherwise insists on bracing.",
+  "hint": "",
+  "hats": [
+   "latex-typesetter"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "Delimiter sizing for the Lamb-vector gradient term is not applied by one rule",
+  "loc": [
+   "src/Generator.jl:417 (display math) \u2014 ``\\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\bigr)`` (sized)",
+   "src/Generator.jl:421 (inline math, six lines later) \u2014 \"the ``\\nabla(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2})`` gradient\" (plain parens)"
+  ],
+  "desc": "Low confidence because the two fraction shapes differ (bare \\tfrac{1}{2} vs. a \\frac{}{} with a \\sqrt{} in the denominator) and could independently justify different sizing by glyph height rather than by an inline/display rule. Flagged because the identical formula is sized in one rendering and bare in another within the same file, showing the choice was not applied by a conscious rule at the point of authorship.",
+  "hint": "",
+  "hats": [
+   "latex-typesetter"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "Sreenivasan1998's fields break from the symbol-naming convention its siblings use",
+  "loc": [
+   "PAGE: api / phenomenology / Scalings \u2014 'Sreenivasan1998(; asymptote = 0.5, correction = 0.0)' vs. 'Sreenivasan1995(; C_K = 1.5)'",
+   "PAGE: api / phenomenology / StructureFunctions \u2014 'Kolmogorov1941(; C\u2082 = 2.0)', 'Kolmogorov1962(; \u03bc = 0.25)'"
+  ],
+  "desc": "Every other Phenomenology law preset names its fitted-constant field after its own published symbol (C_K, C\u2082, \u03bc, \u03b2, \u03b1, c_L, c_\u03b7, p\u2080, C_OC); Sreenivasan1998 alone uses descriptive English (asymptote, correction) for the same role, possibly justified by symbol awkwardness but still the one exception to an otherwise uniform storage-naming convention.",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "A parenthetical that concedes three names for one quantity",
+  "loc": [
+   "PAGE: api / Particles, module map: \"the same quantity the docs also call the Lagrangian velocity or the trajectory velocity\""
+  ],
+  "desc": "The clause reports the docs' own vocabulary drift instead of fixing it, and one synonym it promises (\"trajectory velocity\") appears nowhere else on the rendered site \u2014 a dead pointer offered as a reading aid.",
+  "hint": "CUT; the glossary already binds `particle_velocities` to its symbol.",
+  "hats": [
+   "plain-sense"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "\"Front door\" is a software/business idiom promoted to formal glossary vocabulary",
+  "loc": [
+   "PAGE: notation (Vocabulary) \u2014 'front door | the Simulation constructor that builds every component from a few keywords, as against assembling the pieces yourself.'"
+  ],
+  "desc": "'Front door' is facade-pattern/product-design jargon, not a physics or numerics term, yet it is elevated to a repeatedly-used house term across the architecture doc and the notation page.",
+  "hint": "",
+  "hats": [
+   "naming-policy"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "IT's TeX-idiom block credits PF wholesale but adds a \\mid rule PF's own list lacks",
+  "loc": [
+   "IT CLAUDE.md: '(adopted from PF 2026-08-06...); a conditional bar is \\mid'",
+   "PF CLAUDE.md 'Math spacing and command support' section \u2014 no rule about \\mid anywhere"
+  ],
+  "desc": "The attribution covers the block as a whole but at least one clause (\\mid) is not present in PF's stated rules \u2014 a mild overstatement of provenance, and a candidate for PF to adopt for symmetry.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "PF has a documented examples/ pipeline and a 'run the examples' definition-of-done item; IT has neither",
+  "loc": [
+   "PF CLAUDE.md: extensive examples/ Literate-doc-page rules + 'Definition of done' item 6 'The examples, RUN'",
+   "IT: no examples/ directory exists; CLAUDE.md never mentions one"
+  ],
+  "desc": "Not a documentation defect \u2014 IT hasn't built worked examples yet \u2014 but a scope gap worth naming, since PF's own history shows exactly this gap shipping silent breakages.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "IT's 'Known weaknesses \u2014 self-guards' section has no PF counterpart",
+  "loc": [
+   "IT CLAUDE.md: four-item 'Known weaknesses \u2014 self-guards' section",
+   "PF CLAUDE.md: no equivalent section anywhere"
+  ],
+  "desc": "Likely reflects IT-specific session history rather than a PF gap; named per the brief's instruction to note asymmetric rules even when one-sided.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ },
+ {
+  "sev": "nit",
+  "title": "IT's 'Template conventions' is a consolidated checkable-rules list; PF's equivalent material is scattered and missing two discriminators",
+  "loc": [
+   "IT CLAUDE.md: 'Template conventions, stated so the split is checkable' \u2014 eight bullets including Returns x. and -> Type arrow rules",
+   "PF CLAUDE.md: 'The four shape rules' plus scattered prose; no Returns x. / -> Type arrow rule anywhere"
+  ],
+  "desc": "IT's structure is more disciplined (designed for one-line-per-round additions); PF has no stated policy at all for the Returns-sentence / arrow-type discriminators IT uses. A candidate restructuring/adoption for PF.",
+  "hint": "",
+  "hats": [
+   "pf-parity"
+  ],
+  "arms": [
+   "A"
+  ],
+  "n": 1
+ }
+]

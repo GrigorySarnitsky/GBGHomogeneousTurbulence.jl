@@ -1,7 +1,7 @@
 # Generator
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Generator]
+Modules = [GBGHomogeneousTurbulence.Generator]
 Order   = [:module]
 ```
 

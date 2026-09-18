@@ -9,7 +9,7 @@
 # -Inf·0 = NaN, so exp(NaN) = NaN. The quadratic advection term then spreads the NaN.
 
 using Test, Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 

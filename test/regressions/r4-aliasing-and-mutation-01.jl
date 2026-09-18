@@ -19,7 +19,7 @@
 # does today: the run completes, silently bit-identical to `NoForcing()`.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Random
 

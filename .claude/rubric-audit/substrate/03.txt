@@ -1,13 +1,13 @@
 ----- docs/src/api.md (around line 15) -----
 # API overview
 
-The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules. Its **re-exported**
+The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules. Its **re-exported**
 submodules, in dependency order, are `SimulationDomain` → `State` → `Observables` → `Cache` → `Forcing` →
 `Generator` → `Propagator` → `Particles` → `SimulationRun`; the extraction-bound `Phenomenology` leaf
 leads the include order but is **not** re-exported (reach it opt-in). The umbrella re-exports the public
-surface of the listed submodules, so `using GBGIsotropicTurbulence` brings everything into scope.
+surface of the listed submodules, so `using GBGHomogeneousTurbulence` brings everything into scope.
 
-- [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
+- [GBGHomogeneousTurbulence](api/GBGHomogeneousTurbulence.md): the top-level module and public re-export surface.
 - [SimulationDomain](api/SimulationDomain.md): the discretized periodic box a run lives on — the `FixedDomain` (with its choice of `DealiasingStrategy`), the scratch-field allocators, and the resolved-wavenumber ceiling `max_wavenumber`.
 - [State](api/State.md): the evolving state (`ResolvedFields` — the velocity and scalar in spectral representation, the single source of truth) and the random initial conditions that seed it — a divergence-free velocity and a mean-zero scalar.
 - [Observables](api/Observables.md): the measured functions of state — the energy and dissipation diagnostics of the flow and the scalar (the kinetic energy and its dissipation rate among them), the developed-turbulence markers, the spectrum-derived scales, the maximum velocity component that sets the CFL step, and the field-valued vorticity recovery.
@@ -21,7 +21,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 
 ```@contents
 Pages = [
-  "api/GBGIsotropicTurbulence.md",
+  "api/GBGHomogeneousTurbulence.md",
   "api/SimulationDomain.md",
   "api/State.md",
   "api/Observables.md",
@@ -38,13 +38,13 @@ Depth = 2
 ----- docs/src/api.md (around line 10) -----
 # API overview
 
-The package is an umbrella module (`GBGIsotropicTurbulence`) assembled from submodules. Its **re-exported**
+The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules. Its **re-exported**
 submodules, in dependency order, are `SimulationDomain` → `State` → `Observables` → `Cache` → `Forcing` →
 `Generator` → `Propagator` → `Particles` → `SimulationRun`; the extraction-bound `Phenomenology` leaf
 leads the include order but is **not** re-exported (reach it opt-in). The umbrella re-exports the public
-surface of the listed submodules, so `using GBGIsotropicTurbulence` brings everything into scope.
+surface of the listed submodules, so `using GBGHomogeneousTurbulence` brings everything into scope.
 
-- [GBGIsotropicTurbulence](api/GBGIsotropicTurbulence.md): the top-level module and public re-export surface.
+- [GBGHomogeneousTurbulence](api/GBGHomogeneousTurbulence.md): the top-level module and public re-export surface.
 - [SimulationDomain](api/SimulationDomain.md): the discretized periodic box a run lives on — the `FixedDomain` (with its choice of `DealiasingStrategy`), the scratch-field allocators, and the resolved-wavenumber ceiling `max_wavenumber`.
 - [State](api/State.md): the evolving state (`ResolvedFields` — the velocity and scalar in spectral representation, the single source of truth) and the random initial conditions that seed it — a divergence-free velocity and a mean-zero scalar.
 - [Observables](api/Observables.md): the measured functions of state — the energy and dissipation diagnostics of the flow and the scalar (the kinetic energy and its dissipation rate among them), the developed-turbulence markers, the spectrum-derived scales, the maximum velocity component that sets the CFL step, and the field-valued vorticity recovery.
@@ -58,7 +58,7 @@ surface of the listed submodules, so `using GBGIsotropicTurbulence` brings every
 
 ```@contents
 Pages = [
-  "api/GBGIsotropicTurbulence.md",
+  "api/GBGHomogeneousTurbulence.md",
   "api/SimulationDomain.md",
   "api/State.md",
   "api/Observables.md",

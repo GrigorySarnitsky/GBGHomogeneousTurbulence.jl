@@ -33,7 +33,7 @@ tracers. The second form reads a `Simulation`'s cache.
 
 !!! note
     This is never the second velocity of the tracer position update (the corrector stage of the
-    predictor–corrector push, [`advect!`](@ref GBGIsotropicTurbulence.Particles.advect!)): that one is evaluated at a *predicted* position no tracer ever occupies — a
+    predictor–corrector push, [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!)): that one is evaluated at a *predicted* position no tracer ever occupies — a
     stage register of the scheme, not a sample of the flow — and it is not readable.
 """
 function particle_velocities(cache::ObservablesCache)

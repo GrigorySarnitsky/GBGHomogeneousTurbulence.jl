@@ -13,12 +13,12 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields
 
-const SD = GBGIsotropicTurbulence.SimulationDomain
-const F  = GBGIsotropicTurbulence.Forcing
-const O  = GBGIsotropicTurbulence.Observables
+const SD = GBGHomogeneousTurbulence.SimulationDomain
+const F  = GBGHomogeneousTurbulence.Forcing
+const O  = GBGHomogeneousTurbulence.Observables
 
 @testset "Forcing._target_factor measures in the field's own element type on a Float32 run" begin
   domain = SD.FixedDomain(; grid_points_per_axis = 16, side_length = 2π,

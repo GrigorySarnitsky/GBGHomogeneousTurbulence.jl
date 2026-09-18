@@ -34,7 +34,7 @@
 # prints every computed cell (and the derived flop estimates); review the diff against the frozen
 # tables, then freeze the new values in the same commit, citing the decision.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 using Test
 
@@ -348,7 +348,7 @@ end
   end
 
   @testset "op lists name real displaced registers" begin
-    PB = GBGIsotropicTurbulence.Generator.PhaseShiftBuffers
+    PB = GBGHomogeneousTurbulence.Generator.PhaseShiftBuffers
     @test all(f -> f in fieldnames(PB),
               (:to_shifted, :back, :back_dealiased, :velocity_shifted, :u_shifted, :omega_shifted,
                :scalar_shifted, :scalar_copy, :phi_shifted))

@@ -5,12 +5,12 @@
 # buffer, now holding a different stage's velocity", and the reuse silently supplies the earlier
 # stage's displaced velocity.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, to_physical!
 using Random
 using Test
 
-const SD = GBGIsotropicTurbulence.SimulationDomain
+const SD = GBGHomogeneousTurbulence.SimulationDomain
 
 @testset "scalar_rhs! reuse is keyed on the CONTENTS of û, not on the buffer object" begin
   L, N = 2π, 12

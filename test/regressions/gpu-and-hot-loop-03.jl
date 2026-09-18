@@ -11,9 +11,9 @@
 # interpolates nothing, so its correct allocation count is exactly zero: the assertions below are
 # achievable by giving the buffers the two weight registers (or by a stack-allocated solve).
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
-const IT = GBGIsotropicTurbulence
+const IT = GBGHomogeneousTurbulence
 
 # @allocated inside a function body, on concrete arguments, so the measurement is of the callee
 # alone and not of global-scope boxing.

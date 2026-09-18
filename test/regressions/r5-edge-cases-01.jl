@@ -9,7 +9,7 @@
 # non-positive `cfl` is refused at the front door (an `ArgumentError`, the neighbouring
 # convention) or `advance!` refuses the step it computed — a normal return that moved the clock
 # backwards, or not at all, is the defect.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 # Advance twice, tolerating a refusal (a throw IS the fix). Returns `nothing` when the run
 # refused, or the vector of (time, step) pairs it actually reported.

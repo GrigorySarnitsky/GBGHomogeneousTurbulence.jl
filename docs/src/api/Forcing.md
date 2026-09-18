@@ -1,7 +1,7 @@
 # Forcing
 
 ```@autodocs
-Modules = [GBGIsotropicTurbulence.Forcing]
+Modules = [GBGHomogeneousTurbulence.Forcing]
 Order   = [:module]
 ```
 

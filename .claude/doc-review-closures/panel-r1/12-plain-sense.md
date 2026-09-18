@@ -71,8 +71,8 @@ inversion itself is unchanged.
 
 `deposit_sample!` now has a full docstring at `src/Cache.jl:262-278`, is exported
 (`src/Cache.jl:57`), is listed on the Cache module map (`src/Cache.jl:28`), and appears in the
-rendered `docs/build/api/GBGIsotropicTurbulence/index.html` Index
-(`../Cache/#GBGIsotropicTurbulence.Cache.deposit_sample!`, confirmed by grep on the built HTML). The
+rendered `docs/build/api/GBGHomogeneousTurbulence/index.html` Index
+(`../Cache/#GBGHomogeneousTurbulence.Cache.deposit_sample!`, confirmed by grep on the built HTML). The
 instruction in `particles_modified!`'s docstring now points at a documented, indexed call.
 
 ---

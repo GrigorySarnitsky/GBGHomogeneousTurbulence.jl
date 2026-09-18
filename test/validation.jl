@@ -1,9 +1,9 @@
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: curl!, field_data
 using Random
-using GBGIsotropicTurbulence.Phenomenology
-using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
+using GBGHomogeneousTurbulence.Phenomenology
+using GBGHomogeneousTurbulence.Phenomenology.Spectra: Pope2000
 
 # one short forced run, shared across the validation checks
 const SIM = Simulation(grid_points_per_axis = 32, viscosity = 0.02, velocity_forcing = ConstantPower(injection_rate = 0.1))

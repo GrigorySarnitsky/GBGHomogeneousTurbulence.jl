@@ -3,7 +3,7 @@
 # positions wrap periodically; the interpolation scheme is pluggable; sampling reads a field along
 # the trajectories; and the two-verb push (record + advect) allocates nothing per step.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, field_data, to_physical, PointSet,
                          CatmullRom, LagrangeSpline, point_values
@@ -144,7 +144,7 @@ end
 @testset "AdamsBashforth" begin
   # The solve writes into caller-supplied scratch (the hot loop is allocation-free), so the test
   # wrapper supplies it and returns the filled weights.
-  AB(h, steps, k) = GBGIsotropicTurbulence.Particles._adams_bashforth_weights(
+  AB(h, steps, k) = GBGHomogeneousTurbulence.Particles._adams_bashforth_weights(
                       zeros(Float64, k), zeros(Float64, k), h, steps, k)
 
   @testset "variable-step weights reduce to the classical coefficients" begin

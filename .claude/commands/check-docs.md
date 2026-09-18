@@ -29,7 +29,7 @@ standing remainder — the failure mode this paragraph forbids.)
    current-state sections must match the code.)
 2. Every docstring in `src/*.jl` — `SimulationDomain`, `State`, `Cache`, `Generator`, `Observables`,
    `Forcing`, `Propagator`, `Particles`, `SimulationRun`, `Phenomenology` (and its `Spectra` /
-   `StructureFunctions` / `Scalings` submodules), and the umbrella `GBGIsotropicTurbulence.jl` (module
+   `StructureFunctions` / `Scalings` submodules), and the umbrella `GBGHomogeneousTurbulence.jl` (module
    **and** function docstrings; `#` comments are exempt — not rendered).
 3. Every page in `docs/src/` — `index.md`, `notation.md`, `observables_cache.md`, `api.md`, and all
    `docs/src/api/*.md` (hand-written prose and `@docs` groupings; skip the `@autodocs` / `@example` /
@@ -231,8 +231,8 @@ print("DUPLICATES:", dups if dups else "none")
 print("rendered-name count:", len({n.split('.')[-1] for n in where}))
 PYEOF
 # question 2 — every umbrella export has a home on some api page: diff the rendered names against
-julia --project -e 'using GBGIsotropicTurbulence;
-  println(join(sort(String.(names(GBGIsotropicTurbulence))), "\n"))' | sort > /tmp/exports.txt
+julia --project -e 'using GBGHomogeneousTurbulence;
+  println(join(sort(String.(names(GBGHomogeneousTurbulence))), "\n"))' | sort > /tmp/exports.txt
 # compare /tmp/exports.txt against the rendered names above; checkdocs=:exports guards the docstring
 # EXISTING, this guards it LANDING on a page. Question 3 — each api page/section blurb (the
 # hand-written ## prose) still matches what its @docs block holds: read them against the output.

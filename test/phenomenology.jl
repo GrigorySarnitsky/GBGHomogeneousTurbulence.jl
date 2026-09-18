@@ -1,9 +1,9 @@
 using Test
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Phenomenology
-using GBGIsotropicTurbulence.Phenomenology.Spectra
-using GBGIsotropicTurbulence.Phenomenology.StructureFunctions
-using GBGIsotropicTurbulence.Phenomenology.Scalings
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Phenomenology
+using GBGHomogeneousTurbulence.Phenomenology.Spectra
+using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions
+using GBGHomogeneousTurbulence.Phenomenology.Scalings
 
 const FP = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0, integral_scale = 1.0)
 
@@ -180,12 +180,12 @@ end
 
 
 @testset "Phenomenology is not re-exported by the umbrella" begin
-  # the laws must NOT leak into `using GBGIsotropicTurbulence`
-  @test !isdefined(GBGIsotropicTurbulence, :Pope2000)
-  @test !isdefined(GBGIsotropicTurbulence, :FlowParameters)
+  # the laws must NOT leak into `using GBGHomogeneousTurbulence`
+  @test !isdefined(GBGHomogeneousTurbulence, :Pope2000)
+  @test !isdefined(GBGHomogeneousTurbulence, :FlowParameters)
   # but the submodule namespace IS reachable, and resolves to the same binding
-  @test isdefined(GBGIsotropicTurbulence, :Phenomenology)
-  @test GBGIsotropicTurbulence.Phenomenology.Spectra.Pope2000 === Pope2000
+  @test isdefined(GBGHomogeneousTurbulence, :Phenomenology)
+  @test GBGHomogeneousTurbulence.Phenomenology.Spectra.Pope2000 === Pope2000
 end
 
 # The Pope model spectrum is normalized: c_L = 6.78 is exactly the coefficient making ∫E dκ = k, and

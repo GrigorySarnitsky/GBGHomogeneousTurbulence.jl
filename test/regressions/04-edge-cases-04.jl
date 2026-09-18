@@ -7,7 +7,7 @@
 # zero velocity field, so ⟨S:S⟩ is exactly zero before any seeding.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 @testset "derivative_skewness returns the field's own element type on the degenerate zero-field path" begin
   for T in (Float32, Float64)

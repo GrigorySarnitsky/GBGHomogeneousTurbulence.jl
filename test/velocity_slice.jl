@@ -3,7 +3,7 @@
 # divergence-free to roundoff, no field-sized per-step allocation — and that the passive scalar stays
 # exactly zero (it must not perturb the velocity).
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data
 using Random
 using Test

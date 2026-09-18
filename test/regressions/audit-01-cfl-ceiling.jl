@@ -5,8 +5,8 @@
 # every sub-unit-speed run — a units claim, caught by six audit lanes. The bound kept instead is the
 # RESOLUTION limit 1/(D·κ_min²), the decay time of the longest mode the box holds, which is derived
 # from the run's own ν and L and binds only below Re_L ≈ 1.
-using Test, GBGIsotropicTurbulence, Random
-const SR = GBGIsotropicTurbulence.SimulationRun
+using Test, GBGHomogeneousTurbulence, Random
+const SR = GBGHomogeneousTurbulence.SimulationRun
 
 @testset "a sub-unit-speed turbulent run gets the documented advective step, unthrottled" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, kinetic_energy = 0.02,

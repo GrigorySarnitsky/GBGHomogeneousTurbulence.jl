@@ -37,7 +37,7 @@ const SCHEMA = {
   required: ['lane','findings'],
 }
 
-const PREAMBLE = `You audit the documentation of GBGIsotropicTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (one velocity field and one passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian particle tracking).
+const PREAMBLE = `You audit the documentation of GBGHomogeneousTurbulence — a GPU-primary pseudospectral DNS of homogeneous isotropic turbulence (one velocity field and one passive scalar on a triple-periodic box, integrating-factor time-stepping, pluggable forcing and dealiasing, a deposit-driven observables cache, Lagrangian particle tracking).
 
 THE RULEBOOK IS ${REPO}/CLAUDE.md — read its "Documentation policy", "Style" and "Doc-edit checklist" sections FIRST and treat them as authoritative. GROUND TRUTH IS ${REPO}/src — verify every claim against the code and quote the decisive line.
 
@@ -60,7 +60,7 @@ const lanes = [
 
   { key: 'src-dynamics', substrate: `The docstrings in ${REPO}/src/Forcing.jl, ${REPO}/src/Generator.jl, ${REPO}/src/Propagator.jl and ${REPO}/src/Particles.jl (module AND function/type docstrings; plain # comments are exempt).` },
 
-  { key: 'src-run', substrate: `The docstrings in ${REPO}/src/SimulationRun.jl and the umbrella ${REPO}/src/GBGIsotropicTurbulence.jl (module AND function/type docstrings; plain # comments are exempt).` },
+  { key: 'src-run', substrate: `The docstrings in ${REPO}/src/SimulationRun.jl and the umbrella ${REPO}/src/GBGHomogeneousTurbulence.jl (module AND function/type docstrings; plain # comments are exempt).` },
 
   { key: 'src-phenomenology', substrate: `The docstrings in ${REPO}/src/Phenomenology.jl and ${REPO}/src/phenomenology/*.jl (Spectra, StructureFunctions, Scalings). This is an extraction-bound leaf: it carries its own self-contained Reference values by design and is EXEMPT from the ARCHITECTURE References cross-check, so judge its citations for well-formedness and resolvability instead.` },
 

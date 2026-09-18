@@ -13,7 +13,7 @@ Lagrangian tracer tracking:
 - [`Tracers`](@ref) — the tracer set (positions and a selectable interpolation `scheme`).
 - [`particle_positions`](@ref), [`number_of_tracers`](@ref) — the particle-state readouts (the
   trajectory velocities are read from the run's observables cache through
-  [`particle_velocities`](@ref GBGIsotropicTurbulence.Cache.particle_velocities), where the closing
+  [`particle_velocities`](@ref GBGHomogeneousTurbulence.Cache.particle_velocities), where the closing
   deposit stamps them).
 - [`advect!`](@ref) — the second-order tracer push (Heun-in-time on the velocity at both ends of the step).
 - [`record_trajectory_velocity!`](@ref) — put the Lagrangian velocity at the new positions on record,

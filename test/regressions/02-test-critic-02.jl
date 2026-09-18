@@ -7,8 +7,8 @@
 # a check that tested only one counter, used `||` for `&&`, or compared the wrong counter would fail
 # here rather than pass the suite silently.
 
-using Test, Random, GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: advance_particles_epoch!
+using Test, Random, GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
                      rng = MersenneTwister(1))

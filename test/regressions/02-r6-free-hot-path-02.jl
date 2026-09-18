@@ -7,7 +7,7 @@
 # allocator must refuse it at construction time. Currently neither holds.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: VectorFieldPhysical, field_data, PointSet, CatmullRom, npoints
 
 @testset "allocate_buffers(AdamsBashforth) either refuses an over-deep cache history or hands back buffers one advect! accepts" begin

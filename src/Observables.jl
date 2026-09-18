@@ -19,7 +19,7 @@ The measured functions of the flow state:
   generic shared with `Cache`: the field reduction is homed here, the cached read there).
 - [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
   state's spectral representation, the one field-valued observable
-  (its cached read, [`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical),
+  (its cached read, [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical),
   lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
@@ -31,7 +31,7 @@ the field's own real element type rather than a fixed `Float64`, so a `Float32` 
 `Float32`.
 
 Three observables gate the automatic warm-up
-([`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!)), which advances until the
+([`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
 the scalar is forced — the scalar variance settles too. The kinetic energy is **not** among them: a
 constant-energy forcing clamps it flat and a fixed-injection forcing makes it ring, so it is
@@ -39,7 +39,7 @@ measured (it normalizes the eddy-turnover clock) but never gated on.
 
 None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
 band (see `kinetic_energy` for the condition;
-[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
+[`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
 and the cubic skewness carries a slight aliasing residual — its docstring states the per-strategy
 standing (priced for the sharp truncations, unpriced for `HouLi`'s taper).
 """
@@ -69,10 +69,10 @@ Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_d
 needs no dealiasing of its own: the sum over spectral coefficients is exact, and the equivalent
 physical-space mean picks up no aliasing either, because a quadratic's zero mode folds in nothing
 when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` — satisfied by the ``2/3``
-rule, by [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift)'s wider
+rule, by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s wider
 ``\\sqrt{2}N/3`` band, and by every narrower band.
 
-[`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) retains the full band out to the
+[`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) retains the full band out to the
 Nyquist ``N/2``, where the only pairs that fold to zero are Nyquist modes its taper has
 already damped to machine precision — alias-free in practice, not exactly.
 """
@@ -153,13 +153,13 @@ on a threaded tree, the fused pass serially) — but the pair costs one read of 
 one blocking device-to-host readback instead of two. Reach for it wherever both are
 wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t \\varepsilon/k``
 of a spin-up or budget loop, which is how
-[`StationarityCriterion`](@ref GBGIsotropicTurbulence.SimulationRun.StationarityCriterion) measures it.
+[`StationarityCriterion`](@ref GBGHomogeneousTurbulence.SimulationRun.StationarityCriterion) measures it.
 
 The arguments are:
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
   velocity route of `dissipation`, exact only for a solenoidal field (its docstring carries the
   condition).
-- `domain` — the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain) whose lazy
+- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) whose lazy
   reduction weights the traversal evaluates.
 - `viscosity` — the kinematic viscosity ``\\nu`` scaling the dissipation.
 
@@ -181,7 +181,7 @@ timestep. The magnitude is formed one grid point at a time and consumed by the m
 so no magnitude field is materialized.
 
 The second form reads the number back from an
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache), where the closing deposit
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), where the closing deposit
 left it — the same quantity, measured once per iteration (a step plus the deposit that closes it)
 and served without a reduction (or a device readback); it throws an `ErrorException` when no
 deposit is current, like every cached read.
@@ -189,7 +189,7 @@ deposit is current, like every cached read.
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
     value, which makes the sampled maximum an under-estimate — one of the two loosenesses
-    [`recommended_cfl`](@ref GBGIsotropicTurbulence.Propagator.recommended_cfl) prices when it sets
+    [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) prices when it sets
     its margin. A CFL condition bounds the *stability* of the explicit advective term; it is not by
     itself a guarantee of accuracy.
 
@@ -234,7 +234,7 @@ The arguments are:
 Returns `ω`.
 
 The deposited value is read back with
-[`vorticity_physical`](@ref GBGIsotropicTurbulence.Cache.vorticity_physical), which serves the
+[`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical), which serves the
 iteration's deposit or throws — measure with this function, read with that one.
 """
 function vorticity_physical!(ω, û, domain::FixedDomain, spectral_scratch)
@@ -325,7 +325,7 @@ than dividing by it.
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free. That pricing is the sharp-truncation one: the wider
-[`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi)'s
+[`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi)'s
 smooth taper leaves a residual of its own shape that no bound here prices — on every strategy,
 treat the skewness as an indicator, not an alias-controlled measurement.
 
@@ -338,7 +338,7 @@ gate of the warm-up detector.
     The rank-2 strain tensor is allocated per call rather than kept resident — an occasional
     diagnostic should not hold field-scale storage for a whole run — but while it lives it is the
     biggest single memory episode a default configuration reaches, larger than the resident working
-    set. The [`warmup!`](@ref GBGIsotropicTurbulence.SimulationRun.warmup!) driver calls this on its
+    set. The [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) driver calls this on its
     sampling interval when its skewness gate is on (`gate_skewness = true`; off by default), so a
     run near its memory ceiling should size for the diagnostic rather than for the steady state.
 """
@@ -364,7 +364,7 @@ spectral representation): ``E(\\kappa)\\,\\mathrm{d}\\kappa`` is the turbulent k
 carried by wavenumber magnitudes in ``[\\kappa, \\kappa + \\mathrm{d}\\kappa]``, so
 ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa`` — the object the reference laws are stated
 about, directly comparable to a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum with no conversion. The
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum with no conversion. The
 `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers and the shell width.
 
 Returns a named tuple `(; wavenumbers, energy)`: the shell-center wavenumber magnitudes ``\\kappa``
@@ -404,7 +404,7 @@ L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d
 ```
 
 ``L_{11}`` is the large-eddy scale — the one flow parameter a
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) model spectrum needs that the small
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum needs that the small
 scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
 The integrals above are the idealized continuous definition, written with the spectral density

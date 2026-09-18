@@ -91,7 +91,7 @@ uniform (no "knob", one neutral academic voice).
 - **severity:** nit
 - **confidence:** medium
 - **locations:** (from `docs/build/` rendered `href`s)
-  - Self / canonical links: `https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/**stable**/api/…`
+  - Self / canonical links: `https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/**stable**/api/…`
   - `@extref` cross-links: `https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/**dev**/api/DifferentialOperators/#…curl` (and `…helmholtz_projection`, `…to_spectral`, `VectorPointValues`, `Grid3D`, etc. — all under `/dev/`)
 - **contradicts:** IT's own pages resolve to the pinned `/stable/` channel, while every `@extref` into the sibling PF docs resolves to the moving `/dev/` channel; axis = release channel of the link target.
 - **description:** Not a broken link (all resolve), but the cross-package references point at PF's *dev* docs — a moving target that can drift out from under an anchor — while the same build treats its own docs as `/stable/`. Config-driven (the `objects.inv` used by DocumenterInterLinks), and low-impact, but an internal inconsistency surfaced by inspecting the built HTML.

@@ -4,7 +4,7 @@
 #
 # Measured 2026-08-21 by temporarily renaming `history_filled` -> `history_valid_count` in
 # src/Cache.jl ONLY (Particles.jl untouched), then reverting:
-#   julia --project -e 'using GBGIsotropicTurbulence'   ->  precompiled + loaded CLEAN
+#   julia --project -e 'using GBGHomogeneousTurbulence'   ->  precompiled + loaded CLEAN
 #   Heun run, two advance! steps                ->  OK, no error
 #   AdamsBashforth(order = 2) run, one advance! step    ->  FieldError: type ObservablesCache has no
 #                                                           field `history_filled`
@@ -12,10 +12,10 @@
 # (test/particles.jl:139-180 and ~10 regression witnesses drive front-door AdamsBashforth runs, so
 # `Pkg.test()` fails immediately). The defect is the unchecked cross-module coupling, not a silent
 # wrong answer.
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 
-root = (let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGIsotropicTurbulence.jl")); d = dirname(d); end; d end)
+root = (let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGHomogeneousTurbulence.jl")); d = dirname(d); end; d end)
 show_lines(path, lines) = for n in lines
   println(lpad(n, 4), ": ", rstrip(readlines(joinpath(root, path))[n]))
 end
@@ -37,4 +37,4 @@ show_lines("src/SimulationRun.jl", 41:43)
 
 println("\n=== why nothing forces the duck typing: Cache's own imports (no Particles => no cycle) ===")
 show_lines("src/Cache.jl", 49:51)
-show_lines("src/GBGIsotropicTurbulence.jl", [65, 69])
+show_lines("src/GBGHomogeneousTurbulence.jl", [65, 69])

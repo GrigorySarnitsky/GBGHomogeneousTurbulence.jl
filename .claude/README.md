@@ -1,4 +1,4 @@
-# `.claude/` — local working artifacts (GBGIsotropicTurbulence)
+# `.claude/` — local working artifacts (GBGHomogeneousTurbulence)
 
 Untracked working notes (**never committed** — only the instrument files under `.claude/commands/`
 are tracked). This index says what is **live** versus **settled**, so a future session does not act

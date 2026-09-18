@@ -21,11 +21,11 @@
 
 using Test
 using Random
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields
 
-const SD = GBGIsotropicTurbulence.SimulationDomain
-const F  = GBGIsotropicTurbulence.Forcing
+const SD = GBGHomogeneousTurbulence.SimulationDomain
+const F  = GBGHomogeneousTurbulence.Forcing
 
 # ---- counting wrapper: forwards to the wrapped field, tallies whole-field `inner` calls ----------
 const NINNER = Ref(0)

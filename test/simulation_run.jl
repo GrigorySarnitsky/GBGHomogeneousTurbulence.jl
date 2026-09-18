@@ -3,11 +3,11 @@
 # diagnostics; tracers move and stay in the box; forced runs sustain energy while free decay loses
 # it; and the bring-your-own-domain constructor and fixed-`dt` `advance!` work.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
-using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
-using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948
+using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
+using GBGHomogeneousTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
 using Random
 using Logging
@@ -173,7 +173,7 @@ using Test
   end
 
   @testset "stationarity detector (unit)" begin
-    D = GBGIsotropicTurbulence.SimulationRun
+    D = GBGHomogeneousTurbulence.SimulationRun
     turn = collect(0.0:0.1:10.0)
     @test D._is_flat(turn, fill(2.0, length(turn)) .+ 0.001 .* sin.(turn), 10.0, 4.0, 0.05)  # flat
     @test !D._is_flat(turn, 1.0 .+ 0.1 .* turn, 10.0, 4.0, 0.05)                              # drifting
@@ -214,7 +214,7 @@ using Test
   end
 
   @testset "warmup! gates on the scalar" begin
-    D = GBGIsotropicTurbulence.SimulationRun
+    D = GBGHomogeneousTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                         velocity_forcing = ConstantPower(injection_rate = 0.1),
                         scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.3),

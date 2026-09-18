@@ -2,7 +2,7 @@
 # side effect of the adaptive-CFL branch. `advance!(sim; dt = …)` bypasses `cfl_timestep`, which is
 # the only site carrying `isfinite(speed) || error(…)`, so a run driven with a hand-fixed `dt`
 # deposits NaN/Inf observables and returns normally.
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 
 @testset "advance! with a hand-fixed dt must not silently accept a blown-up (non-finite) state" begin
   make = () -> Simulation(grid_points_per_axis = 8, viscosity = 1e-6,

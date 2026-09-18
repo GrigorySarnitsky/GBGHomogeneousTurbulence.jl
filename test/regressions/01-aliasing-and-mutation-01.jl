@@ -15,7 +15,7 @@
 # further step of the same size.  Their post-reseed state is identical, so the resulting positions
 # must be identical.  `Heun`, which keeps no history, is the control.
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: field_data
 

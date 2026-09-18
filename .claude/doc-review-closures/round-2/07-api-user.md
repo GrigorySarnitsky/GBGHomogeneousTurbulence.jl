@@ -5,7 +5,7 @@
 **VERDICT: ABSENT**
 
 `src/SimulationRun.jl:369-373` now reads: "Closes the iteration with
-[`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so the cache is readable when it
 returns." The docstring states the closing deposit and its consequence (cache readability)
 directly, in `advance!`'s own home. Grepped `advance!` block in full; no other gap found.
 

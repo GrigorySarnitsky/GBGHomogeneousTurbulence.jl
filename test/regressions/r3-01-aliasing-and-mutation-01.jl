@@ -9,8 +9,8 @@
 # epoch.
 
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: advance_particles_epoch!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
 
 @testset "velocity_at_particles throws when only the particles epoch has advanced" begin
   rng = MersenneTwister(20260820)

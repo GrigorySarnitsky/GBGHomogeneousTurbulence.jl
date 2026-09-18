@@ -5,7 +5,7 @@
 **VERDICT: ABSENT**
 
 Evidence: `src/SimulationRun.jl:353-361` — `advance!`'s docstring now reads "Closes the iteration
-with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache is readable when it
+with [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so the cache is readable when it
 returns." Searched `src/SimulationRun.jl` for `advance!`'s docstring block directly; the deposit fact
 is now stated inline, not left to be pieced together from `step!`/`deposit!`'s pages.
 

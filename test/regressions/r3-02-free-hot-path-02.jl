@@ -10,7 +10,7 @@
 using Test
 using GBGPeriodicFields: point_positions
 using Random: MersenneTwister
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 
 function warmed_run(seed)
   s = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 6,

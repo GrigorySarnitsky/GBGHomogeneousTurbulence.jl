@@ -8,7 +8,7 @@
 
 using Test
 using Random: MersenneTwister
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 function scaled_scalar_pair(turnover_time)

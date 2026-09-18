@@ -16,7 +16,7 @@
 # is NOT acceptable is a `DomainError` escaping from inside the hot loop.
 
 using Test
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: convolve!
 using Random
 

@@ -1,4 +1,4 @@
------ src/GBGIsotropicTurbulence.jl (around line 35) -----
+----- src/GBGHomogeneousTurbulence.jl (around line 35) -----
 # package is the consumer that owns time integration, forcing, the scalar transport, particle
 # tracking, and the statistics. GPU is the primary target, so the time loop is in-place and
 # allocation-free over preallocated buffers.
@@ -22,7 +22,7 @@
 
 
 """
-    GBGIsotropicTurbulence
+    GBGHomogeneousTurbulence
 
 Tools for simulating and analyzing homogeneous isotropic turbulence on three-dimensional periodic
 domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
@@ -34,14 +34,14 @@ Built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFie
 The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary
 development took place.
 """
-module GBGIsotropicTurbulence
+module GBGHomogeneousTurbulence
 
 using GBGPeriodicFields
 
 
 # Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.8): it is
 # deliberately NOT re-exported below — reach the reference laws opt-in through the submodule namespace,
-# e.g. `using GBGIsotropicTurbulence.Phenomenology.Spectra`.
+# e.g. `using GBGHomogeneousTurbulence.Phenomenology.Spectra`.
 include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
@@ -58,7 +58,7 @@ include("SimulationRun.jl")
 using .SimulationDomain:
 
 ----- README.md (around line 6) -----
-# GBGIsotropicTurbulence.jl
+# GBGHomogeneousTurbulence.jl
 
 A small, focused pseudospectral DNS of homogeneous isotropic turbulence on three-dimensional periodic
 domains: an incompressible velocity field and a single passive scalar, each optionally forced,
@@ -79,19 +79,19 @@ This is a private, unregistered package. To install it (you need access to the r
 ```julia
 using Pkg
 
-Pkg.add(url="https://github.com/GrigorySarnitsky/GBGIsotropicTurbulence.jl")
+Pkg.add(url="https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl")
 ```
 
 Then:
 
 ```julia
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 ```
 
 ## Documentation
 
 Documentation with the full API reference is available at
-[https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/](https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/).
+[https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/](https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/).
 
 ----- docs/src/index.md (around line 82) -----
 With ``\boldsymbol{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` the vorticity,

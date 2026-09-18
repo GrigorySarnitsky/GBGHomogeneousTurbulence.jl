@@ -4,7 +4,7 @@
 # write_scheme); nothing derivable is stored, so the reads below also exercise the re-deposit and
 # the fill-aware history restore.
 using Test, Random, HDF5
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_positions, point_values,
                          field_data, npoints
 
@@ -42,7 +42,7 @@ end
 @testset "write_state / read_state are bitwise, and refuse a mismatched domain" begin
   path = tempname() * ".h5"
   domain = make_domain()
-  state = GBGIsotropicTurbulence.State.ResolvedFields(domain; scalar = true)
+  state = GBGHomogeneousTurbulence.State.ResolvedFields(domain; scalar = true)
   rng = MersenneTwister(3)
   copyto!(field_data(state.velocity_spectral),
           randn(rng, ComplexF64, size(field_data(state.velocity_spectral))))
@@ -83,7 +83,7 @@ end
   path = tempname() * ".h5"
   domain = make_domain()
   built = (NoForcing(),
-           GBGIsotropicTurbulence.Forcing.Linear(domain; rate = 0.3, lowest_shell = 2,
+           GBGHomogeneousTurbulence.Forcing.Linear(domain; rate = 0.3, lowest_shell = 2,
                                                  highest_shell = 3),
            ConstantPower(domain; injection_rate = 0.1),
            VarianceRescaling(domain; target = 0.5, over = :band),

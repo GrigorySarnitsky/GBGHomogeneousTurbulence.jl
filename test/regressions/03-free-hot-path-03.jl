@@ -16,9 +16,9 @@
 
 using Test, Random
 using GBGPeriodicFields: point_positions, npoints
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Particles: Heun, advect!
-using GBGIsotropicTurbulence.Propagator: allocate_buffers
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Particles: Heun, advect!
+using GBGHomogeneousTurbulence.Propagator: allocate_buffers
 using GBGPeriodicFields: field_data, PointSet
 using GBGPeriodicFields.Interpolation: CatmullRom
 

@@ -104,9 +104,9 @@ through the cache's deposited observables (`velocity_physical(sim.cache)`); summ
 # Setting the Reynolds number
 
 By default the run is **forced and stationary** — a
-[`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) drives the whole-field
+[`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) drives the whole-field
 kinetic energy to the value given by the
-[`kinetic_energy`](@ref GBGIsotropicTurbulence.Observables.kinetic_energy) keyword and holds it
+[`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy) keyword and holds it
 there — and the viscosity is chosen from the grid rather than supplied:
 
   * **Derived viscosity** (no `viscosity` passed explicitly): the constructor picks the highest
@@ -127,13 +127,13 @@ there — and the viscosity is chosen from the grid rather than supplied:
 
     !!! note "The criterion measures the resolved band, strategy by strategy"
         ``\\kappa_{\\max}`` here is each strategy's **resolved** cutoff — for
-        [`HouLi`](@ref GBGIsotropicTurbulence.SimulationDomain.HouLi) that is
+        [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) that is
         ``\\tfrac{4}{5}\\kappa_{\\mathrm{Ny}}``, where its per-step damping overtakes viscosity,
         not the Nyquist its energetic band reaches — so equal `κ_max_η` means equally trusted
         dynamics across strategies. Strategies still reach different Reynolds numbers on the same
         grid, but for the honest reason that their resolved bands differ: with
         ``\\nu \\propto f^{-4/3}``, `HouLi` gives ``\\mathrm{Re}_\\lambda`` about 13% and
-        [`PhaseShift`](@ref GBGIsotropicTurbulence.SimulationDomain.PhaseShift) about 26% above the
+        [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) about 26% above the
         ``2/3`` rule.
 
     The grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; `kinetic_energy` and
@@ -189,7 +189,7 @@ The run group:
   ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
   scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
   ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
-  grid, with [`scalar_dissipation`](@ref GBGIsotropicTurbulence.Observables.scalar_dissipation) then measuring a truncated field. The package targets
+  grid, with [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation) then measuring a truncated field. The package targets
   ``\\mathrm{Sc} = O(1)``, with no Batchelor-range machinery. The constructor **warns** when the
   run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — in **either**
   viscosity mode, since the check reads the resolved ``\\nu`` however it was obtained — a warning,
@@ -198,7 +198,7 @@ The run group:
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
-  [`DeferredForcing`](@ref GBGIsotropicTurbulence.Forcing.DeferredForcing) from an
+  [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` left at `nothing` means the default — a
   `VarianceController` driving the whole-field kinetic energy to the `kinetic_energy` value — and
   `scalar_forcing` defaults to `NoForcing()`. The velocity and scalar are forced independently.
@@ -216,7 +216,7 @@ The run group:
   the mask holds empty; the seeders warn when the envelope's peak reaches the cutoff (a
   model-spectrum seed is shaped by its model instead and is not guarded).
 - `initial_spectrum = nothing` — draw the initial velocity from a
-  [`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) `EnergySpectrum` (say
+  [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) `EnergySpectrum` (say
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
   state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in, not a
   measurement of the field about to be seeded. The assumed state reads: ``\\varepsilon`` from the
@@ -229,9 +229,9 @@ The run group:
   The seeded field is then normalized to `kinetic_energy`, so the model fixes the *shape* and the
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
-  [`random_scalar_spectral!`](@ref GBGIsotropicTurbulence.State.random_scalar_spectral!) on the
+  [`random_scalar_spectral!`](@ref GBGHomogeneousTurbulence.State.random_scalar_spectral!) on the
   built run and announcing the change with
-  [`fields_modified!`](@ref GBGIsotropicTurbulence.Cache.fields_modified!).
+  [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!).
 - `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme (its docstring catalogues the alternatives) and its
   advective-CFL ceiling (adapts to `dealiasing`).
@@ -251,26 +251,26 @@ The run group:
   of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions
   (`nothing` means the default `CatmullRom`), and whether to also track the winding-preserving
   unwrapped positions (read with
-  [`unwrapped_positions`](@ref GBGIsotropicTurbulence.Particles.unwrapped_positions) — what a
+  [`unwrapped_positions`](@ref GBGHomogeneousTurbulence.Particles.unwrapped_positions) — what a
   mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
   A particle-only setting given on a particle-free run is refused rather than silently discarded.
 - `particle_integration_scheme = nothing` — the scheme that advances the trajectories in time, an
-  [`AbstractParticleIntegrator`](@ref GBGIsotropicTurbulence.Particles.AbstractParticleIntegrator)
-  (`nothing` means the default [`Heun`](@ref GBGIsotropicTurbulence.Particles.Heun));
+  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator)
+  (`nothing` means the default [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun));
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
-  [`AdamsBashforth`](@ref GBGIsotropicTurbulence.Particles.AdamsBashforth)`()` when trajectory
+  [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)`()` when trajectory
   accuracy in time limits a measurement: it costs one stored array per extra order and saves an
   interpolation per step.
 - `ordered_interpolation = nothing` — whether the gathers at the tracers (the velocity for the
   advance and the Lagrangian sample, and any field the caller samples) visit them in the
   memory-locality order of a
-  [`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal). The order
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal). The order
   changes no value — a run with and without it is bitwise identical — only the time the gathers
   take. The default `nothing` means `true` whenever the run carries tracers: the order is built at seeding and
   rebuilt from the start-of-step positions every iteration, a cost small against the gather it
   accelerates. `:manual` builds it and leaves every rebuild to the caller, through
-  [`rebuild_traversal!`](@ref GBGIsotropicTurbulence.Particles.rebuild_traversal!) in the `run!`
+  [`rebuild_traversal!`](@ref GBGHomogeneousTurbulence.Particles.rebuild_traversal!) in the `run!`
   callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `false`
   holds no order and gathers in tracer order. The order and its rebuild scratch hold three
   integer or Boolean vectors of the tracer count and two of the tile count — small beside the
@@ -285,7 +285,7 @@ The run group:
     - it must live on the domain's grid and storage backend, and agree with `scalar`;
     - `initial_spectrum` cannot be given with it, since the field is no longer being seeded;
     - a forcing state it carries in its `modeled` entry — as a checkpoint of a
-      [`StochasticOU`](@ref GBGIsotropicTurbulence.Forcing.StochasticOU) run does — continues where it
+      [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) run does — continues where it
       left off, while a forcing whose entry is empty starts a fresh one. An entry that does not fit
       the forcing given is refused with an `ArgumentError`;
     - with a derived ``\\nu``, the constructor measures the adopted state's kinetic energy and warns
@@ -323,7 +323,7 @@ and the tracer positions.
     scale of ``\\mathrm{Re}_\\lambda``. It does not *impose* the value step by step as a rescale
     does, so the fluctuation it leaves is genuine — but it is a controlled variable's fluctuation,
     with the gain setting its amplitude. For the free fluctuation of ``k``, force with fixed
-    injection ([`ConstantPower`](@ref GBGIsotropicTurbulence.Forcing.ConstantPower)) instead.
+    injection ([`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)) instead.
 
 # Fields
 Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the machinery the step runs
@@ -726,7 +726,7 @@ end
     flow_parameters(sim)
 
 The measured flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
-[`Phenomenology`](@ref GBGIsotropicTurbulence.Phenomenology) reference law be evaluated at the run's
+[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) reference law be evaluated at the run's
 measured state. The viscosity ``\\nu`` and the
 Schmidt number are read from the generator's conditions; the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), the longitudinal integral scale ``L_{11}``, and —
@@ -877,10 +877,10 @@ The arguments are:
   smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
   time (the same diffusive-decay bound the `Simulation` docstring states), and `max_dt`.
 
-Closes the iteration with [`deposit!`](@ref GBGIsotropicTurbulence.Propagator.deposit!), so the cache
+Closes the iteration with [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so the cache
 is readable when it returns. Advects the tracers, if any, under the run's chosen particle
 integration scheme — first rebuilding the run's
-[`ParticleTraversal`](@ref GBGIsotropicTurbulence.Particles.ParticleTraversal) from the
+[`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) from the
 start-of-step positions when the run was built with `ordered_interpolation = true` (the default
 with tracers) — and updates the clock.
 
@@ -1275,7 +1275,7 @@ flatness would certify the forcing, not the flow.
   run whose measurement depends on the small scales should set it. The cost is why it is not the
   default — the skewness is the only observation here that transforms a rank-2 field, nine
   component transforms and a per-call tensor allocation larger than the resident working set (see
-  [`derivative_skewness`](@ref GBGIsotropicTurbulence.Observables.derivative_skewness)). When it
+  [`derivative_skewness`](@ref GBGHomogeneousTurbulence.Observables.derivative_skewness)). When it
   is on, the skewness is measured on the criterion's own sampling interval — one
   sample per `window_turnovers / 40` of turnover time, giving about forty samples across the
   trailing window — rather than every iteration.
@@ -1406,7 +1406,7 @@ warmup!(sim::Simulation; dt = nothing, kwargs...) =
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # HDF5 persistence. The bare generics live here so the docstrings and the docs build work without
-# HDF5 in the environment; the methods live in the `GBGIsotropicTurbulenceHDF5Ext` weak-dependency
+# HDF5 in the environment; the methods live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency
 # extension, loaded automatically alongside the HDF5 package (the arrangement the field library's
 # persistence pairs established).
 

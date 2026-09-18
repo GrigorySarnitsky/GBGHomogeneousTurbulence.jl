@@ -6,7 +6,7 @@
 # must refuse a positions array whose second dimension is not 3. Neither guard was reached by any
 # call in the suite before this file existed.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions, npoints
 using GBGPeriodicFields: CatmullRom, PointSet
 using Test

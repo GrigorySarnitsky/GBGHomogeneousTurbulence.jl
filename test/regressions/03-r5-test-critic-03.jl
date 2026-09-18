@@ -16,8 +16,8 @@
 # satisfied and the read would be served instead of throwing.
 
 using Test, Random
-using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!
+using GBGHomogeneousTurbulence
+using GBGHomogeneousTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!
 
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,

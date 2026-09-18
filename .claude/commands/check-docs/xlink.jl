@@ -1,5 +1,5 @@
-using GBGIsotropicTurbulence
-const IT = GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
+const IT = GBGHomogeneousTurbulence
 const MODS = [:SimulationDomain, :State, :Observables, :Cache, :Forcing,
               :Generator, :Propagator, :Particles, :SimulationRun]
 
@@ -61,7 +61,7 @@ function sites(apply::Bool)
       sort!(edits; by = first, rev = true)                   # back-to-front keeps offsets valid
       for (s0, s1, p, ow) in edits
         src = src[1:prevind(src, s0)] *
-              "[`" * p * "`](@ref GBGIsotropicTurbulence." * String(ow) * "." * p * ")" *
+              "[`" * p * "`](@ref GBGHomogeneousTurbulence." * String(ow) * "." * p * ")" *
               src[nextind(src, s1):end]
       end
       write(f, src)

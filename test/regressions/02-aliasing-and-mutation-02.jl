@@ -3,12 +3,12 @@
 # ran since the last scalar consumption", never WHICH û it ran with, so a caller that pairs the two
 # verbs at different stage states silently gets the earlier stage's displaced velocity.
 
-using GBGIsotropicTurbulence
+using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data, to_physical!
 using Random
 using Test
 
-const SD = GBGIsotropicTurbulence.SimulationDomain
+const SD = GBGHomogeneousTurbulence.SimulationDomain
 
 @testset "scalar_rhs! uses the displaced velocity of the û it was given, not the û velocity_rhs! last saw" begin
   L, N = 2π, 12

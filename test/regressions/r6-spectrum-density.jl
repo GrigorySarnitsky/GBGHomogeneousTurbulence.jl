@@ -3,7 +3,7 @@
 # which is how the bin-sum convention survived: every test ran where the factor is invisible. This
 # witness therefore pins the normalization on a NON-default box, where the conventions differ by
 # Δκ = 2π/L = 2 — the old code fails the first assertion at exactly that factor.
-using Test, GBGIsotropicTurbulence, Random
+using Test, GBGHomogeneousTurbulence, Random
 
 
 @testset "energy_spectrum is a density: Parseval quadrature holds off the default box" begin

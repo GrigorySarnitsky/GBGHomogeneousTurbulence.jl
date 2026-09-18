@@ -9,7 +9,7 @@
 # (the particle `deposit!`) must make the next `advance!` succeed. Delete
 # the guard line and part (1) fails; check the wrong epoch there and part (1) fails too.
 
-using Test, Random, GBGIsotropicTurbulence
+using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 
 build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
