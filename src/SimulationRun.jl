@@ -53,7 +53,8 @@ using ..Cache: ObservablesCache, check_deposits,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
-using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController
+using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController, StochasticOUState,
+                 initial_forcing_state
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -280,7 +281,10 @@ The run group:
 - `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in
   place of the random seed: its arrays become the run's own (no copy), which is how a run
   continues from a stored or externally imported field. The state must live on the domain's grid
-  and storage backend and agree with `scalar`; `initial_spectrum` cannot be given with it. When
+  and storage backend and agree with `scalar`; `initial_spectrum` cannot be given with it. A forcing
+  state it carries (the `modeled` entry, as a checkpoint of a `StochasticOU` run does) continues,
+  and an `ArgumentError` refuses one that does not fit the forcing given; a forcing with no carried
+  state starts afresh. When
   ``\\nu`` is derived, the constructor measures the adopted state's kinetic energy and warns if it
   is not the `kinetic_energy` the calibration assumed.
 - `tracers = nothing` — an existing `Tracers` set to adopt in place of seeding
@@ -603,6 +607,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy, envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
     scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
   end
+  state = _with_forcing_states(state, conditions, domain)
 
   # `nothing` sentinels, like `velocity_forcing`'s: a particle-only setting configured on a
   # particle-free run would be silently discarded, which is the quiet-wrong-configuration shape
@@ -646,6 +651,40 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                     tracers, tracers === nothing ? nothing : pscheme, particle_buffers, particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
+
+
+# The state record carries each forcing's evolving state (decision 23(c)). A fresh record is given one
+# started by its forcing; an adopted record keeps the one it carries when that state fits the forcing
+# — the continuation a checkpoint exists for — and is refused by name when it does not, since a
+# process silently restarted or silently misapplied is a different run. The fields are never copied.
+function _with_forcing_states(state::ResolvedFields, conditions::FlowConditions, domain::FixedDomain)
+  velocity = _forcing_state(conditions.velocity_forcing, state.modeled.velocity_forcing,
+                            state.velocity_spectral, domain, "velocity_forcing")
+  scalar = state.scalar_spectral === nothing ? state.modeled.scalar_forcing :
+           _forcing_state(conditions.scalar_forcing, state.modeled.scalar_forcing,
+                          state.scalar_spectral, domain, "scalar_forcing")
+  modeled = (velocity_forcing = velocity, scalar_forcing = scalar)
+  modeled.velocity_forcing === state.modeled.velocity_forcing &&
+    modeled.scalar_forcing === state.modeled.scalar_forcing && return state
+  return ResolvedFields(state.velocity_spectral, state.scalar_spectral, modeled)
+end
+
+function _forcing_state(forcing, carried, field, domain, name)
+  started = initial_forcing_state(forcing, field, domain)
+  carried === nothing && return started
+  _fits(started, carried) && return carried
+  throw(ArgumentError("the adopted state carries a $(nameof(typeof(carried))) for `$name`, which " *
+                      "does not fit the $(nameof(typeof(forcing))) given: " *
+                      (started === nothing ? "that strategy evolves no state. " :
+                       "it belongs to a different forcing, band, or precision. ") *
+                      "Adopt `ResolvedFields(state.velocity_spectral, state.scalar_spectral)` to " *
+                      "start the forcing afresh."))
+end
+
+_fits(started, carried) = typeof(started) === typeof(carried)
+_fits(started::StochasticOUState, carried::StochasticOUState) =
+  typeof(started) === typeof(carried) &&
+  field_grid(started.process).grid_size == field_grid(carried.process).grid_size
 
 
 # The order the gathers take: the traversal's, or none. Keeping the `nothing` case here lets every
@@ -1379,9 +1418,8 @@ self-describing HDF5 group — the domain's parameters, the state in spectral re
 tracer set, both forcing strategies, the Lagrangian sample history a multistep particle
 integration scheme integrates over, the scheme and timestep settings, and the clock. Nothing
 derivable is stored: the physical-representation observables, the current velocity sample, and
-every per-step buffer and transform plan are recomputed on read. A stochastic forcing — none currently ships;
-the one implementation is archived — has its evolving state deliberately not stored (its
-parameters are), so continuation is exact for deterministic forcings.
+every per-step buffer and transform plan are recomputed on read. A stochastic forcing's evolving
+state is part of the state record and is stored with it, so continuation is exact for every forcing.
 
 Available once the `HDF5` package is loaded; opening and closing the file is the caller's job,
 and `parent[name] = sim` is equivalent sugar.
@@ -1405,8 +1443,7 @@ through its own constructor from the recorded parameters, overwrite the freshly 
 positions with the stored ones, re-deposit every observable the schedule carries, restore the
 Lagrangian sample history fill-aware (a scheme of a different order keeps what fits and
 bootstraps the rest), and set the clock — the next [`advance!`](@ref) continues the checkpointed
-run. The one deliberate divergence is a stochastic forcing (none currently ships — the one
-implementation is archived), which resumes on a fresh stream. A
+run, a stochastic forcing's realization included. A
 group not written by `write_simulation`, or written by a newer schema version, is refused with an
 `ArgumentError`. Available once the `HDF5` package is loaded.
 

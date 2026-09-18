@@ -10,7 +10,8 @@ module GBGIsotropicTurbulenceHDF5Ext
 
 using HDF5
 using GBGPeriodicFields: write_field, read_field, write_points, read_points, write_scheme,
-                         read_scheme, field_data, point_positions, point_values, npoints,
+                         read_scheme, field_data, field_grid, field_tensor_order,
+                         point_positions, point_values, npoints,
                          PointSet
 using GBGIsotropicTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
                                                _real_type
@@ -21,14 +22,14 @@ using GBGIsotropicTurbulence.Particles: Tracers, Heun, AdamsBashforth, history_d
 import GBGIsotropicTurbulence.Particles: write_tracers, read_tracers
 using GBGIsotropicTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForcing, Linear,
                                       ConstantPower, VarianceRescaling, VarianceController,
-                                      StochasticOU
+                                      StochasticOU, StochasticOUState
 import GBGIsotropicTurbulence.Forcing: write_forcing, read_forcing
 using GBGIsotropicTurbulence.Cache: fields_modified!, particles_modified!
 using GBGIsotropicTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
 using GBGIsotropicTurbulence.SimulationRun: Simulation
 import GBGIsotropicTurbulence.SimulationRun: write_simulation, read_simulation
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
@@ -141,7 +142,36 @@ end
 
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
-# The state: the spectral fields, the single source of truth; nothing physical is stored.
+# The state: the spectral fields, the single source of truth, and each forcing's evolving state;
+# nothing physical is stored.
+
+const FORCING_STATE_GROUPS = ((:velocity_forcing, "modeled_velocity_forcing"),
+                              (:scalar_forcing, "modeled_scalar_forcing"))
+
+# A forcing state is stored whole, which is what makes a stochastic run continue exactly (decision
+# 90): a `StochasticOU` state is its process — a field on the forcing's companion grid, written through
+# the field library's own field persistence — and its draw count, which with the forcing's stored seed
+# fixes every later draw. The amplitudes are physical, so nothing stored depends on either grid's size.
+_write_forcing_state(g, key, ::Nothing) = nothing
+
+function _write_forcing_state(g, key, state::StochasticOUState)
+  sg = create_group(g, key)
+  a = attrs(sg)
+  a["type"] = "GBGIsotropicTurbulence.StochasticOUState"
+  a["version"] = SCHEMA_VERSION
+  a["draws"] = state.draws
+  write_field(sg, "process", state.process)
+  return sg
+end
+
+# Absent from a file written before forcing states were stored (schema 1): `nothing`, which a run
+# reads as "start the forcing afresh" — exactly what such a file restored to.
+function _read_forcing_state(g, key, who)
+  haskey(g, key) || return nothing
+  sg = g[key]
+  a = _require_tag(sg, key, who, "GBGIsotropicTurbulence.StochasticOUState")
+  return StochasticOUState(read_field(sg, "process"), Int(a["draws"]))
+end
 
 function write_state(parent::HDF5.H5DataStore, name::AbstractString, state::ResolvedFields)
   g = create_group(parent, name)
@@ -151,6 +181,9 @@ function write_state(parent::HDF5.H5DataStore, name::AbstractString, state::Reso
   a["scalar"] = state.scalar_spectral !== nothing
   write_field(g, "velocity_spectral", state.velocity_spectral)
   state.scalar_spectral === nothing || write_field(g, "scalar_spectral", state.scalar_spectral)
+  for (entry, key) in FORCING_STATE_GROUPS
+    _write_forcing_state(g, key, getfield(state.modeled, entry))
+  end
   return g
 end
 
@@ -158,10 +191,12 @@ function read_state(parent::HDF5.H5DataStore, name::AbstractString, domain::Fixe
   g = _require_group(parent, name, "read_state")
   a = _require_tag(g, name, "read_state", "GBGIsotropicTurbulence.ResolvedFields")
   scalar = Bool(a["scalar"])
-  state = ResolvedFields(domain; scalar)
-  _load_field!(state.velocity_spectral, g, "velocity_spectral", "read_state")
-  scalar && _load_field!(state.scalar_spectral, g, "scalar_spectral", "read_state")
-  return state
+  fields = ResolvedFields(domain; scalar)
+  _load_field!(fields.velocity_spectral, g, "velocity_spectral", "read_state")
+  scalar && _load_field!(fields.scalar_spectral, g, "scalar_spectral", "read_state")
+  modeled = NamedTuple{(:velocity_forcing, :scalar_forcing)}(
+    Tuple(_read_forcing_state(g, key, "read_state") for (_, key) in FORCING_STATE_GROUPS))
+  return ResolvedFields(fields.velocity_spectral, fields.scalar_spectral, modeled)
 end
 
 
@@ -195,8 +230,7 @@ end
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The forcings: a strategy IS its parameters (the shell bounds included, stored on the struct for
 # exactly this reason); the band kernel or indicator is rebuilt by the ordinary constructor. The
-# stochastic forcing stores parameters only — its evolving force and random stream are ruled
-# non-persistent, so a reloaded run resumes on a fresh stream.
+# stochastic forcing's process is state, not a parameter: it is stored with the state record.
 
 function _forcing_group(parent, name, tag)
   g = create_group(parent, name)
@@ -249,8 +283,9 @@ function write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::
   g, a = _forcing_group(parent, name, "StochasticOU")
   a["variance"] = forcing.variance
   a["correlation_time"] = forcing.correlation_time
-  # The seed is a defining parameter (it fixes the stream, so a forced run is reproducible); the
-  # stream's evolving POSITION is deliberately not stored — that is the documented divergence.
+  # The seed is a defining parameter (it fixes the stream, so a forced run is reproducible). The
+  # process's evolving amplitudes and its position in the stream are state, not parameters: they
+  # live in the state record and are stored with it (`write_state`).
   a["seed"] = forcing.seed
   a["lowest_shell"] = forcing.lowest_shell
   a["highest_shell"] = forcing.highest_shell
@@ -398,6 +433,20 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
   _require_tag(sg, "state", "read_simulation", "GBGIsotropicTurbulence.ResolvedFields")
   _load_field!(sim.state.velocity_spectral, sg, "velocity_spectral", "read_simulation")
   scalar && _load_field!(sim.state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
+  # The forcing states continue where they were written. The constructor started fresh ones on the
+  # stored forcings; each is overwritten in place, so the run's record keeps its own objects.
+  for (entry, key) in FORCING_STATE_GROUPS
+    stored = _read_forcing_state(sg, key, "read_simulation")
+    stored === nothing && continue            # a schema-1 file: the fresh start stands, as it did then
+    current = getfield(sim.state.modeled, entry)
+    (current isa StochasticOUState &&
+     field_grid(current.process).grid_size == field_grid(stored.process).grid_size &&
+     field_tensor_order(current.process) == field_tensor_order(stored.process)) ||
+      throw(ArgumentError("read_simulation: group \"$name\" stores a forcing state for " *
+                          "`$entry` that does not fit its stored forcing"))
+    copyto!(field_data(current.process), field_data(stored.process))
+    current.draws = stored.draws
+  end
   fields_modified!(sim)
   if has_tracers
     copyto!(point_positions(sim.tracers.positions), point_positions(positions_host))

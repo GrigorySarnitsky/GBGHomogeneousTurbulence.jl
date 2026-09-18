@@ -72,9 +72,10 @@ All keyword, all required:
 - `velocity_forcing`, `scalar_forcing` — the forcing strategies for the velocity and the scalar, each
   an `AbstractForcing` (pass `NoForcing()` to leave a field undriven).
 
-!!! warning "A stateful forcing cannot drive both fields"
-    Its per-step state belongs to one field, so passing the same *mutable* strategy instance as both
-    `velocity_forcing` and `scalar_forcing` throws an `ArgumentError` naming it. Build two.
+!!! warning "A strategy with mutable bookkeeping cannot drive both fields"
+    Its bookkeeping belongs to one field, so passing the same *mutable* strategy instance as both
+    `velocity_forcing` and `scalar_forcing` throws an `ArgumentError` naming it. Build two. The
+    package's own strategies carry nothing between calls and may be shared.
 
 !!! warning "A defaulted controller settling time never drives the scalar"
     A [`VarianceController`](@ref GBGIsotropicTurbulence.Forcing.VarianceController) whose
@@ -248,22 +249,22 @@ function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
   return nothing
 end
 
-# Does this forcing define an `add_forcing_source!` that the run cannot call — one written to the
-# three-argument form the hook carried before the stage field and the diffusivity were added? The
-# arity is the whole question, so the method table is enumerated exactly as the rate probe does it,
-# and for the same reason: `which` resolves a call, not a definition.
-function _defines_stale_source_hook(forcing)
+# Does this forcing define a hook the run cannot call — one written to an earlier, shorter form of it?
+# `add_forcing_source!` gained the stage field and the diffusivity, `prepare_forcing!` the forcing's
+# evolving state. The arity is the whole question, so the method table is enumerated exactly as the
+# rate probe does it, and for the same reason: `which` resolves a call, not a definition.
+function _defines_stale_hook(hook, forcing, arguments::Int)
   overrides = false
   callable = false
-  for m in methods(add_forcing_source!, Tuple{typeof(forcing), Vararg{Any}})
+  for m in methods(hook, Tuple{typeof(forcing), Vararg{Any}})
     signature = Base.unwrap_unionall(m.sig)
     length(signature.parameters) >= 2 || continue
     accepted = signature.parameters[2]
     accepted isa TypeVar && (accepted = accepted.ub)
     accepted === AbstractForcing && continue        # the do-nothing fallback itself
     overrides = true
-    # the function type plus five arguments, or a vararg that can absorb them
-    (m.isva || length(signature.parameters) >= 6) && (callable = true)
+    # the function type plus the hook's arguments, or a vararg that can absorb them
+    (m.isva || length(signature.parameters) >= arguments + 1) && (callable = true)
   end
   # The question is whether a callable method EXISTS, not whether every method is one. Julia
   # auto-generates a short stub for an optional trailing argument, and a strategy may keep an old
@@ -374,6 +375,12 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   # the very field the shift was taken of — a flag says "fresh" just as readily about a different
   # stage's velocity, and the mismatch is silent.
   displaced_velocity_source::Any
+  # Each forcing's evolving state for the step `prepare!` opened, taken from the state record so the
+  # per-stage source hook can read it: the right-hand-side verbs are handed a stage FIELD, not the
+  # record it came from. Refreshed every step beside the scratch above, and `nothing` for a strategy
+  # that evolves nothing.
+  velocity_forcing_state::Any
+  scalar_forcing_state::Any
 end
 
 function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scalar::Bool = false)
@@ -387,17 +394,26 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                         "right-hand side, so the forcing could never be applied. Pass " *
                         "`scalar = true`, or leave `scalar_forcing` at `NoForcing()`."))
   # The source hook gained the stage field and the diffusivity when state-dependent forcings moved
-  # onto it. A strategy still written to the old three-argument form defines a method the run never
-  # calls — dispatch simply falls through to the do-nothing default — so the forcing goes silently
+  # onto it, and the prepare hook the forcing's evolving state when that state moved into the run's
+  # state record. A strategy still written to an old form defines a method the run never calls —
+  # dispatch simply falls through to the do-nothing default — so the forcing goes silently
   # unapplied, exactly the failure the rate guard above exists to prevent. Refuse at construction.
   for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)
-    _defines_stale_source_hook(forcing) &&
-      throw(ArgumentError("$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than " *
+    _defines_stale_hook(prepare_forcing!, forcing, 5) &&
+      throw(ArgumentError("$(nameof(typeof(forcing))) defines prepare_forcing! with fewer than " *
                           "five arguments. The hook is now " *
-                          "`add_forcing_source!(forcing, N̂, field, domain, diffusivity)` — it is " *
-                          "called at every Runge-Kutta stage and is handed that stage's own field " *
-                          "and the diffusivity acting on it. A method written to the old form is " *
-                          "never called, so the forcing would be silently ignored."))
+                          "`prepare_forcing!(forcing, forcing_state, field, domain, dt)` — it is " *
+                          "handed the forcing's evolving state, which the run's state record keeps " *
+                          "(see `initial_forcing_state`). A method written to the old form is never " *
+                          "called, so the forcing would be silently ignored."))
+    _defines_stale_hook(add_forcing_source!, forcing, 6) &&
+      throw(ArgumentError("$(nameof(typeof(forcing))) defines add_forcing_source! with fewer than " *
+                          "six arguments. The hook is now " *
+                          "`add_forcing_source!(forcing, forcing_state, N̂, field, domain, diffusivity)` " *
+                          "— it is called at every Runge-Kutta stage and is handed the forcing's " *
+                          "evolving state, that stage's own field, and the diffusivity acting on it. " *
+                          "A method written to an old form is never called, so the forcing would be " *
+                          "silently ignored."))
   end
   return ResolvedGenerator(conditions,
                     new_vector_field_spectral(domain),
@@ -405,15 +421,15 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
                     _forcing_rate(domain, conditions.velocity_forcing),
                     scalar ? _forcing_rate(domain, conditions.scalar_forcing,
                                            new_scalar_field_spectral) : nothing,
-                    nothing)
+                    nothing, nothing, nothing)
 end
 
 
 """
     prepare!(generator, state, domain, dt)
 
-Open a step of the generator: advance each forcing's internal state once (its per-step
-[`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
+Open a step of the generator: advance each forcing's evolving state, kept in the state record, once
+(its per-step [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) hook) and arm the
 per-mode linear forcing rates — fill them, so the factor verbs return them instead of `nothing`
 (its [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) hook, written
 into the generator's rate arrays). A scheme calls this once before its Runge–Kutta stages; the
@@ -422,7 +438,7 @@ stage evaluations and the integrating factors then consume what it prepared.
 The arguments are:
 - `generator` — the [`ResolvedGenerator`](@ref) being opened.
 - `state` — the start-of-step [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields)
-  the forcing hooks read.
+  the forcing hooks read, whose forcing states they advance.
 - `domain` — the [`FixedDomain`](@ref) the rates are formed on.
 - `dt` — the timestep the forcings prepare for.
 
@@ -430,12 +446,14 @@ Returns `generator`.
 """
 function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::Real)
   generator.displaced_velocity_source = nothing     # a new step opens with the displaced scratch stale
+  generator.velocity_forcing_state = state.modeled.velocity_forcing
+  generator.scalar_forcing_state = state.modeled.scalar_forcing
   conditions = generator.conditions
-  prepare_forcing!(conditions.velocity_forcing, state.velocity_spectral, domain, dt)
+  prepare_forcing!(conditions.velocity_forcing, state.modeled.velocity_forcing, state.velocity_spectral, domain, dt)
   generator.velocity_rate === nothing ||
     set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity_spectral, domain)
   if state.scalar_spectral !== nothing
-    prepare_forcing!(conditions.scalar_forcing, state.scalar_spectral, domain, dt)
+    prepare_forcing!(conditions.scalar_forcing, state.modeled.scalar_forcing, state.scalar_spectral, domain, dt)
     generator.scalar_rate === nothing ||
       set_forcing_rate!(conditions.scalar_forcing, generator.scalar_rate, state.scalar_spectral, domain)
   end
@@ -552,8 +570,8 @@ Returns `N̂`.
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
    _zero_mean_mode!(N̂);
-   add_forcing_source!(generator.conditions.velocity_forcing, N̂, û, domain,
-                       generator.conditions.viscosity))
+   add_forcing_source!(generator.conditions.velocity_forcing, generator.velocity_forcing_state, N̂, û,
+                       domain, generator.conditions.viscosity))
 
 # Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
 # projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
@@ -719,7 +737,7 @@ scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain:
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain,
                       displaced_velocity_current);
    _zero_mean_mode!(N̂);
-   add_forcing_source!(generator.conditions.scalar_forcing, N̂, φ̂, domain,
+   add_forcing_source!(generator.conditions.scalar_forcing, generator.scalar_forcing_state, N̂, φ̂, domain,
                        scalar_diffusivity(generator.conditions)))
 
 # Mask strategies: one flux evaluation, then the divergence with the low-pass kernel AND the −∇·

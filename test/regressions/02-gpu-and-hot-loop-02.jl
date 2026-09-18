@@ -1,19 +1,18 @@
-# Witness: gpu-and-hot-loop-02 — StochasticOU.prepare_forcing! must not allocate per step.
+# Witness: gpu-and-hot-loop-02 — StochasticOU.prepare_forcing! must not allocate at field scale per step.
 #
-# `prepare_forcing!` is reached once per timestep from `step!` via `Generator.prepare!`
-# (src/Generator.jl:267, called at src/Propagator.jl:268 and :374), i.e. it sits on the hot loop the
-# package declares in-place and allocation-free over preallocated buffers. Every other forcing hook
-# (Linear/ConstantPower `set_forcing_rate!`, VarianceRescaling `project_forcing!`) meets that contract.
-# `StochasticOU` owns preallocated noise scratch (`noise_physical`, `noise_spectral`) yet fills it
-# from a freshly allocated host `randn(ou.rng, T, dims...)` on EVERY call (src/Forcing.jl:505) —
-# a full physical-vector host array per step, and on a device backend an implicit host→device copy.
+# `prepare_forcing!` is reached once per timestep from `step!` via `Generator.prepare!`, i.e. it sits
+# on the hot loop the package declares in-place and allocation-free at field scale. The archived
+# `StochasticOU` drew a full physical-vector host array per step (`randn(ou.rng, T, dims...)`) — on a
+# device backend an implicit host→device copy of it too. The band-sparse form draws a few hundred
+# numbers into host scratch and uploads a band-sized array; what remains is the reseed's small
+# fixed-size allocation, far below one field-scale array, and the bound below is held against that
+# field scale.
 
 using Test
 using Random
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: StochasticOU, prepare_forcing!
 
-@testset "StochasticOU.prepare_forcing! is allocation-free after its first-use scratch is built" begin
+@testset "StochasticOU.prepare_forcing! allocates nothing at field scale" begin
   T = Float64
   N = 16
   unit = sizeof(T) * N^3                       # one field-scale real array
@@ -24,15 +23,15 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU, prepare_forcing!
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(1))
+  state = initial_forcing_state(ou, û, domain)
 
-  # First two calls: compile, and build the lazily-allocated scratch (ou.state / ou.noise_*).
-  prepare_forcing!(ou, û, domain, 0.01)
-  prepare_forcing!(ou, û, domain, 0.01)
+  prepare_forcing!(ou, state, û, domain, 0.01)       # compile
+  prepare_forcing!(ou, state, û, domain, 0.01)
 
-  bytes = @allocated prepare_forcing!(ou, û, domain, 0.01)
+  bytes = @allocated prepare_forcing!(ou, state, û, domain, 0.01)
   @info "prepare_forcing! steady-state allocation" bytes units = bytes / unit
-  # The scratch is already resident; a steady-state call must reuse it. Half a field-scale array is
-  # a wide margin over run-layer bookkeeping and far below the 3 units a physical vector costs.
+  # Half a field-scale array is a wide margin over the reseed's fixed allocation and far below the
+  # 3 units a physical vector costs.
   @test bytes < 0.5 * unit
 
   # …and the same must hold through the run layer, the way memory_audit.jl guards every other cell.

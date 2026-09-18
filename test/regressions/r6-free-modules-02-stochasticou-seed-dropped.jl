@@ -14,7 +14,6 @@ if Base.locate_package(Base.PkgId(Base.UUID("f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2
   Pkg.activate(joinpath(pkgdir(GBGIsotropicTurbulence), ".claude", "bug-hunt", "env"); io = devnull)
 end
 using HDF5
-using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); persistable via write_forcing
 
 
 @testset "read_forcing(StochasticOU) restores neither the written seed nor an independent stream" begin
@@ -33,15 +32,16 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); p
   end
   rm(path)
 
-  # Draw from copies so the assertions do not consume each other's stream state.
-  draw(f) = rand(copy(f.rng), UInt64, 4)
+  # The stream is a function of the seed and the state's draw count, so the first draw a restored
+  # forcing makes is the observable test of what was restored. (Rewritten 2026-09-17 for the shipped
+  # StochasticOU, whose generator is scratch reseeded before every draw.)
+  û = new_vector_field_spectral(domain)
+  draw(f) = copy(GBGIsotropicTurbulence.SimulationRun.field_data(initial_forcing_state(f, û, domain).process))
 
-  # Under EITHER reasonable contract — the seed persisted (streams 7 and 8), or the streams
-  # genuinely fresh (independently seeded) — two restored forcings from differently-seeded runs
-  # must not produce bitwise-identical noise.
+  # Two restored forcings from differently-seeded runs must not produce bitwise-identical noise…
   @test draw(read_a) != draw(read_b)
 
-  # And the restored stream must not be the one fixed constructor-default stream: seed 7 was
-  # configured, so neither "the user's seed" nor "a fresh stream" is MersenneTwister(0).
-  @test draw(read_a) != rand(MersenneTwister(0), UInt64, 4)
+  # …and the configured seed is what was restored, not the constructor default.
+  @test draw(read_a) == draw(a)
+  @test draw(read_a) != draw(StochasticOU(domain; variance = 1.0, correlation_time = 0.5))
 end

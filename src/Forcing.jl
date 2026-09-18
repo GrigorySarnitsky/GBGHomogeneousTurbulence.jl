@@ -26,7 +26,8 @@
 # solenoidal velocity solenoidal (per-mode scaling), so the velocity needs no projection here.
 #
 # The additive stochastic (Ornstein–Uhlenbeck / Eswaran–Pope) forcing — which adds a time-correlated
-# force field to the RHS — is a separate, stateful mechanism (`StochasticOU`), advanced once per step.
+# force field to the RHS — is a separate mechanism (`StochasticOU`): its process is advanced once per
+# step and lives in the run's state record, not in the strategy (decision 23(c)).
 
 """
     Forcing
@@ -36,7 +37,9 @@ and the scalar through tensor-order-generic field operators. A strategy acts on 
 to four hook methods, each defaulting to doing nothing, called in the order listed:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`prepare_forcing!`](@ref) — advance the forcing's own internal state, once per step.
+- [`initial_forcing_state`](@ref) — the evolving state a forcing starts with, kept in the run's state
+  record.
+- [`prepare_forcing!`](@ref) — advance that state, once per step.
 - [`set_forcing_rate!`](@ref) — supply a *steady* linear rate, folded into the integrating factor;
   [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
@@ -48,6 +51,8 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
 - [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
   deterministic rescaling, at first order.
+- [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
+  (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
 - [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, built into the concrete strategy once the
   [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
@@ -61,8 +66,9 @@ required. A default at this layer never hides a choice you needed to make; the r
 convenience default (a controller targeting the initial kinetic energy) is that layer's own,
 documented choice.
 
-A band reaching above the dealias cutoff is inert there — the mask holds those modes empty, and a
-band forcing multiplies the field — so construction warns about it.
+A band reaching above the dealias cutoff is inert there for a forcing that multiplies the field — the
+mask holds those modes empty — so construction warns about it; the additive `StochasticOU` would
+inject there instead, and refuses such a band.
 
 The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) — the `Generator`
@@ -74,12 +80,13 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type,
+using ..SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type,
                           _storage_family_name, _show_shape
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
-       Linear, ConstantPower,
-       set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!, add_forcing_source!
+       Linear, ConstantPower, StochasticOU, StochasticOUState,
+       set_forcing_rate!, uses_steady_linear_rate, project_forcing!, initial_forcing_state,
+       prepare_forcing!, add_forcing_source!
 
 
 # Is there anything in the band to rescale? The test carries NO absolute scale, which is what the
@@ -106,8 +113,8 @@ _band_is_empty(band_value, whole_value) =
     AbstractForcing
 
 Supertype of the energy-injection strategies. A strategy may implement any of
-[`prepare_forcing!`](@ref) (advance the strategy's **own** internal state — a stochastic forcing's
-random process, say — never the simulation state), [`set_forcing_rate!`](@ref)
+[`prepare_forcing!`](@ref) (advance the strategy's evolving state — a stochastic forcing's random
+process, say — which [`initial_forcing_state`](@ref) starts and the run's state record keeps), [`set_forcing_rate!`](@ref)
 (a rate that is **constant in time**, folded into the integrating factor — a strategy implementing it
 **must** also declare [`uses_steady_linear_rate`](@ref), or it is never given a rate array to fill),
 [`add_forcing_source!`](@ref) (an additive per-stage source), and [`project_forcing!`](@ref) (a
@@ -116,8 +123,8 @@ need.
 
 The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
 `set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook
-consumes must be prepared here), `add_forcing_source!` runs at every stage, and `project_forcing!` runs after the completed
-step. The rate and the source are two channels of **one** forcing term — the *steady* part is folded
+consumes must be prepared here), `add_forcing_source!` runs at every stage — reading that state, never advancing it — and
+`project_forcing!` runs after the completed step. The rate and the source are two channels of **one** forcing term — the *steady* part is folded
 exactly into the integrating factor, the remainder is added at the stages — so a single strategy may
 legitimately use both.
 
@@ -133,12 +140,13 @@ Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
 `add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns
 `nothing`.
 
-!!! warning "One instance per forced field, for a strategy that carries state"
-    A strategy holding per-field scratch or a random stream must not drive both fields from one
-    instance, or their bookkeeping is conflated;
+!!! warning "One instance per forced field, for a strategy with mutable bookkeeping"
+    A strategy that mutates its own fields as it runs must not drive both fields from one instance,
+    or their bookkeeping is conflated;
     [`FlowConditions`](@ref GBGIsotropicTurbulence.Generator.FlowConditions) throws an
-    `ArgumentError` rather than let that happen. A stateless strategy — one whose whole content is
-    its band and its target — has nothing to conflate and may be shared.
+    `ArgumentError` rather than let that happen. Every strategy here may be shared: none carries
+    anything from one call to the next, since what a strategy evolves lives in the state record, one
+    entry per field, and its scratch is overwritten before each use.
 """
 abstract type AbstractForcing end
 
@@ -152,6 +160,7 @@ A deferred forcing. The operator-free keyword constructors
     ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
     VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
+    StochasticOU(; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 0)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is built into the concrete
@@ -242,20 +251,41 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 
 
 """
-    prepare_forcing!(forcing, field, domain, dt) -> nothing
+    initial_forcing_state(forcing, field, domain)
 
-Update the strategy `forcing`'s internal state once per step, before the Runge–Kutta stages, from the
-start-of-step `field` (in spectral representation) and the timestep `dt`, on the [`FixedDomain`](@ref)
-`domain`. A stateful forcing owns whatever scratch this needs. The default does nothing.
+The evolving state the strategy `forcing` starts with when it drives `field` (the velocity or the
+scalar in spectral representation, which sets how many components the state carries) on the
+[`FixedDomain`](@ref) `domain`, or `nothing` for a strategy that evolves no state of its own — the
+default, and the case of every strategy but [`StochasticOU`](@ref).
+
+A run keeps the returned value in its state record, as the `modeled` entry of
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for that field, and hands it to
+[`prepare_forcing!`](@ref) every step; the strategy itself holds only its parameters and scratch. That
+is what lets a checkpoint of the state record resume a forced run exactly.
 """
-prepare_forcing!(::AbstractForcing, field, domain::FixedDomain, dt::Real) = nothing
+initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 
 
 """
-    add_forcing_source!(forcing, N̂, field, domain, diffusivity) -> N̂
+    prepare_forcing!(forcing, forcing_state, field, domain, dt) -> nothing
+
+Advance the strategy `forcing`'s evolving state `forcing_state` (the value its
+[`initial_forcing_state`](@ref) started, kept in the run's state record, or `nothing`) once per step,
+before the Runge–Kutta stages, given the start-of-step `field` in spectral representation, the timestep
+`dt`, and the [`FixedDomain`](@ref) `domain`. Whatever a later hook reads from the step's state —
+[`add_forcing_source!`](@ref) takes no state argument — is prepared into the strategy's own scratch
+here. The default does nothing.
+"""
+prepare_forcing!(::AbstractForcing, forcing_state, field, domain::FixedDomain, dt::Real) = nothing
+
+
+"""
+    add_forcing_source!(forcing, forcing_state, N̂, field, domain, diffusivity) -> N̂
 
 Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂`, on the
-[`FixedDomain`](@ref) `domain`. The default does nothing.
+[`FixedDomain`](@ref) `domain`, reading whatever it needs of its evolving state `forcing_state` — the
+value [`initial_forcing_state`](@ref) started and [`prepare_forcing!`](@ref) advanced this step, or
+`nothing` for a strategy that evolves none. The default does nothing.
 
 This is the route a **state-dependent** forcing must take. It is called at every Runge–Kutta stage
 and is handed that stage's own `field` — the velocity ``\\hat{\\boldsymbol{u}}`` or the scalar
@@ -277,14 +307,15 @@ multi-weight reduction answers [`VarianceController`](@ref)'s three weighted sum
     Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
     implementation must **add** its contribution and must not overwrite the buffer.
 """
-add_forcing_source!(::AbstractForcing, N̂, field, domain::FixedDomain, diffusivity::Real) = N̂
+add_forcing_source!(::AbstractForcing, forcing_state, N̂, field, domain::FixedDomain,
+                    diffusivity::Real) = N̂
 
 
 # An annular shell band-pass kernel for shells `lowest ≤ |k| ≤ highest` (integer shells of 2π/L).
 # The shell arguments are validated HERE, once for all four band forcings, so the thrown message
 # names the argument the caller typed — the backend's own guard fires on the padded band edges
 # ("band edges must satisfy 0 <= low", with our −0.5 padding visible), which reads as internals.
-function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
+function _check_shells(lowest::Integer, highest::Integer)
   lowest >= 1 ||
     throw(ArgumentError("`lowest_shell` must be at least 1, got $lowest: shell 0 is the mean " *
                         "(κ = 0) mode, which a band forcing cannot legitimately drive — it carries " *
@@ -292,13 +323,18 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
   highest >= lowest ||
     throw(ArgumentError("`highest_shell` must be at least `lowest_shell`, got $highest < $lowest: " *
                         "the band would be empty and the forcing would silently do nothing"))
+  return nothing
+end
+
+function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
+  _check_shells(lowest, highest)
   k0 = 2π / domain.grid.domain_size[1]
   # A band above the dealias cutoff is INERT, not harmful: the mask keeps those modes empty, and
   # every band forcing is field-proportional, so it multiplies zero forever. Measured: a Linear on
   # shells 6–7 at N = 16 (cutoff shell ≈ 5.3) injected exactly nothing over 100 steps. Legal — a
   # marginal band is a legitimate choice — but it cannot be silent, or a run decays with its forcing
-  # apparently on. (An ADDITIVE forcing would genuinely inject there; re-adding `StochasticOU` must
-  # keep this warning in front of it.)
+  # apparently on. (An ADDITIVE forcing would genuinely inject there, so `StochasticOU` does not take
+  # this warning: it refuses such a band outright.)
   κ_max = max_retained_wavenumber(domain)
   if (lowest - 0.5) * k0 > κ_max
     @warn "the forcing band (shells $(lowest)–$(highest)) lies entirely above the dealias cutoff " *
@@ -715,7 +751,7 @@ _stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 // 2) / L
 uses_steady_linear_rate(::VarianceController) = false
 
 
-function add_forcing_source!(forcing::VarianceController, N̂, field, domain::FixedDomain,
+function add_forcing_source!(forcing::VarianceController, forcing_state, N̂, field, domain::FixedDomain,
                              diffusivity::Real)
   T = field_scalar_type(N̂)
   factor = _target_factor(field)
@@ -779,7 +815,7 @@ function _injection_amplitude(injection_rate, band_observable, whole_observable,
 end
 
 
-function add_forcing_source!(forcing::ConstantPower, N̂, field, domain::FixedDomain,
+function add_forcing_source!(forcing::ConstantPower, forcing_state, N̂, field, domain::FixedDomain,
                              diffusivity::Real)
   T = field_scalar_type(N̂)
   # One fused traversal answers the band observable AND the whole-field scale the relative
@@ -799,123 +835,254 @@ end
     StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 0)
 
-Stochastic forcing — Eswaran & Pope (1988,
+The stochastic forcing of Eswaran & Pope (1988,
 [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
-*Computers & Fluids* **16**, 257–278) — built on the
-[`FixedDomain`](@ref) `domain`: each forced
-Fourier mode in the band — the integer shells `lowest_shell` to `highest_shell`, in units of the
-box's fundamental ``2\\pi/L`` — carries an
-independent complex Ornstein–Uhlenbeck process, advanced once per step by the exact transition
+*Computers & Fluids* **16**, 257–278), built on the [`FixedDomain`](@ref) `domain`: a random force,
+correlated over a finite time, added to the right-hand side on a band of low wavenumbers. Use it when
+the force must not depend on the flow it drives. Every other strategy here reads the field it forces,
+so its injection responds to the flow; this one does not, and the price is that the energy it injects
+fluctuates rather than being held.
+
+The force lives on the band's Fourier modes — the integer shells `lowest_shell` to `highest_shell` in
+units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 
 ```math
-\\hat f \\leftarrow \\alpha \\hat f + \\sqrt{\\sigma^{2}(1-\\alpha^{2})} \\xi,
-\\qquad \\alpha = \\exp(-\\Delta t / T_L),
+\\boldsymbol{f}(\\boldsymbol{x}, t) = \\sum_{\\boldsymbol{\\kappa}} \\boldsymbol{a}_{\\boldsymbol{\\kappa}}(t) e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}},
 ```
 
-with correlation time ``T_L = \\texttt{correlation\\_time}``, stationary forcing variance
-``\\sigma^{2} = \\texttt{variance}`` (the stationary ``\\langle\\lvert f\\rvert^{2}\\rangle``), and
-``\\xi`` a unit-variance, band-limited random field. The increment ``\\xi`` is generated as a real
-physical field, transformed, and band-limited — guaranteeing a valid real field with no
-Hermitian-symmetry bookkeeping — and, when forcing the velocity (a vector field), Leray-projected so
-the forcing is divergence-free. The frozen ``\\hat f`` is added to the right-hand side at each stage
-(see [`add_forcing_source!`](@ref)), so it integrates at the scheme's order. The `seed` (default 0) fixes
-the random stream, so a forced run is reproducible.
+each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` an independent complex Ornstein–Uhlenbeck process
+with correlation time ``T_L``, transverse to ``\\boldsymbol{\\kappa}`` when the forced field is the
+velocity, so the force is divergence-free. Its stationary mean square
+``\\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle = \\sigma^{2}`` is shared equally among the band's modes and
+their independent components. Once per step every amplitude takes the process's exact transition over
+the step ``\\Delta t``,
 
-The same type forces either the velocity or the scalar ``\\varphi``: it adapts to the field it is
-given (a vector or scalar state, projected only for the velocity). The forcing owns its state and its
-noise scratch — one field in physical and one in spectral representation, allocated on first use, so a
-velocity-forcing instance holds two resident vector fields beside ``\\hat f``.
+```math
+\\boldsymbol{a}_{\\boldsymbol{\\kappa}} \\leftarrow \\alpha \\boldsymbol{a}_{\\boldsymbol{\\kappa}} + \\sqrt{1 - \\alpha^{2}} \\boldsymbol{\\xi}_{\\boldsymbol{\\kappa}},
+\\qquad \\alpha = e^{-\\Delta t / T_L},
+```
 
-# Arguments
-- `domain` — the `FixedDomain` the band and the noise scratch are built on.
-- `variance` — the stationary forcing variance ``\\sigma^{2}``.
-- `correlation_time` — the correlation time ``T_L`` of each mode's process.
-- `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``.
-- `seed = 0` — fixes the random stream, so a forced run is reproducible.
+with ``\\boldsymbol{\\xi}`` a fresh draw from the stationary distribution, so the statistics are exact for
+any step, a step the CFL condition varies included. The process starts from a stationary draw rather
+than from zero.
 
-!!! note "The random increment is generated host-side"
-    The random increment is generated host-side each step; on the GPU this is a portability-first
-    choice, not yet a performance-tuned one.
+While ``T_L`` is short against the large-eddy turnover time, the velocity the force does work against
+is mostly the velocity that same force produced over the last ``T_L``, and the mean injection rate is
+close to ``\\sigma^{2} T_L`` into the kinetic energy ``k``, or ``2\\sigma^{2} T_L`` into the scalar
+variance ``\\langle\\varphi^{2}\\rangle``. Choose `variance` from the dissipation rate the run should
+sustain; unlike [`ConstantPower`](@ref), nothing holds the injection at that value.
+
+The force is held fixed over a step and added at every stage, as [`add_forcing_source!`](@ref) does for
+every additive source. For a given sequence of amplitudes the field then advances at the scheme's
+order, but the force itself is resolved in time only step by step, so ``T_L`` should span many steps.
+
+The arguments are:
+- `domain` — the `FixedDomain` of the run this force drives.
+- `variance` — the stationary mean square ``\\sigma^{2}`` of the force.
+- `correlation_time` — the correlation time ``T_L`` of each amplitude.
+- `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
+  every mode of the band must lie inside the dealias cutoff.
+- `seed = 0` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
+  independent streams.
+
+The process lives in the run's state record, not in this strategy: a run keeps a
+[`StochasticOUState`](@ref) as the `modeled` entry of its
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields), so a checkpoint of the state
+resumes the same realization. The strategy holds its parameters and the scratch of one draw, so one
+instance may drive both fields.
+
+!!! warning "The band must lie inside the dealias cutoff"
+    A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes
+    empty, but this force is added after the mask and would fill them. Construction therefore throws
+    an `ArgumentError` for a band reaching past the cutoff, where the other strategies only warn.
 
 # Fields
-- `band` — the band-pass kernel for the noise.
-- `correlation_time`, `variance` — ``T_L`` and ``\\sigma^{2}``.
-- `seed` — the integer that seeded `rng`: a defining parameter, persisted by the HDF5 layer.
-- `rng` — the random stream, persisting across steps.
-- `state`, `noise_physical`, `noise_spectral` — the evolving force ``\\hat{\\boldsymbol{f}}`` and
-  its noise scratch, each `nothing` until first use.
-- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is
-  derived from.
+- `variance`, `correlation_time`, `seed`, `lowest_shell`, `highest_shell` — the parameters above.
+- `companion` — the coarse `FixedDomain` over the same box the process is held on: the smallest grid
+  whose modes cover the band, so the whole force costs a few kilobytes and no transform at the run's
+  own resolution.
+- `band` — the shell band, as a kernel on the companion.
+- `velocity`, `scalar` — the draw scratch for each kind of forced field: a physical and a spectral
+  companion field, the host array one draw is made in, and the scale that turns a unit-variance draw
+  into the stationary distribution.
+- `rng` — the random-number generator, reseeded before every draw from the seed and the state's draw
+  count; scratch, not state.
 """
-mutable struct StochasticOU{B, R, T} <: AbstractForcing
-  band::B                                    # band-pass kernel for the noise
-  correlation_time::T                        # T_L
-  variance::T                                # σ²: stationary forcing variance ⟨|f|²⟩
-  seed::Int                                  # the stream's seed — a defining parameter, persisted
-  rng::R                                     # random stream (persists across steps)
-  state::Union{Nothing, AbstractFieldSpectral}   # the OU forcing f̂ (allocated on first use)
-  noise_physical::Union{Nothing, AbstractFieldPhysical}  # own noise scratch (allocated on first use)
-  noise_spectral::Union{Nothing, AbstractFieldSpectral}
-  lowest_shell::Int                          # the band's shell bounds — the parameters `band` is derived from
+struct StochasticOU{T, D, K, V, S} <: AbstractForcing
+  variance::T                            # σ²: stationary ⟨|f|²⟩
+  correlation_time::T                    # T_L
+  seed::Int                              # the stream's seed — a defining parameter, persisted
+  lowest_shell::Int                      # the band's shell bounds
   highest_shell::Int
+  companion::D                           # the coarse FixedDomain over the same box
+  band::K                                # the shell band on the companion
+  velocity::V                            # draw scratch: (physical, spectral, host draw, noise scale)
+  scalar::S
+  rng::Xoshiro                           # scratch: reseeded from (seed, draws, field) before every draw
 end
+
+
+"""
+    StochasticOUState
+
+The evolving state of a [`StochasticOU`](@ref) forcing: its Ornstein–Uhlenbeck process, held as a field
+in spectral representation on the forcing's coarse companion grid, and the number of increments drawn
+so far. A run starts one through [`initial_forcing_state`](@ref) and keeps it in its state record, as
+the `modeled` entry of [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for the
+forced field; there is no reason to build one by hand.
+
+Holding the force as an ordinary field is what makes the rest free: the draw is made real-valued and
+transformed, so its spectrum satisfies the reality condition by construction; the transverse projection
+is the field library's; and the state persists through the library's own field persistence. The
+amplitudes are physical — the coefficients of ``e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}}`` in
+the force, with no transform normalization — so neither the state nor a checkpoint of it depends on
+either grid's size. Together with the forcing's seed, the draw count fixes every later draw.
+
+# Fields
+- `process` — the force in spectral representation on the companion grid.
+- `draws` — the number of increments drawn so far, the stationary start included.
+"""
+mutable struct StochasticOUState{F}
+  process::F                             # the force f̂ on the companion grid — physical amplitudes
+  draws::Int                             # increments drawn so far — the stream's position
+end
+
+
+# The draw scratch of one kind of forced field, and the scale that makes a drawn increment stationary.
+# A unit-variance real draw on the companion carries mean square NC over the whole grid; the band keeps
+# the fraction M/N³ of it (M the band's lattice modes, counted once here), and the transverse projection
+# keeps two components of three, so E⟨ξ,ξ⟩ = 2M/N³ for the velocity and M/N³ for the scalar. Dividing by
+# its square root is what the expectation, rather than each draw's realized norm, sets — the realized
+# norm would fix every increment's size, which is not the independent Gaussian modes the method defines,
+# and would cost a device-to-host reduction every step.
+function _ou_slots(companion::FixedDomain, modes::Integer, ::Val{R}) where {R}
+  physical = R == 1 ? new_vector_field_physical(companion) : new_scalar_field_physical(companion)
+  spectral = R == 1 ? new_vector_field_spectral(companion) : new_scalar_field_spectral(companion)
+  T = _real_type(companion)
+  points = prod(companion.grid.grid_size)
+  retained = R == 1 ? 2 * modes : modes
+  return (physical = physical, spectral = spectral,
+          draws = Array{T}(undef, size(field_data(physical))),
+          scale = one(T) / sqrt(T(retained) / T(points)))
+end
+
+# The band's lattice modes, counted over the whole companion spectrum (both members of every pair).
+function _count_band_modes(companion::FixedDomain, low::Real, high::Real)
+  n = companion.grid.grid_size[1]
+  k0 = 2π / companion.grid.domain_size[1]
+  half = n ÷ 2
+  return count(low <= k0 * sqrt(i^2 + j^2 + k^2) <= high
+               for i in -half:half-1, j in -half:half-1, k in -half:half-1)
+end
+
 
 function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
                       lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 0)
   # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
-  # documented non-negative: the variance's square root is taken when the increment is scaled, so a
-  # negative one surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the
-  # caller had typed.
-  Td = _real_type(domain)
-  variance = Td(variance)
-  correlation_time = Td(correlation_time)
+  # documented non-negative: every draw is scaled by the variance's square root, so a negative one
+  # surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the caller had typed.
+  T = _real_type(domain)
+  variance = T(variance)
+  correlation_time = T(correlation_time)
   (isfinite(variance) && variance >= 0) ||
     throw(ArgumentError("`variance` must be finite and non-negative, got $variance: it is the " *
-                        "stationary variance the process holds, and its square root sets the " *
-                        "noise amplitude"))
+                        "stationary mean square of the force, and its square root sets the " *
+                        "amplitude of every draw"))
   (isfinite(correlation_time) && correlation_time > 0) ||
     throw(ArgumentError("`correlation_time` must be finite and positive, got $correlation_time: " *
-                        "it is the Ornstein–Uhlenbeck relaxation time τ, and the drift is −f/τ"))
-  band = _shell_band(domain, lowest_shell, highest_shell)
-  return StochasticOU(band, correlation_time, variance, Int(seed), MersenneTwister(seed),
-                      nothing, nothing, nothing, Int(lowest_shell), Int(highest_shell))
+                        "it is the Ornstein–Uhlenbeck relaxation time T_L, and each step decays " *
+                        "the amplitudes by exp(−Δt/T_L)"))
+  _check_shells(lowest_shell, highest_shell)
+  L = domain.grid.domain_size[1]
+  k0 = 2π / L
+  low, high = (lowest_shell - 0.5) * k0, (highest_shell + 0.5) * k0
+  # The source is added AFTER the dealiasing mask, so a mode past the cutoff would be filled where the
+  # nonlinear term assumes nothing lives. Refused, not warned: the multiplicative strategies' "inert
+  # there" warning is false for an additive force.
+  κ_max = max_retained_wavenumber(domain)
+  high <= κ_max ||
+    throw(ArgumentError("the forcing band (shells $(lowest_shell)–$(highest_shell)) reaches " *
+                        "|κ| = $(round(high, digits = 3)), past the dealias cutoff " *
+                        "$(round(κ_max, digits = 3)); an additive force would fill modes the " *
+                        "dealiasing holds empty. Lower the shells, or enlarge the grid."))
+  # The companion grid: even, and large enough that the band lies strictly below its Nyquist
+  # frequency, whose modes a transfer between resolutions cannot carry (one coarse Nyquist mode
+  # describes a wave the finer grid splits in two).
+  companion = FixedDomain(; grid_points_per_axis = 2 * (Int(highest_shell) + 1), side_length = L,
+                          dealiasing = TwoThirds(), element_type = T, array_type = domain.storage_family)
+  modes = _count_band_modes(companion, low, high)
+  modes > 0 ||
+    throw(ArgumentError("the band (shells $(lowest_shell)–$(highest_shell)) holds no lattice " *
+                        "wavevector, so the forcing would drive nothing"))
+  return StochasticOU(variance, correlation_time, Int(seed), Int(lowest_shell), Int(highest_shell),
+                      companion, spectral_band(companion.multipliers, low, high),
+                      _ou_slots(companion, modes, Val(1)), _ou_slots(companion, modes, Val(0)),
+                      Xoshiro(0))
 end
 
-_ou_state(::VectorFieldSpectral, domain) = new_vector_field_spectral(domain)
-_ou_state(::ScalarFieldSpectral, domain) = new_scalar_field_spectral(domain)
-_ou_noise(::VectorFieldSpectral, domain) = (new_vector_field_physical(domain), new_vector_field_spectral(domain))
-_ou_noise(::ScalarFieldSpectral, domain) = (new_scalar_field_physical(domain), new_scalar_field_spectral(domain))
-_ou_plans(::VectorFieldSpectral, domain) = domain.transform_plans
-_ou_plans(::ScalarFieldSpectral, domain) = domain.transform_plans
+
+_ou_slots(ou::StochasticOU, field) = field_tensor_order(field) == 1 ? ou.velocity : ou.scalar
+
+# The key of one draw: the seed, the draw's position in the stream, and which field is forced, packed
+# into one 128-bit integer — exact and collision-free, so the stream is a pure function of the three and
+# a state resumes it from its draw count alone. Widened BEFORE shifting: `Int << 64` is zero in Julia.
+_draw_key(seed::Int, draws::Int, order::Int) =
+  (UInt128(reinterpret(UInt64, seed)) << 64) | (UInt128(draws) << 2) | UInt128(order)
+
+# One exact Ornstein–Uhlenbeck transition, a ← α a + √(σ²(1 − α²)) ξ, with ξ drawn from the stationary
+# distribution: a real Gaussian field on the companion grid, transformed, cut to the band, and — for the
+# velocity — projected transverse to κ. Drawing in the physical representation is what keeps ξ isotropic
+# and its spectrum a real field's by construction; the draw is made on the host, so the realization
+# follows the seed rather than the backend's generator.
+function _advance_process!(ou::StochasticOU{T}, state::StochasticOUState, field, α) where {T}
+  slots = _ou_slots(ou, field)
+  Random.seed!(ou.rng, _draw_key(ou.seed, state.draws, field_tensor_order(field)))
+  randn!(ou.rng, slots.draws)
+  copyto!(field_data(slots.physical), slots.draws)
+  to_spectral!(slots.spectral, slots.physical, ou.companion.transform_plans)
+  convolve!(slots.spectral, slots.spectral, ou.band)
+  field_tensor_order(field) == 1 &&
+    helmholtz_projection!(slots.spectral, slots.spectral, ou.companion.multipliers)
+  combine!(state.process, α, state.process,
+           slots.scale * sqrt(ou.variance * (one(T) - α^2)), slots.spectral)
+  state.draws += 1
+  return state
+end
 
 
-function prepare_forcing!(ou::StochasticOU, field, domain::FixedDomain, dt::Real)
-  T = real(eltype(field_data(field)))
-  ou.state === nothing && (ou.state = _ou_state(field, domain))
-  ou.noise_physical === nothing && ((ou.noise_physical, ou.noise_spectral) = _ou_noise(field, domain))
-  noise_physical, noise_spectral, plans = ou.noise_physical, ou.noise_spectral, _ou_plans(field, domain)
+function initial_forcing_state(ou::StochasticOU{T}, field, domain::FixedDomain) where {T}
+  process = field_tensor_order(field) == 1 ? new_vector_field_spectral(ou.companion) :
+                                             new_scalar_field_spectral(ou.companion)
+  return _advance_process!(ou, StochasticOUState(process, 0), field, zero(T))  # α = 0: stationary
+end
 
-  # unit-variance band-limited (and, for the velocity, solenoidal) random increment ξ
-  # In place: `randn` would allocate a fresh field-scale array on every step of the hot loop, and on
-  # a device backend a host array to copy across as well.
-  randn!(ou.rng, field_data(noise_physical))
-  to_spectral!(noise_spectral, noise_physical, plans)
-  convolve!(noise_spectral, noise_spectral, ou.band)
-  field isa VectorFieldSpectral && helmholtz_projection!(noise_spectral, noise_spectral, domain.multipliers)
-  noise_variance = inner(noise_spectral, noise_spectral)
 
-  # exact Ornstein–Uhlenbeck update. The unit-variance rescale of ξ is not a pass of its own: the
-  # only consumer of ξ is the combination below, so 1/√⟨ξ,ξ⟩ rides in as part of its coefficient.
-  α = exp(-T(dt) / T(ou.correlation_time))
-  s = sqrt(T(ou.variance) * (one(T) - α^2))
-  β = noise_variance > 0 ? s / sqrt(T(noise_variance)) : zero(T)
-  combine!(ou.state, α, ou.state, β, noise_spectral)                        # f̂ ← α f̂ + √(σ²(1-α²)) ξ̂
+# A state record built by hand without the forcing's state would hand `nothing` here, and the generic
+# do-nothing method would then leave the force at zero for the whole run — refused instead.
+prepare_forcing!(::StochasticOU, ::Nothing, field, domain::FixedDomain, dt::Real) =
+  throw(ArgumentError("a StochasticOU was prepared with no forcing state: the state record's " *
+                      "`modeled` entry for this field is `nothing`. Start one with " *
+                      "`initial_forcing_state(forcing, field, domain)` and pass it in the " *
+                      "`ResolvedFields`, or let `Simulation` build the record."))
+
+function prepare_forcing!(ou::StochasticOU{T}, state::StochasticOUState, field, domain::FixedDomain,
+                          dt::Real) where {T}
+  field_tensor_order(state.process) == field_tensor_order(field) &&
+    field_grid(state.process).grid_size == ou.companion.grid.grid_size ||
+    throw(ArgumentError("this StochasticOUState holds a tensor-order-$(field_tensor_order(state.process)) " *
+                        "process on a $(field_grid(state.process).grid_size[1])³ grid, but the forcing " *
+                        "drives a tensor-order-$(field_tensor_order(field)) field and its companion grid " *
+                        "is $(ou.companion.grid.grid_size[1])³; the state belongs to a different band " *
+                        "or field"))
+  _advance_process!(ou, state, field, exp(-T(dt) / ou.correlation_time))
   return nothing
 end
 
-add_forcing_source!(ou::StochasticOU, N̂, field, domain::FixedDomain, diffusivity::Real) =
-  add!(N̂, N̂, ou.state)   # the increment was drawn once per step; the stage field is not needed
+# The force of the step, added where the run's own modes and the companion's coincide: the field
+# library's transfer between resolutions, which costs the companion's size and never traverses the
+# run's own field.
+add_forcing_source!(ou::StochasticOU, state::StochasticOUState, N̂, field, domain::FixedDomain,
+                    diffusivity::Real) = embed_modes!(N̂, state.process, 1, 1)
 
 
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
@@ -981,8 +1148,12 @@ function Base.show(io::IO, forcing::StochasticOU)
   print(io, "StochasticOU(variance ", forcing.variance, ", correlation_time ", forcing.correlation_time,
         ", seed ", forcing.seed, ", ")
   _show_shells(io, forcing)
-  print(io, ", ", forcing.band, isnothing(forcing.state) ? ", state unallocated" : ", state allocated", ")")
+  print(io, ", on a ", forcing.companion.grid.grid_size[1], "³ companion grid, ", forcing.band, ")")
 end
+
+Base.show(io::IO, state::StochasticOUState) =
+  print(io, "StochasticOUState(", state.process, ", ", state.draws,
+        state.draws == 1 ? " draw" : " draws", ")")
 
 # The closure has no readable form; the display says what the value is waiting for.
 Base.show(io::IO, ::DeferredForcing) = print(io, "DeferredForcing(awaiting a domain)")
@@ -1004,10 +1175,10 @@ export write_forcing, read_forcing
 
 Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
 self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
-indicator array) is rebuilt from them on read. A stochastic forcing (the archived, un-exported
-`StochasticOU`) stores its parameters and **not** its evolving force or random stream: a reloaded
-stochastic forcing resumes on a fresh stream, so continuation across a checkpoint is exact only
-for the deterministic strategies. A
+indicator array) is rebuilt from them on read. What a strategy evolves is not a parameter: the
+process of a [`StochasticOU`](@ref) lives in the run's state record and is stored by
+[`write_state`](@ref GBGIsotropicTurbulence.State.write_state), so a reloaded strategy continues the
+same realization when the state is restored with it. A
 [`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`
 package is loaded; the caller owns the file.
 

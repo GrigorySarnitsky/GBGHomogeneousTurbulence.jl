@@ -88,7 +88,7 @@ const UNUSED_FUSION = Holder(
 
 const HOST_SIDE_FORCING_SCALARS = Holder(
   "HOST-SIDE FORCING SCALARS", :PF_RAISE,
-  "A forcing reduces its band observable (or the noise variance) to a Julia scalar, branches on it, " *
+  "A forcing reduces its band observable to a Julia scalar, branches on it, " *
   "and feeds it back to a kernel as a coefficient — a full round trip for a number that never " *
   "needed to leave the device. Closing it needs a reduction into a device-resident scalar and " *
   "kernels that accept one as a coefficient; the guard branch folds into the same kernel.")
@@ -151,7 +151,12 @@ end
 #   project_forcing!          (src/Forcing.jl)       — VarianceRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
 #   set_forcing_rate!       (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
-#   prepare_forcing!        (src/Forcing.jl)       — the stochastic forcing's noise variance → the rescale
+#   prepare_forcing!        (src/Forcing.jl)       — none: the stochastic forcing draws on the host and
+#                                                    uploads a band-sized array, a host→device copy
+#                                                    measured not to wait for queued kernels (0.003 ms
+#                                                    against 40 ms queued, RTX 5070 Ti, 2026-09-17), so
+#                                                    no crossing (decision 90; the dense form read its
+#                                                    noise variance back every step)
 #   _observe_and_test!      (src/SimulationRun.jl) — the stationarity detector's sampled signals: the
 #                                                    derivative skewness, and the scalar variance when
 #                                                    the scalar gate is on. ε is NOT counted twice
@@ -215,7 +220,7 @@ function _syncs(; adaptive_dt::Bool, velocity_forcing::Symbol, scalar_forcing::S
         push!(syncs, Sync("VarianceController fused observables ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
       end
     elseif tag === :ou
-      push!(syncs, Sync("OU noise variance ($slot)", 0, HOST_SIDE_FORCING_SCALARS))
+      # no crossing (decision 90): see the transcription note above
     end
   end
   return syncs
@@ -250,7 +255,7 @@ const SYNC_LEDGER = (
   (name = "adaptive dt, ConstantPower, 3-stage",
    cfg = (; adaptive_dt = true, velocity_forcing = :power, stages = 3),          achieved = 4, floor = 1),
   (name = "adaptive dt, stochastic velocity + scalar",
-   cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 4, floor = 1),
+   cfg = (; adaptive_dt = true, velocity_forcing = :ou, scalar_forcing = :ou),   achieved = 2, floor = 1),
   (name = "turnover-budgeted, VarianceRescaling :total",
    cfg = (; adaptive_dt = true, velocity_forcing = :band_total,
             turnover_budget = true),                                             achieved = 3, floor = 2),
@@ -422,10 +427,14 @@ const SYNC_LEDGER = (
     @test _floor_syncs(_syncs(; adaptive_dt = false, velocity_forcing = :none)) == 0
 
     # No forcing raises the floor: a forcing's scalar is consumed by the next device kernel.
-    for tag in (:band, :band_total, :power, :ou)
+    for tag in (:band, :band_total, :power)
       @test _floor_syncs(_syncs(; adaptive_dt = false, velocity_forcing = tag)) == 0
       @test _achieved_syncs(_syncs(; adaptive_dt = false, velocity_forcing = tag)) > 0
     end
+    # …and the stochastic forcing adds none at all (decision 90): its run crosses exactly as often as
+    # the unforced one.
+    @test _achieved_syncs(_syncs(; adaptive_dt = false, velocity_forcing = :ou)) ==
+          _achieved_syncs(_syncs(; adaptive_dt = false, velocity_forcing = :none))
 
     # The default configuration pays four crossings for one — down from ten when the multi-weight
     # fused reduction shipped. It must be the DEFAULT that is asserted here, not a configuration

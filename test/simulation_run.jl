@@ -5,7 +5,6 @@
 
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: point_positions
-using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using GBGIsotropicTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGIsotropicTurbulence.Phenomenology.Spectra: VonKarman1948

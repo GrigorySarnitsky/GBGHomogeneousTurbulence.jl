@@ -88,7 +88,7 @@ end
            ConstantPower(domain; injection_rate = 0.1),
            VarianceRescaling(domain; target = 0.5, over = :band),
            VarianceController(domain; target = 1.2, gain = 2.0),
-           GBGIsotropicTurbulence.Forcing.StochasticOU(domain; variance = 1.0, correlation_time = 0.3))
+           StochasticOU(domain; variance = 1.0, correlation_time = 0.3))
   h5open(path, "w") do io
     for (i, f) in enumerate(built)
       io["f$i"] = f
@@ -280,4 +280,69 @@ end
   end
   @test field_data(sim2.state.velocity_spectral) == field_data(sim.state.velocity_spectral)
   rm(path)
+end
+
+
+@testset "a stochastically forced run continues the same realization bitwise (decision 90)" begin
+  path = tempname() * ".h5"
+  build() = Simulation(make_domain(); viscosity = 0.05, scalar = true, rng = MersenneTwister(4),
+                       velocity_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3, seed = 2),
+                       scalar_forcing = StochasticOU(variance = 0.5, correlation_time = 0.3, seed = 2))
+  uninterrupted = build()
+  checkpointed = build()
+  for _ in 1:4
+    advance!(uninterrupted); advance!(checkpointed)
+  end
+  h5open(io -> write_simulation(io, "run", checkpointed), path, "w")
+  restored = h5open(io -> read_simulation(io, "run"), path, "r")
+  for _ in 1:3
+    advance!(uninterrupted); advance!(restored)
+  end
+  @test field_data(restored.state.velocity_spectral) == field_data(uninterrupted.state.velocity_spectral)
+  @test field_data(restored.state.scalar_spectral) == field_data(uninterrupted.state.scalar_spectral)
+  @test field_data(restored.state.modeled.velocity_forcing.process) ==
+        field_data(uninterrupted.state.modeled.velocity_forcing.process)
+  @test restored.state.modeled.scalar_forcing.draws == uninterrupted.state.modeled.scalar_forcing.draws == 8
+
+  # write_state / read_state carry the forcing states too, and adopting the read record continues.
+  h5open(io -> write_state(io, "state", checkpointed.state), path, "w")
+  record = h5open(io -> read_state(io, "state", checkpointed.domain), path, "r")
+  @test field_data(record.modeled.velocity_forcing.process) ==
+        field_data(checkpointed.state.modeled.velocity_forcing.process)
+  @test record.modeled.velocity_forcing.draws == checkpointed.state.modeled.velocity_forcing.draws
+
+  # A file written before forcing states were stored has no such group; it still restores, with the
+  # forcing started afresh — what that file restored to when it was written.
+  h5open(path, "w") do io
+    write_simulation(io, "run", checkpointed)
+    delete_object(io["run"]["state"], "modeled_velocity_forcing")
+    delete_object(io["run"]["state"], "modeled_scalar_forcing")
+  end
+  old = h5open(io -> read_simulation(io, "run"), path, "r")
+  @test old.state.modeled.velocity_forcing.draws == 1
+  @test field_data(old.state.velocity_spectral) == field_data(checkpointed.state.velocity_spectral)
+  rm(path)
+end
+
+
+@testset "an adopted record's forcing state continues, and one that does not fit is refused" begin
+  domain = make_domain()
+  ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, seed = 5)
+  sim = Simulation(domain; viscosity = 0.05, velocity_forcing = ou, rng = MersenneTwister(1))
+  advance!(sim)
+  carried = sim.state.modeled.velocity_forcing
+  # the carried state continues: adopted as is, not restarted
+  adopted = Simulation(domain; viscosity = 0.05, velocity_forcing = ou, state = sim.state)
+  @test adopted.state.modeled.velocity_forcing === carried
+  # a record without a forcing state starts one
+  bare = ResolvedFields(sim.state.velocity_spectral, sim.state.scalar_spectral)
+  fresh = Simulation(domain; viscosity = 0.05, velocity_forcing = ou, state = bare)
+  @test fresh.state.modeled.velocity_forcing.draws == 1
+  @test field_data(fresh.state.velocity_spectral) === field_data(sim.state.velocity_spectral)   # no copy
+  # a state the forcing does not use, or one of another band, is refused by name
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, velocity_forcing = NoForcing(),
+                                        state = sim.state)
+  other_band = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 1)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, velocity_forcing = other_band,
+                                        state = sim.state)
 end

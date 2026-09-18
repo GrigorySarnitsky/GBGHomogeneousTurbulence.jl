@@ -5,8 +5,8 @@
 # divergence-free (the linear rate, folded into E_ν, preserves solenoidality).
 
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); kept tested for the re-add
-using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type
+using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type,
+                         reality_residual, VectorFieldSpectral
 using GBGIsotropicTurbulence.Forcing: add_forcing_source!
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using Logging
@@ -28,22 +28,29 @@ GBGIsotropicTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, 
                                                  domain::FixedDomain) = (rate .= 1; true)
 
 
-# A forcing written to the source hook's pre-2026-08-22 three-argument form. Dispatch would fall
-# straight through to the do-nothing default, so the forcing would be silently ignored.
+# A forcing written to the source hook's pre-2026-09-18 five-argument form, before the forcing's
+# evolving state reached it. Dispatch would fall straight through to the do-nothing default, so the
+# forcing would be silently ignored.
 struct StaleSourceForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, domain) = N̂
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::StaleSourceForcing, N̂, field, domain, diffusivity) = N̂
+
+
+# A forcing written to the prepare hook's pre-2026-09-17 four-argument form, before the forcing's
+# evolving state moved into the run's state record. Also silently ignored, so also refused.
+struct StalePrepareForcing <: AbstractForcing end
+GBGIsotropicTurbulence.Forcing.prepare_forcing!(::StalePrepareForcing, field, domain, dt) = nothing
 
 
 # The two shapes the arity guard must NOT reject: an idiomatic optional trailing argument (Julia
 # auto-generates a short stub alongside the real method) and a strategy keeping a legacy overload for
 # its own harness. Both dispatch correctly on the run-shaped five-argument call.
 struct OptionalArgForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::OptionalArgForcing, N̂, field, domain,
-                                                   diffusivity = 0.0) = N̂
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::OptionalArgForcing, forcing_state, N̂, field,
+                                                   domain, diffusivity = 0.0) = N̂
 struct KeptLegacyForcing <: AbstractForcing end
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain,
-                                                   diffusivity) = N̂
-GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, domain) = N̂
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, forcing_state, N̂, field,
+                                                   domain, diffusivity) = N̂
+GBGIsotropicTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain, diffusivity) = N̂
 
 
 # A forcing whose rate tracks the state — the pre-2026-08-22 `ConstantPower` — but which declares it
@@ -115,7 +122,7 @@ end
     E_band = band_energy(û0)
     N̂ = new_vector_field_spectral(domain)
     field_data(N̂) .= 0
-    add_forcing_source!(forcing, N̂, û0, domain, ν)
+    add_forcing_source!(forcing, nothing, N̂, û0, domain, ν)
     # ⟨u·f⟩ over the band, with f the source just added: the injected power.
     @test real(inner(û0, N̂)) ≈ power  rtol = 1e-8
   end
@@ -156,30 +163,116 @@ end
     @test scalar_variance(φ̂) > scalar_variance(φ̂0)
   end
 
-  @testset "StochasticOU stationary variance and solenoidality" begin
-    target_variance = 0.4
-    ou = StochasticOU(domain; variance = target_variance, correlation_time = 0.5,
-                      lowest_shell = 1, highest_shell = 2, seed = 123)
-    û = new_vector_field_spectral(domain)                              # velocity reference ⇒ solenoidal forcing
-    samples = T[]
-    for n in 1:1000
-      prepare_forcing!(ou, û, domain, 0.01)
-      n > 500 && push!(samples, inner(ou.state, ou.state))
-    end
-    @test 0.6 * target_variance < sum(samples) / length(samples) < 1.6 * target_variance
-    rel_div = l2norm(divergence(ou.state, domain.multipliers)) / (l2norm(ou.state) + 1e-30)
-    @test rel_div < 1e-8                                   # the forcing state is divergence-free
+  # The force of one step as a field in spectral representation, through the same additive write a
+  # stage uses — so the tests below judge the field the equations actually receive.
+  function ou_force(ou, state, field)
+    f̂ = field isa VectorFieldSpectral ? new_vector_field_spectral(domain) : new_scalar_field_spectral(domain)
+    fill!(field_data(f̂), 0)
+    add_forcing_source!(ou, state, f̂, field, domain, ν)
+    return f̂
+  end
+  # the process's mean square, and the band's lattice modes counted here rather than reached for
+  mean_square(state) = inner(state.process, state.process)
+  band_modes = let k0 = 2π / L
+    count(0.5 * k0 <= k0 * sqrt(i^2 + j^2 + k^2) <= 2.5 * k0 for i in -8:8, j in -8:8, k in -8:8)
   end
 
-  @testset "StochasticOU reproducible from seed" begin
+  @testset "StochasticOU: a real, divergence-free force with the stationary mean square" begin
+    σ² = 0.4
+    for field in (new_vector_field_spectral(domain), new_scalar_field_spectral(domain))
+      ou = StochasticOU(domain; variance = σ², correlation_time = 0.5, seed = 123)
+      state = initial_forcing_state(ou, field, domain)
+      # A step of ten correlation times makes successive draws effectively independent (α = e⁻¹⁰),
+      # so the ensemble mean converges at the rate of independent samples.
+      samples = T[]
+      for n in 1:4000
+        prepare_forcing!(ou, state, field, domain, 5.0)
+        push!(samples, mean_square(state))
+      end
+      average = sum(samples) / length(samples)
+      @test abs(average / σ² - 1) < 0.02
+      # Independent Gaussian modes make ⟨|f|²⟩ itself fluctuate, a χ² over D real degrees of freedom
+      # (two per mode for the velocity after the transverse projection, one for the scalar), with
+      # relative spread √(2/D). Scaling each increment by its realized norm pins it and fails here.
+      D = (field isa VectorFieldSpectral ? 2 : 1) * band_modes
+      spread = sqrt(sum(abs2, samples .- average) / (length(samples) - 1)) / average
+      @test abs(spread / sqrt(2 / D) - 1) < 0.1
+      f̂ = ou_force(ou, state, field)
+      # the transfer between resolutions preserves the physical amplitude, so the force the run's
+      # equations receive has exactly the mean square the process holds
+      @test inner(f̂, f̂) ≈ samples[end] rtol = 1e-12
+      @test reality_residual(f̂) == 0                          # a real force
+      field isa VectorFieldSpectral && @test l2norm(divergence(f̂, domain.multipliers)) < 1e-12 * l2norm(f̂)
+    end
+  end
+
+  @testset "StochasticOU: independent modes, equal shares, exact transition" begin
+    σ², T_L, dt = 1.0, 0.5, 0.05
+    α = exp(-dt / T_L)
+    for û in (new_vector_field_spectral(domain), new_scalar_field_spectral(domain))
+      ou = StochasticOU(domain; variance = σ², correlation_time = T_L, seed = 9)
+      state = initial_forcing_state(ou, û, domain)
+      process = field_data(state.process)
+      # per MODE, summed over components: the transverse projection makes the share of a single
+      # component depend on the mode's direction, while the mode's own share must not
+      mode_share(c) = ndims(c) == 4 ? dropdims(sum(abs2, c; dims = 4), dims = 4) : abs2.(c)
+      per_mode = zeros(size(process)[1:3])
+      lagged = 0.0; power = 0.0
+      previous = copy(process)
+      for n in 1:20000
+        prepare_forcing!(ou, state, û, domain, dt)
+        per_mode .+= mode_share(process)
+        lagged += real(sum(process .* conj.(previous))); power += sum(abs2, previous)
+        previous .= process
+      end
+      # every forced mode holds the same share of the mean square, and every unforced one is empty
+      per_mode ./= 20000
+      forced = per_mode[per_mode .> 0]
+      @test length(forced) > 0 && maximum(forced) / minimum(forced) - 1 < 0.2
+      @test abs(lagged / power - α) < 0.01                      # the lag-one correlation is e^(−Δt/T_L)
+    end
+  end
+
+  @testset "StochasticOU: the stream is fixed by the seed, the draw count, and the field" begin
+    û = new_vector_field_spectral(domain)
+    φ̂ = new_scalar_field_spectral(domain)
     a = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 7)
     b = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 7)
-    û = new_vector_field_spectral(domain)
-    for n in 1:20
-      prepare_forcing!(a, û, domain, 0.01)
-      prepare_forcing!(b, û, domain, 0.01)
+    c = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 8)
+    sa, sb, sc = (initial_forcing_state(f, û, domain) for f in (a, b, c))
+    amplitudes(state) = copy(field_data(state.process))
+    for n in 1:20, (f, s) in ((a, sa), (b, sb), (c, sc))
+      prepare_forcing!(f, s, û, domain, 0.01)
     end
-    @test field_data(a.state) == field_data(b.state)
+    @test amplitudes(sa) == amplitudes(sb) && sa.draws == 21
+    @test amplitudes(sa) != amplitudes(sc)                   # the seed reaches the stream
+    # every 64 bits of the seed reach it: a negative seed builds, draws, and differs from its magnitude
+    # (a seed packed without widening, or cast rather than reinterpreted, fails one of these)
+    negative = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = -7)
+    @test amplitudes(initial_forcing_state(negative, û, domain)) != amplitudes(initial_forcing_state(a, û, domain))
+    # a state resumes from its amplitudes and draw count alone: nothing else carries the stream
+    resumed = StochasticOUState(deepcopy(sa.process), sa.draws)
+    prepare_forcing!(a, sa, û, domain, 0.01)
+    prepare_forcing!(c, resumed, û, domain, 0.01)            # another instance, same parameters but the seed…
+    @test amplitudes(resumed) != amplitudes(sa)
+    resumed = StochasticOUState(deepcopy(sb.process), sb.draws)
+    prepare_forcing!(b, sb, û, domain, 0.01)
+    prepare_forcing!(a, resumed, û, domain, 0.01)            # …and one with the same seed continues exactly
+    @test amplitudes(resumed) == amplitudes(sb)
+    # the velocity and the scalar of one seed draw different numbers
+    sφ = initial_forcing_state(a, φ̂, domain)
+    @test amplitudes(initial_forcing_state(a, û, domain))[:, :, :, 1] != amplitudes(sφ)
+    # a hand-built record without the state is refused, not silently left unforced
+    @test_throws ArgumentError prepare_forcing!(a, nothing, û, domain, 0.01)
+    @test_throws ArgumentError prepare_forcing!(a, sφ, û, domain, 0.01)   # a scalar state on the velocity
+  end
+
+  @testset "StochasticOU: a band past the dealias cutoff is refused" begin
+    # N = 24 under the 2/3 rule keeps |κ| ≤ 8; shells to 8 reach |κ| = 8.5 in the band's corners.
+    @test_throws ArgumentError StochasticOU(domain; variance = 0.1, correlation_time = 0.5,
+                                            lowest_shell = 7, highest_shell = 8)
+    @test StochasticOU(domain; variance = 0.1, correlation_time = 0.5, lowest_shell = 6,
+                       highest_shell = 7) isa StochasticOU
   end
 
   @testset "StochasticOU sustains velocity energy" begin
@@ -188,7 +281,8 @@ end
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.1, envelope_wavenumber = 2.0, rng = MersenneTwister(3))
     truncate_to_band!(û, domain)
-    state = ResolvedFields(û, new_scalar_field_spectral(domain))
+    φ̂ = new_scalar_field_spectral(domain)
+    state = ResolvedFields(û, φ̂, (velocity_forcing = initial_forcing_state(ou, û, domain), scalar_forcing = nothing))
     generator = ResolvedGenerator(domain, conditions; scalar = true)
     cache = ObservablesCache(domain; scalar = true)
     deposit!(cache, state, domain, buffers)
@@ -233,6 +327,7 @@ end
     # form defines a method the run never calls, so construction refuses it rather than integrating
     # an unforced run that reports nothing wrong. Every real strategy must pass unchallenged.
     @test_throws ArgumentError generator(StaleSourceForcing())
+    @test_throws ArgumentError generator(StalePrepareForcing())
 
     # …but only that shape. The guard asks whether a CALLABLE five-argument method exists, not
     # whether every method in the table is one, so neither of these is locked out.
@@ -264,7 +359,7 @@ end
     forcing = VarianceController(domain; target, gain = 1.0)
     û = new_vector_field_spectral(domain); copyto!(field_data(û), field_data(û0))
     N̂ = new_vector_field_spectral(domain); fill!(field_data(N̂), 0)
-    add_forcing_source!(forcing, N̂, û, domain, ν)
+    add_forcing_source!(forcing, nothing, N̂, û, domain, ν)
 
     k_whole = 0.5 * inner(û, û)
     k_band = 0.5 * inner_band(û, forcing.band)
@@ -367,7 +462,7 @@ end
 
     apply(forcing, diffusivity) = begin
       N̂ = new_scalar_field_spectral(domain); fill!(field_data(N̂), 0)
-      add_forcing_source!(forcing, N̂, φ̂, domain, diffusivity)
+      add_forcing_source!(forcing, nothing, N̂, φ̂, domain, diffusivity)
       # N̂ = A·𝟙_band·φ̂; read A off the κ = (1,0,0) mode, which the default band [1,2] contains.
       real(field_data(N̂)[2, 1, 1] / field_data(φ̂)[2, 1, 1])
     end

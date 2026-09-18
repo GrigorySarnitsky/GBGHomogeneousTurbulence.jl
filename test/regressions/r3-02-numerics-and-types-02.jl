@@ -47,7 +47,7 @@ using Random
     forcing = ConstantPower(domain; injection_rate = injection_rate)
     N̂ = new_scalar_field_spectral(domain)
     field_data(N̂) .= 0
-    add_forcing_source!(forcing, N̂, φ, domain, 0.05)     # ConstantPower ignores the diffusivity
+    add_forcing_source!(forcing, nothing, N̂, φ, domain, 0.05)     # ConstantPower ignores the diffusivity
     real(inner(φ, N̂)) / weighted_inner(φ, band)
   end
   A_reference = rate_amplitude(φ0, 0.1)

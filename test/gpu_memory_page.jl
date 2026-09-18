@@ -93,7 +93,8 @@ end
               :ConstantPower => (ConstantPower(injection_rate = 0.1), :same),
               :VarianceController => (VarianceController(target = 0.5), :same),
               :VarianceRescaling => (VarianceRescaling(target = 0.5, over = :band), :same),
-              :Linear => (Linear(rate = 0.1), :more)]
+              :Linear => (Linear(rate = 0.1), :more),
+              :StochasticOU => (StochasticOU(variance = 0.1, correlation_time = 0.5), :same)]
   @test Set(first.(forcings)) == exported(AbstractForcing)
 
   strategies = [:HouLi => (HouLi(), :same), Symbol("HouLi(materialized = true)") => (HouLi(materialized = true), :more)]

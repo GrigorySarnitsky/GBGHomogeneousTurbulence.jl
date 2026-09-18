@@ -181,12 +181,11 @@ const FUSION_GAP_HOLDERS = Dict(
 
 # ---------------------------------------------------------------- the frozen deltas
 
-# Only the OU forcing transforms — its noise pipeline is the single forcing hook that moves a field
-# between representations (src/Forcing.jl prepare_forcing!); every other forcing works through
-# reductions, per-mode multiplies, and the integrating-factor rate.
-_forcing_transform_delta(tag, slot) =
-  tag === :ou ? (slot === :velocity ? (c2r = 0, r2c = 3) : (c2r = 0, r2c = 1)) :
-                (c2r = 0, r2c = 0)
+# No forcing transforms. The last that did was the dense OU, whose noise pipeline moved a field of
+# noise to spectral representation every step (three transforms for the velocity); the band-sparse
+# form of decision 90 draws its process on the band's modes directly. Every forcing works through
+# reductions, per-mode multiplies, the integrating-factor rate, or a band-sized write.
+_forcing_transform_delta(tag, slot) = (c2r = 0, r2c = 0)
 
 # Pass deltas per forcing hook, derived from src/Forcing.jl (the OU-velocity column is
 # cross-checked against its op list below; the rest are frozen by derivation). Every band kernel is
@@ -206,10 +205,10 @@ _forcing_transform_delta(tag, slot) =
 #           dissipation — share ONE traversal, weighted_inner(field, (1, band, |κ|²))
 #           [1 field read, all three kernels lazy] + the accumulating convolve! [3] = 4 slot-shaped
 #           passes per evaluation, the same count as `power`.
-#   ou    — prepare_forcing!: draw + band-limit + project + normalize + state fold (8 slot-shaped
-#           passes + the physical noise write; the unit-variance rescale folds into the state
-#           combination's coefficient), then the per-stage additive source read/accumulate
-#           (3 passes × evaluations).
+#   ou    — nothing at field scale (decision 90): the process is advanced on the host over the band's
+#           M conjugate mode pairs, and the per-stage source is an O(M) indexed write, below this
+#           ledger's resolution. The dense form paid 8 slot-shaped passes and a physical write per
+#           step plus 3 passes per evaluation.
 function _forcing_pass_delta(tag, slot, scheme)
   tag === :none && return ZERO
   if tag === :band
@@ -222,10 +221,10 @@ function _forcing_pass_delta(tag, slot, scheme)
   elseif tag === :controller
     return slot === :velocity ? _ex(spectral_vector = 4 * _evals(scheme)) :
                                 _ex(spectral_scalar = 4 * _evals(scheme))
+  elseif tag === :ou
+    return ZERO
   end
-  return slot === :velocity ?
-    _ex(spectral_vector = 8 + 3 * _evals(scheme), physical_vector = 1) :
-    _ex(spectral_scalar = 8 + 3 * _evals(scheme), physical_scalar = 1)
+  error("unmodelled forcing tag $tag — price it here in the same commit that adds it")
 end
 
 # Tracers add NO transforms: the Heun endpoints ride the fields-epoch chart cache (the pre-step read
@@ -332,14 +331,12 @@ end
     @test NamedTuple{CLASSES}(Tuple(getproperty(_passes(with), c) - getproperty(_passes(without), c)
                                     for c in CLASSES)) ==
           _forcing_pass_delta(:ou, :velocity, :RK3)
-    for tag in (:none, :band, :linear, :power, :controller), slot in (:velocity, :scalar)
+    for tag in (:none, :band, :linear, :power, :controller, :ou), slot in (:velocity, :scalar)
       @test _forcing_transform_delta(tag, slot) == (c2r = 0, r2c = 0)
     end
-    # Every tag must be MODELLED, not fall through to the OU catch-all. An unlisted tag silently
-    # priced as a stochastic forcing is the exact drift this round found in the `:power` cell.
-    for tag in (:band, :linear, :power, :controller)
-      @test _forcing_pass_delta(tag, :velocity, :RK3) != _forcing_pass_delta(:ou, :velocity, :RK3)
-    end
+    # Every tag must be MODELLED: an unlisted tag throws rather than falling through to a catch-all,
+    # the drift an earlier round found in the `:power` cell, silently priced as a stochastic forcing.
+    @test_throws ErrorException _forcing_pass_delta(:unlisted, :velocity, :RK3)
   end
 
   @testset "tracers ride the chart cache — zero transform delta" begin

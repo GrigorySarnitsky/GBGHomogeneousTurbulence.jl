@@ -356,6 +356,11 @@ makedocs(
   format = Documenter.HTML(
     canonical     = "https://grigorysarnitsky.github.io/GBGIsotropicTurbulence.jl/stable",
     collapselevel = 1,
+    # The decision log is exempt from the page-size limit rather than split again. It is append-only
+    # history read by search and by direct link, and it crossed 200 KiB at decision 90; splitting it
+    # by date would put one decision's context on a page its successors are not on, which is worse
+    # for the one reader it has. Every other page stays under the default.
+    size_threshold_ignore = ["decisions.md"],
   ),
   checkdocs = :exports,
   doctest   = false,

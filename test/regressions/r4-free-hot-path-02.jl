@@ -77,7 +77,7 @@ function measure(forcing, kind)
   if kind === :apply
     F.project_forcing!(forcing, field, DOMAIN)
   elseif kind === :source
-    F.add_forcing_source!(forcing, out, field, DOMAIN, 0.05)
+    F.add_forcing_source!(forcing, nothing, out, field, DOMAIN, 0.05)
   else
     F.set_forcing_rate!(forcing, new_scalar_field_spectral(DOMAIN), field, DOMAIN)
   end

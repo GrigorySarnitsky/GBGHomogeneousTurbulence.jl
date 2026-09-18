@@ -37,7 +37,7 @@ using Test
 
   N̂ = new_scalar_field_spectral(domain)
   field_data(N̂) .= 0
-  add_forcing_source!(forcing, N̂, φ̂, domain, κ)
+  add_forcing_source!(forcing, nothing, N̂, φ̂, domain, κ)
 
   # The three reductions, computed independently of the hook's fused route, at factor 1:
   whole = real(inner(φ̂, φ̂))                                   # ⟨φ²⟩, the quantity held

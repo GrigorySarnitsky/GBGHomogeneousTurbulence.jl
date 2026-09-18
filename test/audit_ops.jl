@@ -42,15 +42,24 @@ shape_class(a::AbstractArray, N) =
                          (ndims(a) == 4 ? :physical_vector :
                           (size(a, 1) == N ? :physical_scalar : :real_spectral_scalar))
 
+# Is this array one of the run's own field-scale arrays? The test is the EXACT shape a field on this
+# grid takes, not a threshold: a forcing may hold fields of its own on a coarser grid over the same box
+# (`StochasticOU`'s companion, decision 90), whose size is set by its band rather than by N, and a
+# threshold read those as residency at the tiny N these audits run at while ignoring them at any real
+# one. They are priced as what they are — constant in N — beside the ledger instead.
+_is_field_scale(a, N) = length(a) in (N^3, 3 * N^3, N^2 * (N ÷ 2 + 1), 3 * N^2 * (N ÷ 2 + 1))
+
 # Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
 # aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
 # stream's internal state is O(1) constant memory, not field-scale working memory — skipped, so the
 # audit's tiny N does not misread it as a buffer.
-function collect_field_arrays!(acc, x, seen, N)
+# `keep` decides what counts as storage worth collecting; the default is the run's own field shapes.
+# The particle ledgers pass their own, since an (M, 3) array is storage of a different kind.
+function collect_field_arrays!(acc, x, seen, N; keep = a -> _is_field_scale(a, N))
   x === nothing && return acc
   x isa Random.AbstractRNG && return acc
   if x isa AbstractArray
-    if length(x) >= N^3 ÷ 2 && !(objectid(x) in seen)
+    if keep(x) && !(objectid(x) in seen)
       push!(seen, objectid(x))
       push!(acc, x)
     end
@@ -58,7 +67,7 @@ function collect_field_arrays!(acc, x, seen, N)
     objectid(x) in seen && return acc
     push!(seen, objectid(x))
     for name in fieldnames(typeof(x))
-      isdefined(x, name) && collect_field_arrays!(acc, getfield(x, name), seen, N)
+      isdefined(x, name) && collect_field_arrays!(acc, getfield(x, name), seen, N; keep)
     end
   end
   return acc
@@ -88,11 +97,10 @@ end
 const VALUE_CLASS = Dict(
   :û => :spectral_vector, :ps => :spectral_vector,
   :hu => :spectral_vector, :nl => :spectral_vector, :stage2 => :spectral_vector,
-  :ustar_spec => :spectral_vector, :ou_state => :spectral_vector, :noise_s => :spectral_vector,
+  :ustar_spec => :spectral_vector,
   :s => :spectral_vector, :sb_s => :spectral_scalar,
   :vshift => :spectral_vector,
   :chart_u => :physical_vector, :chart_ω => :physical_vector,
-  :noise_p => :physical_vector,
   :ushift => :physical_vector, :ωshift => :physical_vector,
   :φ̂ => :spectral_scalar,
   :sb_nl => :spectral_scalar, :sb_h => :spectral_scalar, :sb_stage2 => :spectral_scalar,
@@ -109,7 +117,7 @@ const VALUE_CLASS = Dict(
 # the step UNTOUCHED beside separate substage registers, an assumption that had turned the bound into
 # a tautology. The slot=register merge (decision 40) dissolved the choice: one register per chart now
 # serves both roles, so the extension no longer stacks registers on top of the stage need.)
-const DYNAMICS_LIVE = Set([:û, :φ̂, :ou_state, :chart_u, :chart_ω, :chart_φ])
+const DYNAMICS_LIVE = Set([:û, :φ̂, :chart_u, :chart_ω, :chart_φ])
 
 # The traffic model asks the same question of the same set: a value written and still needed after a
 # segment must reach memory.
@@ -145,8 +153,8 @@ end
 # and low-passes; PhaseShift also reads the stage's SPECTRAL velocity `uspec` for the
 # half-cell-displaced evaluation through the generator's PhaseShiftBuffers registers, averages the
 # two grids (the shift-back riding the averaging convolve as one fused α/β pass — the PF-triage free
-# win, 2026-07-19), and truncates spherically. `source` appends the additive-forcing read (the OU's
-# per-stage add_forcing_source!).
+# win, 2026-07-19), and truncates spherically. `source` appends the additive forcing's per-stage write
+# (the OU's add_forcing_source!, a band-sized write into the assembled term).
 function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = false)
   ops = [
     Op("cross u×ω",        [u, ω],        [ω]),
@@ -169,7 +177,7 @@ function _velocity_assembly(uspec, u, ω, out; source = false, phase_shift = fal
   # No separate dealias op: a mask strategy folds the kernel into the projection's own pass, and
   # PhaseShift's truncation rides the primary projection and the composed shift-back kernel
   # (decision 39) — the kernels are compressed symbols, no field-scale configuration read either way.
-  source && push!(ops, Op("add OU source", [out, :ou_state], [out]))
+  source && push!(ops, Op("add OU source", [out], [out]))
   return ops
 end
 
@@ -244,18 +252,12 @@ function _scalar_update(; first = false, last = false)
   return ops
 end
 
-# The OU forcing's prepare! phase (velocity slot, src/Forcing.jl): generate, transform, band-limit,
-# project, normalize, and fold the increment into the contract-live forcing state f̂. The
-# unit-variance rescale of ξ is NOT a pass: its only consumer is the fold, so 1/√⟨ξ,ξ⟩ rides in as
-# part of that combination's coefficient (2026-07-28, decision 35).
-_ou_prepare() = [
-  Op("draw noise",       Symbol[],           [:noise_p]),
-  Op("noise→spectral",   [:noise_p],         [:noise_s]),
-  Op("band-limit",       [:noise_s],         [:noise_s]),
-  Op("project noise",    [:noise_s],         [:noise_s]),
-  Op("normalize",        [:noise_s],         Symbol[]),
-  Op("f̂ ← θf̂ + sξ",    [:ou_state, :noise_s], [:ou_state]),
-]
+# The OU forcing has NO field-scale prepare phase (decision 90): its process lives on the band's M
+# conjugate mode pairs, is advanced on the host, and is uploaded as an (M, NC) array once per step, so
+# nothing it does before the stages touches a field. What remains is the per-stage additive write
+# (`source` in the assembly above). The dense form it replaced drew, transformed, band-limited,
+# projected and normalized a field of noise every step: three transforms, eight slot-shaped passes and
+# one physical write per step, with a spectral and a physical noise vector resident.
 
 
 # IFLowStorageRK3 as one ITERATION: stage 1 reads the deposited observables the previous closing deposit
@@ -265,7 +267,6 @@ _ou_prepare() = [
 # forcing's prepare phase and per-stage source.
 function rk3_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, closing::Bool = true)
   ops = Op[]
-  ou && append!(ops, _ou_prepare())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
   append!(ops, _velocity_update(:nl; first = true))
@@ -294,7 +295,6 @@ end
 # coefficients. Two more stage bodies, nothing else.
 function rk4_ops(scalar::Bool; ou::Bool = false, phase_shift::Bool = false, closing::Bool = true)
   ops = Op[]
-  ou && append!(ops, _ou_prepare())
   append!(ops, _velocity_assembly(:û, :chart_u, :chart_ω, :nl; source = ou, phase_shift))
   scalar && append!(ops, _scalar_assembly(:û, :φ̂, :chart_u, :sb_nl; phase_shift))
   append!(ops, _velocity_update(:nl; first = true))
@@ -456,7 +456,6 @@ _cost(kind; c2r = 0, r2c = 0, extra = ZERO) = (kind = kind, c2r = c2r, r2c = r2c
 const OP_COST = Dict(
   # transforms — the FFT currency
   "flux→spectral"      => _cost(:transform; r2c = 3),
-  "noise→spectral"     => _cost(:transform; r2c = 3),
   "u recovery"         => _cost(:transform; c2r = 3),
   "ω recovery"         => _cost(:transform; c2r = 3),
   "u chart recovery"   => _cost(:transform; c2r = 3),
@@ -468,7 +467,6 @@ const OP_COST = Dict(
   "shifted φ recovery" => _cost(:transform; c2r = 1),
   # reductions — a fusion barrier like a transform (the scalar result gates the next kernel), but
   # the read passes are real and irreducible
-  "normalize"          => _cost(:reduction),
   "max speed"          => _cost(:reduction),
   # Since the PF adoption (decisions 38/39) every kernel a base op applies is a compressed symbol —
   # a radial closure or O(N) per-axis factors — so no op reads a field-scale configuration array and
@@ -485,13 +483,15 @@ const OP_COST = Dict(
   # plane element read once and written once, both arities.
   "reality projection"        => _cost(:noop),
   "scalar reality projection" => _cost(:noop),
+  # The OU source (decision 90) writes the band's M conjugate mode pairs into the assembled term — an
+  # O(M) indexed write, below the ledger's resolution like the reality projection above. It stays in
+  # the op list for the same two reasons.
+  "add OU source"             => _cost(:noop),
 )
-# Plain pointwise ops — passes are their symbolic reads and writes alone. ("project noise" prices
-# the aliased-projection CONTRACT; that the aliased path allocates today is the episode ledger's
-# recorded defect, raised to GBGPeriodicFields.)
+# Plain pointwise ops — passes are their symbolic reads and writes alone.
 for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl û", "shifted curl",
              "cross u×ω", "Leray projection", "divergence", "flux uφ",
-             "shift û", "shift φ̂", "shift-back average", "band-limit",
+             "shift û", "shift φ̂", "shift-back average",
              "seed hu", "seed hφ", "accumulate hu", "accumulate hφ",
              "û ← E(û+B·hu)", "φ̂ ← E(φ̂+B·hφ)", "û* ← E(û+Δt·N̂₁)", "φ̂* ← E(φ̂+Δt·N̂₁)",
              "rotate û", "rotate hu", "rotate φ̂", "rotate hφ",
@@ -500,8 +500,7 @@ for name in ("copy û", "copy φ̂", "shifted copy", "shifted copy φ̂", "curl 
              "s ← E(û+Δt·N̂)", "sφ ← E(φ̂+Δt·N̂)", "s ← E⁻(s+Δt·N̂)", "sφ ← E⁻(sφ+Δt·N̂)",
              "nl ← ¾E·û", "sb_nl ← ¾E·φ̂", "s ← ¼s+nl", "sφ ← ¼sφ+sb_nl",
              "s ← E(s+Δt·N̂)", "sφ ← E(sφ+Δt·N̂)", "û ← ⅓E·û", "φ̂ ← ⅓E·φ̂",
-             "û ← û+⅔s", "φ̂ ← φ̂+⅔sφ",
-             "draw noise", "project noise", "f̂ ← θf̂ + sξ", "add OU source")
+             "û ← û+⅔s", "φ̂ ← φ̂+⅔sφ")
   OP_COST[name] = _cost(:pointwise)
 end
 

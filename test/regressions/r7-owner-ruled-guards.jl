@@ -32,6 +32,6 @@ using GBGPeriodicFields: field_data, convolve!, to_physical, to_spectral
                                           domain.transform_plans))
   N̂ = new_vector_field_spectral(domain); fill!(field_data(N̂), 0)
   @test_logs (:warn, r"band is empty") match_mode=:any add_forcing_source!(
-      forcing, N̂, û, domain, 0.05)
+      forcing, nothing, N̂, û, domain, 0.05)
   @test all(iszero, field_data(N̂))
 end

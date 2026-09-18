@@ -30,7 +30,8 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
 - `State` — the evolving fields a run advances (`ResolvedFields` — the velocity `û` and scalar `φ̂` in
-  spectral representation, the single source of truth) and the random initial conditions. The
+  spectral representation, the single source of truth, plus each forcing's evolving state in its
+  `modeled` slot) and the random initial conditions. The
   physical representations are recovered by the source-preserving four-argument form of PF's
   `to_physical!` at the consuming sites; the vorticity by `Observables.vorticity_physical!` (decision 47).
 - `Observables` — the measured functions of state (energy and dissipation diagnostics of flow and

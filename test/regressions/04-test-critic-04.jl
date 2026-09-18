@@ -45,7 +45,7 @@ using Test
     φ̂ = fresh()
     N̂ = new_scalar_field_spectral(domain)
     field_data(N̂) .= 0
-    add_forcing_source!(forcing, N̂, φ̂, domain, 0.05)   # ConstantPower ignores it
+    add_forcing_source!(forcing, nothing, N̂, φ̂, domain, 0.05)   # ConstantPower ignores it
     # ⟨φ, f⟩ with f the source just added is the injected rate, at the same convention `target` uses.
     @test 2 * real(inner(φ̂, N̂)) ≈ power  rtol = 1e-8
   end

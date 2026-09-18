@@ -23,7 +23,7 @@ mutable struct HookSpy <: AbstractForcing
   applies::Int
 end
 HookSpy() = HookSpy(0, 0)
-prepare_forcing!(f::HookSpy, field, domain::FixedDomain, dt::Real) = (f.prepares += 1; nothing)
+prepare_forcing!(f::HookSpy, forcing_state, field, domain::FixedDomain, dt::Real) = (f.prepares += 1; nothing)
 project_forcing!(f::HookSpy, advanced_field, domain::FixedDomain) = (f.applies += 1; advanced_field)
 
 const N = 16

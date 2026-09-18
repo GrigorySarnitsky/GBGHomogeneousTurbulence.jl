@@ -19,12 +19,11 @@
 # validates nothing: the shared-mutable-forcing guard, the `viscosity > 0` guard and the
 # `schmidt > 0` guard are all bypassed by the very call the docstring tells the reader to make.
 #
-# The hazard the guard exists for is real and reachable. `StochasticOU` allocates its per-field state
-# lazily on first `prepare_forcing!` (`Forcing.jl:534–536`), keyed on the field it is first handed:
-# driving the velocity allocates a VECTOR `noise_physical`, and the scalar leg then reaches
-# `to_spectral!(noise_spectral, noise_physical, domain.transform_plans)` with the vector scratch still in
-# place. The misconfiguration therefore surfaces as a `MethodError` raised inside GBGPeriodicFields,
-# naming neither `FlowConditions` nor the shared forcing.
+# The hazard the guard exists for was real and reachable when this witness was written: the archived
+# `StochasticOU` was mutable and allocated its per-field scratch lazily, keyed on the first field it
+# was handed, so a shared instance surfaced as a `MethodError` inside GBGPeriodicFields. The shipped
+# `StochasticOU` keeps its state in the run's state record and may be shared; the guard still covers
+# any strategy with mutable per-field bookkeeping, which the local `PerFieldCounter` stands in for.
 #
 # The repair is a validating inner constructor (plus the outer wrapper that keeps the documented
 # positional form callable), so that one contract covers both advertised entry points. Either that,
@@ -33,8 +32,22 @@
 
 using Test
 using GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: StochasticOU, NoForcing
+using GBGIsotropicTurbulence.Forcing: AbstractForcing, NoForcing
 using GBGIsotropicTurbulence.Generator: FlowConditions, prepare!
+import GBGIsotropicTurbulence.Forcing: prepare_forcing!
+
+
+# A strategy with mutable per-field bookkeeping: it remembers the first field's tensor order and
+# refuses any other, which is the conflation a shared instance of such a strategy produces.
+mutable struct PerFieldCounter <: AbstractForcing
+  order::Int
+end
+function prepare_forcing!(f::PerFieldCounter, forcing_state, field, domain, dt::Real)
+  order = ndims(GBGIsotropicTurbulence.SimulationRun.field_data(field)) - 3
+  f.order < 0 && (f.order = order)
+  f.order == order || throw(MethodError(prepare_forcing!, (f, forcing_state, field, domain, dt)))
+  return nothing
+end
 
 
 small_domain() = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(),
@@ -47,7 +60,7 @@ small_domain() = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, deal
 # `:accepted` — it runs, with the two fields silently sharing one random stream and one scratch.
 function shared_forcing_outcome()
   domain = small_domain()
-  ou = StochasticOU(domain; variance = 0.1, correlation_time = 0.5)
+  ou = PerFieldCounter(-1)
   conditions = try
     FlowConditions(0.05, 1.0, ou, ou)          # the positional form, exactly as documented
   catch err
@@ -65,8 +78,7 @@ end
 
 
 @testset "FlowConditions's documented plain constructor enforces the same contract as the keyword form" begin
-  domain = small_domain()
-  ou = StochasticOU(domain; variance = 0.1, correlation_time = 0.5)
+  ou = PerFieldCounter(-1)
 
   # Baseline — the keyword form enforces all three guards, as documented.
   @test_throws ArgumentError FlowConditions(; viscosity = 0.05, schmidt = 1.0,

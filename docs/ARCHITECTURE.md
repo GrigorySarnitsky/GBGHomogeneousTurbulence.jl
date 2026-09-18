@@ -205,7 +205,8 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
   record of the evolving fields in spectral representation — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
-  one, the scalar ``\hat\varphi`` — and the *single source of truth*: the physical velocity, vorticity, and
+  one, the scalar ``\hat\varphi`` — together with the `modeled` slot holding any forcing's evolving state
+  (§8), and the *single source of truth*: the physical velocity, vorticity, and
   scalar are functions of it, never independent state. No operation hangs
   on it; the generator advances it and the observables read it, both as external functions of
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
@@ -362,9 +363,11 @@ harness whose *predicted* half is `Phenomenology` (§4.8).
 
 Forcing is the System's energy-injection strategy — the source term ``\boldsymbol{f}`` of §4.2, and the one
 deliberately designed-in extension point. `AbstractForcing` is the supertype; a forcing enters the
-step through a small interface whose four methods each default to doing nothing:
+step through a small interface of four per-step methods, plus `initial_forcing_state`, which starts
+the state the first of them advances; each defaults to doing nothing:
 
-- `prepare_forcing!` — advance internal state once per step (a stochastic process);
+- `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
+  a state `initial_forcing_state` starts and the state record keeps;
 - `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
   per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
@@ -374,7 +377,9 @@ The four hooks form one per-step lifecycle with a fixed order — `prepare_forci
 `set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `project_forcing!` after the
 completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
-hooks need; none receives the scheme's buffers (§11 decision 32).
+hooks need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
+scratch: it lives in the `modeled` slot of `ResolvedFields`, so the state record is the whole
+evolving state of the run (§8's open-systems reading; §11 decisions 23 and 90).
 
 Which hook a strategy uses is not an implementation detail: it decides whether the strategy preserves
 the scheme's order in time. A rate folded into ``\mathcal{E}`` is integrated **exactly**, but only a
@@ -384,7 +389,7 @@ post-step projection is Lie–Trotter splitting, first-order by construction. So
 forcing belongs in the source, where the scheme's own stages integrate it. Measured on the
 third-order `IFLowStorageRK3`: every source-routed forcing converges at 3.01, the projection at 1.02.
 
-Five strategies are provided. `NoForcing` (free decay) and `Linear` (fixed-rate negative damping,
+Six strategies are provided. `NoForcing` (free decay) and `Linear` (fixed-rate negative damping,
 Lundgren 2003) — the latter the one steady rate, folded into ``\mathcal{E}`` and therefore exact and
 free. `ConstantPower` (holding the injection rate) and `VarianceController` (holding the field's
 ``L^2`` observable: the kinetic energy for the velocity, the scalar variance for the scalar; the
@@ -394,12 +399,14 @@ proportional restoring term making the target a stable attractor rather than a c
 `VarianceRescaling` (rescaling a band to hold the same observable — `over = :band | :total`) is the
 one post-step projection, kept as the reference implementation of a published method (Sullivan,
 Mahalingam & Kerr 1994) with its first-order caveat and its Berendsen-class caveat (Bussi, Donadio &
-Parrinello 2007) documented rather than hidden; a stochastic Eswaran–Pope
-Ornstein–Uhlenbeck forcing is archived (§7). **One implementation serves both** the velocity (a vector
-field) and the scalar (a scalar field), because these four methods are written through tensor-order-generic field
-operators; the only field-specific step a forcing can need is the solenoidal (Leray) projection of the
-velocity, and none of the built strategies needs it — each preserves a divergence-free velocity by
-construction (the archived `StochasticOU`, which draws unconstrained noise, is the one that projects). Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
+Parrinello 2007) documented rather than hidden. `StochasticOU` (Eswaran & Pope 1988) is the one
+strategy independent of the flow it drives: an exact Ornstein–Uhlenbeck process on the band's conjugate
+mode pairs, advanced on the host and added at every stage, holding nothing field-sized. **One
+implementation serves both** the velocity (a vector field) and the scalar (a scalar field), because
+these methods are written through tensor-order-generic field operators; the only field-specific step a
+forcing can need is the solenoidal projection of the velocity, which the field-proportional strategies
+never need (each preserves a divergence-free velocity by construction) and `StochasticOU` applies per
+mode, drawing each amplitude perpendicular to its wavevector. Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
 taking no operators, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
 returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
 forcing before the grid exists.
@@ -707,17 +714,13 @@ generalization is built for them until a second concrete case forces the abstrac
 - **The uniform-mean-gradient scalar source** — the standard scalar-injection route
   (``-u_i \partial_{x_i}\bar\varphi`` with an imposed mean gradient), the missing piece of the
   mean-gradient mixing System named in §3. A forcing-strategy slice, not a frame change.
-- **Stochastic (Eswaran–Pope OU) forcing** — `StochasticOU`, a band-limited Ornstein–Uhlenbeck process
-  added to the RHS. *Built and validated, then archived* from the public surface — un-exported, and
-  absent from the rendered API pages, though its docstring is intact — to be re-added; it owns its noise scratch (decision 32), and its host-side random
-  increment is the one exception to the allocation-free hot loop
-  (invariant 4) — it allocates — so the re-add is gated on a GPU-tuned generator (Eswaran & Pope 1988).
-- **Checkpoint / exact restart to HDF5 — DELIVERED (decision 75).** Five writer/reader pairs,
+- **Stochastic (Eswaran–Pope OU) forcing — DELIVERED (decision 90).** Archived while its dense form
+  drew a field of noise on the host every step; returned as a coarse companion field, with its process
+  in the state record.
+- **Checkpoint / exact restart to HDF5 — DELIVERED (decisions 75, 90).** Five writer/reader pairs,
   composed recursively on the field library's persistence groups, restore a run that continues
-  bitwise for deterministic forcings (§4.7). The one recorded gap against the Fluidsim reference
-  bar is deliberate: a stochastic forcing's evolving force and stream are ruled non-persistent, so
-  a reloaded `StochasticOU` resumes on a fresh stream rather than continuing the same
-  realization.
+  bitwise (§4.7), a stochastically forced run included: its process and its position in the stream
+  are part of the stored state record.
 - **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
   ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
@@ -807,8 +810,9 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   the source of §4.2), dissipated to the unmodeled viscous *bath* (the sink), balanced at stationarity. The
   lens carries its own caveat: whatever a model *retains* of the environment — a stochastic forcing's
   internal state, a closure's subgrid degrees of freedom — is not the environment but the finite
-  **Markovian surrogate** kept on the system's own side, a *modeled* degree of freedom; so it homes, when
-  built, as a modeled slot on the one `State`, never a separate "environment state".
+  **Markovian surrogate** kept on the system's own side, a *modeled* degree of freedom; so it homes as
+  the `modeled` slot on the one `State`, never a separate "environment state" — built for the
+  stochastic forcing's process (§11 decision 90).
 - **The commuting square — the modeling ideal.** With ``\Pi`` a coarse-graining and ``S`` a flow map, one
   would like ``\Pi\circ S_{\mathrm{fine}} = S_{\mathrm{coarse}}\circ\Pi``. It cannot hold pathwise: the coarse
   state does not determine its own tendency (that is the memory and noise made concrete), and turbulence is
@@ -2740,6 +2744,90 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     scalar index; and the cost of a time step in unified memory is unmeasured everywhere, GH200
     included — no GH200 figure is written until one is measured on this package's step.
 
+90. **(2026-09-18, user-directed) `StochasticOU` returns as a coarse companion field, with its
+    process in the state record — decision 23(c) built, decision 75's non-persistence ruling
+    superseded, and the field library's `embed_modes!` the one thing it needed.** The owner asked for
+    the Eswaran–Pope forcing as a full option. It had been archived (§7) because its dense form drew
+    white noise on the whole grid every step, transformed, band-limited, projected and normalized it,
+    and held three field-scale arrays to drive shells 1–2. Measured on the RTX 5070 Ti at ``128^3``
+    `Float32`: 17.6 ms per step against the default forcing's 3.2 ms, and 25 MB of host allocation per
+    step — the noise was drawn on the host and copied over, 5 GB per step at ``768^3``.
+
+    **The design, and how it was reached.** A first implementation kept the process on a host-side list
+    of the band's conjugate mode pairs and asked the field library for an O(M) write at those modes.
+    Two adversarial rounds passed it, and the owner then rejected it on the ground the rounds had been
+    briefed away from: that form has this package hand-writing the per-mode transverse projection, the
+    ±``\boldsymbol{\kappa}`` and self-conjugate-plane bookkeeping, the per-mode variance accounting, and
+    bespoke persistence and display — four pieces of machinery the field library owns, against
+    invariant 2. The defence of it rested on the code already being written and measured, which is the
+    circular justification this file's own self-guards name. The request was withdrawn mid-ruling.
+
+    **What ships.** The process is an ordinary field in spectral representation on a **companion grid
+    over the same box** — the smallest even grid whose modes cover the band, ``6^3`` for the default
+    shells 1–2. Two grids over one box resolve the same physical wavenumbers where they overlap, so the
+    companion's modes are exactly a subset of the run's. Each step: a host Gaussian draw into a
+    companion physical field (the stream stays the seed's, and the draw is real, so its spectrum
+    satisfies the reality condition by construction), `to_spectral!`, the band kernel, and — for the
+    velocity — `helmholtz_projection!`, then `combine!` for the exact transition
+    ``\boldsymbol{a} \leftarrow \alpha\boldsymbol{a} + \sqrt{\sigma^{2}(1-\alpha^{2})}\,\boldsymbol{\xi}``,
+    ``\alpha = e^{-\Delta t/T_L}``, starting from a stationary draw. Every stage adds the process into
+    the assembled term with the library's `embed_modes!` (its decision 85, requested and shipped
+    2026-09-17/18), which writes only the shared modes, carries physical amplitudes across the
+    resolution ratio, and never traverses the run's own field.
+
+    The increment's scale is the **expected** variance of the masked, projected draw —
+    ``2M/N_c^{3}`` per unit variance for the velocity, ``M/N_c^{3}`` for the scalar, with ``M`` the
+    band's lattice modes counted once at construction. The archived form divided by each draw's
+    *realized* norm, which fixes every increment's size — not the independent Gaussian modes the method
+    defines — and cost a device-to-host reduction every step. Measured at ``32^3``: the stationary mean
+    square within 0.5 %, the lag-one correlation equal to ``\alpha`` to ``10^{-3}``, the mean square
+    fluctuating as ``\chi^{2}`` over the retained degrees of freedom (the realized-norm form is pinned
+    against), every mode's share equal within sampling error, and the mean injection rate 0.024 and
+    0.047 against the docstring's ``\sigma^{2} T_L`` of 0.025 and 0.050 (``T_L = 0.05, 0.1``), with
+    ``2\sigma^{2}T_L`` confirmed for the scalar variance.
+
+    **Cost, measured on the RTX 5070 Ti at ``128^3`` `Float32`.** 2.68 ms per step — *faster* than the
+    default `VarianceController`'s 3.22 ms, because the controller reads its band observable back to the
+    host every stage and this forcing reads nothing back. Host allocation per step is the run's own;
+    the forcing adds none. Nothing it holds scales with the grid: at ``64^3`` the strategy and its state
+    together are under 1 % of one spectral vector, pinned in the memory audit, and the audits' reflective
+    walk now classifies residency by the run's own field shapes rather than by a threshold, so a
+    companion grid is never miscounted as residency (it was, at the audits' tiny ``N``).
+
+    **Where it lives.** The process and its draw count are a `StochasticOUState` in the new `modeled`
+    slot of `ResolvedFields`, one entry per forced field — decision 23(c)'s Markovian surrogate, built.
+    The strategy holds parameters and the scratch of one draw, is immutable, and may drive both fields.
+    The protocol gained `initial_forcing_state(forcing, field, domain)` (default `nothing`);
+    `prepare_forcing!` gained the state as its second argument, and `add_forcing_source!` likewise, the
+    generator carrying each forcing's state from the step `prepare!` opened, since the right-hand-side
+    verbs are handed a stage field rather than the record it came from. The stale-hook guard now refuses
+    either old arity, and `prepare_forcing!` on a `StochasticOU` refuses a missing state rather than
+    leaving the run silently unforced. `Simulation` starts the states of a fresh record; an adopted
+    record keeps one that fits its forcing and is refused by name when it does not.
+
+    **Persistence — decision 75 superseded.** Decision 75 ruled a stochastic forcing's evolving force
+    and stream non-persistent, when neither had a home in the record and the stream was a generator's
+    internal state. Both reasons are gone, and the owner chose the state's home knowing a checkpoint
+    would then carry it. The process is written through the library's own `write_field` and the draw
+    count beside it (schema 2), so a restored run continues the same realization bitwise — pinned for
+    both fields. A schema-1 file, which has no such group, restores with the forcing started afresh.
+    The stream itself is a pure function of the seed, the draw count and the forced field, through a
+    scratch generator reseeded from their 128-bit packing before every draw (widened before the shift,
+    which at 64 bits would silently drop the seed), so a velocity and a scalar forcing given one seed
+    draw independently and the draw count is the whole stream state.
+
+    **The band must lie inside the dealias cutoff.** The source is added after the dealiasing mask, so
+    an additive force past the cutoff would fill modes the nonlinear term assumes empty; construction
+    throws where the multiplicative strategies only warn. The companion grid is sized so the band sits
+    strictly below its Nyquist frequency, whose modes a transfer between resolutions cannot carry.
+
+    **Ledgers.** Every audit cell of an OU-forced run is the unforced cell's: no field-scale residency
+    (the dense form held two spectral and one physical vector), no transforms at the run's resolution
+    (it had three per step), no passes at field scale, and the last memory-gap holder (OWNERSHIP, OU
+    noise ↔ product) retired with the noise. The synchronization row falls from four crossings per step
+    to two — one of which is the adaptive timestep's, the other the scalar run's NaN guard.
+    **Not done:** no code-to-code comparison exists — TurTLE has no Ornstein–Uhlenbeck forcing — so the
+    process rests on the statistical tests above.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,

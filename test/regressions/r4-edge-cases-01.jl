@@ -5,11 +5,10 @@
 #   "a negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
 #    argument that caused it"
 # and guards `kinetic_energy > 0` / `scalar_variance >= 0` accordingly. `StochasticOU`'s `variance`
-# — documented as the stationary ⟨|f|²⟩ = σ², which cannot be negative — carries no such guard, and
-# `prepare_forcing!` computes s = sqrt(variance · (1 − α²)) with (1 − α²) > 0 for every dt > 0.
+# — documented as the stationary ⟨|f|²⟩ = σ², which cannot be negative — carried no such guard, and
+# every draw scales by sqrt(variance), so a negative value reached `sqrt` downstream.
 # `VarianceRescaling`'s `target` (an exported, front-door forcing) is the same shape via `project_forcing!`.
 using Test, Random, GBGIsotropicTurbulence
-using GBGIsotropicTurbulence.Forcing: StochasticOU
 
 @testset "forcing amplitudes documented non-negative are guarded at construction" begin
 
@@ -33,7 +32,7 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU
   else
     û = new_vector_field_spectral(domain)
     try
-      prepare_forcing!(ou, û, domain, 0.01)
+      prepare_forcing!(ou, initial_forcing_state(ou, û, domain), û, domain, 0.01)
       nothing
     catch err
       err
@@ -45,7 +44,7 @@ using GBGIsotropicTurbulence.Forcing: StochasticOU
   # (3) Control: a legitimate non-negative variance keeps working (the guard must not over-reach).
   ok = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, seed = 3)
   û = new_vector_field_spectral(domain)
-  @test prepare_forcing!(ok, û, domain, 0.01) === nothing
+  @test prepare_forcing!(ok, initial_forcing_state(ok, û, domain), û, domain, 0.01) === nothing
 end
 
 

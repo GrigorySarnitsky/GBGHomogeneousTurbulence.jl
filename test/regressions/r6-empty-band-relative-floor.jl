@@ -30,7 +30,7 @@ using Random
   @test 0 < band_left < 1e-25                        # roundoff, and positive: the old guard's hole
 
   N̂ = new_vector_field_spectral(domain); fill!(field_data(N̂), 0)
-  add_forcing_source!(forcing, N̂, û, domain, 0.05)
+  add_forcing_source!(forcing, nothing, N̂, û, domain, 0.05)
   @test all(iszero, field_data(N̂))                   # no kick: the relative floor names it empty
 
   # A genuinely weak band still forces — and the decision is invariant under a uniform rescale.
@@ -41,7 +41,7 @@ using Random
     ûs = new_vector_field_spectral(domain)
     field_data(ûs) .= scale .* field_data(û2)
     N̂s = new_vector_field_spectral(domain); fill!(field_data(N̂s), 0)
-    add_forcing_source!(forcing, N̂s, ûs, domain, 0.05)
+    add_forcing_source!(forcing, nothing, N̂s, ûs, domain, 0.05)
     @test l2norm(N̂s) > 0                             # forced at unit scale AND at 1e-6 scale
     @test all(isfinite, field_data(N̂s))
   end

@@ -67,7 +67,7 @@ first a matter of kind, the other three the design choice read along its three a
 
 **Is the quantity an observable?** It must be determined by the state at a single ``t_n`` — by the
 state alone, in every argument. A quantity carrying anything else fails: the step size ``\Delta t``, a
-forcing's internal variables (the Ornstein–Uhlenbeck state of a stochastic source, say), the
+forcing's evolving state (the Ornstein–Uhlenbeck amplitudes of a stochastic source, say), the
 coefficients of the time scheme. For a quantity along a trajectory the probe's position — a state of the
 probe's own (§1.1), not of the fluid — counts as an additional argument and is bound by the same
 single-``t_n`` rule.

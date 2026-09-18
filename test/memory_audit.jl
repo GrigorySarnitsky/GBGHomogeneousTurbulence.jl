@@ -41,7 +41,6 @@
 
 using GBGIsotropicTurbulence
 using GBGPeriodicFields: npoints
-using GBGIsotropicTurbulence.Forcing: StochasticOU   # archived (un-exported); audited for the re-add
 using GBGPeriodicFields: field_data, CatmullRom
 using Random
 using Test
@@ -57,13 +56,14 @@ const N_AUDIT = 8
 
 # ---------------------------------------------------------------- the working-set ledger
 
-# Build one combination's working set and measure it. A stateful forcing (the OU) is materialized by
-# one prepare_forcing! call, since its state and noise scratch allocate lazily on first use.
+# Build one combination's working set and measure it. The state record carries each forcing's started
+# state, as a run's does, so a forcing's state is walked wherever it lives.
 function ledger(domain, scheme, scalar::Bool, velocity_forcing, scalar_forcing, tracers::Bool)
   conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0, velocity_forcing, scalar_forcing)
-  state = ResolvedFields(domain; scalar)
-  velocity_forcing isa StochasticOU && prepare_forcing!(velocity_forcing, state.velocity_spectral, domain, 0.01)
-  scalar_forcing isa StochasticOU && prepare_forcing!(scalar_forcing, state.scalar_spectral, domain, 0.01)
+  fields = ResolvedFields(domain; scalar)
+  modeled = (velocity_forcing = initial_forcing_state(velocity_forcing, fields.velocity_spectral, domain),
+             scalar_forcing = scalar ? initial_forcing_state(scalar_forcing, fields.scalar_spectral, domain) : nothing)
+  state = ResolvedFields(fields.velocity_spectral, fields.scalar_spectral, modeled)
   owners = Any[state, ObservablesCache(domain; scalar), ResolvedGenerator(domain, conditions; scalar),
                allocate_buffers(scheme, domain; scalar)]
   if tracers
@@ -129,18 +129,25 @@ const BASE = Dict(
 # the cache strand. PF adoption 2026-08-05/06: the stored translation kernels and the
 # integrating-factor register left the cells (PF decision 50, IT decision 39).)
 
+# What the stochastic forcing holds instead of field-scale arrays: its process and draw scratch live on
+# a companion grid sized by the forced band, so their cost is constant in N and vanishes against the run
+# as the grid grows. Pinned below at a realistic grid rather than at this file's tiny audit size.
+const OU_COMPANION_SHARE_AT_64 = 0.01
+
 # The frozen forcing DELTAS, per slot. Every band kernel is now a lazy radial symbol (PF adoption,
-# 2026-08-05 — PF decision 51), so a band-selecting forcing stores no field-scale kernel; the OU's
-# state and noise scratch take the forced field's shape.
-_forcing_delta(tag, slot) =
-  tag === :none  ? ZERO :
-  tag === :band  ? ZERO :
-  tag === :linear ? (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1) :
-  tag === :power ? ZERO :
-  tag === :controller ? ZERO :
-  slot === :velocity ? (spectral_vector = 2, physical_vector = 1, spectral_scalar = 0, physical_scalar = 0, real_spectral_scalar = 0) :
-                       (spectral_vector = 0, physical_vector = 0, spectral_scalar = 2, physical_scalar = 1, real_spectral_scalar = 0)
-# (:ou — in the forced field's shape, the OU state f̂ and the two noise buffers; its band is lazy.)
+# 2026-08-05 — PF decision 51), so a band-selecting forcing stores no field-scale kernel. The OU is
+# ZERO since decision 90: its process, its draw scratch and its uploaded amplitudes are all sized by
+# the band's M conjugate mode pairs, not the grid — a reduction of two spectral vectors and one
+# physical vector from the dense form (velocity slot), which held its force and a noise pair.
+function _forcing_delta(tag, slot)
+  tag === :none && return ZERO
+  tag === :band && return ZERO
+  tag === :linear && return (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1)
+  tag === :power && return ZERO
+  tag === :controller && return ZERO
+  tag === :ou && return ZERO
+  error("unmodelled forcing tag $tag — price it here in the same commit that adds it")
+end
 # Only a STEADY-rate forcing carries the generator's rate array, plus the materialized real band
 # indicator its rate fill reads (the band kernel being lazy, there are no stored coefficients to read
 # from). Today that is `Linear` alone.
@@ -173,7 +180,8 @@ _build_forcing(tag, domain) =
   # Explicit turnover_time: the scalar slot refuses the derived (kinetic-energy-law) default,
   # and the value is memory-inert — this sweep audits storage, not physics.
   tag === :controller ? VarianceController(domain; target = 0.5, turnover_time = 1.0) :
-  StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
+  tag === :ou ? StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1) :
+  error("unmodelled forcing tag $tag")
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : tag === :RK4 ? IFLowStorageRK4() :
                tag === :SSPRK3 ? IFSSPRK3() : IFHeun()
@@ -358,14 +366,11 @@ end
 #                      register), so there is no boundary left to hold a gap open.
 #   SCALAR REGISTERS — the scalar's copy register could share a slot; it is deleted outright.
 #   (SHARED FACTOR was retired 2026-08-06 with decision 39.)
-# Every unforced cell now sits AT its liveness bound in every class. The one remaining gap is the
-# archived OU's spectral noise: it could alias the generator's spectral registers but lives on the
-# forcing across an ownership boundary — one spectral vector. (Its physical twin closed with
-# decision 41: there is no physical product register left for the noise to alias, so the bound rose
-# to meet the ledger and the holder retired.)
-const GAP_HOLDERS = Dict(
-  (:RK3_OU, false) => Dict(:spectral_vector => "OWNERSHIP (OU noise ↔ nonlinear/product)"),
-)
+# Every cell now sits AT its liveness bound in every class, forced ones included. The last gap was
+# the archived OU's spectral noise, which could alias the generator's spectral registers but lived on
+# the forcing across an ownership boundary; its holder (OWNERSHIP, OU noise ↔ nonlinear/product)
+# retired with decision 90, which removed the noise from field scale altogether.
+const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, String}}()
 
 
 
@@ -394,8 +399,9 @@ const GAP_HOLDERS = Dict(
 #   energy_spectrum       ≈ 0.0 (1.6) — GBGPeriodicFields fused its radial_spectrum staging into the
 #                                  binning kernel (its decision 34); only the O(N) shell vectors
 #                                  remain. integral_scale and flow_parameters inherit the zero.
-# The archived StochasticOU's prepare! projects its noise ALIASED; with the projection now
-# guard-free that path should be allocation-free too — re-measure on the de-archival gate.
+# The dense StochasticOU's prepare! projected its noise aliased per step; the band-sparse form of
+# decision 90 has no field-scale episode at all (its per-step allocation is the reseed's fixed few
+# hundred bytes, pinned by regression 02-gpu-and-hot-loop-02).
 const EPISODE_UNITS = [
   ("seed velocity",       6.1, 1.0),
   ("seed scalar",         2.1, 0.5),
@@ -517,7 +523,7 @@ const EPISODE_UNITS = [
     tcache = ObservablesCache(domains[:TwoThirds]; number_of_particles = 4)
     buffers = allocate_buffers(Heun(), tracers, tcache)
     _m_arrays(owner) = (acc = AbstractArray[];
-                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);  # threshold 4: the M-arrays
+                        collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= 4);
                         [a for a in acc if size(a) == (4, 3)])
     @test length(_m_arrays(tracers)) == 1                  # positions — state, nothing else
     @test length(_m_arrays(tcache)) == 1                   # velocity_at_particles — the cache's slot
@@ -545,7 +551,7 @@ const EPISODE_UNITS = [
     traversal = sim.particle_traversal
     @test traversal isa ParticleTraversal && traversal.automatic
     _m_arrays(owner) = (acc = AbstractArray[];
-                        collect_field_arrays!(acc, owner, Set{UInt}(), 2);
+                        collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= M);
                         [a for a in acc if length(a) >= M])
     owned = _m_arrays(traversal)
     tiles = ntuple(_ -> cld(N_AUDIT, 4), 3)
@@ -577,7 +583,7 @@ const EPISODE_UNITS = [
                          array_type = Array, dealiasing = TwoThirds())
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom)
     m_arrays(owner) = (acc = AbstractArray[];
-                       collect_field_arrays!(acc, owner, Set{UInt}(), 2);
+                       collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= 4);
                        [a for a in acc if size(a) == (4, 3)])
     for K in (1, 2, 4, 8)
       cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),
@@ -596,8 +602,7 @@ const EPISODE_UNITS = [
 
   @testset "op lists name real registers" begin
     # The symbolic values must correspond to actual storage: the chart slots on ObservablesCache,
-    # products on ResolvedGenerator, spectral stage registers on IntegratorBuffers/ScalarBuffers,
-    # the OU's state and noise on the forcing.
+    # products on ResolvedGenerator, spectral stage registers on IntegratorBuffers/ScalarBuffers.
     @test all(f -> f in fieldnames(ObservablesCache),
               (:velocity_physical, :vorticity_physical, :scalar_physical, :max_speed))
     @test :product_spectral in fieldnames(ResolvedGenerator)
@@ -613,7 +618,24 @@ const EPISODE_UNITS = [
     @test isempty(intersect((:velocity_star, :vorticity_physical), fieldnames(IB)))
     @test all(f -> f in fieldnames(SB), (:stage1, :stage2, :predictor_spectral, :nonlinear))
     @test isempty(intersect((:copy, :field), fieldnames(SB)))
-    @test all(f -> f in fieldnames(StochasticOU), (:state, :noise_physical, :noise_spectral))
+    # The OU holds no evolving state and no noise field (decision 90): its process is in the record.
+    @test isempty(intersect((:state, :noise_physical, :noise_spectral), fieldnames(StochasticOU)))
+    @test :modeled in fieldnames(ResolvedFields)
+  end
+
+  @testset "the stochastic forcing's storage is set by its band, not by the grid" begin
+    # Decision 90: the process is a field on a companion grid over the same box, so nothing it holds
+    # scales with N. Measured against ONE of the run's own spectral vectors at a realistic grid.
+    N = 64
+    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
+                         dealiasing = TwoThirds(), array_type = Array)
+    ou = StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
+    û = new_vector_field_spectral(domain)
+    state = initial_forcing_state(ou, û, domain)
+    field_bytes = Base.summarysize(û)
+    @test Base.summarysize(state) + Base.summarysize(ou) < OU_COMPANION_SHARE_AT_64 * field_bytes
+    # …and none of it is counted as the run's residency, because none of it has the run's shape.
+    @test _counts(Any[state, ou], N) == ZERO
   end
 
   @testset "liveness bounds and the gap register" begin
@@ -629,23 +651,12 @@ const EPISODE_UNITS = [
     # sit at the bound too.
     @test peak_liveness(rk3_ops(true; phase_shift = true)) == BASE[(:RK3, :PhaseShift, true)]
 
-    # The one remaining gap: the archived OU's noise pair lives on the forcing, across an ownership
-    # boundary from the generator registers it could alias — one spectral and one physical vector,
-    # both held.
+    # The OU-forced cell sits at its bound too (decision 90): nothing of the forcing is field-scale,
+    # so the ledger and the bound are the unforced cell's, and the gap register is empty.
     ou_ops = rk3_ops(false; ou = true)
     ou_achieved = _add(BASE[(:RK3, :TwoThirds, false)], _forcing_delta(:ou, :velocity))
-    ou_bound = peak_liveness(ou_ops)
-    holders = GAP_HOLDERS[(:RK3_OU, false)]
-    for class in (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar)
-      working = getproperty(ou_achieved, class)
-      b = getproperty(ou_bound, class)
-      @test b <= working                        # a bound above the ledger is a bookkeeping error
-      if working - b > 0
-        @test haskey(holders, class)            # every gap carries a named holder (decision 33)
-      end
-    end
-    @test ou_achieved.spectral_vector - ou_bound.spectral_vector == 1
-    @test ou_achieved.physical_vector == ou_bound.physical_vector
+    @test peak_liveness(ou_ops) == ou_achieved
+    @test isempty(GAP_HOLDERS)
 
     # The physical-vector floor, in numbers: TWO registers — the chart slots, doubling as the
     # substage recovery registers AND as the quadratic products' in-place targets (decision 41) —

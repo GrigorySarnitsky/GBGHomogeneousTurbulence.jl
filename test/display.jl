@@ -14,7 +14,6 @@ using GBGIsotropicTurbulence.Phenomenology: Spectra, StructureFunctions, Scaling
 using GBGIsotropicTurbulence.Phenomenology.Spectra: Pope2000
 using GBGIsotropicTurbulence.Phenomenology.Scalings: Li2008
 using GBGIsotropicTurbulence.Phenomenology.StructureFunctions: Kolmogorov1941
-using GBGIsotropicTurbulence.Forcing: StochasticOU
 using GBGIsotropicTurbulence.Particles: advect!, unwrapped_positions
 using GBGPeriodicFields: field_data, point_positions, npoints, LalescuSpline
 using Random
@@ -125,6 +124,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
       ConstantPower(domain; injection_rate = 0.1), Linear(domain; rate = 0.5),
       VarianceRescaling(domain; target = 0.5, over = :total), VarianceController(domain; target = 0.5),
       StochasticOU(domain; variance = 1.0, correlation_time = 0.5), DeferredForcing(d -> nothing),
+      initial_forcing_state(StochasticOU(domain; variance = 1.0, correlation_time = 0.5),
+                            new_vector_field_spectral(domain), domain),
       StationarityCriterion().monitor,
       FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1),
     ]

@@ -10,12 +10,14 @@
     State
 
 The evolving state a run advances, and how it is seeded:
-- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation. This is the
-  single source of truth: the physical fields are recovered from it and never held in the state.
+- [`ResolvedFields`](@ref) — the evolving velocity and scalar in spectral representation, and any
+  forcing's evolving state. This is the single source of truth: the physical fields are recovered from
+  it and never held in the state.
 - [`random_solenoidal_velocity_spectral!`](@ref) and [`random_scalar_spectral!`](@ref) — the random
   initial conditions (a divergence-free velocity, a mean-zero scalar) that seed it.
 - [`write_state`](@ref) / [`read_state`](@ref) — the state's HDF5 persistence: the fields in
-  spectral representation as one self-describing group (available once `HDF5` is loaded).
+  spectral representation and the forcing states as one self-describing group (available once `HDF5`
+  is loaded).
 
 All sized to a [`FixedDomain`](@ref).
 
@@ -57,35 +59,54 @@ end
 
 """
     ResolvedFields(domain; scalar = false)
+    ResolvedFields(velocity_spectral, scalar_spectral,
+                   modeled = (velocity_forcing = nothing, scalar_forcing = nothing))
 
-The record of the evolving fields a run advances, in spectral representation — the single source of
-truth. The velocity, vorticity, and scalar in physical representation are recoveries of it, not part
-of it — since the state holds no derived copies, nothing in it can fall out of date. Each
-**iteration** — one advance of the run, a step plus the deposit that closes it — recovers the
-physical representations at its end into the
-[`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
+The record of what a run advances: the evolving fields in spectral representation — the single
+source of truth — and the evolving state of any forcing that carries one. The velocity, vorticity, and
+scalar in physical representation are recoveries of the fields, not part of the record — since it
+holds no derived copies, nothing in it can fall out of date. Each **iteration** — one advance of the
+run, a step plus the deposit that closes it — recovers the physical representations at its end into
+the [`ObservablesCache`](@ref GBGIsotropicTurbulence.Cache.ObservablesCache).
 
-Build it on `domain`, a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar.
+Build it on `domain`, a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar. The
+positional form wraps existing fields without copying them, which is how a state is handed to
+[`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation) to adopt. Both forms leave
+`modeled` empty; a `Simulation` fills it from its forcings, starting any forcing state the record
+does not already carry.
 
 # Fields
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
 - `scalar_spectral` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the
   run carries no passive scalar.
+- `modeled` — the evolving state of each forcing, `(velocity_forcing = …, scalar_forcing = …)`: the
+  value a forcing's [`initial_forcing_state`](@ref GBGIsotropicTurbulence.Forcing.initial_forcing_state)
+  started, or `nothing` for a forcing that carries none. A stochastic forcing's process lives here
+  rather than in the forcing, so the record is complete: saving it saves the whole evolving state.
 """
-struct ResolvedFields{UH, PH}
+struct ResolvedFields{UH, PH, MD<:NamedTuple{(:velocity_forcing, :scalar_forcing)}}
   velocity_spectral::UH          # û (spectral) — the resolved velocity, the single source of truth
   scalar_spectral::PH            # φ̂ (spectral), or nothing when the run carries no scalar
+  modeled::MD                    # each forcing's evolving state (decision 23(c)), or nothing per field
 end
+
+const NO_FORCING_STATE = (velocity_forcing = nothing, scalar_forcing = nothing)
+
+ResolvedFields(velocity_spectral, scalar_spectral) =
+  ResolvedFields(velocity_spectral, scalar_spectral, NO_FORCING_STATE)
 
 ResolvedFields(domain::FixedDomain; scalar::Bool = false) =
   ResolvedFields(new_vector_field_spectral(domain), scalar ? new_scalar_field_spectral(domain) : nothing)
 
 # Display (the convention is stated once, at `SimulationDomain`'s display section). The two
 # representations-of-record, each through the field library's own `show` — grid, element type,
-# storage — which is exactly what a run checks a state against; the scalar's absence is said aloud.
+# storage — which is exactly what a run checks a state against; the scalar's absence is said aloud,
+# and a forcing state appears only when one is carried.
 function Base.show(io::IO, state::ResolvedFields)
   print(io, "ResolvedFields(û ", state.velocity_spectral)
   isnothing(state.scalar_spectral) ? print(io, ", no scalar") : print(io, ", φ̂ ", state.scalar_spectral)
+  isnothing(state.modeled.velocity_forcing) || print(io, ", velocity forcing state ", state.modeled.velocity_forcing)
+  isnothing(state.modeled.scalar_forcing) || print(io, ", scalar forcing state ", state.modeled.scalar_forcing)
   print(io, ")")
 end
 
@@ -93,6 +114,8 @@ function Base.show(io::IO, ::MIME"text/plain", state::ResolvedFields)
   print(io, "ResolvedFields")
   print(io, "\n  velocity_spectral  û  ", state.velocity_spectral)
   print(io, "\n  scalar_spectral    φ̂  ", something(state.scalar_spectral, "nothing (no scalar)"))
+  print(io, "\n  modeled            velocity forcing ", something(state.modeled.velocity_forcing, "nothing"),
+        ", scalar forcing ", something(state.modeled.scalar_forcing, "nothing"))
 end
 
 
@@ -301,8 +324,9 @@ export write_state, read_state
 
 Write the [`ResolvedFields`](@ref) `state` under `parent` as one self-describing HDF5 group — the
 velocity, and the scalar when the run carries one, each a nested field group in spectral
-representation. The spectral representation is the single source of truth, so no physical
-representation is stored. Available once the `HDF5` package is loaded; the caller owns the file.
+representation, and each forcing state the record carries. The spectral representation is the single
+source of truth, so no physical representation is stored. Available once the `HDF5` package is loaded;
+the caller owns the file.
 
 The arguments are:
 - `parent` — the open HDF5 file or group to write under.
@@ -321,7 +345,9 @@ function write_state end
 Rebuild a [`ResolvedFields`](@ref) from the group [`write_state`](@ref) wrote, allocated on and
 copied to the storage backend of `domain` (a [`FixedDomain`](@ref)) — which must agree with the
 file in grid size and element type, or the read is refused with an `ArgumentError`, as is a group
-not written by `write_state`. Available once the `HDF5` package is loaded.
+not written by `write_state`. The forcing states come back with the fields; a group written before
+forcing states were stored reads with none, and a run adopting it starts its forcing afresh.
+Available once the `HDF5` package is loaded.
 
 The arguments are:
 - `parent` — the open HDF5 file or group holding the state group.
