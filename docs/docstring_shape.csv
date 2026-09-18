@@ -7,19 +7,19 @@ Cache.jl::scalar_physical(cache),55,0,56
 Cache.jl::velocity_at_particles(cache),115,0,116
 Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
-Forcing.jl::AbstractForcing,94,1,377
+Forcing.jl::AbstractForcing,62,1,447
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,419
 Forcing.jl::DeferredForcing,54,0,216
-Forcing.jl::Forcing,81,0,429
+Forcing.jl::Forcing,109,0,457
 Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,190
 Forcing.jl::NoForcing(),16,0,17
-Forcing.jl::StochasticOU(domain; variance， correlation_time， lowest_shell = 1，,94,1,693
-Forcing.jl::StochasticOUState,89,0,182
+Forcing.jl::StochasticOU(domain; forcing_variance， correlation_time， lowest_shell = 1，,96,1,884
+Forcing.jl::StochasticOUState,69,0,188
 Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,804
 Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,723
-Forcing.jl::add_forcing_source!(forcing， forcing_state， N̂， field， domain， diffusivity) -> N̂,76,1,254
-Forcing.jl::initial_forcing_state(forcing， field， domain),55,0,109
-Forcing.jl::prepare_forcing!(forcing， forcing_state， field， domain， dt) -> nothing,69,0,76
+Forcing.jl::add_forcing_source!(forcing， forcing_state， N̂， field， domain， diffusivity) -> N̂,79,1,303
+Forcing.jl::initial_forcing_state(forcing， field， domain),62,0,131
+Forcing.jl::prepare_forcing!(forcing， forcing_state， field， domain， dt) -> nothing,34,0,138
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::read_forcing(parent::HDF5.H5DataStore， name::AbstractString，,54,0,91
 Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,113,0,119
@@ -113,7 +113,7 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,55,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2582
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2622
 SimulationRun.jl::SimulationRun,31,0,229
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false，,98,0,670
 SimulationRun.jl::advance!(sim; dt = nothing),55,0,124
@@ -147,7 +147,7 @@ Spectra.jl::VonKarmanLarge(c_L),44,0,64
 Spectra.jl::dissipation_factor(f， κη) -> Float64,27,0,31
 Spectra.jl::large_scale_factor(f， κL) -> Float64,54,0,58
 Spectra.jl::large_scale_length(f， fp) -> Float64,65,0,147
-State.jl::ResolvedFields(domain; scalar = false),91,0,245
+State.jl::ResolvedFields(domain; scalar = false),91,0,275
 State.jl::State,77,0,175
 State.jl::random_scalar_spectral!(φ̂， domain; scalar_variance， envelope_wavenumber，,95,1,385
 State.jl::random_solenoidal_velocity_spectral!(û， domain; kinetic_energy， envelope_wavenumber，,100,1,402

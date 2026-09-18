@@ -278,15 +278,18 @@ The run group:
   restored positions.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
-- `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in
-  place of the random seed: its arrays become the run's own (no copy), which is how a run
-  continues from a stored or externally imported field. The state must live on the domain's grid
-  and storage backend and agree with `scalar`; `initial_spectrum` cannot be given with it. A forcing
-  state it carries (the `modeled` entry, as a checkpoint of a `StochasticOU` run does) continues,
-  and an `ArgumentError` refuses one that does not fit the forcing given; a forcing with no carried
-  state starts afresh. When
-  ``\\nu`` is derived, the constructor measures the adopted state's kinetic energy and warns if it
-  is not the `kinetic_energy` the calibration assumed.
+- `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in place of the
+  random seed, which is how a run continues from a stored or externally imported field. Its arrays
+  become the run's own and are not copied, so two runs must not adopt one state object. Four rules
+  apply to it:
+    - it must live on the domain's grid and storage backend, and agree with `scalar`;
+    - `initial_spectrum` cannot be given with it, since the field is no longer being seeded;
+    - a forcing state it carries in its `modeled` entry — as a checkpoint of a
+      [`StochasticOU`](@ref GBGIsotropicTurbulence.Forcing.StochasticOU) run does — continues where it
+      left off, while a forcing whose entry is empty starts a fresh one. An entry that does not fit
+      the forcing given is refused with an `ArgumentError`;
+    - with a derived ``\\nu``, the constructor measures the adopted state's kinetic energy and warns
+      when it is not the `kinetic_energy` the calibration assumed.
 - `tracers = nothing` — an existing `Tracers` set to adopt in place of seeding
   `number_of_particles` fresh ones. The interpolation scheme and the unwrapped record are then
   properties of the given set, so `interpolation_scheme` and `unwrapped` cannot be given with it.

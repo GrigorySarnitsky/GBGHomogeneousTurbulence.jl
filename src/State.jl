@@ -79,10 +79,15 @@ does not already carry.
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
 - `scalar_spectral` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the
   run carries no passive scalar.
-- `modeled` — the evolving state of each forcing, `(velocity_forcing = …, scalar_forcing = …)`: the
-  value a forcing's [`initial_forcing_state`](@ref GBGIsotropicTurbulence.Forcing.initial_forcing_state)
-  started, or `nothing` for a forcing that carries none. A stochastic forcing's process lives here
-  rather than in the forcing, so the record is complete: saving it saves the whole evolving state.
+- `modeled` — each forcing's evolving state, as it stands now:
+  `(velocity_forcing = …, scalar_forcing = …)`. A forcing's
+  [`initial_forcing_state`](@ref GBGIsotropicTurbulence.Forcing.initial_forcing_state) creates the
+  entry and its [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) advances it
+  once per step; it is `nothing` for a forcing that evolves nothing, which is every strategy but
+  [`StochasticOU`](@ref GBGIsotropicTurbulence.Forcing.StochasticOU), whose entry is a
+  [`StochasticOUState`](@ref GBGIsotropicTurbulence.Forcing.StochasticOUState). A stochastic forcing's
+  process lives here rather than in the forcing, so this record is the whole evolving state of the
+  run: saving it saves everything that advances.
 """
 struct ResolvedFields{UH, PH, MD<:NamedTuple{(:velocity_forcing, :scalar_forcing)}}
   velocity_spectral::UH          # û (spectral) — the resolved velocity, the single source of truth
@@ -343,8 +348,8 @@ function write_state end
                domain::FixedDomain) -> ResolvedFields
 
 Rebuild a [`ResolvedFields`](@ref) from the group [`write_state`](@ref) wrote, allocated on and
-copied to the storage backend of `domain` (a [`FixedDomain`](@ref)) — which must agree with the
-file in grid size and element type, or the read is refused with an `ArgumentError`, as is a group
+copied to the storage backend of `domain`, a [`FixedDomain`](@ref) that must agree with the file in
+grid size and element type. A domain that disagrees is refused with an `ArgumentError`, as is a group
 not written by `write_state`. The forcing states come back with the fields; a group written before
 forcing states were stored reads with none, and a run adopting it starts its forcing afresh.
 Available once the `HDF5` package is loaded.

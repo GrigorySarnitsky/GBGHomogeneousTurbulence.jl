@@ -61,8 +61,9 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
-a run holds fixed — `target`, `rate`, `injection_rate`, `over` — has no canonical value and is
-required. A default at this layer never hides a choice you needed to make; the run layer's
+a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
+`correlation_time` — has no canonical value and is required. A `seed` is neither: any value gives an
+equally valid realization, so it defaults, and naming it is how a run is repeated. A default at this layer never hides a choice you needed to make; the run layer's
 convenience default (a controller targeting the initial kinetic energy) is that layer's own,
 documented choice.
 
@@ -112,33 +113,42 @@ _band_is_empty(band_value, whole_value) =
 """
     AbstractForcing
 
-Supertype of the energy-injection strategies. A strategy may implement any of
-[`prepare_forcing!`](@ref) (advance the strategy's evolving state — a stochastic forcing's random
-process, say — which [`initial_forcing_state`](@ref) starts and the run's state record keeps), [`set_forcing_rate!`](@ref)
-(a rate that is **constant in time**, folded into the integrating factor — a strategy implementing it
-**must** also declare [`uses_steady_linear_rate`](@ref), or it is never given a rate array to fill),
-[`add_forcing_source!`](@ref) (an additive per-stage source), and [`project_forcing!`](@ref) (a
-post-step projection); all default to doing nothing, and a strategy owns whatever scratch its hooks
-need.
+Supertype of the energy-injection strategies — the interchangeable ways a run drives its velocity or
+its scalar.
 
-The hooks form **one per-step lifecycle with a fixed order**: `prepare_forcing!` and
-`set_forcing_rate!` run once before the Runge–Kutta stages (whatever internal state a later hook
-consumes must be prepared here), `add_forcing_source!` runs at every stage — reading that state, never advancing it — and
-`project_forcing!` runs after the completed step. The rate and the source are two channels of **one** forcing term — the *steady* part is folded
-exactly into the integrating factor, the remainder is added at the stages — so a single strategy may
-legitimately use both.
+A strategy implements whichever of four hooks it needs; each defaults to doing nothing. A step calls
+them in one fixed order:
 
-Which channel a rate may take is decided by steadiness in time, **not** linearity in the field: the
-integrating factor holds a rate fixed for the whole step, so one re-solved from the state must go
-through `add_forcing_source!` instead. The declaration is measured when the generator is built,
-not trusted: a declared rate is probed on two different fields and refused with an
-`ArgumentError` if the outputs differ — the hook takes no time argument, so a field-independent
-rate is steady — and a strategy that implements `set_forcing_rate!` without the declaration is
-refused likewise.
+- [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
+  such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
+  and the run's state record holds it.
+- [`set_forcing_rate!`](@ref) — once, before the stages: fill a per-mode rate that stays fixed for the
+  whole step, which the scheme folds exactly into the integrating factor. A strategy that implements
+  this hook **must** also declare [`uses_steady_linear_rate`](@ref), or it is never handed a rate
+  array to fill.
+- [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
+- [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 
-Each mutating hook returns its mutated argument (`set_forcing_rate!` the rate,
-`add_forcing_source!` the right-hand side, `project_forcing!` the field); `prepare_forcing!` returns
-`nothing`.
+The rate and the source are two channels of **one** forcing term: the steady part folded exactly into
+the integrating factor, the remainder added at the stages. A single strategy may use both.
+
+Which channel a rate may take is decided by steadiness in time, **not** by linearity in the field. The
+integrating factor holds a rate fixed for the whole step, so a rate re-solved from the state must go
+through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
+first order.
+
+The declaration is measured when the generator is built, not trusted. A declared rate is armed from two
+different fields and refused with an `ArgumentError` when the two differ, the hook taking no time
+argument, so a field-independent rate is a steady one. A strategy that fills a rate without declaring
+it is refused the same way, rather than going silently unapplied.
+
+Each mutating hook returns the argument it mutated: `set_forcing_rate!` the rate,
+`add_forcing_source!` the right-hand side, `project_forcing!` the field. `prepare_forcing!` returns
+`nothing`, having advanced the state it was handed in place.
+
+A hook runs inside the time loop, which is allocation-free at field scale, so a strategy allocates
+whatever scratch it needs once, when it is built, and its hooks touch only that scratch and the
+arguments they are given.
 
 !!! warning "One instance per forced field, for a strategy with mutable bookkeeping"
     A strategy that mutates its own fields as it runs must not drive both fields from one instance,
@@ -162,7 +172,7 @@ A deferred forcing. The operator-free keyword constructors
     VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
     StochasticOU(; forcing_variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 42)
 
-each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
+each returns a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is built into the concrete
 `AbstractForcing` once the [`FixedDomain`](@ref GBGIsotropicTurbulence.SimulationDomain.FixedDomain)
 exists (done for you by [`Simulation`](@ref GBGIsotropicTurbulence.SimulationRun.Simulation)). A
@@ -253,15 +263,19 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 """
     initial_forcing_state(forcing, field, domain)
 
-The evolving state the strategy `forcing` starts with when it drives `field` (the velocity or the
-scalar in spectral representation, which sets how many components the state carries) on the
-[`FixedDomain`](@ref) `domain`, or `nothing` for a strategy that evolves no state of its own — the
-default, and the case of every strategy but [`StochasticOU`](@ref).
+Create the state the strategy `forcing` begins from when it drives `field` — the velocity or the
+scalar in spectral representation, whose tensor order sets how many components the state carries — on
+the [`FixedDomain`](@ref) `domain`.
 
-A run keeps the returned value in its state record, as the `modeled` entry of
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for that field, and hands it to
-[`prepare_forcing!`](@ref) every step; the strategy itself holds only its parameters and scratch. That
-is what lets a checkpoint of the state record resume a forced run exactly.
+Returns `nothing` for a strategy that evolves no state of its own: the default, and the case of every
+strategy but [`StochasticOU`](@ref), which returns a
+[`StochasticOUState`](@ref) holding its random process.
+
+A run calls this once per forced field, keeps what it returns in its state record — the `modeled`
+entry of [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) — and hands that value
+to [`prepare_forcing!`](@ref) every step, which advances it in place. The strategy itself holds only
+its parameters and its scratch, so a checkpoint of the state record is enough to resume a forced run
+exactly.
 """
 initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 
@@ -269,12 +283,21 @@ initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 """
     prepare_forcing!(forcing, forcing_state, field, domain, dt) -> nothing
 
-Advance the strategy `forcing`'s evolving state `forcing_state` (the value its
-[`initial_forcing_state`](@ref) started, kept in the run's state record, or `nothing`) once per step,
-before the Runge–Kutta stages, given the start-of-step `field` in spectral representation, the timestep
-`dt`, and the [`FixedDomain`](@ref) `domain`. Whatever a later hook reads from the step's state —
-[`add_forcing_source!`](@ref) takes no state argument — is prepared into the strategy's own scratch
-here. The default does nothing.
+Advance the strategy `forcing`'s evolving state by one step, before the Runge–Kutta stages begin.
+The state is mutated in place, so it holds its end-of-step value when this call returns; the default
+does nothing.
+
+Everything the stages will need must be ready when this returns, since
+[`add_forcing_source!`](@ref) is handed no timestep of its own.
+
+The arguments are:
+- `forcing` — the strategy whose state advances.
+- `forcing_state` — that state as it stands now, not as it started:
+  [`initial_forcing_state`](@ref) created it once, and this hook has advanced it on every step since.
+  It is `nothing` for a strategy that evolves no state.
+- `field` — the start-of-step velocity or scalar, in spectral representation.
+- `domain` — the [`FixedDomain`](@ref) the run advances on.
+- `dt` — the step about to be taken.
 """
 prepare_forcing!(::AbstractForcing, forcing_state, field, domain::FixedDomain, dt::Real) = nothing
 
@@ -282,26 +305,31 @@ prepare_forcing!(::AbstractForcing, forcing_state, field, domain::FixedDomain, d
 """
     add_forcing_source!(forcing, forcing_state, N̂, field, domain, diffusivity) -> N̂
 
-Add the strategy `forcing`'s additive source to the assembled right-hand side `N̂`, on the
-[`FixedDomain`](@ref) `domain`, reading whatever it needs of its evolving state `forcing_state` — the
-value [`initial_forcing_state`](@ref) started and [`prepare_forcing!`](@ref) advanced this step, or
-`nothing` for a strategy that evolves none. The default does nothing.
+Add the strategy `forcing`'s source term to the assembled right-hand side `N̂`, at every Runge–Kutta
+stage. The default does nothing.
 
-This is the route a **state-dependent** forcing must take. It is called at every Runge–Kutta stage
-and is handed that stage's own `field` — the velocity ``\\hat{\\boldsymbol{u}}`` or the scalar
-``\\hat{\\varphi}`` in spectral representation, whichever this forcing drives — together with the
-`diffusivity` acting on it (``\\nu`` for the velocity, ``\\varkappa`` for the scalar). A strategy
-whose amplitude depends on the current state can therefore measure that state exactly where the
-scheme will integrate the result.
+Two kinds of strategy come through this hook. One measures the stage's own `field` and sets its
+amplitude from it — `ConstantPower` and `VarianceController` do, and this is the only route open to
+them, since a state-dependent rate frozen once per step would drop the scheme to first order. The
+other carries a source that does not read the field at all: [`StochasticOU`](@ref)'s random process,
+already advanced for this step by [`prepare_forcing!`](@ref), which this hook only writes into `N̂`.
 
-The alternative costs accuracy: a state-dependent rate frozen once per step is the left-endpoint
-rectangle rule on ``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order however good it is.
-Only a steady rate may go through [`set_forcing_rate!`](@ref).
+The arguments are:
+- `forcing` — the strategy adding the source.
+- `forcing_state` — its evolving state as `prepare_forcing!` left it this step, or `nothing` for a
+  strategy that evolves none. This hook reads it and does not advance it.
+- `N̂` — the assembled right-hand side, accumulated into.
+- `field` — this stage's own velocity ``\\hat{\\boldsymbol{u}}`` or scalar ``\\hat{\\varphi}``, in
+  spectral representation, whichever the strategy drives.
+- `domain` — the [`FixedDomain`](@ref) the term is assembled on.
+- `diffusivity` — the diffusivity acting on the forced field: ``\\nu`` for the velocity,
+  ``\\varkappa`` for the scalar.
 
-Measuring the state costs one blocking device-to-host transfer **at every stage** — a single fused
-multi-weight reduction answers [`VarianceController`](@ref)'s three weighted sums together,
-[`ConstantPower`](@ref) reads its band (and the empty-band floor's scale) the same fused way, and
-[`Linear`](@ref) pays none. That is the price of the order this route preserves.
+Measuring the field costs one blocking device-to-host transfer at every stage, and that is the price
+of the order this route preserves. A single fused multi-weight reduction answers
+[`VarianceController`](@ref)'s three weighted sums together, and [`ConstantPower`](@ref) reads its
+band the same fused way. A strategy that reads nothing pays nothing: `StochasticOU` makes no such
+transfer, and [`Linear`](@ref), which takes the rate route instead, makes none either.
 
 !!! warning "The source is accumulated, never assigned"
     Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
@@ -838,15 +866,18 @@ end
 The stochastic forcing of Eswaran & Pope (1988,
 [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
 *Computers & Fluids* **16**, 257–278), built on the [`FixedDomain`](@ref) `domain`: a random term,
-correlated over a finite time, added to the right-hand side on a band of low wavenumbers. Its strength
-is `forcing_variance`, the stationary mean square
-``\\sigma^{2} = \\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle`` of the term added — an acceleration
-when it drives the velocity, a rate of change of ``\\varphi`` when it drives the scalar. It is **not**
-the variance of the field itself, which is what [`VarianceController`](@ref) holds.
+correlated over a finite time, added to the right-hand side on a band of low wavenumbers.
 
-Use it when the forcing must not depend on the flow it drives. Every other strategy here reads the
-field it forces, so its injection responds to the flow; this one does not, and the price is that the
-energy it injects fluctuates rather than being held.
+Use it when the forcing must not depend on the flow it drives. Every other strategy here measures the
+field it forces and sets its amplitude from that measurement; this one draws from a random process
+instead. The price is that the energy it injects fluctuates rather than being held — take
+[`ConstantPower`](@ref) or [`VarianceController`](@ref) when a run needs the injection or the variance
+held at a value.
+
+Its strength is `forcing_variance`, the stationary mean square
+``\\sigma^{2} = \\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle`` of the term added: an acceleration
+when it drives the velocity, a rate of change of ``\\varphi`` when it drives the scalar. It is **not**
+the variance of the field itself, which is what `VarianceController` holds.
 
 The forcing lives on the band's Fourier modes — the integer shells `lowest_shell` to `highest_shell` in
 units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
@@ -855,11 +886,12 @@ units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 \\boldsymbol{f}(\\boldsymbol{x}, t) = \\sum_{\\boldsymbol{\\kappa}} \\boldsymbol{a}_{\\boldsymbol{\\kappa}}(t) e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}},
 ```
 
-each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` an independent complex Ornstein–Uhlenbeck process
-with correlation time ``T_L``, transverse to ``\\boldsymbol{\\kappa}`` when the forced field is the
-velocity, so the force is divergence-free. Its stationary mean square
-``\\sigma^{2}`` is shared equally among the band's modes and their independent components. Once per step every amplitude takes the process's exact transition over
-the step ``\\Delta t``,
+where each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` is an independent complex
+Ornstein–Uhlenbeck process with correlation time ``T_L``. When the forced field is the velocity, each
+amplitude is drawn transverse to its own ``\\boldsymbol{\\kappa}``, so the force is divergence-free.
+``\\sigma^{2}`` is shared equally among the band's modes and their independent components.
+
+Once per step every amplitude takes the process's exact transition over the step ``\\Delta t``,
 
 ```math
 \\boldsymbol{a}_{\\boldsymbol{\\kappa}} \\leftarrow \\alpha \\boldsymbol{a}_{\\boldsymbol{\\kappa}} + \\sqrt{1 - \\alpha^{2}} \\boldsymbol{\\xi}_{\\boldsymbol{\\kappa}},
@@ -870,11 +902,12 @@ with ``\\boldsymbol{\\xi}`` a fresh draw from the stationary distribution, so th
 any step, a step the CFL condition varies included. The process starts from a stationary draw rather
 than from zero.
 
-While ``T_L`` is short against the large-eddy turnover time, the velocity the force does work against
-is mostly the velocity that same force produced over the last ``T_L``, and the mean injection rate is
-close to ``\\sigma^{2} T_L`` into the kinetic energy ``k``, or ``2\\sigma^{2} T_L`` into the scalar
-variance ``\\langle\\varphi^{2}\\rangle``. Choose `forcing_variance` from the dissipation rate the run should
-sustain; unlike [`ConstantPower`](@ref), nothing holds the injection at that value.
+How much energy that injects depends on how the force and the field line up. Over a correlation time
+the force builds the very velocity it then does work against, so while ``T_L`` is short against the
+large-eddy turnover time the mean injection rate is close to ``\\sigma^{2} T_L`` into the kinetic energy
+``k``, and to ``2\\sigma^{2} T_L`` into the scalar variance ``\\langle\\varphi^{2}\\rangle``. Both are
+estimates the run drifts around, not values anything holds: choose `forcing_variance` from the
+dissipation rate the run should sustain, and measure what it actually injects.
 
 The forcing is held fixed over a step and added at every stage, as [`add_forcing_source!`](@ref) does for
 every additive source. For a given sequence of amplitudes the field then advances at the scheme's
@@ -889,11 +922,17 @@ The arguments are:
 - `seed = 42` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
   independent streams.
 
-The process lives in the run's state record, not in this strategy: a run keeps a
-[`StochasticOUState`](@ref) as the `modeled` entry of its
-[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields), so a checkpoint of the state
-resumes the same realization. The strategy holds its parameters and the scratch of one draw, so one
-instance may drive both fields.
+The process lives in the run's state record, not in this strategy. A run keeps it as a
+[`StochasticOUState`](@ref) — the `modeled` entry of its
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) — held on a small grid of its own
+over the same box, large enough to carry the band and no larger, so the whole forcing costs a few
+kilobytes and runs no transform at the resolution of the run. A checkpoint of the state record
+therefore resumes the same realization. This strategy holds its parameters and the scratch of one
+draw, so one instance may drive both fields.
+
+A state record built by hand that carries no state for this forcing is refused: preparing it throws an
+`ArgumentError` rather than leave the run unforced without saying so. A `Simulation` builds the record
+for you.
 
 !!! warning "The band must lie inside the dealias cutoff"
     A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes
@@ -909,8 +948,9 @@ instance may drive both fields.
 - `velocity_scratch`, `scalar_scratch` — one draw's scratch for each kind of forced field: a physical
   and a spectral companion field, the host array the draw is made in, and the scale that turns a
   unit-variance draw into the stationary distribution.
-- `rng` — the random-number generator, reseeded before every draw from the seed and the state's draw
-  count; scratch, not state.
+- `rng` — the random-number generator, reseeded before every draw from the seed, the state's draw
+  count, and which field is being forced, which is what makes a velocity and a scalar forcing of one
+  seed independent. Scratch, not state.
 """
 struct StochasticOU{T, D, K, V, S} <: AbstractForcing
   forcing_variance::T                    # σ²: the stationary mean square of the added term
@@ -929,18 +969,21 @@ end
 """
     StochasticOUState
 
-The evolving state of a [`StochasticOU`](@ref) forcing: its Ornstein–Uhlenbeck process, held as a field
-in spectral representation on the forcing's coarse companion grid, and the number of increments drawn
-so far. A run starts one through [`initial_forcing_state`](@ref) and keeps it in its state record, as
-the `modeled` entry of [`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for the
-forced field; there is no reason to build one by hand.
+A [`StochasticOU`](@ref) forcing's evolving state holds two things: the force itself, as a field in
+spectral representation on the forcing's companion grid, and the number of increments drawn so far.
+[`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
+and a run keeps it in its state record as the `modeled` entry of
+[`ResolvedFields`](@ref GBGIsotropicTurbulence.State.ResolvedFields) for the forced field. There is no
+reason to build one by hand.
 
-Holding the force as an ordinary field is what makes the rest free: the draw is made real-valued and
-transformed, so its spectrum satisfies the reality condition by construction; the transverse projection
-is the field library's; and the state persists through the library's own field persistence. The
-amplitudes are physical — the coefficients of ``e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}}`` in
-the force, with no transform normalization — so neither the state nor a checkpoint of it depends on
-either grid's size. Together with the forcing's seed, the draw count fixes every later draw.
+Holding the force as an ordinary field is what keeps the rest simple. The draw is made real-valued and
+then transformed, so its spectrum satisfies the reality condition by construction; the transverse
+projection is the field library's; and the state is saved by the same library's field persistence.
+
+The amplitudes are physical — the coefficients of
+``e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}}`` in the force, with no transform
+normalization — so neither the state nor a checkpoint of it depends on either grid's size. The draw
+count, with the forcing's seed, fixes every later draw.
 
 # Fields
 - `process` — the force in spectral representation on the companion grid.
