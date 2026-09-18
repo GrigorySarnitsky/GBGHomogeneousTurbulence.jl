@@ -1,4 +1,4 @@
-# GPU memory
+# Memory footprint on a GPU
 
 A run goes on a GPU through its `array_type`: `CuArray` for an NVIDIA card, with `CUDA` added to your
 environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` sets the precision. This

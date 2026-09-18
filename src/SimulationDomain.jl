@@ -211,7 +211,7 @@ All keyword; the five naming the box are required:
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
 - `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU);
-  [GPU memory](@ref) gives a run's memory on a card.
+  [Memory footprint on a GPU](@ref) sizes a run.
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to
   [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans).
   On the CPU the default is FFTW's instant `ESTIMATE` heuristic, which can

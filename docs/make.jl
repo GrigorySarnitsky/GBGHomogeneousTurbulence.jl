@@ -366,8 +366,9 @@ makedocs(
   doctest   = false,
   plugins   = [links],
   pages = [
-    "Home"     => "index.md",
-    "Notation" => "notation.md",
+    "Home"              => "index.md",
+    "Memory footprint"  => "gpu.md",
+    "Notation"          => "notation.md",
     "API"  => Any[
       "Overview"               => "api.md",
       "GBGIsotropicTurbulence" => "api/GBGIsotropicTurbulence.md",
@@ -388,7 +389,6 @@ makedocs(
       "StructureFunctions" => "api/phenomenology/StructureFunctions.md",
       "Scalings"           => "api/phenomenology/Scalings.md",
     ],
-    "GPU memory" => "gpu.md",
     "Validation" => "validation.md",
     "Design & Internals" => Any[
       "Architecture"   => "architecture.md",

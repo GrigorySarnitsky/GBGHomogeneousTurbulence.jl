@@ -167,7 +167,7 @@ The domain group:
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
 - `side_length = 2π` — the box side ``L``.
 - `element_type = Float64`, `array_type = Array` — the real element type and storage backend
-  ([GPU memory](@ref) gives a run's memory on a card).
+  ([Memory footprint on a GPU](@ref) sizes a run).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
   ``\\kappa_{\\max}`` of `κ_max_η`).
