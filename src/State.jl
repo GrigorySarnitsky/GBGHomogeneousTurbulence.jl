@@ -83,7 +83,7 @@ does not already carry.
   `(velocity_forcing = …, scalar_forcing = …)`. A forcing's
   [`initial_forcing_state`](@ref GBGIsotropicTurbulence.Forcing.initial_forcing_state) creates the
   entry and its [`prepare_forcing!`](@ref GBGIsotropicTurbulence.Forcing.prepare_forcing!) advances it
-  once per step; it is `nothing` for a forcing that evolves nothing, which is every strategy but
+  once per step; it is `nothing` for a forcing without one, which is every strategy but
   [`StochasticOU`](@ref GBGIsotropicTurbulence.Forcing.StochasticOU), whose entry is a
   [`StochasticOUState`](@ref GBGIsotropicTurbulence.Forcing.StochasticOUState). A stochastic forcing's
   process lives here rather than in the forcing, so this record is the whole evolving state of the

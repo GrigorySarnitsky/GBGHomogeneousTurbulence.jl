@@ -28,7 +28,7 @@ StochasticOU
 ## Forcing state
 
 What a strategy evolves lives in the run's state record rather than in the strategy, so saving the
-record saves it. `StochasticOU` is the one strategy that evolves anything.
+record saves it. `StochasticOU` is the only strategy here that carries such a state.
 
 ```@docs
 StochasticOUState

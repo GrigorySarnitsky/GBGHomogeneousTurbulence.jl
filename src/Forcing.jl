@@ -317,7 +317,7 @@ already advanced for this step by [`prepare_forcing!`](@ref), which this hook on
 The arguments are:
 - `forcing` — the strategy adding the source.
 - `forcing_state` — its evolving state as `prepare_forcing!` left it this step, or `nothing` for a
-  strategy that evolves none. This hook reads it and does not advance it.
+  strategy without one. This hook reads it and does not advance it.
 - `N̂` — the assembled right-hand side, accumulated into.
 - `field` — this stage's own velocity ``\\hat{\\boldsymbol{u}}`` or scalar ``\\hat{\\varphi}``, in
   spectral representation, whichever the strategy drives.

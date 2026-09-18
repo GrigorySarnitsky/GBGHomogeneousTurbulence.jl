@@ -378,7 +378,7 @@ mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   # Each forcing's evolving state for the step `prepare!` opened, taken from the state record so the
   # per-stage source hook can read it: the right-hand-side verbs are handed a stage FIELD, not the
   # record it came from. Refreshed every step beside the scratch above, and `nothing` for a strategy
-  # that evolves nothing.
+  # with no state of its own.
   velocity_forcing_state::Any
   scalar_forcing_state::Any
 end
