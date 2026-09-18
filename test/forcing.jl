@@ -180,7 +180,7 @@ end
   @testset "StochasticOU: a real, divergence-free force with the stationary mean square" begin
     σ² = 0.4
     for field in (new_vector_field_spectral(domain), new_scalar_field_spectral(domain))
-      ou = StochasticOU(domain; variance = σ², correlation_time = 0.5, seed = 123)
+      ou = StochasticOU(domain; forcing_variance = σ², correlation_time = 0.5, seed = 123)
       state = initial_forcing_state(ou, field, domain)
       # A step of ten correlation times makes successive draws effectively independent (α = e⁻¹⁰),
       # so the ensemble mean converges at the rate of independent samples.
@@ -210,7 +210,7 @@ end
     σ², T_L, dt = 1.0, 0.5, 0.05
     α = exp(-dt / T_L)
     for û in (new_vector_field_spectral(domain), new_scalar_field_spectral(domain))
-      ou = StochasticOU(domain; variance = σ², correlation_time = T_L, seed = 9)
+      ou = StochasticOU(domain; forcing_variance = σ², correlation_time = T_L, seed = 9)
       state = initial_forcing_state(ou, û, domain)
       process = field_data(state.process)
       # per MODE, summed over components: the transverse projection makes the share of a single
@@ -236,9 +236,9 @@ end
   @testset "StochasticOU: the stream is fixed by the seed, the draw count, and the field" begin
     û = new_vector_field_spectral(domain)
     φ̂ = new_scalar_field_spectral(domain)
-    a = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 7)
-    b = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 7)
-    c = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 8)
+    a = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = 7)
+    b = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = 7)
+    c = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = 8)
     sa, sb, sc = (initial_forcing_state(f, û, domain) for f in (a, b, c))
     amplitudes(state) = copy(field_data(state.process))
     for n in 1:20, (f, s) in ((a, sa), (b, sb), (c, sc))
@@ -248,7 +248,7 @@ end
     @test amplitudes(sa) != amplitudes(sc)                   # the seed reaches the stream
     # every 64 bits of the seed reach it: a negative seed builds, draws, and differs from its magnitude
     # (a seed packed without widening, or cast rather than reinterpreted, fails one of these)
-    negative = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = -7)
+    negative = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = -7)
     @test amplitudes(initial_forcing_state(negative, û, domain)) != amplitudes(initial_forcing_state(a, û, domain))
     # a state resumes from its amplitudes and draw count alone: nothing else carries the stream
     resumed = StochasticOUState(deepcopy(sa.process), sa.draws)
@@ -269,14 +269,14 @@ end
 
   @testset "StochasticOU: a band past the dealias cutoff is refused" begin
     # N = 24 under the 2/3 rule keeps |κ| ≤ 8; shells to 8 reach |κ| = 8.5 in the band's corners.
-    @test_throws ArgumentError StochasticOU(domain; variance = 0.1, correlation_time = 0.5,
+    @test_throws ArgumentError StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5,
                                             lowest_shell = 7, highest_shell = 8)
-    @test StochasticOU(domain; variance = 0.1, correlation_time = 0.5, lowest_shell = 6,
+    @test StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5, lowest_shell = 6,
                        highest_shell = 7) isa StochasticOU
   end
 
   @testset "StochasticOU sustains velocity energy" begin
-    ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
+    ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
     conditions = FlowConditions(viscosity = ν, velocity_forcing = ou, schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.1, envelope_wavenumber = 2.0, rng = MersenneTwister(3))
@@ -306,7 +306,7 @@ end
     rate_driven = (Linear(domain; rate = 0.5),)
     other = (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
              ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
-             StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
+             StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5))
     generator(f) = ResolvedGenerator(domain, FlowConditions(; viscosity = ν, schmidt = 1.0,
                      velocity_forcing = f, scalar_forcing = NoForcing()); scalar = false)
 
@@ -343,7 +343,7 @@ end
     @test_throws ArgumentError generator(DeclaredNotImplementedForcing())
     for f in (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
               ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
-              Linear(domain; rate = 0.1), StochasticOU(domain; variance = 0.1, correlation_time = 0.5))
+              Linear(domain; rate = 0.1), StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5))
       @test generator(f) isa ResolvedGenerator
     end
   end

@@ -180,7 +180,7 @@ _build_forcing(tag, domain) =
   # Explicit turnover_time: the scalar slot refuses the derived (kinetic-energy-law) default,
   # and the value is memory-inert — this sweep audits storage, not physics.
   tag === :controller ? VarianceController(domain; target = 0.5, turnover_time = 1.0) :
-  tag === :ou ? StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1) :
+  tag === :ou ? StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5, seed = 1) :
   error("unmodelled forcing tag $tag")
 
 _scheme(tag) = tag === :RK3 ? IFLowStorageRK3() : tag === :RK4 ? IFLowStorageRK4() :
@@ -629,7 +629,7 @@ const EPISODE_UNITS = [
     N = 64
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
                          dealiasing = TwoThirds(), array_type = Array)
-    ou = StochasticOU(domain; variance = 0.1, correlation_time = 0.5, seed = 1)
+    ou = StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5, seed = 1)
     û = new_vector_field_spectral(domain)
     state = initial_forcing_state(ou, û, domain)
     field_bytes = Base.summarysize(û)

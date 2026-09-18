@@ -4,7 +4,7 @@
 # `SimulationRun.jl` already records this exact class, in the comment above its own guard:
 #   "a negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
 #    argument that caused it"
-# and guards `kinetic_energy > 0` / `scalar_variance >= 0` accordingly. `StochasticOU`'s `variance`
+# and guards `kinetic_energy > 0` / `scalar_variance >= 0` accordingly. `StochasticOU`'s `forcing_variance`
 # — documented as the stationary ⟨|f|²⟩ = σ², which cannot be negative — carried no such guard, and
 # every draw scales by sqrt(variance), so a negative value reached `sqrt` downstream.
 # `VarianceRescaling`'s `target` (an exported, front-door forcing) is the same shape via `project_forcing!`.
@@ -17,13 +17,13 @@ using Test, Random, GBGIsotropicTurbulence
                        element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
 
   # (1) The construction guard the codebase's own pattern calls for.
-  @test_throws ArgumentError StochasticOU(domain; variance = -1.0, correlation_time = 0.3)
+  @test_throws ArgumentError StochasticOU(domain; forcing_variance = -1.0, correlation_time = 0.3)
 
   # (2) Whatever the tree does at construction, no caller must ever meet a raw `DomainError` out of
   #     `sqrt`: either the keyword was refused by name, or the step runs. Written so that a fixed
   #     tree (ArgumentError at (1)) passes this too.
   ou = try
-    StochasticOU(domain; variance = -1.0, correlation_time = 0.3)
+    StochasticOU(domain; forcing_variance = -1.0, correlation_time = 0.3)
   catch err
     err
   end
@@ -42,7 +42,7 @@ using Test, Random, GBGIsotropicTurbulence
   @info "negative-variance StochasticOU" construction_or_step_error = raised
 
   # (3) Control: a legitimate non-negative variance keeps working (the guard must not over-reach).
-  ok = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, seed = 3)
+  ok = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, seed = 3)
   û = new_vector_field_spectral(domain)
   @test prepare_forcing!(ok, initial_forcing_state(ok, û, domain), û, domain, 0.01) === nothing
 end

@@ -88,7 +88,7 @@ end
            ConstantPower(domain; injection_rate = 0.1),
            VarianceRescaling(domain; target = 0.5, over = :band),
            VarianceController(domain; target = 1.2, gain = 2.0),
-           StochasticOU(domain; variance = 1.0, correlation_time = 0.3))
+           StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3))
   h5open(path, "w") do io
     for (i, f) in enumerate(built)
       io["f$i"] = f
@@ -286,8 +286,8 @@ end
 @testset "a stochastically forced run continues the same realization bitwise (decision 90)" begin
   path = tempname() * ".h5"
   build() = Simulation(make_domain(); viscosity = 0.05, scalar = true, rng = MersenneTwister(4),
-                       velocity_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3, seed = 2),
-                       scalar_forcing = StochasticOU(variance = 0.5, correlation_time = 0.3, seed = 2))
+                       velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.3, seed = 2),
+                       scalar_forcing = StochasticOU(forcing_variance = 0.5, correlation_time = 0.3, seed = 2))
   uninterrupted = build()
   checkpointed = build()
   for _ in 1:4
@@ -327,7 +327,7 @@ end
 
 @testset "an adopted record's forcing state continues, and one that does not fit is refused" begin
   domain = make_domain()
-  ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, seed = 5)
+  ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, seed = 5)
   sim = Simulation(domain; viscosity = 0.05, velocity_forcing = ou, rng = MersenneTwister(1))
   advance!(sim)
   carried = sim.state.modeled.velocity_forcing
@@ -342,7 +342,7 @@ end
   # a state the forcing does not use, or one of another band, is refused by name
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, velocity_forcing = NoForcing(),
                                         state = sim.state)
-  other_band = StochasticOU(domain; variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 1)
+  other_band = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 1)
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, velocity_forcing = other_band,
                                         state = sim.state)
 end

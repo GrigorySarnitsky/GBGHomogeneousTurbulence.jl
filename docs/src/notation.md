@@ -117,6 +117,8 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 |:---|:---|:---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGIsotropicTurbulence.Forcing.set_forcing_rate!) |
 | ``\varepsilon_{\mathrm{target}}`` | the injection rate a `ConstantPower` holds: energy for the velocity, scalar variance for the scalar | `ConstantPower(injection_rate=…)` |
+| ``\sigma^{2}`` | the stationary mean square of the term a stochastic forcing ADDS — an acceleration for the velocity, a rate of change of ``\varphi`` for the scalar. Not the variance of the field, which is what a `VarianceController` holds | `StochasticOU(forcing_variance=…)` |
+| ``T_L`` | the correlation time of that term: each forced mode's amplitude decays by ``e^{-\Delta t/T_L}`` per step. Short against the eddy-turnover time ``\tau``, the mean injection is close to ``\sigma^{2} T_L`` | `StochasticOU(correlation_time=…)` |
 
 ## Vocabulary
 

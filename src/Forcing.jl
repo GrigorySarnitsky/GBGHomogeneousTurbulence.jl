@@ -160,7 +160,7 @@ A deferred forcing. The operator-free keyword constructors
     ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
     VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
-    StochasticOU(; variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 42)
+    StochasticOU(; forcing_variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 42)
 
 each return a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
 `domain`-taking forms documented on each strategy; it is built into the concrete
@@ -832,18 +832,23 @@ end
 
 
 """
-    StochasticOU(domain; variance, correlation_time, lowest_shell = 1,
+    StochasticOU(domain; forcing_variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 42)
 
 The stochastic forcing of Eswaran & Pope (1988,
 [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
-*Computers & Fluids* **16**, 257–278), built on the [`FixedDomain`](@ref) `domain`: a random force,
-correlated over a finite time, added to the right-hand side on a band of low wavenumbers. Use it when
-the force must not depend on the flow it drives. Every other strategy here reads the field it forces,
-so its injection responds to the flow; this one does not, and the price is that the energy it injects
-fluctuates rather than being held.
+*Computers & Fluids* **16**, 257–278), built on the [`FixedDomain`](@ref) `domain`: a random term,
+correlated over a finite time, added to the right-hand side on a band of low wavenumbers. Its strength
+is `forcing_variance`, the stationary mean square
+``\\sigma^{2} = \\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle`` of the term added — an acceleration
+when it drives the velocity, a rate of change of ``\\varphi`` when it drives the scalar. It is **not**
+the variance of the field itself, which is what [`VarianceController`](@ref) holds.
 
-The force lives on the band's Fourier modes — the integer shells `lowest_shell` to `highest_shell` in
+Use it when the forcing must not depend on the flow it drives. Every other strategy here reads the
+field it forces, so its injection responds to the flow; this one does not, and the price is that the
+energy it injects fluctuates rather than being held.
+
+The forcing lives on the band's Fourier modes — the integer shells `lowest_shell` to `highest_shell` in
 units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 
 ```math
@@ -853,8 +858,7 @@ units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` an independent complex Ornstein–Uhlenbeck process
 with correlation time ``T_L``, transverse to ``\\boldsymbol{\\kappa}`` when the forced field is the
 velocity, so the force is divergence-free. Its stationary mean square
-``\\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle = \\sigma^{2}`` is shared equally among the band's modes and
-their independent components. Once per step every amplitude takes the process's exact transition over
+``\\sigma^{2}`` is shared equally among the band's modes and their independent components. Once per step every amplitude takes the process's exact transition over
 the step ``\\Delta t``,
 
 ```math
@@ -869,16 +873,16 @@ than from zero.
 While ``T_L`` is short against the large-eddy turnover time, the velocity the force does work against
 is mostly the velocity that same force produced over the last ``T_L``, and the mean injection rate is
 close to ``\\sigma^{2} T_L`` into the kinetic energy ``k``, or ``2\\sigma^{2} T_L`` into the scalar
-variance ``\\langle\\varphi^{2}\\rangle``. Choose `variance` from the dissipation rate the run should
+variance ``\\langle\\varphi^{2}\\rangle``. Choose `forcing_variance` from the dissipation rate the run should
 sustain; unlike [`ConstantPower`](@ref), nothing holds the injection at that value.
 
-The force is held fixed over a step and added at every stage, as [`add_forcing_source!`](@ref) does for
+The forcing is held fixed over a step and added at every stage, as [`add_forcing_source!`](@ref) does for
 every additive source. For a given sequence of amplitudes the field then advances at the scheme's
-order, but the force itself is resolved in time only step by step, so ``T_L`` should span many steps.
+order, but the forcing itself is resolved in time only step by step, so ``T_L`` should span many steps.
 
 The arguments are:
-- `domain` — the `FixedDomain` of the run this force drives.
-- `variance` — the stationary mean square ``\\sigma^{2}`` of the force.
+- `domain` — the `FixedDomain` of the run this forcing drives.
+- `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above.
 - `correlation_time` — the correlation time ``T_L`` of each amplitude.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff.
@@ -893,31 +897,31 @@ instance may drive both fields.
 
 !!! warning "The band must lie inside the dealias cutoff"
     A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes
-    empty, but this force is added after the mask and would fill them. Construction therefore throws
+    empty, but this forcing is added after the mask and would fill them. Construction therefore throws
     an `ArgumentError` for a band reaching past the cutoff, where the other strategies only warn.
 
 # Fields
-- `variance`, `correlation_time`, `seed`, `lowest_shell`, `highest_shell` — the parameters above.
+- `forcing_variance`, `correlation_time`, `seed`, `lowest_shell`, `highest_shell` — the parameters above.
 - `companion` — the coarse `FixedDomain` over the same box the process is held on: the smallest grid
-  whose modes cover the band, so the whole force costs a few kilobytes and no transform at the run's
+  whose modes cover the band, so the whole forcing costs a few kilobytes and no transform at the run's
   own resolution.
 - `band` — the shell band, as a kernel on the companion.
-- `velocity`, `scalar` — the draw scratch for each kind of forced field: a physical and a spectral
-  companion field, the host array one draw is made in, and the scale that turns a unit-variance draw
-  into the stationary distribution.
+- `velocity_scratch`, `scalar_scratch` — one draw's scratch for each kind of forced field: a physical
+  and a spectral companion field, the host array the draw is made in, and the scale that turns a
+  unit-variance draw into the stationary distribution.
 - `rng` — the random-number generator, reseeded before every draw from the seed and the state's draw
   count; scratch, not state.
 """
 struct StochasticOU{T, D, K, V, S} <: AbstractForcing
-  variance::T                            # σ²: stationary ⟨|f|²⟩
+  forcing_variance::T                    # σ²: the stationary mean square of the added term
   correlation_time::T                    # T_L
   seed::Int                              # the stream's seed — a defining parameter, persisted
   lowest_shell::Int                      # the band's shell bounds
   highest_shell::Int
   companion::D                           # the coarse FixedDomain over the same box
   band::K                                # the shell band on the companion
-  velocity::V                            # draw scratch: (physical, spectral, host draw, noise scale)
-  scalar::S
+  velocity_scratch::V                    # one draw's scratch: (physical, spectral, host draw, scale)
+  scalar_scratch::S
   rng::Xoshiro                           # scratch: reseeded from (seed, draws, field) before every draw
 end
 
@@ -976,18 +980,18 @@ function _count_band_modes(companion::FixedDomain, low::Real, high::Real)
 end
 
 
-function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Real,
+function StochasticOU(domain::FixedDomain; forcing_variance::Real, correlation_time::Real,
                       lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42)
   # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
   # documented non-negative: every draw is scaled by the variance's square root, so a negative one
   # surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the caller had typed.
   T = _real_type(domain)
-  variance = T(variance)
+  forcing_variance = T(forcing_variance)
   correlation_time = T(correlation_time)
-  (isfinite(variance) && variance >= 0) ||
-    throw(ArgumentError("`variance` must be finite and non-negative, got $variance: it is the " *
-                        "stationary mean square of the force, and its square root sets the " *
-                        "amplitude of every draw"))
+  (isfinite(forcing_variance) && forcing_variance >= 0) ||
+    throw(ArgumentError("`forcing_variance` must be finite and non-negative, got $forcing_variance: " *
+                        "it is the stationary mean square of the term the forcing adds, and its " *
+                        "square root sets the amplitude of every draw"))
   (isfinite(correlation_time) && correlation_time > 0) ||
     throw(ArgumentError("`correlation_time` must be finite and positive, got $correlation_time: " *
                         "it is the Ornstein–Uhlenbeck relaxation time T_L, and each step decays " *
@@ -1014,14 +1018,15 @@ function StochasticOU(domain::FixedDomain; variance::Real, correlation_time::Rea
   modes > 0 ||
     throw(ArgumentError("the band (shells $(lowest_shell)–$(highest_shell)) holds no lattice " *
                         "wavevector, so the forcing would drive nothing"))
-  return StochasticOU(variance, correlation_time, Int(seed), Int(lowest_shell), Int(highest_shell),
+  return StochasticOU(forcing_variance, correlation_time, Int(seed), Int(lowest_shell), Int(highest_shell),
                       companion, spectral_band(companion.multipliers, low, high),
                       _ou_slots(companion, modes, Val(1)), _ou_slots(companion, modes, Val(0)),
                       Xoshiro(42))
 end
 
 
-_ou_slots(ou::StochasticOU, field) = field_tensor_order(field) == 1 ? ou.velocity : ou.scalar
+_ou_slots(ou::StochasticOU, field) =
+  field_tensor_order(field) == 1 ? ou.velocity_scratch : ou.scalar_scratch
 
 # The key of one draw: the seed, the draw's position in the stream, and which field is forced, packed
 # into one 128-bit integer — exact and collision-free, so the stream is a pure function of the three and
@@ -1044,7 +1049,7 @@ function _advance_process!(ou::StochasticOU{T}, state::StochasticOUState, field,
   field_tensor_order(field) == 1 &&
     helmholtz_projection!(slots.spectral, slots.spectral, ou.companion.multipliers)
   combine!(state.process, α, state.process,
-           slots.scale * sqrt(ou.variance * (one(T) - α^2)), slots.spectral)
+           slots.scale * sqrt(ou.forcing_variance * (one(T) - α^2)), slots.spectral)
   state.draws += 1
   return state
 end
@@ -1102,9 +1107,10 @@ VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
   DeferredForcing(domain -> VarianceController(domain; target, gain, turnover_time,
                                                lowest_shell, highest_shell))
 
-StochasticOU(; variance::Real, correlation_time::Real,
+StochasticOU(; forcing_variance::Real, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42) =
-  DeferredForcing(domain -> StochasticOU(domain; variance, correlation_time, lowest_shell, highest_shell, seed))
+  DeferredForcing(domain -> StochasticOU(domain; forcing_variance, correlation_time, lowest_shell,
+                                         highest_shell, seed))
 
 
 
@@ -1145,7 +1151,7 @@ function Base.show(io::IO, forcing::VarianceController)
 end
 
 function Base.show(io::IO, forcing::StochasticOU)
-  print(io, "StochasticOU(variance ", forcing.variance, ", correlation_time ", forcing.correlation_time,
+  print(io, "StochasticOU(forcing_variance ", forcing.forcing_variance, ", correlation_time ", forcing.correlation_time,
         ", seed ", forcing.seed, ", ")
   _show_shells(io, forcing)
   print(io, ", on a ", forcing.companion.grid.grid_size[1], "³ companion grid, ", forcing.band, ")")

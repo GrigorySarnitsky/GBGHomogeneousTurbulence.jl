@@ -19,8 +19,8 @@ using HDF5
 @testset "read_forcing(StochasticOU) restores neither the written seed nor an independent stream" begin
   domain = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
                        array_type = Array, dealiasing = TwoThirds())
-  a = StochasticOU(domain; variance = 1.0, correlation_time = 0.5, seed = 7)
-  b = StochasticOU(domain; variance = 1.0, correlation_time = 0.5, seed = 8)
+  a = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5, seed = 7)
+  b = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5, seed = 8)
 
   path = tempname() * ".h5"
   h5open(path, "w") do io
@@ -43,5 +43,5 @@ using HDF5
 
   # …and the configured seed is what was restored, not the constructor default.
   @test draw(read_a) == draw(a)
-  @test draw(read_a) != draw(StochasticOU(domain; variance = 1.0, correlation_time = 0.5))
+  @test draw(read_a) != draw(StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5))
 end

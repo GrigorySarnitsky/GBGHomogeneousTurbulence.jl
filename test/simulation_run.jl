@@ -161,7 +161,7 @@ using Test
 
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(injection_rate = 0.1), Linear(rate = 0.5),
-                 VarianceRescaling(target = 0.5, over = :band), StochasticOU(variance = 1.0, correlation_time = 0.3))
+                 VarianceRescaling(target = 0.5, over = :band), StochasticOU(forcing_variance = 1.0, correlation_time = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
@@ -217,7 +217,7 @@ using Test
     D = GBGIsotropicTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                         velocity_forcing = ConstantPower(injection_rate = 0.1),
-                        scalar_forcing = StochasticOU(variance = 1.0, correlation_time = 0.3),
+                        scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.3),
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
     warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.35, max_turnovers = 10)

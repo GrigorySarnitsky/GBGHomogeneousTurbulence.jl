@@ -19,7 +19,7 @@ using GBGIsotropicTurbulence
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = T,
                        dealiasing = TwoThirds(), array_type = Array)
 
-  ou = StochasticOU(domain; variance = 1.0, correlation_time = 0.5)
+  ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(1))
@@ -36,7 +36,7 @@ using GBGIsotropicTurbulence
 
   # …and the same must hold through the run layer, the way memory_audit.jl guards every other cell.
   sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(2),
-                   velocity_forcing = StochasticOU(variance = 1.0, correlation_time = 0.5))
+                   velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.5))
   advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
   step_bytes = @allocated advance!(sim; dt = 1e-3)
   @info "advance! with StochasticOU forcing" step_bytes units = step_bytes / unit

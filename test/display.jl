@@ -123,8 +123,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
       HouLi(), HouLi(order = 24, strength = 30, materialized = true), AdamsBashforth(order = 3),
       ConstantPower(domain; injection_rate = 0.1), Linear(domain; rate = 0.5),
       VarianceRescaling(domain; target = 0.5, over = :total), VarianceController(domain; target = 0.5),
-      StochasticOU(domain; variance = 1.0, correlation_time = 0.5), DeferredForcing(d -> nothing),
-      initial_forcing_state(StochasticOU(domain; variance = 1.0, correlation_time = 0.5),
+      StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5), DeferredForcing(d -> nothing),
+      initial_forcing_state(StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5),
                             new_vector_field_spectral(domain), domain),
       StationarityCriterion().monitor,
       FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1),
@@ -248,8 +248,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
           repr(VarianceRescaling(domain; target = 0.5, over = :total))
     @test repr(VarianceController(domain; target = 0.5)) != repr(VarianceController(domain; target = 0.5, turnover_time = 1))
     @test repr(Linear(domain; rate = 0.5)) != repr(Linear(domain; rate = 0.5, lowest_shell = 2))
-    @test repr(StochasticOU(domain; variance = 1, correlation_time = 0.5)) !=
-          repr(StochasticOU(domain; variance = 1, correlation_time = 0.5, seed = 1))
+    @test repr(StochasticOU(domain; forcing_variance = 1, correlation_time = 0.5)) !=
+          repr(StochasticOU(domain; forcing_variance = 1, correlation_time = 0.5, seed = 1))
     # The dealiasing strategy's parameters, which change the retained band and the filter.
     @test repr(HouLi()) != repr(HouLi(order = 24))
     @test repr(HouLi()) != repr(HouLi(materialized = true))

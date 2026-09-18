@@ -23,6 +23,6 @@ using GBGIsotropicTurbulence.Forcing: ConstantPower, Linear, VarianceRescaling, 
   @test_throws ArgumentError Linear(domain; rate = 0.5, lowest_shell = 5, highest_shell = 2)
   @test_throws ArgumentError VarianceRescaling(domain; target = 0.5, over = :total,
                                            lowest_shell = 5, highest_shell = 2)
-  @test_throws ArgumentError StochasticOU(domain; variance = 0.1, correlation_time = 0.5,
+  @test_throws ArgumentError StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5,
                                           lowest_shell = 5, highest_shell = 2)
 end

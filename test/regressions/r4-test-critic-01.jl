@@ -44,7 +44,7 @@ prepare_forcing!(f::SharedCounter, forcing_state, field, domain, dt::Real) = (f.
 
   # (4) the shipped StochasticOU is such a strategy: one instance drives both fields, each with its
   #     own state in the record and its own stream.
-  ou = StochasticOU(domain; variance = 0.3, correlation_time = 0.4, seed = 1)
+  ou = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = 1)
   @test !ismutable(ou)
   sim = Simulation(domain; viscosity = 0.05, scalar = true, velocity_forcing = ou, scalar_forcing = ou,
                    rng = MersenneTwister(1))

@@ -281,7 +281,7 @@ end
 
 function write_forcing(parent::HDF5.H5DataStore, name::AbstractString, forcing::StochasticOU)
   g, a = _forcing_group(parent, name, "StochasticOU")
-  a["variance"] = forcing.variance
+  a["forcing_variance"] = forcing.forcing_variance
   a["correlation_time"] = forcing.correlation_time
   # The seed is a defining parameter (it fixes the stream, so a forced run is reproducible). The
   # process's evolving amplitudes and its position in the stream are state, not parameters: they
@@ -325,7 +325,10 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
                               turnover_time = derived ? nothing : a["turnover_time"],
                               lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGIsotropicTurbulence.StochasticOU"
-    return StochasticOU(domain; variance = a["variance"],
+    return StochasticOU(domain;
+                        # A schema-1 file spells it `variance`, the name this keyword had before the
+                        # owner's 2026-09-18 ruling; both are the same σ².
+                        forcing_variance = haskey(a, "forcing_variance") ? a["forcing_variance"] : a["variance"],
                         correlation_time = a["correlation_time"],
                         # A checkpoint written before the seed was persisted carries no attribute.
                         # The fallback is the constructor default OF THAT TIME, not today's: it must
