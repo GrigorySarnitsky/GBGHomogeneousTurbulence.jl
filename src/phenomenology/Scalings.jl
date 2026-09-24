@@ -140,14 +140,13 @@ package's own reduction of that database's forced-isotropic dataset (``\\mathrm{
 periodic-box DNS. The calibration is that single point: applied to a low-Reynolds-number box — the small grids a
 smoke test reaches — the constant is an **extrapolation** below its calibration. Its `Reference` records a
 conservative validity floor of ``\\mathrm{Re}_\\lambda = 100`` below the calibration point;
-`Reference`'s advisory-only contract still applies, and the ``\\nu`` derivation that consumes
-the law inherits the same standing.
+`Reference`'s advisory-only contract still applies.
 
 The `dissipation_group` is the group value ``G`` (default `0.9`); [`scaling`](@ref)`(law, fp)`
 returns it. Inverted, `stationary_dissipation(law, kinetic_energy, side_length)` predicts the
 dissipation a stationary run of energy ``k`` in a box ``L`` sustains,
-``\\varepsilon = (k/G)^{3/2}/L`` — the seam the run layer uses to set the viscosity from the
-grid and target energy.
+``\\varepsilon = (k/G)^{3/2}/L`` — the form a run can use to set its viscosity from the grid and
+target energy.
 
 ``G`` is a distinct group from the classical dissipation anomaly
 ``C_\\varepsilon = \\varepsilon L_{11}/u'^3`` (Taylor 1935, *Proc. R. Soc. A* **151**, 421–444,

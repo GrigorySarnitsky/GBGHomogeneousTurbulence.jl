@@ -37,6 +37,14 @@ constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carr
 over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains most
 of what follows.
 
+**The first scientific goal** is to measure the box-normalized dissipation group
+``G = k/(L\varepsilon)^{2/3}`` as a law ``G(\text{forcing}, \mathrm{Re}_\lambda, \text{band})``,
+integrate it so that a run's derived viscosity is calibrated for the forcing it actually uses, and
+publish it (decision 94). ``G`` is the constant by which the run layer turns a requested resolution into
+a viscosity, and the package's first sweep showed it is neither universal nor near the literature's
+value at the Reynolds numbers a single GPU reaches. Until the law exists, the run layer uses the
+provisional ``G = 0.7``.
+
 ---
 
 ## 2. Running a simulation
@@ -2926,6 +2934,30 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     calls a register's contents the Lamb vector with no product written nearby; those were swept by
     hand, from a full enumeration of the word's occurrences and of every velocity-first product, and
     the glossary row is the reference. The decision log is exempt as history.
+94. **(2026-09-24, user-directed) The package's first goal is the law ``G(\text{forcing}, \mathrm{Re}_\lambda,
+    \text{band})``, and until it exists the run layer uses ``G = 0.7``.** **Why.** The run layer derives
+    ``\nu`` from a requested ``\kappa_{\max}\eta`` through the stationary estimate
+    ``\varepsilon = (k/G)^{3/2}/L``, and it used `Li2008`'s ``G = 0.9``, a JHTDB reduction at
+    ``\mathrm{Re}_\lambda \approx 433``. The owner's first sweep, 96³ `VarianceRescaling(over = :total)`
+    runs at ``k = 1.5`` across the three dealiasing strategies and ``\kappa_{\max}\eta = 1.5`` and 3,
+    measured ``G = 0.59``–0.74 on shells 1–2, rising with ``\mathrm{Re}_\lambda`` over about 28–66;
+    ``\approx 0.50``–0.59 on shells 1–4; and ``\approx 0.44``–0.48 on every mode. Plotted against the
+    ``\mathrm{Re}_\lambda`` each run actually reached, the three strategies fall on one curve per band,
+    so dealiasing enters only through the Reynolds number it buys. The consequence was practical, not
+    only scientific: with 0.9 a requested ``\kappa_{\max}\eta = 1.5`` delivered about 1.37 on the
+    default band and 1.18 on every mode, and the logged ``\mathrm{Re}_\lambda`` overstated the real one by
+    15–40%. An earlier witness had seen the same bias at 32³, where the modelled ``\varepsilon`` fell
+    about 2× short. ``G = 0.7`` is the default band's value at the upper end of the Reynolds numbers
+    reached; it corrects the common case and is **not** a law — the band dependence alone moves ``G`` by
+    a third. **Where the value lives.** `Li2008` keeps 0.9: it is the record of that paper's dataset, and
+    relabelling a number the package measured as Li et al.'s would misattribute it. The provisional value
+    is one constant in `Forcing`'s stationary estimate, which the `VarianceController`'s default clock
+    already used and which the run layer now calls too. The two previously held separate copies pinned
+    together by a test; they now share one function, so they cannot disagree. **What comes next** is
+    the owner's: the sweep design (forcing type × band × ``\mathrm{Re}_\lambda``, resolution and
+    dealiasing as convergence checks) and, once enough data exist, whether the law enters as an
+    empirical fit, a theoretical form, or a ``\nu`` that recalibrates itself from the warm-up's measured
+    ``\varepsilon``.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

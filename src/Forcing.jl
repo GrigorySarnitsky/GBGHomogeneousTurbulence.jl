@@ -793,17 +793,21 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
 end
 
 
-# ε_∞ = (k/G)^{3/2}/L for a stationary box-filling flow, with G ≈ 0.9 the box-normalized dissipation
-# group Li et al. (2008) fit to JHTDB. Spelled here rather than reached for from `Phenomenology`,
-# which is an extraction-bound leaf this module must not depend on — so the value is duplicated
-# deliberately, and `test/forcing.jl` pins it against `Scalings.Li2008` so the copy cannot drift.
-# It has to be the SAME estimate the viscosity derivation uses: that derivation chooses ν from the
-# assumed k, and the controller's default relaxation time sets how fast the run reaches it. Two
-# different notions of "stationary for this box" would put the two out of step with each other.
+# ε_∞ = (k/G)^{3/2}/L for a stationary box-filling flow, G = k/(Lε)^{2/3} the box-normalized
+# dissipation group. G = 0.7 is PROVISIONAL and the package's own (decision 94): measured 2026-09-24
+# on 96³ VarianceRescaling(over = :total) runs forced on shells 1–2, G = 0.59–0.74 rising with Re_λ
+# over 28–66. `Scalings.Li2008`'s 0.9 is a JHTDB reduction at Re_λ ≈ 433 and overestimates G at the
+# Reynolds numbers these grids reach, which left the requested κ_max·η unmet by ~10%. G also falls
+# as the forcing band widens (≈ 0.56 on shells 1–4, ≈ 0.47 on every mode), so this one number is a
+# stand-in for the G(forcing, Re_λ, band) law the package exists to measure first.
+# This is the ONE estimate: the controller's default relaxation time and the run layer's derived
+# viscosity both call it, so the two agree on what "stationary for this box" means by construction.
+# It lives here, not in `Phenomenology`, because that leaf is extraction-bound and this module and
+# the run layer must not depend on it for a calibration that is not a literature law.
 # A `Rational` and a rational exponent, never floating literals — the same rule `_target_factor`
 # carries and for the same reason: a bare `0.9` or `3/2` is a `Float64` and promotes the estimate,
 # the turnover time, and then the whole controller off a Float32 run's element type.
-const _DISSIPATION_GROUP = 9 // 10
+const _DISSIPATION_GROUP = 7 // 10
 _stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 // 2) / L
 
 

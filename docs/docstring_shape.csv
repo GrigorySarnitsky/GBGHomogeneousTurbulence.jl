@@ -90,7 +90,7 @@ Propagator.jl::allocate_buffers(scheme， domain; scalar = false) -> IntegratorB
 Propagator.jl::deposit!(cache， state， domain， buffers),82,0,503
 Propagator.jl::recommended_cfl(scheme， domain),98,1,474
 Propagator.jl::step!(scheme， state， generator， domain， buffers， cache， dt),81,1,331
-Scalings.jl::Li2008(; dissipation_group = 0.9),117,0,320
+Scalings.jl::Li2008(; dissipation_group = 0.9),105,0,308
 Scalings.jl::Phenomenology.Scalings,10,0,82
 Scalings.jl::ScalingLaw <: TurbulenceLaw,60,0,63
 Scalings.jl::Sreenivasan1995(; C_K = 1.5),59,0,95
@@ -113,7 +113,7 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,55,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,77,1,2621
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = 1.5，,71,1,2676
 SimulationRun.jl::SimulationRun,31,0,229
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false，,98,0,670
 SimulationRun.jl::advance!(sim; dt = nothing),55,0,124

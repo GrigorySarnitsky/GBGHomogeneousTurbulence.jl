@@ -5,7 +5,9 @@
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
-using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
+# The run layer's stationary estimate ε = (k/G)^{3/2}/L at the package's provisional G — the one
+# function the derived viscosity is solved against.
+const RUN_ESTIMATE = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
 using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGHomogeneousTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
@@ -66,7 +68,7 @@ using Test
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = κ_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
     ν = sim.generator.conditions.viscosity
-    ε = stationary_dissipation(Li2008(), 1.5, L)               # kinetic_energy = 1.5, side_length = L
+    ε = RUN_ESTIMATE(1.5, L)                                  # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_resolved_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
     # Forced by default, and by the CONTROLLER since 2026-08-22: the default was `VarianceRescaling`,
@@ -290,9 +292,9 @@ end
     sim = Simulation(grid_points_per_axis = 32, κ_max_η = target, kinetic_energy = k,
                      velocity_forcing = ConstantPower(injection_rate = 0.1))
     ν = sim.generator.conditions.viscosity
-    # The constructor solved with the Li2008 stationary ESTIMATE, not the measured dissipation of
-    # the seeded state, so the round trip must use the same estimate.
-    ε_design = stationary_dissipation(Li2008(), k, sim.domain.grid.domain_size[1])
+    # The constructor solved with its stationary ESTIMATE, not the measured dissipation of the
+    # seeded state, so the round trip must use the same estimate.
+    ε_design = RUN_ESTIMATE(k, sim.domain.grid.domain_size[1])
     η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_design,
                                          rms_velocity = sqrt(2k / 3), integral_scale = 1.0,
                                          schmidt = 1.0))

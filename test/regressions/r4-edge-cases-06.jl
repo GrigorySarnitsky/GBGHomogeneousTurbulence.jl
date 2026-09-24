@@ -13,6 +13,12 @@
 # would not move the control. The tests below assert what the code actually contracts: the derived ν
 # is a function of the grid and the target energy alone, deliberately independent of the forcing,
 # and the log line reports that design target rather than a measured state.
+#
+# 2026-09-24 (decision 94): the stationary estimate now uses the package's provisional G = 0.7 rather
+# than `Li2008`'s 0.9, and the control's miss shrank from the ~2×-in-ε error recorded above to ~9% in
+# κ_max·η (1.815 against 2). Assertions 2 and 3 pinned the SIZE of the old calibration error, which
+# the decision reduced, so they now pin what holds instead: the control's residual miss is small, and
+# the forcing mismatch — the arm the constructor already warns about — is now the larger error.
 
 using Test, Random, Logging
 using GBGHomogeneousTurbulence
@@ -42,14 +48,13 @@ end
   #    consistent with the resolution criterion").
   @test ν_band == ν_cp01 == ν_cp30
 
-  # 2. The hunter's discriminator fails on the CONTROL too: the forcing the docstring says
-  #    "guarantees" self-consistency does not put the measured κ_max·η at the nominal 2 either.
-  #    So a deviation from 2 does not isolate a missing forcing check.
-  @test !isapprox(ratio_band, 2.0; rtol = 0.10)
+  # 2. The control's miss is the modeled-ε residual at this grid's Reynolds number: small, but not
+  #    zero, since a single G cannot follow G's rise with Re_λ (measured 1.815 against the nominal 2).
+  @test isapprox(ratio_band, 2.0; rtol = 0.15)
 
-  # 3. And the control's own miss is comparable in size to the accused arm's, i.e. the modeled-ε
-  #    error dominates. Adding the requested `velocity_forcing` check would leave arm 2 untouched.
-  @test abs(log(ratio_band / 2.0)) > 0.5 * abs(log(ratio_cp01 / 2.0))
+  # 3. With the calibration closer, the forcing mismatch is the larger error — which is why the
+  #    constructor warns about a forcing that does not hold k (assertion 4).
+  @test abs(log(ratio_band / 2.0)) < abs(log(ratio_cp01 / 2.0))
 
   # 4. The derived route remains REACHABLE with any forcing — but the disposition this item once pinned
   #    ("without warning or error ... a precondition on the user, not a guard") was REVERSED by the

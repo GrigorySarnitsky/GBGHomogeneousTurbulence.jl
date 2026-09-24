@@ -14,7 +14,7 @@
 using Test
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
-using GBGHomogeneousTurbulence.Phenomenology.Scalings: stationary_dissipation, Li2008
+const RUN_ESTIMATE = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
 using Random
 
 @testset "the derived ν solves `kolmogorov_length`'s relation, measured by that function" begin
@@ -22,7 +22,7 @@ using Random
     sim = Simulation(grid_points_per_axis = N, side_length = L, kinetic_energy = k,
                      κ_max_η = res, rng = MersenneTwister(3))
     ν = sim.generator.conditions.viscosity
-    ε = stationary_dissipation(Li2008(), k, L)
+    ε = RUN_ESTIMATE(k, L)
     fp = FlowParameters(; viscosity = ν, dissipation = ε,
                         rms_velocity = sqrt(2k / 3), integral_scale = one(ν), schmidt = 1.0)
 

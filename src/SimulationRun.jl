@@ -54,7 +54,7 @@ using ..Cache: ObservablesCache, check_deposits,
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
 using ..Forcing: AbstractForcing, NoForcing, VarianceRescaling, VarianceController, StochasticOUState,
-                 initial_forcing_state
+                 initial_forcing_state, _stationary_dissipation_estimate
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -64,7 +64,6 @@ using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
 import ..Particles: rebuild_traversal!
 using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
-using ..Phenomenology.Scalings: Li2008, stationary_dissipation
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
        current_time, current_step, flow_parameters, every_steps, every_time
@@ -112,12 +111,20 @@ there — and the viscosity is chosen from the grid rather than supplied:
   * **Derived viscosity** (no `viscosity` passed explicitly): the constructor picks the highest
     Reynolds number consistent with the resolution criterion `κ_max_η`.
 
-    First it estimates the dissipation the box sustains, from the box-normalized law `Li2008` (in
-    `Phenomenology.Scalings`): ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the energy
-    ``k``, `side_length` the side ``L``, and ``G \\approx 0.9`` a dimensionless constant. ``G``
-    carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a
-    run is forced — so the estimate assumes forcing in the same low shells as the runs it was
-    calibrated on, and a forcing moved higher invalidates it.
+    First it estimates the dissipation the box sustains from the box-normalized dissipation group
+    ``G = k/(L\\varepsilon)^{2/3}``: ``\\varepsilon = (k/G)^{3/2}/L``, with `kinetic_energy` the
+    energy ``k``, `side_length` the side ``L``, and ``G = 0.7``.
+
+    That value is **provisional**, measured in this package's own forced runs on shells 1–2, where
+    ``G`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66. The literature
+    value 0.9 (`Li2008`, in `Phenomenology.Scalings`) is calibrated at
+    ``\\mathrm{Re}_\\lambda \\approx 433`` and overestimates ``G`` at the Reynolds numbers a single GPU
+    reaches.
+
+    ``G`` carries
+    ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
+    forced: the same runs gave ``G \\approx 0.56`` forced on shells 1–4 and ``\\approx 0.47`` on every
+    mode. A forcing moved off the default band therefore misses the requested resolution.
 
     Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
     ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta`` the Kolmogorov
@@ -150,7 +157,7 @@ there — and the viscosity is chosen from the grid rather than supplied:
   * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. The derived viscosity is calibrated on a *stationary
-    forced* balance (`Li2008`'s ``G`` is fitted to forced-isotropic DNS), so a decaying run should set
+    forced* balance (``G`` is measured on forced stationary runs), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
     law assumes.
 
@@ -220,7 +227,7 @@ The run group:
   `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
   state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in, not a
   measurement of the field about to be seeded. The assumed state reads: ``\\varepsilon`` from the
-  `Li2008` stationary-dissipation law at the requested `kinetic_energy` and box side, ``u'`` from
+  same stationary estimate at the requested `kinetic_energy` and box side, ``u'`` from
   that same energy, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
   (rather than the ``L_{11}`` the seeded field will actually have). Note the ``\\varepsilon`` half:
   it is the *stationary forced* estimate, so on a decaying run the model's dissipation-range
@@ -487,7 +494,8 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("the given `tracers` live on a different storage backend than " *
                           "`domain`: move them, or build the domain, on the matching backend."))
   end
-  # The stationary dissipation the box sustains (`Li2008`) — a modeled estimate, not a measurement.
+  # The stationary dissipation the box sustains, ε = (k/G)^{3/2}/L with the provisional G — a
+  # modeled estimate, not a measurement, and the same one the controller's default clock uses.
   # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
   # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
@@ -508,7 +516,7 @@ function Simulation(domain::FixedDomain;
   scalar_variance >= 0 ||
     throw(ArgumentError("`scalar_variance` must be non-negative, got $scalar_variance: it is ⟨φ²⟩"))
   side_length = domain.grid.domain_size[1]
-  ε = stationary_dissipation(Li2008(), kinetic_energy, side_length)
+  ε = _stationary_dissipation_estimate(kinetic_energy, side_length)
   # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
   if !isnothing(viscosity) && !isnothing(κ_max_η)
     throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
@@ -533,7 +541,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                                          rms_velocity = sqrt(2 * kinetic_energy / 3),
                                          integral_scale = one(ν), schmidt))
     # One word for the three numbers that share one provenance: ν is SET here; the dissipation is
-    # the `Li2008` stationary estimate at the requested `kinetic_energy`, and Re_λ and the realized
+    # the stationary estimate at the requested `kinetic_energy`, and Re_λ and the realized
     # κ_max·η follow from it — all three are what the run is EXPECTED to reach once stationary under
     # a forcing holding that energy, none a measurement (the seeded field dissipates less until the
     # cascade fills in). `flow_parameters(sim)` measures; the docstring says so.
