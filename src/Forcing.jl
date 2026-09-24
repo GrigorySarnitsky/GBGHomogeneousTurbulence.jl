@@ -69,7 +69,8 @@ documented choice.
 
 A band reaching above the dealias cutoff is inert there for a forcing that multiplies the field — the
 mask holds those modes empty — so construction warns about it; the additive `StochasticOU` would
-inject there instead, and refuses such a band.
+inject there instead, and refuses such a band. `highest_shell = Inf` asks for that reach on purpose —
+every retained mode but the mean, on any grid — so it draws no warning; `StochasticOU` refuses it too.
 
 The two fields are forced **independently**:
 [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) — the `Generator`
@@ -342,18 +343,25 @@ add_forcing_source!(::AbstractForcing, forcing_state, N̂, field, domain::FixedD
 # The shell arguments are validated HERE, once for all four band forcings, so the thrown message
 # names the argument the caller typed — the backend's own guard fires on the padded band edges
 # ("band edges must satisfy 0 <= low", with our −0.5 padding visible), which reads as internals.
-function _check_shells(lowest::Integer, highest::Integer)
+function _check_shells(lowest::Integer, highest::Real)
   lowest >= 1 ||
     throw(ArgumentError("`lowest_shell` must be at least 1, got $lowest: shell 0 is the mean " *
                         "(κ = 0) mode, which a band forcing cannot legitimately drive — it carries " *
                         "the box's total momentum (or the scalar's mean), not turbulence"))
+  # An integer shell, or `Inf` for no upper bound. Nothing between: a lattice |κ|²/κ₀² is always an
+  # integer and an integer shell's edge sits at (n + ½)², which never is one, so no mode lies on an
+  # edge for roundoff to decide. A bound of 2.5 would put the edge exactly on |κ| = 3κ₀.
+  (highest isa Integer || highest == Inf) ||
+    throw(ArgumentError("`highest_shell` must be an integer shell or `Inf` (every retained mode " *
+                        "but the mean), got $highest: a shell between two integers would put the " *
+                        "band's edge on lattice modes, which roundoff then assigns"))
   highest >= lowest ||
     throw(ArgumentError("`highest_shell` must be at least `lowest_shell`, got $highest < $lowest: " *
                         "the band would be empty and the forcing would silently do nothing"))
   return nothing
 end
 
-function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
+function _shell_band(domain::FixedDomain, lowest::Integer, highest::Real)
   _check_shells(lowest, highest)
   k0 = 2π / domain.grid.domain_size[1]
   # A band above the dealias cutoff is INERT, not harmful: the mask keeps those modes empty, and
@@ -368,13 +376,23 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Integer)
           "(shell ≈ $(round(κ_max / k0, digits = 1))): those modes are held empty by the mask and " *
           "a band forcing multiplies the field, so this forcing will do NOTHING. Lower the shells, " *
           "or enlarge the grid."
-  elseif (highest + 0.5) * k0 > κ_max
+  elseif isfinite(highest) && (highest + 0.5) * k0 > κ_max    # `Inf` asked for exactly this: no warning
     @warn "the forcing band (shells $(lowest)–$(highest)) reaches above the dealias cutoff " *
           "(shell ≈ $(round(κ_max / k0, digits = 1))): the shells above it are held empty by the " *
           "mask and contribute nothing — the forcing acts only on the retained part of the band."
   end
-  return spectral_band(domain.multipliers, (lowest - 0.5) * k0, (highest + 0.5) * k0)
+  # PF's band needs a finite edge. The stored grid's corner — √3 times its Nyquist shell — lies past
+  # every mode the grid holds, retained or not, so `Inf` becomes "every mode but the mean" on any N.
+  top = isfinite(highest) ? highest : _corner_shell(domain)
+  return spectral_band(domain.multipliers, (lowest - 0.5) * k0, (top + 0.5) * k0)
 end
+
+_corner_shell(domain::FixedDomain) = ceil(Int, sqrt(3) * maximum(domain.grid.grid_size) / 2)
+
+# The stored upper bound: the integer the caller gave, or `Inf` itself — never the corner shell it
+# resolves to on this grid, which would read back as "all modes" only on the grid it came from.
+_shell_bound(highest::Integer) = Int(highest)
+_shell_bound(highest::Real) = Inf
 
 
 # The observable a forcing `target` agrees with: kinetic energy ½⟨|u|²⟩ for the velocity (a vector
@@ -432,6 +450,10 @@ modes differ in which quantity a run may no longer measure:
     (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the forcing
     sets and the band is free.
 
+With `highest_shell = Inf` the band is every retained mode but the mean, on any grid, and the two
+coincide — the mean holds nothing in a field started without one — so a single factor rescales the
+whole field: the rescaling a physical-space code applies.
+
 Neither is a default, because the right answer depends on what the run is calibrated against.
 A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
@@ -474,11 +496,11 @@ struct VarianceRescaling{K, T} <: AbstractForcing
   target::T            # the VALUE to hold, of kinetic_energy (velocity) or scalar_variance (scalar)
   over::Symbol         # :band (hold the band's value) or :total (hold the whole-field value)
   lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
-  highest_shell::Int
+  highest_shell::Union{Int, Float64}   # an integer shell, or `Inf`: every mode but the mean
 end
 
 function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
-                       lowest_shell::Integer = 1, highest_shell::Integer = 2)
+                       lowest_shell::Integer = 1, highest_shell::Real = 2)
   over in (:band, :total) ||
     throw(ArgumentError("VarianceRescaling `over` must be :band or :total; got :$over"))
   # Cast to the domain's element type FIRST, so the guard certifies the stored value.
@@ -490,7 +512,7 @@ function VarianceRescaling(domain::FixedDomain; target::Real, over::Symbol,
                         "it is the kinetic energy or scalar variance the forcing holds, and the " *
                         "rescale takes its square root"))
   return VarianceRescaling(_shell_band(domain, lowest_shell, highest_shell), target, over,
-                           Int(lowest_shell), Int(highest_shell))
+                           Int(lowest_shell), _shell_bound(highest_shell))
 end
 
 
@@ -535,7 +557,9 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
 - `domain` — the `FixedDomain` the band is built on.
 - `rate` — the fixed linear rate ``A``. A positive value amplifies the field.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``.
+  fundamental ``2\\pi/L``. `highest_shell = Inf` lifts the band limit: every retained mode but the
+  mean is forced, on any grid, and this is Lundgren's forcing itself — the form a physical-space code
+  applies.
 
 # Fields
 - `indicator` — the band indicator as a real array.
@@ -547,14 +571,14 @@ struct Linear{M, T} <: AbstractForcing
   indicator::M         # real array: the band indicator (1 in band, 0 outside)
   rate::T              # the linear rate A
   lowest_shell::Int    # the band's shell bounds — the parameters `indicator` is derived from
-  highest_shell::Int
+  highest_shell::Union{Int, Float64}   # an integer shell, or `Inf`: every mode but the mean
 end
 
-function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
+function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2)
   # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
   # indicator is materialized once here — the same stored mask this forcing always carried.
   indicator = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
-  return Linear(indicator, _real_type(domain)(rate), Int(lowest_shell), Int(highest_shell))
+  return Linear(indicator, _real_type(domain)(rate), Int(lowest_shell), _shell_bound(highest_shell))
 end
 
 uses_steady_linear_rate(::Linear) = true
@@ -598,7 +622,10 @@ rather than the integrating factor, where freezing it would cost the scheme its 
 - `injection_rate` — the rate at which energy (for the velocity) or scalar variance (for the scalar)
   is injected; not an instantaneous dissipation the forcing measures or clamps.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
-  fundamental ``2\\pi/L``.
+  fundamental ``2\\pi/L``. `highest_shell = Inf` forces every retained mode but the mean, on any grid:
+  the band-free linear forcing of Lundgren (2003, *Linearly forced isotropic turbulence*,
+  *CTR Annual Research Briefs*, 461–473) that physical-space codes apply, with its rate re-solved to
+  hold the injection.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
@@ -620,7 +647,7 @@ struct ConstantPower{K, T} <: AbstractForcing
   band::K              # band-pass kernel (lazy radial symbol) — the band observable's weight
   injection_rate::T    # the VALUE of the dissipation rate to hold: dissipation or scalar_dissipation
   lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
-  highest_shell::Int
+  highest_shell::Union{Int, Float64}   # an integer shell, or `Inf`: every mode but the mean
 end
 
 """
@@ -696,6 +723,10 @@ does not take.
   marginal law stays legal). Driving the scalar, pass the **flow's** turnover time
   ``2k/(3\\varepsilon)`` explicitly.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
+  `highest_shell = Inf` forces every retained mode but the mean, on any grid: the band-free linear
+  forcing of Lundgren (2003, *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*,
+  461–473) that physical-space codes apply, where
+  ``k_f = k`` — the form Bassenne et al. designed the controller in.
 
 !!! note "The settling time, not the gain, is the physical parameter"
     Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a
@@ -716,13 +747,13 @@ struct VarianceController{K, T} <: AbstractForcing
   turnover_time::T
   turnover_time_derived::Bool   # true when tℓ came from the kinetic-energy default, not the caller
   lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
-  highest_shell::Int
+  highest_shell::Union{Int, Float64}   # an integer shell, or `Inf`: every mode but the mean
 end
 
 
 function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                             turnover_time = nothing, lowest_shell::Integer = 1,
-                            highest_shell::Integer = 2)
+                            highest_shell::Real = 2)
   # The strategy carries the DOMAIN's element type: each scalar is cast to it, so a Float32 run's
   # default controller stays Float32 even when the target arrives as an untyped Float64 literal —
   # the Simulation keyword default rode `promote(float(target), …)` up to Float64 on every
@@ -757,7 +788,7 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                          " (derived from `target` = $target and the box side; pass " *
                          "`turnover_time` explicitly)" : "")))
   return VarianceController(band, target, gain, tℓ, turnover_time === nothing,
-                            Int(lowest_shell), Int(highest_shell))
+                            Int(lowest_shell), _shell_bound(highest_shell))
 end
 
 
@@ -806,13 +837,13 @@ function add_forcing_source!(forcing::VarianceController, forcing_state, N̂, fi
   return N̂
 end
 
-function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2)
+function ConstantPower(domain::FixedDomain; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2)
   # No materialized indicator: it existed only to fill the integrating-factor rate array, and this
   # forcing no longer uses that route. The lazy kernel is convolved against directly, so a
   # `ConstantPower` run now carries NO field-scale storage of its own — two arrays fewer.
   return ConstantPower(_shell_band(domain, lowest_shell, highest_shell),
                        _real_type(domain)(injection_rate),
-                       Int(lowest_shell), Int(highest_shell))
+                       Int(lowest_shell), _shell_bound(highest_shell))
 end
 
 # NOT a steady rate, and declaring it one was the defect. `A = ε/2k_band` is linear in the field but
@@ -917,7 +948,8 @@ The arguments are:
 - `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above.
 - `correlation_time` — the correlation time ``T_L`` of each amplitude.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
-  every mode of the band must lie inside the dealias cutoff.
+  every mode of the band must lie inside the dealias cutoff, so the `Inf` the field-multiplying
+  strategies accept is refused here.
 - `seed = 42` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
   independent streams.
 
@@ -1023,7 +1055,7 @@ end
 
 
 function StochasticOU(domain::FixedDomain; forcing_variance::Real, correlation_time::Real,
-                      lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42)
+                      lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42)
   # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
   # documented non-negative: every draw is scaled by the variance's square root, so a negative one
   # surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the caller had typed.
@@ -1039,6 +1071,14 @@ function StochasticOU(domain::FixedDomain; forcing_variance::Real, correlation_t
                         "it is the Ornstein–Uhlenbeck relaxation time T_L, and each step decays " *
                         "the amplitudes by exp(−Δt/T_L)"))
   _check_shells(lowest_shell, highest_shell)
+  # The band-free form the multiplicative strategies take is not open to an additive one: a source on
+  # every mode would fill the ones the dealias mask holds empty, and the grid carrying the process is
+  # sized from the top shell. Refused by name, before the cutoff guard reports "|κ| = Inf".
+  isinf(highest_shell) &&
+    throw(ArgumentError("StochasticOU needs a finite `highest_shell`, got Inf: it adds its process " *
+                        "rather than multiplying the field, so its band must stay below the dealias " *
+                        "cutoff, and the coarse grid carrying the process is sized from the band's " *
+                        "top shell"))
   L = domain.grid.domain_size[1]
   k0 = 2π / L
   low, high = (lowest_shell - 0.5) * k0, (highest_shell + 0.5) * k0
@@ -1135,22 +1175,22 @@ add_forcing_source!(ou::StochasticOU, state::StochasticOUState, N̂, field, doma
 # Operator-free keyword constructors: capture the parameters now and build the forcing once the
 # domain exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
 # `ConstantPower(injection_rate = 0.1)` — with `Simulation` supplying the domain.
-Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing(domain -> Linear(domain; rate, lowest_shell, highest_shell))
 
-ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing(domain -> ConstantPower(domain; injection_rate, lowest_shell, highest_shell))
 
-VarianceRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+VarianceRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing(domain -> VarianceRescaling(domain; target, over, lowest_shell, highest_shell))
 
 VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
-                   lowest_shell::Integer = 1, highest_shell::Integer = 2) =
+                   lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing(domain -> VarianceController(domain; target, gain, turnover_time,
                                                lowest_shell, highest_shell))
 
 StochasticOU(; forcing_variance::Real, correlation_time::Real,
-             lowest_shell::Integer = 1, highest_shell::Integer = 2, seed::Integer = 42) =
+             lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42) =
   DeferredForcing(domain -> StochasticOU(domain; forcing_variance, correlation_time, lowest_shell,
                                          highest_shell, seed))
 

@@ -311,7 +311,7 @@ function read_forcing(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
   _require_tag(g, name, "read_forcing", tag)          # version check under the group's own tag
   tag == "GBGHomogeneousTurbulence.NoForcing" && return NoForcing()
   lo = haskey(a, "lowest_shell") ? Int(a["lowest_shell"]) : 1
-  hi = haskey(a, "highest_shell") ? Int(a["highest_shell"]) : 2
+  hi = haskey(a, "highest_shell") ? a["highest_shell"] : 2     # an integer, or Inf: the constructor checks
   if tag == "GBGHomogeneousTurbulence.Linear"
     return Linear(domain; rate = a["rate"], lowest_shell = lo, highest_shell = hi)
   elseif tag == "GBGHomogeneousTurbulence.ConstantPower"

@@ -88,6 +88,7 @@ end
            ConstantPower(domain; injection_rate = 0.1),
            VarianceRescaling(domain; target = 0.5, over = :band),
            VarianceController(domain; target = 1.2, gain = 2.0),
+           VarianceController(domain; target = 1.2, highest_shell = Inf),   # every mode, stored as Inf
            StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3))
   h5open(path, "w") do io
     for (i, f) in enumerate(built)

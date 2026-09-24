@@ -2857,6 +2857,36 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     another session's report. What is verified is the exposure, not any repair — and that GitHub
     redirects a renamed repository URL but not its Pages URL, so a stale link in a sibling's table
     breaks outright.)*
+92. **(2026-09-24, user-directed) `highest_shell = Inf` is the band-free form of every
+    field-multiplying forcing.** It forces every retained mode but the mean, on any grid. **Why.**
+    The linear forcing a physical-space code applies acts on the whole field, and the only way to ask
+    for it before was `highest_shell = N`, a number the user had to restate for every grid. With the
+    band set to the whole field, `Linear` is Lundgren's forcing itself, `VarianceController` is
+    Bassenne et al.'s scheme in the physical-space form their title names (``k_f = k``),
+    `ConstantPower` is the constant-injection variant, and `VarianceRescaling` is the whole-field
+    rescale ``\boldsymbol{u} \leftarrow \boldsymbol{u}\sqrt{\texttt{target}/k}`` — verified mode
+    by mode to round-off, and identical under `over = :band` and `:total`, which then coincide
+    (`over` stays required, one rule rather than a special case, and the docstring says they agree).
+    **What is stored is `Inf`, not the shell it resolves to.** A strategy's shell bounds are what
+    rebuild its band and what it displays, and `Inf` rebuilds the right band on any grid, where the
+    resolved shell would read back as "every mode" only on the grid it came from. PF's
+    `spectral_band` requires finite edges, so IT resolves `Inf` at construction to the stored grid's
+    corner, ``\lceil\sqrt{3}N/2\rceil`` shells — past every mode the grid holds, retained or not,
+    whatever the dealiasing mask's shape. That is the physics-side reading of an unbounded request
+    mapped onto a finite-edge operation, not field machinery, so it is not a PF raise. **`Inf` is the
+    only non-integer.** A lattice ``\lvert\boldsymbol{\kappa}\rvert^2/\kappa_0^2`` is always an
+    integer and an integer shell's edge sits at ``(n + \tfrac{1}{2})^2``, which never is one, so no
+    mode lies on an edge for roundoff to decide; `highest_shell = 2.5` would put the edge on
+    ``\lvert\boldsymbol{\kappa}\rvert = 3\kappa_0``. **The mean stays out**, since `lowest_shell`
+    is still at least 1: the band-free form is ``\boldsymbol{f} = A(\boldsymbol{u} - \langle\boldsymbol{u}\rangle)``,
+    not the literal ``\boldsymbol{f} = A\boldsymbol{u}``, which would drive the mean at rate ``A`` with nothing to
+    damp it and amplify its round-off exponentially — the class decision 88 closed for the
+    self-conjugate planes. **`StochasticOU` refuses it**, by name: an additive source must stay below
+    the dealias cutoff, and its coarse grid is sized from the top shell. **Rejected:**
+    `highest_shell = nothing` (a physicist can read "no highest shell" as "no band"; `Inf` has one
+    reading), a separate band argument such as `shells = 1:2` (Base has no infinite integer range, so
+    "all" would need its own sentinel anyway), a named constant (an invented alias for a number
+    everyone reads), and `typemax(Int)` (a workaround, not an interface).
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,

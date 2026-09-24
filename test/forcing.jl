@@ -443,6 +443,51 @@ end
   end
 
 
+  @testset "highest_shell = Inf forces every mode but the mean, on any grid" begin
+    # The band-free form a physical-space code applies, stated once for every N. On each grid it must
+    # be the whole-field rescale u ← u·√(target/k) mode by mode — and so identical for :band and
+    # :total — reach every stored mode but κ = 0, draw no warning, and store Inf rather than the
+    # corner shell it resolved to, which would mean "all modes" only on the grid it came from.
+    quiet(f) = begin
+      buf = IOBuffer()
+      value = Logging.with_logger(Logging.SimpleLogger(buf, Logging.Warn)) do; f(); end
+      value, String(take!(buf))
+    end
+    for n in (16, 24)                 # even and not a power of two: the corner shell differs
+      d = FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
+                      dealiasing = TwoThirds(), array_type = Array)
+      u = new_vector_field_spectral(d)
+      random_solenoidal_velocity_spectral!(u, d; kinetic_energy = 0.7, envelope_wavenumber = 3.0,
+                                           rng = MersenneTwister(n))
+      expected = field_data(u) .* sqrt(1.3 / kinetic_energy(u))
+      for over in (:band, :total)
+        forcing, log = quiet(() -> VarianceRescaling(d; target = 1.3, over, highest_shell = Inf))
+        @test isempty(log)
+        @test forcing.highest_shell === Inf
+        v = deepcopy(u)
+        GBGHomogeneousTurbulence.Forcing.project_forcing!(forcing, v, d)
+        @test kinetic_energy(v) ≈ 1.3 rtol = 1e-12
+        @test maximum(abs.(field_data(v) .- expected)) <= 1e-12 * maximum(abs.(expected))
+      end
+      linear, log = quiet(() -> Linear(d; rate = 0.1, highest_shell = Inf))
+      @test isempty(log)
+      @test count(iszero, linear.indicator) == 1          # every stored mode but κ = 0
+      @test linear.indicator[1, 1, 1] == 0
+    end
+    # The deferred form carries it through to whichever grid the run builds.
+    d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
+                      dealiasing = TwoThirds(), array_type = Array)
+    @test VarianceController(; target = 1.0, highest_shell = Inf)(d16).highest_shell === Inf
+    @test occursin("shells 1 to Inf", repr(ConstantPower(d16; injection_rate = 0.1, highest_shell = Inf)))
+    # Nothing between the integers, and no stochastic forcing of every mode.
+    for bad in (2.5, -Inf, NaN)
+      @test_throws ArgumentError ConstantPower(d16; injection_rate = 0.1, highest_shell = bad)
+    end
+    @test_throws ArgumentError StochasticOU(d16; forcing_variance = 0.1, correlation_time = 0.5,
+                                            highest_shell = Inf)
+  end
+
+
   @testset "VarianceController's in-line scalar dissipation matches scalar_dissipation" begin
     # The controller re-derives the field's dissipation mid-reduction (it cannot call the
     # `Observables` reduction without a second traversal) — a duplicated spelling the file's own
