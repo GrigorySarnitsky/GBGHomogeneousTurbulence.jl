@@ -30,6 +30,15 @@ Partial:
 - [ ] **B4-N7** — one unbraced `\,\mathrm dt` survives in ARCH §4.4 current text (history hits
       stay).
 
+Science — the G law (owner-set first goal, decisions 94–95):
+- [ ] **G-LAW-1** *(paper)* — the dissipation-group law must relate ε not only to the whole-field k
+      but to the **forced band's own energy** k_band. `Linear`'s stationary rate is A = ε/(2 k_band),
+      so it can take its rate from the run's state only once k_band(forcing, Re_λ, band) is modelled;
+      until then `Linear(; rate)` stays required (owner-ruled 2026-09-24). Measure it alongside G.
+- [ ] **G-LAW-2** *(later, a project in itself)* — the scalar side: a scalar forcing states its own
+      target, because predicting ε_φ from ⟨φ²⟩ needs the mechanical-to-scalar time-scale ratio,
+      unmeasured here. Left as is by owner ruling 2026-09-24.
+
 Cosmetic residue found by the sweep:
 - [ ] memory_audit.jl:27 comment still says "open item G2" (G2 is closed by decision 79).
 

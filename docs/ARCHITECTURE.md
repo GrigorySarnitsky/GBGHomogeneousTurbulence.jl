@@ -403,8 +403,9 @@ Lundgren 2003) — the latter the one steady rate, folded into ``\mathcal{E}`` a
 free. `ConstantPower` (holding the injection rate) and `VarianceController` (holding the field's
 ``L^2`` observable: the kinetic energy for the velocity, the scalar variance for the scalar; the
 constant-``k`` controller of Bassenne et al. 2016, Eq. 20) both carry state-dependent rates and enter
-through the source at every stage; the controller is the **default velocity forcing**, its
-proportional restoring term making the target a stable attractor rather than a clamp.
+through the source at every stage; the controller's proportional restoring term makes its target a
+stable attractor rather than a clamp. `ConstantPower` is the **default velocity forcing**, chosen
+because it has no gain or settling time to choose (decision 95).
 `VarianceRescaling` (rescaling a band to hold the same observable — `over = :band | :total`) is the
 one post-step projection, kept as the reference implementation of a published method (Sullivan,
 Mahalingam & Kerr 1994) with its first-order caveat and its Berendsen-class caveat (Bussi, Donadio &
@@ -418,7 +419,11 @@ never need (each preserves a divergence-free velocity by construction) and `Stoc
 mode, drawing each amplitude perpendicular to its wavevector. Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
 taking no operators, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
 returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
-forcing before the grid exists.
+forcing before the grid exists. A velocity forcing named so may also leave its target out, and
+`Simulation` fills it from the run's stationary state: the pair ``(k, \varepsilon)``, stated once — by
+`kinetic_energy`, `dissipation`, or a forcing's own target — with the other member predicted through
+``G`` (decision 95). `Linear`'s rate stays required, since its stationary value needs the band's own
+energy, and so does a scalar forcing's target, since no scalar state is modelled.
 
 ### 4.5 `Propagator` — the map that advances the state in time
 
@@ -527,7 +532,9 @@ Over it:
   existing state and tracer set outright (the injection door, decision 83) — and picks the default
   scheme. The viscosity is derived from the grid by default — the highest Reynolds number consistent with the
   chosen resolution criterion `κ_max_η` (decision 20; measured against the resolved cutoff, decision
-  82) — with a supplied `viscosity` the opt-in override.
+  82), solved from the ε of the run's stationary state (decision 95) — with a supplied `viscosity` the
+  opt-in override. A forcing holding ε, the default, meets `κ_max_η` in the stationary mean; one
+  holding k leaves the resolution predicted through ``G``.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -2958,6 +2965,35 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     dealiasing as convergence checks) and, once enough data exist, whether the law enters as an
     empirical fit, a theoretical form, or a ``\nu`` that recalibrates itself from the warm-up's measured
     ``\varepsilon``.
+95. **(2026-09-24, user-directed) A run is set up for a stationary state stated once, and the
+    default forcing holds its dissipation rate.** **The state.** A forced run settles at a pair
+    ``(k, \varepsilon)``. `Simulation` now takes it from exactly one source — `kinetic_energy`,
+    `dissipation`, or the target of a velocity forcing that holds one of the two — and predicts the other
+    member through ``G``, the only place ``G`` enters a run. Two sources are an `ArgumentError`, because
+    the state would be stated twice; none gives ``k = 1.5``. Before, `kinetic_energy` and a forcing's
+    target stated the same quantity separately and a mismatch only warned. The derived viscosity is
+    solved from the state's ``\varepsilon``, the initial velocity is seeded at its ``k``, and a start
+    from another energy is an adopted `state`. **Filling the forcing.** A deferred velocity forcing
+    may leave its target out, and the run fills it from the state: `ConstantPower` its injection rate
+    from ``\varepsilon``, `VarianceController` and `VarianceRescaling(over = :total)` their target from
+    ``k``, `StochasticOU` its variance from ``\varepsilon/T_L``. `DeferredForcing` therefore holds its
+    strategy and keywords rather than an opaque closure, so the run can see what was stated. Three
+    stay required. `Linear`'s rate would need the band's own energy, a model the ``G`` study must
+    supply (the open item for the paper). `VarianceRescaling(over = :band)` holds that energy. A
+    scalar forcing's target stays required because the scalar has no modelled state, and the
+    mechanical-to-scalar time scale is a project in itself (owner-ruled). **Why the state, and why
+    ``\varepsilon``.** Resolution is a statement about ``\eta = (\nu^3/\varepsilon)^{1/4}``, so
+    given ``\varepsilon`` the viscosity for a requested ``\kappa_{\max}\eta`` is exact, with no ``G``
+    between request and outcome; given ``k`` instead, ``G``'s error lands on the resolution.
+    Holding ``\varepsilon`` moves that error onto ``k``, which only rescales the velocity unit.
+    Measured in the rewritten 32³ witness: `ConstantPower` at two injection rates reached
+    ``\kappa_{\max}\eta = 2.016`` against 2, a `VarianceRescaling(over = :total)` holding ``k``
+    reached 1.815. **The default is `ConstantPower()`**, and the owner's reason is not the guarantee
+    but that it has no gain or settling time to choose — fewer parameters to get right. It enters
+    every stage like the `VarianceController` it replaces, so default runs keep the scheme's order,
+    and ``k`` now fluctuates freely rather than being restored. Tests that seeded one energy beside a
+    target holding another now adopt a seeded `state`; the witness pinning the old "ν is
+    forcing-independent" contract now pins the new one.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

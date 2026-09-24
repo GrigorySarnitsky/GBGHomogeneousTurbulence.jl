@@ -52,9 +52,8 @@ sim = Simulation(grid_points_per_axis = 64)
 # A 64³ forced-stationary run; ν is set so the grid captures the dissipation scale.
 
 warmup!(sim)
-# Spin up to statistical stationarity. The default forcing holds the kinetic energy
-# at the `kinetic_energy` keyword's value, 1.5 — see VarianceController before
-# measuring k itself.
+# Spin up to statistical stationarity. The default forcing holds the injection rate
+# the run was set up for, so k settles freely — see ConstantPower before measuring it.
 
 t_end = current_time(sim) + 5.0
 run!(sim) do s              # observe and advance: the callback reads the run,
@@ -98,8 +97,8 @@ dealiased by the default ``2/3`` rule (other strategies are available).
     The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref),
     [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref) and [`IFHeun`](@ref)), with the forcing menu
-    `NoForcing`, `Linear`, `ConstantPower`,
-    `VarianceController` (the velocity default), `VarianceRescaling`, and `StochasticOU`, and Lagrangian particle
+    `NoForcing`, `Linear`, `ConstantPower` (the velocity default),
+    `VarianceController`, `VarianceRescaling`, and `StochasticOU`, and Lagrangian particle
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     provide usable model spectra, structure-function laws, and scaling constants. Accumulating
     statistics over the fields and the sampled trajectories is the caller's own analysis:

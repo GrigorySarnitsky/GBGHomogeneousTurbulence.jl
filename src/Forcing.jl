@@ -47,8 +47,9 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`NoForcing`](@ref) — leave the field undriven.
 - [`Linear`](@ref) — a fixed linear rate on a **band**, an annulus of integer Fourier shells (the
   convention every strategy shares).
-- [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate.
-- [`VarianceController`](@ref) — drive the field's variance to a target by feedback; the default.
+- [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate; the
+  velocity default.
+- [`VarianceController`](@ref) — drive the field's variance to a target by feedback.
 - [`VarianceRescaling`](@ref) — hold the band's or the whole field's variance (`over`) by
   deterministic rescaling, at first order.
 - [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
@@ -63,9 +64,12 @@ Which keywords carry defaults follows one test: **does the value come from the m
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
 `correlation_time` — has no canonical value and is required. A `seed` is neither: any value gives an
-equally valid realization, so it defaults, and naming it is how a run is repeated. A default at this layer never hides a choice you needed to make; the run layer's
-convenience default (a controller targeting the initial kinetic energy) is that layer's own,
-documented choice.
+equally valid realization, so it defaults, and naming it is how a run is repeated. A default at this
+layer never hides a choice you needed to make.
+
+The one relaxation is the run's own: a deferred velocity forcing may leave its target out, and the
+run fills it from the stationary state it is set up for — the value still comes from the run, not
+from a default here.
 
 A band reaching above the dealias cutoff is inert there for a forcing that multiplies the field — the
 mask holds those modes empty — so construction warns about it; the additive `StochasticOU` would
@@ -165,45 +169,81 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A deferred forcing. The operator-free keyword constructors
+A forcing named before its domain exists. The operator-free keyword constructors
 
+    ConstantPower(; injection_rate = nothing, lowest_shell = 1, highest_shell = 2)
+    VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
+                       lowest_shell = 1, highest_shell = 2)
+    VarianceRescaling(; target = nothing, over, lowest_shell = 1, highest_shell = 2)
+    StochasticOU(; forcing_variance = nothing, correlation_time,
+                 lowest_shell = 1, highest_shell = 2, seed = 42)
     Linear(; rate, lowest_shell = 1, highest_shell = 2)
-    ConstantPower(; injection_rate, lowest_shell = 1, highest_shell = 2)
-    VarianceRescaling(; target, over, lowest_shell = 1, highest_shell = 2)
-    VarianceController(; target, gain = 1, turnover_time = nothing, lowest_shell = 1, highest_shell = 2)
-    StochasticOU(; forcing_variance, correlation_time, lowest_shell = 1, highest_shell = 2, seed = 42)
 
-each returns a `DeferredForcing` capturing **the same keywords, with the same defaults**, as their
-`domain`-taking forms documented on each strategy; it is built into the concrete
+each return a `DeferredForcing` holding their keywords. It is built into the concrete
 `AbstractForcing` once the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain)
-exists (done for you by [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)). A
-forcing argument
-therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking constructor) or a
-`DeferredForcing`.
+exists, which [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) does for you. A
+forcing argument therefore accepts either a ready-built `AbstractForcing` (from the `domain`-taking
+constructor) or a `DeferredForcing`.
+
+**Only the deferred form may leave its target out**, because only a run can supply it. A velocity
+forcing built by `Simulation` then takes the quantity it controls from the stationary state the
+run is set up for:
+
+- `ConstantPower` its `injection_rate`, from the dissipation rate ``\\varepsilon``;
+- `VarianceController` and `VarianceRescaling(over = :total)` their `target`, from the kinetic
+  energy ``k``;
+- `StochasticOU` its `forcing_variance`, from ``\\varepsilon/T_L`` — the variance whose injection
+  ``\\sigma^{2} T_L`` matches ``\\varepsilon`` while ``T_L`` is short.
+
+Three targets stay required. `Linear`'s `rate` would need a model of the band's own energy, and
+`VarianceRescaling(over = :band)` holds that energy. A scalar forcing states its target too, since
+the run models no scalar state. Otherwise the keywords and defaults are those of the `domain`-taking
+forms documented on each strategy.
 
 # Examples
-Name a forcing before any grid exists, or build it directly once the domain is in hand:
-
 ```julia
-# Name the forcing before any grid exists — `Simulation` supplies the domain:
-sim = Simulation(grid_points_per_axis = 64, viscosity = 5e-3,
-                 velocity_forcing = ConstantPower(injection_rate = 0.1))
+# The run supplies the injection rate from the dissipation it is set up for:
+sim = Simulation(grid_points_per_axis = 64, kinetic_energy = 1.5,
+                 velocity_forcing = ConstantPower())
+
+# Or state it, and the forcing's target is the run's state:
+sim = Simulation(grid_points_per_axis = 64, velocity_forcing = ConstantPower(injection_rate = 0.4))
 
 # Or build it directly, once the domain is in hand:
 domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(),
                      element_type = Float64, array_type = Array)
-forcing = ConstantPower(domain; injection_rate = 0.1)
+forcing = ConstantPower(domain; injection_rate = 0.4)
 ```
 
 # Fields
-- `build` — the captured constructor closure: calling the `DeferredForcing` on a `FixedDomain`
-  invokes it, yielding the concrete strategy.
+The type parameter `F` is the strategy the forcing builds into.
+- `parameters` — the keywords given, an omitted target held as `nothing`.
 """
-struct DeferredForcing{F}
-  build::F
+struct DeferredForcing{F, P <: NamedTuple}
+  parameters::P
 end
 
-(deferred::DeferredForcing)(domain::FixedDomain) = deferred.build(domain)
+DeferredForcing{F}(parameters::P) where {F, P <: NamedTuple} = DeferredForcing{F, P}(parameters)
+
+# Build on `domain`, filling an omitted target from `design`, the run's stationary state
+# `(; kinetic_energy, dissipation)` — or `nothing` where no state is modelled (the scalar), which
+# makes an omitted target an error naming the keyword.
+(deferred::DeferredForcing{F})(domain::FixedDomain, design = nothing) where {F} =
+  F(domain; _completed(deferred, design)...)
+
+_completed(deferred::DeferredForcing, design) = deferred.parameters
+
+function _from_design(design, quantity::Symbol, strategy, keyword::Symbol)
+  design === nothing &&
+    throw(ArgumentError("`$strategy(; …)` was given no `$keyword`, and nothing supplies one here: " *
+                        "only a `Simulation` fills an omitted target, from the stationary state it " *
+                        "sets up for the velocity. A scalar forcing, or one built on a domain by " *
+                        "hand, must state `$keyword`."))
+  return getfield(design, quantity)
+end
+
+_fill(parameters, keyword, value) = merge(parameters, NamedTuple{(keyword,)}((value,)))
+
 
 
 """
@@ -455,6 +495,9 @@ With `highest_shell = Inf` the band is every retained mode but the mean, on any 
 coincide — the mean holds nothing in a field started without one — so a single factor rescales the
 whole field: the rescaling a physical-space code applies.
 
+The deferred form of `over = :total` may leave `target` out, and a run then supplies its stationary
+``k``; `over = :band` always needs it, since no run state determines a band's own value.
+
 Neither is a default, because the right answer depends on what the run is calibrated against.
 A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
 from the *assumed* kinetic energy, so a forcing put there by hand must be a `:total` one or that
@@ -621,7 +664,9 @@ rather than the integrating factor, where freezing it would cost the scheme its 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `injection_rate` — the rate at which energy (for the velocity) or scalar variance (for the scalar)
-  is injected; not an instantaneous dissipation the forcing measures or clamps.
+  is injected; not an instantaneous dissipation the forcing measures or clamps. A deferred velocity
+  forcing may leave it out, and the run then supplies its stationary ``\\varepsilon`` (see
+  [`DeferredForcing`](@ref)).
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``. `highest_shell = Inf` forces every retained mode but the mean, on any grid:
   the band-free linear forcing of Lundgren (2003, *Linearly forced isotropic turbulence*,
@@ -654,7 +699,7 @@ end
 """
     VarianceController(domain; target, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
-    VarianceController(; target, gain = 1, turnover_time = nothing,
+    VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
@@ -706,7 +751,8 @@ does not take.
 - `domain` — the [`FixedDomain`](@ref) the band kernel is built on (the first form; the
   operator-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
-  kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar.
+  kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar. The deferred
+  velocity form may leave it out, and the run then supplies its stationary ``k``.
 - `gain = 1` — the dimensionless gain ``G``. A larger gain relaxes faster; Bassenne et al. report
   ``O(1-10)``, and the default sits at that range's gentle end so the controller perturbs the
   dynamics least. `0` is the bare marginal law above.
@@ -809,6 +855,7 @@ end
 # the turnover time, and then the whole controller off a Float32 run's element type.
 const _DISSIPATION_GROUP = 7 // 10
 _stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 // 2) / L
+_stationary_energy_estimate(ε, L) = _DISSIPATION_GROUP * (L * ε)^(2 // 3)
 
 
 uses_steady_linear_rate(::VarianceController) = false
@@ -950,7 +997,9 @@ order, but the forcing itself is resolved in time only step by step, so ``T_L`` 
 
 The arguments are:
 - `domain` — the `FixedDomain` of the run this forcing drives.
-- `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above.
+- `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above. A
+  deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
+  variance whose estimated injection matches its stationary ``\\varepsilon``.
 - `correlation_time` — the correlation time ``T_L`` of each amplitude.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff, so the `Inf` the field-multiplying
@@ -1177,27 +1226,78 @@ add_forcing_source!(ou::StochasticOU, state::StochasticOUState, N̂, field, doma
                     diffusivity::Real) = embed_modes!(N̂, state.process, 1, 1)
 
 
-# Operator-free keyword constructors: capture the parameters now and build the forcing once the
-# domain exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
-# `ConstantPower(injection_rate = 0.1)` — with `Simulation` supplying the domain.
+# How each strategy's deferred form meets the run's stationary state (see `DeferredForcing`).
+_completed(d::DeferredForcing{ConstantPower}, design) =
+  d.parameters.injection_rate === nothing ?
+    _fill(d.parameters, :injection_rate, _from_design(design, :dissipation, :ConstantPower, :injection_rate)) :
+    d.parameters
+_completed(d::DeferredForcing{VarianceController}, design) =
+  d.parameters.target === nothing ?
+    _fill(d.parameters, :target, _from_design(design, :kinetic_energy, :VarianceController, :target)) :
+    d.parameters
+_completed(d::DeferredForcing{VarianceRescaling}, design) =
+  d.parameters.target === nothing ?
+    _fill(d.parameters, :target, _from_design(design, :kinetic_energy, :VarianceRescaling, :target)) :
+    d.parameters
+_completed(d::DeferredForcing{StochasticOU}, design) =
+  d.parameters.forcing_variance === nothing ?
+    _fill(d.parameters, :forcing_variance,
+          _from_design(design, :dissipation, :StochasticOU, :forcing_variance) / d.parameters.correlation_time) :
+    d.parameters
+
+# What a forcing states about the run's stationary state: `(; kinetic_energy = k)` or
+# `(; dissipation = ε)` for the one quantity it holds exactly, `nothing` for a forcing that holds
+# neither. A deferred forcing whose target is omitted states nothing — it takes the state instead.
+# `Simulation` counts this as a source of the state, so a target cannot also be given there.
+_stated_state(::Any) = nothing
+_stated_state(f::ConstantPower) = (dissipation = f.injection_rate,)
+_stated_state(f::VarianceController) = (kinetic_energy = f.target,)
+_stated_state(f::VarianceRescaling) = f.over === :total ? (kinetic_energy = f.target,) : nothing
+_stated_state(d::DeferredForcing{ConstantPower}) =
+  d.parameters.injection_rate === nothing ? nothing : (dissipation = d.parameters.injection_rate,)
+_stated_state(d::DeferredForcing{VarianceController}) =
+  d.parameters.target === nothing ? nothing : (kinetic_energy = d.parameters.target,)
+_stated_state(d::DeferredForcing{VarianceRescaling}) =
+  d.parameters.over === :total && d.parameters.target !== nothing ?
+    (kinetic_energy = d.parameters.target,) : nothing
+
+# Whether a forcing takes its strength from the run's state — true only for a deferred forcing
+# whose target was left out. Such a forcing is consistent with the derived viscosity by construction.
+_takes_design(::Any) = false
+_takes_design(d::DeferredForcing{ConstantPower}) = d.parameters.injection_rate === nothing
+_takes_design(d::DeferredForcing{VarianceController}) = d.parameters.target === nothing
+_takes_design(d::DeferredForcing{VarianceRescaling}) = d.parameters.target === nothing
+_takes_design(d::DeferredForcing{StochasticOU}) = d.parameters.forcing_variance === nothing
+
+
+# Operator-free keyword constructors: hold the keywords now and build the forcing once the domain
+# exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
+# `ConstantPower(injection_rate = 0.1)`, or `ConstantPower()` for the run to supply the rate.
 Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
-  DeferredForcing(domain -> Linear(domain; rate, lowest_shell, highest_shell))
+  DeferredForcing{Linear}((; rate, lowest_shell, highest_shell))
 
-ConstantPower(; injection_rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
-  DeferredForcing(domain -> ConstantPower(domain; injection_rate, lowest_shell, highest_shell))
+ConstantPower(; injection_rate::Union{Nothing, Real} = nothing, lowest_shell::Integer = 1,
+              highest_shell::Real = 2) =
+  DeferredForcing{ConstantPower}((; injection_rate, lowest_shell, highest_shell))
 
-VarianceRescaling(; target::Real, over::Symbol, lowest_shell::Integer = 1, highest_shell::Real = 2) =
-  DeferredForcing(domain -> VarianceRescaling(domain; target, over, lowest_shell, highest_shell))
+function VarianceRescaling(; target::Union{Nothing, Real} = nothing, over::Symbol,
+                           lowest_shell::Integer = 1, highest_shell::Real = 2)
+  # `:band` holds the band's own energy, which no run state supplies — refused here, where the
+  # keyword was typed, rather than when a run tries to fill it.
+  target === nothing && over !== :total &&
+    throw(ArgumentError("`VarianceRescaling(over = :$over)` needs its `target`: it holds the " *
+                        "band's own value, which a run's stationary state does not determine. Only " *
+                        "`over = :total` can take its target from the run."))
+  return DeferredForcing{VarianceRescaling}((; target, over, lowest_shell, highest_shell))
+end
 
-VarianceController(; target::Real, gain::Real = 1, turnover_time = nothing,
+VarianceController(; target::Union{Nothing, Real} = nothing, gain::Real = 1, turnover_time = nothing,
                    lowest_shell::Integer = 1, highest_shell::Real = 2) =
-  DeferredForcing(domain -> VarianceController(domain; target, gain, turnover_time,
-                                               lowest_shell, highest_shell))
+  DeferredForcing{VarianceController}((; target, gain, turnover_time, lowest_shell, highest_shell))
 
-StochasticOU(; forcing_variance::Real, correlation_time::Real,
+StochasticOU(; forcing_variance::Union{Nothing, Real} = nothing, correlation_time::Real,
              lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42) =
-  DeferredForcing(domain -> StochasticOU(domain; forcing_variance, correlation_time, lowest_shell,
-                                         highest_shell, seed))
+  DeferredForcing{StochasticOU}((; forcing_variance, correlation_time, lowest_shell, highest_shell, seed))
 
 
 
@@ -1249,7 +1349,19 @@ Base.show(io::IO, state::StochasticOUState) =
         state.draws == 1 ? " draw" : " draws", ")")
 
 # The closure has no readable form; the display says what the value is waiting for.
-Base.show(io::IO, ::DeferredForcing) = print(io, "DeferredForcing(awaiting a domain)")
+# The one keyword a run can fill, per strategy — so only that `nothing` reads "from the run"; any
+# other `nothing` (a controller's `turnover_time`) is the strategy's own default and prints as given.
+_design_keyword(::Type) = nothing
+_design_keyword(::Type{ConstantPower}) = :injection_rate
+_design_keyword(::Type{VarianceController}) = :target
+_design_keyword(::Type{VarianceRescaling}) = :target
+_design_keyword(::Type{StochasticOU}) = :forcing_variance
+
+function Base.show(io::IO, d::DeferredForcing{F}) where {F}
+  parts = [v === nothing && k === _design_keyword(F) ? "$k from the run" : "$k = $(repr(v))"
+           for (k, v) in pairs(d.parameters)]
+  print(io, "DeferredForcing(", nameof(F), "(", join(parts, ", "), "))")
+end
 
 
 

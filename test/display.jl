@@ -107,8 +107,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
   M = 12
   sim = Simulation(domain; viscosity = 0.05, scalar = true, number_of_particles = M,
                    particle_integration_scheme = AdamsBashforth(order = 3),
-                   velocity_forcing = DeferredForcing(d -> ConstantPower(d; injection_rate = 0.1)),
-                   scalar_forcing = DeferredForcing(d -> VarianceRescaling(d; target = 0.5, over = :band)))
+                   velocity_forcing = ConstantPower(injection_rate = 0.1),
+                   scalar_forcing = VarianceRescaling(target = 0.5, over = :band))
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(1, 1),
                     rng = MersenneTwister(1))
 
@@ -123,7 +123,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
       HouLi(), HouLi(order = 24, strength = 30, materialized = true), AdamsBashforth(order = 3),
       ConstantPower(domain; injection_rate = 0.1), Linear(domain; rate = 0.5),
       VarianceRescaling(domain; target = 0.5, over = :total), VarianceController(domain; target = 0.5),
-      StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5), DeferredForcing(d -> nothing),
+      StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5), ConstantPower(),
       initial_forcing_state(StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5),
                             new_vector_field_spectral(domain), domain),
       StationarityCriterion().monitor,
@@ -309,8 +309,8 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
                                  dealiasing = PhaseShift(), array_type = Array);
                      viscosity = 0.05, scalar = true, number_of_particles = m,
                      particle_integration_scheme = AdamsBashforth(order = 3),
-                     velocity_forcing = DeferredForcing(d -> ConstantPower(d; injection_rate = 0.1)),
-                     scalar_forcing = DeferredForcing(d -> VarianceRescaling(d; target = 0.5, over = :band)))
+                     velocity_forcing = ConstantPower(injection_rate = 0.1),
+                     scalar_forcing = VarianceRescaling(target = 0.5, over = :band))
     floor = n^3 * sizeof(Float64) ÷ 2
     @test m * 3 * sizeof(Float64) > floor   # the particle arrays are field-scale here, by construction
     for sample in (big.domain, big.state, big.cache, big.tracers, big.buffers, big.generator,

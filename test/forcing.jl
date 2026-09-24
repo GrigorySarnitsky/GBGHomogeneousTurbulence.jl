@@ -409,9 +409,13 @@ end
     # reinjects exactly the instantaneous dissipation, so k is conserved at its INITIAL value and
     # `target` never enters. A controller restores toward target; the marginal law must not. Seeding
     # k = 0.5 against target = 1.5 separates the two models by 3x — a drift could not fake it.
+    # A starting energy away from the held one is an adopted `state`, not a second statement of the
+    # stationary state (`kinetic_energy` alongside a forcing target is refused as stating it twice).
     marginal = VarianceController(domain; target = 1.5, gain = 0)
-    sim = Simulation(domain; viscosity = 0.05, velocity_forcing = marginal,
-                     kinetic_energy = 0.5, rng = MersenneTwister(3))
+    seeded = ResolvedFields(domain)
+    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain; kinetic_energy = 0.5,
+                                         envelope_wavenumber = 2.0, rng = MersenneTwister(3))
+    sim = Simulation(domain; viscosity = 0.05, velocity_forcing = marginal, state = seeded)
     k0 = kinetic_energy(sim.state.velocity_spectral)
     for _ in 1:150; advance!(sim); end
     k = kinetic_energy(sim.state.velocity_spectral)

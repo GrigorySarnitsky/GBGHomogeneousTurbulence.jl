@@ -36,39 +36,35 @@ function grid_mode_run(forcing)
 end
 
 
-@testset "The derived ν is forcing-independent by contract, and its κ_max·η target is a modeled design value" begin
+# 2026-09-24 (decision 95): the contract changed on purpose. The run's stationary state is stated once
+# — by `kinetic_energy`, `dissipation`, or the forcing's own target — and ν is solved from its ε. So a
+# derived ν now FOLLOWS the forcing that states the state, and a forcing holding ε makes the requested
+# κ_max·η exact in the stationary mean. Measured on this file's 32³ runs: the two ConstantPower arms land
+# at 2.016 against 2 (their ν now differ, as their injection rates do), while the k-holding control still
+# misses by the G residual (1.815). The assertions below pin that.
+@testset "The derived ν follows the stated state, and a forcing holding ε meets κ_max·η" begin
   ν_band,  ratio_band  = grid_mode_run(VarianceRescaling(target = 1.5, over = :total))
   ν_cp01,  ratio_cp01  = grid_mode_run(ConstantPower(injection_rate = 0.1))
   ν_cp30,  ratio_cp30  = grid_mode_run(ConstantPower(injection_rate = 3.0))
   @info "measured" ν_band ratio_band ratio_cp01 ratio_cp30
 
-  # 1. The contract the constructor states: a derived ν is fixed by the grid, `kinetic_energy`
-  #    and `κ_max_η`. It is the same number under every forcing — that is not an oversight, it is
-  #    the documented meaning of the mode ("the constructor picks the highest Reynolds number
-  #    consistent with the resolution criterion").
-  @test ν_band == ν_cp01 == ν_cp30
-
-  # 2. The control's miss is the modeled-ε residual at this grid's Reynolds number: small, but not
-  #    zero, since a single G cannot follow G's rise with Re_λ (measured 1.815 against the nominal 2).
+  # 1. ν is solved from the state the forcing states: two injection rates, two viscosities.
+  @test ν_cp01 < ν_cp30
+  # 2. Holding ε, the run meets the requested resolution — no G between request and outcome.
+  @test isapprox(ratio_cp01, 2.0; rtol = 0.03)
+  @test isapprox(ratio_cp30, 2.0; rtol = 0.03)
+  # 3. Holding k, it misses by the G residual at this Reynolds number — small, not zero.
   @test isapprox(ratio_band, 2.0; rtol = 0.15)
+  @test abs(log(ratio_cp01 / 2.0)) < abs(log(ratio_band / 2.0))
 
-  # 3. With the calibration closer, the forcing mismatch is the larger error — which is why the
-  #    constructor warns about a forcing that does not hold k (assertion 4).
-  @test abs(log(ratio_band / 2.0)) < abs(log(ratio_cp01 / 2.0))
-
-  # 4. The derived route remains REACHABLE with any forcing — but the disposition this item once pinned
-  #    ("without warning or error ... a precondition on the user, not a guard") was REVERSED by the
-  #    owner on 2026-08-24: a hand-built forcing that voids the ν calibration now draws a WARNING
-  #    (never an error). Reachability and the warning are asserted together below.
-  @test ν_band > 0
-  # A matching :total rescale is consistent with the calibration and stays silent; a forcing that
-  # does not hold k warns; a mismatched target warns. Construction only — no spin-up needed.
+  # 4. The derived route stays reachable with any forcing; one that holds neither k nor ε, given its
+  #    own strength, draws a WARNING (owner-ruled 2026-08-24), and stating the state twice is refused.
   @test_logs min_level=Logging.Warn Simulation(grid_points_per_axis = 16,
       velocity_forcing = VarianceRescaling(target = 1.5, over = :total), rng = MersenneTwister(1))
+  @test_logs min_level=Logging.Warn Simulation(grid_points_per_axis = 16,
+      velocity_forcing = ConstantPower(injection_rate = 0.1), rng = MersenneTwister(1))
   @test_logs (:warn, r"derived viscosity.*does not hold") match_mode=:any Simulation(
-      grid_points_per_axis = 16, velocity_forcing = ConstantPower(injection_rate = 0.1),
-      rng = MersenneTwister(1))
-  @test_logs (:warn, r"holds target = 0.5") match_mode=:any Simulation(
-      grid_points_per_axis = 16, velocity_forcing = VarianceController(target = 0.5),
-      rng = MersenneTwister(1))
+      grid_points_per_axis = 16, velocity_forcing = Linear(rate = 0.1), rng = MersenneTwister(1))
+  @test_throws ArgumentError Simulation(grid_points_per_axis = 16, kinetic_energy = 1.5,
+                                        velocity_forcing = VarianceController(target = 0.5))
 end

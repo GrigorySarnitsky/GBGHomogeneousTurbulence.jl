@@ -88,7 +88,7 @@ could enter only by making the iteration compute it, which the choice forbids. T
 component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
 wants one computes it at an observation (§2.4).
 
-One case looks like a counterexample and is worth stating. The default `VarianceController` *does*
+One case looks like a counterexample and is worth stating. A `VarianceController` *does*
 form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
 **mid-step** ones — each measured at a Runge–Kutta stage's own state and discarded — not the
 observable at the iteration's end, which is what a slot must hold, so the case fails the surviving
@@ -235,7 +235,7 @@ every class.
 
 One configuration fixes the system. The chapter's running instance is the default one — a mask
 dealiasing rule (`TwoThirds` or `HouLi`, each removing the aliased wavenumbers by a per-wavenumber
-multiplication), a three-stage scheme, the default controller velocity forcing, an adaptive
+multiplication), a three-stage scheme, the default constant-power velocity forcing, an adaptive
 timestep — and the departures from it are priced in place: `PhaseShift` and another stage count
 in §2.3, a hand-fixed ``\Delta t`` in §1.4. Whatever the configuration, those axes fix the whole
 of an iteration's work —

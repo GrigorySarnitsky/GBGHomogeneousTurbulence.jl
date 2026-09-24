@@ -71,11 +71,13 @@ using Test
     ε = RUN_ESTIMATE(1.5, L)                                  # kinetic_energy = 1.5, side_length = L
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_resolved_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
-    # Forced by default, and by the CONTROLLER since 2026-08-22: the default was `VarianceRescaling`,
-    # a post-step projection, which is Lie–Trotter splitting and held every default run to first
-    # order in time (measured 1.02 against 3.01). `VarianceController` holds the same quantity
-    # through a rate the scheme integrates, so a default run is now third order.
-    @test sim.generator.conditions.velocity_forcing isa VarianceController
+    # Forced by default, by `ConstantPower` since 2026-09-24 (owner-ruled, decision 95): it takes its
+    # injection rate from the run's state and needs no gain or settling time to choose. Like the
+    # `VarianceController` it replaced, its rate enters every stage, so a default run keeps the
+    # scheme's order (the `VarianceRescaling` default before 2026-08-22 held it to first order).
+    vf = sim.generator.conditions.velocity_forcing
+    @test vf isa ConstantPower
+    @test vf.injection_rate ≈ ε                                 # the rate IS the run's stationary ε
     @test ν > 0
 
     @test Simulation(grid_points_per_axis = 32, κ_max_η = 3; rng = MersenneTwister(3)).generator.conditions.viscosity > ν
@@ -264,9 +266,16 @@ using Test
 
   @testset "VarianceRescaling over = :total pins total energy" begin
     # :total rescales the band to make the whole-field energy equal the target each step
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
+    # Seeded away from the target through an adopted state: `kinetic_energy` beside the forcing's
+    # target would state the stationary state twice.
+    d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
+                      element_type = Float64, array_type = Array)
+    seeded = ResolvedFields(d16)
+    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d16; kinetic_energy = 0.5,
+                                         envelope_wavenumber = 2.0, rng = MersenneTwister(40))
+    sim = Simulation(d16; viscosity = 0.05,
                      velocity_forcing = VarianceRescaling(target = 0.8, over = :total),
-                     scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
+                     scalar = false, state = seeded)
     advance!(sim; dt = 0.01)
     @test kinetic_energy(sim.state.velocity_spectral) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
@@ -289,8 +298,7 @@ end
 @testset "the viscosity derivation inverts kolmogorov_length, and the round trip closes" begin
   k = 1.5                                    # passed explicitly, not inherited from the default
   for target in (1.0, 1.5, 2.0, 3.0)
-    sim = Simulation(grid_points_per_axis = 32, κ_max_η = target, kinetic_energy = k,
-                     velocity_forcing = ConstantPower(injection_rate = 0.1))
+    sim = Simulation(grid_points_per_axis = 32, κ_max_η = target, kinetic_energy = k)
     ν = sim.generator.conditions.viscosity
     # The constructor solved with its stationary ESTIMATE, not the measured dissipation of the
     # seeded state, so the round trip must use the same estimate.
@@ -302,24 +310,31 @@ end
   end
 
 
-  @testset "the default run holds the kinetic energy the derived viscosity was calibrated against" begin
-    # The derivation chooses ν from the ASSUMED kinetic energy, so κ_max·η is self-consistent only if the
-    # run really holds k there. That makes this an end-to-end check of a *precondition*, not a
-    # forcing unit test: it is the only place the calibration's assumption is confronted with the
-    # integrated trajectory. It caught nothing when written, because it did not exist — the audit
-    # measured k settling ~30% high under a controller restoring toward the band instead of the field.
+  @testset "the default run holds the dissipation rate its viscosity was solved from" begin
+    # A derived ν is solved from the run's stationary ε, so κ_max·η is self-consistent only if the run
+    # really holds ε there. Since 2026-09-24 the default forcing does so by construction: it takes its
+    # injection rate from that same ε. (Before, the default held k and ε was predicted through G — the
+    # calibration a controller restoring the band instead of the field once broke, k settling ~30% high.)
     for k_target in (1.5, 0.8)
       sim = Simulation(grid_points_per_axis = 24, kinetic_energy = k_target)
-      for _ in 1:200; advance!(sim); end
-      k = kinetic_energy(sim.state.velocity_spectral)
-      @test isapprox(k, k_target; rtol = 0.05)
+      ε = RUN_ESTIMATE(k_target, sim.domain.grid.domain_size[1])
+      @test sim.generator.conditions.velocity_forcing.injection_rate ≈ ε
+      η = kolmogorov_length(FlowParameters(; viscosity = sim.generator.conditions.viscosity,
+                                           dissipation = ε, rms_velocity = 1.0,
+                                           integral_scale = 1.0, schmidt = 1.0))
+      @test max_resolved_wavenumber(sim.domain) * η ≈ 2.0 rtol = 1e-10
     end
 
-    # And it converges TO the target rather than merely starting there. The initial condition is
-    # seeded well below the controller's target — through the constructor, since the cache refuses a
-    # state mutated behind its back — so the run has to climb, which a band-restoring controller
-    # would not do to the whole field.
-    sim = Simulation(grid_points_per_axis = 24, viscosity = 0.05, kinetic_energy = 0.4,
+    # A controller holding k converges TO its target rather than merely starting there. The field is
+    # seeded well below the target — adopted through the constructor, since the cache refuses a state
+    # mutated behind its back, and `kinetic_energy` beside the target would state the state twice —
+    # so the run has to climb, which a band-restoring controller would not do to the whole field.
+    d24 = FixedDomain(grid_points_per_axis = 24, side_length = 2π, dealiasing = TwoThirds(),
+                      element_type = Float64, array_type = Array)
+    seeded = ResolvedFields(d24)
+    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d24; kinetic_energy = 0.4,
+                                         envelope_wavenumber = 2.0, rng = MersenneTwister(5))
+    sim = Simulation(d24; viscosity = 0.05, state = seeded,
                      velocity_forcing = VarianceController(target = 1.5))
     û = sim.state.velocity_spectral
     @test kinetic_energy(û) < 0.6
