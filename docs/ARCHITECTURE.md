@@ -262,13 +262,14 @@ adds the `Generator → Forcing` dependency. It carries a
 **metriplectic seam** — a reversible part that conserves energy and an irreversible part that dissipates
 it (§8) — and the numerical split is built to honor it. The incompressible momentum equation is
 advanced in **rotational (Lamb-vector) form**: writing the convective term through the identity
-``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) - \boldsymbol{u}\times\boldsymbol{\omega}``
-(with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}``) and letting the Leray–Helmholtz
+``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) + \boldsymbol{\omega}\times\boldsymbol{u}``
+(with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` and the Lamb vector
+``\boldsymbol{\omega}\times\boldsymbol{u}``, the literature's sign, decision 93) and letting the Leray–Helmholtz
 projection ``\mathbb{P}`` onto divergence-free fields absorb the pressure and the kinetic-energy gradient,
 the equation becomes
 
 ```math
-\partial_t\boldsymbol{u} = \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}.
+\partial_t\boldsymbol{u} = -\mathbb{P} (\boldsymbol{\omega}\times\boldsymbol{u}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}.
 ```
 
 Its three terms are the seam made explicit, and the time-stepping treats each according to its nature:
@@ -276,7 +277,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
 - **The reversible term.** The recoveries — the source-preserving four-argument `to_physical!` and
   the vorticity observable `vorticity_physical!` (decision 47) — produce the physical velocity and
   vorticity from ``\hat{\boldsymbol{u}}``; `velocity_rhs!` then assembles
-  ``\mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased by the ``2/3`` rule to remove the
+  ``-\mathbb{P} (\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased by the ``2/3`` rule to remove the
   aliasing of the quadratic product (the pseudospectral method; Orszag & Patterson 1972, the ``2/3`` rule
   Orszag 1971). Rotational form is the cheap way to compute the advection spectrally, and under a sharp mask the
   truncation is exactly Galerkin, so the discrete advection conserves kinetic energy (`HouLi`, which
@@ -2887,11 +2888,46 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     reading), a separate band argument such as `shells = 1:2` (Base has no infinite integer range, so
     "all" would need its own sentinel anyway), a named constant (an invented alias for a number
     everyone reads), and `typemax(Int)` (a workaround, not an interface).
+93. **(2026-09-24, user-directed) The Lamb vector is ``\boldsymbol{\omega}\times\boldsymbol{u}``, vorticity
+    first — the literature's sign — and the package follows it.** **Why.** A PF reviewer questioned an
+    example calling ``\boldsymbol{u}\times\boldsymbol{\omega}`` "the Lamb vector", and this package did
+    the same on its landing page, in §4.2 and in `velocity_rhs!`. The owner asked for a firm check
+    rather than recall, so the definitions were read from primary texts. Lamb (1932), Art. 146, Eq. (5)
+    (read from the page scan), writes the rotational form as
+    ``\partial_t u - v\zeta + w\eta = -\partial_x\chi'``, whose middle terms are
+    ``(\boldsymbol{\omega}\times\boldsymbol{u})_x``; he gives the vector no name. Every source found that
+    does name it takes vorticity first: Hamman, Klewicki & Kirby (2008, p. 265, "l = ω × u … or Lamb
+    vector"), Sagaut & Cambon (2018, p. 586, "the Lamb vector ω × u"), and eleven more, each read in its
+    own text —
+    turbulence theory, experiment, aerodynamic force theory and aeroacoustics, 1996–2022 — along with
+    OpenFOAM's `LambVector` function object, which computes `fvc::curl(U)^U`. None defines the reversed
+    order. Pope (2000) writes ``\boldsymbol{U}\times\boldsymbol{\omega}`` but never names it. Wikipedia
+    defines the reversed order, and it contradicts itself: its divergence identities are Hamman et al.'s,
+    which hold only for vorticity first, and its page citation to Lamb (1932) lands on the motion of two
+    spheres. The reversed usage is a code-side habit of solvers that write the term on the right-hand
+    side, not a definition anyone publishes. **The convention, applied.** The identity is
+    ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) + \boldsymbol{\omega}\times\boldsymbol{u}``
+    and the momentum equation is ``\partial_t\boldsymbol{u} = -\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u}) + \nu\nabla^2\boldsymbol{u} + \boldsymbol{f}``
+    on every current-state surface. **The arithmetic did not change.** The solver still forms the
+    velocity-first product in place over the vorticity's array: reversing a cross product's operands
+    negates it, so the minus sign is carried by the operand order and costs no pass, and the run is
+    bit-identical. What changed is the name — that product is the *negated* Lamb vector wherever it
+    is named — and the internal assembly function, now `_velocity_advective_term!`, which no longer
+    claims to form the Lamb vector. The one term the package might have introduced, a Lamb-vector
+    symbol, was not: ``\ell`` is `large_scale_length`, and a bold ``\boldsymbol{l}`` beside it invites
+    the confusion the glossary exists to prevent, so the vector is written out. **Enforced**, not only
+    stated: `docs/make.jl`'s `lint_lamb_vector_sign()` fails the build on a velocity-first cross product
+    — in math, in Unicode or as the `cross!` call — within three lines of the word *Lamb* unless the
+    window names it the negation. It fired on six sites of the tree it was written against (the
+    landing page, §4.2 and four in the generator) before any was fixed. It cannot see a sentence that
+    calls a register's contents the Lamb vector with no product written nearby; those were swept by
+    hand, from a full enumeration of the word's occurrences and of every velocity-first product, and
+    the glossary row is the reference. The decision log is exempt as history.
 ## References
 
-Cited author–year above; full entries here, each with its DOI where the work has one. Three do not,
+Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
 and the reason is stated with the entry rather than left to the reader to wonder about: two NASA
-technical memoranda and a CTR research brief sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
+technical memoranda, a CTR research brief and a 1932 monograph sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
 is worse than none, since it silently sends the reader somewhere else.
 
 The extraction-bound `Phenomenology` leaf (§4.8) is exempt: each reference law carries its own
@@ -2967,3 +3003,9 @@ cites.
   410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
 - Öttinger, H. C. (2005). [*Beyond Equilibrium Thermodynamics.*](https://doi.org/10.1002/0471727903) Wiley. *(GENERIC; the
   reversible/irreversible split, §8.)*
+- Lamb, H. (1932). *Hydrodynamics*, 6th ed. Cambridge University Press. *(No DOI; a 1932 monograph.
+  Art. 146, Eq. (5): the rotational form of the equations of motion, decision 93.)*
+- Hamman, C. W., Klewicki, J. C. & Kirby, R. M. (2008). [*On the Lamb vector divergence in Navier–Stokes flows*](https://doi.org/10.1017/S0022112008002760).
+  *J. Fluid Mech.* **610**, 261–284. *(The Lamb vector defined as ω × u, p. 265; decision 93.)*
+- Sagaut, P. & Cambon, C. (2018). [*Homogeneous Turbulence Dynamics*](https://doi.org/10.1007/978-3-319-73162-9), 2nd ed.
+  Springer. *(The package's scope, decision 91; the Lamb vector named ω × u, p. 586, decision 93.)*

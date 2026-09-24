@@ -147,8 +147,8 @@ end
 
 
 # The velocity right-hand side at a stage (velocity_rhs! in src/Generator.jl), reading the physical
-# (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. The Lamb
-# vector forms IN PLACE over ω's register (decision 41 — the alias-safe cross), so the assembly
+# (u, ω) named by the caller and writing the dealiased, Leray-projected term into `out`. The negated
+# Lamb vector u×ω forms IN PLACE over ω's register (decision 41 — the alias-safe cross), so the assembly
 # consumes ω and owns no physical product array. A mask strategy (TwoThirds / HouLi) evaluates once
 # and low-passes; PhaseShift also reads the stage's SPECTRAL velocity `uspec` for the
 # half-cell-displaced evaluation through the generator's PhaseShiftBuffers registers, averages the

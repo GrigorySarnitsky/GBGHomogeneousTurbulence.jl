@@ -46,7 +46,7 @@ include("audit_ops.jl")     # the op model AND its cost model — shared with th
 
 # Scalar-equivalent transforms per step, chart recomputes amortized in. The structure behind the
 # cells (asserted below): transforms are strictly per-evaluation — a mask evaluation costs (6, 3)
-# for the velocity (u and ω recovered, six component fields, one c2r each; the Lamb product back,
+# for the velocity (u and ω recovered, six component fields, one c2r each; the negated Lamb vector u×ω back,
 # three r2c) plus (1, 3) for the scalar (φ recovered; the flux vector back); PhaseShift doubles the
 # velocity ((12, 6): the displaced recovery and product have no cheaper route than their own
 # transforms) and exactly doubles the scalar too ((2, 6): the displaced φ recovery and flux — the

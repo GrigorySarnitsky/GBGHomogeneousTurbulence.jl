@@ -3,7 +3,7 @@
 # In the Mori–Zwanzig reading (ARCHITECTURE §8) this is the generator of the full dynamics — the RHS
 # the numerical propagator (Propagator) advances; the `Observables` are the functions of that state.
 #
-# The momentum equation is advanced as ∂û/∂t = ℙ(u×ω)^ − ν|k|²û (+ forcing), with the viscous term
+# The momentum equation is advanced as ∂û/∂t = −ℙ(ω×u)^ − ν|κ|²û (+ forcing), ω×u the Lamb vector, with the viscous term
 # integrated exactly through the integrating factor ℰ = exp(-ν|k|²Δt) (built here, applied in
 # Propagator). This module owns the nonlinear-term assembly and the integrating factor;
 # everything diagonal-in-Fourier is a GBGPeriodicFields operator.
@@ -305,8 +305,8 @@ displaced-evaluation buffers.
 
 That scratch is the **generator's own** storage, distinct from the run's observables cache. The two
 do meet at one point: the physical quadratic products are formed *in place over the cache's arrays*,
-the Lamb vector over the vorticity slot and the scalar flux over the velocity slot, so no product
-field in physical representation is allocated anywhere.
+the negated Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}`` over the vorticity slot and the scalar flux over the
+velocity slot, so no product field in physical representation is allocated anywhere.
 
 A time-marching scheme consumes the generator through a fixed protocol: [`prepare!`](@ref) once per
 step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
@@ -344,11 +344,11 @@ you.
 
 # Fields
 - `conditions` — the `FlowConditions` parameter record (``\\nu``, ``\\mathrm{Sc}``, the forcings).
-- `product_spectral` — the quadratic products' spectral image (the transformed Lamb vector
+- `product_spectral` — the quadratic products' spectral image (the transformed negated Lamb vector
   ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, or the transformed scalar flux
   ``\\boldsymbol{u}\\varphi``). In physical representation each product is formed in place over an
-  operand's own array — the Lamb vector over the vorticity's, the flux over the velocity's — so
-  no physical product array exists.
+  operand's own array — the negated Lamb vector over the vorticity's, the flux over the velocity's —
+  so no physical product array exists.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
 - `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``.
@@ -489,7 +489,7 @@ end
 
 
 # The κ = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY. The continuous
-# law is momentum (and scalar-mean) conservation on a periodic box: ⟨u×ω⟩ = 0 since u×ω is a
+# law is momentum (and scalar-mean) conservation on a periodic box: ⟨ω×u⟩ = 0 since ω×u is a
 # gradient plus a divergence, and ⟨∇·(uφ)⟩ = 0 outright. Discretely the identity holds only to
 # roundoff, and the mode has no restoring term — the Leray projection legitimately keeps constants
 # (ℙ(0) = I) and the integrating factor is exp(0) = 1 there — so the residual is integrated
@@ -521,10 +521,11 @@ The arguments are:
 - `ω_consumed` — the stage vorticity in physical representation, consumed (see the note below).
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
 
-In physical space the rotational form writes the convective term as the Lamb vector, through the identity
+In physical space the rotational form writes the convective term through the Lamb vector
+``\\boldsymbol{\\omega}\\times\\boldsymbol{u}``, by the identity
 
 ```math
-(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\bigr) - \\boldsymbol{u}\\times\\boldsymbol{\\omega},
+(\\boldsymbol{u}\\cdot\\nabla)\\boldsymbol{u} = \\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\\bigr) + \\boldsymbol{\\omega}\\times\\boldsymbol{u},
 ```
 
 so that, with the Leray–Helmholtz projection ``\\mathbb{P}`` onto divergence-free fields absorbing the
@@ -532,13 +533,17 @@ pressure and the ``\\nabla\\bigl(\\tfrac{1}{2}\\lvert\\boldsymbol{u}\\rvert^{2}\
 becomes
 
 ```math
-\\partial_t\\boldsymbol{u} = \\mathbb{P} (\\boldsymbol{u}\\times\\boldsymbol{\\omega}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
+\\partial_t\\boldsymbol{u} = -\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
 ```
 
-The term computed is the spectral image of ``\\mathbb{P} (\\boldsymbol{u}\\times\\boldsymbol{\\omega})``,
+The term computed is the spectral image of ``-\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref), plus the per-stage additive source of the
 generator's velocity forcing (its
-[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook). A **mask**
+[`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook). Its minus
+sign costs nothing: the product is formed as the negated Lamb vector
+``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, operands in the order that carries the sign.
+
+A **mask**
 strategy ([`TwoThirds`](@ref),
 [`HouLi`](@ref)) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
 leaving `û` unused; [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
@@ -549,20 +554,20 @@ Two linear pieces are deliberately **not** in `N̂`: the viscous term and the ex
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
 The advective term's ``\\kappa = 0`` mode is zeroed exactly
-(``\\langle\\boldsymbol{u}\\times\\boldsymbol{\\omega}\\rangle = 0`` holds discretely only to
+(``\\langle\\boldsymbol{\\omega}\\times\\boldsymbol{u}\\rangle = 0`` holds discretely only to
 roundoff, and the mean mode has no viscous damping); the forcing source, added after, may carry a mean.
 
 Returns `N̂`.
 
 !!! note "The vorticity argument is read and then overwritten"
-    The Lamb vector is formed in place over the vorticity's array — the backend's cross product may
+    The negated Lamb vector is formed in place over the vorticity's array — the backend's cross product may
     write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
     does on return, while `u` is only read. This is what keeps a product field in physical
     representation from existing at all; passing a copy instead would cost a resident ``N^{3}``
     vector, which the package's preference for the smallest working set forbids.
 
-    Which operand is consumed follows the **physics**, not the argument position: the Lamb vector
-    forms over the vorticity here, and the scalar flux over the velocity in
+    Which operand is consumed follows the **physics**, not the argument position: the negated Lamb
+    vector forms over the vorticity here, and the scalar flux over the velocity in
     [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
     to infer it. Only the spectral product scratch remains on the generator, and the operation
     allocates nothing.
@@ -576,7 +581,7 @@ velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::Fix
 # Mask strategies (TwoThirds / HouLi): one evaluation, the low-pass kernel folded into the
 # projection's own pass (the kernel-composed ℙ arity) — one pass fewer than project-then-convolve.
 function _velocity_nonlinear!(::DealiasingStrategy, nonlinear, generator, û, u, ω_consumed, domain::FixedDomain)
-  _velocity_lamb!(nonlinear, u, ω_consumed, domain, generator.product_spectral, domain.dealias)
+  _velocity_advective_term!(nonlinear, u, ω_consumed, domain, generator.product_spectral, domain.dealias)
   return nonlinear
 end
 
@@ -589,28 +594,29 @@ function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω_cons
   phase_shift = generator.phase_shift
   product_spectral = generator.product_spectral
   T = real(eltype(field_data(nonlinear)))
-  _velocity_lamb!(nonlinear, u, ω_consumed, domain, product_spectral, domain.dealias)   # primary, truncated
+  _velocity_advective_term!(nonlinear, u, ω_consumed, domain, product_spectral, domain.dealias)   # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
   to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.transform_plans, product_spectral)
   vorticity_physical!(phase_shift.omega_shifted, phase_shift.velocity_shifted, domain, product_spectral)
-  # The displaced Lamb consumes ω_shifted only, so u_shifted still holds this stage's displaced
+  # The displaced assembly consumes ω_shifted only, so u_shifted still holds this stage's displaced
   # velocity — left fresh for the scalar assembly of the SAME stage (the freshness contract that
   # deletes its re-recovery, decision 45).
   generator.displaced_velocity_source = û
-  _velocity_lamb!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_spectral)
+  _velocity_advective_term!(phase_shift.velocity_shifted, phase_shift.u_shifted, phase_shift.omega_shifted, domain, product_spectral)
   # Shift-back, two-grid average, and truncation in ONE α/β convolve: ½·(𝔻⊙back)⊙(displaced) +
   # ½·(primary, already truncated) — the composed kernel is built once at construction.
   convolve!(nonlinear, phase_shift.velocity_shifted, phase_shift.back_dealiased, T(1 // 2), T(1 // 2))
   return nonlinear
 end
 
-# The pseudospectral ℙ(u×ω) in spectral representation — with an optional dealias kernel folded into
-# the projection's own pass (the kernel-composed arity; `nothing` gives the raw projected term).
-# The Lamb vector is formed IN PLACE over ω's array: the backend's cross product reads each grid
+# The pseudospectral −ℙ(ω×u) in spectral representation, taken as ℙ(u×ω): the Lamb vector is ω×u, and
+# the operand order below is the whole of the sign — no negation pass. An optional dealias kernel folds
+# into the projection's own pass (the kernel-composed arity; `nothing` gives the raw projected term).
+# The negated Lamb vector is formed IN PLACE over ω's array: the backend's cross product reads each grid
 # point's whole fiber before writing, so the destination may be an operand, and the product needs no
 # physical register of its own (ω is dead the instant after the cross — the projection's spectral
 # image carries the term from here).
-function _velocity_lamb!(out, u, ω, domain::FixedDomain, product_spectral, kernel = nothing)
+function _velocity_advective_term!(out, u, ω, domain::FixedDomain, product_spectral, kernel = nothing)
   cross!(ω, u, ω)
   to_spectral!(product_spectral, ω, domain.transform_plans)
   kernel === nothing ? helmholtz_projection!(out, product_spectral, domain.multipliers) :
@@ -768,7 +774,7 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_cons
   T = real(eltype(field_data(nonlinear)))
   _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, product_spectral, domain.dealias, -1)   # primary −𝔻∇·(uφ)
   # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
-  # Lamb consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
+  # assembly consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
   # transforms — exists only on the fallback path a hand-run bare `scalar_rhs!` takes (decision 45).
   # The reuse needs BOTH: the caller's assurance that no field has changed since `velocity_rhs!`
   # (only a scheme evaluating both right-hand sides at one stage can give it), and a matching `û`.

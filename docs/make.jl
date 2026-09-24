@@ -209,6 +209,45 @@ function lint_notation_variants()
 end
 
 
+# Doc lint: THE LAMB VECTOR IS ω × u (decision 93). Vorticity first is the literature's sign — Lamb's own
+# rotational form, Hamman, Klewicki & Kirby (2008), Sagaut & Cambon (2018), and every defining source a
+# 2026-09-24 sweep found. The rotational right-hand side carries its negation u × ω, which the solver
+# forms directly by the cross product's operand order, and the drift this guards is calling that
+# product "the Lamb vector": it stood on the landing page, in ARCHITECTURE and in the generator's
+# docstring until the sweep. A u-first cross product — in math, in Unicode, or as the `cross!(ω, u, ω)`
+# call — within three lines of the word fails unless the same window says it is the negation. The
+# decision log is exempt: it is history, and records what each entry was written against. The check
+# cannot see a sentence that calls the register's contents "the Lamb vector" with no product written
+# near it — those were swept by hand, and the glossary row is the reference.
+function lint_lamb_vector_sign()
+  u_first = (r"\\{1,2}boldsymbol\{u\}\s*\\{1,2}times\s*\\{1,2}boldsymbol\{\\{1,2}omega\}",
+             r"\bu\s*×\s*ω", r"cross!\(\s*ω\s*,\s*u\s*,\s*ω\s*\)")
+  srcs = _doc_lint_sources()
+  problems = String[]
+  mentions = 0
+  for file in srcs
+    lines = readlines(file)
+    history = 1:0
+    if endswith(file, "ARCHITECTURE.md")
+      first = findfirst(startswith("## 11."), lines)
+      last = findfirst(startswith("## References"), lines)
+      first === nothing || (history = first:something(last, length(lines)))
+    end
+    for (n, line) in enumerate(lines)
+      n in history && continue
+      occursin(r"\b[Ll]amb(?![A-Za-z])", line) || continue
+      mentions += 1
+      window = join(lines[max(1, n - 3):min(length(lines), n + 3)], "\n")
+      any(re -> occursin(re, window), u_first) && !occursin("negat", window) &&
+        push!(problems, string(relpath(file, joinpath(@__DIR__, "..")), ":", n,
+                               "  a u-first cross product named as the Lamb vector — it is ω × u; call u × ω its negation"))
+    end
+  end
+  isempty(problems) || error("doc lint failed — Lamb vector sign:\n  " * join(problems, "\n  "))
+  @info "doc lint: Lamb vector sign OK over $mentions mentions in $(length(srcs)) source files"
+end
+
+
 # ------------------------------------------------------------------ review-round closure
 #
 # An unclosed review round cannot ship. The three lints above check the PROSE; this one checks the
@@ -304,6 +343,7 @@ end
 copy_rationale_pages()
 lint_inline_math()
 lint_notation_variants()
+lint_lamb_vector_sign()
 lint_docstring_shape()
 lint_review_closure()
 

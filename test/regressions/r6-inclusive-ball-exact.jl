@@ -5,7 +5,7 @@
 #
 # The mechanism this test pins: at cutoff N/3 the only aliased product image that lands inside the
 # ball comes from the axis self-pair (N/3,0,0)+(N/3,0,0), and that image is a pure gradient — the
-# single-mode Lamb vector is ∇(|u|²/2), its alias stays gradient-shaped — which the Leray projection
+# single-mode Lamb vector is −∇(|u|²/2) (u·∇u vanishes for one mode), its alias stays gradient-shaped — which the Leray projection
 # annihilates exactly. The test therefore populates EVERY stored boundary mode with random
 # solenoidal content (the adversarial configuration: any surviving wrap would show) and holds the
 # N-grid projected term against a 2N zero-padded oracle, on and below the boundary shell.
@@ -47,19 +47,19 @@ const GEN6 = GBGHomogeneousTurbulence.Generator
                end; B)
   restrict(B) = [B[i1, mapidx(i2), mapidx(i3), c] / 8
                  for i1 in 1:half+1, i2 in 1:Np, i3 in 1:Np, c in 1:3]
-  function projected_lamb(domain, ûf)
+  function projected_advective_term(domain, ûf)
     u = SD6.new_vector_field_physical(domain); ω = SD6.new_vector_field_physical(domain)
     tmp = SD6.new_vector_field_spectral(domain)
     to_physical!(u, ûf, domain.transform_plans, tmp)
     vorticity_physical!(ω, ûf, domain, tmp)
     out = SD6.new_vector_field_spectral(domain)
-    GEN6._velocity_lamb!(out, u, ω, domain, SD6.new_vector_field_spectral(domain))
+    GEN6._velocity_advective_term!(out, u, ω, domain, SD6.new_vector_field_spectral(domain))
     field_data(out)
   end
-  raw = projected_lamb(d23, û)
+  raw = projected_advective_term(d23, û)
   û2 = SD6.new_vector_field_spectral(d2)
   field_data(û2) .= embed(field_data(û))
-  oracle = restrict(projected_lamb(d2, û2))
+  oracle = restrict(projected_advective_term(d2, û2))
 
   m = d23.multipliers
   κm = sqrt.(reshape(m.squared_wavenumber_1, :, 1, 1) .+

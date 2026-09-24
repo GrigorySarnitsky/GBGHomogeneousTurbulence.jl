@@ -28,14 +28,14 @@ Forcing.jl::write_forcing(parent::HDF5.H5DataStore， name::AbstractString，,96
 GBGHomogeneousTurbulence.jl::GBGHomogeneousTurbulence,39,0,118
 Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),76,2,311
 Generator.jl::Generator,37,0,184
-Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),57,2,593
+Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),59,2,597
 Generator.jl::finalize!(generator， state， domain),84,0,119
 Generator.jl::prepare!(generator， state， domain， dt),72,0,123
 Generator.jl::scalar_diffusivity(conditions) -> Float64,14,0,17
 Generator.jl::scalar_integrating_factor(generator， τ),42,0,44
 Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,104,1,569
 Generator.jl::velocity_integrating_factor(generator， τ),87,0,207
-Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),91,1,499
+Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),62,1,525
 Observables.jl::Observables,68,0,296
 Observables.jl::derivative_skewness(û， domain),85,1,448
 Observables.jl::dissipation(ω， viscosity),75,1,307

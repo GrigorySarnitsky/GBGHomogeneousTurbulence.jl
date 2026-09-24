@@ -30,6 +30,7 @@ The **Code** column gives the name each symbol carries in the package.
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
 | ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the cached field; [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
+| ``\boldsymbol{\omega}\times\boldsymbol{u}`` | the Lamb vector — vorticity first, the literature's sign, so that ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) + \boldsymbol{\omega}\times\boldsymbol{u}``; the rotational form's right-hand side carries its negation, ``\boldsymbol{u}\times\boldsymbol{\omega}``, which is the product the solver forms | never stored: formed in place over the vorticity's array by [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!) |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) |

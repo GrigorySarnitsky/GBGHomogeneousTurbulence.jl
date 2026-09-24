@@ -77,7 +77,7 @@ end
 # decision. Columns: spectral_vector, physical_vector, spectral_scalar, physical_scalar,
 # real_spectral_scalar.
 # Re-frozen 2026-08-06 (decisions 40 and 41 — the deposit-driven cache, then the in-place quadratic
-# products: the Lamb vector forms over the vorticity register and the scalar flux over the
+# products: the negated Lamb vector u×ω forms over the vorticity register and the scalar flux over the
 # velocity's, so `product_physical` is deleted outright, −1 pv in every cell on top of the merge):
 # the cache's chart slots ARE the step's substage recovery registers, so the two physical vectors
 # the old IntegratorBuffers carried beside the charts are gone (−2 pv in every cell, 768 MiB at
@@ -606,7 +606,7 @@ const EPISODE_UNITS = [
     @test all(f -> f in fieldnames(ObservablesCache),
               (:velocity_physical, :vorticity_physical, :scalar_physical, :max_speed))
     @test :product_spectral in fieldnames(ResolvedGenerator)
-    # The physical product register is gone (decision 41): the Lamb vector forms over the vorticity
+    # The physical product register is gone (decision 41): the negated Lamb vector u×ω forms over the vorticity
     # slot and the scalar flux over the velocity slot — in place, alias-safe.
     @test !(:product_physical in fieldnames(ResolvedGenerator))
     IB = GBGHomogeneousTurbulence.Propagator.IntegratorBuffers

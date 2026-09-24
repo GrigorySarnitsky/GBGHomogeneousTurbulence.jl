@@ -73,11 +73,11 @@ flow_parameters(sim)                          # the run's measured flow state
 With ``\boldsymbol{u}`` the velocity, ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` the vorticity,
 ``\nu`` the kinematic viscosity, ``\mathbb{P}`` the Leray–Helmholtz projection onto divergence-free
 fields, and ``\boldsymbol{f}`` a forcing, the momentum equation is advanced in rotational form (its
-advective term carried by the Lamb vector ``\boldsymbol{u}\times\boldsymbol{\omega}``),
+advective term carried by the Lamb vector ``\boldsymbol{\omega}\times\boldsymbol{u}``),
 
 ```math
 \begin{aligned}
-\partial_t \boldsymbol{u} &= \mathbb{P} (\boldsymbol{u}\times\boldsymbol{\omega})
+\partial_t \boldsymbol{u} &= -\mathbb{P} (\boldsymbol{\omega}\times\boldsymbol{u})
   + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}, &
 \nabla\cdot\boldsymbol{u} &= 0,
 \end{aligned}

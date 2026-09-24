@@ -349,7 +349,7 @@ function _low_storage_2n_step!(a::NTuple{S, T}, b::NTuple{S, T}, d::NTuple{S, T}
     if i == 1
       u = velocity_physical(cache)                     # the deposited observables, deposited by the
       ω = vorticity_physical(cache)                    # previous iteration's closing deposit (never recomputed)
-      take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
+      take_vorticity!(cache)                           # the assembly forms u×ω, the negated Lamb vector, in ω's register
       has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
     else
       # From stage 2 on the cache slots ARE the recovery registers: take them (their epochs go to
@@ -475,8 +475,8 @@ function step!(::IFHeun, state::ResolvedFields, generator::ResolvedGenerator,
   prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
 
   # stage 1 — right-hand sides at the state between iterations, read from the cache (deposited by the previous
-  # iteration's closing deposit; never recomputed). The assemblies consume the chart registers — the Lamb vector
-  # forms in the vorticity's, and the scalar flux in the velocity's — so those slots are taken first.
+  # iteration's closing deposit; never recomputed). The assemblies consume the chart registers — the negated Lamb
+  # vector u×ω forms in the vorticity's, and the scalar flux in the velocity's — so those slots are taken first.
   u = velocity_physical(cache)
   ω = vorticity_physical(cache)
   take_vorticity!(cache)
@@ -618,7 +618,7 @@ function step!(::IFSSPRK3, state::ResolvedFields, generator::ResolvedGenerator,
   # ---- stage 1: N̂ at the deposited state; q⁽¹⁾ = E(Δt)(û + Δt N̂) ----
   u = velocity_physical(cache)                     # the deposited observables, deposited by the
   ω = vorticity_physical(cache)                    # previous iteration's closing deposit
-  take_vorticity!(cache)                           # the assembly forms the Lamb vector in ω's register
+  take_vorticity!(cache)                           # the assembly forms u×ω, the negated Lamb vector, in ω's register
   has_scalar && take_velocity!(cache)              # …and, with a scalar, the flux in u's register
   velocity_rhs!(nl, generator, û, u, ω, domain)
   if has_scalar

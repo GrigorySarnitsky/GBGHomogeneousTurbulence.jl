@@ -16,7 +16,7 @@ some are values at particle positions, and some are single numbers.
 Components of a run need the same observable within one iteration. The velocity in physical
 representation is the clearest case: at ``t_n`` the timestep control needs its maximum for the
 advective CFL, the tracer set interpolates it onto the particles to start their push, and the
-generator's first stage assembles the Lamb vector from it. Left to themselves they would each recover
+generator's first stage assembles the advective term from it. Left to themselves they would each recover
 it from ``\hat{\boldsymbol{u}}`` and keep a copy — three recoveries and three resident fields where
 one of each suffices.
 
@@ -111,8 +111,8 @@ observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
 what removes one: a register overwritten before the iteration's end has nothing left to deposit. The contents
 are consequently a property of the solver's storage decisions, not a promise. §2.3's in-place product
-reuse is the case that shows how narrow the dependence is: it takes the vorticity slot as the Lamb
-vector's scratch mid-iteration, yet the vorticity is deposited at the iteration's end either way, so
+reuse is the case that shows how narrow the dependence is: it takes the vorticity slot as scratch for
+the negated Lamb vector mid-iteration, yet the vorticity is deposited at the iteration's end either way, so
 the reuse moved the run's residency and left the contents untouched (§1.4).
 
 ### 1.3 When a cached value is valid
@@ -169,8 +169,8 @@ the only repair is to fix the schedule.
 
 **A slot belongs to the component that produces it**; that component owes a correct
 value at every iteration's end. Any component may take the array as scratch mid-iteration, and taking it
-marks its epoch as scratch; this is what lets the Lamb vector be assembled into the vorticity's own slot,
-with no product array of its own (§2.3). While the slot holds the Lamb vector its epoch says
+marks its epoch as scratch; this is what lets the negated Lamb vector be assembled into the vorticity's own slot,
+with no product array of its own (§2.3). While the slot holds that product its epoch says
 *scratch*, so a read throws rather than returning a mislabelled field. Taking a slot costs no
 transform, since the owner deposits at the iteration's end from the state it has just produced, which it would
 recover anyway. What it costs is reads: a slot taken before the last reader of that observable makes
@@ -249,8 +249,10 @@ passive scalar and tracer particles. The convective term is written through
 
 ```math
 (\boldsymbol{u}\cdot\nabla)\boldsymbol{u}
-  = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) - \boldsymbol{u}\times\boldsymbol{\omega}
+  = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) + \boldsymbol{\omega}\times\boldsymbol{u},
 ```
+
+with ``\boldsymbol{\omega}\times\boldsymbol{u}`` the Lamb vector,
 
 and the Leray–Helmholtz projection ``\mathbb{P}`` onto divergence-free fields absorbs both the pressure
 and the gradient ``\nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr)``; the system then reads
@@ -258,7 +260,7 @@ and the gradient ``\nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr)`
 ```math
 \begin{aligned}
 \partial_t \boldsymbol{u}
-  &= \mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
+  &= -\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f},
 &\qquad \nabla\cdot\boldsymbol{u} &= 0, \\[4pt]
 \partial_t \varphi
   &= -\nabla\cdot(\boldsymbol{u}\varphi) + \varkappa\nabla^{2}\varphi + f_\varphi, \\[4pt]
@@ -276,7 +278,7 @@ transforms below.
 
 ### 2.2 How a step treats each term
 
-- **The quadratic terms** ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})`` and
+- **The quadratic terms** ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})`` and
   ``-\nabla\cdot(\boldsymbol{u}\varphi)``: evaluated as fields.
 - **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
@@ -305,7 +307,7 @@ velocity term has just built.
 Under a mask rule one **evaluation** of the velocity term proceeds as follows: recover
 ``\boldsymbol{u}`` (3 inverse transforms); form
 ``\hat{\boldsymbol{\omega}} = \mathrm{i}\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and recover
-``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the Lamb vector forming in place over the
+``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the negated Lamb vector ``\boldsymbol{u}\times\boldsymbol{\omega}`` forming in place over the
 vorticity's own array, as below — and transform it back (3 forward); apply ``\mathbb{P}`` and the
 mask, both per-wavenumber multiplications.
 
@@ -323,7 +325,7 @@ These transforms carry essentially all of the arithmetic: a scalar transform cos
 floating-point operations per grid point, a pointwise multiplication of order one.
 
 The pointwise product writes into one of its own operands: the backend's cross product reads each
-grid point's whole fiber before writing, so the Lamb vector is assembled into the vorticity's own
+grid point's whole fiber before writing, so the negated Lamb vector is assembled into the vorticity's own
 array — the slot, taken as the producer's scratch exactly as §1.3 describes — and the scalar flux
 into the velocity's. No third array exists, and the evaluation holds two vector arrays in physical
 representation at once. The vorticity is deposited at the iteration's end either way, so the reuse changes the
@@ -356,15 +358,15 @@ there is no moment to date it to, so no act at an observation builds it either.
 
 | Observable | Where it lives | Cached | Producer, or reason |
 |:---|:---|:---|:---|
-| ``\boldsymbol{u}`` | physical, grid | yes | the closing recovery; read by the timestep choice, the tracer advance, the Lamb assembly, and observations |
-| ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the Lamb assembly |
+| ``\boldsymbol{u}`` | physical, grid | yes | the closing recovery; read by the timestep choice, the tracer advance, the advective-term assembly, and observations |
+| ``\boldsymbol{\omega}`` | physical, grid | yes | the closing recovery; read by the advective-term assembly |
 | ``\varphi`` | physical, grid | yes | the closing recovery; read by the flux assembly |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the velocity at the particles | ``M\times3`` at points | yes | the closing interpolation from the cached velocity; read by the next push and by Lagrangian statistics |
 | the sample history, ``\boldsymbol{u}(t_{n-j}, \boldsymbol{X}(t_{n-j}))``, ``j = 1..\texttt{history\_depth}-1`` | ``M\times3`` each, a bounded ring | depends | kept only when a multistep particle integration scheme asks for depth; rotated at each sample deposit, discarded by an out-of-band reposition |
 | the maximum speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | one number | yes | the closing reduction over the cached velocity; read by the next timestep choice |
-| ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
+| ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})``, dealiased | spectral, grid | no | not surviving: since the products form in place over the velocity and vorticity slots (§2.3), assembling the term at the iteration's end would destroy the deposited velocity and vorticity — keeping both needs a product array the minimal-memory schedule does not carry |
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
-| ``\boldsymbol{u}\times\boldsymbol{\omega}`` | physical, grid | no | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
+| ``\boldsymbol{u}\times\boldsymbol{\omega}``, the negated Lamb vector | physical, grid | no | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
 | ``E(\kappa_n)``, the spectral density | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | not computed: no iteration forms it |

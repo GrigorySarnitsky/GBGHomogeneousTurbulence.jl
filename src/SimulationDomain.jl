@@ -350,7 +350,7 @@ _resolved_wavenumber(strategy, N, L, ::Type{T}) where {T} =
 # can alias back into the ball (N/3 + N/3 → −N/3). Expanded for THIS discretization, the only pair
 # whose image lands inside the ball is the axis self-pair (N/3,0,0)+(N/3,0,0) — every other boundary
 # pair either does not wrap past Nyquist or lands outside the mask — and that image is a PURE
-# GRADIENT (the single-mode Lamb vector is ∇(|u|²/2), and its alias stays gradient-shaped), which
+# GRADIENT (the single-mode Lamb vector is −∇(|u|²/2), since u·∇u vanishes for one mode, and its alias stays gradient-shaped), which
 # the Leray projection annihilates exactly; the scalar's aliased flux is transverse to its
 # wavevector, so the divergence kills it the same way. Demonstrated against a 2N zero-padded oracle
 # at N = 12 (3|N, every stored boundary mode populated): the closed ball matches to 1.5e-16 ON the
