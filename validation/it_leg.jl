@@ -136,7 +136,7 @@ println("== writing gbgit_reference_data.h5")
 t = DT .* collect(0:STRIDE:NSTEPS)   # IT clock; t₀ here = TurTLE's absolute t = 0.2
 h5open(joinpath(DIR, "gbgit_reference_data.h5"), "w") do io
   io["t"] = t; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
-  a = attributes(io)
+  a = HDF5.attributes(io)   # qualified: CUDA.jl exports an `attributes` too, and the bare name is then ambiguous
   a["code"] = "GBGHomogeneousTurbulence (IFSSPRK3, HouLi order 36 strength 63.463), Float64, ROCm GPU"
   a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, ConstantPower ε_inj = 1 shells 1–2; " *
              "18400 steps = 36.8 time units from the same frozen handoff as TurTLE's collect run; " *

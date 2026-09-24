@@ -131,7 +131,7 @@ nst = length(ts) - 1
 println("== writing gbgit_rk4adaptive_reference_data.h5")
 h5open(joinpath(DIR, "gbgit_rk4adaptive_reference_data.h5"), "w") do io
   io["t"] = ts; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
-  a = attributes(io)
+  a = HDF5.attributes(io)   # qualified: CUDA.jl exports an `attributes` too, and the bare name is then ambiguous
   a["code"] = "GBGHomogeneousTurbulence (IFLowStorageRK4, ADAPTIVE CFL step, HouLi order 36 strength 63.463), Float64, ROCm GPU"
   a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, ConstantPower ε_inj = 1 shells 1–2; " *
              "adaptive CFL stepping (recommended ceiling for IFLowStorageRK4) to t = 36.8 from the same frozen handoff; " *
