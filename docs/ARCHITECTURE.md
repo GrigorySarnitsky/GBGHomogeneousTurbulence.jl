@@ -2887,7 +2887,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `highest_shell = nothing` (a physicist can read "no highest shell" as "no band"; `Inf` has one
     reading), a separate band argument such as `shells = 1:2` (Base has no infinite integer range, so
     "all" would need its own sentinel anyway), a named constant (an invented alias for a number
-    everyone reads), and `typemax(Int)` (a workaround, not an interface).
+    everyone reads), and `typemax(Int)` (a workaround, not an interface). *(Amended the same day: the test is on the value, not the type.
+    An integer-valued float such as `2.0` is accepted and stored as the integer, because a sweep
+    written `[2, 4, Inf]` promotes its integers to `Float64`, and refusing `2.0` broke the natural
+    way to vary the band. Only a fractional value such as `2.5` is refused.)*
 93. **(2026-09-24, user-directed) The Lamb vector is ``\boldsymbol{\omega}\times\boldsymbol{u}``, vorticity
     first — the literature's sign — and the package follows it.** **Why.** A PF reviewer questioned an
     example calling ``\boldsymbol{u}\times\boldsymbol{\omega}`` "the Lamb vector", and this package did

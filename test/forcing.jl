@@ -479,6 +479,14 @@ end
                       dealiasing = TwoThirds(), array_type = Array)
     @test VarianceController(; target = 1.0, highest_shell = Inf)(d16).highest_shell === Inf
     @test occursin("shells 1 to Inf", repr(ConstantPower(d16; injection_rate = 0.1, highest_shell = Inf)))
+    # An integer-valued float is that shell — `[2, 4, Inf]` promotes 2 to 2.0 — and must never
+    # read as `Inf`: it builds the same band and stores the integer.
+    sweep = [2, 4, Inf]
+    @test eltype(sweep) == Float64
+    as_float = VarianceRescaling(d16; target = 1.0, over = :band, highest_shell = sweep[1])
+    @test as_float.highest_shell === 2
+    @test repr(as_float) == repr(VarianceRescaling(d16; target = 1.0, over = :band, highest_shell = 2))
+    @test StochasticOU(d16; forcing_variance = 0.1, correlation_time = 0.5, highest_shell = 2.0).highest_shell === 2
     # Nothing between the integers, and no stochastic forcing of every mode.
     for bad in (2.5, -Inf, NaN)
       @test_throws ArgumentError ConstantPower(d16; injection_rate = 0.1, highest_shell = bad)

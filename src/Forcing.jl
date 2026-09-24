@@ -350,8 +350,9 @@ function _check_shells(lowest::Integer, highest::Real)
                         "the box's total momentum (or the scalar's mean), not turbulence"))
   # An integer shell, or `Inf` for no upper bound. Nothing between: a lattice |κ|²/κ₀² is always an
   # integer and an integer shell's edge sits at (n + ½)², which never is one, so no mode lies on an
-  # edge for roundoff to decide. A bound of 2.5 would put the edge exactly on |κ| = 3κ₀.
-  (highest isa Integer || highest == Inf) ||
+  # edge for roundoff to decide. A bound of 2.5 would put the edge exactly on |κ| = 3κ₀. The test is
+  # on the VALUE, not the type: `[2, 4, Inf]` promotes its integers to Float64, and 2.0 is shell 2.
+  (highest == Inf || (isfinite(highest) && isinteger(highest))) ||
     throw(ArgumentError("`highest_shell` must be an integer shell or `Inf` (every retained mode " *
                         "but the mean), got $highest: a shell between two integers would put the " *
                         "band's edge on lattice modes, which roundoff then assigns"))
@@ -363,6 +364,7 @@ end
 
 function _shell_band(domain::FixedDomain, lowest::Integer, highest::Real)
   _check_shells(lowest, highest)
+  highest = _shell_bound(highest)                     # 2.0 reads as shell 2 in the warnings too
   k0 = 2π / domain.grid.domain_size[1]
   # A band above the dealias cutoff is INERT, not harmful: the mask keeps those modes empty, and
   # every band forcing is field-proportional, so it multiplies zero forever. Measured: a Linear on
@@ -391,8 +393,7 @@ _corner_shell(domain::FixedDomain) = ceil(Int, sqrt(3) * maximum(domain.grid.gri
 
 # The stored upper bound: the integer the caller gave, or `Inf` itself — never the corner shell it
 # resolves to on this grid, which would read back as "all modes" only on the grid it came from.
-_shell_bound(highest::Integer) = Int(highest)
-_shell_bound(highest::Real) = Inf
+_shell_bound(highest::Real) = isinf(highest) ? Inf : Int(highest)
 
 
 # The observable a forcing `target` agrees with: kinetic energy ½⟨|u|²⟩ for the velocity (a vector
