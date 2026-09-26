@@ -13,6 +13,8 @@ The measured functions of the flow state:
   variance.
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
 - [`kinetic_energy_and_dissipation`](@ref) — ``(k, \\varepsilon)`` in one fused traversal.
+- [`kinetic_energy_and_dissipation_below_scale`](@ref) — the kinetic energy and dissipation held in
+  scales below each box side ``l`` the grid offers.
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
   developed cascade.
 - [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
@@ -49,7 +51,8 @@ using GBGPeriodicFields
 using Statistics: mean                    # the mapped mean — PF extends it, Statistics owns the name
 using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 
-export kinetic_energy, dissipation, kinetic_energy_and_dissipation, max_speed, vorticity_physical!,
+export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
+       kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
        energy_spectrum, integral_scale
 
@@ -170,6 +173,93 @@ function kinetic_energy_and_dissipation(û, domain::FixedDomain, viscosity::Real
   return (kinetic_energy = whole / 2, dissipation = oftype(dirichlet, viscosity) * dirichlet)
 end
 
+
+"""
+    kinetic_energy_and_dissipation_below_scale(û, domain, viscosity)
+
+The kinetic energy and the dissipation rate held in scales below a box side ``l``, for every side
+``l = nL/N`` (``n = 1, \\dots, N``) of an ``N^{3}`` grid on a box of side ``L``.
+
+Cut from the flow a cubic box of side ``l``, remove the box's own mean velocity, and take the kinetic
+energy of what is left; averaged over every position of the box, that is ``k(l)``. The same cut with
+the box's mean vorticity removed gives the dissipation ``\\varepsilon(l)`` carried below ``l``.
+Removing the mean velocity instead would leave every gradient, and so the dissipation, unchanged,
+which is why the vorticity's mean is the one removed. With ``\\bar{\\boldsymbol{u}}_l`` and
+``\\bar{\\boldsymbol{\\omega}}_l`` the box means of side ``l`` centred at each point,
+
+```math
+\\begin{aligned}
+k(l) &= k - \\tfrac{1}{2}\\langle\\lvert\\bar{\\boldsymbol{u}}_l\\rvert^{2}\\rangle
+      = \\tfrac{1}{2}\\sum_{\\boldsymbol{\\kappa}} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2}, \\\\
+\\varepsilon(l) &= \\varepsilon - \\nu\\langle\\lvert\\bar{\\boldsymbol{\\omega}}_l\\rvert^{2}\\rangle
+      = \\nu \\sum_{\\boldsymbol{\\kappa}} \\lvert\\boldsymbol{\\kappa}\\rvert^{2} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2},
+\\end{aligned}
+```
+
+with ``W_l(\\boldsymbol{\\kappa}) = \\prod_{a} \\operatorname{sinc}(\\kappa_a l/2)`` the transfer function of
+the box mean, the sums in the normalized convention of [`kinetic_energy`](@ref). Both rise from zero
+as ``l \\to 0`` to ``k`` and ``\\varepsilon`` at ``l = L``, where the box is the domain and only the mean
+is removed. ``k(l)`` is the position average of the residual kinetic energy of a top-hat filter of
+width ``l`` in Pope (2000, [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge
+University Press, Exercise 13.22); in the inertial range it grows as ``(\\varepsilon l)^{2/3}``.
+
+The box mean is that of the band-limited field the coefficients represent, not the mean of the grid
+values inside the box, even for a side of a whole number of cells (the window is
+[`tophat_window`](@extref GBGPeriodicFields.Convolution.tophat_window)). Each value is the whole-field
+reduction minus the retained part, so its relative precision is lower by the ratio ``k/k(l)``.
+
+The arguments are:
+- `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
+  velocity route of [`dissipation`](@ref), exact only for a solenoidal field.
+- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) the
+  velocity lives on, which fixes ``N``, ``L`` and the windows.
+- `viscosity` — the kinematic viscosity ``\\nu`` scaling the dissipation.
+
+Returns a named tuple `(scales, kinetic_energy, dissipation)` of three host vectors of length ``N``,
+in the field's own real element type: the sides ``l``, then ``k(l)`` and ``\\varepsilon(l)`` at each.
+
+!!! warning "An occasional diagnostic, not a per-step one"
+    The ``N`` sides take ``N/2`` traversals of `û`, two sides each, so the cost grows as ``N^{4}``.
+    Measure it at observations, not inside a stepping loop. In `Float32` the subtraction above
+    costs digits where ``k(l) \\ll k``, at the smallest sides of a field with little small-scale
+    energy; measure in `Float64` where those sides matter.
+"""
+kinetic_energy_and_dissipation_below_scale(û, domain::FixedDomain, viscosity::Real) =
+  _below_scale(û, domain, viscosity, Val(_BELOW_SCALE_BATCH))
+
+# `B` sides per traversal, a type parameter so each width compiles one fused reduction; the public
+# form fixes it, the batch-width benchmark varies it.
+function _below_scale(û, domain::FixedDomain, viscosity::Real, ::Val{B}) where {B}
+  whole, dirichlet = weighted_inner(û, (domain.unit_kernel, domain.squared_wavenumber_kernel))
+  T = typeof(whole)
+  N = domain.grid.grid_size[1]
+  L = domain.grid.domain_size[1]
+  scales = [T(n * L / N) for n in 1:N]
+  retained = similar(scales)                     # ⟨|ū_l|²⟩ for each side
+  retained_dirichlet = similar(scales)           # ⟨|ω̄_l|²⟩ for each side
+  for first in 1:B:N
+    # A fixed batch width keeps one compiled traversal: the last batch is padded by repeating its
+    # final side, and the repeats' values are simply written twice.
+    sides = ntuple(j -> min(first + j - 1, N), Val(B))
+    w² = map(i -> (w = tophat_window(domain.multipliers, scales[i]); convolve(w, w)), sides)
+    κ²w² = map(v -> convolve(domain.squared_wavenumber_kernel, v), w²)
+    values = weighted_inner(û, (w²..., κ²w²...))
+    for j in 1:B
+      retained[sides[j]] = values[j]
+      retained_dirichlet[sides[j]] = values[B + j]
+    end
+  end
+  ν = oftype(whole, viscosity)
+  return (; scales, kinetic_energy = (whole .- retained) ./ 2,
+          dissipation = ν .* (dirichlet .- retained_dirichlet))
+end
+
+# Sides per traversal, MEASURED (2026-09-26, RTX 5070 Ti, one call over all N sides): B = 2 is the
+# fastest or tied at 128³ and 256³ in both precisions, and wider batches are slower — each side's
+# weight is a product of lazy kernels, so arithmetic, not the field read the batching saves, sets the
+# cost (PF's register-pressure caution, confirmed). Hard ceiling: the fused tuple fails to COMPILE on
+# CUDA at 32 weights (B = 16; Julia's generic splat past its tuple limit), 24 compile. ROCm unmeasured.
+const _BELOW_SCALE_BATCH = 2
 
 """
     max_speed(u)

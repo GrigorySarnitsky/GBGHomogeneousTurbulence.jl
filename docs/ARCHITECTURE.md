@@ -362,7 +362,13 @@ states the physical quantity first, then the reduction that computes it:
   skewness);
 - ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum
   over the shell width — the **density**, the same object a model law gives — and `integral_scale`
-  derived from it.
+  derived from it;
+- `kinetic_energy_and_dissipation_below_scale`, the kinetic energy ``k(l)`` and dissipation
+  ``\varepsilon(l)`` held in scales below each box side ``l`` the grid offers — what a box of side ``l``
+  measures once its own mean velocity (or vorticity) is removed, averaged over its positions — as the
+  weighted reductions ``\tfrac{1}{2}\sum(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2`` and
+  ``\nu\sum\lvert\boldsymbol{\kappa}\rvert^2(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2`` over
+  `GBGPeriodicFields`' top-hat window (decision 96).
 
 These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
 and the stationarity signals `warmup!` watches. They are also the *measured* half of the validation
@@ -2994,6 +3000,31 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     and ``k`` now fluctuates freely rather than being restored. Tests that seeded one energy beside a
     target holding another now adopt a seeded `state`; the witness pinning the old "ν is
     forcing-independent" contract now pins the new one.
+96. **(2026-09-26, user-directed) `kinetic_energy_and_dissipation_below_scale`: the energy and dissipation
+    a sub-box of side ``l`` measures.** The owner's construction: cut a cube of side ``l``, remove its
+    own mean, compute ``k`` there, and average over every position. That average is exactly
+    ``k(l) = k - \tfrac{1}{2}\langle\lvert\bar{\boldsymbol{u}}_l\rvert^2\rangle =
+    \tfrac{1}{2}\sum(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2``, the position average of Pope's
+    residual kinetic energy of a top-hat filter (2000, Ex. 13.22); the vorticity analogue gives
+    ``\varepsilon(l)``, because removing the mean *velocity* leaves every gradient and so a flat
+    ``\varepsilon``. **Settled with the owner:** the cube, on principle (other window shapes may
+    become an option later); one function returning `(; scales, kinetic_energy, dissipation)`, named
+    after `kinetic_energy_and_dissipation` since it carries both; ``N`` domain-derived sides
+    ``l = nL/N``; the glossary symbols ``l`` (free) and ``W_l`` (``G`` already wore two meanings).
+    **The window is PF's** — requested 2026-09-22 with the full rationale and built as `tophat_window`
+    (PF decision 87; `assignment_window` is now its square at the grid spacing), so no kernel machinery
+    lives here. It is the continuum box mean of the band-limited field, not a mean of grid values.
+    **The batch width is measured, not assumed:** on the RTX 5070 Ti two sides per traversal were the
+    fastest or tied at 128³ and 256³ in both precisions, wider batches slower (the per-mode arithmetic
+    of the lazy product kernels, not the saved field read, sets the cost), and 32 weights in one fused
+    tuple fail to compile on CUDA (Julia's generic splat past its tuple limit), so ``B = 2``, ROCm still
+    to be measured. **Precision:** each value is a whole-field reduction minus a retained part, so in
+    `Float32` the smallest sides of a field with little small-scale energy lose digits — batch widths
+    differed by up to ``6\times10^{-4}`` relative there at 256³; the docstring says to measure in
+    `Float64` where those sides matter. **Tested** against two independent oracles: the exact spectral
+    sums as plain host loops (``10^{-12}``), and the definition itself — boxes cut on an 8× zero-padded
+    grid, each mean removed, averaged over positions — elementwise within its own ``1/q^2``
+    discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

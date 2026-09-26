@@ -31,6 +31,15 @@ Both quadratic reductions of the velocity from one traversal — the eddy-turnov
 kinetic_energy_and_dissipation
 ```
 
+## Energy and dissipation below a scale
+
+The kinetic energy and the dissipation held in scales below each box side the grid offers — what a
+box of that side measures once its own mean is removed, averaged over every position.
+
+```@docs
+kinetic_energy_and_dissipation_below_scale
+```
+
 ## Derivative skewness
 
 The velocity-derivative skewness — the developed-turbulence marker that gates warm-up.

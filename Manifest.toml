@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "278da847f2429a0957c4ce23b7ab7c1028150e23"
+project_hash = "b8d771af6d65d124ab4726808b3d6264b316aa39"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -107,7 +107,7 @@ version = "0.1.0"
 
 [[deps.GBGPeriodicFields]]
 deps = ["AbstractFFTs", "Adapt", "Atomix", "FFTW", "KernelAbstractions", "LinearAlgebra", "StaticArrays", "Statistics"]
-git-tree-sha1 = "7aa7460642cfa1fc16540687c4baf0388707423f"
+git-tree-sha1 = "73fd42c80ee1595873148f66f2b1338100e1ecb5"
 repo-rev = "master"
 repo-url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"
 uuid = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
