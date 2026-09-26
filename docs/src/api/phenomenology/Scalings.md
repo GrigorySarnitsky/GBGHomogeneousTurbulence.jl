@@ -13,16 +13,6 @@ The dimensionless scaling constants and their Reynolds-number trends, evaluated 
 ScalingLaw
 Sreenivasan1998
 Sreenivasan1995
-Li2008
-```
-
-## Predicting dissipation
-
-Invert a box-normalized dissipation law to the dissipation a stationary run sustains — the seam the run
-layer uses to set the viscosity from the grid and target energy.
-
-```@docs
-stationary_dissipation
 ```
 
 ## References
@@ -35,7 +25,7 @@ for an individual coefficient or a comparison is cited in place and not repeated
 import GBGHomogeneousTurbulence.Phenomenology as Phen
 import GBGHomogeneousTurbulence.Phenomenology.Scalings as Scal
 import Markdown
-laws = [Scal.Sreenivasan1998(), Scal.Sreenivasan1995(), Scal.Li2008()]
+laws = [Scal.Sreenivasan1998(), Scal.Sreenivasan1995()]
 cites = unique([Phen.provenance(l).citation for l in laws])
 Markdown.parse(join(["- " * c for c in cites], "\n"))
 ```

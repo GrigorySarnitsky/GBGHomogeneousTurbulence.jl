@@ -12,7 +12,6 @@ using GBGHomogeneousTurbulence: SimulationDomain, State, Observables, Cache, For
                               Propagator, Particles, SimulationRun, Phenomenology
 using GBGHomogeneousTurbulence.Phenomenology: Spectra, StructureFunctions, Scalings, FlowParameters, Reference
 using GBGHomogeneousTurbulence.Phenomenology.Spectra: Pope2000
-using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008
 using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions: Kolmogorov1941
 using GBGHomogeneousTurbulence.Particles: advect!, unwrapped_positions
 using GBGPeriodicFields: field_data, point_positions, npoints, LalescuSpline
@@ -37,7 +36,6 @@ const NO_DISPLAY = Dict(
   :Clock                  => RECORD_REASON * "; private to the run layer",
   :EveryTime              => RECORD_REASON * "; private to the run layer",
   :Reference              => RECORD_REASON,
-  :Li2008                 => RECORD_REASON,
   :Sreenivasan1995        => RECORD_REASON,
   :Sreenivasan1998        => RECORD_REASON,
   :ObukhovCorrsin1949     => RECORD_REASON,
@@ -263,7 +261,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
                    FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1),
                    FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1,
                                   schmidt = 0.7, scalar_dissipation = 0.05),
-                   Reference("Someone (2000)", (10.0, 100.0)), Li2008(0.6), Kolmogorov1941(2.1), Pope2000(C_K = 1.6),
+                   Reference("Someone (2000)", (10.0, 100.0)), Kolmogorov1941(2.1), Pope2000(C_K = 1.6),
                    SimulationRun.Clock(1.5, 3), SimulationRun.EveryTime(0.5, 1.0))
       rebuilt = eval(Meta.parse(repr(record)))
       @test typeof(rebuilt) === typeof(record)

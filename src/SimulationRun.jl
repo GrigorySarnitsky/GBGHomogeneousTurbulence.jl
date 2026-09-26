@@ -125,13 +125,9 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     ``\\varepsilon = (k/G)^{3/2}/L``, with ``L`` the box side and ``G = 0.7``.
 
     That value is **provisional**, measured in this package's own forced runs on shells 1–2, where
-    ``G`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66. The literature
-    value 0.9 (`Li2008`, in `Phenomenology.Scalings`) is calibrated at
-    ``\\mathrm{Re}_\\lambda \\approx 433`` and overestimates ``G`` at the Reynolds numbers a single GPU
-    reaches.
+    ``G`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66.
 
-    ``G`` carries
-    ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
+    ``G`` carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
     forced: the same runs gave ``G \\approx 0.56`` forced on shells 1–4 and ``\\approx 0.47`` on every
     mode. A forcing moved off the default band therefore misses the requested resolution.
 

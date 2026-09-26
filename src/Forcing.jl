@@ -842,8 +842,7 @@ end
 # ε_∞ = (k/G)^{3/2}/L for a stationary box-filling flow, G = k/(Lε)^{2/3} the box-normalized
 # dissipation group. G = 0.7 is PROVISIONAL and the package's own (decision 94): measured 2026-09-24
 # on 96³ VarianceRescaling(over = :total) runs forced on shells 1–2, G = 0.59–0.74 rising with Re_λ
-# over 28–66. `Scalings.Li2008`'s 0.9 is a JHTDB reduction at Re_λ ≈ 433 and overestimates G at the
-# Reynolds numbers these grids reach, which left the requested κ_max·η unmet by ~10%. G also falls
+# over 28–66. G also falls
 # as the forcing band widens (≈ 0.56 on shells 1–4, ≈ 0.47 on every mode), so this one number is a
 # stand-in for the G(forcing, Re_λ, band) law the package exists to measure first.
 # This is the ONE estimate: the controller's default relaxation time and the run layer's derived

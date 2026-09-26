@@ -608,8 +608,8 @@ would be Kolmogorov 1941 across two submodules — `StructureFunctions.Kolmogoro
 laws) and a spectrum counterpart `Spectra.Kolmogorov1941`, were one added — separated by the submodule
 alone. The full
 handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction — and
-where a preset's value is *not* read off its name's paper (`Li2008`'s own database reduction,
-`Sreenivasan1995`'s as-quoted value), the docstring says so at the value.
+where a preset's value is *not* read off its name's paper (`Sreenivasan1995`'s as-quoted value), the
+docstring says so at the value.
 
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
 
@@ -620,9 +620,8 @@ where a preset's value is *not* read off its name's paper (`Li2008`'s own databa
 - **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
   representation, any two-point correlation law when one is added).
 - **`Scalings`** — the dimensionless numbers and their ``\mathrm{Re}_\lambda`` trends: the Kolmogorov
-  constant ``C_K`` (`Sreenivasan1995`), the normalized dissipation constant ``C_\varepsilon``
-  (`Sreenivasan1998`), and the box-normalized dissipation group ``k/(L\varepsilon)^{2/3}`` (`Li2008`,
-  which the run layer inverts to set the viscosity). The derivative skewness, the flatness, the
+  constant ``C_K`` (`Sreenivasan1995`) and the normalized dissipation constant ``C_\varepsilon``
+  (`Sreenivasan1998`). The derivative skewness, the flatness, the
   Lagrangian ``C_0``, and the mechanical-to-scalar timescale ratio are forward-looking additions to the
   family, not yet built.
 
@@ -2970,7 +2969,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the owner's: the sweep design (forcing type × band × ``\mathrm{Re}_\lambda``, resolution and
     dealiasing as convergence checks) and, once enough data exist, whether the law enters as an
     empirical fit, a theoretical form, or a ``\nu`` that recalibrates itself from the warm-up's measured
-    ``\varepsilon``.
+    ``\varepsilon``. *(Amended 2026-09-26, decision 97: `Li2008` was removed, so "Where the value lives"
+    now records only the package's provisional constant.)*
 95. **(2026-09-24, user-directed) A run is set up for a stationary state stated once, and the
     default forcing holds its dissipation rate.** **The state.** A forced run settles at a pair
     ``(k, \varepsilon)``. `Simulation` now takes it from exactly one source — `kinetic_energy`,
@@ -3025,6 +3025,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     sums as plain host loops (``10^{-12}``), and the definition itself — boxes cut on an 8× zero-padded
     grid, each mean removed, averaged over positions — elementwise within its own ``1/q^2``
     discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%.
+97. **(2026-09-26, user-directed) `Li2008` and `stationary_dissipation` are removed from
+    `Phenomenology.Scalings`.** **Why.** The law gave one number, ``G = 0.9``, the package's own reduction
+    of one JHTDB dataset at ``\mathrm{Re}_\lambda \approx 433``. It is not a published
+    ``G(\text{forcing}, \mathrm{Re}_\lambda, \text{band})`` or band energy fraction, and no published
+    source provides them (decision 94 makes measuring them the package's first goal). A preset naming a
+    paper that does not supply the quantity misattributes it, and the run layer had already stopped
+    using it. `stationary_dissipation` had `Li2008` as its only method, so it goes too. The Li et al.
+    (2008) entry leaves §References, which lists only works a current docstring cites. The provisional
+    ``G = 0.7`` stays in `Forcing`'s stationary estimate. Its test now spells out
+    ``(k/0.7)^{3/2}/L`` rather than evaluating a law. `Scalings` keeps `Sreenivasan1998` and
+    `Sreenivasan1995`.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
@@ -3053,10 +3064,6 @@ cites.
 - Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
-- Li, Y., Perlman, E., Wan, M., Yang, Y., Meneveau, C., Burns, R., Chen, S., Szalay, A. & Eyink, G.
-  (2008). [*A public turbulence database cluster and applications to study Lagrangian evolution of velocity increments in turbulence*](https://doi.org/10.1080/14685240802376389). *J. Turbulence* **9**, N31.
-  *(The box-normalized dissipation law `Li2008`, which
-  sets ``\nu`` in the run layer's viscosity derivation.)*
 - Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.

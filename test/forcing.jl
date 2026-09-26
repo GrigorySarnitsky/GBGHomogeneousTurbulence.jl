@@ -8,7 +8,6 @@ using GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type,
                          reality_residual, VectorFieldSpectral
 using GBGHomogeneousTurbulence.Forcing: add_forcing_source!
-using GBGHomogeneousTurbulence.Phenomenology.Scalings: Li2008, stationary_dissipation
 using Logging
 
 
@@ -382,12 +381,11 @@ end
     # One estimate serves the controller's default relaxation time and the run layer's derived
     # viscosity, so the two agree on what "stationary for this box" means by construction — they
     # disagreed by a factor of 2.68 when each spelled its own copy. G = 0.7 is the package's own
-    # provisional measurement, NOT `Li2008`'s literature 0.9, which stays the record of that paper.
+    # provisional measurement.
     estimate = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
     for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)
-      @test estimate(k, L) ≈ stationary_dissipation(Li2008(dissipation_group = 0.7), k, L)
+      @test estimate(k, L) ≈ (k / 0.7)^(3 / 2) / L
     end
-    @test Li2008().dissipation_group == 0.9       # the literature law is untouched
   end
 
 

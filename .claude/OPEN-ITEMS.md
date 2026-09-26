@@ -215,7 +215,7 @@ Re-verified 2026-08-22 by running every witness; the pile had gone stale on the 
 - [ ] **M8** FlowConditions and FlowParameters are a naming-collision risk the docs must explicitly defuse  
       `2 hats` · arms A · PAGE api/Generator, FlowConditions docstring: "Not to be confused with Phenomenology's FlowParameters, which s
 
-- [ ] **M9** EQUIVOCATION: `Li2008` is an author-year handle for a fit the docstring says is not theirs  
+- [x] **M9** (closed 2026-09-26: `Li2008` removed, decision 97) EQUIVOCATION: `Li2008` is an author-year handle for a fit the docstring says is not theirs  
       `2 hats` · arms A · PAGE: api / phenomenology / Scalings, `Li2008` — "The value is this package's own reduction of the Johns Hopki
 
 - [ ] **M10** current_step used at the Cache page before its own definition  
