@@ -76,7 +76,7 @@ See `docs/ARCHITECTURE.md` §4.7 and decision 18.
    forcing, transport, run control. The numerics and statistics stay rich; the physics stays thin.
 2. **Belongs-in-PF / SS → raise, don't reimplement.** A general, physics-free field operation (a fused
    reduction, a differential or tensor operator) belongs in PF; an online statistic (a density, a
-   moment, a conditional expectation) in SS. When IT needs one, **raise it to the backend** — never
+   moment, a conditional expectation) in SS. When HT needs one, **raise it to the backend** — never
    reimplement field or statistics machinery here. A deferred backend feature is a *request*, not a
    local workaround.
 3. **Deferred ≠ missing.** A recorded coverage gap or a deferred capability is a *decision*, not an
@@ -178,7 +178,7 @@ docstring, never one per method. Across an `f` / `f!` pair the in-place `!` form
 the formula and the kernel, listed first); the allocating form is a thin `@ref`-linking wrapper with no
 second copy of the formula and no notation that drifts across the pair (`\partial_i` vs
 `\partial_{x_i}`). PF's verbatim in-place-steer sentence is deliberately **not** adopted
-(owner-ruled 2026-08-25): IT's pairs are few and non-uniform — the flagship
+(owner-ruled 2026-08-25): HT's pairs are few and non-uniform — the flagship
 `vorticity_physical!` / `vorticity_physical` pair is a compute/cached-read split, not an
 in-place/allocating pair, so PF's sentence would be false of it.
 
@@ -232,7 +232,7 @@ line rather than a clause:
   needs no `Returns` sentence; arrow and sentence never both appear.
 - A **module map is identity → contents list → optional trailing remark**, in that order, with no
   essay before the list — deliberately tighter than PF's map rule, which asks for scope-and-invariants
-  prose ahead of the list: IT's four-role maps stay list-first (owner-ratified 2026-08-25).
+  prose ahead of the list: HT's four-role maps stay list-first (owner-ratified 2026-08-25).
 
 **Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
 docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never
@@ -284,7 +284,7 @@ group arguments — ``\tfrac{1}{2}``, ``\boldsymbol{u}``, never `\tfrac12` / `\b
 ``\mathbb`` on a digit; the thin space ``\,`` reserved for the differential ``\,\mathrm dx``, never
 between plain factors; no manual ``\;`` / ``\:`` spacing around relations; no ``\left``/``\right``
 auto-sizing (size by hand with ``\bigl``/``\Bigl``; the ``\left\{ \dots \right.`` system idiom and
-the arrow commands are exempt); a conditional bar is ``\mid`` (IT's own addition to the adopted set).
+the arrow commands are exempt); a conditional bar is ``\mid`` (HT's own addition to the adopted set).
 
 **Correctness is verified, not asserted.** Check every formula, normalization (the ``1/N``, the
 ``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval / spectral factors), and every "X is just Y"
