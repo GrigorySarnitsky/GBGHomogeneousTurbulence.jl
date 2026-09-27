@@ -219,47 +219,24 @@ Returns a named tuple `(scales, kinetic_energy, dissipation)` of three host vect
 in the field's own real element type: the sides ``l``, then ``k(l)`` and ``\\varepsilon(l)`` at each.
 
 !!! warning "An occasional diagnostic, not a per-step one"
-    The ``N`` sides take ``N/2`` traversals of `û`, two sides each, so the cost grows as ``N^{4}``.
-    Measure it at observations, not inside a stepping loop. In `Float32` the subtraction above
-    costs digits where ``k(l) \\ll k``, at the smallest sides of a field with little small-scale
+    Each of the ``N`` sides is a weighted reduction over the ``N^{3}`` coefficients of `û`, so the
+    cost grows as ``N^{4}``. Measure it at observations, not inside a stepping loop. In `Float32` the
+    subtraction above costs digits where ``k(l) \\ll k``, at the smallest sides of a field with little small-scale
     energy; measure in `Float64` where those sides matter.
 """
-kinetic_energy_and_dissipation_below_scale(û, domain::FixedDomain, viscosity::Real) =
-  _below_scale(û, domain, viscosity, Val(_BELOW_SCALE_BATCH))
-
-# `B` sides per traversal, a type parameter so each width compiles one fused reduction; the public
-# form fixes it, the batch-width benchmark varies it.
-function _below_scale(û, domain::FixedDomain, viscosity::Real, ::Val{B}) where {B}
+function kinetic_energy_and_dissipation_below_scale(û, domain::FixedDomain, viscosity::Real)
   whole, dirichlet = weighted_inner(û, (domain.unit_kernel, domain.squared_wavenumber_kernel))
   T = typeof(whole)
   N = domain.grid.grid_size[1]
   L = domain.grid.domain_size[1]
   scales = [T(n * L / N) for n in 1:N]
-  retained = similar(scales)                     # ⟨|ū_l|²⟩ for each side
-  retained_dirichlet = similar(scales)           # ⟨|ω̄_l|²⟩ for each side
-  for first in 1:B:N
-    # A fixed batch width keeps one compiled traversal: the last batch is padded by repeating its
-    # final side, and the repeats' values are simply written twice.
-    sides = ntuple(j -> min(first + j - 1, N), Val(B))
-    w² = map(i -> (w = tophat_window(domain.multipliers, scales[i]); convolve(w, w)), sides)
-    κ²w² = map(v -> convolve(domain.squared_wavenumber_kernel, v), w²)
-    values = weighted_inner(û, (w²..., κ²w²...))
-    for j in 1:B
-      retained[sides[j]] = values[j]
-      retained_dirichlet[sides[j]] = values[B + j]
-    end
-  end
+  w² = ntuple(n -> (w = tophat_window(domain.multipliers, scales[n]); convolve(w, w)), N)
+  κ²w² = map(v -> convolve(domain.squared_wavenumber_kernel, v), w²)
+  retained = weighted_inner(û, (w²..., κ²w²...))       # ⟨|ū_l|²⟩ for every side, then ⟨|ω̄_l|²⟩
   ν = oftype(whole, viscosity)
-  return (; scales, kinetic_energy = (whole .- retained) ./ 2,
-          dissipation = ν .* (dirichlet .- retained_dirichlet))
+  return (; scales, kinetic_energy = [(whole - retained[n]) / 2 for n in 1:N],
+          dissipation = [ν * (dirichlet - retained[N + n]) for n in 1:N])
 end
-
-# Sides per traversal, MEASURED (2026-09-26, RTX 5070 Ti, one call over all N sides): B = 2 is the
-# fastest or tied at 128³ and 256³ in both precisions, and wider batches are slower — each side's
-# weight is a product of lazy kernels, so arithmetic, not the field read the batching saves, sets the
-# cost (PF's register-pressure caution, confirmed). Hard ceiling: the fused tuple fails to COMPILE on
-# CUDA at 32 weights (B = 16; Julia's generic splat past its tuple limit), 24 compile. ROCm unmeasured.
-const _BELOW_SCALE_BATCH = 2
 
 """
     max_speed(u)

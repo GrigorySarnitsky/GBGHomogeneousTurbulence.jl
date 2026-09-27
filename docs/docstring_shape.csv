@@ -43,7 +43,7 @@ Observables.jl::energy_spectrum(û， domain),66,0,178
 Observables.jl::integral_scale(û， domain),65,0,229
 Observables.jl::kinetic_energy(u),67,0,156
 Observables.jl::kinetic_energy_and_dissipation(û， domain， viscosity),98,0,194
-Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),89,1,448
+Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),89,1,452
 Observables.jl::max_speed(u),55,2,313
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
 Observables.jl::scalar_variance(φ),31,0,33

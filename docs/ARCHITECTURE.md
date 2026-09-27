@@ -3024,7 +3024,10 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `Float64` where those sides matter. **Tested** against two independent oracles: the exact spectral
     sums as plain host loops (``10^{-12}``), and the definition itself — boxes cut on an 8× zero-padded
     grid, each mean removed, averaged over positions — elementwise within its own ``1/q^2``
-    discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%.
+    discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%. *(Amended
+    2026-09-27, decision 98: the batch width and its padding are gone; the observable passes all its
+    weights to one `weighted_inner` call, and the 32-weight compile failure was fixed in PF, its
+    decision 88.)*
 97. **(2026-09-26, user-directed) `Li2008` and `stationary_dissipation` are removed from
     `Phenomenology.Scalings`.** **Why.** The law gave one number, ``G = 0.9``, the package's own reduction
     of one JHTDB dataset at ``\mathrm{Re}_\lambda \approx 433``. It is not a published
@@ -3036,6 +3039,17 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``G = 0.7`` stays in `Forcing`'s stationary estimate. Its test now spells out
     ``(k/0.7)^{3/2}/L`` rather than evaluating a law. `Scalings` keeps `Sreenivasan1998` and
     `Sreenivasan1995`.
+98. **(2026-09-27, user-directed) `kinetic_energy_and_dissipation_below_scale` uses PF's
+    `weighted_inner` as documented, with no batching layer of its own.** **Why.** Decision 96 split the
+    ``2N`` weights into batches of a width measured on one GPU, padded the last batch, and recorded
+    the width as a tuning constant. That was a layer built over the backend to fit measurements that
+    depend on Julia's compilation path, the backend and the hardware. How many weights one traversal
+    answers is PF's concern, and PF now owns it: its tuple form takes any number of weights and groups
+    them itself (PF decision 88, fixing the 32-weight compile failure reported from here). The
+    observable now builds every side's two weights and makes one call. **Measured once, to confirm it
+    works, not to tune it:** on the RTX 5070 Ti one call at 256³ takes 0.17 s in `Float32` and 0.26 s
+    in `Float64`, after a first-call compilation of about 10 s for each grid size, since the weight
+    tuple's length is ``2N``.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

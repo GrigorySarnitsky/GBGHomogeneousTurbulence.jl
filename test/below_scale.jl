@@ -64,7 +64,7 @@ end
 
 
 @testset "kinetic_energy_and_dissipation_below_scale" begin
-  for N in (16, 12)                          # 12 is not a multiple of the batch width: pins the padding
+  for N in (16, 12)
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                          element_type = Float64, array_type = Array)
     û = new_vector_field_spectral(domain)
