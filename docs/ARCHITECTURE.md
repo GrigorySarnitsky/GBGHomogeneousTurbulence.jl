@@ -3071,7 +3071,12 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     reach the run's storage through `adapt!`. The element type is read with `field_scalar_type`, and
     the CFL grid spacing from the grid. **Kept, on PF's ruling:** `StochasticOU`'s exact lattice mode
     count, `_check_reality`'s largest-stored-coefficient scale, and the zero fill in the allocators
-    (PF's constructors return uninitialized memory).
+    (PF's constructors return uninitialized memory). *(Verified the same day: 24 fixed-``\Delta t`` runs
+    covering every changed path — `Linear` on its default band and on every mode, a `Linear`-forced
+    scalar, `StochasticOU`, `ConstantPower` with a scalar — under the three dealiasing strategies in
+    both precisions are bitwise identical to the pre-change tree on the CPU. `max_speed` matched at
+    all 3600 sampled steps, because StaticArrays' `norm` returns the plain magnitude whenever it is
+    finite and nonzero, so adaptive runs are unchanged too.)*
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
