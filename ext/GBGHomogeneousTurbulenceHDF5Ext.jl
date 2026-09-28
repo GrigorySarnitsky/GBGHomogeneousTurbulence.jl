@@ -10,7 +10,7 @@ module GBGHomogeneousTurbulenceHDF5Ext
 
 using HDF5
 using GBGPeriodicFields: write_field, read_field, write_points, read_points, write_scheme,
-                         read_scheme, field_data, field_grid, field_tensor_order,
+                         read_scheme, adapt!, field_grid, field_tensor_order,
                          point_positions, point_values, npoints,
                          PointSet
 using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, HouLi, PhaseShift,
@@ -74,17 +74,18 @@ function _element_type(a, name::AbstractString, who::String)
                       "does not build runs on"))
 end
 
-# Copy a stored field into an existing (possibly device-resident) one, refusing a shape or element
-# type that does not match the destination the domain built.
+# Move a stored field, which `read_field` returns on the host, into the (possibly device-resident) one
+# the domain built. `adapt!` refuses any mismatch — element type, tensor order, grid, layout — naming
+# what differs; the checkpoint's context is put in front of its message.
 function _load_field!(dest, g, name::AbstractString, who::String)
   src = read_field(g, name)
-  size(field_data(src)) == size(field_data(dest)) || throw(ArgumentError(
-    "$who: the stored field \"$name\" has shape $(size(field_data(src))), but the domain builds " *
-    "$(size(field_data(dest))) — the checkpoint belongs to a different grid"))
-  eltype(field_data(src)) == eltype(field_data(dest)) || throw(ArgumentError(
-    "$who: the stored field \"$name\" has element type $(eltype(field_data(src))), but the " *
-    "domain builds $(eltype(field_data(dest)))"))
-  copyto!(field_data(dest), field_data(src))
+  try
+    adapt!(dest, src)
+  catch refusal
+    refusal isa ArgumentError || rethrow()
+    throw(ArgumentError("$who: the stored field \"$name\" does not fit the run the domain builds " *
+                        "— the checkpoint belongs to a different run. $(refusal.msg)"))
+  end
   return dest
 end
 
@@ -454,7 +455,7 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
      field_tensor_order(current.process) == field_tensor_order(stored.process)) ||
       throw(ArgumentError("read_simulation: group \"$name\" stores a forcing state for " *
                           "`$entry` that does not fit its stored forcing"))
-    copyto!(field_data(current.process), field_data(stored.process))
+    adapt!(current.process, stored.process)
     current.draws = stored.draws
   end
   fields_modified!(sim)

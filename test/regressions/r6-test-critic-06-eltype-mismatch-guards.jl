@@ -1,5 +1,5 @@
 # Witness r6-test-critic-06: the HDF5 element-type-mismatch guards refuse, with an ArgumentError
-# naming the element types, a Float64-written state / tracer set read back against a Float32 domain
+# naming both precisions, a Float64-written state / tracer set read back against a Float32 domain
 # of the SAME grid size (and vice versa for state) — the branch the suite's domain-mismatch test
 # (grid-size only, Float64 throughout) never exercises.
 using Test, Random
@@ -40,9 +40,9 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
     end
   end
   @test err isa ArgumentError
-  @test err !== nothing && occursin("element type", sprint(showerror, err))
-  @test err !== nothing && occursin("ComplexF64", sprint(showerror, err)) &&
-        occursin("ComplexF32", sprint(showerror, err))
+  # The state's refusal is PF's `adapt!`, which names the two precisions (decision 100).
+  @test err !== nothing && occursin("Float64", sprint(showerror, err)) &&
+        occursin("Float32", sprint(showerror, err))
 
   # ——— state, the other direction: written Float32, read against a Float64 domain ———
   path2 = tempname() * ".h5"
@@ -59,7 +59,8 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
     end
   end
   @test err2 isa ArgumentError
-  @test err2 !== nothing && occursin("element type", sprint(showerror, err2))
+  @test err2 !== nothing && occursin("Float64", sprint(showerror, err2)) &&
+        occursin("Float32", sprint(showerror, err2))
 
   # ——— tracers: written Float64 positions, read against a Float32 domain ———
   path3 = tempname() * ".h5"

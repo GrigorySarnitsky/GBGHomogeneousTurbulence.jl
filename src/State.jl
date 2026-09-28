@@ -352,7 +352,7 @@ function write_state end
 
 Rebuild a [`ResolvedFields`](@ref) from the group [`write_state`](@ref) wrote, allocated on and
 copied to the storage backend of `domain`, a [`FixedDomain`](@ref) that must agree with the file in
-grid size and element type. A domain that disagrees is refused with an `ArgumentError`, as is a group
+grid (point count, side length and origin) and element type. A domain that disagrees is refused with an `ArgumentError`, as is a group
 not written by `write_state`. The forcing states come back with the fields; a group written before
 forcing states were stored reads with none, and a run adopting it starts its forcing afresh.
 Available once the `HDF5` package is loaded.

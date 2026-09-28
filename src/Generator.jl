@@ -239,7 +239,7 @@ function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
   data .= reshape(1:length(data), size(data)) ./ length(data)
   set_forcing_rate!(forcing, second_rate, probe, domain)
 
-  field_data(first_rate) == field_data(second_rate) ||
+  first_rate == second_rate ||
     throw(ArgumentError("$(nameof(typeof(forcing))) declares uses_steady_linear_rate = true, but " *
                         "the rate it supplies changes with the field, so it is not steady in time. " *
                         "A state-dependent rate folded into the integrating factor is frozen for " *

@@ -3077,6 +3077,22 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     both precisions are bitwise identical to the pre-change tree on the CPU. `max_speed` matched at
     all 3600 sampled steps, because StaticArrays' `norm` returns the plain magnitude whenever it is
     finite and nonzero, so adaptive runs are unchanged too.)*
+100. **(2026-09-28, user-directed) HT's remaining raw-storage sites, ruled by PF, and a test that
+    keeps the list closed.** PF reviewed three sites the first audit missed and changed two things for
+    them (PF decision 91): `adapt!` now refuses every mismatch by name, and fields compare by value
+    with `==`. **Checkpoint loads.** A stored field, which `read_field` returns on the host, is moved into
+    the run's field with `adapt!`, and so is `StochasticOU`'s process. HT's own size and element-type
+    checks and the raw `copyto!` are gone; HT only puts the checkpoint's context in front of PF's
+    message. One behaviour changed, correctly: `adapt!` compares the whole grid, so a checkpoint with
+    the same point count but another box side or origin, which the size check let through, is now
+    refused. **The steady-rate probe** keeps its two raw fills: the probe is a fixture, not a physical
+    field, and PF has no operation for writing arbitrary coefficients. It compares the two rates with
+    PF's `==` instead of their raw storage. **The check.** `test/pf_storage_access.jl` lists every
+    `field_data` call in `src/` and `ext/` against an allowlist, each entry citing its ruling. A new
+    site fails the suite until it is ruled on, and an entry whose site is gone fails until it is
+    removed. It is falsified in the same test, against a planted site and a deleted one. It cannot see
+    a layer built over a correct PF call, such as the batch width of decision 98; that remains a matter
+    for review.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
