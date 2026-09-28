@@ -235,7 +235,7 @@ end
 
 # ————————————————————————————————————————————————————————————————————————————————————————————————
 # The forcings: a strategy IS its parameters (the shell bounds included, stored on the struct for
-# exactly this reason); the band kernel or indicator is rebuilt by the ordinary constructor. The
+# exactly this reason); the band kernel is rebuilt by the ordinary constructor. The
 # stochastic forcing's process is state, not a parameter: it is stored with the run's state.
 
 function _forcing_group(parent, name, tag)

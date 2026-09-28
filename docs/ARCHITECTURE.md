@@ -383,14 +383,15 @@ the state the first of them advances; each defaults to doing nothing:
 
 - `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
   a state `initial_forcing_state` starts and the run's `ResolvedFields` keeps;
-- `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``): fill the
-  per-mode rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor (exact, order-preserving);
+- `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``) and steady in
+  time: fill the per-mode rate ``A(\boldsymbol{\kappa})``, once, when the generator is built, folded into the
+  integrating factor (exact, order-preserving);
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
 - `project_forcing!` — apply a post-step projection or rescale.
 
-The four hooks form one per-step lifecycle with a fixed order — `prepare_forcing!` and
-`set_forcing_rate!` before the stages, `add_forcing_source!` at every stage, `project_forcing!` after the
-completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
+The hooks form one lifecycle with a fixed order — `set_forcing_rate!` once, when the generator is
+built; then per step `prepare_forcing!` before the stages, `add_forcing_source!` at every stage,
+`project_forcing!` after the completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
 hooks need; none receives the scheme's buffers (§11 decision 32). What a strategy *evolves* is not
 scratch: it lives in the `modeled` slot of `ResolvedFields`, so that one record is the whole
@@ -1584,7 +1585,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the same re-freeze: every band forcing's kernel is lazy (`VarianceRescaling` and `StochasticOU` store
     none; `Linear` and `ConstantPower` keep one materialized *real* indicator each for the rate fill
     — *superseded for `ConstantPower` by decision 58, which moved it off the rate route: its band is
-    lazy now and only `Linear`, the one remaining rate-route strategy, keeps an indicator*),
+    lazy now and only `Linear`, the one remaining rate-route strategy, keeps an indicator; since
+    decision 99 `Linear` keeps none either*),
     and the seed/spectrum episodes shrank because `GBGPeriodicFields` delivered the guard-free aliased
     projection and fused its `radial_spectrum` staging. The bare `ScalarFieldSpectral` integrating
     factor is wrapped in `StoredKernel` at its apply sites — a transitional form; the fused
@@ -3050,6 +3052,26 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     works, not to tune it:** on the RTX 5070 Ti one call at 256³ takes 0.17 s in `Float32` and 0.26 s
     in `Float64`, after a first-call compilation of about 10 s for each grid size, since the weight
     tuple's length is ``2N``.
+99. **(2026-09-28, user-directed) HT's calls into PF, reviewed by PF and corrected.** HT sent PF its
+    audit of every place HT reached past PF's API. PF ruled on each and shipped two operations for it
+    (PF decision 90): `mean_free_projection!` and `materialize_kernel!`. **Mean mode.** The velocity's
+    advective term had its ``\kappa = 0`` coefficient zeroed by writing raw storage at the index PF
+    keeps private. It now uses `mean_free_projection!`, exact and ``O(1)``, in the same place: between
+    the assembly and the forcing source, since the Leray projection passes the mean through. The scalar
+    path's zeroing is gone. The divergence's mean is exactly zero under all three dealiasing strategies,
+    and a test pins it with `iszero`. **`Linear`'s rate.** `Linear` kept the materialized band as a raw
+    real ``N^{3}`` array (1.69 GiB at 768³ `Float64`) and rewrote the rate from it by a raw broadcast at
+    every step. The rate is steady, so the generator now fills it once, when it is built, from the
+    steadiness probe's own fill. `Linear` keeps only its lazy band kernel, and the fill is
+    `materialize_kernel!(StoredKernel(rate), band)` followed by `multiply!`, allocating nothing. The
+    memory ledger drops the real array and the compute ledger the per-step write. **`max_speed`** keeps
+    the fused `maximum` but maps the squared magnitude and takes one square root. The overflow-safe
+    fiber `norm` it used costs several times more, and a velocity cannot overflow; the result is
+    identical. **Raw-storage clean-ups.** In-place scalings use `multiply!`, and host-drawn random fields
+    reach the run's storage through `adapt!`. The element type is read with `field_scalar_type`, and
+    the CFL grid spacing from the grid. **Kept, on PF's ruling:** `StochasticOU`'s exact lattice mode
+    count, `_check_reality`'s largest-stored-coefficient scale, and the zero fill in the allocators
+    (PF's constructors return uninitialized memory).
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

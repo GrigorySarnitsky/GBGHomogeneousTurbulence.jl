@@ -92,6 +92,31 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     @test field_data(φ̂)[1, 1, 1] ≈ mean_before
   end
 
+  @testset "the scalar right-hand side's mean is exactly zero under every dealiasing strategy" begin
+    # Nothing removes it: the divergence multiplier iκ vanishes at κ = 0, on every dealiasing path, so
+    # the mean of the advective term is zero by construction, not to round-off. `iszero`, because the
+    # exact zero may be −0.0.
+    for dealiasing in (TwoThirds(), HouLi(), PhaseShift())
+      d = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = dealiasing,
+                      element_type = Float64, array_type = Array)
+      û = new_vector_field_spectral(d)
+      random_solenoidal_velocity_spectral!(û, d; kinetic_energy = 0.5, envelope_wavenumber = 3.0,
+                                           rng = MersenneTwister(7))
+      φ̂ = new_scalar_field_spectral(d)
+      random_scalar_spectral!(φ̂, d; scalar_variance = 1.0, envelope_wavenumber = 3.0, rng = MersenneTwister(8))
+      field_data(φ̂)[1, 1, 1] = 3.0 + 0.0im                    # a nonzero mean, so φ carries one
+      u, φ = new_vector_field_physical(d), new_scalar_field_physical(d)
+      to_physical!(u, û, d.transform_plans, new_vector_field_spectral(d))
+      to_physical!(φ, φ̂, d.transform_plans, new_scalar_field_spectral(d))
+      generator = ResolvedGenerator(d, FlowConditions(viscosity = 0.05, schmidt = 1.0,
+                                                      velocity_forcing = NoForcing(),
+                                                      scalar_forcing = NoForcing()); scalar = true)
+      N̂ = new_scalar_field_spectral(d)
+      scalar_rhs!(N̂, generator, û, φ̂, u, φ, d)
+      @test iszero(field_data(N̂)[1, 1, 1])
+    end
+  end
+
   @testset "scalar dissipation = Dirichlet energy" begin
     Sc = 0.7
     κ = ν / Sc

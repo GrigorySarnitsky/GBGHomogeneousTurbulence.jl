@@ -473,8 +473,11 @@ end
       end
       linear, log = quiet(() -> Linear(d; rate = 0.1, highest_shell = Inf))
       @test isempty(log)
-      @test count(iszero, linear.indicator) == 1          # every stored mode but κ = 0
-      @test linear.indicator[1, 1, 1] == 0
+      rate = new_scalar_field_spectral(d)
+      GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(linear, rate, u, d)
+      @test count(iszero, field_data(rate)) == 1          # every stored mode but κ = 0
+      @test field_data(rate)[1, 1, 1] == 0
+      @test all(x -> x == 0 || x == 0.1, field_data(rate))
     end
     # The deferred form carries it through to whichever grid the run builds.
     d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,

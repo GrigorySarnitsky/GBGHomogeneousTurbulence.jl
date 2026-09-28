@@ -86,8 +86,7 @@ module Forcing
 
 using GBGPeriodicFields
 using Random
-using ..SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type,
-                          _storage_family_name, _show_shape
+using ..SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber, new_scalar_field_spectral, new_vector_field_spectral, new_scalar_field_physical, new_vector_field_physical, _real_type
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower, StochasticOU, StochasticOUState,
@@ -127,8 +126,8 @@ them in one fixed order:
 - [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
   such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
   and the run's [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
-- [`set_forcing_rate!`](@ref) — once, before the stages: fill a per-mode rate that stays fixed for the
-  whole step, which the scheme folds exactly into the integrating factor. A strategy that implements
+- [`set_forcing_rate!`](@ref) — once, when the generator is built: fill a per-mode rate that stays
+  fixed for the whole run, which the scheme folds exactly into the integrating factor. A strategy that implements
   this hook **must** also declare [`uses_steady_linear_rate`](@ref), or it is never handed a rate
   array to fill.
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
@@ -142,7 +141,7 @@ integrating factor holds a rate fixed for the whole step, so a rate re-solved fr
 through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
 first order.
 
-The declaration is measured when the generator is built, not trusted. A declared rate is armed from two
+The declaration is measured when the generator is built, not trusted. A declared rate is filled from two
 different fields and refused with an `ArgumentError` when the two differ, the hook taking no time
 argument, so a field-independent rate is a steady one. A strategy that fills a rate without declaring
 it is refused the same way, rather than going silently unapplied.
@@ -249,16 +248,21 @@ _fill(parameters, keyword, value) = merge(parameters, NamedTuple{(keyword,)}((va
 """
     set_forcing_rate!(forcing, rate, field, domain) -> rate
 
-For a strategy `forcing` whose rate is linear in the field **and constant in time** (the
-[`uses_steady_linear_rate`](@ref) declaration), fill the per-mode rate `rate` — a scalar field in spectral
-representation holding real values — with ``A(\\boldsymbol{\\kappa})``
-(the forcing ``f = A \\texttt{field}``) and return `rate`; the scheme folds it into the diffusive
-integrating factor ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor)), so the
-forced modes advance at the net linear rate ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``
-(``D`` the field's diffusivity). Only a forcing declaring `uses_steady_linear_rate` is ever handed
-a rate array, so the default method is never reached in a run; it returns `rate` untouched. The
-`field` is the start-of-step field in spectral representation; `domain` is the
-[`FixedDomain`](@ref).
+Fill the per-mode rate ``A(\\boldsymbol{\\kappa})`` of a strategy `forcing` whose forcing is linear in
+the field and constant in time, ``f = A \\texttt{field}`` (the [`uses_steady_linear_rate`](@ref)
+declaration). The scheme folds the rate into the diffusive integrating factor
+``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor)),
+so the forced modes advance at the net linear rate
+``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``, with ``D`` the field's diffusivity.
+
+The generator calls it once, when it is built. The arguments are:
+- `rate` — a scalar field in spectral representation holding real values, overwritten with ``A``.
+- `field` — a field in spectral representation of the kind being forced; a steady rate does not
+  depend on it.
+- `domain` — the [`FixedDomain`](@ref).
+
+Only a forcing declaring `uses_steady_linear_rate` is handed a rate, so the default method, which
+returns `rate` untouched, is never reached in a run.
 """
 set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate
 
@@ -606,30 +610,30 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
   applies.
 
 # Fields
-- `indicator` — the band indicator as a real array.
+- `band` — the band-pass kernel, lazy: the rate is evaluated from it into the generator's rate field
+  once, so no indicator array is stored.
 - `rate` — the fixed linear rate ``A``.
-- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `indicator` is
-  derived from.
+- `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
+  from.
 """
-struct Linear{M, T} <: AbstractForcing
-  indicator::M         # real array: the band indicator (1 in band, 0 outside)
+struct Linear{K, T} <: AbstractForcing
+  band::K              # band-pass kernel (lazy radial symbol): 1 in band, 0 outside
   rate::T              # the linear rate A
-  lowest_shell::Int    # the band's shell bounds — the parameters `indicator` is derived from
+  lowest_shell::Int    # the band's shell bounds — the parameters `band` is derived from
   highest_shell::Union{Int, Float64}   # an integer shell, or `Inf`: every mode but the mean
 end
 
-function Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2)
-  # The band kernel is lazy (a radial symbol); the rate fill wants its values as a real array, so the
-  # indicator is materialized once here — the same stored mask this forcing always carried.
-  indicator = real.(field_data(materialize_kernel(_shell_band(domain, lowest_shell, highest_shell)).field))
-  return Linear(indicator, _real_type(domain)(rate), Int(lowest_shell), _shell_bound(highest_shell))
-end
+Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
+  Linear(_shell_band(domain, lowest_shell, highest_shell), _real_type(domain)(rate), Int(lowest_shell),
+         _shell_bound(highest_shell))
 
 uses_steady_linear_rate(::Linear) = true
 
+# The band evaluated straight into the rate's own storage, then scaled in place: no indicator is kept
+# and nothing field-sized is allocated.
 function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
-  T = field_scalar_type(rate)
-  rate .= T(forcing.rate) .* forcing.indicator
+  materialize_kernel!(StoredKernel(rate), forcing.band)
+  multiply!(rate, field_scalar_type(rate)(forcing.rate), rate)
   return rate
 end
 
@@ -1093,7 +1097,10 @@ function _ou_slots(companion::FixedDomain, modes::Integer, ::Val{R}) where {R}
   points = prod(companion.grid.grid_size)
   retained = R == 1 ? 2 * modes : modes
   return (physical = physical, spectral = spectral,
-          draws = Array{T}(undef, size(field_data(physical))),
+          draws = R == 1 ? VectorFieldPhysical(Array{T}(undef, field_physical_shape(companion.grid, Val(1))),
+                                               companion.grid, companion.layout) :
+                           ScalarFieldPhysical(Array{T}(undef, field_physical_shape(companion.grid, Val(0))),
+                                               companion.grid, companion.layout),
           scale = one(T) / sqrt(T(retained) / T(points)))
 end
 
@@ -1177,8 +1184,8 @@ _draw_key(seed::Int, draws::Int, order::Int) =
 function _advance_process!(ou::StochasticOU{T}, state::StochasticOUState, field, α) where {T}
   slots = _ou_slots(ou, field)
   Random.seed!(ou.rng, _draw_key(ou.seed, state.draws, field_tensor_order(field)))
-  randn!(ou.rng, slots.draws)
-  copyto!(field_data(slots.physical), slots.draws)
+  randn!(ou.rng, field_data(slots.draws))           # a host field: the draw follows the seed, not the backend
+  adapt!(slots.physical, slots.draws)
   to_spectral!(slots.spectral, slots.physical, ou.companion.transform_plans)
   convolve!(slots.spectral, slots.spectral, ou.band)
   field_tensor_order(field) == 1 &&
@@ -1318,9 +1325,7 @@ end
 function Base.show(io::IO, forcing::Linear)
   print(io, "Linear(rate ", forcing.rate, ", ")
   _show_shells(io, forcing)
-  print(io, ", indicator ", _storage_family_name(forcing.indicator), "{", eltype(forcing.indicator), "} ")
-  _show_shape(io, size(forcing.indicator))
-  print(io, " coefficients)")
+  print(io, ", ", forcing.band, ")")
 end
 
 function Base.show(io::IO, forcing::VarianceRescaling)
@@ -1378,8 +1383,8 @@ export write_forcing, read_forcing
                   forcing::AbstractForcing)
 
 Write the forcing strategy `forcing` (an [`AbstractForcing`](@ref)) under `parent` as one
-self-describing HDF5 group — its defining parameters only; every derived object (a band kernel, an
-indicator array) is rebuilt from them on read. What a strategy evolves is not a parameter: the
+self-describing HDF5 group — its defining parameters only; every derived object (a band kernel) is
+rebuilt from them on read. What a strategy evolves is not a parameter: the
 process of a [`StochasticOU`](@ref) lives in the run's state and is stored by
 [`write_state`](@ref GBGHomogeneousTurbulence.State.write_state), so a reloaded strategy continues the
 same realization when the state is restored with it. A
@@ -1401,8 +1406,8 @@ function write_forcing end
                  domain::FixedDomain) -> AbstractForcing
 
 Rebuild a forcing strategy from the group [`write_forcing`](@ref) wrote, through its ordinary
-keyword constructor on `domain` (a [`FixedDomain`](@ref)) — the derived band kernel or indicator
-is rebuilt, never read. A group not written by `write_forcing`, or written by a newer schema
+keyword constructor on `domain` (a [`FixedDomain`](@ref)) — the derived band kernel is rebuilt,
+never read. A group not written by `write_forcing`, or written by a newer schema
 version, is refused with an `ArgumentError`. Available once the `HDF5` package is loaded.
 
 The arguments are:

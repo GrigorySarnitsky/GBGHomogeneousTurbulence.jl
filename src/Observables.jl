@@ -272,14 +272,13 @@ deposit is current, like every cached read.
 """
 function max_speed end
 
-# `maximum(norm, u)` and not `lpnorm(u, Inf)`, which returns the identical number. The choice is a
-# measured trade, and it goes the way invariant 4 sets: `norm` on a fibre is StaticArrays'
-# overflow-guarded implementation, which rescales by the largest component before squaring, and that
-# guard costs ~2.9x the plain magnitude and ~1.7x `lpnorm` on this whole-grid reduction — but
-# `lpnorm(u, Inf)` ALLOCATES (2 MiB at 16³ here, scaling with the grid) while this route allocates
-# nothing. A per-step allocation in the hot loop is the thing the footprint invariant forbids
-# outright, so the compute cost is the one to accept. Measured both ways rather than argued.
-max_speed(u) = maximum(norm, u)
+# The fused mapped reduction, not `lpnorm(u, Inf)`, which materializes a magnitude field first. The map
+# is the squared magnitude rather than `norm`: `norm` on a fibre is the overflow-safe algorithm,
+# several times the cost of a plain sum of squares, and a velocity cannot overflow it. One square root
+# of the maximum then gives the identical number, since the square root is monotone and correctly
+# rounded, where mapping `norm` would take one per grid point.
+_speed_squared(v) = sum(abs2, v)
+max_speed(u) = sqrt(maximum(_speed_squared, u))
 
 
 """

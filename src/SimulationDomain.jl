@@ -548,13 +548,6 @@ truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.d
 # set never restates the grid the library already spells. NOTHING here reads an element: a display
 # holds under `allowscalar(false)`, and never touches a device array. The gate is `test/display.jl`.
 
-# The storage family of an array — `Array`, `CuArray`, `ROCArray` — through any wrapper, as a name.
-# The field library keeps its own copy private, so the two lines live here for the raw arrays the
-# package holds outside a field-library section (a forcing's materialized indicator, a predictor).
-_storage_family_name(array::AbstractArray) =
-  parent(array) === array ? nameof(Base.typename(typeof(array)).wrapper) : _storage_family_name(parent(array))
-_show_shape(io::IO, dims) = join(io, dims, "×")
-
 # The constructor call, printing only what departs from the defaults — `HouLi()` at the defaults.
 function Base.show(io::IO, strategy::HouLi)
   default = HouLi()

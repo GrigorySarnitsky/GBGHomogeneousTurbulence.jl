@@ -212,23 +212,23 @@ function _forcing_rate(domain::FixedDomain, forcing, allocate_probe = new_vector
                         "does not implement set_forcing_rate!, so its rate array would stay zero " *
                         "and the forcing would silently never act. Implement the hook, or declare " *
                         "false."))
-  _check_rate_is_steady(domain, forcing, allocate_probe)
-  # A scalar field in spectral representation holding REAL values (the complex container is what the
-  # fused exponential's per-mode offset takes), zeroed so an un-set rate acts as no forcing.
-  return new_scalar_field_spectral(domain)
+  # A steady rate does not depend on the state, so the one the probe filled is THE rate: it is filled
+  # here, once, and never again. A scalar field in spectral representation holding REAL values — the
+  # complex container is what the fused exponential's per-mode offset takes.
+  return _check_rate_is_steady(domain, forcing, allocate_probe)
 end
 
 
 # The declaration says the rate is STEADY, and steadiness is the property that makes folding it into
 # the integrating factor exact. Unlike the arity guards this one is semantic, so it is measured
-# rather than trusted: the hook is armed from two different states, and a rate that tracks the state
+# rather than trusted: the hook is filled from two different states, and a rate that tracks the state
 # gives two different answers. Letting it lie is not a cosmetic error — a state-dependent rate frozen
 # for the step is the left-endpoint rectangle rule on ∫A dt, which drops a third-order scheme to
 # first order and does so silently, because every value in sight stays finite and plausible.
 #
 # The probes are all-ones and a spatially varying ramp, so the pair differs in BOTH magnitude and
 # shape: a rate keyed to the field's amplitude and one keyed to its distribution across modes are
-# each caught. Twice at construction, never in the loop.
+# each caught. Twice at construction, never in the loop; the first fill is returned as the rate.
 function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
   probe = allocate_probe(domain)
   first_rate, second_rate = new_scalar_field_spectral(domain), new_scalar_field_spectral(domain)
@@ -246,7 +246,7 @@ function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
                         "the whole step, which costs the scheme its order — a third-order scheme " *
                         "measures 1.0. Supply it through add_forcing_source! instead, where every " *
                         "stage evaluates it, and leave uses_steady_linear_rate at false."))
-  return nothing
+  return first_rate
 end
 
 # Does this forcing define a hook the run cannot call — one written to an earlier, shorter form of it?
@@ -351,9 +351,9 @@ you.
   so no physical product array exists.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
-- `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``.
-  `prepare!` fills them at the start of each step; a rate that has been filled is one the
-  integrating-factor verbs then return alongside the viscous coefficient, so the forcing rides the
+- `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``,
+  filled once when the generator is built (the rate is steady, so it never changes). The
+  integrating-factor verbs return them alongside the viscous coefficient, so the forcing rides the
   exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
   [`uses_steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate), so a field driven by
   a post-step projection, a stochastic source, or nothing at
@@ -429,11 +429,10 @@ end
     prepare!(generator, state, domain, dt)
 
 Open a step of the generator: advance each forcing's evolving state, kept in the run's state, once
-(its per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) hook) and arm the
-per-mode linear forcing rates — fill them, so the factor verbs return them instead of `nothing`
-(its [`set_forcing_rate!`](@ref GBGHomogeneousTurbulence.Forcing.set_forcing_rate!) hook, written
-into the generator's rate arrays). A scheme calls this once before its Runge–Kutta stages; the
-stage evaluations and the integrating factors then consume what it prepared.
+(its per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) hook). A
+scheme calls this once before its Runge–Kutta stages; the stage evaluations then consume what it
+prepared. The steady per-mode linear forcing rates are not touched here: they were filled once, when
+the generator was built.
 
 The arguments are:
 - `generator` — the [`ResolvedGenerator`](@ref) being opened.
@@ -450,13 +449,8 @@ function prepare!(generator::ResolvedGenerator, state, domain::FixedDomain, dt::
   generator.scalar_forcing_state = state.modeled.scalar_forcing
   conditions = generator.conditions
   prepare_forcing!(conditions.velocity_forcing, state.modeled.velocity_forcing, state.velocity_spectral, domain, dt)
-  generator.velocity_rate === nothing ||
-    set_forcing_rate!(conditions.velocity_forcing, generator.velocity_rate, state.velocity_spectral, domain)
-  if state.scalar_spectral !== nothing
+  state.scalar_spectral === nothing ||
     prepare_forcing!(conditions.scalar_forcing, state.modeled.scalar_forcing, state.scalar_spectral, domain, dt)
-    generator.scalar_rate === nothing ||
-      set_forcing_rate!(conditions.scalar_forcing, generator.scalar_rate, state.scalar_spectral, domain)
-  end
   return generator
 end
 
@@ -488,22 +482,17 @@ end
 
 
 
-# The κ = 0 (mean) mode of the assembled advective term is pinned to zero EXACTLY. The continuous
-# law is momentum (and scalar-mean) conservation on a periodic box: ⟨ω×u⟩ = 0 since ω×u is a
-# gradient plus a divergence, and ⟨∇·(uφ)⟩ = 0 outright. Discretely the identity holds only to
-# roundoff, and the mode has no restoring term — the Leray projection legitimately keeps constants
-# (ℙ(0) = I) and the integrating factor is exp(0) = 1 there — so the residual is integrated
-# undamped and, the flow being chaotic, grows at the Lyapunov rate: measured 3% of u′ after 3000
-# Float32 steps. Every reference DNS pins this mode. The zeroing sits BETWEEN the nonlinear
-# assembly and the forcing source on purpose: the exact law covers the advective term alone, so a
-# forcing that deliberately drives a mean remains expressible and honest. An O(1) write (three
-# complex numbers), below field scale — outside the pass ledgers by the same rule as the tracers'
-# M×3 reads.
-_zero_mean_mode!(f) = (_zero_mean_mode_data!(field_data(f)); f)
-_zero_mean_mode_data!(data::AbstractArray{T, 3}) where {T} = fill!(view(data, 1:1, 1:1, 1:1), zero(T))
-_zero_mean_mode_data!(data::AbstractArray{T, 4}) where {T} = fill!(view(data, 1:1, 1:1, 1:1, :), zero(T))
 
 
+# The κ = 0 (mean) mode of the assembled advective term is removed EXACTLY. The continuous law is
+# momentum conservation on a periodic box: ⟨ω×u⟩ = 0, since ω×u is a gradient plus a divergence.
+# Discretely it holds only to roundoff, and the mode has no restoring term — the Leray projection
+# legitimately keeps constants (ℙ(0) = I) and the integrating factor is exp(0) = 1 there — so the
+# residual is integrated undamped and, the flow being chaotic, grows at the Lyapunov rate: measured 3%
+# of u′ after 3000 Float32 steps. Every reference DNS pins this mode. The projection sits BETWEEN the
+# nonlinear assembly and the forcing source on purpose: the exact law covers the advective term alone,
+# so a forcing that deliberately drives a mean remains expressible and honest. An O(1) write, below
+# field scale — outside the pass ledgers by the same rule as the tracers' M×3 reads.
 """
     velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)
 
@@ -574,7 +563,7 @@ Returns `N̂`.
 """
 velocity_rhs!(N̂, generator::ResolvedGenerator, û, u, ω_consumed, domain::FixedDomain) =
   (_velocity_nonlinear!(domain.dealiasing, N̂, generator, û, u, ω_consumed, domain);
-   _zero_mean_mode!(N̂);
+   mean_free_projection!(N̂);
    add_forcing_source!(generator.conditions.velocity_forcing, generator.velocity_forcing_state, N̂, û,
                        domain, generator.conditions.viscosity))
 
@@ -593,7 +582,7 @@ end
 function _velocity_nonlinear!(::PhaseShift, nonlinear, generator, û, u, ω_consumed, domain::FixedDomain)
   phase_shift = generator.phase_shift
   product_spectral = generator.product_spectral
-  T = real(eltype(field_data(nonlinear)))
+  T = field_scalar_type(nonlinear)
   _velocity_advective_term!(nonlinear, u, ω_consumed, domain, product_spectral, domain.dealias)   # primary, truncated
   convolve!(phase_shift.velocity_shifted, û, phase_shift.to_shifted)                                   # û on the displaced grid
   to_physical!(phase_shift.u_shifted, phase_shift.velocity_shifted, domain.transform_plans, product_spectral)
@@ -630,11 +619,11 @@ end
 
 The velocity's exact linear subflow over a substep ``\\tau`` (`τ`), as the **parameters of its
 exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
-supplies the viscosity ``\\nu`` and the armed rate; `τ` is the sub-interval the stage advances.
+supplies the viscosity ``\\nu`` and the linear forcing rate; `τ` is the sub-interval the stage advances.
 
 The linear part of the momentum equation — the diffusion
 ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
-``A(\\boldsymbol{\\kappa})`` that [`prepare!`](@ref) armed — is solved exactly in spectral
+``A(\\boldsymbol{\\kappa})``, filled once when the generator was built — is solved exactly in spectral
 representation by the per-mode multiplier
 
 ```math
@@ -645,14 +634,14 @@ with ``A = 0`` when no linear forcing is active. Multiplying a field by ``\\math
 viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
 scheme's explicit stage combination carries truncation error.
 
-Since the multiplier is the exponential of a radial symbol plus the armed per-mode rate, a scheme
+Since the multiplier is the exponential of a radial symbol plus the per-mode rate, a scheme
 applies it through the backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
 Returns a named tuple `(; coefficient, offset_scale, offset)` — exactly the arguments that
 fused exponential takes:
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the armed
+``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the
 rate field, or `nothing` when no linear forcing is active).
 """
 velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
@@ -666,7 +655,7 @@ velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
 The passive scalar's exact linear subflow over a substep `τ` — the same exponential parameters
 [`velocity_integrating_factor`](@ref) returns for `generator`, with the scalar diffusivity
 ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
-``\\nu`` and the scalar forcing's armed linear rate in place of the velocity's.
+``\\nu`` and the scalar forcing's linear rate in place of the velocity's.
 """
 scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -scalar_diffusivity(generator.conditions) * τ,
@@ -723,11 +712,11 @@ record alone can only force a rebuild, never a wrong reuse; the keyword is the l
 containers are rewritten in place, so a false promise over the *same* container is quietly wrong,
 where the default merely rebuilds (one shift, three inverse transforms) and stays correct.
 
-The advective term's ``\\kappa = 0`` mode is zero exactly by construction — the divergence
-multiplier ``\\mathrm{i}\\boldsymbol{\\kappa}`` vanishes identically at
-``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` — and the assembly pins it anyway, for uniformity with
-the velocity route, whose product mean is only roundoff-small; the mean of ``\\varphi`` has no
-diffusive damping. The forcing source, added after, may carry a mean.
+The advective term's ``\\kappa = 0`` mode is zero exactly by construction, under every dealiasing
+strategy: the divergence multiplier ``\\mathrm{i}\\boldsymbol{\\kappa}`` vanishes identically at
+``\\boldsymbol{\\kappa} = \\boldsymbol{0}``, so no further step removes it. That exactness matters,
+since the mean of ``\\varphi`` has no diffusive damping. The forcing source, added after, may carry
+a mean.
 
 Returns `N̂`.
 
@@ -742,7 +731,6 @@ scalar_rhs!(N̂, generator::ResolvedGenerator, û, φ̂, u_consumed, φ, domain:
             displaced_velocity_current::Bool = false) =
   (_scalar_nonlinear!(domain.dealiasing, N̂, generator, û, φ̂, u_consumed, φ, domain,
                       displaced_velocity_current);
-   _zero_mean_mode!(N̂);
    add_forcing_source!(generator.conditions.scalar_forcing, generator.scalar_forcing_state, N̂, φ̂, domain,
                        scalar_diffusivity(generator.conditions)))
 
@@ -771,7 +759,7 @@ function _scalar_nonlinear!(::PhaseShift, nonlinear, generator, û, φ̂, u_cons
                         "displaced-scalar scratch and cannot assemble a scalar right-hand side " *
                         "under `PhaseShift` dealiasing. Rebuild it with `scalar = true`."))
   product_spectral = generator.product_spectral
-  T = real(eltype(field_data(nonlinear)))
+  T = field_scalar_type(nonlinear)
   _scalar_flux_divergence!(nonlinear, u_consumed, φ, domain, product_spectral, domain.dealias, -1)   # primary −𝔻∇·(uφ)
   # The same stage's velocity assembly left the displaced velocity fresh in u_shifted (its displaced
   # assembly consumes only ω_shifted), so the re-recovery — one shift convolve and three inverse
@@ -806,7 +794,7 @@ function _scalar_flux_divergence!(out, u, φ, domain::FixedDomain, product_spect
     # No kernel to fold `α` into, so it is applied here. Dropping it — as this branch did — silently
     # returned +∇·(uφ) to a caller who asked for the −∇· the scalar equation needs.
     divergence!(out, product_spectral, domain.multipliers)
-    isone(α) || (field_data(out) .*= α)
+    isone(α) || multiply!(out, α, out)
   else
     divergence!(out, product_spectral, domain.multipliers, kernel, α, 0)
   end

@@ -45,10 +45,11 @@ DeferredForcing
 
 ## Forcing methods
 
-The method that starts a strategy's evolving state, then the four step methods a strategy may
-implement (each a no-op by default) in the order `step!` fires them, followed by the trait that
-declares a strategy supplies a linear rate — part of implementing `set_forcing_rate!`, since the
-generator allocates a rate array only where one is declared.
+The method that starts a strategy's evolving state, then the four methods a strategy may implement
+(each a no-op by default): the per-step `prepare_forcing!`, the rate hook `set_forcing_rate!` the
+generator calls once when it is built, and the per-stage and post-step hooks in the order `step!`
+fires them. Last is the trait that declares a strategy supplies a linear rate — part of implementing
+`set_forcing_rate!`, since the generator allocates a rate array only where one is declared.
 
 ```@docs
 initial_forcing_state

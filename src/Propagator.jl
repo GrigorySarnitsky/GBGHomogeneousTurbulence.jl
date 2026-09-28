@@ -131,7 +131,7 @@ end
 
 
 # The two shapes the fused exponential serves in a stage, branching once on whether a linear forcing
-# rate is armed (the factor's `offset`): the update fuses a weighted combination with the factor —
+# rate is present (the factor's `offset`): the update fuses a weighted combination with the factor —
 # dest ← E ⊙ (α a + β b) — and the rotation applies the factor alone. Both evaluate
 # E = exp(coefficient·|κ|² [+ offset_scale·Â]) per mode from the wavenumber arrays; no kernel field
 # exists.
@@ -274,7 +274,7 @@ struct IFLowStorageRK3 <: AbstractIntegrator end
 
 function step!(::IFLowStorageRK3, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
-  T = real(eltype(field_data(state.velocity_spectral)))
+  T = field_scalar_type(state.velocity_spectral)
   a = (zero(T), T(-5 // 9), T(-153 // 128))
   b = (T(1 // 3), T(15 // 16), T(8 // 15))
   d = (T(1 // 3), T(5 // 12), T(1 // 4))
@@ -313,7 +313,7 @@ struct IFLowStorageRK4 <: AbstractIntegrator end
 
 function step!(::IFLowStorageRK4, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
-  T = real(eltype(field_data(state.velocity_spectral)))
+  T = field_scalar_type(state.velocity_spectral)
   # Carpenter & Kennedy's exact rationals; the node increments d are differences of the abscissae
   # c = (0, B₁, …), rounded to T only after the exact subtraction is set up.
   a = (zero(T), T(-567301805773 // 1357537059087), T(-2404267990393 // 2016746695238),
@@ -343,7 +343,7 @@ function _low_storage_2n_step!(a::NTuple{S, T}, b::NTuple{S, T}, d::NTuple{S, T}
   sb = buffers.scalar                                                             # ScalarBuffers, or nothing
   has_scalar = φ̂ !== nothing
 
-  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance
 
   for i in 1:S
     if i == 1
@@ -466,13 +466,13 @@ struct IFHeun <: AbstractIntegrator end
 function step!(::IFHeun, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity_spectral, state.scalar_spectral
-  T = real(eltype(field_data(û)))
+  T = field_scalar_type(û)
   dt_T = T(dt)
   half = dt_T / 2
   sb = buffers.scalar                                                            # ScalarBuffers, or nothing
   has_scalar = φ̂ !== nothing
 
-  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance
 
   # stage 1 — right-hand sides at the state between iterations, read from the cache (deposited by the previous
   # iteration's closing deposit; never recomputed). The assemblies consume the chart registers — the negated Lamb
@@ -606,14 +606,14 @@ struct IFSSPRK3 <: AbstractIntegrator end
 function step!(::IFSSPRK3, state::ResolvedFields, generator::ResolvedGenerator,
                domain::FixedDomain, buffers::IntegratorBuffers, cache::ObservablesCache, dt::Real)
   û, φ̂ = state.velocity_spectral, state.scalar_spectral
-  T = real(eltype(field_data(û)))
+  T = field_scalar_type(û)
   dt_T = T(dt)
   s = buffers.stage1                                    # the STAGE STATE q⁽¹⁾, then q⁽²⁾ — where
   nl = buffers.nonlinear                                # IFLowStorageRK3 accumulates, this holds the
   sb = buffers.scalar                                   # stage; û stays at t_n until the last line
   has_scalar = φ̂ !== nothing
 
-  prepare!(generator, state, domain, dt)          # per-step forcing state advance + armed linear rates
+  prepare!(generator, state, domain, dt)          # per-step forcing state advance
 
   # ---- stage 1: N̂ at the deposited state; q⁽¹⁾ = E(Δt)(û + Δt N̂) ----
   u = velocity_physical(cache)                     # the deposited observables, deposited by the

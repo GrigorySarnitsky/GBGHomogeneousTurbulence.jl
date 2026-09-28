@@ -877,8 +877,8 @@ end
 # makes diffusion exact, so only the advective limit applies). The maximum speed is the cache's
 # deposited number — the previous closing deposit measured it — so choosing Δt is scalar arithmetic, not a pass.
 function cfl_timestep(sim::Simulation)
-  N = size(field_data(sim.cache.velocity_physical), 1)
-  Δx = Float64(sim.domain.grid.domain_size[1]) / N
+  grid = sim.domain.grid
+  Δx = minimum(Float64.(grid.domain_size) ./ grid.grid_size)
   speed = max_speed(sim.cache)
   # Kept for a direct `cfl_timestep(sim)` call; `advance!` guards its own path independently, since
   # a hand-fixed `dt` never reaches here.

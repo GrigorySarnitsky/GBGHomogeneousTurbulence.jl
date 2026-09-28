@@ -180,8 +180,10 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      initial_spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
+  # Drawn on the host, so a seed gives the same field on every backend, then moved to the run's storage.
   noise = new_vector_field_physical(domain)
-  copyto!(field_data(noise), randn(rng, T, field_physical_shape(domain.grid, Val(1))...))
+  adapt!(noise, VectorFieldPhysical(randn(rng, T, field_physical_shape(domain.grid, Val(1))...),
+                                    domain.grid, domain.layout))
   to_spectral!(û, noise, domain.transform_plans)
 
   # The envelope is a radial symbol of |κ|², built as a lazy kernel (no field of coefficients); the
@@ -222,7 +224,7 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                         "by the envelope and the dealiasing band together, so the requested " *
                         "`kinetic_energy` cannot be realized. Lower `envelope_wavenumber` below " *
                         "the dealiasing cutoff, or raise the resolution."))
-  field_data(û) .*= sqrt(T(kinetic_energy) / current_energy)
+  multiply!(û, sqrt(T(kinetic_energy) / current_energy), û)
   return û
 end
 
@@ -282,7 +284,8 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
   noise = new_scalar_field_physical(domain)
-  copyto!(field_data(noise), randn(rng, T, field_physical_shape(domain.grid, Val(0))...))
+  adapt!(noise, ScalarFieldPhysical(randn(rng, T, field_physical_shape(domain.grid, Val(0))...),
+                                    domain.grid, domain.layout))
   to_spectral!(φ̂, noise, domain.transform_plans)
 
   # Radial-symbol envelope, as for the velocity: lazy kernels, value-only captures.
@@ -309,7 +312,7 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
                         "by the envelope and the dealiasing band together, so the requested " *
                         "`scalar_variance` cannot be realized. Lower `envelope_wavenumber` below " *
                         "the dealiasing cutoff, or raise the resolution."))
-  field_data(φ̂) .*= sqrt(T(scalar_variance) / current_variance)
+  multiply!(φ̂, sqrt(T(scalar_variance) / current_variance), φ̂)
   return φ̂
 end
 

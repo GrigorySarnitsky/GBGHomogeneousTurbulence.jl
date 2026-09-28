@@ -236,7 +236,7 @@ _recoveries(src; scratch) = [
 # no read of the dead register), later stages accumulate; the accumulator's own rotation is skipped
 # at the last stage (`i < 3 &&` — it is dead after).
 # The stage update and its integrating-factor rotation are ONE fused exponential pass (decision 39):
-# E is evaluated per mode from the O(N) wavenumber arrays (plus, when a linear forcing is armed, the
+# E is evaluated per mode from the O(N) wavenumber arrays (plus, when a linear forcing is present, the
 # rate field — priced on the forcing axis, not in these unforced base lists), so no factor is built,
 # stored, or read.
 function _velocity_update(rhs; first = false, last = false)

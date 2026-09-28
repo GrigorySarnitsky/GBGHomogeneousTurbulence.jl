@@ -142,15 +142,15 @@ const OU_COMPANION_SHARE_AT_64 = 0.01
 function _forcing_delta(tag, slot)
   tag === :none && return ZERO
   tag === :band && return ZERO
-  tag === :linear && return (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 1)
+  tag === :linear && return (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0)
   tag === :power && return ZERO
   tag === :controller && return ZERO
   tag === :ou && return ZERO
   error("unmodelled forcing tag $tag — price it here in the same commit that adds it")
 end
-# Only a STEADY-rate forcing carries the generator's rate array, plus the materialized real band
-# indicator its rate fill reads (the band kernel being lazy, there are no stored coefficients to read
-# from). Today that is `Linear` alone.
+# Only a STEADY-rate forcing carries the generator's rate array. Today that is `Linear` alone. Since
+# 2026-09-28 (decision 99) it holds no indicator: the band is evaluated from its lazy kernel straight
+# into the rate, once, when the generator is built.
 #
 # `ConstantPower` and `VarianceController` are ZERO as of 2026-08-22, and the change is a REDUCTION
 # of two field-scale arrays each. Their rates depend on the state, so folding them into the
@@ -159,8 +159,8 @@ end
 # `convolve!` reads the lazy band kernel directly — so neither the rate array nor the indicator is
 # allocated at all. The footprint fell out of the accuracy fix rather than being traded for it.
 # The rate itself is a scalar FIELD in spectral representation since decision 39 — the complex
-# container the fused exponential's per-mode offset takes — so a rate-armed forcing shows one
-# spectral scalar (the rate) plus one real array (the indicator/mask).
+# container the fused exponential's per-mode offset takes — so a rate-carrying forcing shows one
+# spectral scalar (the rate) and nothing else.
 
 # Tracers cost NOTHING at field scale: everything they hold is O(M) — positions, the Heun predictor,
 # and the two interpolated point-value sets. The start-of-step endpoint velocity is recorded onto the

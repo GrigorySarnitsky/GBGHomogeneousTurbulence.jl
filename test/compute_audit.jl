@@ -189,12 +189,12 @@ _forcing_transform_delta(tag, slot) = (c2r = 0, r2c = 0)
 
 # Pass deltas per forcing hook, derived from src/Forcing.jl (the OU-velocity column is
 # cross-checked against its op list below; the rest are frozen by derivation). Every band kernel is
-# a lazy radial symbol since the PF adoption, so no hook reads a stored kernel; an ARMED rate is a
+# a lazy radial symbol since the PF adoption, so no hook reads a stored kernel; a linear rate is a
 # spectral-scalar field the fused exponential reads once per application (_applies below).
 #   band  — project_forcing!: weighted_inner(field, band) [field read] + the in-band rescale
 #           convolve [field r/w].
-#   linear — set_forcing_rate!: rate .= A·mask [mask (real) read + rate (spectral scalar) write],
-#           then the armed exponential reads the rate once per application.
+#   linear — the rate is filled once, when the generator is built, so no step writes it; the
+#           exponential reads it once per application. No mask is stored (the band kernel is lazy).
 #   power — add_forcing_source!, at EVERY right-hand-side evaluation (the amplitude tracks the band
 #           observable, so it cannot be armed once per step): weighted_inner(field, band)
 #           [1 field read; the band kernel is lazy, so no configuration array is read] + the
@@ -214,7 +214,7 @@ function _forcing_pass_delta(tag, slot, scheme)
   if tag === :band
     return slot === :velocity ? _ex(spectral_vector = 3) : _ex(spectral_scalar = 3)
   elseif tag === :linear
-    return _ex(spectral_scalar = 1 + _applies(scheme), real_spectral_scalar = 1)
+    return _ex(spectral_scalar = _applies(scheme))
   elseif tag === :power
     return slot === :velocity ? _ex(spectral_vector = 4 * _evals(scheme)) :
                                 _ex(spectral_scalar = 4 * _evals(scheme))

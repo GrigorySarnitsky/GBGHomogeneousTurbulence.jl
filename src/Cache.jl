@@ -50,7 +50,7 @@ gone?".
 """
 module Cache
 
-using GBGPeriodicFields: point_values, field_data, VectorPointValues, npoints
+using GBGPeriodicFields: point_values, field_data, field_scalar_type, VectorPointValues, npoints
 using ..SimulationDomain: FixedDomain, new_vector_field_physical, new_scalar_field_physical
 import ..Observables: max_speed           # one generic: the field reduction there, the cached read here
 
@@ -168,7 +168,7 @@ function ObservablesCache(domain::FixedDomain; scalar::Bool = false,
   # hardwired `Float64` promoted a Float32 run's timestep arithmetic and broke the element-type
   # contract the rest of the observables surface keeps. `NaN` in that type is the never-deposited
   # value, matching the epoch sentinel next to it.
-  T = real(eltype(field_data(velocity)))
+  T = field_scalar_type(velocity)
   # The velocity-at-particles slot is the cache's own, like every other slot (decision 67 — the
   # sample is an observable of the flow, not particle state, so its storage lives with the observables): an
   # M×3 point-value section on the domain's backend, plus `history_depth - 1` past samples for a
