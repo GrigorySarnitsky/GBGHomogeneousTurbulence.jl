@@ -10,31 +10,31 @@ using GBGHomogeneousTurbulence
 
   # definitions, spelled through the physical scales rather than the closed forms the code uses
   u_box = (ε * L)^(1 / 3)                              # the Kolmogorov velocity of a box-sized eddy
-  @test reynolds_box(ε, L, ν) ≈ u_box * L / ν rtol = 1e-14
+  @test reynolds_box(L, ε, ν) ≈ u_box * L / ν rtol = 1e-14
   u′ = sqrt(2k / 3)
   λ = sqrt(15ν * u′^2 / ε)
-  @test reynolds_taylor(ε, k, ν) ≈ u′ * λ / ν rtol = 1e-14
+  @test reynolds_taylor(k, ε, ν) ≈ u′ * λ / ν rtol = 1e-14
 
   # Re_λ = k̃ √((20/3) Re_box), with k̃ = k/(εL)^{2/3}
   k̃ = k / (ε * L)^(2 / 3)
-  @test reynolds_taylor(ε, k, ν) ≈ k̃ * sqrt(20 / 3 * reynolds_box(ε, L, ν)) rtol = 1e-13
+  @test reynolds_taylor(k, ε, ν) ≈ k̃ * sqrt(20 / 3 * reynolds_box(L, ε, ν)) rtol = 1e-13
   # Re_box = (L/η)^{4/3}, with η = (ν³/ε)^{1/4} the Kolmogorov length
   η = (ν^3 / ε)^(1 / 4)
-  @test reynolds_box(ε, L, ν) ≈ (L / η)^(4 / 3) rtol = 1e-13
+  @test reynolds_box(L, ε, ν) ≈ (L / η)^(4 / 3) rtol = 1e-13
 
   # the arguments' own floating-point type; integers promote to Float64
-  @test reynolds_box(0.37f0, Float32(2π), 0.011f0) isa Float32
-  @test reynolds_taylor(0.37f0, 1.5f0, 0.011f0) isa Float32
+  @test reynolds_box(Float32(2π), 0.37f0, 0.011f0) isa Float32
+  @test reynolds_taylor(1.5f0, 0.37f0, 0.011f0) isa Float32
   @test reynolds_box(1, 1, 1) === 1.0
-  @test reynolds_box(0.0, L, ν) == 0                   # no dissipation, no box-eddy velocity
+  @test reynolds_box(L, 0.0, ν) == 0                   # no dissipation, no box-eddy velocity
 
   # refusals, by name
-  @test_throws ArgumentError reynolds_box(-ε, L, ν)
-  @test_throws ArgumentError reynolds_box(ε, 0, ν)
-  @test_throws ArgumentError reynolds_box(ε, L, 0)
-  @test_throws ArgumentError reynolds_box(Inf, L, ν)
-  @test_throws ArgumentError reynolds_taylor(0, k, ν)
-  @test_throws ArgumentError reynolds_taylor(ε, -k, ν)
-  @test_throws ArgumentError reynolds_taylor(ε, k, -ν)
-  @test_throws ArgumentError reynolds_taylor(ε, NaN, ν)
+  @test_throws ArgumentError reynolds_box(L, -ε, ν)
+  @test_throws ArgumentError reynolds_box(0, ε, ν)
+  @test_throws ArgumentError reynolds_box(L, ε, 0)
+  @test_throws ArgumentError reynolds_box(L, Inf, ν)
+  @test_throws ArgumentError reynolds_taylor(k, 0, ν)
+  @test_throws ArgumentError reynolds_taylor(-k, ε, ν)
+  @test_throws ArgumentError reynolds_taylor(k, ε, -ν)
+  @test_throws ArgumentError reynolds_taylor(NaN, ε, ν)
 end

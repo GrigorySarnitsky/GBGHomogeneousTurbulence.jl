@@ -521,7 +521,7 @@ end
 
 
 """
-    reynolds_box(dissipation, side_length, viscosity)
+    reynolds_box(side_length, dissipation, viscosity)
 
 The box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}}`` of a flow, from three scalars: the Reynolds number
 of an eddy the size of the box, with the Kolmogorov velocity ``(\\varepsilon L)^{1/3}`` of that eddy and
@@ -536,25 +536,25 @@ kinetic energy in box units ``\\tilde{k}`` is stated against; [`reynolds_taylor`
 Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by the resolution
 ``\\kappa_{\\max}\\eta`` has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
 
-The arguments are:
-- `dissipation` — the dissipation rate ``\\varepsilon``, such as a run's measured time mean.
+The arguments run from the largest scale to the smallest:
 - `side_length` — the box side ``L``.
+- `dissipation` — the dissipation rate ``\\varepsilon``, such as a run's measured time mean.
 - `viscosity` — the kinematic viscosity ``\\nu``.
 
-Returns a number in the floating-point type the arguments promote to. A negative or non-finite
-`dissipation`, or a non-positive `side_length` or `viscosity`, throws an `ArgumentError`.
+Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
+`side_length` or `viscosity`, or a negative or non-finite `dissipation`, throws an `ArgumentError`.
 """
-function reynolds_box(dissipation::Real, side_length::Real, viscosity::Real)
-  ε, L, ν = promote(float(dissipation), float(side_length), float(viscosity))
-  (isfinite(ε) && ε >= 0) || throw(ArgumentError("`dissipation` must be finite and non-negative, got $dissipation"))
+function reynolds_box(side_length::Real, dissipation::Real, viscosity::Real)
+  L, ε, ν = promote(float(side_length), float(dissipation), float(viscosity))
   (isfinite(L) && L > 0) || throw(ArgumentError("`side_length` must be finite and positive, got $side_length"))
+  (isfinite(ε) && ε >= 0) || throw(ArgumentError("`dissipation` must be finite and non-negative, got $dissipation"))
   (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
   return cbrt(ε) * cbrt(L)^4 / ν
 end
 
 
 """
-    reynolds_taylor(dissipation, kinetic_energy, viscosity)
+    reynolds_taylor(kinetic_energy, dissipation, viscosity)
 
 The Taylor-microscale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of a flow, from three
 scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one component and
@@ -568,19 +568,19 @@ It is the Reynolds number turbulence results are usually compared on. [`reynolds
 box Reynolds number of the same run, and the two are tied by the kinetic energy in box units,
 ``\\mathrm{Re}_\\lambda = \\tilde{k}\\sqrt{(20/3)\\mathrm{Re}_{\\mathrm{box}}}``.
 
-The arguments are:
-- `dissipation` — the dissipation rate ``\\varepsilon``.
+The arguments run from the largest scale to the smallest:
 - `kinetic_energy` — the turbulent kinetic energy ``k``.
+- `dissipation` — the dissipation rate ``\\varepsilon``.
 - `viscosity` — the kinematic viscosity ``\\nu``.
 
-Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
-`dissipation` or `viscosity`, or a negative or non-finite `kinetic_energy`, throws an
+Returns a number in the floating-point type the arguments promote to. A negative or non-finite
+`kinetic_energy`, or a non-positive or non-finite `dissipation` or `viscosity`, throws an
 `ArgumentError`.
 """
-function reynolds_taylor(dissipation::Real, kinetic_energy::Real, viscosity::Real)
-  ε, k, ν = promote(float(dissipation), float(kinetic_energy), float(viscosity))
-  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+function reynolds_taylor(kinetic_energy::Real, dissipation::Real, viscosity::Real)
+  k, ε, ν = promote(float(kinetic_energy), float(dissipation), float(viscosity))
   (isfinite(k) && k >= 0) || throw(ArgumentError("`kinetic_energy` must be finite and non-negative, got $kinetic_energy"))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
   (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
   return sqrt(oftype(ε, 20) / 3) * k / sqrt(ε * ν)
 end
