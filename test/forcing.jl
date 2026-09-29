@@ -377,10 +377,10 @@ end
   end
 
 
-  @testset "the stationary-dissipation estimate is ε = (k/G)^{3/2}/L at the provisional G = 0.7" begin
+  @testset "the stationary-dissipation estimate is ε = (k/k̃)^{3/2}/L at the provisional k̃ = 0.7" begin
     # One estimate serves the controller's default relaxation time and the run layer's derived
     # viscosity, so the two agree on what "stationary for this box" means by construction — they
-    # disagreed by a factor of 2.68 when each spelled its own copy. G = 0.7 is the package's own
+    # disagreed by a factor of 2.68 when each spelled its own copy. k̃ = 0.7 is the package's own
     # provisional measurement.
     estimate = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
     for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)

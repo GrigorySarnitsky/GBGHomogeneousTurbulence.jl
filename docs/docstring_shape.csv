@@ -26,7 +26,7 @@ Forcing.jl::set_forcing_rate!(forcing， rate， field， domain) -> rate,59,0,1
 Forcing.jl::uses_steady_linear_rate(forcing) -> Bool,72,0,165
 Forcing.jl::write_forcing(parent::HDF5.H5DataStore， name::AbstractString，,93,0,133
 GBGHomogeneousTurbulence.jl::GBGHomogeneousTurbulence,39,0,118
-Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),76,2,311
+Generator.jl::FlowConditions(; viscosity， schmidt， velocity_forcing， scalar_forcing),78,2,313
 Generator.jl::Generator,37,0,184
 Generator.jl::ResolvedGenerator(domain， conditions; scalar = false),59,2,595
 Generator.jl::finalize!(generator， state， domain),84,0,119
@@ -112,7 +112,7 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,55,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = nothing，,62,1,2863
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = nothing，,62,1,2868
 SimulationRun.jl::SimulationRun,31,0,229
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false，,97,0,669
 SimulationRun.jl::advance!(sim; dt = nothing),55,0,124

@@ -53,7 +53,7 @@ export FlowConditions, ResolvedGenerator,
 
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
 ``\\mathrm{Re} = u'L/\\nu``: with ``u' = 1`` and the shipped ``L = 2\\pi`` the box-scale value is
-``2\\pi/\\nu``, and ``1/\\nu`` when lengths are measured in box units; the Reynolds number
+``2\\pi/\\nu``, and ``1/\\nu`` with the box side as the unit of length; the Reynolds number
 built on the integral scale is smaller still), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
 (`velocity_forcing`, `scalar_forcing`, both

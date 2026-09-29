@@ -37,13 +37,12 @@ constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carr
 over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains most
 of what follows.
 
-**The first scientific goal** is to measure the box-normalized dissipation group
-``G = k/(L\varepsilon)^{2/3}`` as a law ``G(\text{forcing}, \mathrm{Re}_\lambda, \text{band})``,
+**The first scientific goal** is to measure the kinetic energy in box units
+``\tilde{k} = k/(\varepsilon L)^{2/3}`` as a law ``\tilde{k}(\text{forcing}, \mathrm{Re}, \text{band})``,
 integrate it so that a run's derived viscosity is calibrated for the forcing it actually uses, and
-publish it (decision 94). ``G`` is the constant by which the run layer turns a requested resolution into
-a viscosity, and the package's first sweep showed it is neither universal nor near the literature's
-value at the Reynolds numbers a single GPU reaches. Until the law exists, the run layer uses the
-provisional ``G = 0.7``.
+publish it (decisions 94 and 101). ``\tilde{k}`` is the constant by which the run layer turns a requested
+resolution into a viscosity, and the package's first sweep showed it is not universal. Until the law
+exists, the run layer uses the provisional ``\tilde{k} = 0.7``.
 
 ---
 
@@ -263,7 +262,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 
 `Generator` realizes the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
 inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} = u'L/\nu``:
-``2\pi/\nu`` on the shipped defaults ``u' = 1``, ``L = 2\pi``, and ``1/\nu`` in box units), the Schmidt number
+``2\pi/\nu`` on the shipped defaults ``u' = 1``, ``L = 2\pi``, and ``1/\nu`` with the box side as the unit of length), the Schmidt number
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
@@ -429,7 +428,7 @@ returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so
 forcing before the grid exists. A velocity forcing named so may also leave its target out, and
 `Simulation` fills it from the run's stationary state: the pair ``(k, \varepsilon)``, stated once — by
 `kinetic_energy`, `dissipation`, or a forcing's own target — with the other member predicted through
-``G`` (decision 95). `Linear`'s rate stays required, since its stationary value needs the band's own
+``\tilde{k}`` (decision 95). `Linear`'s rate stays required, since its stationary value needs the band's own
 energy, and so does a scalar forcing's target, since no scalar state is modelled.
 
 ### 4.5 `Propagator` — the map that advances the state in time
@@ -541,7 +540,7 @@ Over it:
   chosen resolution criterion `κ_max_η` (decision 20; measured against the resolved cutoff, decision
   82), solved from the ε of the run's stationary state (decision 95) — with a supplied `viscosity` the
   opt-in override. A forcing holding ε, the default, meets `κ_max_η` in the stationary mean; one
-  holding k leaves the resolution predicted through ``G``.
+  holding k leaves the resolution predicted through ``\tilde{k}``.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -877,10 +876,10 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
 The public surface and these absences are the spec. Do not add a capability "for completeness"; a missing
 one usually encodes a decision.
 
-1. **No physical units.** Quantities are in box units; control is by ``\mathrm{Re}`` (through ``\nu``)
-   and ``\mathrm{Sc}``, and the reference constants a run is judged against — ``C_K``,
-   ``C_\varepsilon``, and the box-normalized dissipation group ``G = k/(L\varepsilon)^{2/3}`` — are
-   dimensionless groups.
+1. **No physical units.** Quantities are dimensionless, on the box's order-one reference scales;
+   control is by ``\mathrm{Re}`` (through ``\nu``) and ``\mathrm{Sc}``, and the reference constants a run
+   is judged against — ``C_K``, ``C_\varepsilon``, and the kinetic energy in box units
+   ``\tilde{k} = k/(\varepsilon L)^{2/3}`` — are dimensionless groups.
 2. **No field or statistics machinery reimplemented.** Field operations come from `GBGPeriodicFields`,
    estimators from `GBGStreamingStatistics` (§5).
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
@@ -3093,6 +3092,24 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     removed. It is falsified in the same test, against a planted site and a deleted one. It cannot see
     a layer built over a correct PF call, such as the batch width of decision 98; that remains a matter
     for review.
+101. **(2026-09-29, user-directed) The box-normalized quantity is ``\tilde{k}``, the kinetic energy in box
+    units, and a tilde means box units throughout.** Decisions 94 and 95 wrote it ``G = k/(L\varepsilon)^{2/3}``
+    and called it the box-normalized dissipation group, a name taken from the `Li2008` law, which
+    decision 97 removed. The literature has no name for it. ``G`` also names `VarianceController`'s
+    gain, so the glyph meant two things. **The symbol:** ``\tilde{k} = k/(\varepsilon L)^{2/3}``, with
+    the tilde marking a quantity in box units: the unit system built from the box side ``L`` and
+    ``\varepsilon``, as Sagaut & Cambon mark nondimensional variables. The hat is taken by the spectral
+    representation, and the asterisk by the complex conjugate. The tilde is free because averages and
+    filters are written as brackets with an index, never with a tilde or an overbar (owner ruling,
+    same day). Its physical reading is ``\tilde{k}^{3/2} = (k^{3/2}/\varepsilon)/L``, the large-eddy length
+    as a fraction of the box side. The companion Reynolds number is
+    ``\mathrm{Re}_{\mathrm{box}} = \varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``, written with ``\mathrm{box}`` rather
+    than ``L``, because Pope's ``\mathrm{Re}_L`` is ``k^{2}/(\varepsilon\nu)``. The band energy fraction
+    is written ``k_f/k``, since ``f`` names the force. **Names, for the model to come:**
+    `kinetic_energy_in_box_units` and `band_energy_fraction`, with the Reynolds keywords
+    `reynolds_box` and `reynolds_taylor` (owner ruling; `Phenomenology` is not a precedent until it is
+    extracted). `G` now names the gain alone, and the provisional constant is
+    `_KINETIC_ENERGY_IN_BOX_UNITS`. Earlier log entries keep ``G`` as history.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

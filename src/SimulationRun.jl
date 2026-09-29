@@ -56,7 +56,7 @@ using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation
 using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, VarianceRescaling,
                  VarianceController, StochasticOUState, initial_forcing_state,
                  _stationary_dissipation_estimate, _stationary_energy_estimate, _stated_state,
-                 _takes_design, _DISSIPATION_GROUP
+                 _takes_design, _KINETIC_ENERGY_IN_BOX_UNITS
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -109,8 +109,8 @@ By default the run is **forced and stationary**, set up for a stationary state: 
 ``k`` and the dissipation rate ``\\varepsilon`` it settles at.
 
 State that state **once** — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
-forcing that holds one of the two — and the other member is predicted through the box's dissipation
-group ``G`` (below). Stating it twice is an `ArgumentError`; stating nothing means ``k = 1.5``.
+forcing that holds one of the two — and the other member is predicted through the kinetic energy in
+box units ``\\tilde{k}`` (below). Stating it twice is an `ArgumentError`; stating nothing means ``k = 1.5``.
 
 A velocity forcing whose target is left out takes it from that state (see
 [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). The default,
@@ -121,14 +121,14 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     Reynolds number consistent with the resolution criterion `κ_max_η`.
 
     It takes the dissipation rate of the run's state — stated, or predicted from ``k`` through the
-    box-normalized dissipation group ``G = k/(L\\varepsilon)^{2/3}`` as
-    ``\\varepsilon = (k/G)^{3/2}/L``, with ``L`` the box side and ``G = 0.7``.
+    kinetic energy in box units ``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` as
+    ``\\varepsilon = (k/\\tilde{k})^{3/2}/L``, with ``L`` the box side and ``\\tilde{k} = 0.7``.
 
     That value is **provisional**, measured in this package's own forced runs on shells 1–2, where
-    ``G`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66.
+    ``\\tilde{k}`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66.
 
-    ``G`` carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
-    forced: the same runs gave ``G \\approx 0.56`` forced on shells 1–4 and ``\\approx 0.47`` on every
+    ``\\tilde{k}`` carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
+    forced: the same runs gave ``\\tilde{k} \\approx 0.56`` forced on shells 1–4 and ``\\approx 0.47`` on every
     mode. A forcing moved off the default band therefore misses the requested resolution.
 
     Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
@@ -153,7 +153,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     ``\\mathrm{Re}_\\lambda`` are logged, with what the forcing guarantees.
 
     What is guaranteed follows what the forcing holds. A forcing holding ``\\varepsilon``, as the
-    default does, meets `κ_max_η` in the stationary mean whatever ``G`` truly is, and leaves ``k`` the
+    default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves ``k`` the
     prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the prediction.
 
     One holding neither, given its own strength — a `Linear` rate, a `StochasticOU` variance, a
@@ -163,7 +163,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
   * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError` — for a decaying
     run (`velocity_forcing = NoForcing()`) or manual control. The derived viscosity is calibrated on a *stationary
-    forced* balance (``G`` is measured on forced stationary runs), so a decaying run should set
+    forced* balance (``\\tilde{k}`` is measured on forced stationary runs), so a decaying run should set
     ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
     law assumes.
 
@@ -199,7 +199,7 @@ The run group:
 - `kinetic_energy = nothing`, `dissipation = nothing` — the run's stationary state, as its kinetic
   energy ``k`` or its dissipation rate ``\\varepsilon``. Give at most one, or neither and let the
   velocity forcing's target state it; with no source at all ``k = 1.5``, an r.m.s. velocity
-  ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``G``. The velocity is seeded
+  ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``\\tilde{k}``. The velocity is seeded
   at the state's ``k``; to start from another energy, adopt a `state`.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
   ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
@@ -341,7 +341,7 @@ and the tracer positions.
 
 !!! note "The default holds the injection rate, so the kinetic energy is free"
     `ConstantPower` injects the state's ``\\varepsilon`` at every stage and never measures ``k``,
-    which settles where the true ``G`` puts it and fluctuates with the cascade. It was chosen as the
+    which settles where the true ``\\tilde{k}`` puts it and fluctuates with the cascade. It was chosen as the
     default because it has no gain or settling time to choose. To hold ``k`` instead, force with a
     [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) whose target is
     left out: it takes the target from the state and restores ``k`` exponentially, its gain setting
@@ -403,7 +403,7 @@ end
 
 # The run's stationary state — the (k, ε) it is set up for — from its ONE source: `kinetic_energy`,
 # `dissipation`, or the target the velocity forcing states. The other member is predicted through the
-# box's dissipation group, which is the only place G enters a run. Two sources would state the state
+# kinetic energy in box units k̃ = k/(εL)^{2/3}, which is the only place k̃ enters a run. Two sources would state the state
 # twice, and are refused rather than reconciled; none means the default k = 1.5 (u′ = 1).
 function _design_state(kinetic_energy, dissipation, stated, L)
   sources = String[]
@@ -542,7 +542,7 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("the given `tracers` live on a different storage backend than " *
                           "`domain`: move them, or build the domain, on the matching backend."))
   end
-  # The stationary dissipation the box sustains, ε = (k/G)^{3/2}/L with the provisional G — a
+  # The stationary dissipation the box sustains, ε = (k/k̃)^{3/2}/L with the provisional k̃ — a
   # modeled estimate, not a measurement, and the same one the controller's default clock uses.
   # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
@@ -598,7 +598,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
       held === :kinetic_energy ?
       "the forcing holds k; ε, and with it κ_max·η ≈ $(resolution), is predicted" :
       "the forcing holds neither k nor ε; both, and κ_max·η ≈ $(resolution), are predicted"
-    @info "Simulation: ν is set from ε; $guarantee (G = $(Float64(_DISSIPATION_GROUP)))" viscosity=ν kinetic_energy=k_design dissipation=ε expected_Re_λ=reλ
+    @info "Simulation: ν is set from ε; $guarantee (k̃ = $(Float64(_KINETIC_ENERGY_IN_BOX_UNITS)))" viscosity=ν kinetic_energy=k_design dissipation=ε expected_Re_λ=reλ
   else
     ν = Float64(viscosity)
   end

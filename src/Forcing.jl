@@ -843,12 +843,12 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
 end
 
 
-# ε_∞ = (k/G)^{3/2}/L for a stationary box-filling flow, G = k/(Lε)^{2/3} the box-normalized
-# dissipation group. G = 0.7 is PROVISIONAL and the package's own (decision 94): measured 2026-09-24
-# on 96³ VarianceRescaling(over = :total) runs forced on shells 1–2, G = 0.59–0.74 rising with Re_λ
-# over 28–66. G also falls
-# as the forcing band widens (≈ 0.56 on shells 1–4, ≈ 0.47 on every mode), so this one number is a
-# stand-in for the G(forcing, Re_λ, band) law the package exists to measure first.
+# ε_∞ = (k/k̃)^{3/2}/L for a stationary box-filling flow, k̃ = k/(εL)^{2/3} the kinetic energy in
+# box units. k̃ = 0.7 is PROVISIONAL and the package's own (decision 94): measured 2026-09-24
+# on 96³ VarianceRescaling(over = :total) runs forced on shells 1–2, k̃ = 0.59–0.74 rising with Re_λ
+# over 28–66. k̃ also falls as the forcing band widens (≈ 0.56 on shells 1–4, ≈ 0.47 on every mode),
+# so this one number is a stand-in for the k̃(forcing, Re, band) law the package exists to measure
+# first.
 # This is the ONE estimate: the controller's default relaxation time and the run layer's derived
 # viscosity both call it, so the two agree on what "stationary for this box" means by construction.
 # It lives here, not in `Phenomenology`, because that leaf is extraction-bound and this module and
@@ -856,9 +856,9 @@ end
 # A `Rational` and a rational exponent, never floating literals — the same rule `_target_factor`
 # carries and for the same reason: a bare `0.9` or `3/2` is a `Float64` and promotes the estimate,
 # the turnover time, and then the whole controller off a Float32 run's element type.
-const _DISSIPATION_GROUP = 7 // 10
-_stationary_dissipation_estimate(k, L) = (k / _DISSIPATION_GROUP)^(3 // 2) / L
-_stationary_energy_estimate(ε, L) = _DISSIPATION_GROUP * (L * ε)^(2 // 3)
+const _KINETIC_ENERGY_IN_BOX_UNITS = 7 // 10
+_stationary_dissipation_estimate(k, L) = (k / _KINETIC_ENERGY_IN_BOX_UNITS)^(3 // 2) / L
+_stationary_energy_estimate(ε, L) = _KINETIC_ENERGY_IN_BOX_UNITS * (L * ε)^(2 // 3)
 
 
 uses_steady_linear_rate(::VarianceController) = false
