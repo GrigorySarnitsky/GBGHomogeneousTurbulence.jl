@@ -3128,6 +3128,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     the kinetic energy ``k`` restricted to the band, matches the code's `band` kernels and
     `band_energy_fraction`, and makes the fraction ``k_{\mathrm{band}}/k``. It has a glossary row, and the
     docstrings, comments, validation page and tests use it. Earlier log entries keep ``k_f`` as history.
+104. **(2026-09-29, user-directed) The two Reynolds numbers as plain functions of three scalars.**
+    `reynolds_box(dissipation, side_length, viscosity)` gives ``\varepsilon^{1/3}L^{4/3}/\nu`` and
+    `reynolds_taylor(dissipation, kinetic_energy, viscosity)` gives ``\sqrt{20/3} k/\sqrt{\varepsilon\nu}``.
+    **Why scalars, not a run or a field:** the owner's ruling. A study reduces a run to time means first,
+    and the Reynolds number belongs to those means, not to an instantaneous state. The functions give
+    that study the package's one definition, so no script carries its own copy. They live in
+    `Observables` beside the reductions whose results they take, and the argument order is the
+    owner's: ``\varepsilon`` first, then the other quantity, then ``\nu``. The same names serve as the keywords of
+    the ``\tilde{k}`` model to come, as `kinetic_energy` is both a keyword and an observable.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

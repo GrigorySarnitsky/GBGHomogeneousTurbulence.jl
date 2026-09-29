@@ -36,7 +36,7 @@ Generator.jl::scalar_integrating_factor(generator， τ),41,0,43
 Generator.jl::scalar_rhs!(N̂， generator， û， φ̂， u_consumed， φ， domain;,104,1,563
 Generator.jl::velocity_integrating_factor(generator， τ),85,0,210
 Generator.jl::velocity_rhs!(N̂， generator， û， u， ω_consumed， domain),62,1,525
-Observables.jl::Observables,68,0,315
+Observables.jl::Observables,68,0,336
 Observables.jl::derivative_skewness(û， domain),85,1,448
 Observables.jl::dissipation(ω， viscosity),75,1,307
 Observables.jl::energy_spectrum(û， domain),66,0,178
@@ -45,6 +45,8 @@ Observables.jl::kinetic_energy(u),67,0,156
 Observables.jl::kinetic_energy_and_dissipation(û， domain， viscosity),98,0,194
 Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),85,1,439
 Observables.jl::max_speed(u),55,2,313
+Observables.jl::reynolds_box(dissipation， side_length， viscosity),56,0,163
+Observables.jl::reynolds_taylor(dissipation， kinetic_energy， viscosity),36,0,130
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),34,0,131

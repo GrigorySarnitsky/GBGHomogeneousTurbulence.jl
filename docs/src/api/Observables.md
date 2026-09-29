@@ -40,6 +40,16 @@ box of that side measures once its own mean is removed, averaged over every posi
 kinetic_energy_and_dissipation_below_scale
 ```
 
+## Reynolds numbers
+
+The box and Taylor-microscale Reynolds numbers, computed from measured scalars (a run's time-mean
+``\varepsilon`` and ``k``, its ``\nu`` and box side) rather than from a field.
+
+```@docs
+reynolds_box
+reynolds_taylor
+```
+
 ## Derivative skewness
 
 The velocity-derivative skewness — the developed-turbulence marker that gates warm-up.

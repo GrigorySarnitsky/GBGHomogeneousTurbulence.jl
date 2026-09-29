@@ -25,8 +25,10 @@ The measured functions of the flow state:
   lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
+- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref) — the box and Taylor-microscale Reynolds numbers,
+  from measured scalars rather than a field.
 
-Each is a function of the state: most reduce a field to a scalar, the energy spectrum reduces to
+All but the two Reynolds numbers are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
 the spectral density sampled on the wavenumber shells, and the vorticity recovery alone produces a
 field. Each returns
 the field's own real element type rather than a fixed `Float64`, so a `Float32` run measures in
@@ -54,7 +56,7 @@ using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
        kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
-       energy_spectrum, integral_scale
+       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor
 
 
 """
@@ -515,6 +517,72 @@ function integral_scale(û, domain::FixedDomain)
   total > 0 ||
     throw(ArgumentError("this velocity field carries no energy, so it has no integral scale"))
   return oftype(weighted, 3 * π / 4) * weighted / total
+end
+
+
+"""
+    reynolds_box(dissipation, side_length, viscosity)
+
+The box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}}`` of a flow, from three scalars: the Reynolds number
+of an eddy the size of the box, with the Kolmogorov velocity ``(\\varepsilon L)^{1/3}`` of that eddy and
+the box side ``L``,
+
+```math
+\\mathrm{Re}_{\\mathrm{box}} = \\frac{(\\varepsilon L)^{1/3} L}{\\nu} = \\frac{\\varepsilon^{1/3} L^{4/3}}{\\nu} = \\frac{1}{\\tilde{\\nu}},
+```
+
+with ``\\tilde{\\nu}`` the viscosity in box units. Use it to place a run on the Reynolds axis the
+kinetic energy in box units ``\\tilde{k}`` is stated against; [`reynolds_taylor`](@ref) gives the
+Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by the resolution
+``\\kappa_{\\max}\\eta`` has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
+
+The arguments are:
+- `dissipation` — the dissipation rate ``\\varepsilon``, such as a run's measured time mean.
+- `side_length` — the box side ``L``.
+- `viscosity` — the kinematic viscosity ``\\nu``.
+
+Returns a number in the floating-point type the arguments promote to. A negative or non-finite
+`dissipation`, or a non-positive `side_length` or `viscosity`, throws an `ArgumentError`.
+"""
+function reynolds_box(dissipation::Real, side_length::Real, viscosity::Real)
+  ε, L, ν = promote(float(dissipation), float(side_length), float(viscosity))
+  (isfinite(ε) && ε >= 0) || throw(ArgumentError("`dissipation` must be finite and non-negative, got $dissipation"))
+  (isfinite(L) && L > 0) || throw(ArgumentError("`side_length` must be finite and positive, got $side_length"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return cbrt(ε) * cbrt(L)^4 / ν
+end
+
+
+"""
+    reynolds_taylor(dissipation, kinetic_energy, viscosity)
+
+The Taylor-microscale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of a flow, from three
+scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one component and
+``\\lambda = \\sqrt{15\\nu u'^{2}/\\varepsilon}`` the Taylor microscale, which gives
+
+```math
+\\mathrm{Re}_\\lambda = \\sqrt{\\frac{20}{3}} \\frac{k}{\\sqrt{\\varepsilon\\nu}}.
+```
+
+It is the Reynolds number turbulence results are usually compared on. [`reynolds_box`](@ref) gives the
+box Reynolds number of the same run, and the two are tied by the kinetic energy in box units,
+``\\mathrm{Re}_\\lambda = \\tilde{k}\\sqrt{(20/3)\\mathrm{Re}_{\\mathrm{box}}}``.
+
+The arguments are:
+- `dissipation` — the dissipation rate ``\\varepsilon``.
+- `kinetic_energy` — the turbulent kinetic energy ``k``.
+- `viscosity` — the kinematic viscosity ``\\nu``.
+
+Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
+`dissipation` or `viscosity`, or a negative or non-finite `kinetic_energy`, throws an
+`ArgumentError`.
+"""
+function reynolds_taylor(dissipation::Real, kinetic_energy::Real, viscosity::Real)
+  ε, k, ν = promote(float(dissipation), float(kinetic_energy), float(viscosity))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+  (isfinite(k) && k >= 0) || throw(ArgumentError("`kinetic_energy` must be finite and non-negative, got $kinetic_energy"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return sqrt(oftype(ε, 20) / 3) * k / sqrt(ε * ν)
 end
 
 
