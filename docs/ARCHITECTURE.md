@@ -733,7 +733,7 @@ These are **named so they are not precluded, and deliberately left un-abstracted
 generalization is built for them until a second concrete case forces the abstraction. None is a gap.
 
 - **The uniform-mean-gradient scalar source** — the standard scalar-injection route
-  (``-u_i \partial_{x_i}\bar\varphi`` with an imposed mean gradient), the missing piece of the
+  (``-u_i \partial_{x_i}\langle\varphi\rangle`` with an imposed mean gradient), the missing piece of the
   mean-gradient mixing System named in §3. A forcing-strategy slice, not a frame change.
 - **Stochastic (Eswaran–Pope OU) forcing — DELIVERED (decision 90).** Archived while its dense form
   drew a field of noise on the host every step; returned as a coarse companion field, with its process
@@ -3004,7 +3004,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 96. **(2026-09-26, user-directed) `kinetic_energy_and_dissipation_below_scale`: the energy and dissipation
     a sub-box of side ``l`` measures.** The owner's construction: cut a cube of side ``l``, remove its
     own mean, compute ``k`` there, and average over every position. That average is exactly
-    ``k(l) = k - \tfrac{1}{2}\langle\lvert\bar{\boldsymbol{u}}_l\rvert^2\rangle =
+    ``k(l) = k - \tfrac{1}{2}\langle\lvert\langle\boldsymbol{u}\rangle_l\rvert^2\rangle =
     \tfrac{1}{2}\sum(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2``, the position average of Pope's
     residual kinetic energy of a top-hat filter (2000, Ex. 13.22); the vorticity analogue gives
     ``\varepsilon(l)``, because removing the mean *velocity* leaves every gradient and so a flat
@@ -3028,7 +3028,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%. *(Amended
     2026-09-27, decision 98: the batch width and its padding are gone; the observable passes all its
     weights to one `weighted_inner` call, and the 32-weight compile failure was fixed in PF, its
-    decision 88.)*
+    decision 88.)* *(Notation updated 2026-09-29: the box mean, written ``\bar{\boldsymbol{u}}_l`` when this
+    entry was recorded, is ``\langle\boldsymbol{u}\rangle_l`` by decision 102.)*
 97. **(2026-09-26, user-directed) `Li2008` and `stationary_dissipation` are removed from
     `Phenomenology.Scalings`.** **Why.** The law gave one number, ``G = 0.9``, the package's own reduction
     of one JHTDB dataset at ``\mathrm{Re}_\lambda \approx 433``. It is not a published
@@ -3110,6 +3111,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `reynolds_box` and `reynolds_taylor` (owner ruling; `Phenomenology` is not a precedent until it is
     extracted). `G` now names the gain alone, and the provisional constant is
     `_KINETIC_ENERGY_IN_BOX_UNITS`. Earlier log entries keep ``G`` as history.
+102. **(2026-09-29, user-directed) Averages and filters are brackets with an index, never an overbar or
+    a tilde.** The box mean of side ``l`` is ``\langle\boldsymbol{u}\rangle_l``, a field; the unindexed
+    ``\langle\cdot\rangle`` is the average over the whole box; a time average over a window is
+    ``\langle\cdot\rangle_T``, as in Pope's glossary. Converted: the ``k(l)`` docstring and its test, the
+    validation page's window means, the mean scalar of the mean-gradient source in §7, and the box
+    mean in decision 96 (with an in-entry note, at the owner's instruction).
+    The complex conjugate's overline is a different operation and stays. The same pass fixed a silent
+    rendering defect on the validation page: one passage carried doubled backslashes, pasted from a
+    Julia string, so its math rendered as raw source.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

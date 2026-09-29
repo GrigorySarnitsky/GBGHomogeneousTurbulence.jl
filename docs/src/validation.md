@@ -86,12 +86,12 @@ Every step of that import is witnessed, not assumed:
 
 ![TurTLE (solid) vs this package (dashed): k(t), ε(t), ρ_u(τ)](assets/comparison_overlay.png)
 
-Window means over the 14.9 turnovers (each code its own realization after decorrelation):
+Window means ``\langle\cdot\rangle_T`` over the 14.9 turnovers (each code its own realization after decorrelation):
 
 | quantity | this package | TurTLE | relative difference |
 |:---|:---|:---|:---|
-| ``\bar\varepsilon`` | 0.9990 | 0.9987 | ``3 \times 10^{-4}`` |
-| ``\bar k`` | 2.517 | 2.565 | ``1.9\%`` |
+| ``\langle\varepsilon\rangle_T`` | 0.9990 | 0.9987 | ``3 \times 10^{-4}`` |
+| ``\langle k\rangle_T`` | 2.517 | 2.565 | ``1.9\%`` |
 | ``u'`` | 1.295 | 1.308 | ``0.9\%`` |
 | ``\mathrm{Re}_\lambda`` | 68.4 | 69.7 | ``1.9\%`` |
 
@@ -164,13 +164,13 @@ Three findings:
   ``2 \times 10^{-10}`` at ``\tau = 0.5`` and ``8 \times 10^{-6}`` at ``\tau = 5``.
 - **The unanchored equilibrium wandered — identically in both codes.** With fixed ``A`` the band
   self-amplifies until the cascade balances it: both codes migrated to a hotter state
-  (``\bar k \approx 3.4`` from 2.5, ``\bar\varepsilon \approx 1.6`` from 1.0), agreeing on the new
+  (``\langle k\rangle_T \approx 3.4`` from 2.5, ``\langle\varepsilon\rangle_T \approx 1.6`` from 1.0), agreeing on the new
   attractor's statistics to ``\sim 3\%`` — the larger scatter reflecting linear forcing's
   well-known larger, slower energy fluctuations, visible in the ``k(t)`` panel.
 - **The amplitude estimate illustrates why anchored forcings exist.** ``A`` was chosen from the
   *instantaneous* handoff band energy; the fixed-``A`` balance settled at a larger one
-  (``\bar E_{\mathrm{band}} \approx 1.87`` from 1.18), so
-  ``\bar\varepsilon = 2A\bar E_{\mathrm{band}} \approx 1.59`` rather than 1. Both codes agree
+  (``\langle E_{\mathrm{band}}\rangle_T \approx 1.87`` from 1.18), so
+  ``\langle\varepsilon\rangle_T = 2A\langle E_{\mathrm{band}}\rangle_T \approx 1.59`` rather than 1. Both codes agree
   precisely on this migration —
   it is the physics of unanchored linear forcing, not a discrepancy.
 
@@ -186,19 +186,19 @@ discrete routes.
 
 ![RK4-adaptive pair: TurTLE (fixed-step SSPRK3, solid) vs this package (IFLowStorageRK4, adaptive, dashed)](assets/comparison_overlay_rk4.png)
 
-- **The window took 6,739 adaptive steps at mean ``\\Delta t = 0.00546`` — ``2.73\\times`` the
-  reference legs' fixed ``2 \\times 10^{-3}``** (the fixed value was chosen for cross-code
+- **The window took 6,739 adaptive steps at mean ``\Delta t = 0.00546`` — ``2.73\times`` the
+  reference legs' fixed ``2 \times 10^{-3}``** (the fixed value was chosen for cross-code
   matching, well inside even RK3's ceiling), completing the same 36.8 time units in 174 s against
   the fixed-step leg's 265 s on the same GPU.
-- **Same agreement structure, with an instructive seed ladder.** ``k`` and ``\\varepsilon`` track
-  at ``10^{-6}``–``10^{-5}`` relative through ``t \\approx 5``, separating from a seed of
-  ``\\sim 6 \\times 10^{-7}`` at ``t = 1`` — the *truncation-level* difference of two tableaux on
-  two step sizes, against ``\\sim 10^{-12}`` for the matched-tableau pair: same physics reached by
+- **Same agreement structure, with an instructive seed ladder.** ``k`` and ``\varepsilon`` track
+  at ``10^{-6}``–``10^{-5}`` relative through ``t \approx 5``, separating from a seed of
+  ``\sim 6 \times 10^{-7}`` at ``t = 1`` — the *truncation-level* difference of two tableaux on
+  two step sizes, against ``\sim 10^{-12}`` for the matched-tableau pair: same physics reached by
   discretizations of increasing unlikeness, separating at exactly the level each unlikeness
-  predicts. Window means agree to ``0.2\\%`` in ``\\bar\\varepsilon`` and ``3\\%`` in ``\\bar k``
+  predicts. Window means agree to ``0.2\%`` in ``\langle\varepsilon\rangle_T`` and ``3\%`` in ``\langle k\rangle_T``
   (two 15-turnover realizations of the same statistics).
-- **``\\rho_u`` is again indistinguishable** through the physical decay: ``5 \\times 10^{-6}`` at
-  ``\\tau = 0.5``, ``2 \\times 10^{-6}`` at ``\\tau = 1``, ``10^{-5}`` at ``\\tau = 2`` — computed
+- **``\rho_u`` is again indistinguishable** through the physical decay: ``5 \times 10^{-6}`` at
+  ``\tau = 0.5``, ``2 \times 10^{-6}`` at ``\tau = 1``, ``10^{-5}`` at ``\tau = 2`` — computed
   in the run's callback on the *irregular* adaptive time grid, against TurTLE's fixed-grid
   post-hoc curve.
 
