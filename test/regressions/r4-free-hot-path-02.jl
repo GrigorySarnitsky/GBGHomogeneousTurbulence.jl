@@ -116,7 +116,7 @@ const EVALS_RK3 = 3
     @test POWER.out.convolve > 0
     @test CONTROLLER.out.convolve > 0
     # Since the multi-weight fusion (PF decision 72, wired 2026-08-23) the controller answers its
-    # three observables — k, k_f, and the dissipation — in ONE fused readback, the same crossing
+    # three observables — k, k_band, and the dissipation — in ONE fused readback, the same crossing
     # count as `power`'s single band observable: the distinction moved into the weights. The guard
     # that this hook still reduces at all is the equality itself against the non-zero count.
     @test readbacks(CONTROLLER) == 1 && readbacks(POWER) == 1

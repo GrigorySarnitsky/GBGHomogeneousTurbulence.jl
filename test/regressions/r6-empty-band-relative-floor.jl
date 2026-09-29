@@ -1,7 +1,7 @@
 # Dismissal-audit catch (2026-08-23, overturning a round-2 triage): the bare-positivity
 # empty-band guard readmitted the unbounded kick its docstrings still promised away. A band
 # emptied by a mask or a rescale retains roundoff-level content — positive, so it passed the
-# guard — and A = rate/(2·E_band) then overflows the field in one stage (A ~ 1e58 measured from a
+# guard — and A = rate/(2·k_band) then overflows the field in one stage (A ~ 1e58 measured from a
 # subtracted band). The floor is back as a RELATIVE one (10·eps of the whole-field observable),
 # riding the same fused traversal, so it is scale-invariant (the round-4 concern that removed the
 # absolute floor) and costs no extra crossing.

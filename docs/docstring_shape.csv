@@ -15,7 +15,7 @@ Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,2
 Forcing.jl::NoForcing(),16,0,17
 Forcing.jl::StochasticOU(domain; forcing_variance， correlation_time， lowest_shell = 1，,94,1,913
 Forcing.jl::StochasticOUState,65,0,184
-Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,869
+Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,878
 Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,803
 Forcing.jl::add_forcing_source!(forcing， forcing_state， N̂， field， domain， diffusivity) -> N̂,79,1,302
 Forcing.jl::initial_forcing_state(forcing， field， domain),57,0,126
@@ -43,7 +43,7 @@ Observables.jl::energy_spectrum(û， domain),66,0,178
 Observables.jl::integral_scale(û， domain),65,0,229
 Observables.jl::kinetic_energy(u),67,0,156
 Observables.jl::kinetic_energy_and_dissipation(û， domain， viscosity),98,0,194
-Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),89,1,452
+Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),85,1,439
 Observables.jl::max_speed(u),55,2,313
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
 Observables.jl::scalar_variance(φ),31,0,33

@@ -145,7 +145,7 @@ itself is statistical noise of that size.
 
 The whole comparison was repeated with a different forcing law — the band-limited **linear
 (Lundgren-type) forcing** ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
-**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2E_{\mathrm{band}}(t_0))``
+**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``
 (this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
 the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, nothing
 here reads the state or pins the injection: energy and dissipation are entirely outputs.
@@ -169,8 +169,8 @@ Three findings:
   well-known larger, slower energy fluctuations, visible in the ``k(t)`` panel.
 - **The amplitude estimate illustrates why anchored forcings exist.** ``A`` was chosen from the
   *instantaneous* handoff band energy; the fixed-``A`` balance settled at a larger one
-  (``\langle E_{\mathrm{band}}\rangle_T \approx 1.87`` from 1.18), so
-  ``\langle\varepsilon\rangle_T = 2A\langle E_{\mathrm{band}}\rangle_T \approx 1.59`` rather than 1. Both codes agree
+  (``\langle k_{\mathrm{band}}\rangle_T \approx 1.87`` from 1.18), so
+  ``\langle\varepsilon\rangle_T = 2A\langle k_{\mathrm{band}}\rangle_T \approx 1.59`` rather than 1. Both codes agree
   precisely on this migration —
   it is the physics of unanchored linear forcing, not a discrepancy.
 

@@ -1,6 +1,6 @@
 # Forcing tests for the linear (rate-folded-into-integrating-factor) strategies: Linear and
 # ConstantPower. Checks (1) the rate amplitudes are set correctly — Linear gives A on the band,
-# ConstantPower gives A = ε/(2E_band) so the injection rate equals the target; (2) the physical
+# ConstantPower gives A = ε/(2k_band) so the injection rate equals the target; (2) the physical
 # effect — Linear injects energy, scalar Linear builds variance; (3) the forced velocity stays
 # divergence-free (the linear rate, folded into E_ν, preserves solenoidality).
 
@@ -98,9 +98,6 @@ end
     û
   end
 
-  k0 = 2π / L
-  band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)   # shells 1–2
-  band_energy(field) = (tmp = new_vector_field_spectral(domain); convolve!(tmp, field, band); 0.5 * inner(tmp, tmp))
 
   @testset "Linear rate amplitude" begin
     A = 0.7
@@ -118,7 +115,6 @@ end
     # scheme its order). The source hook receives the STAGE field, which is the point.
     power = 0.3
     forcing = ConstantPower(domain; injection_rate = power, lowest_shell = 1, highest_shell = 2)
-    E_band = band_energy(û0)
     N̂ = new_vector_field_spectral(domain)
     field_data(N̂) .= 0
     add_forcing_source!(forcing, nothing, N̂, û0, domain, ν)
@@ -350,8 +346,8 @@ end
 
   @testset "VarianceController holds the WHOLE-field variance, normalizing by the band it forces" begin
     # Bassenne et al. (2016) Eq. 20 puts two DIFFERENT reductions in two places: the forcing acts on
-    # the band, so the amplitude is normalized by k_f; the quantity held is the whole field, so the
-    # restoring term measures k. Using k_f in both holds the band instead and lets k settle wherever
+    # the band, so the amplitude is normalized by k_band; the quantity held is the whole field, so the
+    # restoring term measures k. Using k_band in both holds the band instead and lets k settle wherever
     # the cascade puts it — which is what this package shipped once, ~30% above the requested value.
     # The witness works on the amplitude directly, so it cannot be satisfied by a lucky steady state.
     target = 0.5

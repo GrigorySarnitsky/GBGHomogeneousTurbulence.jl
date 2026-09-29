@@ -103,7 +103,7 @@ export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceC
 # band observable by the WHOLE-FIELD observable, which was scale-free but bought it with an extra
 # `inner(field, field)` every step. The bare-positivity form that then stood here was itself wrong
 # the other way (caught by the 2026-08-23 dismissal audit): a band emptied by a mask or a rescale
-# retains ROUNDOFF-level content, which is positive, so the amplitude ~ ε/2k_f took the unbounded
+# retains ROUNDOFF-level content, which is positive, so the amplitude ~ ε/2k_band took the unbounded
 # kick the docstrings promise it never takes — A ≈ 1e58 from a 1e-60 band, Inf in one stage. The
 # floor is back, but RELATIVE now: measured against the whole field's observable, it is invariant
 # under φ → sφ (both scale by s²), which is the invariance the positivity form was keeping — and
@@ -645,11 +645,11 @@ Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a 
 forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
 whose rate ``A`` is re-solved at every stage so the injection rate holds the `injection_rate`. A
-linear rate injects at ``2 A E_{\\mathrm{band}}``, with ``E_{\\mathrm{band}}`` the band's own
+linear rate injects at ``2 A k_{\\mathrm{band}}``, with ``k_{\\mathrm{band}}`` the band's own
 observable, so the rate that holds it is
 
 ```math
-A = \\frac{\\texttt{injection\\_rate}}{2 E_{\\mathrm{band}}}.
+A = \\frac{\\texttt{injection\\_rate}}{2 k_{\\mathrm{band}}}.
 ```
 
 In stationarity the injection balances dissipation, so `injection_rate` is the value ``\\varepsilon``
@@ -715,10 +715,11 @@ Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, whic
 it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
 rescaling is a post-step projection capping the iteration at first order.
 
-The rate is the marginal law ``A = \\varepsilon/2k_f`` plus a proportional restoring term:
+The rate is the marginal law ``A = \\varepsilon/2k_{\\mathrm{band}}``, with ``k_{\\mathrm{band}}`` the variance held in
+the forced band, plus a proportional restoring term:
 
 ```math
-A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\ell}{2k_f(t)}
+A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\ell}{2k_{\\mathrm{band}}(t)}
 \\quad\\text{in the band, } 0 \\text{ outside,}
 ```
 
@@ -734,7 +735,7 @@ per 1000 steps, measured at ``24^3`` in `Float64`; a `Float32` run's roundoff bi
 unmeasured), and nothing ever restores it.
 
 The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held;
-``k_f`` the forced band's, dividing out because the forcing injects only there. An empty band is
+``k_{\\mathrm{band}}`` the forced band's, dividing out because the forcing injects only there. An empty band is
 left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documents), so seed content
 in the band if the run depends on the controller taking hold.
 
@@ -777,7 +778,7 @@ does not take.
   `highest_shell = Inf` forces every retained mode but the mean, on any grid: the band-free linear
   forcing of Lundgren (2003, *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*,
   461–473) that physical-space codes apply, where
-  ``k_f = k`` — the form Bassenne et al. designed the controller in.
+  ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
 
 !!! note "The settling time, not the gain, is the physical parameter"
     Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a
@@ -869,9 +870,9 @@ function add_forcing_source!(forcing::VarianceController, forcing_state, N̂, fi
   T = field_scalar_type(N̂)
   factor = _target_factor(field)
   # Two DIFFERENT weights, and which one goes where is the whole content of Bassenne's Eq. 20.
-  # The forcing acts on the band alone, so it injects 2·A·k_f and the amplitude must be normalized by
+  # The forcing acts on the band alone, so it injects 2·A·k_band and the amplitude must be normalized by
   # the BAND's variance; the quantity being held is the field's whole-field variance, so the restoring
-  # term must measure THAT. Using k_f in both places holds the band at `target` instead, which is a
+  # term must measure THAT. Using k_band in both places holds the band at `target` instead, which is a
   # different physical model and leaves the whole field wherever the cascade puts it.
   # One traversal, one readback: the three weighted sums share a single fused reduction (PF
   # decision 72) where three separate calls would read the field three times and block on the
@@ -879,7 +880,7 @@ function add_forcing_source!(forcing::VarianceController, forcing_state, N̂, fi
   whole, band, dirichlet =
     weighted_inner(field, (domain.unit_kernel, forcing.band, domain.squared_wavenumber_kernel))
   whole_variance = factor * whole                                        # k, the quantity held
-  band_variance = factor * band                                          # k_f, the forced band
+  band_variance = factor * band                                          # k_band, the forced band
   # ε = D⟨|∇f|²⟩ = D·⟨f, |κ|²f⟩, the field's own dissipation at this stage. The factor is the same
   # convention `target` carries — ½ for the velocity, 1 for the scalar.
   dissipation = 2 * factor * diffusivity * dirichlet

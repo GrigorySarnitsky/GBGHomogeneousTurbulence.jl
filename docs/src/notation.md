@@ -126,6 +126,7 @@ Measured from the resolved state, or derived from it through a `FlowParameters` 
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`set_forcing_rate!`](@ref GBGHomogeneousTurbulence.Forcing.set_forcing_rate!) |
 | ``\varepsilon_{\mathrm{target}}`` | the injection rate a `ConstantPower` holds: energy for the velocity, scalar variance for the scalar | `ConstantPower(injection_rate=…)` |
 | ``\sigma^{2}`` | the stationary mean square of the term a stochastic forcing ADDS — an acceleration for the velocity, a rate of change of ``\varphi`` for the scalar. Not the variance of the field, which is what a `VarianceController` holds | `StochasticOU(forcing_variance=…)` |
+| ``k_{\mathrm{band}}`` | the energy in the forced band, ``\tfrac{1}{2}\sum_{\text{band}} \lvert\hat{\boldsymbol{u}}\rvert^{2}`` over the shells `lowest_shell` to `highest_shell`: the part of ``k`` the forcing acts on, and for a scalar forcing the band's part of ``\langle\varphi^{2}\rangle``. Its share of the whole is the band energy fraction ``k_{\mathrm{band}}/k`` | — |
 | ``T_L`` | the correlation time of that term: each forced mode's amplitude decays by ``e^{-\Delta t/T_L}`` per step. Short against the eddy-turnover time ``\tau``, the mean injection is close to ``\sigma^{2} T_L`` | `StochasticOU(correlation_time=…)` |
 
 ## Vocabulary

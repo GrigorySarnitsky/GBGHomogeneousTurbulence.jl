@@ -3106,7 +3106,8 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     as a fraction of the box side. The companion Reynolds number is
     ``\mathrm{Re}_{\mathrm{box}} = \varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``, written with ``\mathrm{box}`` rather
     than ``L``, because Pope's ``\mathrm{Re}_L`` is ``k^{2}/(\varepsilon\nu)``. The band energy fraction
-    is written ``k_f/k``, since ``f`` names the force. **Names, for the model to come:**
+    is written ``k_f/k``, since ``f`` names the force. *(Superseded the same day by decision 103: the band
+    energy is ``k_{\mathrm{band}}``, the fraction ``k_{\mathrm{band}}/k``.)* **Names, for the model to come:**
     `kinetic_energy_in_box_units` and `band_energy_fraction`, with the Reynolds keywords
     `reynolds_box` and `reynolds_taylor` (owner ruling; `Phenomenology` is not a precedent until it is
     extracted). `G` now names the gain alone, and the provisional constant is
@@ -3120,6 +3121,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     The complex conjugate's overline is a different operation and stays. The same pass fixed a silent
     rendering defect on the validation page: one passage carried doubled backslashes, pasted from a
     Julia string, so its math rendered as raw source.
+103. **(2026-09-29, user-directed) The energy in the forced band is ``k_{\mathrm{band}}``.** It had two
+    symbols: ``k_f`` in `VarianceController`'s docstring and ``E_{\mathrm{band}}`` in `ConstantPower`'s and on the
+    validation page. Neither was sound: ``k_f`` is the literature's forcing wavenumber and its ``f``
+    names the force, and ``E`` is the spectral density ``E(\kappa)``, not an energy. ``k_{\mathrm{band}}`` reads as
+    the kinetic energy ``k`` restricted to the band, matches the code's `band` kernels and
+    `band_energy_fraction`, and makes the fraction ``k_{\mathrm{band}}/k``. It has a glossary row, and the
+    docstrings, comments, validation page and tests use it. Earlier log entries keep ``k_f`` as history.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
@@ -3168,7 +3176,7 @@ cites.
   Nosé–Hoover move.)*
 - Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
   *(`VarianceController`: the constant-``k`` controller of their Eq. 20, the marginal law
-  ``A = \varepsilon/2k_f`` plus a proportional restoring term measuring the whole-field ``k``, giving exponential relaxation to a stable
+  ``A = \varepsilon/2k_{\mathrm{band}}`` plus a proportional restoring term measuring the whole-field ``k``, giving exponential relaxation to a stable
   attractor. The smooth, gain-limited replacement for the discontinuous projection above.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
   [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
