@@ -6,7 +6,7 @@ GBGHomogeneousTurbulence = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
 GBGPeriodicFields = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
 
 [sources]
-GBGCodingTools = {rev = "v2.0.0-rc.47", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
+GBGCodingTools = {rev = "v2.0.0-rc.48", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
 GBGHomogeneousTurbulence = {path = ".."}
 GBGPeriodicFields = {rev = "master", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
 
