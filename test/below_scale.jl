@@ -31,7 +31,7 @@ function spectral_oracle(û, domain, ν)
 end
 
 
-# (2) the definition, in physical space: k(l) = ½⟨|u|²⟩ − ½⟨|ū_l|²⟩, the position average of the energy
+# (2) the definition, in physical space: k(l) = ½⟨|u|²⟩ − ½⟨|⟨u⟩_l|²⟩, the position average of the energy
 # left after removing each box's own mean (the box average of |u|² averages back to the global mean)
 periodic_box_mean(a, q, dim) = begin
   n = size(a, dim)
@@ -53,11 +53,11 @@ function physical_oracle(û, domain; refine = 8)
   total = sum(abs2, a) / M^3 / 2
   k = zeros(N)
   for n in 1:N
-    ū = a
+    box_mean = a
     for dim in 1:3
-      ū = periodic_box_mean(ū, n * refine, dim)
+      box_mean = periodic_box_mean(box_mean, n * refine, dim)
     end
-    k[n] = total - sum(abs2, ū) / M^3 / 2
+    k[n] = total - sum(abs2, box_mean) / M^3 / 2
   end
   return k
 end

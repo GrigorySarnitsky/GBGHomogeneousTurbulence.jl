@@ -181,17 +181,18 @@ The kinetic energy and the dissipation rate held in scales below a box side ``l`
 ``l = nL/N`` (``n = 1, \\dots, N``) of an ``N^{3}`` grid on a box of side ``L``.
 
 Cut from the flow a cubic box of side ``l``, remove the box's own mean velocity, and take the kinetic
-energy of what is left; averaged over every position of the box, that is ``k(l)``. The same cut with
-the box's mean vorticity removed gives the dissipation ``\\varepsilon(l)`` carried below ``l``.
-Removing the mean velocity instead would leave every gradient, and so the dissipation, unchanged,
-which is why the vorticity's mean is the one removed. With ``\\bar{\\boldsymbol{u}}_l`` and
-``\\bar{\\boldsymbol{\\omega}}_l`` the box means of side ``l`` centred at each point,
+energy of what is left; averaged over every position of the box, that is ``k(l)``. The dissipation
+``\\varepsilon(l)`` removes the box's mean vorticity instead, since removing the mean velocity leaves
+every gradient unchanged.
+
+With ``\\langle\\boldsymbol{u}\\rangle_l`` and ``\\langle\\boldsymbol{\\omega}\\rangle_l`` the box means of side ``l``
+centred at each point (fields), and ``\\langle\\cdot\\rangle`` the average over the whole box,
 
 ```math
 \\begin{aligned}
-k(l) &= k - \\tfrac{1}{2}\\langle\\lvert\\bar{\\boldsymbol{u}}_l\\rvert^{2}\\rangle
+k(l) &= k - \\tfrac{1}{2}\\langle\\lvert\\langle\\boldsymbol{u}\\rangle_l\\rvert^{2}\\rangle
       = \\tfrac{1}{2}\\sum_{\\boldsymbol{\\kappa}} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2}, \\\\
-\\varepsilon(l) &= \\varepsilon - \\nu\\langle\\lvert\\bar{\\boldsymbol{\\omega}}_l\\rvert^{2}\\rangle
+\\varepsilon(l) &= \\varepsilon - \\nu\\langle\\lvert\\langle\\boldsymbol{\\omega}\\rangle_l\\rvert^{2}\\rangle
       = \\nu \\sum_{\\boldsymbol{\\kappa}} \\lvert\\boldsymbol{\\kappa}\\rvert^{2} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2},
 \\end{aligned}
 ```
@@ -232,7 +233,7 @@ function kinetic_energy_and_dissipation_below_scale(û, domain::FixedDomain, vis
   scales = [T(n * L / N) for n in 1:N]
   w² = ntuple(n -> (w = tophat_window(domain.multipliers, scales[n]); convolve(w, w)), N)
   κ²w² = map(v -> convolve(domain.squared_wavenumber_kernel, v), w²)
-  retained = weighted_inner(û, (w²..., κ²w²...))       # ⟨|ū_l|²⟩ for every side, then ⟨|ω̄_l|²⟩
+  retained = weighted_inner(û, (w²..., κ²w²...))       # ⟨|⟨u⟩_l|²⟩ for every side, then ⟨|⟨ω⟩_l|²⟩
   ν = oftype(whole, viscosity)
   return (; scales, kinetic_energy = [(whole - retained[n]) / 2 for n in 1:N],
           dissipation = [ν * (dirichlet - retained[N + n]) for n in 1:N])
