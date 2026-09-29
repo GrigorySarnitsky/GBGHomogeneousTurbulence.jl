@@ -1,3 +1,14 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterInterLinks = "d12716ef-a0f6-4df4-a9f1-a5a34e75c656"
+GBGCodingTools = "3aee1de0-bb62-4679-b1c5-a861fbcaaa51"
+GBGHomogeneousTurbulence = "3aaacc91-4a61-401b-8a51-8cd29bd9b474"
+GBGPeriodicFields = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"
+
+[sources]
+GBGCodingTools = {rev = "v2.0.0-rc.47", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
+GBGHomogeneousTurbulence = {path = ".."}
+GBGPeriodicFields = {rev = "master", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
+
+[compat]
+GBGCodingTools = "=2.0.0"

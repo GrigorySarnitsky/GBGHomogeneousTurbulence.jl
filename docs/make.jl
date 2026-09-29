@@ -350,7 +350,10 @@ lint_review_closure()
 
 using Documenter
 using DocumenterInterLinks
+using GBGCodingTools
 using GBGHomogeneousTurbulence
+const ROOT = normpath(joinpath(@__DIR__, ".."))
+const TOOLING = GBGCodingTools.Render.pages(GBGCodingTools.ConfigIO.read_config(ROOT), ROOT)
 # Phenomenology is deliberately not re-exported by the umbrella (ARCHITECTURE §4.7); bring its
 # submodule names into scope here so the docs pages can reference them by bare name, as the DNS API is.
 using GBGHomogeneousTurbulence.Phenomenology
@@ -375,7 +378,7 @@ links = InterLinks(
 )
 
 
-makedocs(
+GBGCodingTools.makedocs(ROOT;
   sitename = "GBGHomogeneousTurbulence.jl",
   modules  = [
     GBGHomogeneousTurbulence,
@@ -434,6 +437,7 @@ makedocs(
       "Architecture"   => "architecture.md",
       "Decision log"   => "decisions.md",
       "Observables cache" => "observables_cache.md",
+      "Documentation tooling" => only(TOOLING),
     ],
   ],
 )

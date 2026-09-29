@@ -34,3 +34,6 @@ for witness in sort(filter(f -> endswith(f, ".jl"), readdir(joinpath(@__DIR__, "
   path = joinpath(@__DIR__, "regressions", witness)
   @eval module $name; include($path); end
 end
+
+using GBGCodingTools
+GBGCodingTools.Engine.Harness.test(dirname(@__DIR__); checks = (GBGCodingTools.Render.wiring,))

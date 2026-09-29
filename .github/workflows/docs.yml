@@ -24,6 +24,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/gbg-auth
+        with:
+          token: ${{ secrets.GBG_DEPS_TOKEN }}
 
       - uses: julia-actions/setup-julia@v3
         with:
@@ -31,19 +34,10 @@ jobs:
 
       - uses: julia-actions/cache@v3
 
-      # GBGPeriodicFields is a PRIVATE dependency in a separate repo, which the default GITHUB_TOKEN
-      # cannot read. Provide a (fine-grained) PAT with read access to GBGPeriodicFields.jl as the
-      # repo secret GBG_DEPS_TOKEN; this rewrites the clone URL to authenticate with it.
-      - name: Authenticate the private dependency
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.GBG_DEPS_TOKEN }}@github.com/".insteadOf "https://github.com/"
-
       - name: Install doc environment
         run: |
           julia --color=yes --project=docs -e '
             using Pkg;
-            Pkg.add(url="https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl");
-            Pkg.develop(PackageSpec(path=pwd()));
             Pkg.instantiate();
           '
 
