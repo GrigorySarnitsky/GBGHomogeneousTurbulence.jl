@@ -5,9 +5,6 @@
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
-# The run layer's stationary estimate ε = (k/G)^{3/2}/L at the package's provisional G — the one
-# function the derived viscosity is solved against.
-const RUN_ESTIMATE = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
 using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGHomogeneousTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
@@ -68,7 +65,7 @@ using Test
     # No `viscosity`: ν is chosen so the grid resolves κ_max·η = κ_max_η, forced-and-stationary.
     sim = Simulation(grid_points_per_axis = 32; rng = MersenneTwister(3))
     ν = sim.generator.conditions.viscosity
-    ε = RUN_ESTIMATE(1.5, L)                                  # kinetic_energy = 1.5, side_length = L
+    ε = predicted_stationary_state(sim.domain; kinetic_energy = 1.5).dissipation    # the state ν was solved from
     η = (ν^3 / ε)^(1 / 4)
     @test isapprox(max_resolved_wavenumber(sim.domain) * η, 2.0; rtol = 1e-6)   # κ_max·η = 2 (default)
     # Forced by default, by `ConstantPower` since 2026-09-24 (owner-ruled, decision 95): it takes its
@@ -165,7 +162,7 @@ using Test
 
   @testset "domain-free forcing spec" begin
     for spec in (ConstantPower(injection_rate = 0.1), Linear(rate = 0.5),
-                 VarianceRescaling(target = 0.5, over = :band), StochasticOU(forcing_variance = 1.0, correlation_time = 0.3))
+                 VarianceRescaling(target = 0.5, over = :band), StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3))
       @test spec isa DeferredForcing
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
@@ -221,7 +218,7 @@ using Test
     D = GBGHomogeneousTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                         velocity_forcing = ConstantPower(injection_rate = 0.1),
-                        scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.3),
+                        scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3),
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
     warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.35, max_turnovers = 10)
@@ -302,7 +299,7 @@ end
     ν = sim.generator.conditions.viscosity
     # The constructor solved with its stationary ESTIMATE, not the measured dissipation of the
     # seeded state, so the round trip must use the same estimate.
-    ε_design = RUN_ESTIMATE(k, sim.domain.grid.domain_size[1])
+    ε_design = predicted_stationary_state(sim.domain; kinetic_energy = k, κ_max_η = target).dissipation
     η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_design,
                                          rms_velocity = sqrt(2k / 3), integral_scale = 1.0,
                                          schmidt = 1.0))
@@ -317,7 +314,7 @@ end
     # calibration a controller restoring the band instead of the field once broke, k settling ~30% high.)
     for k_target in (1.5, 0.8)
       sim = Simulation(grid_points_per_axis = 24, kinetic_energy = k_target)
-      ε = RUN_ESTIMATE(k_target, sim.domain.grid.domain_size[1])
+      ε = predicted_stationary_state(sim.domain; kinetic_energy = k_target).dissipation
       @test sim.generator.conditions.velocity_forcing.injection_rate ≈ ε
       η = kolmogorov_length(FlowParameters(; viscosity = sim.generator.conditions.viscosity,
                                            dissipation = ε, rms_velocity = 1.0,

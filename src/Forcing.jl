@@ -54,6 +54,8 @@ to four hook methods, each defaulting to doing nothing, called in the order list
   deterministic rescaling, at first order.
 - [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
   (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
+- [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the stationary state a
+  forcing drives, as the kinetic energy in box units ``\\tilde{k}`` and the band's share of it.
 - [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, built into the concrete strategy once the
   [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
@@ -63,7 +65,7 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 Which keywords carry defaults follows one test: **does the value come from the method, or from this
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
-`correlation_time` — has no canonical value and is required. A `seed` is neither: any value gives an
+the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
 equally valid realization, so it defaults, and naming it is how a run is repeated. A default at this
 layer never hides a choice you needed to make.
 
@@ -91,7 +93,7 @@ using ..SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber, new_s
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower, StochasticOU, StochasticOUState,
        set_forcing_rate!, uses_steady_linear_rate, project_forcing!, initial_forcing_state,
-       prepare_forcing!, add_forcing_source!
+       prepare_forcing!, add_forcing_source!, kinetic_energy_in_box_units, band_energy_fraction
 
 
 # Is there anything in the band to rescale? The test carries NO absolute scale, which is what the
@@ -174,9 +176,9 @@ A forcing named before its domain exists. The operator-free keyword constructors
     VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target = nothing, over, lowest_shell = 1, highest_shell = 2)
-    StochasticOU(; forcing_variance = nothing, correlation_time,
+    StochasticOU(; forcing_variance = nothing, correlation_time_in_box_units,
                  lowest_shell = 1, highest_shell = 2, seed = 42)
-    Linear(; rate, lowest_shell = 1, highest_shell = 2)
+    Linear(; rate = nothing, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` holding their keywords. It is built into the concrete
 `AbstractForcing` once the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain)
@@ -190,14 +192,19 @@ run is set up for:
 
 - `ConstantPower` its `injection_rate`, from the dissipation rate ``\\varepsilon``;
 - `VarianceController` and `VarianceRescaling(over = :total)` their `target`, from the kinetic
-  energy ``k``;
+  energy ``k``, and the controller its `turnover_time`, from ``2k/(3\\varepsilon)``;
+- `VarianceRescaling(over = :band)` its `target`, from the predicted energy in the band
+  ``k_{\\mathrm{band}}``;
+- `Linear` its `rate`, from ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, the rate that injects ``\\varepsilon``;
 - `StochasticOU` its `forcing_variance`, from ``\\varepsilon/T_L`` — the variance whose injection
   ``\\sigma^{2} T_L`` matches ``\\varepsilon`` while ``T_L`` is short.
 
-Three targets stay required. `Linear`'s `rate` would need a model of the band's own energy, and
-`VarianceRescaling(over = :band)` holds that energy. A scalar forcing states its target too, since
-the run models no scalar state. Otherwise the keywords and defaults are those of the `domain`-taking
-forms documented on each strategy.
+The state, and ``k_{\\mathrm{band}}`` with it, is the one
+[`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state)
+returns. The deferred `StochasticOU` states its correlation time in box units, as a multiple of
+``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_L`` the strategy
+holds. A scalar forcing states its target, since the run models no scalar state. Otherwise the
+keywords and defaults are those of the `domain`-taking forms documented on each strategy.
 
 # Examples
 ```julia
@@ -233,7 +240,7 @@ DeferredForcing{F}(parameters::P) where {F, P <: NamedTuple} = DeferredForcing{F
 _completed(deferred::DeferredForcing, design) = deferred.parameters
 
 function _from_design(design, quantity::Symbol, strategy, keyword::Symbol)
-  design === nothing &&
+  (design === nothing || !haskey(design, quantity) || getfield(design, quantity) === nothing) &&
     throw(ArgumentError("`$strategy(; …)` was given no `$keyword`, and nothing supplies one here: " *
                         "only a `Simulation` fills an omitted target, from the stationary state it " *
                         "sets up for the velocity. A scalar forcing, or one built on a domain by " *
@@ -499,8 +506,10 @@ With `highest_shell = Inf` the band is every retained mode but the mean, on any 
 coincide — the mean holds nothing in a field started without one — so a single factor rescales the
 whole field: the rescaling a physical-space code applies.
 
-The deferred form of `over = :total` may leave `target` out, and a run then supplies its stationary
-``k``; `over = :band` always needs it, since no run state determines a band's own value.
+The deferred form may leave `target` out, and a run then supplies it: its stationary ``k`` for
+`over = :total`, and the band's predicted ``k_{\\mathrm{band}}`` for `over = :band`. That prediction
+takes the band's share of ``k`` to be the one `over = :total` holds on the same band: both rescale
+the same modes, and they are taken to reach the same stationary flow.
 
 Neither is a default, because the right answer depends on what the run is calibrated against.
 A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
@@ -603,7 +612,9 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
-- `rate` — the fixed linear rate ``A``. A positive value amplifies the field.
+- `rate` — the fixed linear rate ``A``. A positive value amplifies the field. The deferred form may
+  leave it out, and a run then supplies ``A = \\varepsilon/(2 k_{\\mathrm{band}})`` from its predicted state.
+  The balance is not anchored, so the run settles near that state rather than exactly at it.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``. `highest_shell = Inf` lifts the band limit: every retained mode but the
   mean is forced, on any grid, and this is Lundgren's forcing itself — the form a physical-space code
@@ -763,9 +774,11 @@ does not take.
   dynamics least. `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/(3\\varepsilon_\\infty)``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
-  Left at `nothing` it is computed for you from that formula, with ``\\varepsilon_\\infty`` the
-  stationary estimate for this box — the same estimate the viscosity derivation uses, so a run
-  that sets ``\\nu`` explicitly against a very different regime should pass its own value. The
+  Left at `nothing` it is computed for you from that formula. A `Simulation` uses the state it
+  predicts; built on a domain, the controller takes
+  ``\\varepsilon_\\infty = (k_\\infty/\\tilde{k})^{3/2}/L`` with the placeholder ``\\tilde{k}`` of its band
+  ([`kinetic_energy_in_box_units`](@ref)), and refuses a band that model does not cover. A run that
+  sets ``\\nu`` against a very different regime should pass its own value. The
   derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
   controller left at the default and handed to
   [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) as a `scalar_forcing` with a
@@ -826,12 +839,18 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
                         "the restoring term push the variance AWAY from the target. The value " *
                         "`gain = 0` is the bare marginal law — no restoring at all — and is allowed."))
   band = _shell_band(domain, lowest_shell, highest_shell)
-  # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ the stationary estimate for this box —
-  # the same estimate the viscosity derivation uses, so the two agree on what "stationary" means.
-  tℓ = Td(turnover_time === nothing ?
-          2 * float(target) / (3 * _stationary_dissipation_estimate(float(target),
-                                                                    domain.grid.domain_size[1])) :
-          turnover_time)
+  # t_ℓ = 2k_∞/3ε_∞, the large-eddy turnover time, with ε_∞ = (k_∞/k̃)^{3/2}/L from the model's k̃ for
+  # this band. A `Simulation` passes the turnover time of the state it predicts instead; this default
+  # serves a controller built on a domain by hand, and holds only while the placeholder k̃ is flat in
+  # the Reynolds number, which such a controller does not know.
+  if turnover_time === nothing
+    reason = _uncovered_reason((; lowest_shell, highest_shell))
+    reason === nothing ||
+      throw(ArgumentError("`turnover_time` has no default here: $reason. Pass `turnover_time`."))
+    k̃ = Td(_placeholder_kinetic_energy_in_box_units(highest_shell))
+    ε = (target / k̃)^(3 // 2) / Td(domain.grid.domain_size[1])
+  end
+  tℓ = Td(turnover_time === nothing ? 2 * target / (3 * ε) : turnover_time)
   # r6-edge-cases-01: the message must show the value the check REJECTED. When the keyword was
   # omitted, that is the derived tℓ, never the caller's `nothing`.
   (isfinite(tℓ) && tℓ > 0) ||
@@ -844,22 +863,165 @@ function VarianceController(domain::FixedDomain; target::Real, gain::Real = 1,
 end
 
 
-# ε_∞ = (k/k̃)^{3/2}/L for a stationary box-filling flow, k̃ = k/(εL)^{2/3} the kinetic energy in
-# box units. k̃ = 0.7 is PROVISIONAL and the package's own (decision 94): measured 2026-09-24
-# on 96³ VarianceRescaling(over = :total) runs forced on shells 1–2, k̃ = 0.59–0.74 rising with Re_λ
-# over 28–66. k̃ also falls as the forcing band widens (≈ 0.56 on shells 1–4, ≈ 0.47 on every mode),
-# so this one number is a stand-in for the k̃(forcing, Re, band) law the package exists to measure
-# first.
-# This is the ONE estimate: the controller's default relaxation time and the run layer's derived
-# viscosity both call it, so the two agree on what "stationary for this box" means by construction.
-# It lives here, not in `Phenomenology`, because that leaf is extraction-bound and this module and
-# the run layer must not depend on it for a calibration that is not a literature law.
-# A `Rational` and a rational exponent, never floating literals — the same rule `_target_factor`
-# carries and for the same reason: a bare `0.9` or `3/2` is a `Float64` and promotes the estimate,
-# the turnover time, and then the whole controller off a Float32 run's element type.
-const _KINETIC_ENERGY_IN_BOX_UNITS = 7 // 10
-_stationary_dissipation_estimate(k, L) = (k / _KINETIC_ENERGY_IN_BOX_UNITS)^(3 // 2) / L
-_stationary_energy_estimate(ε, L) = _KINETIC_ENERGY_IN_BOX_UNITS * (L * ε)^(2 // 3)
+
+
+
+# ————————————————————————————————————————————————————————————————————————————————————————————————
+# The stationary-state model: k̃ = k/(εL)^{2/3} and k_band/k as functions of the forcing (its type,
+# band and, for VarianceRescaling, `over`) and the box Reynolds number. PLACEHOLDER values (decisions
+# 94, 101): k̃ is FLAT in Re — the keyword is accepted and validated, and changes nothing until the
+# measured dependence replaces it — and the same for every forcing type. Band values from the first
+# sweep (96³–128³ VarianceRescaling(over = :total)): 0.72 on shells 1–2, 0.56 on 1–4, 0.47 on every
+# mode, piecewise linear in 1/highest_shell between them. k_band/k is the inertial-tail estimate with
+# the same k̃. Both are to be replaced by a measured table for highest_shell = 2, …, 6 and Inf.
+
+const _PLACEHOLDER_KINETIC_ENERGY_IN_BOX_UNITS = ((0.0, 0.47), (0.25, 0.56), (0.5, 0.72))  # (1/highest_shell, k̃)
+const _KOLMOGOROV_CONSTANT = 1.5     # C_K in the inertial-tail estimate of k_band/k
+
+# The forced band and the strategy's identity, read from a built strategy or its deferred form alike.
+_band_parameters(f::DeferredForcing) = f.parameters
+_band_parameters(f::AbstractForcing) = f
+_band_parameters(p::NamedTuple) = p                  # a strategy's own shell bounds, as its constructor holds them
+_strategy_name(::DeferredForcing{F}) where {F} = nameof(F)
+_strategy_name(f::AbstractForcing) = nameof(typeof(f))
+_strategy_name(::NamedTuple) = "forcing"
+
+# Why the model has no value for `forcing`, or `nothing` when it has one.
+function _uncovered_reason(forcing)
+  (forcing isa NoForcing || forcing isa DeferredForcing{NoForcing}) &&
+    return "an unforced flow decays and has no stationary state to predict"
+  p = _band_parameters(forcing)
+  (hasproperty(p, :lowest_shell) && hasproperty(p, :highest_shell)) ||
+    return "$(_strategy_name(forcing)) forces no band of shells, and the model covers banded forcings only"
+  p.lowest_shell == 1 ||
+    return "the model covers bands that start at shell 1, but this $(_strategy_name(forcing)) starts " *
+           "at shell $(p.lowest_shell)"
+  (isinf(p.highest_shell) || p.highest_shell >= 2) ||
+    return "the model has no value for a band ending at shell $(p.highest_shell); the measured bands " *
+           "end at shell 2 or higher"
+  return nothing
+end
+
+_model_covers(forcing) = _uncovered_reason(forcing) === nothing
+
+function _modelled_band(forcing, who)
+  reason = _uncovered_reason(forcing)
+  reason === nothing || throw(ArgumentError("$who: $reason"))
+  return _band_parameters(forcing).highest_shell
+end
+
+# The box Reynolds number from whichever keyword was given. The Taylor form is solved for Re_box from
+# Re_λ = k̃(Re_box)·√((20/3)·Re_box) by bisection in log Re_box: the right side increases with Re_box
+# whenever d ln k̃/d ln Re_box > −½, and the bracket is widened until it holds the root.
+function _box_reynolds(k̃_of, reynolds_box, reynolds_taylor, who)
+  (reynolds_box === nothing) == (reynolds_taylor === nothing) &&
+    throw(ArgumentError("$who: give exactly one Reynolds number, `reynolds_box` or `reynolds_taylor`"))
+  value, name = reynolds_box !== nothing ? (reynolds_box, "reynolds_box") : (reynolds_taylor, "reynolds_taylor")
+  (isfinite(value) && value > 0) ||
+    throw(ArgumentError("$who: `$name` must be finite and positive, got $value"))
+  reynolds_box !== nothing && return Float64(reynolds_box)
+  target = Float64(reynolds_taylor)
+  taylor(log_box) = k̃_of(exp(log_box)) * sqrt(20 / 3 * exp(log_box))
+  low, high = log(1e-6), log(1e12)
+  (taylor(low) <= target <= taylor(high)) ||
+    throw(ArgumentError("$who: no box Reynolds number gives `reynolds_taylor` = $target"))
+  for _ in 1:200
+    middle = (low + high) / 2
+    taylor(middle) < target ? (low = middle) : (high = middle)
+    high - low < 1e-13 && break
+  end
+  return exp((low + high) / 2)
+end
+
+function _placeholder_kinetic_energy_in_box_units(highest_shell)
+  x = isinf(highest_shell) ? 0.0 : 1 / highest_shell
+  table = _PLACEHOLDER_KINETIC_ENERGY_IN_BOX_UNITS
+  x >= last(table)[1] && return last(table)[2]
+  for i in 1:length(table) - 1
+    (x0, y0), (x1, y1) = table[i], table[i + 1]
+    x0 <= x <= x1 && return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+  end
+end
+
+_placeholder_band_energy_fraction(highest_shell, k̃) =
+  isinf(highest_shell) ? 1.0 :
+  1 - 3 / 2 * _KOLMOGOROV_CONSTANT / (k̃ * (2π * (highest_shell + 1 / 2))^(2 / 3))
+
+
+"""
+    kinetic_energy_in_box_units(forcing; reynolds_box = nothing, reynolds_taylor = nothing)
+
+The kinetic energy a flow driven by `forcing` holds in its stationary state, in box units,
+``\\tilde{k} \\equiv k/(\\varepsilon L)^{2/3}``: the kinetic energy ``k`` over the energy
+``(\\varepsilon L)^{2/3}`` of a Kolmogorov eddy the size of the box, with ``L`` the box side and
+``\\varepsilon`` the dissipation rate. Its ``3/2`` power is the large-eddy length
+``k^{3/2}/\\varepsilon`` as a fraction of the box side. It is what a run predicts its state with: given
+``k``, the dissipation is ``\\varepsilon = (k/\\tilde{k})^{3/2}/L``, and given ``\\varepsilon``, the
+energy is ``k = \\tilde{k} (\\varepsilon L)^{2/3}``. [`band_energy_fraction`](@ref) is the share of
+``k`` held in the forced band.
+
+The arguments are:
+- `forcing` — the velocity forcing, built or in its deferred keyword form. The value depends on its
+  strategy, its band and, for [`VarianceRescaling`](@ref), on `over`, but not on its strength.
+- `reynolds_box`, `reynolds_taylor` — the Reynolds number the value is wanted at: exactly one of the box
+  Reynolds number ``\\varepsilon^{1/3}L^{4/3}/\\nu`` ([`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box))
+  and the Taylor-microscale ``\\mathrm{Re}_\\lambda``
+  ([`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor)).
+
+Returns a `Float64`. An unforced flow, a forcing without a band, a band that does not start at shell
+1 and a band ending at shell 1 have no value and throw an `ArgumentError`, as do both or neither
+Reynolds number.
+
+!!! warning "Placeholder values"
+    The values are provisional, the same for every strategy, and do not yet depend on the Reynolds
+    number: the keyword is checked and then has no effect. They are 0.72 for shells 1–2, 0.56 for
+    shells 1–4 and 0.47 for every mode but the mean, measured in this package's first sweep, and
+    interpolated linearly in the reciprocal of `highest_shell` between them. A measured table per
+    strategy and band replaces them.
+"""
+function kinetic_energy_in_box_units(forcing; reynolds_box = nothing, reynolds_taylor = nothing)
+  who = "kinetic_energy_in_box_units"
+  h = _modelled_band(forcing, who)
+  k̃_of(_) = _placeholder_kinetic_energy_in_box_units(h)
+  _box_reynolds(k̃_of, reynolds_box, reynolds_taylor, who)
+  return k̃_of(nothing)
+end
+
+
+"""
+    band_energy_fraction(forcing; reynolds_box = nothing, reynolds_taylor = nothing)
+
+The share of the kinetic energy a flow driven by `forcing` holds in its forced band, in its
+stationary state: ``k_{\\mathrm{band}}/k``, with ``k_{\\mathrm{band}} = \\tfrac{1}{2}\\sum_{\\text{band}}
+\\lvert\\hat{\\boldsymbol{u}}\\rvert^{2}`` over the shells `lowest_shell` to `highest_shell`. A run uses it
+to set a strength that is stated through the band: the rate of [`Linear`](@ref),
+``A = \\varepsilon/(2 k_{\\mathrm{band}})``, and the target of `VarianceRescaling(over = :band)`, which
+is ``k_{\\mathrm{band}}`` itself. The band that holds everything but the mean (`highest_shell = Inf`) has
+the fraction 1.
+
+The arguments are those of [`kinetic_energy_in_box_units`](@ref): the forcing, and exactly one of
+`reynolds_box` and `reynolds_taylor`. For `VarianceRescaling(over = :band)` the fraction is the one
+`over = :total` holds on the same band: both rescale the same modes, one holding the band and the
+other the whole field, so they are taken to reach the same stationary flow.
+
+Returns a `Float64`, and refuses what `kinetic_energy_in_box_units` refuses.
+
+!!! warning "Placeholder values"
+    Until it is measured, the fraction is the inertial-range estimate: the energy
+    ``\\tfrac{3}{2}C_K \\varepsilon^{2/3}\\kappa_{\\mathrm{c}}^{-2/3}`` above the band's outer edge
+    ``\\kappa_{\\mathrm{c}} = (h + \\tfrac{1}{2}) 2\\pi/L``, with ``h`` the `highest_shell` and
+    ``C_K = 1.5``, subtracted from ``k``, so that
+    ``k_{\\mathrm{band}}/k = 1 - \\tfrac{3}{2}C_K/[\\tilde{k}(2\\pi(h + \\tfrac{1}{2}))^{2/3}]`` with the
+    placeholder ``\\tilde{k}``. It gives about 0.50 for shells 1–2 and 0.57 for shells 1–4, and it
+    does not depend on the Reynolds number.
+"""
+function band_energy_fraction(forcing; reynolds_box = nothing, reynolds_taylor = nothing)
+  who = "band_energy_fraction"
+  h = _modelled_band(forcing, who)
+  k̃ = _placeholder_kinetic_energy_in_box_units(h)
+  _box_reynolds(_ -> k̃, reynolds_box, reynolds_taylor, who)
+  return _placeholder_band_energy_fraction(h, k̃)
+end
 
 
 uses_steady_linear_rate(::VarianceController) = false
@@ -948,6 +1110,8 @@ end
 """
     StochasticOU(domain; forcing_variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = 42)
+    StochasticOU(; forcing_variance = nothing, correlation_time_in_box_units,
+                 lowest_shell = 1, highest_shell = 2, seed = 42)
 
 The stochastic forcing of Eswaran & Pope (1988,
 [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
@@ -1004,7 +1168,9 @@ The arguments are:
 - `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above. A
   deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
   variance whose estimated injection matches its stationary ``\\varepsilon``.
-- `correlation_time` — the correlation time ``T_L`` of each amplitude.
+- `correlation_time` — the correlation time ``T_L`` of each amplitude. The deferred form takes
+  `correlation_time_in_box_units` instead, a multiple ``\\tilde{T}_L`` of ``(L^{2}/\\varepsilon)^{1/3}``, and
+  a run converts it once into ``T_L = \\tilde{T}_L (L^{2}/\\varepsilon)^{1/3}`` from its predicted ``\\varepsilon``.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff, so the `Inf` the field-multiplying
   strategies accept is refused here.
@@ -1238,19 +1404,46 @@ _completed(d::DeferredForcing{ConstantPower}, design) =
   d.parameters.injection_rate === nothing ?
     _fill(d.parameters, :injection_rate, _from_design(design, :dissipation, :ConstantPower, :injection_rate)) :
     d.parameters
-_completed(d::DeferredForcing{VarianceController}, design) =
-  d.parameters.target === nothing ?
+# The controller's omitted settling time is the run's own large-eddy turnover time 2k/3ε, from the
+# predicted state, so it follows the Reynolds number the model is evaluated at.
+function _completed(d::DeferredForcing{VarianceController}, design)
+  p = d.parameters.target === nothing ?
     _fill(d.parameters, :target, _from_design(design, :kinetic_energy, :VarianceController, :target)) :
     d.parameters
+  design === nothing || p.turnover_time !== nothing || !haskey(design, :dissipation) ||
+    design.dissipation === nothing ||
+    (p = _fill(p, :turnover_time, 2 * design.kinetic_energy / (3 * design.dissipation)))
+  return p
+end
+# `:total` holds the whole field's energy, `:band` the band's own, which the model predicts.
 _completed(d::DeferredForcing{VarianceRescaling}, design) =
   d.parameters.target === nothing ?
-    _fill(d.parameters, :target, _from_design(design, :kinetic_energy, :VarianceRescaling, :target)) :
+    _fill(d.parameters, :target,
+          d.parameters.over === :total ?
+            _from_design(design, :kinetic_energy, :VarianceRescaling, :target) :
+            _from_design(design, :band_kinetic_energy, :VarianceRescaling, :target)) :
     d.parameters
-_completed(d::DeferredForcing{StochasticOU}, design) =
-  d.parameters.forcing_variance === nothing ?
-    _fill(d.parameters, :forcing_variance,
-          _from_design(design, :dissipation, :StochasticOU, :forcing_variance) / d.parameters.correlation_time) :
+# The rate that injects the predicted ε into the predicted band energy: ε = 2A k_band.
+_completed(d::DeferredForcing{Linear}, design) =
+  d.parameters.rate === nothing ?
+    _fill(d.parameters, :rate, _from_design(design, :dissipation, :Linear, :rate) /
+                               (2 * _from_design(design, :band_kinetic_energy, :Linear, :rate))) :
     d.parameters
+# The correlation time is stated in box units, (L²/ε)^{1/3}, and converted once here; the strategy then
+# holds a constant time, as its exact decay factor exp(−Δt/T_L) needs.
+function _completed(d::DeferredForcing{StochasticOU}, design)
+  (design === nothing || !haskey(design, :box_time) || design.box_time === nothing) &&
+    throw(ArgumentError("`StochasticOU(; …)` states its correlation time in box units, (L²/ε)^{1/3}, " *
+                        "and nothing here supplies ε to convert it: only a `Simulation` does, from " *
+                        "the stationary state it sets up for the velocity. Build it on a domain " *
+                        "with `correlation_time` instead."))
+  p = d.parameters
+  correlation_time = p.correlation_time_in_box_units * design.box_time
+  forcing_variance = p.forcing_variance === nothing ?
+    _from_design(design, :dissipation, :StochasticOU, :forcing_variance) / correlation_time :
+    p.forcing_variance
+  return (; forcing_variance, correlation_time, p.lowest_shell, p.highest_shell, p.seed)
+end
 
 # What a forcing states about the run's stationary state: `(; kinetic_energy = k)` or
 # `(; dissipation = ε)` for the one quantity it holds exactly, `nothing` for a forcing that holds
@@ -1275,36 +1468,31 @@ _takes_design(d::DeferredForcing{ConstantPower}) = d.parameters.injection_rate =
 _takes_design(d::DeferredForcing{VarianceController}) = d.parameters.target === nothing
 _takes_design(d::DeferredForcing{VarianceRescaling}) = d.parameters.target === nothing
 _takes_design(d::DeferredForcing{StochasticOU}) = d.parameters.forcing_variance === nothing
+_takes_design(d::DeferredForcing{Linear}) = d.parameters.rate === nothing
 
 
 # Operator-free keyword constructors: hold the keywords now and build the forcing once the domain
 # exists (via `DeferredForcing`), so a case can name its forcing before the grid is built —
 # `ConstantPower(injection_rate = 0.1)`, or `ConstantPower()` for the run to supply the rate.
-Linear(; rate::Real, lowest_shell::Integer = 1, highest_shell::Real = 2) =
+Linear(; rate::Union{Nothing, Real} = nothing, lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing{Linear}((; rate, lowest_shell, highest_shell))
 
 ConstantPower(; injection_rate::Union{Nothing, Real} = nothing, lowest_shell::Integer = 1,
               highest_shell::Real = 2) =
   DeferredForcing{ConstantPower}((; injection_rate, lowest_shell, highest_shell))
 
-function VarianceRescaling(; target::Union{Nothing, Real} = nothing, over::Symbol,
-                           lowest_shell::Integer = 1, highest_shell::Real = 2)
-  # `:band` holds the band's own energy, which no run state supplies — refused here, where the
-  # keyword was typed, rather than when a run tries to fill it.
-  target === nothing && over !== :total &&
-    throw(ArgumentError("`VarianceRescaling(over = :$over)` needs its `target`: it holds the " *
-                        "band's own value, which a run's stationary state does not determine. Only " *
-                        "`over = :total` can take its target from the run."))
-  return DeferredForcing{VarianceRescaling}((; target, over, lowest_shell, highest_shell))
-end
+VarianceRescaling(; target::Union{Nothing, Real} = nothing, over::Symbol, lowest_shell::Integer = 1,
+                  highest_shell::Real = 2) =
+  DeferredForcing{VarianceRescaling}((; target, over, lowest_shell, highest_shell))
 
 VarianceController(; target::Union{Nothing, Real} = nothing, gain::Real = 1, turnover_time = nothing,
                    lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing{VarianceController}((; target, gain, turnover_time, lowest_shell, highest_shell))
 
-StochasticOU(; forcing_variance::Union{Nothing, Real} = nothing, correlation_time::Real,
+StochasticOU(; forcing_variance::Union{Nothing, Real} = nothing, correlation_time_in_box_units::Real,
              lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42) =
-  DeferredForcing{StochasticOU}((; forcing_variance, correlation_time, lowest_shell, highest_shell, seed))
+  DeferredForcing{StochasticOU}((; forcing_variance, correlation_time_in_box_units, lowest_shell,
+                                 highest_shell, seed))
 
 
 

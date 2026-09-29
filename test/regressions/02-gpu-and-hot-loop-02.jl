@@ -36,7 +36,7 @@ using GBGHomogeneousTurbulence
 
   # …and the same must hold through the run layer, the way memory_audit.jl guards every other cell.
   sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(2),
-                   velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.5))
+                   velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.5))
   advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
   step_bytes = @allocated advance!(sim; dt = 1e-3)
   @info "advance! with StochasticOU forcing" step_bytes units = step_bytes / unit

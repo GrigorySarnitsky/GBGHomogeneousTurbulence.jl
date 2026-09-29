@@ -34,6 +34,16 @@ saves it too. `StochasticOU` is the only strategy here that carries such a state
 StochasticOUState
 ```
 
+## The stationary-state model
+
+The stationary state a forcing drives: the kinetic energy in box units ``\tilde{k}`` and the share of
+the energy held in the forced band, both provisional placeholders until they are measured.
+
+```@docs
+kinetic_energy_in_box_units
+band_energy_fraction
+```
+
 ## Deferred forcing
 
 The operator-free deferred form a strategy's constructor returns, materialized into a concrete forcing

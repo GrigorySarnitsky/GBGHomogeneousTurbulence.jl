@@ -373,15 +373,27 @@ end
   end
 
 
-  @testset "the stationary-dissipation estimate is ε = (k/k̃)^{3/2}/L at the provisional k̃ = 0.7" begin
-    # One estimate serves the controller's default relaxation time and the run layer's derived
-    # viscosity, so the two agree on what "stationary for this box" means by construction — they
-    # disagreed by a factor of 2.68 when each spelled its own copy. k̃ = 0.7 is the package's own
-    # provisional measurement.
-    estimate = getfield(GBGHomogeneousTurbulence.Forcing, :_stationary_dissipation_estimate)
-    for k in (0.5, 1.5, 3.0), L in (1.0, 2π, 4.0)
-      @test estimate(k, L) ≈ (k / 0.7)^(3 / 2) / L
+  @testset "a controller built by hand and one built by the run agree on the settling time" begin
+    # The controller's default settling time 2k/3ε and the run layer's prediction must describe one
+    # stationary state: they disagreed by a factor of 2.68 when each spelled its own estimate. Built on
+    # a domain, the controller takes ε from the model's k̃ for its band; built by `Simulation`, it takes
+    # the predicted state's turnover time. The placeholder k̃ is flat in Re, so the two coincide.
+    for highest_shell in (2, 4, Inf)
+      d = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64,
+                      dealiasing = TwoThirds(), array_type = Array)
+      by_hand = VarianceController(d; target = 1.5, highest_shell)
+      run = Simulation(d; κ_max_η = 1.5, velocity_forcing = VarianceController(; highest_shell))
+      @test by_hand.turnover_time ≈ run.generator.conditions.velocity_forcing.turnover_time rtol = 1e-12
+      prediction = predicted_stationary_state(d; κ_max_η = 1.5,
+                                              velocity_forcing = VarianceController(; highest_shell))
+      @test by_hand.turnover_time ≈ 2 * 1.5 / (3 * prediction.dissipation) rtol = 1e-12
     end
+    # A band the model does not cover has no default settling time: it must be stated.
+    d = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64,
+                    dealiasing = TwoThirds(), array_type = Array)
+    @test_throws ArgumentError VarianceController(d; target = 1.5, lowest_shell = 2, highest_shell = 3)
+    @test VarianceController(d; target = 1.5, lowest_shell = 2, highest_shell = 3,
+                             turnover_time = 1.0).turnover_time == 1.0
   end
 
 

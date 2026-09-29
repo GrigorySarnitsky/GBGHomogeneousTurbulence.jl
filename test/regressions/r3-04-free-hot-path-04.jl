@@ -33,6 +33,8 @@ end
 #     two hooks that HARD-ERROR at them, and never learns the assembly needed one too.
 struct ProbePad <: DealiasingStrategy end
 GBGHomogeneousTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
+# The resolved cutoff too: a run predicts its κ_max·η from it, and the witness is about the assembly.
+GBGHomogeneousTurbulence.SimulationDomain._resolved_nyquist_fraction(::ProbePad) = 2 // 3
 GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, reference, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(multipliers, T(2 // 3) * (N / 2) * (2π / L))
 

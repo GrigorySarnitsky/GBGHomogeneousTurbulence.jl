@@ -19,6 +19,7 @@ module PhenomenologyTests;  include("phenomenology.jl");  end
 module ValidationTests;     include("validation.jl");     end
 module BelowScaleTests;     include("below_scale.jl");    end
 module ReynoldsTests;       include("reynolds.jl");       end
+module StationaryModelTests; include("stationary_model.jl"); end
 module HDF5CheckpointTests; include("hdf5_checkpoint.jl"); end
 module DisplayTests;        include("display.jl");        end
 module GPUMemoryPageTests;  include("gpu_memory_page.jl"); end

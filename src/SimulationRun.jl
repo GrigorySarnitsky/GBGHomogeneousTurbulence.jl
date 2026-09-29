@@ -52,11 +52,12 @@ using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
-                     scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness
+                     scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness,
+                     reynolds_box, reynolds_taylor
 using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, VarianceRescaling,
                  VarianceController, StochasticOUState, initial_forcing_state,
-                 _stationary_dissipation_estimate, _stationary_energy_estimate, _stated_state,
-                 _takes_design, _KINETIC_ENERGY_IN_BOX_UNITS
+                 kinetic_energy_in_box_units, band_energy_fraction, _uncovered_reason, _stated_state,
+                 _takes_design
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
 using ..Propagator: AbstractIntegrator, IntegratorBuffers, allocate_buffers, step!,
                     recommended_cfl, IFLowStorageRK3
@@ -68,7 +69,8 @@ using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
 using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
-       current_time, current_step, flow_parameters, every_steps, every_time
+       current_time, current_step, flow_parameters, every_steps, every_time,
+       predicted_stationary_state
 
 
 mutable struct Clock
@@ -105,37 +107,34 @@ through the cache's deposited observables (`velocity_physical(sim.cache)`); summ
 
 # Setting the Reynolds number
 
-By default the run is **forced and stationary**, set up for a stationary state: the kinetic energy
-``k`` and the dissipation rate ``\\varepsilon`` it settles at.
+By default the run is **forced and stationary**, set up for the stationary state it is predicted to
+settle in: the kinetic energy ``k`` and the dissipation rate ``\\varepsilon``.
 
 State that state **once** — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
-forcing that holds one of the two — and the other member is predicted through the kinetic energy in
-box units ``\\tilde{k}`` (below). Stating it twice is an `ArgumentError`; stating nothing means ``k = 1.5``.
+forcing that holds one of the two — and the other member is predicted; stating it twice is an
+`ArgumentError`, and stating nothing means ``k = 1.5``. The prediction is
+[`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units
+``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` of the velocity forcing
+([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
+with ``L`` the box side, and the band's share of the energy
+([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)).
 
-A velocity forcing whose target is left out takes it from that state (see
+A velocity forcing whose strength is left out takes it from that state (see
 [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). The default,
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) with its injection rate filled
 so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather than supplied:
 
-  * **Derived viscosity** (no `viscosity` passed explicitly): the constructor picks the highest
-    Reynolds number consistent with the resolution criterion `κ_max_η`.
+  * **Derived viscosity** (no `viscosity` passed explicitly): ``\\nu`` is set so that
+    ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, the highest Reynolds number the grid resolves, with
+    ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta = (\\nu^{3}/\\varepsilon)^{1/4}`` the
+    Kolmogorov length.
 
-    It takes the dissipation rate of the run's state — stated, or predicted from ``k`` through the
-    kinetic energy in box units ``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` as
-    ``\\varepsilon = (k/\\tilde{k})^{3/2}/L``, with ``L`` the box side and ``\\tilde{k} = 0.7``.
-
-    That value is **provisional**, measured in this package's own forced runs on shells 1–2, where
-    ``\\tilde{k}`` rose from 0.59 to 0.74 as ``\\mathrm{Re}_\\lambda`` went from about 28 to 66.
-
-    ``\\tilde{k}`` carries ``C_\\varepsilon^{-2/3}`` and the ratio ``L_{11}/L``, and that ratio is set by *where* a run is
-    forced: the same runs gave ``\\tilde{k} \\approx 0.56`` forced on shells 1–4 and ``\\approx 0.47`` on every
-    mode. A forcing moved off the default band therefore misses the requested resolution.
-
-    Then it sets ``\\nu`` so that ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, with
-    ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta`` the Kolmogorov
-    microscale. Since ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the
+    The resolution fixes ``\\eta``, hence the box Reynolds number
+    ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, at which ``\\tilde{k}`` is read, and then
+    ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. Since ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the
     resolved-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
-    ``2/3`` rule.
+    ``2/3`` rule. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda`` are logged, with what
+    the forcing guarantees.
 
     !!! note "The criterion measures the resolved band, strategy by strategy"
         ``\\kappa_{\\max}`` here is each strategy's **resolved** cutoff — for
@@ -148,24 +147,22 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
         [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) about 26% above the
         ``2/3`` rule.
 
-    The grid and `κ_max_η` fix ``\\mathrm{Re}_\\lambda \\sim N^{2/3}``; the stated state and
-    `side_length` fix the units. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and
-    ``\\mathrm{Re}_\\lambda`` are logged, with what the forcing guarantees.
-
     What is guaranteed follows what the forcing holds. A forcing holding ``\\varepsilon``, as the
-    default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves ``k`` the
-    prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the prediction.
+    default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves
+    ``k`` the prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the
+    prediction. One holding neither, given its own strength — a `Linear` rate, a `StochasticOU`
+    variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
+    describes a state the run may not reach.
 
-    One holding neither, given its own strength — a `Linear` rate, a `StochasticOU` variance, a
-    `VarianceRescaling(over = :band)` band — draws a warning, since ``\\nu`` then describes a state
-    the run may not reach.
+    A forcing the model does not cover has no stationary state to derive ``\\nu`` from, and is
+    refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), and a band
+    that does not start at shell 1 or ends at shell 1.
 
   * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
-    passing both raises an `ArgumentError` — for a decaying
-    run (`velocity_forcing = NoForcing()`) or manual control. The derived viscosity is calibrated on a *stationary
-    forced* balance (``\\tilde{k}`` is measured on forced stationary runs), so a decaying run should set
-    ``\\nu`` explicitly: the resolution it buys is only meaningful while the box sustains the energy the
-    law assumes.
+    passing both raises an `ArgumentError`. A covered forcing's state is still predicted, at the
+    ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the model
+    does not cover, nothing is predicted: the velocity is seeded at the stated ``k``, and an unforced
+    run may state ``\\varepsilon`` as well, since a decaying initial state has no balance tying the two.
 
 # Arguments
 
@@ -199,8 +196,9 @@ The run group:
 - `kinetic_energy = nothing`, `dissipation = nothing` — the run's stationary state, as its kinetic
   energy ``k`` or its dissipation rate ``\\varepsilon``. Give at most one, or neither and let the
   velocity forcing's target state it; with no source at all ``k = 1.5``, an r.m.s. velocity
-  ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``\\tilde{k}``. The velocity is seeded
-  at the state's ``k``; to start from another energy, adopt a `state`.
+  ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``\\tilde{k}``. An unforced run
+  may give both, as its initial state. The velocity is seeded at the state's ``k``; to start from
+  another energy, adopt a `state`.
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
   ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
   scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
@@ -217,7 +215,7 @@ The run group:
   [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing) from an
   operator-free constructor); `velocity_forcing` left at `nothing` means the default,
   `ConstantPower()` injecting the state's ``\\varepsilon``, and `scalar_forcing` defaults to
-  `NoForcing()`. A deferred velocity forcing may leave its target out for the state to fill; a
+  `NoForcing()`. A deferred velocity forcing may leave its strength out for the state to fill; a
   scalar forcing states its own, since no scalar state is modelled. The velocity and scalar are forced independently.
   A `VarianceController` with a defaulted `turnover_time` is refused as `scalar_forcing` (its
   derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
@@ -238,10 +236,9 @@ The run group:
   state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in, not a
   measurement of the field about to be seeded. The assumed state reads: ``\\varepsilon`` and ``u'``
   from the run's stationary state, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
-  (rather than the ``L_{11}`` the seeded field will actually have). Note the ``\\varepsilon`` half:
-  it is the *stationary forced* estimate, so on a decaying run the model's dissipation-range
-  placement is misplaced from the start. That failed balance is the same reason the
-  explicit-``\\nu`` advice above exists.
+  (rather than the ``L_{11}`` the seeded field will actually have). A run with nothing predicted,
+  such as an unforced one, must state `dissipation` for the model to be evaluated at, and is refused
+  otherwise.
   The seeded field is then normalized to the state's ``k``, so the model fixes the *shape* and the
   assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
   the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
@@ -347,6 +344,12 @@ and the tracer positions.
     left out: it takes the target from the state and restores ``k`` exponentially, its gain setting
     the fluctuation it leaves.
 
+!!! warning "The prediction rests on placeholder values"
+    ``\\tilde{k}`` and the band's share of ``k`` are provisional, the same for every forcing strategy,
+    and not yet dependent on the Reynolds number; the values per band are listed at
+    `kinetic_energy_in_box_units`. A forcing that holds ``k`` or ``\\varepsilon`` exactly meets that
+    member; the rest of the state, and a filled strength, are as good as the model.
+
 # Fields
 Three of these are what a user reads — `state`, `cache`, and `tracers`. The rest are the machinery the step runs
 on: they hold partial values while a step is in flight, so read them only between steps, and treat
@@ -401,40 +404,150 @@ _held_quantity(spec) = let stated = _stated_state(spec)
 end
 
 
-# The run's stationary state — the (k, ε) it is set up for — from its ONE source: `kinetic_energy`,
-# `dissipation`, or the target the velocity forcing states. The other member is predicted through the
-# kinetic energy in box units k̃ = k/(εL)^{2/3}, which is the only place k̃ enters a run. Two sources would state the state
-# twice, and are refused rather than reconciled; none means the default k = 1.5 (u′ = 1).
-function _design_state(kinetic_energy, dissipation, stated, L)
+# How many times a quantity was stated; a forced run's balance ties k to ε, so it may state one.
+function _state_sources(kinetic_energy, dissipation, stated)
   sources = String[]
   kinetic_energy === nothing || push!(sources, "`kinetic_energy`")
   dissipation === nothing || push!(sources, "`dissipation`")
   stated === nothing || push!(sources, "the velocity forcing's own target")
+  return sources
+end
+
+function _require_one_source(sources)
   length(sources) <= 1 ||
     throw(ArgumentError("the run's stationary state is stated twice, by " * join(sources, " and ") *
                         ". State it once — the kinetic energy k, the dissipation rate ε, or the " *
                         "forcing's target — and the other quantity is predicted from it; leave the " *
                         "forcing's target out to have it filled from the state."))
-  # A refusal names what the caller typed — the keyword, or the forcing whose target it was.
+  return nothing
+end
+
+function _positive(value, name, meaning)
+  (isfinite(value) && value > 0) ||
+    throw(ArgumentError("$name must be positive and finite, got $value: $meaning"))
+  return Float64(value)
+end
+
+
+"""
+    predicted_stationary_state(domain; velocity_forcing = ConstantPower(), kinetic_energy = nothing,
+                               dissipation = nothing, κ_max_η = nothing, viscosity = nothing)
+
+The stationary state a forced run on `domain` is predicted to settle in: the kinetic energy ``k``,
+the dissipation rate ``\\varepsilon``, the energy ``k_{\\mathrm{band}}`` held in the forced band, the
+viscosity ``\\nu`` and the two Reynolds numbers. It is what [`Simulation`](@ref) sets a run up for, so
+calling it first shows what a run will be given, and it serves a study that plans its runs. The
+prediction goes through the kinetic energy in box units
+([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
+``k = \\tilde{k} (\\varepsilon L)^{2/3}``, and the band's share of it
+([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)), both taken at
+the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu``.
+
+The arguments are:
+- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain), which fixes
+  the box side ``L`` and the largest resolved wavenumber ``\\kappa_{\\max}``.
+- `velocity_forcing` — the velocity forcing, built or in its deferred keyword form. A forcing that
+  states its own target (a `ConstantPower` injection rate, a `VarianceController` or
+  `VarianceRescaling(over = :total)` target) states the state through it.
+- `kinetic_energy`, `dissipation` — the state, stated once: ``k``, ``\\varepsilon``, or neither when the
+  forcing states it. With none of the three, ``k = 1.5``.
+- `κ_max_η`, `viscosity` — at most one. A resolution ``\\kappa_{\\max}\\eta`` (default 2) fixes the
+  Kolmogorov length ``\\eta``, hence ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, and ``\\nu`` follows
+  from ``\\varepsilon`` as ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. A given `viscosity` is kept, and
+  ``\\kappa_{\\max}\\eta`` follows instead.
+
+Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
+reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` of `Float64`s. A forcing the model does not
+cover (an unforced run, a band that does not start at shell 1) has no stationary state to predict,
+and it throws an `ArgumentError`, as does a state stated twice or both `κ_max_η` and `viscosity`.
+
+!!! warning "A prediction, not a measurement"
+    The values rest on the model's placeholder ``\\tilde{k}`` and ``k_{\\mathrm{band}}/k``, which are
+    provisional and do not yet depend on the Reynolds number. A forcing that holds ``\\varepsilon`` or
+    ``k`` exactly meets that member in the stationary mean; the rest is as good as the model.
+"""
+function predicted_stationary_state(domain::FixedDomain; velocity_forcing = ConstantPower(),
+                                    kinetic_energy = nothing, dissipation = nothing,
+                                    κ_max_η = nothing, viscosity = nothing)
+  reason = _uncovered_reason(velocity_forcing)
+  reason === nothing || throw(ArgumentError("predicted_stationary_state: $reason"))
+  stated = _stated_state(velocity_forcing)
+  sources = _state_sources(kinetic_energy, dissipation, stated)
+  _require_one_source(sources)
+  viscosity === nothing || κ_max_η === nothing ||
+    throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it " *
+                        "directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   source = isempty(sources) ? "the default kinetic energy" :
            only(sources) == "the velocity forcing's own target" ? "the velocity forcing's target" :
            only(sources)
-  if dissipation !== nothing || (stated !== nothing && haskey(stated, :dissipation))
-    ε = dissipation !== nothing ? dissipation : stated.dissipation
-    (isfinite(ε) && ε > 0) ||
-      throw(ArgumentError("$source must be positive and finite, got $ε: it is the dissipation " *
-                          "rate ε = ν⟨|ω|²⟩ the run holds, from which the viscosity is solved"))
-    return (kinetic_energy = _stationary_energy_estimate(Float64(ε), L), dissipation = Float64(ε),
-            specified = :dissipation)
+  ε_stated = dissipation !== nothing ? dissipation :
+             stated !== nothing && haskey(stated, :dissipation) ? stated.dissipation : nothing
+  k_stated = kinetic_energy !== nothing ? kinetic_energy :
+             stated !== nothing && haskey(stated, :kinetic_energy) ? stated.kinetic_energy : nothing
+  ε_stated === nothing ||
+    (ε_stated = _positive(ε_stated, source, "it is the dissipation rate ε = ν⟨|ω|²⟩ the run holds"))
+  ε_stated === nothing &&
+    (k_stated = _positive(k_stated === nothing ? 1.5 : k_stated, source,
+                          "it is the kinetic energy k = ½⟨|u|²⟩, and a zero-energy field has no spectrum"))
+  L = Float64(domain.grid.domain_size[1])
+  κ_max = Float64(max_resolved_wavenumber(domain))
+  k̃_at(re) = kinetic_energy_in_box_units(velocity_forcing; reynolds_box = re)
+
+  if viscosity === nothing
+    resolution = _positive(κ_max_η === nothing ? 2 : κ_max_η, "`κ_max_η`",
+                           "it is the resolution criterion κ_max·η, from which the viscosity is solved")
+    η = resolution / κ_max
+    re = (L / η)^(4 / 3)
+    k̃ = k̃_at(re)
+    ε = ε_stated !== nothing ? ε_stated : (k_stated / k̃)^(3 / 2) / L
+    k = ε_stated !== nothing ? k̃ * (ε * L)^(2 / 3) : k_stated
+    ν = cbrt(ε) * η^(4 / 3)
+  else
+    ν = _positive(viscosity, "`viscosity`", "it is the kinematic viscosity ν")
+    if ε_stated !== nothing
+      ε = ε_stated
+    else
+      # k = k̃(Re_box(ε)) (εL)^{2/3}, solved for ε by bisection in log ε: the right side increases with
+      # ε whenever d ln k̃/d ln Re_box > −2, far beyond any measured slope.
+      energy(log_ε) = k̃_at(reynolds_box(L, exp(log_ε), ν)) * (exp(log_ε) * L)^(2 / 3)
+      low, high = log(1e-30), log(1e30)
+      for _ in 1:300
+        middle = (low + high) / 2
+        energy(middle) < k_stated ? (low = middle) : (high = middle)
+        high - low < 1e-13 && break
+      end
+      ε = exp((low + high) / 2)
+    end
+    re = reynolds_box(L, ε, ν)
+    k̃ = k̃_at(re)
+    k = ε_stated !== nothing ? k̃ * (ε * L)^(2 / 3) : k_stated
+    resolution = κ_max * (ν^3 / ε)^(1 / 4)
   end
-  k = kinetic_energy !== nothing ? kinetic_energy : stated !== nothing ? stated.kinetic_energy : 1.5
-  (isfinite(k) && k > 0) ||
-    throw(ArgumentError("$source must be positive and finite, got $k: it is the kinetic energy " *
-                        "k = ½⟨|u|²⟩, which cannot be negative, and a zero-energy field has no " *
-                        "spectrum to seed"))
-  return (kinetic_energy = Float64(k), dissipation = _stationary_dissipation_estimate(Float64(k), L),
-          specified = :kinetic_energy)
+  band = band_energy_fraction(velocity_forcing; reynolds_box = re) * k
+  return (; kinetic_energy = k, dissipation = ε, band_kinetic_energy = band, viscosity = ν,
+          reynolds_box = re, reynolds_taylor = reynolds_taylor(k, ε, ν),
+          kinetic_energy_in_box_units = k̃, κ_max_η = resolution)
 end
+
+
+# The state an UNCOVERED run is set up with (decision 105): nothing is predicted, and a derived ν is
+# refused before this is reached. The seed takes the stated k (default 1.5); ε is kept only when
+# stated. An unforced run may state both, since a decaying initial state has no balance tying them.
+function _unmodelled_state(kinetic_energy, dissipation, stated, forcing)
+  sources = _state_sources(kinetic_energy, dissipation, stated)
+  forcing isa NoForcing || forcing isa DeferredForcing{NoForcing} || _require_one_source(sources)
+  ε = dissipation !== nothing ? dissipation :
+      stated !== nothing && haskey(stated, :dissipation) ? stated.dissipation : nothing
+  k = kinetic_energy !== nothing ? kinetic_energy :
+      stated !== nothing && haskey(stated, :kinetic_energy) ? stated.kinetic_energy : 1.5
+  ε === nothing || (ε = _positive(ε, "`dissipation`", "it is the dissipation rate ε = ν⟨|ω|²⟩"))
+  k = _positive(k, "`kinetic_energy`", "it is the kinetic energy k = ½⟨|u|²⟩, and a zero-energy field has no spectrum")
+  return (; kinetic_energy = k, dissipation = ε, band_kinetic_energy = nothing, box_time = nothing)
+end
+
+
+# At module scope, so the `dissipation` keyword of `Simulation` cannot shadow the reduction.
+_seeded_dissipation(state, domain, ν) = dissipation(state.velocity_spectral, domain, ν)
 
 
 # The adopted-state sibling of the forcing check below: ν was derived assuming k =
@@ -461,13 +574,6 @@ _warn_derived_viscosity_forcing_mismatch(vf::VarianceRescaling, design) =
          "(k ≈ $(round(design.kinetic_energy, sigdigits = 4)), ε ≈ $(round(design.dissipation, sigdigits = 4))), " *
          "but this `VarianceRescaling(over = :band)` holds only the band and lets both settle " *
          "elsewhere. Use `over = :total`, or set `viscosity` yourself.";
-   nothing)
-
-_warn_derived_viscosity_forcing_mismatch(vf::NoForcing, design) =
-  (@warn "Simulation (derived viscosity): ν was calibrated assuming a forcing holds the state " *
-         "(k ≈ $(round(design.kinetic_energy, sigdigits = 4)), ε ≈ $(round(design.dissipation, sigdigits = 4))), " *
-         "but the run is unforced and will decay away from that state. The derived viscosity is calibrated " *
-         "on a stationary forced balance — a decaying run should set `viscosity` explicitly.";
    nothing)
 
 _warn_derived_viscosity_forcing_mismatch(vf::AbstractForcing, design) =
@@ -542,9 +648,6 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("the given `tracers` live on a different storage backend than " *
                           "`domain`: move them, or build the domain, on the matching backend."))
   end
-  # The stationary dissipation the box sustains, ε = (k/k̃)^{3/2}/L with the provisional k̃ — a
-  # modeled estimate, not a measurement, and the same one the controller's default clock uses.
-  # It sets the derived ν and shapes a `Phenomenology` `initial_spectrum`.
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
   # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
   # argument that caused it. Likewise a scalar variance, ⟨φ²⟩ ≥ 0.
@@ -563,45 +666,43 @@ function Simulation(domain::FixedDomain;
   # The default forcing needs no gain or settling time to choose — it holds the injection rate, which
   # it takes from the run's state. `nothing` stays the sentinel so a hand-built forcing is detectable.
   velocity_spec = velocity_forcing === nothing ? ConstantPower() : velocity_forcing
-  design = _design_state(kinetic_energy, dissipation, _stated_state(velocity_spec), side_length)
-  k_design, ε = design.kinetic_energy, design.dissipation
+  # A forcing given as a function of the domain is built now, so the model can read the strategy it
+  # returns; a built strategy states its own strength.
+  velocity_spec isa Union{AbstractForcing, DeferredForcing} || (velocity_spec = velocity_spec(domain))
   # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
   if !isnothing(viscosity) && !isnothing(κ_max_η)
     throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
 directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
-  if isnothing(viscosity)                              # no ν supplied: derive the highest Re resolved
-    resolution = isnothing(κ_max_η) ? 2 : κ_max_η
-    # ν is solved from this, so a non-positive or non-finite resolution yields ν = 0, NaN or Inf and
-    # a run that is not a run. κ_max·η is a positive, finite resolution criterion by construction.
-    (isfinite(resolution) && resolution > 0) ||
-      throw(ArgumentError("`κ_max_η` must be positive and finite, got $κ_max_η: it is the " *
-                          "resolution criterion κ_max·η, from which the viscosity is solved"))
-    # `kolmogorov_length`'s η = (ν³/ε)^(1/4), inverted: with κ_max·η fixed at `resolution`,
-    # η = resolution/κ_max and ν = (ε η⁴)^(1/3). No inverse of that law exists to call, so the
-    # arithmetic stays here — but the two are pinned against each other by a round-trip test
-    # (solve for ν, then measure η through `kolmogorov_length` and recover `resolution`), so neither
-    # can drift from the other in silence.
-    ν = ε^(1//3) * (resolution / max_resolved_wavenumber(domain))^(4//3)
-    # Through the canonical reduction, not a second spelling of it: `integral_scale` does not enter
-    # Re_λ, so any positive value serves — the measured-state bridge is what owns this formula.
-    reλ = taylor_reynolds(FlowParameters(; viscosity = ν, dissipation = ε,
-                                         rms_velocity = sqrt(2 * k_design / 3),
-                                         integral_scale = one(ν), schmidt))
-    # ν is SET here from the state's ε. Which member of (k, ε) is guaranteed depends on what the
-    # forcing holds, so the line says so: a forcing holding ε makes κ_max·η exact in the stationary
-    # mean and leaves k predicted; one holding k does the reverse; one holding neither leaves both
-    # predicted. Nothing here is a measurement — `flow_parameters(sim)` measures.
-    held = _held_quantity(velocity_spec)
-    guarantee = held === :dissipation ?
-      "the forcing holds ε, so κ_max·η = $(resolution) holds in the stationary mean; k is predicted" :
-      held === :kinetic_energy ?
-      "the forcing holds k; ε, and with it κ_max·η ≈ $(resolution), is predicted" :
-      "the forcing holds neither k nor ε; both, and κ_max·η ≈ $(resolution), are predicted"
-    @info "Simulation: ν is set from ε; $guarantee (k̃ = $(Float64(_KINETIC_ENERGY_IN_BOX_UNITS)))" viscosity=ν kinetic_energy=k_design dissipation=ε expected_Re_λ=reλ
+  uncovered = _uncovered_reason(velocity_spec)
+  if uncovered === nothing
+    # The model covers this forcing: the state is predicted, and a derived ν is solved from it.
+    prediction = predicted_stationary_state(domain; velocity_forcing = velocity_spec, kinetic_energy,
+                                            dissipation, κ_max_η, viscosity)
+    ν = prediction.viscosity
+    design = (; prediction.kinetic_energy, prediction.dissipation, prediction.band_kinetic_energy,
+              box_time = cbrt(side_length^2 / prediction.dissipation))
+    if isnothing(viscosity)
+      # ν is SET here from the predicted ε. Which member of (k, ε) is guaranteed depends on what the
+      # forcing holds, so the line says so. Nothing here is a measurement — `flow_parameters` measures.
+      resolution = prediction.κ_max_η
+      held = _held_quantity(velocity_spec)
+      guarantee = held === :dissipation ?
+        "the forcing holds ε, so κ_max·η = $(resolution) holds in the stationary mean; k is predicted" :
+        held === :kinetic_energy ?
+        "the forcing holds k; ε, and with it κ_max·η ≈ $(resolution), is predicted" :
+        "the forcing holds neither k nor ε; both, and κ_max·η ≈ $(resolution), are predicted"
+      @info "Simulation: ν is set from ε; $guarantee (k̃ = $(prediction.kinetic_energy_in_box_units), placeholder)" viscosity=ν kinetic_energy=prediction.kinetic_energy dissipation=prediction.dissipation expected_Re_λ=prediction.reynolds_taylor
+    end
   else
+    # No stationary state to predict: a derived ν has nothing to be solved from, and is refused.
+    isnothing(viscosity) &&
+      throw(ArgumentError("Simulation: a derived viscosity is solved from the predicted stationary " *
+                          "state, and there is none here: $uncovered. Set `viscosity`."))
     ν = Float64(viscosity)
+    design = _unmodelled_state(kinetic_energy, dissipation, _stated_state(velocity_spec), velocity_spec)
   end
+  k_design, ε = design.kinetic_energy, design.dissipation
   # An adopted state can void the derived-ν calibration the same way a hand-built forcing can:
   # the stationary estimate assumed k = `kinetic_energy`, and the state handed over may hold
   # something else. Measured, not trusted; explicit-ν runs stay silent.
@@ -609,15 +710,17 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     _warn_adopted_state_energy_mismatch(state, k_design)
 
   buffers = allocate_buffers(field_integration_scheme, domain; scalar)
-  # The velocity forcing is built against the run's state, filling an omitted target from it; the
-  # scalar has no modelled state, so its forcing states its own. A derived ν warns only for a forcing
+  # The velocity forcing is built against the run's predicted state, filling an omitted strength from
+  # it; the scalar has no modelled state, so its forcing states its own, and takes from the velocity's
+  # state only the box time a correlation time in box units is converted with. A derived ν warns only for a forcing
   # that neither holds a member of the state nor takes its strength from it (owner-ruled 2026-08-24).
   vf = _materialize_forcing(velocity_spec, domain, design)
   viscosity === nothing && _held_quantity(velocity_spec) === nothing && !_takes_design(velocity_spec) &&
     _warn_derived_viscosity_forcing_mismatch(vf, design)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = vf,
-                    scalar_forcing = _materialize_forcing(scalar_forcing, domain, nothing))
+                    scalar_forcing = _materialize_forcing(scalar_forcing, domain,
+                                                          (; box_time = design.box_time)))
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).
   # The velocity's criterion does not cover it. ν was derived or supplied
@@ -629,8 +732,30 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # well-resolved for the velocity — below it the scalar is clearly under-resolved, and the warning
   # carries the measured numbers and the remedies. A warning, never an error: the value stays legal
   # (a deliberately under-resolved scalar is a legitimate experiment), it just cannot be silent.
+
+
+  if state === nothing
+    state = ResolvedFields(domain; scalar)
+    ic_spectrum = nothing
+    if initial_spectrum isa EnergySpectrum     # a `Phenomenology` model → evaluate at the run's state
+      ε === nothing &&
+        throw(ArgumentError("a `Phenomenology` `initial_spectrum` is evaluated at the run's dissipation " *
+                            "rate, and this run has none predicted ($uncovered). State `dissipation`."))
+      fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * k_design / 3),
+                          integral_scale = inv(envelope_wavenumber), schmidt)
+      ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
+    elseif !isnothing(initial_spectrum)
+      ic_spectrum = initial_spectrum           # a raw κ -> E(κ) function
+    end
+    random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy = k_design,
+                                         envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
+    scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
+  end
+  state = _with_forcing_states(state, conditions, domain)
   if scalar
-    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε,
+    # The predicted stationary ε where there is one; the seeded field's own ε where nothing is predicted.
+    ε_check = ε !== nothing ? ε : _seeded_dissipation(state, domain, ν)
+    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_check,
                                          rms_velocity = sqrt(2 * k_design / 3),
                                          integral_scale = inv(envelope_wavenumber), schmidt))
     κ_max_η = max_resolved_wavenumber(domain) * η
@@ -647,27 +772,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
             "against the well-resolved floor of 1.5. " * velocity_clause *
             "`scalar_dissipation` will measure a truncated field. Raise `κ_max_η` by √Sc, lower " *
             "`schmidt`, or set `viscosity` yourself if the truncation is deliberate. (η here uses " *
-            "the run's stationary dissipation rate; a decaying " *
-            "run resolves better than this as it decays.)"
+            (ε !== nothing ? "the run's stationary dissipation rate; a decaying run resolves better " *
+            "than this as it decays.)" : "the seeded field's dissipation rate.)")
     end
   end
 
-
-  if state === nothing
-    state = ResolvedFields(domain; scalar)
-    ic_spectrum = nothing
-    if initial_spectrum isa EnergySpectrum     # a `Phenomenology` model → evaluate at the run's state
-      fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * k_design / 3),
-                          integral_scale = inv(envelope_wavenumber), schmidt)
-      ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
-    elseif !isnothing(initial_spectrum)
-      ic_spectrum = initial_spectrum           # a raw κ -> E(κ) function
-    end
-    random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy = k_design,
-                                         envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
-    scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
-  end
-  state = _with_forcing_states(state, conditions, domain)
 
   # `nothing` sentinels, like `velocity_forcing`'s: a particle-only setting configured on a
   # particle-free run would be silently discarded, which is the quiet-wrong-configuration shape

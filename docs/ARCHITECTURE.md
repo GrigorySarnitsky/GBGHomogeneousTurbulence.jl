@@ -42,7 +42,8 @@ of what follows.
 integrate it so that a run's derived viscosity is calibrated for the forcing it actually uses, and
 publish it (decisions 94 and 101). ``\tilde{k}`` is the constant by which the run layer turns a requested
 resolution into a viscosity, and the package's first sweep showed it is not universal. Until the law
-exists, the run layer uses the provisional ``\tilde{k} = 0.7``.
+exists, the run layer predicts with provisional values per forcing band (0.72 for shells 1–2, 0.56
+for 1–4, 0.47 for every mode), flat in the Reynolds number.
 
 ---
 
@@ -425,11 +426,13 @@ never need (each preserves a divergence-free velocity by construction) and `Stoc
 mode, drawing each amplitude perpendicular to its wavevector. Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
 taking no operators, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
 returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
-forcing before the grid exists. A velocity forcing named so may also leave its target out, and
-`Simulation` fills it from the run's stationary state: the pair ``(k, \varepsilon)``, stated once — by
-`kinetic_energy`, `dissipation`, or a forcing's own target — with the other member predicted through
-``\tilde{k}`` (decision 95). `Linear`'s rate stays required, since its stationary value needs the band's own
-energy, and so does a scalar forcing's target, since no scalar state is modelled.
+forcing before the grid exists. A velocity forcing named so may also leave its strength out, and
+`Simulation` fills it from the run's predicted stationary state: the pair ``(k, \varepsilon)``, stated
+once — by `kinetic_energy`, `dissipation`, or a forcing's own target — with the other member, and the
+band's energy ``k_{\mathrm{band}}``, predicted by `predicted_stationary_state` through the forcing's
+``\tilde{k}`` and ``k_{\mathrm{band}}/k`` (decisions 95, 105). That fills `Linear`'s rate
+``\varepsilon/(2k_{\mathrm{band}})`` and `VarianceRescaling(over = :band)`'s target ``k_{\mathrm{band}}``
+too. A scalar forcing states its target, since no scalar state is modelled.
 
 ### 4.5 `Propagator` — the map that advances the state in time
 
@@ -538,9 +541,11 @@ Over it:
   existing state and tracer set outright (the injection door, decision 83) — and picks the default
   scheme. The viscosity is derived from the grid by default — the highest Reynolds number consistent with the
   chosen resolution criterion `κ_max_η` (decision 20; measured against the resolved cutoff, decision
-  82), solved from the ε of the run's stationary state (decision 95) — with a supplied `viscosity` the
-  opt-in override. A forcing holding ε, the default, meets `κ_max_η` in the stationary mean; one
-  holding k leaves the resolution predicted through ``\tilde{k}``.
+  82), solved from the ε of the run's predicted stationary state (decisions 95, 105) — with a supplied
+  `viscosity` the opt-in override. A forcing holding ε, the default, meets `κ_max_η` in the stationary
+  mean; one holding k leaves the resolution predicted through ``\tilde{k}``. A forcing the model does not
+  cover — an unforced run, a band not starting at shell 1 — has nothing to derive ν from and must
+  supply it.
   Setup is a few numbers.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
@@ -3138,6 +3143,29 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     large scale first, then small — the energy-containing quantity (``L`` or ``k``), then the cascade
     rate ``\varepsilon``, then ``\nu``. **Positional, not keywords**, like every other observable. The same names serve as the keywords of
     the ``\tilde{k}`` model to come, as `kinetic_energy` is both a keyword and an observable.
+105. **(2026-09-29, user-directed) The stationary-state model, and the run predicting from it.**
+    `kinetic_energy_in_box_units(forcing; reynolds_box | reynolds_taylor)` and
+    `band_energy_fraction(...)`, in `Forcing`, give ``\tilde{k}`` and ``k_{\mathrm{band}}/k`` for a forcing's
+    strategy, band and `over`; exactly one Reynolds keyword, and the Taylor form is solved for
+    ``\mathrm{Re}_{\mathrm{box}}`` by bisection. **Placeholders:** ``\tilde{k}`` flat in ``\mathrm{Re}`` (the keyword
+    is checked and changes nothing until the dependence is measured) and the same for every strategy:
+    0.72, 0.56 and 0.47 for shells 1–2, 1–4 and every mode, linear in ``1/h`` between; ``k_{\mathrm{band}}/k``
+    the inertial-tail estimate, 1 for every mode. A band from shell 1 ending at shell 2 or above is
+    covered. **The prediction** is one public function, `predicted_stationary_state`, which
+    `Simulation` calls. A derived ν needs no fixed point: ``\kappa_{\max}\eta`` fixes ``\eta``, so
+    ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}``, then ``\tilde{k}``, then the unstated member, then
+    ``\nu = \varepsilon^{1/3}\eta^{4/3}``. With a given ν and a stated ``k``, ``\varepsilon`` is solved by bisection.
+    **Fills** (owner's rulings): `Linear`'s rate becomes optional, ``A = \varepsilon/(2k_{\mathrm{band}})``;
+    `VarianceRescaling(over = :band)`'s target becomes optional, ``k_{\mathrm{band}}``, its fraction
+    taken to be the one `over = :total` holds on the same band (a modelling assumption, testable by one
+    run); the controller's omitted settling time is the predicted ``2k/(3\varepsilon)``; the deferred
+    `StochasticOU` states `correlation_time_in_box_units`, converted once to ``T_L``. **Uncovered runs**
+    (owner's rulings): a derived ν for an unforced run or an uncovered band is an `ArgumentError`
+    (the unforced case was a warning); with a given ν nothing is predicted, the seed takes the stated
+    ``k``, an unforced run may state both ``k`` and ``\varepsilon``, a `Phenomenology` initial spectrum
+    without ``\varepsilon`` is refused, and the scalar-resolution check measures the seeded field's ``\varepsilon``.
+    The single constant 0.7 and its two estimate functions are gone. The run layer's expected
+    ``\mathrm{Re}_\lambda`` now comes from `reynolds_taylor`, not `Phenomenology`.
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

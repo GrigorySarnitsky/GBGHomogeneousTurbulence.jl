@@ -28,9 +28,11 @@ const FIT_SIZES = (32, 40, 48, 56)
 const CHECK_SIZE = 64
 
 
-# Every array a run can reach is counted once, the way `summarysize` walks an object graph.
+# Every array a run can reach is counted once, the way `summarysize` walks an object graph. An
+# unforced run has no stationary state to derive ν from, so it is given one; storage does not depend on ν.
 resident_bytes(N; kwargs...) = with_logger(NullLogger()) do
-  Base.summarysize(Simulation(; grid_points_per_axis = N, κ_max_η = 1.5, rng = MersenneTwister(1),
+  setting = get(kwargs, :velocity_forcing, nothing) isa NoForcing ? (; viscosity = 0.02) : (; κ_max_η = 1.5)
+  Base.summarysize(Simulation(; grid_points_per_axis = N, setting..., rng = MersenneTwister(1),
                               kwargs...))
 end
 
@@ -94,7 +96,7 @@ end
               :VarianceController => (VarianceController(target = 0.5), :same),
               :VarianceRescaling => (VarianceRescaling(target = 0.5, over = :band), :same),
               :Linear => (Linear(rate = 0.1), :more),
-              :StochasticOU => (StochasticOU(forcing_variance = 0.1, correlation_time = 0.5), :same)]
+              :StochasticOU => (StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5), :same)]
   @test Set(first.(forcings)) == exported(AbstractForcing)
 
   strategies = [:HouLi => (HouLi(), :same), Symbol("HouLi(materialized = true)") => (HouLi(materialized = true), :more)]

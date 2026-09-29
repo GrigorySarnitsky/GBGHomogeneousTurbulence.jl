@@ -16,6 +16,15 @@ domain-taking `Simulation(domain; …)` constructors. Read its measured state by
 Simulation
 ```
 
+## The predicted stationary state
+
+The state a forced run is set up for — ``k``, ``\varepsilon``, the band's energy, ``\nu`` and the two
+Reynolds numbers — predicted before the run is built, as `Simulation` predicts it.
+
+```@docs
+predicted_stationary_state
+```
+
 ## Advancing the run
 
 Advance one iteration, or observe-and-advance until the callback stops the run; the packaged

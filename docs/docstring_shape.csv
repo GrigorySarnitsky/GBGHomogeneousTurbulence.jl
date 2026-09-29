@@ -9,16 +9,18 @@ Cache.jl::velocity_physical(cache),83,0,84
 Cache.jl::vorticity_physical(cache),50,0,51
 Forcing.jl::AbstractForcing,62,1,449
 Forcing.jl::ConstantPower(domain; injection_rate， lowest_shell = 1， highest_shell = 2),67,1,478
-Forcing.jl::DeferredForcing,59,0,354
-Forcing.jl::Forcing,91,0,512
-Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,236
+Forcing.jl::DeferredForcing,68,0,408
+Forcing.jl::Forcing,93,0,538
+Forcing.jl::Linear(domain; rate， lowest_shell = 1， highest_shell = 2),66,0,273
 Forcing.jl::NoForcing(),16,0,17
-Forcing.jl::StochasticOU(domain; forcing_variance， correlation_time， lowest_shell = 1，,94,1,913
+Forcing.jl::StochasticOU(domain; forcing_variance， correlation_time， lowest_shell = 1，,94,1,953
 Forcing.jl::StochasticOUState,65,0,184
-Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,878
-Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,803
+Forcing.jl::VarianceController(domain; target， gain = 1， turnover_time = nothing，,110,1,894
+Forcing.jl::VarianceRescaling(domain; target， over， lowest_shell = 1， highest_shell = 2),71,1,833
 Forcing.jl::add_forcing_source!(forcing， forcing_state， N̂， field， domain， diffusivity) -> N̂,79,1,302
+Forcing.jl::band_energy_fraction(forcing; reynolds_box = nothing， reynolds_taylor = nothing),80,1,226
 Forcing.jl::initial_forcing_state(forcing， field， domain),57,0,126
+Forcing.jl::kinetic_energy_in_box_units(forcing; reynolds_box = nothing， reynolds_taylor = nothing),102,1,286
 Forcing.jl::prepare_forcing!(forcing， forcing_state， field， domain， dt) -> nothing,34,0,138
 Forcing.jl::project_forcing!(forcing， advanced_field， domain) -> advanced_field,49,0,83
 Forcing.jl::read_forcing(parent::HDF5.H5DataStore， name::AbstractString，,52,0,89
@@ -45,8 +47,8 @@ Observables.jl::kinetic_energy(u),67,0,156
 Observables.jl::kinetic_energy_and_dissipation(û， domain， viscosity),98,0,194
 Observables.jl::kinetic_energy_and_dissipation_below_scale(û， domain， viscosity),85,1,439
 Observables.jl::max_speed(u),55,2,313
-Observables.jl::reynolds_box(dissipation， side_length， viscosity),56,0,163
-Observables.jl::reynolds_taylor(dissipation， kinetic_energy， viscosity),36,0,130
+Observables.jl::reynolds_box(side_length， dissipation， viscosity),56,0,172
+Observables.jl::reynolds_taylor(kinetic_energy， dissipation， viscosity),36,0,137
 Observables.jl::scalar_dissipation(φ̂， domain， diffusivity),45,0,121
 Observables.jl::scalar_variance(φ),31,0,33
 Observables.jl::vorticity_physical!(ω， û， domain， spectral_scratch),34,0,131
@@ -114,7 +116,7 @@ SimulationDomain.jl::new_vector_field_spectral(domain),17,0,18
 SimulationDomain.jl::read_domain(parent::HDF5.H5DataStore， name::AbstractString;,55,0,124
 SimulationDomain.jl::truncate_to_band!(field， domain),71,1,135
 SimulationDomain.jl::write_domain(parent::HDF5.H5DataStore， name::AbstractString， domain::FixedDomain),61,0,100
-SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = nothing，,62,1,2868
+SimulationRun.jl::Simulation(; grid_points_per_axis， κ_max_η = nothing， kinetic_energy = nothing，,80,2,2894
 SimulationRun.jl::SimulationRun,31,0,229
 SimulationRun.jl::StationarityCriterion(; gate_scalar = true， gate_skewness = false，,97,0,669
 SimulationRun.jl::advance!(sim; dt = nothing),55,0,124
@@ -123,6 +125,7 @@ SimulationRun.jl::current_time(sim),6,0,7
 SimulationRun.jl::every_steps(n),43,0,98
 SimulationRun.jl::every_time(period),114,0,194
 SimulationRun.jl::flow_parameters(sim),96,0,97
+SimulationRun.jl::predicted_stationary_state(domain; velocity_forcing = ConstantPower()， kinetic_energy = nothing，,102,1,347
 SimulationRun.jl::read_simulation(parent::HDF5.H5DataStore， name::AbstractString;,97,0,202
 SimulationRun.jl::run!(callback， sim; dt = nothing),75,0,304
 SimulationRun.jl::warmup!(sim; dt = nothing， kwargs...),88,0,137

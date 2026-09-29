@@ -287,8 +287,8 @@ end
 @testset "a stochastically forced run continues the same realization bitwise (decision 90)" begin
   path = tempname() * ".h5"
   build() = Simulation(make_domain(); viscosity = 0.05, scalar = true, rng = MersenneTwister(4),
-                       velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time = 0.3, seed = 2),
-                       scalar_forcing = StochasticOU(forcing_variance = 0.5, correlation_time = 0.3, seed = 2))
+                       velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3, seed = 2),
+                       scalar_forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3, seed = 2))
   uninterrupted = build()
   checkpointed = build()
   for _ in 1:4

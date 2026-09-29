@@ -143,7 +143,9 @@ using .Forcing:
   project_forcing!,
   initial_forcing_state,
   prepare_forcing!,
-  add_forcing_source!
+  add_forcing_source!,
+  kinetic_energy_in_box_units,
+  band_energy_fraction
 
 using .Propagator:
   AbstractIntegrator,
@@ -183,7 +185,8 @@ using .SimulationRun:
   current_step,
   flow_parameters,
   every_steps,
-  every_time
+  every_time,
+  predicted_stationary_state
 
 
 export FixedDomain,
@@ -245,6 +248,8 @@ export FixedDomain,
        initial_forcing_state,
        prepare_forcing!,
        add_forcing_source!,
+       kinetic_energy_in_box_units,
+       band_energy_fraction,
        AbstractIntegrator,
        IFHeun,
        IFLowStorageRK3,
@@ -277,6 +282,7 @@ export FixedDomain,
        StationarityCriterion,
        every_steps,
        every_time,
+       predicted_stationary_state,
        current_time,
        current_step,
        flow_parameters
