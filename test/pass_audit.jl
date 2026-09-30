@@ -79,10 +79,6 @@ const COMPANION = let n = 2 * (2 + 1); 3 * (n ÷ 2) * (n - 1)^2 end
 # trips to memory, so a load of an element the same iteration has just loaded is counted twice though
 # it is served from cache; each holder says which kind it is. The timings are 256³ on an RTX 5070 Ti,
 # 2026-09-30.
-const DOUBLE_READ = "PF's one-field `weighted_inner(f, w)` forwards to ⟨f, w f⟩ and loads each element " *
-                    "once as each operand, in one pass; the second load hits cache. The tuple form's " *
-                    "`abs2` loads once and ran 11% faster in Float32, 1.5% in Float64; both run 40–60% " *
-                    "above a plain read of the field. Sent to PF to study"
 const ACCUMULATE_READ = "the accumulating `convolve!(field, field, band, α, 1)` loads its destination beside " *
                         "its source, one array, in one pass. A non-accumulating kernel of symbol 1 + (s − 1)χ " *
                         "loads once and ran 11% faster in Float32, no faster in Float64; it would state the " *
@@ -123,20 +119,20 @@ end
     audit(() -> add_forcing_source!(VELOCITY_FORCING, nothing, N̂, Û, DOMAIN, 0.05),
           "add_forcing_source!(ConstantPower)",
           Traffic("dest", field_data(N̂), (P, P)),
-          Traffic("source", field_data(Û), (3P, 0), (2P, 0), DOUBLE_READ); print = PRINT_COUNTS)
+          Traffic("source", field_data(Û), (2P, 0)); print = PRINT_COUNTS)
     audit(() -> add_forcing_source!(CONTROLLER, nothing, N̂, Û, DOMAIN, 0.05),
           "add_forcing_source!(VarianceController)",
           Traffic("dest", field_data(N̂), (P, P)),
-          Traffic("source", field_data(Û), (3P, 0), (2P, 0), DOUBLE_READ); print = PRINT_COUNTS)
+          Traffic("source", field_data(Û), (2P, 0)); print = PRINT_COUNTS)
     audit(() -> add_forcing_source!(OU, OU_PROCESS, N̂, OU_Û, DOMAIN, 0.05),
           "add_forcing_source!(StochasticOU)",
           Traffic("dest", field_data(N̂), (COMPANION, COMPANION), (B, B), WHOLE_COMPANION),
           Traffic("source", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
     audit(() -> project_forcing!(TOTAL, Û, DOMAIN), "project_forcing!(VarianceRescaling :total)",
-          Traffic("field", field_data(Û), (4P, P), (2P, P), DOUBLE_READ * "; and " * ACCUMULATE_READ);
+          Traffic("field", field_data(Û), (3P, P), (2P, P), ACCUMULATE_READ);
           print = PRINT_COUNTS)
     audit(() -> project_forcing!(BAND, Û, DOMAIN), "project_forcing!(VarianceRescaling :band)",
-          Traffic("field", field_data(Û), (4P, P), (2P, P), DOUBLE_READ * "; and " * ACCUMULATE_READ);
+          Traffic("field", field_data(Û), (3P, P), (2P, P), ACCUMULATE_READ);
           print = PRINT_COUNTS)
     audit(() -> set_forcing_rate!(LINEAR, RATE, Û, DOMAIN), "set_forcing_rate!(Linear)",
           Traffic("rate", field_data(RATE), (S, 2S), (0, S), TWO_CALL_RATE),
