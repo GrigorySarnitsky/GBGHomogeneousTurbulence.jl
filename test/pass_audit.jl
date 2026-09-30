@@ -75,15 +75,25 @@ const B = 3 * count(!iszero, field_data(materialize_kernel(spectral_band(DOMAIN.
 # n/2 × (n − 1)² per component, the companion being the smallest even grid above the band, n = 2(2 + 1).
 const COMPANION = let n = 2 * (2 + 1); 3 * (n ÷ 2) * (n - 1)^2 end
 
-const DOUBLE_READ = "PF's one-field `weighted_inner(f, w)` reads each element twice, once as each operand " *
-                    "of ⟨f, w f⟩: one pass more than the reduction needs, PF's to remove"
-const ACCUMULATE_READ = "the accumulating `convolve!(field, field, band, α, 1)` reads its destination beside " *
-                        "its source, although here they are one array"
-const WHOLE_COMPANION = "the source is PF's `embed_modes!`, which transfers every mode of the companion grid " *
-                        "below its Nyquist frequency; the process is zero outside the band, and the transfer " *
-                        "has no band-restricted form"
-const TWO_CALL_RATE = "the rate is evaluated from the band kernel and then scaled, two PF calls: no PF operation " *
-                      "writes a scaled kernel into a field in one pass"
+# A holder names why the counted accesses exceed the ideal. The counter counts element loads, not
+# trips to memory, so a load of an element the same iteration has just loaded is counted twice though
+# it is served from cache; each holder says which kind it is. The timings are 256³ on an RTX 5070 Ti,
+# 2026-09-30.
+const DOUBLE_READ = "PF's one-field `weighted_inner(f, w)` forwards to ⟨f, w f⟩ and loads each element " *
+                    "once as each operand, in one pass; the second load hits cache. The tuple form's " *
+                    "`abs2` loads once and ran 11% faster in Float32, 1.5% in Float64; both run 40–60% " *
+                    "above a plain read of the field. Sent to PF to study"
+const ACCUMULATE_READ = "the accumulating `convolve!(field, field, band, α, 1)` loads its destination beside " *
+                        "its source, one array, in one pass. A non-accumulating kernel of symbol 1 + (s − 1)χ " *
+                        "loads once and ran 11% faster in Float32, no faster in Float64; it would state the " *
+                        "band edges a second time, beside `spectral_band`"
+const WHOLE_COMPANION = "the source is PF's `embed_modes!`, which copies every mode of the companion grid " *
+                        "below its Nyquist frequency, zeros outside the band included. The companion is the " *
+                        "smallest grid holding the band, so the excess is a few hundred modes, independent " *
+                        "of N; the whole-cube copy is contiguous, and a band-only copy is not known to be faster"
+const TWO_CALL_RATE = "the rate is the band kernel evaluated and then scaled, two PF calls. One call through " *
+                      "`radial_kernel` would write it in one pass, but would state the band edges a second " *
+                      "time, beside `spectral_band`; the fill runs once, when the generator is built"
 
 const VELOCITY_FORCING = RUN.generator.conditions.velocity_forcing
 const CONTROLLER = VarianceController(DOMAIN; target = 1.5)
