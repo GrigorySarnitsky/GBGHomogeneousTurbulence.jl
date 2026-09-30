@@ -1,0 +1,503 @@
+# Method-parity baseline, read by GBGCodingTools.TestHarness.method_parity from test/method_parity.jl.
+# The package DECLARES method parity to the tool (RULE.TEST.METHOD_PARITY); these are its frozen numbers.
+#
+# Two baselines, counting DIFFERENT denominators, which must not be compared:
+# - [[generic]]: every function on the public surface, by the module that defines methods for it, the
+#   set named after that module. A generic several modules extend (`show`, `deposit!`) has one entry
+#   per module.
+# - [module]: the derived one, every method each module owns over the package's whole function surface,
+#   internals included, so adding a method anywhere moves a number.
+# A moved number is refrozen deliberately, in the same commit, with the reason written beside it.
+# Frozen 2026-09-30 at the declaration. Phenomenology is outside the surface until it is extracted
+# (the owner, 2026-09-29), and the HDF5 extension's methods live in their own module and are not counted.
+
+[[generic]]
+set = "Forcing"
+name = "add_forcing_source!"
+count = 4
+module = "Forcing"
+
+[[generic]]
+set = "SimulationRun"
+name = "advance!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Particles"
+name = "advect!"
+count = 2
+module = "Particles"
+
+[[generic]]
+set = "Propagator"
+name = "allocate_buffers"
+count = 4
+module = "Propagator"
+
+[[generic]]
+set = "Particles"
+name = "allocate_buffers"
+count = 2
+module = "Particles"
+
+[[generic]]
+set = "Forcing"
+name = "band_energy_fraction"
+count = 1
+module = "Forcing"
+
+[[generic]]
+set = "SimulationRun"
+name = "current_step"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "SimulationRun"
+name = "current_time"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Propagator"
+name = "deposit!"
+count = 1
+module = "Propagator"
+
+[[generic]]
+set = "Particles"
+name = "deposit!"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "SimulationRun"
+name = "deposit!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Observables"
+name = "derivative_skewness"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "dissipation"
+count = 2
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "energy_spectrum"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "SimulationRun"
+name = "every_steps"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "SimulationRun"
+name = "every_time"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Cache"
+name = "fields_modified!"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "SimulationRun"
+name = "fields_modified!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Generator"
+name = "finalize!"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "SimulationRun"
+name = "flow_parameters"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Particles"
+name = "history_depth"
+count = 2
+module = "Particles"
+
+[[generic]]
+set = "Forcing"
+name = "initial_forcing_state"
+count = 2
+module = "Forcing"
+
+[[generic]]
+set = "Observables"
+name = "integral_scale"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Particles"
+name = "interpolate_at_particles!"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "Observables"
+name = "kinetic_energy"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "kinetic_energy_and_dissipation"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "kinetic_energy_and_dissipation_below_scale"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Forcing"
+name = "kinetic_energy_in_box_units"
+count = 1
+module = "Forcing"
+
+[[generic]]
+set = "SimulationDomain"
+name = "max_resolved_wavenumber"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "SimulationDomain"
+name = "max_retained_wavenumber"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "Observables"
+name = "max_speed"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Cache"
+name = "max_speed"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_scalar_field_physical"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_scalar_field_spectral"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "Particles"
+name = "new_scalar_point_values"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_tensor_field_physical"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_tensor_field_spectral"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_vector_field_physical"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "SimulationDomain"
+name = "new_vector_field_spectral"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "Particles"
+name = "new_vector_point_values"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "Cache"
+name = "particles_modified!"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "SimulationRun"
+name = "particles_modified!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "SimulationRun"
+name = "predicted_stationary_state"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Generator"
+name = "prepare!"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "Forcing"
+name = "prepare_forcing!"
+count = 3
+module = "Forcing"
+
+[[generic]]
+set = "Forcing"
+name = "project_forcing!"
+count = 2
+module = "Forcing"
+
+[[generic]]
+set = "State"
+name = "random_scalar_spectral!"
+count = 1
+module = "State"
+
+[[generic]]
+set = "State"
+name = "random_solenoidal_velocity_spectral!"
+count = 1
+module = "State"
+
+[[generic]]
+set = "Particles"
+name = "rebuild_traversal!"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "SimulationRun"
+name = "rebuild_traversal!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Propagator"
+name = "recommended_cfl"
+count = 1
+module = "Propagator"
+
+[[generic]]
+set = "Particles"
+name = "restart!"
+count = 2
+module = "Particles"
+
+[[generic]]
+set = "Observables"
+name = "reynolds_box"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "reynolds_taylor"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "SimulationRun"
+name = "run!"
+count = 1
+module = "SimulationRun"
+
+[[generic]]
+set = "Observables"
+name = "scalar_dissipation"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Generator"
+name = "scalar_integrating_factor"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "Cache"
+name = "scalar_physical"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "Generator"
+name = "scalar_rhs!"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "Observables"
+name = "scalar_variance"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Forcing"
+name = "set_forcing_rate!"
+count = 2
+module = "Forcing"
+
+[[generic]]
+set = "SimulationDomain"
+name = "show"
+count = 3
+module = "SimulationDomain"
+
+[[generic]]
+set = "State"
+name = "show"
+count = 2
+module = "State"
+
+[[generic]]
+set = "Cache"
+name = "show"
+count = 2
+module = "Cache"
+
+[[generic]]
+set = "Forcing"
+name = "show"
+count = 7
+module = "Forcing"
+
+[[generic]]
+set = "Generator"
+name = "show"
+count = 3
+module = "Generator"
+
+[[generic]]
+set = "Propagator"
+name = "show"
+count = 2
+module = "Propagator"
+
+[[generic]]
+set = "Particles"
+name = "show"
+count = 5
+module = "Particles"
+
+[[generic]]
+set = "SimulationRun"
+name = "show"
+count = 4
+module = "SimulationRun"
+
+[[generic]]
+set = "Propagator"
+name = "step!"
+count = 4
+module = "Propagator"
+
+[[generic]]
+set = "SimulationDomain"
+name = "truncate_to_band!"
+count = 1
+module = "SimulationDomain"
+
+[[generic]]
+set = "Particles"
+name = "unwrapped_positions"
+count = 1
+module = "Particles"
+
+[[generic]]
+set = "Forcing"
+name = "uses_steady_linear_rate"
+count = 4
+module = "Forcing"
+
+[[generic]]
+set = "Cache"
+name = "velocity_at_particles"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "Generator"
+name = "velocity_integrating_factor"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "Cache"
+name = "velocity_physical"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "Generator"
+name = "velocity_rhs!"
+count = 1
+module = "Generator"
+
+[[generic]]
+set = "Cache"
+name = "vorticity_physical"
+count = 1
+module = "Cache"
+
+[[generic]]
+set = "Observables"
+name = "vorticity_physical!"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "SimulationRun"
+name = "warmup!"
+count = 1
+module = "SimulationRun"
+
+[module]
+SimulationDomain = 25
+Observables = 15
+State = 5
+Cache = 23
+Forcing = 77
+Generator = 28
+Propagator = 22
+Particles = 21
+SimulationRun = 42
