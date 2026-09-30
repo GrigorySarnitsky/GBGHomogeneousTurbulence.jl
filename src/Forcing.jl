@@ -149,7 +149,7 @@ argument, so a field-independent rate is a steady one. A strategy that fills a r
 it is refused the same way, rather than going silently unapplied.
 
 Each mutating hook returns the argument it mutated: `set_forcing_rate!` the rate,
-`add_forcing_source!` the right-hand side, `project_forcing!` the field. `prepare_forcing!` returns
+`add_forcing_source!` the right-hand side, `project_forcing!` the field. The hook `prepare_forcing!` returns
 `nothing`, having advanced the state it was handed in place.
 
 A hook runs inside the time loop, which is allocation-free at field scale, so a strategy allocates
@@ -262,7 +262,9 @@ declaration). The scheme folds the rate into the diffusive integrating factor
 so the forced modes advance at the net linear rate
 ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``, with ``D`` the field's diffusivity.
 
-The generator calls it once, when it is built. The arguments are:
+The generator calls it once, when it is built.
+
+# Arguments
 - `rate` — a scalar field in spectral representation holding real values, overwritten with ``A``.
 - `field` — a field in spectral representation of the kind being forced; a steady rate does not
   depend on it.
@@ -301,13 +303,16 @@ uses_steady_linear_rate(::AbstractForcing) = false
 """
     project_forcing!(forcing, advanced_field, domain) -> advanced_field
 
-Apply the strategy `forcing`'s post-step projection to `advanced_field` (a velocity or scalar
-``\\varphi`` field in spectral representation) in place, on the [`FixedDomain`](@ref) `domain`. The
-default does nothing; see `VarianceRescaling`.
+Apply a strategy's post-step projection to the advanced field, in place. The default does nothing;
+see `VarianceRescaling`.
 
-Unlike the two hooks that read the start-of-step field, this one is handed the field the step has
-already advanced — the argument is named for that instant, since a strategy that rescales toward a
-target must measure the state it is correcting, not the one it started from.
+# Arguments
+- `forcing` — the strategy.
+- `advanced_field` — a velocity or scalar ``\\varphi`` field in spectral representation, as the step
+  has advanced it. Unlike the two hooks that read the start-of-step field, this one is handed the
+  field at that later instant, since a strategy that rescales toward a target must measure the state
+  it is correcting, not the one it started from.
+- `domain` — the [`FixedDomain`](@ref).
 """
 project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advanced_field
 
@@ -315,9 +320,13 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 """
     initial_forcing_state(forcing, field, domain)
 
-Create the state the strategy `forcing` begins from when it drives `field` — the velocity or the
-scalar in spectral representation, whose tensor order sets how many components the state carries — on
-the [`FixedDomain`](@ref) `domain`.
+Create the state a forcing strategy begins from when it drives a field.
+
+# Arguments
+- `forcing` — the strategy.
+- `field` — the velocity or the scalar in spectral representation; its tensor order sets how many
+  components the state carries.
+- `domain` — the [`FixedDomain`](@ref).
 
 Returns `nothing` for a strategy that evolves no state of its own: the default, and the case of every
 strategy but [`StochasticOU`](@ref), which returns a
@@ -341,7 +350,7 @@ does nothing.
 Everything the stages will need must be ready when this returns, since
 [`add_forcing_source!`](@ref) is handed no timestep of its own.
 
-The arguments are:
+# Arguments
 - `forcing` — the strategy whose state advances.
 - `forcing_state` — that state as it stands now, not as it started:
   [`initial_forcing_state`](@ref) created it once, and this hook has advanced it on every step since.
@@ -365,7 +374,7 @@ them, since a state-dependent rate frozen once per step would drop the scheme to
 other carries a source that does not read the field at all: [`StochasticOU`](@ref)'s random process,
 already advanced for this step by [`prepare_forcing!`](@ref), which this hook only writes into `N̂`.
 
-The arguments are:
+# Arguments
 - `forcing` — the strategy adding the source.
 - `forcing_state` — its evolving state as `prepare_forcing!` left it this step, or `nothing` for a
   strategy without one. This hook reads it and does not advance it.
@@ -469,9 +478,7 @@ struct NoForcing <: AbstractForcing end
 """
     VarianceRescaling(domain; target, over, lowest_shell = 1, highest_shell = 2)
 
-The deterministic rescaling forcing of Sullivan, Mahalingam & Kerr (1994,
-[*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274),
-*Phys. Fluids* **6**(4), 1612–1614), built on the [`FixedDomain`](@ref)
+The deterministic rescaling forcing of Sullivan, Mahalingam & Kerr (1994), built on the [`FixedDomain`](@ref)
 `domain`: after each step the in-band Fourier modes — the integer shells `lowest_shell` to
 `highest_shell`, in units of the box's fundamental ``2\\pi/L`` — are rescaled by a single factor that
 holds `target`. The rescale is per-mode, so a divergence-free velocity stays divergence-free.
@@ -490,26 +497,27 @@ energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for 
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
 to the field being a vector.
 
-The `over` keyword selects *where* that target applies — it is required, since a deterministic clamp destroys
-the physical fluctuation of whatever it holds and no default is right for every run — and the two
-modes differ in which quantity a run may no longer measure:
-
-  * `:band` holds the band's own value. The whole-field value then floats, oscillating about its mean
-    as the band feeds the cascade. On the default shells 1–2 — the energy-containing range — most of
-    ``k`` is held rather than free, though it remains a measurable.
-  * `:total` rescales the band to absorb the whole-field deficit, so the whole-field value equals
-    `target`. For the velocity this pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``
-    (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the forcing
-    sets and the band is free.
-
-With `highest_shell = Inf` the band is every retained mode but the mean, on any grid, and the two
-coincide — the mean holds nothing in a field started without one — so a single factor rescales the
-whole field: the rescaling a physical-space code applies.
-
-The deferred form may leave `target` out, and a run then supplies it: its stationary ``k`` for
-`over = :total`, and the band's predicted ``k_{\\mathrm{band}}`` for `over = :band`. That prediction
-takes the band's share of ``k`` to be the one `over = :total` holds on the same band: both rescale
-the same modes, and they are taken to reach the same stationary flow.
+# Arguments
+- `domain` — the `FixedDomain` the band kernel is built on.
+- `target` — the value held, in the field's own observable above. The deferred form may leave it
+  out, and a run then supplies it: its stationary ``k`` for `over = :total`, and the band's predicted
+  ``k_{\\mathrm{band}}`` for `over = :band`. That prediction takes the band's share of ``k`` to be the one
+  `over = :total` holds on the same band: both rescale the same modes, and they are taken to reach
+  the same stationary flow.
+- `over` — *where* the target applies, `:band` or `:total`. It is required, since a deterministic
+  clamp destroys the physical fluctuation of whatever it holds and no default is right for every run,
+  and the two modes differ in which quantity a run may no longer measure:
+    * `:band` holds the band's own value. The whole-field value then floats, oscillating about its
+      mean as the band feeds the cascade. On the default shells 1–2 — the energy-containing range —
+      most of ``k`` is held rather than free, though it remains a measurable.
+    * `:total` rescales the band to absorb the whole-field deficit, so the whole-field value equals
+      `target`. For the velocity this pins ``u'`` and with it the scale of ``\\mathrm{Re}_\\lambda``
+      (whose value still fluctuates with the instantaneous dissipation). Here ``k`` is what the
+      forcing sets and the band is free.
+- `lowest_shell = 1`, `highest_shell = 2` — the rescaled band, as integer shells in units of the box's
+  fundamental ``2\\pi/L``. With `highest_shell = Inf` the band is every retained mode but the mean, on
+  any grid, and the two modes of `over` coincide — the mean holds nothing in a field started without
+  one — so a single factor rescales the whole field: the rescaling a physical-space code applies.
 
 Neither is a default, because the right answer depends on what the run is calibrated against.
 A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) deriving ``\\nu`` chooses it
@@ -530,9 +538,7 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     Molecular dynamics reached the same
     conclusion about the same manoeuvre — per-step rescaling is the deterministic (Berendsen) limit
     of stochastic velocity rescaling, with no conserved quantity and no well-defined ensemble except
-    in limiting cases (Bussi, Donadio & Parrinello 2007,
-    [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420),
-    *J. Chem. Phys.* **126**, 014101) — and the fix is to extend the dynamics with feedback rather
+    in limiting cases (Bussi, Donadio & Parrinello 2007) — and the fix is to extend the dynamics with feedback rather
     than project after the fact.
 
     Two configurations also behave sharply. Under `:total`, if the out-of-band value alone exceeds
@@ -540,6 +546,10 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     the rescale can make. At the other end an empty band is **left alone** rather than divided by ~0,
     so it stays empty instead of being driven to `target`. Seed content in the band if a run depends
     on the clamp taking hold.
+
+# References
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6*
+- Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420). *J. Chem. Phys.* **126**, 014101.
 
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.
@@ -719,8 +729,7 @@ end
 
 Hold the field's variance at `target` by feedback — the kinetic energy ``k`` for the velocity,
 ``\\langle\\varphi^{2}\\rangle`` for the scalar — with the constant-``k`` controller of
-Bassenne et al. (2016, [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629),
-*Phys. Fluids* **28**, 035114).
+Bassenne et al. (2016).
 
 Prefer it to [`VarianceRescaling`](@ref) whenever accuracy in time matters, which is nearly always:
 it enters the right-hand side as a smooth rate the scheme integrates and keeps its order, where a
@@ -751,16 +760,11 @@ left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documen
 in the band if the run depends on the controller taking hold.
 
 The molecular-dynamics thermostats map the design space exactly, and **this controller is the
-Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984,
-[*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118),
-*J. Chem. Phys.* **81**, 3684–3690), carrying that class's known caveat: the
+Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
 held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
 thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
 that restores canonical fluctuations is Nosé–Hoover
-(Nosé 1984, [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334),
-*J. Chem. Phys.* **81**(1), 511–519; Hoover 1985,
-[*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695),
-*Phys. Rev. A* **31**(3), 1695–1697), a design this package
+(Nosé 1984; Hoover 1985), a design this package
 does not take.
 
 # Arguments
@@ -774,7 +778,7 @@ does not take.
   dynamics least. `0` is the bare marginal law above.
 - `turnover_time = nothing` — the large-eddy turnover time ``t_\\ell = 2k_\\infty/(3\\varepsilon_\\infty)``
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
-  Left at `nothing` it is computed for you from that formula. A `Simulation` uses the state it
+  Left at `nothing` it is computed for you from that formula. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses the state it
   predicts; built on a domain, the controller takes
   ``\\varepsilon_\\infty = (k_\\infty/\\tilde{k})^{3/2}/L`` with the placeholder ``\\tilde{k}`` of its band
   ([`kinetic_energy_in_box_units`](@ref)), and refuses a band that model does not cover. A run that
@@ -796,6 +800,12 @@ does not take.
 !!! note "The settling time, not the gain, is the physical parameter"
     Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a
     disturbance. The two are kept separate because that is how the source states them.
+
+# References
+- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
+- Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984). [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
+- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* **81*
+- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* **31*
 
 # Fields
 - `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
@@ -957,10 +967,10 @@ The kinetic energy a flow driven by `forcing` holds in its stationary state, in 
 ``\\varepsilon`` the dissipation rate. Its ``3/2`` power is the large-eddy length
 ``k^{3/2}/\\varepsilon`` as a fraction of the box side. It is what a run predicts its state with: given
 ``k``, the dissipation is ``\\varepsilon = (k/\\tilde{k})^{3/2}/L``, and given ``\\varepsilon``, the
-energy is ``k = \\tilde{k} (\\varepsilon L)^{2/3}``. [`band_energy_fraction`](@ref) is the share of
+energy is ``k = \\tilde{k} (\\varepsilon L)^{2/3}``. Its companion [`band_energy_fraction`](@ref) is the share of
 ``k`` held in the forced band.
 
-The arguments are:
+# Arguments
 - `forcing` — the velocity forcing, built or in its deferred keyword form. The value depends on its
   strategy, its band and, for [`VarianceRescaling`](@ref), on `over`, but not on its strength.
 - `reynolds_box`, `reynolds_taylor` — the Reynolds number the value is wanted at: exactly one of the box
@@ -999,10 +1009,12 @@ to set a strength that is stated through the band: the rate of [`Linear`](@ref),
 is ``k_{\\mathrm{band}}`` itself. The band that holds everything but the mean (`highest_shell = Inf`) has
 the fraction 1.
 
-The arguments are those of [`kinetic_energy_in_box_units`](@ref): the forcing, and exactly one of
-`reynolds_box` and `reynolds_taylor`. For `VarianceRescaling(over = :band)` the fraction is the one
-`over = :total` holds on the same band: both rescale the same modes, one holding the band and the
-other the whole field, so they are taken to reach the same stationary flow.
+# Arguments
+- `forcing` — the velocity forcing, built or in its deferred keyword form, as for
+  [`kinetic_energy_in_box_units`](@ref). For `VarianceRescaling(over = :band)` the fraction is the one
+  `over = :total` holds on the same band: both rescale the same modes, one holding the band and the
+  other the whole field, so they are taken to reach the same stationary flow.
+- `reynolds_box`, `reynolds_taylor` — exactly one: the Reynolds number the value is wanted at.
 
 Returns a `Float64`, and refuses what `kinetic_energy_in_box_units` refuses.
 
@@ -1113,9 +1125,7 @@ end
     StochasticOU(; forcing_variance = nothing, correlation_time_in_box_units,
                  lowest_shell = 1, highest_shell = 2, seed = 42)
 
-The stochastic forcing of Eswaran & Pope (1988,
-[*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8),
-*Computers & Fluids* **16**, 257–278), built on the [`FixedDomain`](@ref) `domain`: a random term,
+The stochastic forcing of Eswaran & Pope (1988), built on the [`FixedDomain`](@ref) `domain`: a random term,
 correlated over a finite time, added to the right-hand side on a band of low wavenumbers.
 
 Use it when the forcing must not depend on the flow it drives. Every other strategy here measures the
@@ -1139,7 +1149,7 @@ units of the box's fundamental ``\\kappa_0 = 2\\pi/L``:
 where each amplitude ``\\boldsymbol{a}_{\\boldsymbol{\\kappa}}`` is an independent complex
 Ornstein–Uhlenbeck process with correlation time ``T_L``. When the forced field is the velocity, each
 amplitude is drawn transverse to its own ``\\boldsymbol{\\kappa}``, so the force is divergence-free.
-``\\sigma^{2}`` is shared equally among the band's modes and their independent components.
+The variance ``\\sigma^{2}`` is shared equally among the band's modes and their independent components.
 
 Once per step every amplitude takes the process's exact transition over the step ``\\Delta t``,
 
@@ -1163,7 +1173,7 @@ The forcing is held fixed over a step and added at every stage, as [`add_forcing
 every additive source. For a given sequence of amplitudes the field then advances at the scheme's
 order, but the forcing itself is resolved in time only step by step, so ``T_L`` should span many steps.
 
-The arguments are:
+# Arguments
 - `domain` — the `FixedDomain` of the run this forcing drives.
 - `forcing_variance` — the stationary mean square ``\\sigma^{2}`` of the added term, as above. A
   deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
@@ -1186,13 +1196,16 @@ resumes the same realization. This strategy holds its parameters and the scratch
 draw, so one instance may drive both fields.
 
 A `ResolvedFields` built by hand that carries no state for this forcing is refused: preparing it
-throws an `ArgumentError` rather than leave the run unforced without saying so. A `Simulation` builds
+throws an `ArgumentError` rather than leave the run unforced without saying so. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds
 it for you.
 
 !!! warning "The band must lie inside the dealias cutoff"
     A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes
     empty, but this forcing is added after the mask and would fill them. Construction therefore throws
     an `ArgumentError` for a band reaching past the cutoff, where the other strategies only warn.
+
+# References
+- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278.
 
 # Fields
 - `forcing_variance`, `correlation_time`, `seed`, `lowest_shell`, `highest_shell` — the parameters above.
@@ -1226,7 +1239,7 @@ end
 
 A [`StochasticOU`](@ref) forcing's evolving state holds two things: the force itself, as a field in
 spectral representation on the forcing's companion grid, and the number of increments drawn so far.
-[`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
+The hook [`initial_forcing_state`](@ref) creates it, [`prepare_forcing!`](@ref) advances it in place every step,
 and a run keeps it as the `modeled` entry of
 [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) for the forced field. There is no
 reason to build one by hand.
@@ -1580,7 +1593,7 @@ same realization when the state is restored with it. A
 [`DeferredForcing`](@ref) is refused — resolve it on a domain first. Available once the `HDF5`
 package is loaded; the caller owns the file.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group to write under.
 - `name` — the created group's name.
 - `forcing` — the built strategy to record.
@@ -1599,7 +1612,7 @@ keyword constructor on `domain` (a [`FixedDomain`](@ref)) — the derived band k
 never read. A group not written by `write_forcing`, or written by a newer schema
 version, is refused with an `ArgumentError`. Available once the `HDF5` package is loaded.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group holding the forcing group.
 - `name` — the group's name.
 - `domain` — the `FixedDomain` the strategy is rebuilt on.

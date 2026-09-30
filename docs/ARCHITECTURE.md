@@ -1,5 +1,8 @@
 # Architecture
 
+!!! info "Written by AI, not regularly reviewed"
+    This page is written by AI and is not reviewed regularly by a human.
+
 This is the design document for `GBGHomogeneousTurbulence` — what the package is, how it is organized,
 and *why* it is shaped the way it is. It is the spec: read it before any structural change, and do not
 re-litigate a recorded decision (§11) without the user. `CLAUDE.md` is the terse working copy and defers
@@ -40,7 +43,7 @@ of what follows.
 **The first scientific goal** is to measure the kinetic energy in box units
 ``\tilde{k} = k/(\varepsilon L)^{2/3}`` as a law ``\tilde{k}(\text{forcing}, \mathrm{Re}, \text{band})``,
 integrate it so that a run's derived viscosity is calibrated for the forcing it actually uses, and
-publish it (decisions 94 and 101). ``\tilde{k}`` is the constant by which the run layer turns a requested
+publish it (decisions 94 and 101). This ``\tilde{k}`` is the constant by which the run layer turns a requested
 resolution into a viscosity, and the package's first sweep showed it is not universal. Until the law
 exists, the run layer predicts with provisional values per forcing band (0.72 for shells 1–2, 0.56
 for 1–4, 0.47 for every mode), flat in the Reynolds number.
@@ -294,7 +297,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\bigr)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\bigr)``
   — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep
   ``d_i\Delta t``, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
@@ -486,11 +489,11 @@ probes (§7). `Tracers` holds positions and a chosen interpolation scheme — tr
 with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
 (decision 50). The default scheme, `Heun`, is Heun-in-time on
-the velocity at the iteration's two endpoints. ``\boldsymbol{v}_1`` is the **trajectory
+the velocity at the iteration's two endpoints. The first, ``\boldsymbol{v}_1``, is the **trajectory
 sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
 Lagrangian velocity, held in the observables cache's own `velocity_at_particles` slot and dated
 against BOTH epochs, since it is a function of the state and the positions together (read through
-`velocity_at_particles`, §11 decisions 42 and 67). ``\boldsymbol{v}_2`` interpolates the just-deposited
+`velocity_at_particles`, §11 decisions 42 and 67). The second, ``\boldsymbol{v}_2``, interpolates the just-deposited
 ``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
 `ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, the particle form of
 `deposit!` interpolates the new sample at the new positions from the same deposited field and
@@ -1884,7 +1887,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `ArgumentError` naming the choice — a better error than a missing-keyword one, but a merge
     forced by the language rather than preferred.
 
-53. **(2026-08, user-directed) "Stamp" is retired; a slot carries an **epoch**, and an epoch is not
+53. **(2026-08, user-directed) "Stamp" is retired; a slot carries an *epoch*, and an epoch is not
     an iteration number.** The cache described itself as "stamped storage" and gave each slot a
     `*_stamp` field, while the two counters those fields were compared against were called *epochs* —
     two names for one integer, related only in a `#` comment. Asked whether "stamped storage" was a
@@ -2341,7 +2344,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     keep the old words.
 
 74. **(2026-08, user-directed) The `Simulation` constructor forms name their mechanism —
-    **domain-building** / **domain-taking** — and the argument list is grouped the same way.**
+    *domain-building* / *domain-taking* — and the argument list is grouped the same way.**
     "Front door" as the name of the no-`domain` form said nothing about what distinguishes it (it
     builds the `FixedDomain` for you), so the form dichotomy is now mechanism-named and exhaustive:
     the domain is either built from keywords or taken pre-built. The `# Arguments` section splits
@@ -2796,7 +2799,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     companion physical field (the stream stays the seed's, and the draw is real, so its spectrum
     satisfies the reality condition by construction), `to_spectral!`, the band kernel, and — for the
     velocity — `helmholtz_projection!`, then `combine!` for the exact transition
-    ``\boldsymbol{a} \leftarrow \alpha\boldsymbol{a} + \sqrt{\sigma^{2}(1-\alpha^{2})}\,\boldsymbol{\xi}``,
+    ``\boldsymbol{a} \leftarrow \alpha\boldsymbol{a} + \sqrt{\sigma^{2}(1-\alpha^{2})} \boldsymbol{\xi}``,
     ``\alpha = e^{-\Delta t/T_L}``, starting from a stationary draw. Every stage adds the process into
     the assembled term with the library's `embed_modes!` (its decision 85, requested and shipped
     2026-09-17/18), which writes only the shared modes, carries physical amplitudes across the
@@ -3184,7 +3187,7 @@ cites.
   `PhaseShift` strategy, §7, decision 27.)*
 - Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
 - Orszag, S. A. & Patterson, G. S. (1972). [*Numerical simulation of three-dimensional homogeneous isotropic turbulence*](https://doi.org/10.1103/PhysRevLett.28.76). *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
-- Rogallo, R. S. (1981). *Numerical experiments in homogeneous turbulence.* NASA TM-81315. *(No DOI;
+- Rogallo, R. S. (1981). [*Numerical experiments in homogeneous turbulence.*](https://ntrs.nasa.gov/citations/19810022965) NASA TM-81315. *(No DOI;
   a NASA technical memorandum. The sheared-frame scheme, §7; the spherical-truncation dealiasing of
   the `PhaseShift` strategy, decision 27.)*
 - Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014).
@@ -3194,7 +3197,7 @@ cites.
 - Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
 - Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
-- Lundgren, T. S. (2003). Linearly forced isotropic turbulence. *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
+- Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
   *(The interpolation family `LalescuSpline` implements,
@@ -3228,9 +3231,9 @@ cites.
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
   cites the family rather than a numbered case.)*
-- Carpenter, M. H. & Kennedy, C. A. (1994). *Fourth-order 2N-storage Runge–Kutta schemes.*
-  NASA TM-109112. *(The five-stage, two-register fourth-order scheme `IFLowStorageRK4`
-  implements; a NASA technical memorandum, outside the DOI system.)*
+- Carpenter, M. H. & Kennedy, C. A. (1994). [*Fourth-order 2N-storage Runge–Kutta schemes.*](https://ntrs.nasa.gov/citations/19940028444) NASA TM-109112. *(No DOI;
+  a NASA technical memorandum. The five-stage, two-register fourth-order scheme `IFLowStorageRK4`
+  implements.)*
 - Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471. *(The SSPRK3 tableau
   `IFSSPRK3` implements, in TurTLE's stage arrangement.)*
 - Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press. *(Notation; the
@@ -3242,7 +3245,7 @@ cites.
   410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
 - Öttinger, H. C. (2005). [*Beyond Equilibrium Thermodynamics.*](https://doi.org/10.1002/0471727903) Wiley. *(GENERIC; the
   reversible/irreversible split, §8.)*
-- Lamb, H. (1932). *Hydrodynamics*, 6th ed. Cambridge University Press. *(No DOI; a 1932 monograph.
+- Lamb, H. (1932). [*Hydrodynamics*](https://openlibrary.org/books/OL6287619M/Hydrodynamics), 6th ed. Cambridge University Press. *(No DOI; a 1932 monograph.
   Art. 146, Eq. (5): the rotational form of the equations of motion, decision 93.)*
 - Hamman, C. W., Klewicki, J. C. & Kirby, R. M. (2008). [*On the Lamb vector divergence in Navier–Stokes flows*](https://doi.org/10.1017/S0022112008002760).
   *J. Fluid Mech.* **610**, 261–284. *(The Lamb vector defined as ω × u, p. 265; decision 93.)*

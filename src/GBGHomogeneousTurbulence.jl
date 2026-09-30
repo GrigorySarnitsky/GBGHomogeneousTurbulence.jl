@@ -41,10 +41,10 @@ of integrating-factor time-stepping scheme, with Lagrangian particle tracking an
 The package produces the flow and the values sampled from it; accumulating statistics over them is
 the caller's own analysis, for which the two sibling packages supply the tools —
 [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) the field reductions
-and [`GBGStreamingStatistics`](https://github.com/GrigorySarnitsky/GBGStreamingStatistics.jl) the
+and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the
 online estimators.
 
-A run checkpoints to HDF5 and restores from it — `write_simulation` / `read_simulation`, once the
+A run checkpoints to HDF5 and restores from it — [`write_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.write_simulation) / [`read_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.read_simulation), once the
 `HDF5` package is loaded.
 
 Built on `GBGPeriodicFields`.

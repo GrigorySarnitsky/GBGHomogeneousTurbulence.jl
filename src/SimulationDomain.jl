@@ -60,49 +60,48 @@ abstract type DealiasingStrategy end
 """
     TwoThirds()
 
-The sharp isotropic ``2/3``-rule truncation of Orszag (1971,
-[*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2),
-*J. Atmos. Sci.* **28**, 1074).
+The sharp isotropic ``2/3``-rule truncation of Orszag (1971).
 Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
 ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
 of the quadratic nonlinearity, with the narrowest retained band of the three and no taper to evaluate.
+
+# References
+- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074.
 """
 struct TwoThirds <: DealiasingStrategy end
 
 """
     HouLi(; order = 36, strength = nothing, materialized = false)
 
-The smooth spectral filter of Hou & Li (2007,
-[*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014),
-*J. Comput. Phys.* **226**, 379–397). Each mode is multiplied
+The smooth spectral filter of Hou & Li (2007). Each mode is multiplied
 by the transfer function
-``\\exp\\!\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
+``\\exp\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
 applied isotropically in ``\\kappa``, with
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. It keeps more
 modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
 stabilization.
 
-The `order` sets the sharpness of the spectral roll-off (higher is closer to a sharp cutoff). The
-`strength` sets the damping at the Nyquist mode, which is multiplied by
-``\\mathrm{e}^{-\\texttt{strength}}``. By default (`strength = nothing`) `strength` is chosen for the
-domain's element type as ``-\\log`` of its machine epsilon — ``\\approx 36`` for
-[`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
-[`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps to that
-precision's machine epsilon; pass an explicit `strength` to override.
-
 Because the filter retains energy out to the Nyquist wavenumber it takes a proportionally smaller
 CFL step than the ``2/3`` rule — handled automatically by
 [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 
-The `materialized` keyword chooses how the filter is *applied* — a memory-for-compute choice
-with no effect on the numbers. The default `false` keeps the filter as a closed-form radial
-symbol re-evaluated per mode in every pass: zero resident storage, the minimal-footprint side.
-`true` evaluates the same expression once into a stored coefficient array — one resident complex
-spectral scalar (``\\approx 17`` MiB at ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``) —
-that the passes then merely read. Because the coefficients are the same expression evaluated
-once, the two settings advance a run **bit-identically**.
+# Arguments
+- `order = 36` — the sharpness of the spectral roll-off; higher is closer to a sharp cutoff.
+- `strength = nothing` — the damping at the Nyquist mode, which is multiplied by
+  ``\\mathrm{e}^{-\\texttt{strength}}``. By default it is chosen for the domain's element type as
+  ``-\\log`` of its machine epsilon — ``\\approx 36`` for
+  [`Float64`](@extref Julia :jl:type:Core.Float64), ``\\approx 16`` for
+  [`Float32`](@extref Julia :jl:type:Core.Float32) — so the Nyquist mode always damps to that
+  precision's machine epsilon; pass a value to override.
+- `materialized = false` — how the filter is *applied*, a memory-for-compute choice with no effect
+  on the numbers. `false` keeps the filter as a closed-form radial symbol re-evaluated per mode in
+  every pass: zero resident storage, the minimal-footprint side. `true` evaluates the same expression
+  once into a stored coefficient array — one resident complex spectral scalar (``\\approx 17`` MiB at
+  ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``) — that the passes then merely read. Because
+  the coefficients are the same expression evaluated once, the two settings advance a run
+  **bit-identically**.
 
 Measured at ``128^3`` `Float64` on a GPU with `order = 36`: the on-the-fly evaluation costs
 ``\\approx 14\\%`` of the step, of which `materialized = true` recovers ``\\approx 7\\%`` — the
@@ -118,6 +117,9 @@ Prefer `true` when compute is the scarce resource, `false` when memory is.
     The resolution criterion ``\\kappa_{\\max}\\eta`` therefore uses
     [`max_resolved_wavenumber`](@ref), which is ``\\tfrac{4}{5} \\kappa_{\\mathrm{Ny}}`` under
     this strategy whatever the `order` — not the Nyquist (its docstring scopes the convention).
+
+# References
+- Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014). *J. Comput. Phys.* **226**, 379–397.
 
 # Fields
 The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:
@@ -138,9 +140,7 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing,
 """
     PhaseShift()
 
-Phase-shift dealiasing — Patterson & Orszag (1971,
-[*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365),
-*Phys. Fluids* **14**, 2538–2541), combined with the spherical truncation of
+Phase-shift dealiasing — Patterson & Orszag (1971), combined with the spherical truncation of
 Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble
 each quadratic nonlinear term on the grid **and** on a grid displaced by half a cell, average the
 two, and truncate spherically at
@@ -168,6 +168,9 @@ than the ``2/3`` rule — handled automatically by
     ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
     cutoff at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
     Nyquist content to mistranslate.
+
+# References
+- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* **14**, 2538–2541.
 """
 struct PhaseShift <: DealiasingStrategy end
 
@@ -593,7 +596,7 @@ dealiasing strategy with its settings), never the derived machinery (transform p
 kernels), which the reader rebuilds. Available once the `HDF5` package is loaded; opening and
 closing the file is the caller's job.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group to write under.
 - `name` — the created group's name.
 - `domain` — the `FixedDomain` to record.
@@ -612,7 +615,7 @@ parameters through the ordinary constructor, so the transform plans, multipliers
 rebuilt, never read. A group that was not written by `write_domain`, or was written by a newer
 schema version, is refused with an `ArgumentError`. Available once the `HDF5` package is loaded.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group holding the domain group.
 - `name` — the group's name.
 - `array_type = Array` — the storage backend the rebuilt domain lives on. The backend is

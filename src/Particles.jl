@@ -68,7 +68,7 @@ export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
 Give **exactly one** of the two. The `number_of_particles` form seeds that many tracers uniformly
-at random in the periodic box. The `positions` form supplies the tracer positions as a `GBGPeriodicFields`
+at random in the periodic box. The `positions` form supplies the tracer positions as a [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet), copied to `domain`'s
 backend and element type. Supplying both, or neither, raises an `ArgumentError`, and so does a raw
 array in place of the `PointSet`: coordinates cross into the package only through the
@@ -205,7 +205,7 @@ Building it by hand belongs with a hand-run loop, where it is passed on to
 [`advect!`](@ref), the particle form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
 and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
 
-The arguments are:
+# Arguments
 
 - `domain` — the `FixedDomain` whose grid the tiles are laid over.
 - `tracers` — the [`Tracers`](@ref) whose positions are ordered; the order is sized to their count
@@ -246,11 +246,14 @@ end
     rebuild_traversal!(traversal, domain, tracers) -> traversal
     rebuild_traversal!(sim) -> sim
 
-Rebuild the tracer traversal order from the current tracer positions, in place — the
-[`ParticleTraversal`](@ref) `traversal` over the tracer set `tracers` on the grid of `domain` (a
-[`FixedDomain`](@ref)), or the one the run `sim` (a
-[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)) carries as
-`sim.particle_traversal`.
+Rebuild the tracer traversal order from the current tracer positions, in place.
+
+# Arguments
+- `traversal` — the [`ParticleTraversal`](@ref) to rebuild.
+- `domain` — the [`FixedDomain`](@ref) whose grid the order is taken on.
+- `tracers` — the tracer set whose positions are ordered.
+- `sim` — a run ([`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)), in the second
+  form: the traversal it carries as `sim.particle_traversal` is rebuilt.
 
 Call it from a run's callback when the run was built with `ordered_interpolation = :manual`, at
 whatever cadence you choose — every so many steps with
@@ -345,7 +348,7 @@ function restart! end
 
 The per-step storage a particle integration scheme computes in, sized to a tracer set and allocated
 once, so advancing the tracers allocates nothing. Build it with
-[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)`(scheme, tracers, cache)`,
+[`allocate_buffers(scheme, tracers, cache)`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers),
 which allocates exactly what `scheme` needs and nothing more; a run builds it for you.
 
 This storage belongs to the scheme, not to the trajectory — which is why it lives here rather than
@@ -411,9 +414,7 @@ restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
     AdamsBashforth(; order = 4)
 
 Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
-its default order (Lalescu et al. 2022,
-[*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406),
-*Comput. Phys. Commun.* **278**, 108406) — buying accuracy in
+its default order (Lalescu et al. 2022) — buying accuracy in
 time at **no extra field evaluation and no extra interpolation** per step.
 
 Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
@@ -463,9 +464,11 @@ produce.
     class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying
     the smoothness at fixed degree left the time convergence unchanged. Raise the degree when the
     floor is what limits you; smoothness buys something different, namely readouts that
-    *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010,
-    [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006),
-    *J. Comput. Phys.* **229**(17), 5862–5869).
+    *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010).
+
+# References
+- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* **278**, 108406.
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229*
 
 # Fields
 The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
@@ -630,20 +633,22 @@ end
     advect!(scheme, tracers, velocity_end, domain, buffers, dt;
             traversal = nothing) -> tracers
 
-Advance the positions of the tracer set `tracers` by one step of size `dt` (written ``\\Delta t``
-below), in place, under the particle integration scheme `scheme` (an
-[`AbstractParticleIntegrator`](@ref)), using its working storage `buffers` (the
-[`ParticleIntegratorBuffers`](@ref) that
-[`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for
-that scheme). The `domain` (a [`FixedDomain`](@ref))
-supplies the box side the positions are wrapped into. The keyword `traversal` takes the
-`PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order` field) to gather the velocity in
-memory-locality order; the default `nothing` gathers in tracer order, with identical values.
+Advance the positions of a tracer set by one step, in place.
 
-Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the
-step — the start-of-step values the previous iteration's closing particle deposit stored, and
-`velocity_end`, the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical
-representation:
+# Arguments
+- `scheme` — the particle integration scheme, an [`AbstractParticleIntegrator`](@ref).
+- `tracers` — the tracer set whose positions advance.
+- `velocity_end` — the end-of-step velocity field ``\\boldsymbol{u}(t_{n+1})`` in physical representation.
+- `domain` — the [`FixedDomain`](@ref), which supplies the box side the positions are wrapped into.
+- `buffers` — the scheme's working storage, the [`ParticleIntegratorBuffers`](@ref) that
+  [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for it.
+- `dt` — the step size, written ``\\Delta t`` below.
+- `traversal = nothing` — the `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order`
+  field), to gather the velocity in memory-locality order; `nothing` gathers in tracer order, with
+  identical values.
+
+Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the step — the
+start-of-step values the previous iteration's closing particle deposit stored, and `velocity_end`:
 
 ```math
 \\begin{aligned}
@@ -717,15 +722,19 @@ end
 """
     interpolate_at_particles!(out, field, tracers; traversal = nothing) -> out
 
-Sample the physical `field` at the current tracer positions into the point-value buffer `out` (a
-[`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
-velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
-for the scalar ``\\varphi``), using the interpolation scheme of the tracer set `tracers`. This is how
-a field is gathered along the trajectories; what is then accumulated over those values is the
-caller's own analysis. The keyword `traversal` takes the `PointTraversalOrder` of a
-[`ParticleTraversal`](@ref) (its `order` field) to gather in memory-locality order — on a run,
-`sim.particle_traversal.order`; the default `nothing` gathers in tracer order, with identical
-values.
+Sample a physical field at the current tracer positions. This is how a field is gathered along the
+trajectories; what is then accumulated over those values is the caller's own analysis.
+
+# Arguments
+- `out` — the point-value buffer written: a
+  [`VectorPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.VectorPointValues) for the
+  velocity, a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues)
+  for the scalar ``\\varphi``.
+- `field` — the field in physical representation.
+- `tracers` — the tracer set, whose positions and interpolation scheme are used.
+- `traversal = nothing` — the `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order`
+  field), to gather in memory-locality order — on a run, `sim.particle_traversal.order`; `nothing`
+  gathers in tracer order, with identical values.
 """
 function interpolate_at_particles!(out, field, tracers::Tracers; traversal = nothing)
   interpolate!(out, field, tracers.positions, tracers.interpolation_scheme; traversal)
@@ -837,7 +846,7 @@ wrapped positions, the unwrapped positions when tracked, and the interpolation s
 persisted through the field library's own pairs. Available once the `HDF5` package is loaded; the
 caller owns the file.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group to write under.
 - `name` — the created group's name.
 - `tracers` — the tracer set to record.
@@ -856,7 +865,7 @@ on the storage backend of `domain` (a [`FixedDomain`](@ref)), whose element type
 the file or the read is refused with an `ArgumentError`, as is a group not written by
 `write_tracers`. Available once the `HDF5` package is loaded.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group holding the tracer group.
 - `name` — the group's name.
 - `domain` — the `FixedDomain` whose backend the rebuilt set lives on.

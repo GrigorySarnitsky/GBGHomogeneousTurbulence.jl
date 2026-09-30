@@ -26,7 +26,7 @@ the whole polynomial, lower-order terms included.
 | `PhaseShift()` | `Float64` | no | 216 | 27.1 GiB | 91.3 GiB | 216.2 GiB |
 | `PhaseShift()` | `Float64` | yes | 272 | 34.1 GiB | 114.9 GiB | 272.3 GiB |
 
-The table holds for every forcing except [`Linear`](@ref), for [`HouLi`](@ref)`()` as for
+The table holds for every forcing except [`Linear`](@ref), for [`HouLi()`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) as for
 `TwoThirds()`, and for the integrators `IFLowStorageRK3`, `IFLowStorageRK4` and `IFSSPRK3`. The `Linear`
 forcing, the [`IFHeun`](@ref) integrator and `HouLi(materialized = true)` each add storage of their own.
 Tracers are cheap next to the fields: with the default [`Heun`](@ref) scheme a `Float32` run holds 61 bytes per tracer and a `Float64` run 109.

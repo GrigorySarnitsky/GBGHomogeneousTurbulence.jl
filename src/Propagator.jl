@@ -61,7 +61,7 @@ export AbstractIntegrator, IFHeun, IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, I
 
 Supertype of the time-marching schemes: [`IFLowStorageRK3`](@ref) (the default),
 [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref) and [`IFHeun`](@ref). A scheme implements
-[`step!`](@ref)`(scheme, state, generator, domain, buffers, cache, dt)`, advancing the `state`'s
+[`step!(scheme, state, generator, domain, buffers, cache, dt)`](@ref GBGHomogeneousTurbulence.Propagator.step!), advancing the `state`'s
 velocity ``\\hat{\\boldsymbol{u}}`` and scalar ``\\hat\\varphi`` (both in spectral representation) by one
 timestep in place, and may specialize
 [`recommended_cfl`](@ref).
@@ -83,7 +83,7 @@ end
     IntegratorBuffers
 
 The preallocated per-step scratch the scheme writes into, sized so a step allocates no field-sized
-memory. Built per scheme by [`allocate_buffers`](@ref)`(scheme, domain; scalar)`, which allocates
+memory. Built per scheme by [`allocate_buffers(scheme, domain; scalar)`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which allocates
 **exactly** that scheme's working set: an array another scheme would use is left `nothing`, never
 allocated.
 
@@ -158,7 +158,7 @@ Allocate the per-step registers a scheme needs, dispatching on the concrete sche
 here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
 a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation).
 
-The arguments are:
+# Arguments
 - `scheme` — the concrete scheme dispatched on: an [`AbstractIntegrator`](@ref) in the field form,
   an
   [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator)
@@ -191,7 +191,7 @@ Advance the velocity ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varp
 by one timestep `dt` in place. Dispatches on the concrete `scheme` type (the schemes are
 catalogued under [`AbstractIntegrator`](@ref)).
 
-The arguments are:
+# Arguments
 - `scheme` — the stateless dispatch tag naming the scheme.
 - `state` — the [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) this call
   mutates: the fields in spectral representation.
@@ -232,9 +232,7 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980,
-[*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9),
-*J. Comput. Phys.* **35**, 48–56) 2N-storage family. The
+Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980) 2N-storage family. The
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
 unlike [`IFHeun`](@ref).
 
@@ -268,6 +266,9 @@ evolved field registers — two registers per field: the state's own array plus 
 (`stage1`). The [`IntegratorBuffers`](@ref) a run allocates also holds `nonlinear`, the register the
 right-hand-side assembly and its dealiasing pass write through: the 2N count measures the scheme,
 not the solver it is embedded in.
+
+# References
+- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* **35**, 48–56.
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
@@ -304,7 +305,7 @@ evaluations per step — measured on a ``128^3`` `Float64` GPU run: the step cos
 ``1.665`` more than `IFLowStorageRK3`'s (every per-stage cost scales with the five stages alike), so a
 stability-limited run advances ``\\approx 16\\%`` more physical time per unit compute — with
 fourth-order accuracy, which removes the field's own time error as the limit on an
-[`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)`(order = 4)` tracer —
+[`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer —
 whose [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) bootstrap still caps its measured
 convergence near third order, as its docstring records.
 """
@@ -557,9 +558,7 @@ end
 """
     IFSSPRK3()
 
-Integrating-factor strong-stability-preserving third-order Runge–Kutta of Shu & Osher (1988,
-[*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5),
-*J. Comput. Phys.* **77**, 439–471) — the SSPRK3 tableau, in exactly the stage arrangement of
+Integrating-factor strong-stability-preserving third-order Runge–Kutta of Shu & Osher (1988) — the SSPRK3 tableau, in exactly the stage arrangement of
 TurTLE, the reference pseudospectral solver, so a code-to-code comparison against it shares the time
 discretization. Choose it for that comparison; for everything else it and [`IFLowStorageRK3`](@ref)
 are interchangeable — same order, same three right-hand-side evaluations, same two registers per
@@ -599,6 +598,9 @@ no accumulator is rotated).
     roundoff-level; a run driven with a hand-fixed ``\\Delta t \\gg`` the advective step would
     amplify high-wavenumber roundoff instead. `IFLowStorageRK3`'s stages only ever transport
     forward and carry no such term.
+
+# References
+- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471.
 """
 struct IFSSPRK3 <: AbstractIntegrator end
 
@@ -768,7 +770,7 @@ it is one concept — each dynamical factor's advance is followed by its own dep
 closes as `step!` then `deposit!`, then
 [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) then `deposit!` again.
 
-The arguments are:
+# Arguments
 - `cache` — every form's destination: the cache whose slots receive the deposits.
 - `state` — field form: the [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields)
   the step has just produced.

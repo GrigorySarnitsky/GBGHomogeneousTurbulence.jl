@@ -186,7 +186,7 @@ Code that writes the state outside an iteration — a reseed, a filter — must 
 calling [`fields_modified!`](@ref), which advances the fields counter past every slot, so that reads
 throw
 until the next deposit. That interval belongs to whoever made the change: the recoveries stay callable — the field ones
-through the backend (`GBGPeriodicFields`' four-argument `to_physical!`), the vorticity through this
+through the backend ([`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)' four-argument `to_physical!`), the vorticity through this
 package's [`vorticity_physical!`](@ref) — so a caller who mutates the state mid-run computes what
 they need themselves, in their own buffer.
 
@@ -282,7 +282,7 @@ transforms below.
   ``-\nabla\cdot(\boldsymbol{u}\varphi)``: evaluated as fields.
 - **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\!\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a field-proportional forcing's
   rate, and ``\tau`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A field-proportional one folds its rate into that

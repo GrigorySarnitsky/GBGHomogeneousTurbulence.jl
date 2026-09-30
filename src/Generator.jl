@@ -85,8 +85,10 @@ All keyword, all required:
 
 # Fields
 The plain constructor `FlowConditions(viscosity, schmidt, velocity_forcing, scalar_forcing)` takes the
-four fields directly, in the order shown; each holds the value documented for the keyword of the same name
-above, with the two numbers stored as `Float64`.
+four fields directly, in the order shown:
+- `viscosity`, `schmidt` — ``\\nu`` and ``\\mathrm{Sc}``, as the keywords of the same names, stored as
+  `Float64`.
+- `velocity_forcing`, `scalar_forcing` — the two forcing strategies, as the keywords of the same names.
 """
 struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
   viscosity::Float64
@@ -327,7 +329,7 @@ you.
 !!! warning "The constructor rejects a misdeclared forcing"
     A forcing that implements
     [`set_forcing_rate!`](@ref GBGHomogeneousTurbulence.Forcing.set_forcing_rate!) without also
-    declaring `uses_steady_linear_rate` is given no
+    declaring [`uses_steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate) is given no
     rate array to fill, so its forcing would silently never be applied. Building a
     `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
     the run proceed quietly wrong.
@@ -355,7 +357,7 @@ you.
   filled once when the generator is built (the rate is steady, so it never changes). The
   integrating-factor verbs return them alongside the viscous coefficient, so the forcing rides the
   exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
-  [`uses_steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate), so a field driven by
+  `uses_steady_linear_rate`, so a field driven by
   a post-step projection, a stochastic source, or nothing at
   all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
 - `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds,
@@ -363,6 +365,9 @@ you.
   two conditions together: this record must match the caller's `û`, **and** the caller must promise
   through `displaced_velocity_current` that the scratch is still fresh. The record alone can only
   force a rebuild.
+- `velocity_forcing_state`, `scalar_forcing_state` — each forcing's evolving state for the step
+  `prepare!` opened, taken from the run's state so the stage hooks receive it; `nothing` for a
+  forcing that evolves none.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
   const conditions::C
@@ -434,7 +439,7 @@ scheme calls this once before its Runge–Kutta stages; the stage evaluations th
 prepared. The steady per-mode linear forcing rates are not touched here: they were filled once, when
 the generator was built.
 
-The arguments are:
+# Arguments
 - `generator` — the [`ResolvedGenerator`](@ref) being opened.
 - `state` — the start-of-step [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields)
   the forcing hooks read, whose forcing states they advance.
@@ -466,7 +471,7 @@ after its final stage, so everything that follows the step — the diagnostics, 
 observables, the tracer advance — sees the forced end-of-step fields. The name is this protocol's
 step-closing verb, unrelated to `Base.finalize`, Julia's garbage-collection finalizer vocabulary.
 
-The arguments are:
+# Arguments
 - `generator` — the [`ResolvedGenerator`](@ref) whose forcings project.
 - `state` — the advanced [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) the
   projections act on.
@@ -501,10 +506,10 @@ Leray-projected rotational nonlinear term plus any additive forcing source. Two 
 written, not one: `N̂` receives the result, and `ω_consumed` is consumed in place — the
 `_consumed` suffix marks it, since Julia's `!` convention flags only the first.
 
-The arguments are:
+# Arguments
 - `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
-- `û` — the stage velocity in spectral representation, consulted by `PhaseShift`'s displaced
+- `û` — the stage velocity in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s displaced
   evaluation; a mask strategy leaves it unused.
 - `u` — the stage velocity in physical representation, only read.
 - `ω_consumed` — the stage vorticity in physical representation, consumed (see the note below).
@@ -627,7 +632,7 @@ The linear part of the momentum equation — the diffusion
 representation by the per-mode multiplier
 
 ```math
-\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\!\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\bigr),
+\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\bigr),
 ```
 
 with ``A = 0`` when no linear forcing is active. Multiplying a field by ``\\mathcal{E}`` advances its
@@ -672,10 +677,10 @@ advection term plus any additive forcing source. Two arguments are written, not 
 the result, and `u_consumed` is consumed in place — the `_consumed` suffix marks it, since Julia's
 `!` convention flags only the first.
 
-The arguments are:
+# Arguments
 - `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
-- `û`, `φ̂` — the stage velocity and scalar in spectral representation, consulted by `PhaseShift`;
+- `û`, `φ̂` — the stage velocity and scalar in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift);
   a mask strategy leaves both unused.
 - `u_consumed` — the stage velocity in physical representation, consumed (see the note below).
 - `φ` — the stage scalar in physical representation, only read.

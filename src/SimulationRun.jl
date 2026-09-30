@@ -150,7 +150,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     What is guaranteed follows what the forcing holds. A forcing holding ``\\varepsilon``, as the
     default does, meets `κ_max_η` in the stationary mean whatever ``\\tilde{k}`` truly is, and leaves
     ``k`` the prediction. One holding ``k`` makes ``\\varepsilon``, and with it the resolution, the
-    prediction. One holding neither, given its own strength — a `Linear` rate, a `StochasticOU`
+    prediction. One holding neither, given its own strength — a [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU)
     variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
     describes a state the run may not reach.
 
@@ -185,7 +185,8 @@ The domain group:
   `FixedDomain` being built (pass `FFTW.MEASURE` for a long CPU run — the planner note
   there explains why; inert on a GPU backend).
 
-The run group:
+The run group, `kwargs...` in both signatures
+([keyword arguments](https://docs.julialang.org/en/v1/manual/functions/#Keyword-Arguments)):
 
 - `κ_max_η` — the resolution criterion ``\\kappa_{\\max}\\eta`` a derived ``\\nu`` is set from;
   ``\\ge 1.5`` is well-resolved, higher trades Reynolds number for margin. It defaults to `nothing`
@@ -212,12 +213,12 @@ The run group:
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
-  [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing) from an
+  `DeferredForcing` from an
   operator-free constructor); `velocity_forcing` left at `nothing` means the default,
   `ConstantPower()` injecting the state's ``\\varepsilon``, and `scalar_forcing` defaults to
   `NoForcing()`. A deferred velocity forcing may leave its strength out for the state to fill; a
   scalar forcing states its own, since no scalar state is modelled. The velocity and scalar are forced independently.
-  A `VarianceController` with a defaulted `turnover_time` is refused as `scalar_forcing` (its
+  A [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) with a defaulted `turnover_time` is refused as `scalar_forcing` (its
   derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
   explicitly there.
   A velocity forcing's stated target is a statement of the run's state, so giving
@@ -272,7 +273,7 @@ The run group:
   (`nothing` means the default [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun));
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
-  [`AdamsBashforth`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth)`()` when trajectory
+  [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
   accuracy in time limits a measurement: it costs one stored array per extra order and saves an
   interpolation per step.
 - `ordered_interpolation = nothing` — whether the gathers at the tracers (the velocity for the
@@ -298,7 +299,7 @@ The run group:
     - it must live on the domain's grid and storage backend, and agree with `scalar`;
     - `initial_spectrum` cannot be given with it, since the field is no longer being seeded;
     - a forcing state it carries in its `modeled` entry — as a checkpoint of a
-      [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) run does — continues where it
+      `StochasticOU` run does — continues where it
       left off, while a forcing whose entry is empty starts a fresh one. An entry that does not fit
       the forcing given is refused with an `ArgumentError`;
     - with a derived ``\\nu``, the constructor measures the adopted state's kinetic energy and warns
@@ -340,7 +341,7 @@ and the tracer positions.
     `ConstantPower` injects the state's ``\\varepsilon`` at every stage and never measures ``k``,
     which settles where the true ``\\tilde{k}`` puts it and fluctuates with the cascade. It was chosen as the
     default because it has no gain or settling time to choose. To hold ``k`` instead, force with a
-    [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) whose target is
+    `VarianceController` whose target is
     left out: it takes the target from the state and restores ``k`` exponentially, its gain setting
     the fluctuation it leaves.
 
@@ -430,8 +431,9 @@ end
 
 
 """
-    predicted_stationary_state(domain; velocity_forcing = ConstantPower(), kinetic_energy = nothing,
-                               dissipation = nothing, κ_max_η = nothing, viscosity = nothing)
+    predicted_stationary_state(domain; velocity_forcing = ConstantPower(),
+                               kinetic_energy = nothing, dissipation = nothing,
+                               κ_max_η = nothing, viscosity = nothing)
 
 The stationary state a forced run on `domain` is predicted to settle in: the kinetic energy ``k``,
 the dissipation rate ``\\varepsilon``, the energy ``k_{\\mathrm{band}}`` held in the forced band, the
@@ -443,11 +445,11 @@ prediction goes through the kinetic energy in box units
 ([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)), both taken at
 the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu``.
 
-The arguments are:
+# Arguments
 - `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain), which fixes
   the box side ``L`` and the largest resolved wavenumber ``\\kappa_{\\max}``.
 - `velocity_forcing` — the velocity forcing, built or in its deferred keyword form. A forcing that
-  states its own target (a `ConstantPower` injection rate, a `VarianceController` or
+  states its own target (a [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) injection rate, a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) or
   `VarianceRescaling(over = :total)` target) states the state through it.
 - `kinetic_energy`, `dissipation` — the state, stated once: ``k``, ``\\varepsilon``, or neither when the
   forcing states it. With none of the three, ``k = 1.5``.
@@ -1037,7 +1039,7 @@ end
 
 Advance `sim` by one timestep in place and return it.
 
-The arguments are:
+# Arguments
 - `sim` — the [`Simulation`](@ref) to advance.
 - `dt = nothing` — pass a value to force a fixed step; `nothing` picks the adaptive step, the
   smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
@@ -1193,8 +1195,10 @@ A predicate on a run that is `true` on every `n`-th step — the cadence test a
 `ordered_interpolation = :manual`, record a spectrum, write a checkpoint.
 
 The argument `n` is the period in steps, a positive integer; the returned function `fires(sim)` is
-`true` when [`current_step`](@ref)`(sim)` is a multiple of `n` — including at step `0`, the seeded
-state `run!` observes first. For a cadence in simulation time use [`every_time`](@ref).
+`true` when [`current_step(sim)`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) is a multiple of `n` — including at step `0`, the seeded
+state `run!` observes first. For a cadence in simulation time use [`every_time`](@ref). The example
+passes the callback as a
+[`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
 ```julia
 rebuild = every_steps(50)
@@ -1223,10 +1227,13 @@ The argument `period` is the interval in simulation time, positive. The returned
 `fires(sim)` is `true` at the first observation at or past each multiple
 ``0, \\Delta T, 2\\Delta T, \\ldots`` of the period ``\\Delta T`` — at the seeded state first, since
 it lies on ``0`` — so the firing instants land within one step past the multiples, never before
-them. A step that jumps over two
-multiples fires once, not twice, and the next firing is at the next multiple ahead. The predicate
-carries its own record of the next multiple to fire on, so it serves **one** run: make a fresh one
-per run. For a cadence in steps use [`every_steps`](@ref).
+them. A step that jumps over two multiples fires once, not twice, and the next firing is at the next
+multiple ahead.
+
+The predicate carries its own record of the next multiple to fire on, so it serves **one** run: make
+a fresh one per run. For a cadence in steps use [`every_steps`](@ref). The example passes the
+callback as a
+[`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
 ```julia
 record = every_time(0.25)
@@ -1262,7 +1269,8 @@ end
     run!(callback, sim; dt = nothing)
     run!(sim; dt = nothing) do sim … end
 
-Observe and advance `sim` until the observation stops it.
+Observe and advance `sim` until the observation stops it. The second form passes the callback as a
+[`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
 After every iteration — and once at the seeded initial state, before any advance — the `callback`
 **observes** the run as `callback(sim)`: it reads the state and the cached observables, records
@@ -1282,7 +1290,7 @@ Whatever the callback needs beyond the cached observables it computes itself, at
 with the exported reductions and recoveries; [`every_steps`](@ref) and [`every_time`](@ref) are
 the cadence tests for that.
 
-The arguments are:
+# Arguments
 - `callback` — the observation, called as `callback(sim)`; returns `true` to continue, `false` to
   stop.
 - `sim` — the [`Simulation`](@ref) to observe and advance.
@@ -1548,13 +1556,16 @@ run!(StationarityCriterion(; kwargs...), sim; dt)
 ```
 
 — it spins `sim` up to a statistically stationary state before measurement and returns it, by
-running the observation-first loop with the packaged stationarity observation. The `dt` keyword is
-[`run!`](@ref)'s — a value forces that fixed timestep, `nothing` keeps the adaptive step; every
-other keyword is
-passed through to [`StationarityCriterion`](@ref) untouched; its docstring is the home for what is
-detected (the flat dissipation, the scalar-variance and derivative-skewness gates, the give-up cap)
-and for every option. For a fixed spin-up budget, write the three-line budget callback instead
-(see `run!`).
+running the observation-first loop with the packaged stationarity observation. For a fixed spin-up
+budget, write the three-line budget callback instead (see [`run!`](@ref)).
+
+# Arguments
+- `sim` — the run.
+- `dt = nothing` — `run!`'s: a value forces that fixed timestep, `nothing` keeps the adaptive step.
+- `kwargs...` — every other keyword, passed through to [`StationarityCriterion`](@ref) untouched
+  ([keyword arguments](https://docs.julialang.org/en/v1/manual/functions/#Keyword-Arguments)); its
+  docstring is the home for what is detected (the flat dissipation, the scalar-variance and
+  derivative-skewness gates, the give-up cap) and for every option.
 
 # Examples
 ```julia
@@ -1593,7 +1604,7 @@ state is part of the run's state and is stored with it, so continuation is exact
 Available once the `HDF5` package is loaded; opening and closing the file is the caller's job,
 and `parent[name] = sim` is equivalent sugar.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group to write under.
 - `name` — the created group's name.
 - `sim` — the run to checkpoint.
@@ -1616,7 +1627,7 @@ run, a stochastic forcing's realization included. A
 group not written by `write_simulation`, or written by a newer schema version, is refused with an
 `ArgumentError`. Available once the `HDF5` package is loaded.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group holding the checkpoint group.
 - `name` — the group's name.
 - `array_type = Array` — the storage backend the restored run lives on; the reader names it, so a

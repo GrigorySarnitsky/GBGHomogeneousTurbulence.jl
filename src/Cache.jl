@@ -90,7 +90,7 @@ and seeds one for you; a hand-assembled run constructs it here.
 - `scalar = false` — pass `true` when the run evolves a passive scalar, which adds the scalar's slot.
 - `history_depth = 1` — how many Lagrangian samples the run must be able to look back over,
   including the current one. A hand-assembled run sets it to
-  [`history_depth`](@ref GBGHomogeneousTurbulence.Particles.history_depth)`(scheme)` for its particle
+  [`history_depth(scheme)`](@ref GBGHomogeneousTurbulence.Particles.history_depth) for its particle
   integration scheme. A one-step scheme needs 1 and stores no history; an `order`-step scheme needs
   `order`, and allocating the scheme's per-step buffers
   ([`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)) refuses a cache
@@ -122,10 +122,11 @@ depends on.
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
-- `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first, and
-  `history_steps` the step sizes they were taken over; `history_filled` says how many are valid. A
-  multistep particle integration scheme integrates over these; an announced reposition invalidates them
+- `velocity_at_particles_history` — the earlier Lagrangian samples, most recent first. A multistep
+  particle integration scheme integrates over these; an announced reposition invalidates them
   together with the current sample.
+- `history_steps` — the step sizes the earlier samples were taken over.
+- `history_filled` — how many of the earlier samples are valid.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `velocity_at_particles_fields_epoch`, `velocity_at_particles_particles_epoch` — the velocity-at-particles slot's two epochs, against
@@ -406,13 +407,13 @@ history-keeping announcement — the push *extends* the history this verb discar
 A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
 `deposit!(cache, tracers, u)` — from the
 deposited velocity, so the slot is refilled at the new positions. A loop
-announcing to a bare cache rather than a `Simulation` must also call
+announcing to a bare cache rather than a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) must also call
 [`restart!`](@ref GBGHomogeneousTurbulence.Particles.restart!) itself, for a scheme carrying per-step
 buffers of its own
 ([`ParticleIntegratorBuffers`](@ref GBGHomogeneousTurbulence.Particles.ParticleIntegratorBuffers)):
 the `Simulation` form calls that for you; the bare-cache form cannot dispatch to it.
 
-Given a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) it announces the change
+Given a `Simulation` it announces the change
 to that run's cache — the form to reach for when a run is what you are holding, mirroring
 [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)'s own `sim` form.
 

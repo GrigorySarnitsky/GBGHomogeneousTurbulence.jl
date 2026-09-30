@@ -69,11 +69,16 @@ holds no derived copies, nothing in it can fall out of date. Each **iteration** 
 run, a step plus the deposit that closes it — recovers the physical representations at its end into
 the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 
-Build it on `domain`, a [`FixedDomain`](@ref); pass `scalar = true` to carry a passive scalar. The
-positional form wraps existing fields without copying them, which is how a state is handed to
-[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to adopt. Both forms leave
-`modeled` empty; a `Simulation` fills it from its forcings, starting any forcing state the record
-does not already carry.
+The positional form wraps existing fields without copying them, which is how a state is handed to
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to adopt.
+
+# Arguments
+- `domain` — the [`FixedDomain`](@ref) to build the fields on, in the first form.
+- `scalar = false` — `true` to carry a passive scalar.
+- `velocity_spectral`, `scalar_spectral` — existing fields in spectral representation, in the second
+  form, wrapped as they are; `scalar_spectral` is `nothing` for a run without a scalar.
+- `modeled` — the forcing states. Both forms leave it empty; a `Simulation` fills it from its
+  forcings, starting any forcing state the record does not already carry.
 
 # Fields
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
@@ -134,7 +139,7 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 `kinetic_energy`. The Leray–Helmholtz projection ``\\mathbb{P}`` enforces
 ``\\nabla\\cdot\\boldsymbol{u} = 0``.
 
-The arguments are:
+# Arguments
 - `û` — the velocity field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `kinetic_energy` — the kinetic energy the seeded field is rescaled to.
@@ -145,11 +150,11 @@ The arguments are:
 - `rng = default_rng()` — the random stream.
 
 By default (`initial_spectrum = nothing`) the velocity is concentrated at large scales by a Gaussian
-envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
+envelope ``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
 amplitudes, zeroed at ``\\boldsymbol{\\kappa} = \\boldsymbol{0}`` so the mean mode stays empty; its
 characteristic wavenumber ``\\kappa_p`` is `envelope_wavenumber`. Because the envelope multiplies the
 amplitudes, the shell-summed energy spectrum
-``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)`` peaks at
+``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)`` peaks at
 ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above it puts most of the
 pre-rescale seed into shells the mask holds empty, and the seeder warns when the peak
@@ -239,7 +244,7 @@ requested `scalar_variance`. The mean vanishes by construction: the envelope is 
 ``\\boldsymbol{\\kappa}=\\boldsymbol{0}``, and that mode's coefficient *is* the spatial mean
 ``\\langle\\varphi\\rangle``.
 
-The arguments are:
+# Arguments
 - `φ̂` — the scalar field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `scalar_variance` — the variance the seeded field is rescaled to.
@@ -250,10 +255,10 @@ The arguments are:
 - `rng = default_rng()` — the random stream.
 
 By default (`initial_spectrum = nothing`) the scalar is concentrated at large scales by a Gaussian
-envelope ``\\exp\\!\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
+envelope ``\\exp\\bigl(-\\lvert\\boldsymbol{\\kappa}\\rvert^{2}/\\kappa_p^{2}\\bigr)`` on the mode
 amplitudes — zeroed, as above, at the origin — whose characteristic wavenumber ``\\kappa_p`` is
 `envelope_wavenumber`. Because the envelope multiplies the amplitudes, the shell-summed
-scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\!\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
+scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's
 mode count). Keep ``\\kappa_p`` well below the dealias cutoff — a value near or above it puts most
 of the pre-rescale seed into masked shells, and the seeder warns when the peak
@@ -336,7 +341,7 @@ representation, and each forcing state it carries. The spectral representation i
 source of truth, so no physical representation is stored. Available once the `HDF5` package is loaded;
 the caller owns the file.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group to write under.
 - `name` — the created group's name.
 - `state` — the `ResolvedFields` to record.
@@ -357,7 +362,7 @@ not written by `write_state`. The forcing states come back with the fields; a gr
 forcing states were stored reads with none, and a run adopting it starts its forcing afresh.
 Available once the `HDF5` package is loaded.
 
-The arguments are:
+# Arguments
 - `parent` — the open HDF5 file or group holding the state group.
 - `name` — the group's name.
 - `domain` — the `FixedDomain` whose backend the rebuilt state lives on.

@@ -102,7 +102,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
     tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
     provide usable model spectra, structure-function laws, and scaling constants. Accumulating
     statistics over the fields and the sampled trajectories is the caller's own analysis:
-    `GBGPeriodicFields` supplies the field reductions and `GBGStreamingStatistics` the online
+    `GBGPeriodicFields` supplies the field reductions and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the online
     estimators.
 
 ## Components

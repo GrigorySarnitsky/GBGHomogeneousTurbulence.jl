@@ -102,7 +102,7 @@ boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\bold
 the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
-The arguments are:
+# Arguments
 - `ω` — first form: a vorticity field, in either representation.
 - `û` — second form: the velocity in spectral representation.
 - `domain` — second form: the [`FixedDomain`](@ref) supplying the
@@ -151,8 +151,8 @@ dissipation(û, domain::FixedDomain, viscosity::Real) =
 Measure the turbulent kinetic energy ``k`` and the viscous dissipation rate ``\\varepsilon``
 together, from one fused traversal of the velocity in spectral representation.
 
-The two values are [`kinetic_energy`](@ref)`(û)` and [`dissipation`](@ref)`(û, domain,
-viscosity)` — each formula at its own home; the dissipation is bitwise identical to its single
+The two values are [`kinetic_energy(û)`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy) and [`dissipation(û, domain,
+viscosity)`](@ref GBGHomogeneousTurbulence.Observables.dissipation) — each formula at its own home; the dissipation is bitwise identical to its single
 call, the kinetic energy equal to within summation-order roundoff (a few ulp: the single reduces
 on a threaded tree, the fused pass serially) — but the pair costs one read of the coefficients and
 one blocking device-to-host readback instead of two. Reach for it wherever both are
@@ -160,7 +160,7 @@ wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delt
 of a spin-up or budget loop, which is how
 [`StationarityCriterion`](@ref GBGHomogeneousTurbulence.SimulationRun.StationarityCriterion) measures it.
 
-The arguments are:
+# Arguments
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
   velocity route of `dissipation`, exact only for a solenoidal field (its docstring carries the
   condition).
@@ -202,16 +202,15 @@ k(l) &= k - \\tfrac{1}{2}\\langle\\lvert\\langle\\boldsymbol{u}\\rangle_l\\rvert
 with ``W_l(\\boldsymbol{\\kappa}) = \\prod_{a} \\operatorname{sinc}(\\kappa_a l/2)`` the transfer function of
 the box mean, the sums in the normalized convention of [`kinetic_energy`](@ref). Both rise from zero
 as ``l \\to 0`` to ``k`` and ``\\varepsilon`` at ``l = L``, where the box is the domain and only the mean
-is removed. ``k(l)`` is the position average of the residual kinetic energy of a top-hat filter of
-width ``l`` in Pope (2000, [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge
-University Press, Exercise 13.22); in the inertial range it grows as ``(\\varepsilon l)^{2/3}``.
+is removed. The value ``k(l)`` is the position average of the residual kinetic energy of a top-hat filter of
+width ``l`` in Pope (2000, Exercise 13.22); in the inertial range it grows as ``(\\varepsilon l)^{2/3}``.
 
 The box mean is that of the band-limited field the coefficients represent, not the mean of the grid
 values inside the box, even for a side of a whole number of cells (the window is
 [`tophat_window`](@extref GBGPeriodicFields.Convolution.tophat_window)). Each value is the whole-field
 reduction minus the retained part, so its relative precision is lower by the ratio ``k/k(l)``.
 
-The arguments are:
+# Arguments
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
   velocity route of [`dissipation`](@ref), exact only for a solenoidal field.
 - `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) the
@@ -226,6 +225,9 @@ in the field's own real element type: the sides ``l``, then ``k(l)`` and ``\\var
     cost grows as ``N^{4}``. Measure it at observations, not inside a stepping loop. In `Float32` the
     subtraction above costs digits where ``k(l) \\ll k``, at the smallest sides of a field with little small-scale
     energy; measure in `Float64` where those sides matter.
+
+# References
+- Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press.
 """
 function kinetic_energy_and_dissipation_below_scale(û, domain::FixedDomain, viscosity::Real)
   whole, dirichlet = weighted_inner(û, (domain.unit_kernel, domain.squared_wavenumber_kernel))
@@ -269,7 +271,7 @@ deposit is current, like every cached read.
     run itself needs it: on the adaptive-CFL path the next timestep is chosen from it, so the
     reduction happens whether or not anyone reads the value. Under a hand-fixed ``\\Delta t`` nothing
     consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
-    not vary with how the run is driven. [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
+    not vary with how the run is driven. The observables [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
     because no part of the iteration leaves one alive at its end; caching either would mean adding a
     reduction the run does not otherwise perform, which is the one thing the cache may not do.
 """
@@ -292,7 +294,7 @@ representation into `ω` — the field-valued observable the iteration deposits 
 curl is formed as ``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` in spectral
 representation and transformed to physical.
 
-The arguments are:
+# Arguments
 - `ω` — the vector field in physical representation receiving the vorticity.
 - `û` — the velocity in spectral representation; only read, so unlike a pure representation
   recovery no preservation copy is needed.
@@ -330,7 +332,7 @@ scalar_variance(φ) = inner(φ, φ)
 The mean scalar-variance dissipation rate
 ``\\varepsilon_\\varphi = 2\\varkappa \\langle\\lvert\\nabla\\varphi\\rvert^{2}\\rangle``.
 
-The arguments are:
+# Arguments
 - `φ̂` — the scalar field in spectral representation.
 - `domain` — the [`FixedDomain`](@ref) bundle.
 - `diffusivity` — the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}``.
@@ -376,9 +378,7 @@ Because ``\\boldsymbol{S}`` is symmetric and, for the incompressible field, trac
 longitudinal skewness ``\\langle(\\partial_{x_1} u_1)^{3}\\rangle / \\langle(\\partial_{x_1} u_1)^{2}\\rangle^{3/2}``;
 the constant follows from ``\\langle\\operatorname{tr}\\boldsymbol{S}^{3}\\rangle = \\tfrac{105}{8}\\langle(\\partial_{x_1} u_1)^{3}\\rangle``
 and ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{15}{2}\\langle(\\partial_{x_1} u_1)^{2}\\rangle``
-(Betchov 1956,
-[*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317),
-*J. Fluid Mech.* **1**(5), 497–504). So the
+(Betchov 1956). So the
 reported value is the familiar ``S \\approx -0.5`` of developed turbulence, but from a genuine tensor
 invariant rather than an axis-dependent gradient.
 
@@ -398,7 +398,7 @@ quadratic reductions, not exactly alias-free. That pricing is the sharp-truncati
 smooth taper leaves a residual of its own shape that no bound here prices — on every strategy,
 treat the skewness as an indicator, not an alias-controlled measurement.
 
-``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
+The skewness ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
 (all odd invariants vanish), while fully developed isotropic turbulence has ``S \\approx -0.5`` (an
 empirical, weakly Reynolds-number-dependent value) — the enstrophy-production / vortex-stretching signature. Its plateau is the "real turbulence yet"
 gate of the warm-up detector.
@@ -410,6 +410,9 @@ gate of the warm-up detector.
     set. The [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) driver calls this on its
     sampling interval when its skewness gate is on (`gate_skewness = true`; off by default), so a
     run near its memory ceiling should size for the diagnostic rather than for the steady state.
+
+# References
+- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317). *J. Fluid Mech.* **1*
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
@@ -441,7 +444,7 @@ and the density estimate at each (positional destructuring `κ, E = energy_spect
 works). Both come back as host `Vector`s whatever backend `û` lives on — the ``O(N)`` shell accumulators
 return with the reduction, so a caller needs no transfer of its own.
 
-Each value is the shell's energy — half the `GBGPeriodicFields` radial spectrum, which sums
+Each value is the shell's energy — half the [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/) radial spectrum, which sums
 ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` — divided by the shell width
 ``\\Delta\\kappa = 2\\pi/L``, making Parseval the quadrature
 ``k = \\sum_n E(\\kappa_n) \\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
@@ -472,7 +475,7 @@ spectral density (from [`energy_spectrum`](@ref)),
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
 ```
 
-``L_{11}`` is the large-eddy scale — the one flow parameter a
+The integral scale ``L_{11}`` is the large-eddy scale — the one flow parameter a
 [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum needs that the small
 scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
 
@@ -536,10 +539,12 @@ kinetic energy in box units ``\\tilde{k}`` is stated against; [`reynolds_taylor`
 Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by the resolution
 ``\\kappa_{\\max}\\eta`` has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
 
-The arguments run from the largest scale to the smallest:
+# Arguments
 - `side_length` — the box side ``L``.
 - `dissipation` — the dissipation rate ``\\varepsilon``, such as a run's measured time mean.
 - `viscosity` — the kinematic viscosity ``\\nu``.
+
+The arguments run from the largest scale to the smallest.
 
 Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
 `side_length` or `viscosity`, or a negative or non-finite `dissipation`, throws an `ArgumentError`.
@@ -564,14 +569,16 @@ scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one compone
 \\mathrm{Re}_\\lambda = \\sqrt{\\frac{20}{3}} \\frac{k}{\\sqrt{\\varepsilon\\nu}}.
 ```
 
-It is the Reynolds number turbulence results are usually compared on. [`reynolds_box`](@ref) gives the
+It is the Reynolds number turbulence results are usually compared on. Its companion [`reynolds_box`](@ref) gives the
 box Reynolds number of the same run, and the two are tied by the kinetic energy in box units,
 ``\\mathrm{Re}_\\lambda = \\tilde{k}\\sqrt{(20/3)\\mathrm{Re}_{\\mathrm{box}}}``.
 
-The arguments run from the largest scale to the smallest:
+# Arguments
 - `kinetic_energy` — the turbulent kinetic energy ``k``.
 - `dissipation` — the dissipation rate ``\\varepsilon``.
 - `viscosity` — the kinematic viscosity ``\\nu``.
+
+The arguments run from the largest scale to the smallest.
 
 Returns a number in the floating-point type the arguments promote to. A negative or non-finite
 `kinetic_energy`, or a non-positive or non-finite `dissipation` or `viscosity`, throws an
