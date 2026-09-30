@@ -28,6 +28,8 @@ module DisplayTests;        include("display.jl");        end
 module GPUMemoryPageTests;  include("gpu_memory_page.jl"); end
 module PFStorageAccessTests; include("pf_storage_access.jl"); end
 module AllocationsTests;     include("allocations.jl");     end
+module ObservablesAnalyticTests; include("observables_analytic.jl"); end
+module OracleRegistryTests;  include("oracle_registry.jl");  end
 
 # The /bug-hunt regression witnesses. Each file is the executable form of one confirmed defect: it
 # asserts the CORRECT behaviour and was observed to FAIL before its fix landed, so it is already a
