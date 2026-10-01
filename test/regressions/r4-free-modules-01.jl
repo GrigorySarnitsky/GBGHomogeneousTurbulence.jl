@@ -11,7 +11,7 @@
 using Test
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.SimulationDomain: FixedDomain, TwoThirds, new_scalar_field_spectral
-using GBGHomogeneousTurbulence.Forcing: VarianceRescaling, ConstantPower, project_forcing!, set_forcing_rate!
+using GBGHomogeneousTurbulence.Forcing: VarianceRescaling, ConstantPower, project_forcing!
 using GBGHomogeneousTurbulence.State: random_solenoidal_velocity_spectral!
 using GBGPeriodicFields
 using Random
@@ -65,12 +65,6 @@ let cf = seeded_field()
   reset_counts!()
   project_forcing!(VarianceRescaling(domain; target = 1.5, over = :band), cf, domain)
   @info "measured: VarianceRescaling(over = :band)" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1
-end
-let cf = seeded_field()
-  rate = new_scalar_field_spectral(domain)
-  reset_counts!()
-  set_forcing_rate!(ConstantPower(domain; injection_rate = 0.1), rate, cf, domain)
-  @info "measured: ConstantPower" inner = COUNTS[:inner] weighted_inner = COUNTS[:weighted_inner] ledger_crossings = 1
 end
 
 

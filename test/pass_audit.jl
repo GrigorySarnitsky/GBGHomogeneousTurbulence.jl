@@ -29,7 +29,7 @@ using Logging
 import KernelAbstractions
 import GBGCodingTools
 using GBGCodingTools.TestHarness: CountingArray, Traffic, counting, audit
-using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, project_forcing!, set_forcing_rate!, prepare_forcing!
+using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, project_forcing!, prepare_forcing!
 using GBGHomogeneousTurbulence.Generator: prepare!, finalize!
 using GBGHomogeneousTurbulence.Particles: advect!, new_vector_point_values
 using GBGHomogeneousTurbulence.Propagator: deposit!
@@ -59,15 +59,12 @@ counting_physical(f) = VectorFieldPhysical(counting(copy(field_data(f))), DOMAIN
 const Û = counting_spectral(RUN.state.velocity_spectral)
 const N̂ = counting_spectral(new_vector_field_spectral(DOMAIN))
 const U = counting_physical(velocity_physical(RUN.cache))
-const RATE = ScalarFieldSpectral(counting(zeros(ComplexF64, size(field_data(new_scalar_field_spectral(DOMAIN))))),
-                                 DOMAIN.grid, DOMAIN.layout)
 const SAMPLES = new_vector_point_values(RUN.tracers)
 const OU_Û = counting_spectral(OU_RUN.state.velocity_spectral)
 const OU_STATE = ResolvedFields(OU_Û, nothing, (velocity_forcing = OU_RUN.state.modeled.velocity_forcing,
                                                 scalar_forcing = nothing))
 
 const P = length(field_data(Û))
-const S = length(field_data(RATE))
 const GATHER = 8 * 4^3 * 3                       # M tracers × the 4³ CatmullRom stencil × 3 components
 # The stored entries of the default forcing band, shells 1–2: the modes the stochastic source changes.
 const B = 3 * count(!iszero, field_data(materialize_kernel(spectral_band(DOMAIN.multipliers, 0.5, 2.5)).field))
@@ -87,15 +84,12 @@ const WHOLE_COMPANION = "the source is PF's `embed_modes!`, which copies every m
                         "below its Nyquist frequency, zeros outside the band included. The companion is the " *
                         "smallest grid holding the band, so the excess is a few hundred modes, independent " *
                         "of N; the whole-cube copy is contiguous, and a band-only copy is not known to be faster"
-const TWO_CALL_RATE = "the rate is the band kernel evaluated and then scaled, two PF calls. One call through " *
-                      "`radial_kernel` would write it in one pass, but would state the band edges a second " *
-                      "time, beside `spectral_band`; the fill runs once, when the generator is built"
+
 
 const VELOCITY_FORCING = RUN.generator.conditions.velocity_forcing
 const CONTROLLER = VarianceController(DOMAIN; target = 1.5)
 const TOTAL = VarianceRescaling(DOMAIN; target = 1.5, over = :total)
 const BAND = VarianceRescaling(DOMAIN; target = 0.5, over = :band)
-const LINEAR = Linear(DOMAIN; rate = 0.1)
 const OU = OU_RUN.generator.conditions.velocity_forcing
 const OU_PROCESS = OU_RUN.state.modeled.velocity_forcing
 
@@ -103,7 +97,7 @@ const OU_PROCESS = OU_RUN.state.modeled.velocity_forcing
 for warm in (() -> add_forcing_source!(VELOCITY_FORCING, nothing, N̂, Û, DOMAIN, 0.05),
              () -> add_forcing_source!(CONTROLLER, nothing, N̂, Û, DOMAIN, 0.05),
              () -> project_forcing!(TOTAL, Û, DOMAIN), () -> project_forcing!(BAND, Û, DOMAIN),
-             () -> set_forcing_rate!(LINEAR, RATE, Û, DOMAIN), () -> truncate_to_band!(Û, DOMAIN),
+             () -> truncate_to_band!(Û, DOMAIN),
              () -> interpolate_at_particles!(SAMPLES, U, RUN.tracers),
              () -> advect!(RUN.particle_integration_scheme, RUN.tracers, U, DOMAIN, RUN.particle_buffers, 1e-3),
              () -> deposit!(RUN.cache, RUN.tracers, U),
@@ -134,9 +128,6 @@ end
     audit(() -> project_forcing!(BAND, Û, DOMAIN), "project_forcing!(VarianceRescaling :band)",
           Traffic("field", field_data(Û), (3P, P), (2P, P), ACCUMULATE_READ);
           print = PRINT_COUNTS)
-    audit(() -> set_forcing_rate!(LINEAR, RATE, Û, DOMAIN), "set_forcing_rate!(Linear)",
-          Traffic("rate", field_data(RATE), (S, 2S), (0, S), TWO_CALL_RATE),
-          Traffic("field", field_data(Û), (0, 0)); print = PRINT_COUNTS)
     audit(() -> prepare_forcing!(OU, OU_PROCESS, OU_Û, DOMAIN, 1e-3), "prepare_forcing!(StochasticOU)",
           Traffic("field", field_data(OU_Û), (0, 0)); print = PRINT_COUNTS)
   end

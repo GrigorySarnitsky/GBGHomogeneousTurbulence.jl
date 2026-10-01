@@ -554,14 +554,9 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
   "no slot can be read stale, since every slot is deposited at every iteration's end, and the " *
   "frozen ledgers stay exact (a named property, not a time)")
 
-# Found 2026-09-30 when the working set's symbols were first held against the frame's zero floor.
-const RESIDENT_LINEAR_RATE = Holder(
-  "RESIDENT LINEAR RATE", :PF_RAISE,
-  "Linear's steady rate A(κ) is a function of |κ|² alone — the forced band's indicator times A — " *
-  "yet it is stored as one scalar field in spectral representation per Linear-forced field (about " *
-  "129 MiB at 256³ / Float64), because PF's exponential_convolve! takes its offset only as a " *
-  "stored field. Its floor is zero, as for every symbol the frame dropped. Closing it needs the " *
-  "offset as a radial symbol; requested of PF 2026-10-01, for its evaluation.")
+# RESIDENT LINEAR RATE — RETIRED 2026-10-01 (decision 106, on PF decision 92): Linear's steady rate is a
+# radial symbol the integrating factor evaluates per mode, so it is stored nowhere. RATE PROBE retired
+# in the same commit: a rate hook handed no field is steady by construction, so nothing is probed.
 
 # The temporary ledger's field-scale rows (test/temporary_audit.jl, 2026-10-01). Each is listed, not
 # judged: the dispositions are provisional, the remedies candidates, and each is the owner's to decide.
@@ -589,11 +584,6 @@ const SEEDING_DOUBLE_DRAW = Holder(
   "about 6 N³ reals for the velocity: both copies exist on the CPU, where one would do. The host " *
   "draw is what makes a seed give the same field on every backend, a property no decision records. " *
   "Candidate: draw straight into the noise field when it is host memory.")
-const RATE_PROBE = Holder(
-  "RATE PROBE", :FIX,
-  "Building a generator for a steady-rate forcing (Linear) checks that the rate is steady by " *
-  "filling it twice from a vector probe, about 4 N³ reals of probe and second rate discarded. " *
-  "Candidate: probe with buffers the run already allocates.")
 const FULL_STRAIN_TENSORS = Holder(
   "FULL STRAIN TENSORS", :FIX,
   "derivative_skewness allocates about 18 N³ reals per call: the strain rate as a full 9-component " *
@@ -603,9 +593,9 @@ const FULL_STRAIN_TENSORS = Holder(
   "forming each in one spectral scratch and transforming it into its own physical slot would cost " *
   "about 7 N³ reals. The call is occasional and its gate is off by default.")
 
-const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
+const ALL_HOLDERS = (UNUSED_FUSION,
                      DOMAIN_CONSTRUCTION_TEMPLATES, RESTORE_REBUILDS_A_SEEDED_RUN, CHECKPOINT_STAGING_COPY,
-                     SEEDING_DOUBLE_DRAW, RATE_PROBE, FULL_STRAIN_TENSORS,
+                     SEEDING_DOUBLE_DRAW, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)
 
@@ -613,8 +603,7 @@ const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
 # (Empty from CHART CONTRACT's taking, 2026-08-06, until the temporary ledger listed its first gaps.)
 const OPEN_LOCAL_WINS = ("DOMAIN CONSTRUCTION TEMPLATES", "RESTORE REBUILDS A SEEDED RUN",
-                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "RATE PROBE",
-                         "FULL STRAIN TENSORS")
+                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "FULL STRAIN TENSORS")
 
 
 # ---------------------------------------------------------------- the op cost model

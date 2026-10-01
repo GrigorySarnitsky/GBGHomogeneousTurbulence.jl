@@ -91,7 +91,7 @@ end
 # evaluation scratch on top (+1 sv, +2 pv; scalar +2 ss +1 ps).
 # The real_spectral_scalar column is ZERO throughout, and the zero is the point (2026-07-28,
 # decision 35): a rate
-# array exists only where a forcing declares `uses_steady_linear_rate`, so an unforced field — and the
+# array existed only where a forcing supplied a steady rate, so an unforced field — and the
 # default configuration, whose VarianceRescaling is a post-step projection — carries none. It used to
 # read 1 (2 with a scalar) for arrays that were never written and never read.
 const BASE = Dict(
@@ -145,17 +145,16 @@ const OU_COMPANION_SHARE_AT_64 = 0.01
 function _forcing_delta(tag, slot)
   tag === :none && return ZERO
   tag === :band && return ZERO
-  tag === :linear && return (spectral_vector = 0, physical_vector = 0, spectral_scalar = 1, physical_scalar = 0, real_spectral_scalar = 0)
+  tag === :linear && return ZERO
   tag === :power && return ZERO
   tag === :controller && return ZERO
   tag === :ou && return ZERO
   error("unmodelled forcing tag $tag — price it here in the same commit that adds it")
 end
-# Only a STEADY-rate forcing carries the generator's rate array. Today that is `Linear` alone. Since
-# 2026-09-28 (decision 99) it holds no indicator: the band is evaluated from its lazy kernel straight
-# into the rate, once, when the generator is built. The rate is a function of |κ|² alone, so its
-# floor is zero: optimality_audit.jl shows it radial and claims its residency with the holder
-# RESIDENT LINEAR RATE, which retires — with this delta — when the rate stops being stored.
+# A STEADY-rate forcing's rate is a radial symbol since decision 106 (on PF decision 92), evaluated
+# per mode inside the fused exponential, so `Linear` is ZERO like every other forcing. It held one
+# spectral scalar until 2026-10-01 — about 129 MiB at 256³ / Float64 per forced field — whose floor
+# optimality_audit.jl had shown to be zero, claimed by the holder RESIDENT LINEAR RATE, now retired.
 #
 # `ConstantPower` and `VarianceController` are ZERO as of 2026-08-22, and the change is a REDUCTION
 # of two field-scale arrays each. Their rates depend on the state, so folding them into the

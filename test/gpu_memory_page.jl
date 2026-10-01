@@ -95,7 +95,7 @@ end
               :ConstantPower => (ConstantPower(injection_rate = 0.1), :same),
               :VarianceController => (VarianceController(target = 0.5), :same),
               :VarianceRescaling => (VarianceRescaling(target = 0.5, over = :band), :same),
-              :Linear => (Linear(rate = 0.1), :more),
+              :Linear => (Linear(rate = 0.1), :same),   # its rate is a symbol since decision 106
               :StochasticOU => (StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5), :same)]
   @test Set(first.(forcings)) == exported(AbstractForcing)
 

@@ -1,4 +1,6 @@
 # Witness: a configured, rate-carrying scalar forcing must never be silently discarded.
+# (Written against the first rate hook, `set_forcing_rate!`, since replaced by `steady_linear_rate`;
+# the class — a scalar forcing paired with a scalar-free generator — is what the test still pins.)
 #
 # `ResolvedGenerator(domain, conditions; scalar = false)` allocates no scalar rate array
 # (src/Generator.jl:262), and `prepare!` gates `set_forcing_rate!` on `generator.scalar_rate === nothing`

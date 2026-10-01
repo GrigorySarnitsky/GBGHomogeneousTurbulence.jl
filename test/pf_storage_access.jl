@@ -19,11 +19,6 @@ const ALLOWED = Dict(
   ("src/SimulationRun.jl", "scale = maximum(abs, field_data(field))") =>
     "PF 2026-09-28: reality_residual is in stored-coefficient units, so the largest stored coefficient " *
     "is its yardstick; PF's `maximum` is physical-only",
-  ("src/Generator.jl", "fill!(field_data(probe), 1)") =>
-    "PF 2026-09-28: the steady-rate probe is a test fixture, not a physical field, and PF has no " *
-    "operation for writing arbitrary coefficients",
-  ("src/Generator.jl", "data = field_data(probe)") =>
-    "PF 2026-09-28: the probe's second fill, a ramp over the stored coefficients (the same fixture)",
   ("src/Forcing.jl", "randn!(ou.rng, field_data(slots.draws))") =>
     "PF 2026-09-28: the draw is made into a HOST field, so a seed gives the same realization on every " *
     "backend; adapt! then moves it",

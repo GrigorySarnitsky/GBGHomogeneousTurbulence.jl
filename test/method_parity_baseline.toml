@@ -373,7 +373,7 @@ module = "Observables"
 
 [[generic]]
 set = "Forcing"
-name = "set_forcing_rate!"
+name = "steady_linear_rate"
 count = 2
 module = "Forcing"
 
@@ -444,12 +444,6 @@ count = 1
 module = "Particles"
 
 [[generic]]
-set = "Forcing"
-name = "uses_steady_linear_rate"
-count = 4
-module = "Forcing"
-
-[[generic]]
 set = "Cache"
 name = "velocity_at_particles"
 count = 1
@@ -496,8 +490,8 @@ SimulationDomain = 25
 Observables = 15
 State = 5
 Cache = 23
-Forcing = 77
-Generator = 28
+Forcing = 74
+Generator = 25
 Propagator = 22
 Particles = 21
 SimulationRun = 42

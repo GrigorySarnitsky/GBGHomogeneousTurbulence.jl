@@ -89,7 +89,7 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :velocity_at_particles => (:structural, "reads a cache slot's storage"),
   :unwrapped_positions   => (:structural, "returns the tracers' unwrapped position record"),
   :history_depth         => (:structural, "a scheme's number of past samples, metadata"),
-  :uses_steady_linear_rate => (:structural, "a strategy's declaration, a trait"),
+  :steady_linear_rate    => (:independent, "forcing.jl — A on the band and zero elsewhere, on exactly the band's modes; every mode but the mean for an unbounded band"),
   :show                  => (:structural, "a display, gated in display.jl"),
 )
 

@@ -3,7 +3,7 @@
 #
 # Commit f557311 made the empty-band guard RELATIVE (`_band_is_empty(band_value, total_value)`),
 # adding an unconditional whole-field `inner(field, field)` to `project_forcing!(::VarianceRescaling, …)`
-# (src/Forcing.jl:322) and to `set_forcing_rate!(::ConstantPower, …)` (src/Forcing.jl:441). Neither
+# (src/Forcing.jl:322) and to the then-hook `set_forcing_rate!(::ConstantPower, …)`. Neither
 # test/optimality_audit.jl's `_syncs` nor test/compute_audit.jl's `_forcing_pass_delta` was updated,
 # so both instruments report FEWER host readbacks and FEWER field-scale passes than the code
 # performs — and both pass green, because each is a hand-written model of src/Forcing.jl rather than
@@ -79,7 +79,7 @@ function measure(forcing, kind)
   elseif kind === :source
     F.add_forcing_source!(forcing, nothing, out, field, DOMAIN, 0.05)
   else
-    F.set_forcing_rate!(forcing, new_scalar_field_spectral(DOMAIN), field, DOMAIN)
+    F.steady_linear_rate(forcing, DOMAIN)              # returns a symbol; reads no field at all
   end
   return (; field, out)
 end

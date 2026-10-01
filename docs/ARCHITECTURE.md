@@ -386,13 +386,13 @@ the state the first of them advances; each defaults to doing nothing:
 
 - `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
   a state `initial_forcing_state` starts and the run's `ResolvedFields` keeps;
-- `set_forcing_rate!` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``) and steady in
-  time: fill the per-mode rate ``A(\boldsymbol{\kappa})``, once, when the generator is built, folded into the
-  integrating factor (exact, order-preserving);
+- `steady_linear_rate` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``) and steady in
+  time: return the rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor; handed no field,
+  it is steady by construction;
 - `add_forcing_source!` — add an additive source at each Runge–Kutta stage;
 - `project_forcing!` — apply a post-step projection or rescale.
 
-The hooks form one lifecycle with a fixed order — `set_forcing_rate!` once, when the generator is
+The hooks form one lifecycle with a fixed order — `steady_linear_rate` once, when the generator is
 built; then per step `prepare_forcing!` before the stages, `add_forcing_source!` at every stage,
 `project_forcing!` after the completed step — and the rate and the source are two channels of *one* forcing term (the exactly linear
 part folded into ``\mathcal{E}``, the remainder added at stages). A strategy owns whatever scratch its
@@ -3169,6 +3169,23 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     without ``\varepsilon`` is refused, and the scalar-resolution check measures the seeded field's ``\varepsilon``.
     The single constant 0.7 and its two estimate functions are gone. The run layer's expected
     ``\mathrm{Re}_\lambda`` now comes from `reynolds_taylor`, not `Phenomenology`.
+106. **(2026-10-01, user-directed) A steady linear rate is returned, not filled, and is a symbol.**
+    The rate hook was `set_forcing_rate!(forcing, rate, field, domain)`: the generator allocated a
+    scalar field in spectral representation, the hook filled it, and the declaration
+    `uses_steady_linear_rate` gated both. So `Linear`'s rate, ``A`` on the band and zero elsewhere, was
+    resident for the whole run — about 129 MiB at ``256^3`` / `Float64` per forced field — though it
+    is a function of ``\lvert\boldsymbol{\kappa}\rvert^{2}`` alone, whose floor the optimality audit had
+    shown to be zero. Steadiness was checked by filling it from two probe states, about 4 ``N^3``
+    reals at construction.
+
+    PF's decision 92, raised by HT the same day, lets `exponential_convolve!` take its offset as a
+    radial kernel, bitwise identical to the stored form and measured 13–15% faster. The hook is now
+    `steady_linear_rate(forcing, domain)`, returning a radial kernel, a stored field for a rate that
+    is not radial, or `nothing`. Handed no field, a rate is steady by construction, so the probe is
+    gone; and since a rate is present exactly when the hook returns one, the declaration is gone too.
+    `Linear`'s symbol takes the band's edges from the one helper `_shell_edges` and equals the old
+    stored rate value for value.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

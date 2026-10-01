@@ -206,7 +206,7 @@ Re-verified 2026-08-22 by running every witness; the pile had gone stale on the 
 - [ ] **M5** The IFRK2-vs-RK3 register count does not decompose as the architecture claims  
       `2 hats` · arms A · PAGE: architecture §4.5: "three spectral registers per field against the low-storage scheme's two, counting th
 
-- [ ] **M6** EQUIVOCATION: `set_forcing_rate!` is gated by linearity in one docstring and steadiness in its neighbours  
+- [x] **M6** EQUIVOCATION: `set_forcing_rate!` is gated by linearity in one docstring and steadiness in its neighbours — moot 2026-10-01: the hook is gone (decision 106); `steady_linear_rate` states steadiness as the load-bearing word  
       `logician` · arms A · PAGE: api / Forcing, `set_forcing_rate!` — "For a strategy `forcing` linear in the field, fill the per-mode ra
 
 - [ ] **M7** NON SEQUITUR: `Kolmogorov1941`'s order guard is justified by a universality its own bullet denies  

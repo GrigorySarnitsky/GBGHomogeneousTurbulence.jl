@@ -20,8 +20,7 @@ Its contents (each formula lives in the operation's own docstring):
   the Schmidt number, the forcings).
 - [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch, consumed
   through the protocol below.
-- [`prepare!`](@ref) — open a step: advance the forcings' internal state and fill the linear rate
-  arrays the integrating factors consume.
+- [`prepare!`](@ref) — open a step: advance the forcings' internal state.
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (each
   dealiased term plus its additive forcing source) at a stage state.
 - [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's
@@ -41,7 +40,7 @@ using ..SimulationDomain: FixedDomain, DealiasingStrategy, TwoThirds, HouLi, Pha
                           new_vector_field_spectral, new_vector_field_physical, new_scalar_field_spectral, new_scalar_field_physical
 using ..Observables: vorticity_physical!
 using ..Forcing: AbstractForcing, NoForcing, VarianceController,
-                 set_forcing_rate!, uses_steady_linear_rate, project_forcing!, prepare_forcing!,
+                 steady_linear_rate, project_forcing!, prepare_forcing!,
                  add_forcing_source!
 
 export FlowConditions, ResolvedGenerator,
@@ -119,8 +118,7 @@ struct FlowConditions{VF<:AbstractForcing, SF<:AbstractForcing}
     # carries only its band and its target, so sharing one is harmless; `===` would not even
     # distinguish two separately-built copies of it, since Julia compares immutables by value. The
     # hazard is exactly the mutable strategies, whose scratch and random stream are per-field. Caught
-    # here rather than left to a docstring warning, matching how the sibling misconfiguration (a
-    # forcing that fills a rate without declaring it) is handled.
+    # here rather than left to a docstring warning, since the run would otherwise proceed quietly wrong.
     ismutable(velocity_forcing) && velocity_forcing === scalar_forcing &&
       throw(ArgumentError("the same $(nameof(typeof(velocity_forcing))) instance was given as both " *
                           "`velocity_forcing` and `scalar_forcing`; that strategy carries per-field " *
@@ -195,61 +193,18 @@ function PhaseShiftBuffers(domain::FixedDomain, scalar::Bool)
 end
 
 
-# A rate array exists only for a forcing that declares one — the storage tracks the physics, not the
-# possibility of it. A forcing that fills a rate without declaring it would be handed `nothing` and go
-# silently unapplied, so that mismatch is a construction-time error rather than a wrong quiet run.
-function _forcing_rate(domain::FixedDomain, forcing, allocate_probe = new_vector_field_spectral)
-  if !uses_steady_linear_rate(forcing)
-    _overrides_rate_hook(forcing) &&
-      throw(ArgumentError("$(nameof(typeof(forcing))) implements set_forcing_rate! but does not " *
-                          "declare uses_steady_linear_rate(::$(nameof(typeof(forcing)))) = true, so it " *
-                          "would be given no rate array to fill and would never be applied"))
-    return nothing
-  end
-  # The mirror of the guard below: a forcing DECLARING the rate without IMPLEMENTING the hook
-  # inherits the do-nothing default, whose untouched (zeroed) rate is trivially steady — the probe
-  # cannot see the difference between "steady" and "absent", so absence is checked first.
-  _overrides_rate_hook(forcing) ||
-    throw(ArgumentError("$(nameof(typeof(forcing))) declares uses_steady_linear_rate = true but " *
-                        "does not implement set_forcing_rate!, so its rate array would stay zero " *
-                        "and the forcing would silently never act. Implement the hook, or declare " *
-                        "false."))
-  # A steady rate does not depend on the state, so the one the probe filled is THE rate: it is filled
-  # here, once, and never again. A scalar field in spectral representation holding REAL values — the
-  # complex container is what the fused exponential's per-mode offset takes.
-  return _check_rate_is_steady(domain, forcing, allocate_probe)
+# The rate a forcing folds into the integrating factor, or `nothing`. The hook is handed no field, so
+# a rate is steady by construction (decision 106); what is checked here is only that the integrating
+# factor can take it — a radial kernel, evaluated per mode, or a stored scalar field.
+function _steady_rate(domain::FixedDomain, forcing)
+  rate = steady_linear_rate(forcing, domain)
+  rate === nothing || rate isa RadialKernel || rate isa ScalarFieldSpectral ||
+    throw(ArgumentError("$(nameof(typeof(forcing)))'s steady_linear_rate returned a " *
+                        "$(nameof(typeof(rate))); the integrating factor takes a radial kernel, a " *
+                        "scalar field in spectral representation, or `nothing`."))
+  return rate
 end
 
-
-# The declaration says the rate is STEADY, and steadiness is the property that makes folding it into
-# the integrating factor exact. Unlike the arity guards this one is semantic, so it is measured
-# rather than trusted: the hook is filled from two different states, and a rate that tracks the state
-# gives two different answers. Letting it lie is not a cosmetic error — a state-dependent rate frozen
-# for the step is the left-endpoint rectangle rule on ∫A dt, which drops a third-order scheme to
-# first order and does so silently, because every value in sight stays finite and plausible.
-#
-# The probes are all-ones and a spatially varying ramp, so the pair differs in BOTH magnitude and
-# shape: a rate keyed to the field's amplitude and one keyed to its distribution across modes are
-# each caught. Twice at construction, never in the loop; the first fill is returned as the rate.
-function _check_rate_is_steady(domain::FixedDomain, forcing, allocate_probe)
-  probe = allocate_probe(domain)
-  first_rate, second_rate = new_scalar_field_spectral(domain), new_scalar_field_spectral(domain)
-
-  fill!(field_data(probe), 1)
-  set_forcing_rate!(forcing, first_rate, probe, domain)
-  data = field_data(probe)
-  data .= reshape(1:length(data), size(data)) ./ length(data)
-  set_forcing_rate!(forcing, second_rate, probe, domain)
-
-  first_rate == second_rate ||
-    throw(ArgumentError("$(nameof(typeof(forcing))) declares uses_steady_linear_rate = true, but " *
-                        "the rate it supplies changes with the field, so it is not steady in time. " *
-                        "A state-dependent rate folded into the integrating factor is frozen for " *
-                        "the whole step, which costs the scheme its order — a third-order scheme " *
-                        "measures 1.0. Supply it through add_forcing_source! instead, where every " *
-                        "stage evaluates it, and leave uses_steady_linear_rate at false."))
-  return first_rate
-end
 
 # Does this forcing define a hook the run cannot call — one written to an earlier, shorter form of it?
 # `add_forcing_source!` gained the stage field and the diffusivity, `prepare_forcing!` the forcing's
@@ -276,32 +231,12 @@ function _defines_stale_hook(hook, forcing, arguments::Int)
 end
 
 
-# Does this forcing define its own `set_forcing_rate!`, rather than inheriting the do-nothing
-# fallback? The question is about the FORCING argument alone, so it is asked of the method table
-# directly. A `which` probe cannot ask it: `which` resolves a call at specific argument types, and
-# passing `Any` for the remaining parameters matches nothing when an override annotates them — so an
-# override written `set_forcing_rate!(f::MyForcing, rate::AbstractArray, …)` looked identical to no
-# override at all, and the misdeclaration this guard exists to catch became a silently unapplied
-# forcing. Enumerating the table instead is indifferent to how the other parameters are spelled.
-function _overrides_rate_hook(forcing)
-  for m in methods(set_forcing_rate!, Tuple{typeof(forcing), Vararg{Any}})
-    signature = Base.unwrap_unionall(m.sig)
-    length(signature.parameters) >= 2 || continue
-    accepted = signature.parameters[2]
-    accepted isa TypeVar && (accepted = accepted.ub)
-    accepted === AbstractForcing && continue        # the do-nothing fallback itself
-    return true
-  end
-  return false
-end
-
-
 """
     ResolvedGenerator(domain, conditions; scalar = false)
 
 The flow's generator as one value a scheme can hold. It carries the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
-through: the quadratic-product fields, the per-mode forcing-rate arrays, and — when the domain
+through: the quadratic-product fields, any steady forcing rate, and — when the domain
 dealiases by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) — the
 displaced-evaluation buffers.
 
@@ -320,19 +255,10 @@ it can never assemble the right-hand side from a mismatched intermediate state.
 - `domain` — the [`FixedDomain`](@ref) the assembly scratch is sized on.
 - `conditions` — the `FlowConditions` the generator resolves: the viscosity, the Schmidt
   number, and the two forcing strategies.
-- `scalar = false` — pass `true` when the run carries a passive scalar; it allocates the scalar's
-  forcing-rate array, required for a scalar-forced run.
+- `scalar = false` — pass `true` when the run carries a passive scalar, as a scalar-forced run must.
 
 [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds one for
 you.
-
-!!! warning "The constructor rejects a misdeclared forcing"
-    A forcing that implements
-    [`set_forcing_rate!`](@ref GBGHomogeneousTurbulence.Forcing.set_forcing_rate!) without also
-    declaring [`uses_steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate) is given no
-    rate array to fill, so its forcing would silently never be applied. Building a
-    `ResolvedGenerator` around one throws an `ArgumentError` naming the strategy, rather than letting
-    the run proceed quietly wrong.
 
 !!! note "One optimization crosses two verbs"
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
@@ -353,13 +279,13 @@ you.
   so no physical product array exists.
 - `phase_shift` — the displaced-evaluation scratch and translation kernels (`PhaseShift` dealiasing
   only), else `nothing`.
-- `velocity_rate`, `scalar_rate` — the per-mode linear forcing-rate arrays ``A(\\boldsymbol{\\kappa})``,
-  filled once when the generator is built (the rate is steady, so it never changes). The
+- `velocity_rate`, `scalar_rate` — each field's steady linear forcing rate
+  ``A(\\boldsymbol{\\kappa})``, as its forcing's
+  [`steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.steady_linear_rate) returned it when
+  the generator was built: a radial kernel for [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear), which stores nothing. The
   integrating-factor verbs return them alongside the viscous coefficient, so the forcing rides the
-  exact linear solve instead of being added afterwards. Each is `nothing` unless that field's forcing declares
-  `uses_steady_linear_rate`, so a field driven by
-  a post-step projection, a stochastic source, or nothing at
-  all carries no rate storage; `scalar_rate` is also `nothing` for a scalar-free generator.
+  exact linear solve instead of being added afterwards. Each is `nothing` for a field driven any
+  other way, and `scalar_rate` also for a scalar-free generator.
 - `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds,
   left fresh by `velocity_rhs!` for the same stage's `scalar_rhs!` (`PhaseShift` only). Reuse takes
   two conditions together: this record must match the caller's `û`, **and** the caller must promise
@@ -402,7 +328,7 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
   # onto it, and the prepare hook the forcing's evolving state when that state moved into the run's
   # state. A strategy still written to an old form defines a method the run never calls —
   # dispatch simply falls through to the do-nothing default — so the forcing goes silently
-  # unapplied, exactly the failure the rate guard above exists to prevent. Refuse at construction.
+  # unapplied. Refuse at construction.
   for forcing in (conditions.velocity_forcing, conditions.scalar_forcing)
     _defines_stale_hook(prepare_forcing!, forcing, 5) &&
       throw(ArgumentError("$(nameof(typeof(forcing))) defines prepare_forcing! with fewer than " *
@@ -423,9 +349,8 @@ function ResolvedGenerator(domain::FixedDomain, conditions::FlowConditions; scal
   return ResolvedGenerator(conditions,
                     new_vector_field_spectral(domain),
                     domain.dealiasing isa PhaseShift ? PhaseShiftBuffers(domain, scalar) : nothing,
-                    _forcing_rate(domain, conditions.velocity_forcing),
-                    scalar ? _forcing_rate(domain, conditions.scalar_forcing,
-                                           new_scalar_field_spectral) : nothing,
+                    _steady_rate(domain, conditions.velocity_forcing),
+                    scalar ? _steady_rate(domain, conditions.scalar_forcing) : nothing,
                     nothing, nothing, nothing)
 end
 
@@ -436,7 +361,7 @@ end
 Open a step of the generator: advance each forcing's evolving state, kept in the run's state, once
 (its per-step [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) hook). A
 scheme calls this once before its Runge–Kutta stages; the stage evaluations then consume what it
-prepared. The steady per-mode linear forcing rates are not touched here: they were filled once, when
+prepared. The steady per-mode linear forcing rates are not touched here: they were fixed once, when
 the generator was built.
 
 # Arguments
@@ -628,7 +553,7 @@ supplies the viscosity ``\\nu`` and the linear forcing rate; `τ` is the sub-int
 
 The linear part of the momentum equation — the diffusion
 ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
-``A(\\boldsymbol{\\kappa})``, filled once when the generator was built — is solved exactly in spectral
+``A(\\boldsymbol{\\kappa})``, fixed when the generator was built — is solved exactly in spectral
 representation by the per-mode multiplier
 
 ```math
@@ -639,15 +564,13 @@ with ``A = 0`` when no linear forcing is active. Multiplying a field by ``\\math
 viscous (and linear-forcing) part exactly — machine-exact, with no stability restriction; only a
 scheme's explicit stage combination carries truncation error.
 
-Since the multiplier is the exponential of a radial symbol plus the per-mode rate, a scheme
-applies it through the backend's fused exponential convolution
+A scheme applies the multiplier through the backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
-Returns a named tuple `(; coefficient, offset_scale, offset)` — exactly the arguments that
-fused exponential takes:
+Returns the named tuple `(; coefficient, offset_scale, offset)` that function takes:
 ``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})`` (the
-rate field, or `nothing` when no linear forcing is active).
+``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})``, a radial
+kernel or a stored field, or `nothing` without a linear forcing.
 """
 velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
   (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
@@ -822,8 +745,8 @@ end
 # print their two numbers and nest each forcing's own display; the generator prints its conditions,
 # its assembly scratch through the field library's `show` (the grid and storage it was built on),
 # and the two things a caller is refused on — whether it carries the displaced-grid scratch of
-# `PhaseShift` and whether that scratch extends to a scalar. The rate slots exist only under a
-# `Linear` forcing (`uses_steady_linear_rate`), so their absence is a fact of the conditions, not of
+# `PhaseShift` and whether that scratch extends to a scalar. The rate slots are filled only under a
+# `Linear` forcing (its `steady_linear_rate`), so their absence is a fact of the conditions, not of
 # the moment. An optional part prints through its own display when present and as `no …` when not.
 
 Base.show(io::IO, conditions::FlowConditions) =

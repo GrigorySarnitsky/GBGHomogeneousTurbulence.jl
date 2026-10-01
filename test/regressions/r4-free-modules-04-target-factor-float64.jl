@@ -49,7 +49,7 @@ const O  = GBGHomogeneousTurbulence.Observables
   @test typeof(F._target_factor(û) * weighted_inner(û, band)) === Float32
   @test typeof(F._target_factor(φ̂) * weighted_inner(φ̂, band)) === Float32
 
-  # (2) the band observable `VarianceRescaling.project_forcing!` / `ConstantPower.set_forcing_rate!`
+  # (2) the band observable `VarianceRescaling.project_forcing!` / `ConstantPower.add_forcing_source!`
   #     compute must be the same kind of number as the diagnostic they are documented to match.
   forcing = F.VarianceRescaling(domain; target = 1.0f0, over = :band)
   band_observable = F._target_factor(û) * weighted_inner(û, forcing.band)

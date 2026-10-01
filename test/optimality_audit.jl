@@ -58,7 +58,7 @@
 using GBGHomogeneousTurbulence
 using InteractiveUtils: subtypes
 using GBGPeriodicFields: point_positions
-using GBGPeriodicFields: field_data, materialize_kernel
+using GBGPeriodicFields: field_data, materialize_kernel, ScalarFieldSpectral
 using Test
 
 include("audit_ops.jl")
@@ -86,7 +86,7 @@ end
 #                                                    (a turnover-budget callback pays the same two)
 #   project_forcing!          (src/Forcing.jl)       — VarianceRescaling's band observable, and the whole-field
 #                                                    observable as well when `over = :total`
-#   set_forcing_rate!       (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
+#   add_forcing_source!     (src/Forcing.jl)       — ConstantPower's band observable → the amplitude
 #   prepare_forcing!        (src/Forcing.jl)       — none: the stochastic forcing draws on the host and
 #                                                    uploads a band-sized array, a host→device copy
 #                                                    measured not to wait for queued kernels (0.003 ms
@@ -290,9 +290,9 @@ const SYNC_LEDGER = (
     # The frame's zero floor rests on one fact: an array that is a function of |κ|² alone carries no
     # information the O(N) axis multipliers do not, so storing it is materialization. The same fact
     # holds wherever such an array lives, and a forcing's steady rate lives in the generator, which
-    # no floor reached (2026-09-30). The generator's rate slots are the working set's configuration
-    # arrays — its other arrays are working registers, bounded by the liveness audit — so each is
-    # tested here: shown radial, its floor is zero, and its residency is a gap the register claims.
+    # no floor reached until 2026-09-30. There `Linear`'s rate was found stored as a field — about
+    # 129 MiB at 256³ / Float64 — and claimed by RESIDENT LINEAR RATE; since decision 106 (on PF
+    # decision 92) it is a radial symbol, and the floor is ACHIEVED: no rate slot holds storage.
     N = 8
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
     m = domain.multipliers
@@ -312,7 +312,7 @@ const SYNC_LEDGER = (
     package_forcings = filter(t -> Base.moduleroot(parentmodule(t)) === GBGHomogeneousTurbulence,
                               subtypes(GBGHomogeneousTurbulence.AbstractForcing))
     @test Set(keys(forcings)) == Set(package_forcings)
-    claimed = 0
+    symbols = 0
     for (type, forcing) in forcings, slot in (:velocity, :scalar)
       conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0,
                                   velocity_forcing = slot === :velocity ? forcing : NoForcing(),
@@ -320,22 +320,20 @@ const SYNC_LEDGER = (
       generator = ResolvedGenerator(domain, conditions; scalar = true)
       rate = slot === :velocity ? generator.velocity_rate : generator.scalar_rate
       rate === nothing && continue
-      data = field_data(rate)
-      @test all(iszero, imag.(data))                      # real content in a complex container
+      @test _counts((rate,), N) == ZERO                    # stored nowhere at field scale
+      @test !(rate isa ScalarFieldSpectral)                # a stored rate would need a holder
+      # …and genuinely a function of |κ|²: materialized here only to check, constant on level sets.
+      data = field_data(materialize_kernel(rate).field)
       by_level = Dict{Float64, Float64}()
       radial = true
       for i in eachindex(data, κ²)
         level, v = κ²[i], real(data[i])
         haskey(by_level, level) ? (radial &= by_level[level] ≈ v) : (by_level[level] = v)
       end
-      @test radial                                         # a function of |κ|² — floor zero
-      @test any(!iszero, data)                             # non-vacuous: the rate is not empty
-      @test type === Linear                                # the one strategy the holder claims
-      claimed += 1
+      @test radial && any(!iszero, data)                   # non-vacuous: the rate is not empty
+      symbols += 1
     end
-    # Two directions, as everywhere in the register: every resident symbol is claimed, and the
-    # holder retires when no forcing stores one.
-    @test (claimed > 0) == (RESIDENT_LINEAR_RATE in ALL_HOLDERS)
+    @test symbols == 2                                     # Linear, on either field
   end
 
   @testset "no stale holder — every holder still names a live gap" begin

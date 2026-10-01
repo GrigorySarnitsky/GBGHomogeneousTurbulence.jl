@@ -22,8 +22,7 @@ using GBGPeriodicFields: field_data
 using Random
 using Logging
 using GBGHomogeneousTurbulence.Generator: prepare!, finalize!, velocity_rhs!, scalar_rhs!
-using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, prepare_forcing!, project_forcing!,
-                                        set_forcing_rate!
+using GBGHomogeneousTurbulence.Forcing: add_forcing_source!, prepare_forcing!, project_forcing!
 using GBGHomogeneousTurbulence.Particles: advect!, restart!, new_vector_point_values
 using GBGHomogeneousTurbulence.Propagator: step!, deposit!
 using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
@@ -51,8 +50,6 @@ const U, Ω, Φ = new_vector_field_physical(DOMAIN), new_vector_field_physical(D
 const SCRATCH = new_vector_field_spectral(DOMAIN)
 const CONTROLLER = VarianceController(DOMAIN; target = 1.5)
 const RESCALING = VarianceRescaling(DOMAIN; target = 1.5, over = :total)
-const LINEAR = Linear(DOMAIN; rate = 0.1)
-const RATE = new_scalar_field_spectral(DOMAIN)
 const SAMPLES = new_vector_point_values(SIM.tracers)
 const SEED = Xoshiro(2)                        # one generator, so a row does not count its own construction
 
@@ -114,7 +111,6 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
                                                        STATE.modeled.scalar_forcing, STATE.scalar_spectral,
                                                        DOMAIN, 1e-3)
     @alloc_below bound() project_forcing!(RESCALING, STATE.velocity_spectral, DOMAIN)
-    @alloc_below bound() set_forcing_rate!(LINEAR, RATE, STATE.velocity_spectral, DOMAIN)
   end
 
   @testset "the particles" begin

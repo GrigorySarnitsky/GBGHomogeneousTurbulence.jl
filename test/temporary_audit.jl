@@ -3,7 +3,7 @@
 #
 # The episode ledger it replaces was a hand-written list of six episodes, and construction,
 # checkpointing and every observable added after it were never on it: `FixedDomain`, the rate probe
-# of a `Linear` generator and `read_simulation` each allocated a large multiple of a field and no
+# a `Linear` generator then carried and `read_simulation` each allocated a large multiple of a field and no
 # ledger saw it. The required set is now the export list itself. Every exported function and
 # concrete type is a row, built and called at three grid sizes; an in-place operation is the
 # allocation audit's (`test/allocations.jl`), which bounds it below field scale, except `warmup!`,
@@ -107,7 +107,7 @@ const ROWS = Dict{Symbol, Function}(
   :velocity_at_particles => c -> (() -> velocity_at_particles(c.sim.cache), (c.sim,)),
   :unwrapped_positions => c -> (() -> unwrapped_positions(c.sim.tracers), (c.sim,)),
   :history_depth => c -> (() -> history_depth(AdamsBashforth(order = 3)), ()),
-  :uses_steady_linear_rate => c -> (() -> uses_steady_linear_rate(Linear(c.domain; rate = 0.1)), (c.domain,)),
+  :steady_linear_rate => c -> (() -> steady_linear_rate(Linear(c.domain; rate = 0.1), c.domain), (c.domain,)),
   :initial_forcing_state =>
     c -> (() -> initial_forcing_state(c.sim.generator.conditions.velocity_forcing, c.û, c.domain), (c.sim,)),
   # ---- the allocators: their allocation IS the result, so the transient is zero
@@ -193,7 +193,6 @@ const FIELD_SCALE_ROWS = Dict(
   :read_domain => (11.2, DOMAIN_CONSTRUCTION_TEMPLATES),
   :Simulation => (6.0, SEEDING_DOUBLE_DRAW),
   Symbol("Simulation/scalar and tracers") => (8.0, SEEDING_DOUBLE_DRAW),
-  Symbol("ResolvedGenerator/Linear") => (4.3, RATE_PROBE),
   :write_simulation => (4.1, CHECKPOINT_STAGING_COPY),
   :write_state => (4.1, CHECKPOINT_STAGING_COPY),
   :read_state => (4.1, CHECKPOINT_STAGING_COPY),

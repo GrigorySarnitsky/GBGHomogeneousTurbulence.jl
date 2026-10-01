@@ -1,12 +1,12 @@
 # Forcing — the interchangeable energy-injection strategies, concrete `AbstractForcing` subtypes that act
 # on the time step in one of two ways:
 #
-#   * `set_forcing_rate!` — for a forcing whose rate is linear in the field AND STEADY IN TIME: fill a
-#     per-mode A(k) folded into the integrating factor, so the linear operator becomes A(k) - D|k|².
-#     Exact, and free. `uses_steady_linear_rate` declares it, and BOTH words are load-bearing: the
-#     exponent is ∫A dt, so a rate that varies over the step is integrated by a left-endpoint
-#     rectangle rule — local error O(Δt²), and the whole iteration collapses to FIRST order however
-#     good the scheme is. Only `Linear`, whose A is a fixed coefficient, qualifies.
+#   * `steady_linear_rate` — for a forcing whose rate is linear in the field AND STEADY IN TIME: return
+#     a per-mode A(k) folded into the integrating factor, so the linear operator becomes A(k) - D|k|².
+#     Exact, and free. BOTH words are load-bearing: the exponent is ∫A dt, so a rate that varies over
+#     the step is integrated by a left-endpoint rectangle rule — local error O(Δt²), and the whole
+#     iteration collapses to FIRST order however good the scheme is. The hook is handed no field, so
+#     what it returns cannot depend on the state (decision 106). Only `Linear` qualifies.
 #   * `add_forcing_source!` — a source added at each stage, at the STAGE state. This is where a
 #     state-dependent rate belongs: the scheme's own order conditions then apply to it, with nothing
 #     to prove. `ConstantPower` and `VarianceController` use it. (TurTLE does the same — its
@@ -40,8 +40,7 @@ to four hook methods, each defaulting to doing nothing, called in the order list
 - [`initial_forcing_state`](@ref) — the evolving state a forcing starts with, kept in the run's state
   record.
 - [`prepare_forcing!`](@ref) — advance that state, once per step.
-- [`set_forcing_rate!`](@ref) — supply a *steady* linear rate, folded into the integrating factor;
-  [`uses_steady_linear_rate`](@ref) declares that a forcing supplies one.
+- [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
 - [`NoForcing`](@ref) — leave the field undriven.
@@ -92,7 +91,7 @@ using ..SimulationDomain: FixedDomain, TwoThirds, max_retained_wavenumber, new_s
 
 export AbstractForcing, DeferredForcing, NoForcing, VarianceRescaling, VarianceController,
        Linear, ConstantPower, StochasticOU, StochasticOUState,
-       set_forcing_rate!, uses_steady_linear_rate, project_forcing!, initial_forcing_state,
+       steady_linear_rate, project_forcing!, initial_forcing_state,
        prepare_forcing!, add_forcing_source!, kinetic_energy_in_box_units, band_energy_fraction
 
 
@@ -128,10 +127,8 @@ them in one fixed order:
 - [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
   such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
   and the run's [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
-- [`set_forcing_rate!`](@ref) — once, when the generator is built: fill a per-mode rate that stays
-  fixed for the whole run, which the scheme folds exactly into the integrating factor. A strategy that implements
-  this hook **must** also declare [`uses_steady_linear_rate`](@ref), or it is never handed a rate
-  array to fill.
+- [`steady_linear_rate`](@ref) — once, when the generator is built: return a per-mode rate that
+  stays fixed for the whole run, which the scheme folds exactly into the integrating factor.
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
 - [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 
@@ -143,13 +140,11 @@ integrating factor holds a rate fixed for the whole step, so a rate re-solved fr
 through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
 first order.
 
-The declaration is measured when the generator is built, not trusted. A declared rate is filled from two
-different fields and refused with an `ArgumentError` when the two differ, the hook taking no time
-argument, so a field-independent rate is a steady one. A strategy that fills a rate without declaring
-it is refused the same way, rather than going silently unapplied.
+The rate hook is handed neither the field nor the time, so the rate it returns cannot depend on the
+state: it is steady by construction.
 
-Each mutating hook returns the argument it mutated: `set_forcing_rate!` the rate,
-`add_forcing_source!` the right-hand side, `project_forcing!` the field. The hook `prepare_forcing!` returns
+Each mutating hook returns the argument it mutated: `add_forcing_source!` the right-hand side,
+`project_forcing!` the field. The hook `prepare_forcing!` returns
 `nothing`, having advanced the state it was handed in place.
 
 A hook runs inside the time loop, which is allocation-free at field scale, so a strategy allocates
@@ -253,51 +248,27 @@ _fill(parameters, keyword, value) = merge(parameters, NamedTuple{(keyword,)}((va
 
 
 """
-    set_forcing_rate!(forcing, rate, field, domain) -> rate
+    steady_linear_rate(forcing, domain)
 
-Fill the per-mode rate ``A(\\boldsymbol{\\kappa})`` of a strategy `forcing` whose forcing is linear in
-the field and constant in time, ``f = A \\texttt{field}`` (the [`uses_steady_linear_rate`](@ref)
-declaration). The scheme folds the rate into the diffusive integrating factor
+The per-mode rate ``A(\\boldsymbol{\\kappa})`` of a strategy `forcing` whose forcing is linear in the
+field and constant in time, ``f = A \\texttt{field}``, on the [`FixedDomain`](@ref) `domain`; `nothing`
+for every other strategy, the default. The scheme folds the rate into the diffusive integrating factor
 ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor)),
 so the forced modes advance at the net linear rate
 ``A(\\boldsymbol{\\kappa}) - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``, with ``D`` the field's diffusivity.
 
-The generator calls it once, when it is built.
-
-# Arguments
-- `rate` — a scalar field in spectral representation holding real values, overwritten with ``A``.
-- `field` — a field in spectral representation of the kind being forced; a steady rate does not
-  depend on it.
-- `domain` — the [`FixedDomain`](@ref).
-
-Only a forcing declaring `uses_steady_linear_rate` is handed a rate, so the default method, which
-returns `rate` untouched, is never reached in a run.
-"""
-set_forcing_rate!(::AbstractForcing, rate, field, domain::FixedDomain) = rate
-
-
-"""
-    uses_steady_linear_rate(forcing) -> Bool
-
-Whether `forcing` drives its field through a per-mode rate that is **constant in time**, and can
-therefore be folded into the integrating factor — that is, whether it implements
-[`set_forcing_rate!`](@ref). The default is `false`; a forcing that does implement the hook **must**
-declare it `true`.
+The generator calls it once, when it is built. A rate that is a function of
+``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` alone is returned as a radial kernel, evaluated per
+mode inside the integrating factor and stored nowhere; any other rate as a scalar field in spectral
+representation holding real values.
 
 *Steady*, not merely linear, is the load-bearing word: a per-mode rate re-solved from the state each
-step must **not** declare this. Freezing it would be the left-endpoint rectangle rule on
+step must not be returned here. Freezing it would be the left-endpoint rectangle rule on
 ``\\int A\\,\\mathrm{d}t``, dropping the scheme to first order; such a forcing goes through
-[`add_forcing_source!`](@ref) instead.
-
-The generator allocates a rate array ``A(\\boldsymbol{\\kappa})`` per field only for a forcing that
-declares this, so an unforced field, a post-step projection, or a stochastic source carries no rate
-storage at all. Declaring it is therefore part of implementing `set_forcing_rate!`: a forcing
-that fills a rate without declaring one is never given an array to fill, and
-the [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) constructor
-rejects
-it rather than let the forcing go silently unapplied.
+[`add_forcing_source!`](@ref) instead. The hook is handed no field, so a rate it returns is steady by
+construction.
 """
-uses_steady_linear_rate(::AbstractForcing) = false
+steady_linear_rate(::AbstractForcing, domain::FixedDomain) = nothing
 
 
 """
@@ -443,10 +414,17 @@ function _shell_band(domain::FixedDomain, lowest::Integer, highest::Real)
           "(shell ≈ $(round(κ_max / k0, digits = 1))): the shells above it are held empty by the " *
           "mask and contribute nothing — the forcing acts only on the retained part of the band."
   end
-  # PF's band needs a finite edge. The stored grid's corner — √3 times its Nyquist shell — lies past
-  # every mode the grid holds, retained or not, so `Inf` becomes "every mode but the mean" on any N.
+  return spectral_band(domain.multipliers, _shell_edges(domain, lowest, highest)...)
+end
+
+# The wavenumber edges of shells `lowest`–`highest`, the one home of the convention every band
+# shares: shell h covers [h − ½, h + ½) in units of the fundamental 2π/L. PF's band needs a finite
+# edge; the stored grid's corner — √3 times its Nyquist shell — lies past every mode the grid holds,
+# retained or not, so `Inf` becomes "every mode but the mean" on any N.
+function _shell_edges(domain::FixedDomain, lowest::Integer, highest::Real)
+  k0 = 2π / domain.grid.domain_size[1]
   top = isfinite(highest) ? highest : _corner_shell(domain)
-  return spectral_band(domain.multipliers, (lowest - 0.5) * k0, (top + 0.5) * k0)
+  return ((lowest - 0.5) * k0, (top + 0.5) * k0)
 end
 
 _corner_shell(domain::FixedDomain) = ceil(Int, sqrt(3) * maximum(domain.grid.grid_size) / 2)
@@ -631,8 +609,8 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
   applies.
 
 # Fields
-- `band` — the band-pass kernel, lazy: the rate is evaluated from it into the generator's rate field
-  once, so no indicator array is stored.
+- `band` — the band-pass kernel, lazy; the rate is a radial kernel on the same edges, so neither is
+  stored.
 - `rate` — the fixed linear rate ``A``.
 - `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
   from.
@@ -648,14 +626,14 @@ Linear(domain::FixedDomain; rate::Real, lowest_shell::Integer = 1, highest_shell
   Linear(_shell_band(domain, lowest_shell, highest_shell), _real_type(domain)(rate), Int(lowest_shell),
          _shell_bound(highest_shell))
 
-uses_steady_linear_rate(::Linear) = true
-
-# The band evaluated straight into the rate's own storage, then scaled in place: no indicator is kept
-# and nothing field-sized is allocated.
-function set_forcing_rate!(forcing::Linear, rate, field, domain::FixedDomain)
-  materialize_kernel!(StoredKernel(rate), forcing.band)
-  multiply!(rate, field_scalar_type(rate)(forcing.rate), rate)
-  return rate
+# The rate as a radial symbol, A on the band and zero elsewhere: the integrating factor evaluates it
+# per mode beside ν|κ|², so nothing is stored (PF decision 92). The edges are the band's own, and the
+# closure captures converted values only — a captured type is not a bitstype, which a device refuses.
+function steady_linear_rate(forcing::Linear, domain::FixedDomain)
+  T = _real_type(domain)
+  low, high = _shell_edges(domain, forcing.lowest_shell, forcing.highest_shell)
+  low², high², A, zero_rate = T(low)^2, T(high)^2, T(forcing.rate), zero(T)
+  return radial_kernel(κ² -> ifelse(low² <= κ² <= high², A, zero_rate), domain.multipliers)
 end
 
 
@@ -1036,7 +1014,6 @@ function band_energy_fraction(forcing; reynolds_box = nothing, reynolds_taylor =
 end
 
 
-uses_steady_linear_rate(::VarianceController) = false
 
 
 function add_forcing_source!(forcing::VarianceController, forcing_state, N̂, field, domain::FixedDomain,
@@ -1083,7 +1060,6 @@ end
 # gave 1.02 under this forcing against 2.995 unforced, while `Linear` — the same code path, the same
 # exponent, differing only in that its A is genuinely steady — kept 2.987. That contrast is the proof.
 # It goes through the per-stage source instead, where the scheme's own order conditions apply.
-uses_steady_linear_rate(::ConstantPower) = false
 
 # The amplitude A that injects `injection_rate` into the band, evaluated AT THE FIELD IT IS GIVEN.
 # Shared by `ConstantPower` and `VarianceController`, which differ only in what A is asked to hold.

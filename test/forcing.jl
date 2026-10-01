@@ -6,7 +6,7 @@
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: divergence, l2norm, field_data, spectral_band, convolve!, inner, weighted_inner, field_scalar_type,
-                         reality_residual, VectorFieldSpectral
+                         reality_residual, VectorFieldSpectral, RadialKernel, materialize_kernel
 using GBGHomogeneousTurbulence.Forcing: add_forcing_source!
 using Logging
 
@@ -15,16 +15,15 @@ using Logging
 # reached for, so the witness cannot be satisfied by reusing the code under test.
 inner_band(f, band) = weighted_inner(f, band)
 inner_kappa2(f, domain) = weighted_inner(f, domain.squared_wavenumber_kernel)
-_probe_band(domain) = getfield(GBGHomogeneousTurbulence.Forcing, :_shell_band)(domain, 1, 2)
 using Random
 using Test
 
 
-# A forcing that implements the rate hook but forgets to declare it — the mistake the constructor
-# guard exists to catch (defined at top level: a struct cannot be declared inside a testset body).
-struct UndeclaredRateForcing <: AbstractForcing end
-GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(::UndeclaredRateForcing, rate, field,
-                                                 domain::FixedDomain) = (rate .= 1; true)
+# A forcing whose rate hook returns something the integrating factor cannot take — the one mistake
+# left to check once the hook returns its rate (defined at top level: a struct cannot be declared
+# inside a testset body).
+struct WrongRateForcing <: AbstractForcing end
+GBGHomogeneousTurbulence.Forcing.steady_linear_rate(::WrongRateForcing, domain::FixedDomain) = zeros(3)
 
 
 # A forcing written to the source hook's pre-2026-09-18 five-argument form, before the forcing's
@@ -50,27 +49,6 @@ struct KeptLegacyForcing <: AbstractForcing end
 GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, forcing_state, N̂, field,
                                                    domain, diffusivity) = N̂
 GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, field, domain, diffusivity) = N̂
-
-
-# A forcing whose rate tracks the state — the pre-2026-08-22 `ConstantPower` — but which declares it
-# steady. Folded into the integrating factor it is frozen for the step, and the scheme silently drops
-# to first order; measured at 1.05 against 3.01. Nothing about the values looks wrong, which is why
-# the declaration is measured rather than trusted.
-struct LyingRateForcing{K} <: AbstractForcing
-  band::K
-end
-
-
-# Declares the steady rate and never implements the hook — the run would be silently unforced.
-struct DeclaredNotImplementedForcing <: AbstractForcing end
-GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate(::DeclaredNotImplementedForcing) = true
-GBGHomogeneousTurbulence.Forcing.uses_steady_linear_rate(::LyingRateForcing) = true
-function GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(forcing::LyingRateForcing, rate, field,
-                                                          domain::FixedDomain)
-  amplitude = 0.1 / (2 * max(weighted_inner(field, forcing.band), 1e-30))
-  field_data(rate) .= field_scalar_type(rate)(amplitude)
-  return rate
-end
 
 
 @testset "forcing" begin
@@ -102,10 +80,13 @@ end
   @testset "Linear rate amplitude" begin
     A = 0.7
     forcing = Linear(domain; rate = A, lowest_shell = 1, highest_shell = 2)
-    rate = new_scalar_field_spectral(domain)                  # the generator's rate slot: a scalar field in spectral representation
-    @test set_forcing_rate!(forcing, rate, û0, domain) === rate   # the hook returns its mutated argument
-    @test maximum(real.(field_data(rate))) ≈ A      # A on the band
-    @test minimum(real.(field_data(rate))) == 0     # zero outside the band
+    rate = steady_linear_rate(forcing, domain)                # a radial symbol: nothing stored
+    @test rate isa RadialKernel
+    values = real.(field_data(materialize_kernel(rate).field))
+    @test maximum(values) ≈ A                       # A on the band
+    @test minimum(values) == 0                      # zero outside the band
+    # …on exactly the band's modes: the rate and the band share their edges.
+    @test (values .!= 0) == (real.(field_data(materialize_kernel(forcing.band).field)) .!= 0)
   end
 
   @testset "ConstantPower injects exactly its injection rate, through the per-stage source" begin
@@ -306,17 +287,18 @@ end
                      velocity_forcing = f, scalar_forcing = NoForcing()); scalar = false)
 
     for f in rate_driven
-      @test uses_steady_linear_rate(f)
-      @test generator(f).velocity_rate !== nothing
+      @test steady_linear_rate(f, domain) !== nothing
+      @test generator(f).velocity_rate isa RadialKernel      # the rate is a symbol, stored nowhere
     end
     for f in other
-      @test !uses_steady_linear_rate(f)
+      @test steady_linear_rate(f, domain) === nothing
       @test generator(f).velocity_rate === nothing
     end
 
-    # The declaration is a contract, and breaking it is loud: a forcing that fills a rate without
-    # declaring one would be handed nothing and go silently unapplied, so construction rejects it.
-    @test_throws ArgumentError generator(UndeclaredRateForcing())
+    # Steadiness is structural: the hook is handed no field, so a rate it returns cannot track the
+    # state. What remains to check is that the integrating factor can take what it returns.
+    @test !hasmethod(steady_linear_rate, Tuple{Linear, Any, FixedDomain})
+    @test_throws ArgumentError generator(WrongRateForcing())
 
     # The same contract on the other hook: a strategy still written to the three-argument source
     # form defines a method the run never calls, so construction refuses it rather than integrating
@@ -329,13 +311,6 @@ end
     @test generator(OptionalArgForcing()) isa ResolvedGenerator
     @test generator(KeptLegacyForcing()) isa ResolvedGenerator
 
-    # `uses_steady_linear_rate` carries a semantic conjunct the arity guards cannot see, so it is
-    # measured: the hook is armed from two different states and must give the same rate.
-    @test_throws ArgumentError generator(LyingRateForcing(_probe_band(domain)))
-
-    # …and the mirror: DECLARING the rate without IMPLEMENTING the hook leaves the do-nothing
-    # default, whose zeroed rate is trivially steady — absence must be refused before steadiness.
-    @test_throws ArgumentError generator(DeclaredNotImplementedForcing())
     for f in (NoForcing(), VarianceRescaling(domain; target = 0.5, over = :band),
               ConstantPower(domain; injection_rate = 0.1), VarianceController(domain; target = 0.5),
               Linear(domain; rate = 0.1), StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5))
@@ -481,11 +456,10 @@ end
       end
       linear, log = quiet(() -> Linear(d; rate = 0.1, highest_shell = Inf))
       @test isempty(log)
-      rate = new_scalar_field_spectral(d)
-      GBGHomogeneousTurbulence.Forcing.set_forcing_rate!(linear, rate, u, d)
-      @test count(iszero, field_data(rate)) == 1          # every stored mode but κ = 0
-      @test field_data(rate)[1, 1, 1] == 0
-      @test all(x -> x == 0 || x == 0.1, field_data(rate))
+      rate = field_data(materialize_kernel(steady_linear_rate(linear, d)).field)
+      @test count(iszero, rate) == 1                      # every stored mode but κ = 0
+      @test rate[1, 1, 1] == 0
+      @test all(x -> x == 0 || x == 0.1, rate)
     end
     # The deferred form carries it through to whichever grid the run builds.
     d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
