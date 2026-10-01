@@ -38,8 +38,8 @@ Deviations from the plan, each with its reason:
 - **Item 5, the written bound and the function computing P**: to be built with the GPU leg, its only
   consumer.
 
-Not sent yet, awaiting the owner: the PF request behind `RESIDENT LINEAR RATE` (a radial offset for
-`exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), so
+Sent 2026-10-01, for PF's evaluation: the request behind `RESIDENT LINEAR RATE` (a radial offset
+for `exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), so
 `FULL STRAIN TENSORS` is a provisional local entry, its candidate the component-at-a-time strain.
 The skewness's ⟨S:S⟩ now reads from û (the Dirichlet route): 1.5× faster in Float32 and 2.6× in
 Float64 at 256³ on the 5070 Ti, 24× closer to a Float64 reference in Float32; about 2% of the call.

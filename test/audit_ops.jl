@@ -561,7 +561,7 @@ const RESIDENT_LINEAR_RATE = Holder(
   "yet it is stored as one scalar field in spectral representation per Linear-forced field (about " *
   "129 MiB at 256³ / Float64), because PF's exponential_convolve! takes its offset only as a " *
   "stored field. Its floor is zero, as for every symbol the frame dropped. Closing it needs the " *
-  "offset as a radial symbol; the request is drafted in the memory-audit plan, not yet sent.")
+  "offset as a radial symbol; requested of PF 2026-10-01, for its evaluation.")
 
 # The temporary ledger's field-scale rows (test/temporary_audit.jl, 2026-10-01). Each is listed, not
 # judged: the dispositions are provisional, the remedies candidates, and each is the owner's to decide.
