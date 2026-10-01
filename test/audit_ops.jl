@@ -576,19 +576,20 @@ const CHECKPOINT_STAGING_COPY = Holder(
   "Array(field_data(field)), which copies an Array too, and PF's read_field returns a new host field " *
   "the caller then copies into its own. Requested of PF 2026-10-01, for evaluation.")
 const SEEDING_NOISE_FIELD = Holder(
-  "SEEDING NOISE FIELD", :FIX,
-  "Seeding the velocity draws a full physical noise vector, about 3 N³ reals (4 with a scalar), " *
-  "before transforming it. Candidate, not yet checked against PF's operations: draw and transform " *
-  "one component at a time into û, about 1 N³ reals; the draws keep their order, so the seed would " *
-  "give the same field.")
+  "SEEDING NOISE FIELD", :DESIGN,
+  "Seeding the velocity holds a full physical noise vector before transforming it. Drawing and " *
+  "transforming one component at a time would assemble a field outside PF's whole-field " *
+  "operations, so the owner kept it (decision 108).",
+  "about 3 N³ reals (4 with a scalar), once per construction — the temporary ledger's Simulation rows",
+  "seeding stays one whole-field PF transform, no component-wise assembly in HT (a named property)")
 const FULL_STRAIN_TENSORS = Holder(
-  "FULL STRAIN TENSORS", :FIX,
-  "derivative_skewness allocates about 18 N³ reals per call: the strain rate as a full 9-component " *
-  "tensor in spectral and in physical representation, for one reduction, ⟨det S⟩ (⟨S:S⟩ is read " *
-  "from û since 2026-10-01). Symmetric tensor storage is ruled out by the owner. Candidate, not yet " *
-  "checked against PF's operations: S is symmetric and traceless, so 5 components determine it; " *
-  "forming each in one spectral scratch and transforming it into its own physical slot would cost " *
-  "about 7 N³ reals. The call is occasional and its gate is off by default.")
+  "FULL STRAIN TENSORS", :DESIGN,
+  "derivative_skewness holds the strain rate as a full tensor, in spectral and in physical " *
+  "representation, for one reduction, ⟨det S⟩. Symmetric storage and forming one component at a " *
+  "time are both ruled out by the owner, the second as assembly outside PF's whole-field " *
+  "operations (decision 108). The call is occasional and its gate is off by default.",
+  "about 18 N³ reals per call — the temporary ledger's derivative_skewness row",
+  "the strain formed by PF's whole-field symmetric_gradient, no component-wise assembly in HT (a named property)")
 
 const ALL_HOLDERS = (UNUSED_FUSION,
                      TRANSFORM_PLANNING, CHECKPOINT_STAGING_COPY, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
@@ -597,8 +598,8 @@ const ALL_HOLDERS = (UNUSED_FUSION,
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
-# (Empty from CHART CONTRACT's taking, 2026-08-06, until the temporary ledger listed its first gaps.)
-const OPEN_LOCAL_WINS = ("SEEDING NOISE FIELD", "FULL STRAIN TENSORS")
+# (Empty: the temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108.)
+const OPEN_LOCAL_WINS = ()
 
 
 # ---------------------------------------------------------------- the op cost model

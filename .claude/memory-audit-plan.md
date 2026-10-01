@@ -39,8 +39,8 @@ Deviations from the plan, each with its reason:
   consumer.
 
 Sent 2026-10-01, for PF's evaluation: the request behind `RESIDENT LINEAR RATE` (a radial offset
-for `exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), so
-`FULL STRAIN TENSORS` is a provisional local entry, its candidate the component-at-a-time strain.
+for `exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), and so is component-at-a-time
+assembly in HT (decision 108): `FULL STRAIN TENSORS` and `SEEDING NOISE FIELD` are adopted costs.
 The skewness's ⟨S:S⟩ now reads from û (the Dirichlet route): 1.5× faster in Float32 and 2.6× in
 Float64 at 256³ on the 5070 Ti, 24× closer to a Float64 reference in Float32; about 2% of the call.
 

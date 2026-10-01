@@ -3199,6 +3199,15 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     same stream on host and device; the property, not the mechanism, is what is fixed. It is checked
     by the memory plan's GPU leg, where a CPU and a GPU run with one seed must agree.
 
+108. **(2026-10-01, user-directed) Two temporaries are kept, rather than built component by
+    component.** `derivative_skewness` holds the full strain tensor while it reduces
+    ``\langle\det\boldsymbol{S}\rangle`` (about 18 ``N^3`` reals per call), and seeding holds a full
+    physical noise vector before transforming it (about 3, once per construction). Each could shrink
+    by forming and transforming one component at a time inside HT, but that assembles a field outside
+    PF's whole-field operations, against the division the package rests on: field mathematics is PF's.
+    The owner ruled both stay. Both are occasional — the skewness gate is off by default — and the
+    memory audit lists them as adopted costs, not open wins.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
