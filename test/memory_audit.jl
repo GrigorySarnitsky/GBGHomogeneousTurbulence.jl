@@ -381,40 +381,11 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
 
 # ---------------------------------------------------------------- the episode ledger
 #
-# Peak memory = resident + the transients of whatever episode is running. The hot loop is
-# allocation-free (the step!/advance! guards), so during production stepping peak equals the resident
-# ledger above. Outside it, the transient episodes are few, sequential (single-threaded — episodes
-# never overlap, so the run-phase peak is resident + the LARGEST episode), and frozen here in units
-# of N³ reals, measured mechanically via @allocated (warmed calls; generous bands for library drift).
-# Attribution (re-measured 2026-08-05 at the PF adoption; the 2026-07-18 numbers in parentheses):
-#   seeding (velocity)    ≈ 6.1 (10.3) — noise vector 3.0 + host randn staging 3.1. The envelope
-#                                  (was 1.06) is now a lazy radial kernel, and the ALIASED
-#                                  helmholtz_projection!(û, û, …) transient (was 3.2) is gone — the
-#                                  raise to GBGPeriodicFields landed as its guard-free one-pass
-#                                  projection. Construction-time only.
-#   seeding (scalar)      ≈ 2.1 (3.1) — noise scalar 1.0 + host randn staging 1.0; envelope lazy.
-#   derivative_skewness   ≈ 18.6 (19.6) — spectral tensor 9 × 1.06 + physical tensor 9; the det
-#                                  field (was 1) is gone — ⟨det S⟩ is the fused mapped mean now: the
-#                                  DOMINANT episode (~ +55 % over the default resident set), reached
-#                                  whenever the skewness gate is enabled — OFF by default since
-#                                  decision 78, so this is the binding device peak of a warm-up that
-#                                  opts in, not of the default one. Invariant
-#                                  4's per-call-diagnostic trade, priced. (PF stores full 9-component
-#                                  tensors; symmetric 6-component storage is the recorded reduction.)
-#   energy_spectrum       ≈ 0.0 (1.6) — GBGPeriodicFields fused its radial_spectrum staging into the
-#                                  binning kernel (its decision 34); only the O(N) shell vectors
-#                                  remain. integral_scale and flow_parameters inherit the zero.
-# The dense StochasticOU's prepare! projected its noise aliased per step; the band-sparse form of
-# decision 90 has no field-scale episode at all (its per-step allocation is the reseed's fixed few
-# hundred bytes, pinned by regression 02-gpu-and-hot-loop-02).
-const EPISODE_UNITS = [
-  ("seed velocity",       6.1, 1.0),
-  ("seed scalar",         2.1, 0.5),
-  ("derivative_skewness", 18.6, 1.0),
-  ("energy_spectrum",     0.0, 0.2),
-  ("integral_scale",      0.0, 0.2),
-  ("flow_parameters",     0.0, 0.2),
-]
+# Moved to test/temporary_audit.jl (2026-10-01), where it is derived: every exported function and
+# concrete type is a row, measured at three grid sizes, and every field-scale temporary is claimed by
+# a holder of the one register. The hand-written list of six episodes it replaces had never seen
+# construction, checkpointing, or any observable added after it. What stays here is the hot loop's
+# guard below: during production stepping the peak equals the resident ledger above.
 
 
 @testset "memory audit" begin
@@ -712,36 +683,10 @@ const EPISODE_UNITS = [
     @test CONTRACT_LIVE == DYNAMICS_LIVE                 # no choice-extension set remains
   end
 
-  @testset "episode ledger — transient peaks, frozen and attributed" begin
+  @testset "the hot loop allocates nothing at field scale at the run layer" begin
     N = 32
-    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
     unit = 8 * N^3
-    û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(1))
-    φ̂ = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = MersenneTwister(2))
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
-    episodes = Dict(
-      "seed velocity" => () -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
-                                                           envelope_wavenumber = 2.0, rng = MersenneTwister(1)),
-      "seed scalar" => () -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
-                                            envelope_wavenumber = 2.0, rng = MersenneTwister(2)),
-      "derivative_skewness" => () -> derivative_skewness(û, domain),
-      "energy_spectrum" => () -> energy_spectrum(û, domain),
-      "integral_scale" => () -> integral_scale(û, domain),
-      "flow_parameters" => () -> flow_parameters(sim),
-    )
-    measured = Dict{String, Float64}()
-    for (name, expected, tolerance) in EPISODE_UNITS
-      f = episodes[name]
-      f(); f()                                          # warm (compile) before measuring
-      measured[name] = (@allocated f()) / unit
-      @test abs(measured[name] - expected) <= tolerance
-    end
-    # The skewness is the dominant episode — the run-phase peak driver a default warm-up pays.
-    @test measured["derivative_skewness"] == maximum(values(measured))
-
-    # The hot loop stays allocation-free at the run layer too, so stepping-phase peak = resident.
     advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)
     @test (@allocated advance!(sim; dt = 1e-3)) < 0.2 * unit
   end

@@ -563,14 +563,56 @@ const RESIDENT_LINEAR_RATE = Holder(
   "stored field. Its floor is zero, as for every symbol the frame dropped. Closing it needs the " *
   "offset as a radial symbol; the request is drafted in the memory-audit plan, not yet sent.")
 
+# The temporary ledger's field-scale rows (test/temporary_audit.jl, 2026-10-01). Each is listed, not
+# judged: the dispositions are provisional, the remedies candidates, and each is the owner's to decide.
+const DOMAIN_CONSTRUCTION_TEMPLATES = Holder(
+  "DOMAIN CONSTRUCTION TEMPLATES", :FIX,
+  "Building a FixedDomain allocates about 11 N³ reals it does not keep: a local velocity_physical " *
+  "it never reads, a vector template where the scalar one it also builds would serve the " *
+  "multipliers and the mask, and the planner's templates. read_domain inherits it. Candidate: " *
+  "delete the unused field and build from the scalar template, then attribute what remains.")
+const RESTORE_REBUILDS_A_SEEDED_RUN = Holder(
+  "RESTORE REBUILDS A SEEDED RUN", :FIX,
+  "read_simulation allocates about 24 N³ reals it does not keep: it builds a Simulation through its " *
+  "constructor — a new domain and a seeded state — then overwrites the state with the stored one, " *
+  "read through host staging. Candidate: a constructor route that skips seeding, and reading into " *
+  "the run's own storage.")
+const CHECKPOINT_STAGING_COPY = Holder(
+  "CHECKPOINT STAGING COPY", :FIX,
+  "write_state, read_state and write_simulation each move the state through a host copy, about " *
+  "4 N³ reals, also on the CPU where the state is already host memory. On a GPU the copy is the " *
+  "transfer, though where it lives there is not yet measured. Candidate: no copy when the storage " *
+  "is already on the host; one component at a time on a device.")
+const SEEDING_DOUBLE_DRAW = Holder(
+  "SEEDING DOUBLE DRAW", :FIX,
+  "Seeding draws the noise into a host array and then adapts it into a field-sized noise field, " *
+  "about 6 N³ reals for the velocity: both copies exist on the CPU, where one would do. The host " *
+  "draw is what makes a seed give the same field on every backend, a property no decision records. " *
+  "Candidate: draw straight into the noise field when it is host memory.")
+const RATE_PROBE = Holder(
+  "RATE PROBE", :FIX,
+  "Building a generator for a steady-rate forcing (Linear) checks that the rate is steady by " *
+  "filling it twice from a vector probe, about 4 N³ reals of probe and second rate discarded. " *
+  "Candidate: probe with buffers the run already allocates.")
+const FULL_STRAIN_TENSORS = Holder(
+  "FULL STRAIN TENSORS", :PF_RAISE,
+  "derivative_skewness allocates about 18 N³ reals per call: the strain rate as a full 9-component " *
+  "tensor in spectral and in physical representation, where the symmetric tensor has 6 " *
+  "independent components and the invariant it reduces to needs neither stored. Symmetric storage " *
+  "is the recorded reduction, a backend matter; the call is occasional and its gate is off by " *
+  "default. The request is not yet sent.")
+
 const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
+                     DOMAIN_CONSTRUCTION_TEMPLATES, RESTORE_REBUILDS_A_SEEDED_RUN, CHECKPOINT_STAGING_COPY,
+                     SEEDING_DOUBLE_DRAW, RATE_PROBE, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
-# (Empty since CHART CONTRACT was taken, 2026-08-06.)
-const OPEN_LOCAL_WINS = ()
+# (Empty from CHART CONTRACT's taking, 2026-08-06, until the temporary ledger listed its first gaps.)
+const OPEN_LOCAL_WINS = ("DOMAIN CONSTRUCTION TEMPLATES", "RESTORE REBUILDS A SEEDED RUN",
+                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "RATE PROBE")
 
 
 # ---------------------------------------------------------------- the op cost model

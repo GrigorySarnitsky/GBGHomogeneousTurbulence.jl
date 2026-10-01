@@ -10,6 +10,7 @@ module MethodParityTests;   include("method_parity.jl");   end
 module VelocitySliceTests; include("velocity_slice.jl"); end
 module ObservablesCacheTests; include("observables_cache.jl"); end
 module MemoryAuditTests;   include("memory_audit.jl");   end
+module TemporaryAuditTests; include("temporary_audit.jl"); end
 module ComputeAuditTests;  include("compute_audit.jl");  end
 module OptimalityAuditTests; include("optimality_audit.jl"); end
 module DealiasingTests;    include("dealiasing.jl");     end
