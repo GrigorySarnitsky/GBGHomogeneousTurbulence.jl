@@ -560,30 +560,27 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
 
 # The temporary ledger's field-scale rows (test/temporary_audit.jl, 2026-10-01). Each is listed, not
 # judged: the dispositions are provisional, the remedies candidates, and each is the owner's to decide.
-const DOMAIN_CONSTRUCTION_TEMPLATES = Holder(
-  "DOMAIN CONSTRUCTION TEMPLATES", :FIX,
-  "Building a FixedDomain allocates about 11 N³ reals it does not keep: a local velocity_physical " *
-  "it never reads, a vector template where the scalar one it also builds would serve the " *
-  "multipliers and the mask, and the planner's templates. read_domain inherits it. Candidate: " *
-  "delete the unused field and build from the scalar template, then attribute what remains.")
-const RESTORE_REBUILDS_A_SEEDED_RUN = Holder(
-  "RESTORE REBUILDS A SEEDED RUN", :FIX,
-  "read_simulation allocates about 24 N³ reals it does not keep: it builds a Simulation through its " *
-  "constructor — a new domain and a seeded state — then overwrites the state with the stored one, " *
-  "read through host staging. Candidate: a constructor route that skips seeding, and reading into " *
-  "the run's own storage.")
+# Fixed 2026-10-01 and retired: DOMAIN CONSTRUCTION TEMPLATES (an unused vector field and a vector
+# template, −6.1 N³ reals), SEEDING DOUBLE DRAW (the host copy of the noise on the CPU, −3), and
+# RESTORE REBUILDS A SEEDED RUN (read_simulation now hands the stored state to the constructor, which
+# seeds nothing, −14 in all). What each left is below.
+const TRANSFORM_PLANNING = Holder(
+  "TRANSFORM PLANNING", :PF_RAISE,
+  "Building a FixedDomain allocates about 5 N³ reals it does not keep, all at PF's planner: 3.06 " *
+  "inside FieldTransformPlans, and the 2.03 of the scalar templates it must be handed to plan " *
+  "against. read_domain and read_simulation inherit it. The request is not yet sent.")
 const CHECKPOINT_STAGING_COPY = Holder(
-  "CHECKPOINT STAGING COPY", :FIX,
-  "write_state, read_state and write_simulation each move the state through a host copy, about " *
-  "4 N³ reals, also on the CPU where the state is already host memory. On a GPU the copy is the " *
-  "transfer, though where it lives there is not yet measured. Candidate: no copy when the storage " *
-  "is already on the host; one component at a time on a device.")
-const SEEDING_DOUBLE_DRAW = Holder(
-  "SEEDING DOUBLE DRAW", :FIX,
-  "Seeding draws the noise into a host array and then adapts it into a field-sized noise field, " *
-  "about 6 N³ reals for the velocity: both copies exist on the CPU, where one would do. The host " *
-  "draw is what makes a seed give the same field on every backend, a property no decision records. " *
-  "Candidate: draw straight into the noise field when it is host memory.")
+  "CHECKPOINT STAGING COPY", :PF_RAISE,
+  "write_state, read_state and the two simulation calls move the state through a host copy, about " *
+  "4 N³ reals, also on the CPU where it is already host memory: PF's write_field writes " *
+  "Array(field_data(field)), which copies an Array too, and PF's read_field returns a new host field " *
+  "the caller then copies into its own. The request is not yet sent.")
+const SEEDING_NOISE_FIELD = Holder(
+  "SEEDING NOISE FIELD", :FIX,
+  "Seeding the velocity draws a full physical noise vector, about 3 N³ reals (4 with a scalar), " *
+  "before transforming it. Candidate, not yet checked against PF's operations: draw and transform " *
+  "one component at a time into û, about 1 N³ reals; the draws keep their order, so the seed would " *
+  "give the same field.")
 const FULL_STRAIN_TENSORS = Holder(
   "FULL STRAIN TENSORS", :FIX,
   "derivative_skewness allocates about 18 N³ reals per call: the strain rate as a full 9-component " *
@@ -594,16 +591,14 @@ const FULL_STRAIN_TENSORS = Holder(
   "about 7 N³ reals. The call is occasional and its gate is off by default.")
 
 const ALL_HOLDERS = (UNUSED_FUSION,
-                     DOMAIN_CONSTRUCTION_TEMPLATES, RESTORE_REBUILDS_A_SEEDED_RUN, CHECKPOINT_STAGING_COPY,
-                     SEEDING_DOUBLE_DRAW, FULL_STRAIN_TENSORS,
+                     TRANSFORM_PLANNING, CHECKPOINT_STAGING_COPY, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
 # (Empty from CHART CONTRACT's taking, 2026-08-06, until the temporary ledger listed its first gaps.)
-const OPEN_LOCAL_WINS = ("DOMAIN CONSTRUCTION TEMPLATES", "RESTORE REBUILDS A SEEDED RUN",
-                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "FULL STRAIN TENSORS")
+const OPEN_LOCAL_WINS = ("SEEDING NOISE FIELD", "FULL STRAIN TENSORS")
 
 
 # ---------------------------------------------------------------- the op cost model

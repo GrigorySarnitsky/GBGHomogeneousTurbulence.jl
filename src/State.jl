@@ -129,6 +129,21 @@ function Base.show(io::IO, ::MIME"text/plain", state::ResolvedFields)
 end
 
 
+# Standard normal noise drawn on the HOST, so a seed gives the same field on every backend — the rule
+# the forcing's draws keep under decision 90, the stream staying the seed's. On the CPU the drawn
+# array IS the noise field's storage; on a device it is moved into a device field. The first form saved
+# a field-sized copy on the CPU (2026-10-01) and reaches no raw storage.
+function _host_noise(rng, T, domain, ::Val{R}) where {R}
+  host = randn(rng, T, field_physical_shape(domain.grid, Val(R))...)
+  drawn = R == 0 ? ScalarFieldPhysical(host, domain.grid, domain.layout) :
+                   VectorFieldPhysical(host, domain.grid, domain.layout)
+  domain.storage_family === Array && return drawn
+  noise = R == 0 ? new_scalar_field_physical(domain) : new_vector_field_physical(domain)
+  adapt!(noise, drawn)
+  return noise
+end
+
+
 """
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,
                                 initial_spectrum = nothing, rng = default_rng())
@@ -185,10 +200,7 @@ function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
                                      initial_spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
-  # Drawn on the host, so a seed gives the same field on every backend, then moved to the run's storage.
-  noise = new_vector_field_physical(domain)
-  adapt!(noise, VectorFieldPhysical(randn(rng, T, field_physical_shape(domain.grid, Val(1))...),
-                                    domain.grid, domain.layout))
+  noise = _host_noise(rng, T, domain, Val(1))
   to_spectral!(û, noise, domain.transform_plans)
 
   # The envelope is a radial symbol of |κ|², built as a lazy kernel (no field of coefficients); the
@@ -288,9 +300,7 @@ function random_scalar_spectral!(φ̂, domain::FixedDomain;
                         initial_spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
-  noise = new_scalar_field_physical(domain)
-  adapt!(noise, ScalarFieldPhysical(randn(rng, T, field_physical_shape(domain.grid, Val(0))...),
-                                    domain.grid, domain.layout))
+  noise = _host_noise(rng, T, domain, Val(0))
   to_spectral!(φ̂, noise, domain.transform_plans)
 
   # Radial-symbol envelope, as for the velocity: lazy kernels, value-only captures.

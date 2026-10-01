@@ -411,6 +411,14 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
                              ftag == "IFSSPRK3" ? IFSSPRK3() :
                              throw(ArgumentError("read_simulation: unrecognized field scheme tag " *
                                                  "\"$ftag\" in group \"$name\""))
+  # The stored state is read first and ADOPTED by the constructor, which then seeds nothing: building
+  # a seeded run and overwriting its state cost a seeded field's worth of temporaries for values never
+  # used (2026-10-01).
+  sg = _require_group(g, "state", "read_simulation")
+  _require_tag(sg, "state", "read_simulation", "GBGHomogeneousTurbulence.ResolvedFields")
+  state = ResolvedFields(domain; scalar)
+  _load_field!(state.velocity_spectral, sg, "velocity_spectral", "read_simulation")
+  scalar && _load_field!(state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
   has_tracers = haskey(g, "tracers")
   if has_tracers
     tg = _require_group(g, "tracers", "read_simulation")
@@ -427,23 +435,19 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_t
                      velocity_forcing, scalar_forcing, field_integration_scheme,
                      cfl = a["cfl"], max_dt = a["max_dt"],
                      number_of_particles = npoints(positions_host), interpolation_scheme,
-                     unwrapped, particle_integration_scheme, ordered_interpolation)
+                     unwrapped, particle_integration_scheme, ordered_interpolation, state)
   else
     # Forwarded here too, so a traversal setting on a tracer-free file meets the constructor's
     # by-name refusal rather than being silently dropped.
     sim = Simulation(domain; viscosity = a["viscosity"], schmidt = a["schmidt"], scalar,
                      velocity_forcing, scalar_forcing, field_integration_scheme,
-                     cfl = a["cfl"], max_dt = a["max_dt"], ordered_interpolation)
+                     cfl = a["cfl"], max_dt = a["max_dt"], ordered_interpolation, state)
   end
-  # The seeded state gives way to the stored one; the announcements and the closing deposits then
-  # replay the constructor's own seeding schedule over it, so every derived slot is recomputed
-  # rather than read. Order is load-bearing: `particles_modified!` restarts the unwrapped record at
-  # the wrapped positions, so the stored unwrapped positions are copied AFTER it — and it discards
-  # the sample history, so the stored history is restored after it too.
-  sg = _require_group(g, "state", "read_simulation")
-  _require_tag(sg, "state", "read_simulation", "GBGHomogeneousTurbulence.ResolvedFields")
-  _load_field!(sim.state.velocity_spectral, sg, "velocity_spectral", "read_simulation")
-  scalar && _load_field!(sim.state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
+  # The announcements and the closing deposits replay the constructor's schedule over the adopted
+  # state, so every derived slot is recomputed rather than read. Order is load-bearing:
+  # `particles_modified!` restarts the unwrapped record at the wrapped positions, so the stored
+  # unwrapped positions are copied AFTER it — and it discards the sample history, so the stored
+  # history is restored after it too.
   # The forcing states continue where they were written. The constructor started fresh ones on the
   # stored forcings; each is overwritten in place, so the run's record keeps its own objects.
   for (entry, key) in FORCING_STATE_GROUPS

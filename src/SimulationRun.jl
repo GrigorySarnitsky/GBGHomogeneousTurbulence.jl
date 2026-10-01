@@ -1618,13 +1618,13 @@ function write_simulation end
     read_simulation(parent::HDF5.H5DataStore, name::AbstractString;
                     array_type = Array, ordered_interpolation = nothing) -> Simulation
 
-Restore a run from the group [`write_simulation`](@ref) wrote: rebuild the [`Simulation`](@ref)
-through its own constructor from the recorded parameters, overwrite the freshly seeded state and
-positions with the stored ones, re-deposit every observable the schedule carries, restore the
-Lagrangian sample history fill-aware (a scheme of a different order keeps what fits and
-bootstraps the rest), and set the clock — the next [`advance!`](@ref) continues the checkpointed
-run, a stochastic forcing's realization included. A
-group not written by `write_simulation`, or written by a newer schema version, is refused with an
+Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
+through its own constructor from the recorded parameters, adopting the stored state rather than
+seeding one; the positions, the deposited observables, the Lagrangian sample history (fill-aware:
+a scheme of a different order keeps what fits and bootstraps the rest) and the clock follow. The
+next [`advance!`](@ref) continues the run, a stochastic forcing's realization included.
+
+A group not written by `write_simulation`, or written by a newer schema version, is refused with an
 `ArgumentError`. Available once the `HDF5` package is loaded.
 
 # Arguments

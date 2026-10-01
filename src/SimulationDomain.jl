@@ -300,8 +300,6 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   grid = Grid3D((N, N, N), (L, L, L))
   layout = RealFourierLayout()
 
-  velocity_physical = VectorFieldPhysical((x, y, z) -> (zero(T), zero(T), zero(T)), grid; array_type)
-  velocity_spectral = VectorFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(1))), grid)
   scalar_physical_template = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
   scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(0))), grid)
 
@@ -315,7 +313,9 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # overwrites the arrays it plans against, cannot clobber anything here by construction.
   transform_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage;
                                         fft_flags, fft_timelimit = Float64(fft_timelimit))
-  multipliers = FieldSpectralMultipliers(velocity_spectral)
+  # The multipliers and the mask need a spectral field only for its grid, layout and storage type, so
+  # the planner's scalar template serves; a vector template here cost two unused fields (2026-10-01).
+  multipliers = FieldSpectralMultipliers(scalar_spectral_storage)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
   squared_wavenumber_kernel = radial_kernel(identity, multipliers)
@@ -324,7 +324,7 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # against the backend). A named function, not a closure: the kernel's type is then a constant
   # across constructions, which keeps every downstream specialization stable.
   unit_kernel = radial_kernel(_unit_symbol, multipliers)
-  dealias = _build_dealias(dealiasing, velocity_spectral, multipliers, N, L, T)
+  dealias = _build_dealias(dealiasing, scalar_spectral_storage, multipliers, N, L, T)
 
   return FixedDomain(grid, layout, transform_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
 end

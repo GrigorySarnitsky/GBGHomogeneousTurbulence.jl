@@ -182,20 +182,20 @@ const ROWS = Dict{Symbol, Function}(
 in_place_owned(n) = endswith(String(n), "!") && n !== :warmup!
 
 
-# The field-scale rows, each frozen at the largest size in N³ reals and claimed by a holder of the one
+# The field-scale rows, each frozen at the largest size in N³ reals and claimed by the holders of the one
 # register (audit_ops.jl). A row is below field scale when its units at the largest size are small or
 # fall at least twofold from the middle size — a field-scale cost stays flat in these units — and
 # every other row must be listed here; a listed row that has fallen below field scale fails too.
 const FIELD_SCALE_ROWS = Dict(
-  :read_simulation => (24.1, RESTORE_REBUILDS_A_SEEDED_RUN),
-  :derivative_skewness => (18.3, FULL_STRAIN_TENSORS),
-  :FixedDomain => (11.2, DOMAIN_CONSTRUCTION_TEMPLATES),
-  :read_domain => (11.2, DOMAIN_CONSTRUCTION_TEMPLATES),
-  :Simulation => (6.0, SEEDING_DOUBLE_DRAW),
-  Symbol("Simulation/scalar and tracers") => (8.0, SEEDING_DOUBLE_DRAW),
-  :write_simulation => (4.1, CHECKPOINT_STAGING_COPY),
-  :write_state => (4.1, CHECKPOINT_STAGING_COPY),
-  :read_state => (4.1, CHECKPOINT_STAGING_COPY),
+  :derivative_skewness => (18.3, (FULL_STRAIN_TENSORS,)),
+  :read_simulation => (10.0, (TRANSFORM_PLANNING, CHECKPOINT_STAGING_COPY)),
+  :FixedDomain => (5.1, (TRANSFORM_PLANNING,)),
+  :read_domain => (5.1, (TRANSFORM_PLANNING,)),
+  :write_simulation => (4.1, (CHECKPOINT_STAGING_COPY,)),
+  :write_state => (4.1, (CHECKPOINT_STAGING_COPY,)),
+  :read_state => (4.1, (CHECKPOINT_STAGING_COPY,)),
+  Symbol("Simulation/scalar and tracers") => (4.0, (SEEDING_NOISE_FIELD,)),
+  :Simulation => (3.0, (SEEDING_NOISE_FIELD,)),
 )
 const FROZEN_TOLERANCE = 0.3          # N³ reals at the largest size
 below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
@@ -244,8 +244,8 @@ below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
         haskey(FIELD_SCALE_ROWS, name) || @error "temporary ledger: $name allocates $(round(u[end]; digits = 2)) N³ reals and no holder claims it"
       end
     end
-    for (name, (frozen, holder)) in FIELD_SCALE_ROWS
-      @test holder in ALL_HOLDERS
+    for (name, (frozen, holders)) in FIELD_SCALE_ROWS
+      @test !isempty(holders) && all(h -> h in ALL_HOLDERS, holders)
       haskey(units, name) && @test abs(units[name][end] - frozen) <= FROZEN_TOLERANCE
     end
     # The skewness stays the largest temporary an observable takes — the run-phase peak an opted-in

@@ -123,10 +123,12 @@ deposited_cache(sim) = (deposit!(sim); sim.cache)
     fields_modified!(SIM); deposit!(SIM)
   end
 
-  @testset "the seeders: one device field for the noise, one host array for the draw" begin
-    @alloc_below 2 * VECTOR_BYTES + bound() random_solenoidal_velocity_spectral!(
+  @testset "the seeders: one noise field, drawn into directly on the CPU" begin
+    # On a device the draw is made into a host array and moved, a second field's worth; on the CPU
+    # the noise field IS host memory and the draws go straight into it, so one field is the bound.
+    @alloc_below VECTOR_BYTES + bound() random_solenoidal_velocity_spectral!(
       STATE.velocity_spectral, DOMAIN; kinetic_energy = 1.5, envelope_wavenumber = 2.0, rng = SEED)
-    @alloc_below 2 * SCALAR_BYTES + bound() random_scalar_spectral!(
+    @alloc_below SCALAR_BYTES + bound() random_scalar_spectral!(
       STATE.scalar_spectral, DOMAIN; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = SEED)
     fields_modified!(SIM); deposit!(SIM)
   end
