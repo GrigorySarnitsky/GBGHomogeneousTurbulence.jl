@@ -13,7 +13,8 @@
 # The scalar φ = D sin x gives ⟨φ²⟩ = D²/2 and ε_φ = 2ϰ⟨|∇φ|²⟩ = ϰD².
 using Test
 using GBGHomogeneousTurbulence
-using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, to_spectral!, to_physical!, multiply!
+using GBGPeriodicFields: VectorFieldPhysical, ScalarFieldPhysical, to_spectral!, to_physical!, multiply!,
+                         symmetric_gradient, inner, weighted_inner
 using Logging
 
 const N = 16
@@ -79,6 +80,23 @@ end
   @test fp.dissipation ≈ ν * squares / 2 rtol = 1e-12
   @test fp.rms_velocity ≈ sqrt(2 * (squares / 4) / 3) rtol = 1e-12
   @test fp.viscosity == ν
+end
+
+
+@testset "the skewness denominator: the Dirichlet route equals the direct ⟨S:S⟩" begin
+  # `derivative_skewness` reads ⟨S:S⟩ = ½⟨|ω|²⟩ = ½Σ|κ|²|û|² from û rather than from the physical
+  # strain tensor. The identity is exact for a solenoidal field on Fourier sums — the cross term
+  # ⟨∂_{x_j}u_i ∂_{x_i}u_j⟩ vanishes by incompressibility — so the two routes agree to round-off. The
+  # direct route is computed here explicitly, from the strain in physical representation.
+  for (T, tolerance) in ((Float64, 1e-12), (Float32, 1e-5))
+    d = FixedDomain(grid_points_per_axis = 32, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
+                    array_type = Array)
+    û = new_vector_field_spectral(d)
+    random_solenoidal_velocity_spectral!(û, d; kinetic_energy = 1.5, envelope_wavenumber = 4.0)
+    S = new_tensor_field_physical(d)
+    to_physical!(S, symmetric_gradient(û, d.multipliers), d.transform_plans)
+    @test weighted_inner(û, d.squared_wavenumber_kernel) / 2 ≈ inner(S, S) rtol = tolerance
+  end
 end
 
 

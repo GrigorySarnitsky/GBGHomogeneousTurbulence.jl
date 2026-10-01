@@ -16,7 +16,7 @@ Built and pushed, the full suite passing at each step:
   `RESIDENT LINEAR RATE`; the forcing list checked against the package's own subtypes.
 - **Items 1–2, the temporary ledger** (`test/temporary_audit.jl`) — every exported function and
   concrete type a row at 16³, 32³, 64³, plus four variants; every field-scale row frozen and claimed
-  (six holders, five of them `:FIX` on the open list, one `:PF_RAISE`); a planted wasteful
+  (six holders, all `:FIX` on the open list); a planted wasteful
   constructor reads as field scale. The hand-written episode list is retired.
 
 Deviations from the plan, each with its reason:
@@ -38,8 +38,11 @@ Deviations from the plan, each with its reason:
 - **Item 5, the written bound and the function computing P**: to be built with the GPU leg, its only
   consumer.
 
-Not sent yet, both awaiting the owner: the PF requests behind `RESIDENT LINEAR RATE` (a radial
-offset for `exponential_convolve!`) and `FULL STRAIN TENSORS` (symmetric tensor storage).
+Not sent yet, awaiting the owner: the PF request behind `RESIDENT LINEAR RATE` (a radial offset for
+`exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), so
+`FULL STRAIN TENSORS` is a provisional local entry, its candidate the component-at-a-time strain.
+The skewness's ⟨S:S⟩ now reads from û (the Dirichlet route): 1.5× faster in Float32 and 2.6× in
+Float64 at 256³ on the 5070 Ti, 24× closer to a Float64 reference in Float32; about 2% of the call.
 
 ## What the instrument is
 

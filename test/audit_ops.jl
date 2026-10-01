@@ -595,12 +595,13 @@ const RATE_PROBE = Holder(
   "filling it twice from a vector probe, about 4 N³ reals of probe and second rate discarded. " *
   "Candidate: probe with buffers the run already allocates.")
 const FULL_STRAIN_TENSORS = Holder(
-  "FULL STRAIN TENSORS", :PF_RAISE,
+  "FULL STRAIN TENSORS", :FIX,
   "derivative_skewness allocates about 18 N³ reals per call: the strain rate as a full 9-component " *
-  "tensor in spectral and in physical representation, where the symmetric tensor has 6 " *
-  "independent components and the invariant it reduces to needs neither stored. Symmetric storage " *
-  "is the recorded reduction, a backend matter; the call is occasional and its gate is off by " *
-  "default. The request is not yet sent.")
+  "tensor in spectral and in physical representation, for one reduction, ⟨det S⟩ (⟨S:S⟩ is read " *
+  "from û since 2026-10-01). Symmetric tensor storage is ruled out by the owner. Candidate, not yet " *
+  "checked against PF's operations: S is symmetric and traceless, so 5 components determine it; " *
+  "forming each in one spectral scratch and transforming it into its own physical slot would cost " *
+  "about 7 N³ reals. The call is occasional and its gate is off by default.")
 
 const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
                      DOMAIN_CONSTRUCTION_TEMPLATES, RESTORE_REBUILDS_A_SEEDED_RUN, CHECKPOINT_STAGING_COPY,
@@ -612,7 +613,8 @@ const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
 # (Empty from CHART CONTRACT's taking, 2026-08-06, until the temporary ledger listed its first gaps.)
 const OPEN_LOCAL_WINS = ("DOMAIN CONSTRUCTION TEMPLATES", "RESTORE REBUILDS A SEEDED RUN",
-                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "RATE PROBE")
+                         "CHECKPOINT STAGING COPY", "SEEDING DOUBLE DRAW", "RATE PROBE",
+                         "FULL STRAIN TENSORS")
 
 
 # ---------------------------------------------------------------- the op cost model
