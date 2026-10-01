@@ -1,6 +1,6 @@
 # Memory audit: from ledgers to a bound on the whole run
 
-Status: draft 3, 2026-09-30, after two adversarial rounds (coverage, soundness, facts each). Not
+Status: draft 4, 2026-10-01, after three adversarial rounds (coverage, soundness, facts each). Not
 started.
 
 ## Why
@@ -10,13 +10,14 @@ complete within itself, and nothing checks that the union covers every stage of 
 
 - The resident ledger (`test/memory_audit.jl`, working set + frame) is derived: it walks every
   field-sized array a live `Simulation` reaches, and a completeness test requires the two ledgers to
-  account for all of them. But the walk (`collect_field_arrays!`, `test/audit_ops.jl:58–74`) has
-  three blind spots, each confirmed: it skips closures (`!(x isa Function)`, line 66); it tests an
-  array as one leaf and never descends into its elements, so an array held by a struct inside a
-  `Vector` or a `Dict` is invisible (a `Vector{Holder}` of two field arrays: 0 found); and a
-  closure's reassigned capture sits behind a `Core.Box`. The particle sample history is stored in
-  exactly the second shape (`src/Cache.jl:151`, a `Vector` of point-value sets); its test counts the
-  slots, not their bytes.
+  account for all of them. The walk (`collect_field_arrays!`, `test/audit_ops.jl:58–74`) has four
+  blind spots, each reproduced on a fixture: closures (`!(x isa Function)`, line 66), the elements
+  of an array whose element type is not a number (a `Vector` of structs; a `Dict`'s values, which
+  sit in such a vector), a closure's reassigned capture behind a `Core.Box`, and a view counted
+  again beside its parent. An extended walk run on five live CPU configurations finds exactly what
+  the current one finds, so these hide no field-scale array today; they are holes the next storage
+  choice falls into. The particle sample history (`src/Cache.jl:151`) is stored in the second shape,
+  and its test (`test/memory_audit.jl:592`) counts the slots, not their bytes.
 - The temporary ledger (`EPISODE_UNITS`, `test/memory_audit.jl:405`) is a hand-written list of six
   episodes. Construction, checkpointing, and every observable added after it were never on it.
 - The zero-storage floor for a function of |κ|² is demonstrated only for the `FixedDomain`. A symbol
@@ -24,12 +25,12 @@ complete within itself, and nothing checks that the union covers every stage of 
   that floor.
 - The liveness bound is built from the unforced step lists (`rk3_ops` and `rk4_ops` take only an
   `ou` forcing keyword); the forcing deltas are "priced on the forcing axis" and never bounded.
-- Every scaling statement is in the grid size N. The particle count M, the sample-history depth, and
-  a forcing's band (which sizes `StochasticOU`'s companion grid, `src/Forcing.jl:1337`) are never
+- Every scaling statement is in the grid size N. The particle count M, the multistep order K, and a
+  forcing's band (which sizes `StochasticOU`'s companion grid, `src/Forcing.jl:1337`) are never
   scaling axes.
-- Every CPU measurement reads Julia's heap. Memory the C libraries allocate themselves — FFTW's
-  planner (1.2 MB of resident host memory at 48³ under `FFTW.MEASURE`, against 66 KB on the heap)
-  and HDF5's buffers — is invisible to all of them.
+- Every CPU measurement reads Julia's heap. Memory the C libraries allocate themselves is invisible
+  to them: under `FFTW.MEASURE` a 48³ domain raises the resident set by 1.2 MB against 0.07–0.17 MB
+  on the heap.
 
 Measured on the CPU at 32³, Float64, in N³ reals (default resident set ≈ 19); re-measured
 independently at 16³, 32³, 64³, every row but one flat in these units:
@@ -42,8 +43,8 @@ independently at 16³, 32³, 64³, every row but one flat in these units:
 | `kinetic_energy_and_dissipation_below_scale` | 0.7 at 32³, sub-cubic in N | no |
 | `FixedDomain` construction | 11.4 | no |
 | `ResolvedGenerator` with `Linear` | 4.3, plus resident 1.06 with no floor | no |
-| `write_simulation` | 4.3 | no |
-| `read_simulation` | 25.4 | no |
+| `write_simulation` | 4.3 on the heap; its resident-set rise is flat in N | no |
+| `read_simulation` | 25.4 (independently: 49.8 MB over a plain build at 64³, within 7%) | no |
 
 Causes identified: `src/SimulationDomain.jl:303` builds a local `velocity_physical` and never reads
 it, and a vector template serves the multipliers and the mask where the scalar one would do;
@@ -68,63 +69,90 @@ exactly this, each part checked:
 ### The theorem
 
 A run is a sequence of stages: build the domain; build the run (buffers, cache, generator, state,
-tracers); seed; step; warm up; observe; checkpoint; restore. For a stage s let R(s) be the ledgered
-resident set when s begins, and T(s) the peak of all bytes concurrently live during s beyond R(s) —
-including whatever s builds that becomes part of R(s+1). Then, on each memory space (device, host),
+tracers); seed; step; warm up; observe; checkpoint; restore. For a stage s and a memory space σ
+(device or host) let R_σ(s) be the ledgered resident bytes in σ when s begins, and T_σ(s) the peak
+of all bytes concurrently live in σ during s beyond R_σ(s) — including whatever s builds that
+becomes part of R_σ(s+1). Then, in each space,
 
-    peak ≤ P := max_s ( R(s) + T(s) )
+    peak_σ ≤ P_σ := max_s ( R_σ(s) + T_σ(s) )
 
 provided:
 
 - **A1 (sequential)** stages do not overlap: the run is single-threaded at the Julia level. CUDA.jl's
   background pool-trimming task only calls `reclaim()`, so it cannot raise a peak.
 - **A2 (reclaimed)** the temporaries of a finished stage are not live when a later stage allocates.
-  On the GPU, CUDA.jl collects and retries on allocation failure, so the property that matters is
-  that the run *fits*.
-- **A3 (no fragmentation loss)** a request for B bytes succeeds when B bytes are free.
-- **A4 (scaling)** each stage's bytes are a·N³ + b·M + c·(K − 1)·M + d·N_c³ + O(N²), with K the
-  multistep order that sets the history depth, N_c a companion grid's size, and the coefficients
-  derived from the ledger's shape classes — never fitted to the measurements they are checked
-  against. Each axis is checked at three points.
-- **A5 (precision and backend)** precision and backend change bytes, never counts. Tested by running
-  both precisions, and ROCm on Aiporetne.
-- **A6 (outside the heap and the pool)** allocations neither Julia's heap nor the device pool sees —
-  cuFFT/rocFFT workspaces and handles on the device; FFTW's planner and HDF5's buffers on the host —
-  are measured: the driver's free memory on the device, the process's resident set on the host.
-- **A7 (the configuration space)** is derived from the code: the `subtypes` of `AbstractForcing`,
-  `AbstractIntegrator`, `DealiasingStrategy`, `AbstractParticleIntegrator` (with `AdamsBashforth`'s
-  order K), and every keyword of the constructors a run goes through (`Simulation`, `FixedDomain`,
-  `Tracers`, each forcing, `ResolvedGenerator`, `FlowConditions`, `ObservablesCache`,
-  `allocate_buffers`, `ResolvedFields`), each classified as a categorical axis, a scaling axis, or
-  memory-neutral with a reason — a new keyword fails until classified. Among them:
-  `interpolation_scheme` and `fft_flags` are categorical; `number_of_particles` and the band edges
-  are scaling axes.
-- **A8 (the measurements measure)** every reading is falsified before it is trusted: after a known
-  allocation, the pool's used high-water mark must show it. The trap is that a pool handle taken
-  before the first allocation is the driver's stock pool, whose statistics never move; the handle is
-  taken from `CUDA.memory_pool(device())` after one allocation, public API only. The high-water mark
-  is reset by writing 0, which the driver takes as "reset to current". A CPU row's kept-versus-
-  transient split is computed with the shared frame excluded, not by subtracting a `summarysize`
-  that may count shared storage.
+  Leg: the collection at every stage boundary, and the process-growth checks.
+- **A3 (no fragmentation loss)** a request for B bytes succeeds when B bytes are free. Leg: the
+  limit runs.
+- **A4a (resident scaling)** R_σ is a·N³ + b·M + c·(K − 1)·M + d·N_c³ + O(N²), with N_c a companion
+  grid's size and coefficients derived in closed form from the ledger's shape classes.
+- **A4b (temporary scaling)** T_σ has the same form, with coefficients *measured* at three points on
+  each axis and asserted to fit that form within a stated tolerance. This is an empirical fit
+  against a form chosen beforehand, not a derivation; the fit is never refitted to the top-down
+  measurements it is checked against.
+- **A5 (precision and backend)** precision and backend change bytes, never counts. Leg: both
+  precisions, and the ROCm run on Aiporetne.
+- **A6 (outside the heap and the pool)** allocations neither Julia's heap nor the device pool sees
+  are measured: on the device, cuFFT workspaces and library handles, read from the driver; on the
+  host, FFTW's planner and HDF5's buffers, read from the process's resident set.
+- **A7 (the configuration space)** is derived from the code where the code defines it, and stated
+  by convention where it does not:
+  - derived: the `subtypes` of `AbstractForcing`, `AbstractIntegrator`, `DealiasingStrategy`,
+    `AbstractParticleIntegrator`; scalar off, or on with each scalar forcing the constructor accepts
+    (all six but `VarianceController` with its default `turnover_time`); tracers off, `Heun`, or
+    `AdamsBashforth` with its order K;
+  - by convention: `interpolation_scheme` is a family with parameters (`CatmullRom`,
+    `LalescuSpline(n, m)`, `LagrangeSpline(n)`), swept as one representative of each and the widest
+    stencil in use; `fft_flags` takes FFTW's planner modes (`nothing`, `ESTIMATE`, `MEASURE`), named
+    here because FFTW owns them;
+  - every keyword of every constructor a run goes through (`Simulation`, `FixedDomain`, `Tracers`,
+    `ParticleTraversal`, each forcing, `ResolvedGenerator`, `FlowConditions`, `ObservablesCache`,
+    `allocate_buffers`, `ResolvedFields`) is classified as a categorical axis, a scaling axis, or
+    memory-neutral with a reason — a new keyword fails until classified. `ObservablesCache`'s
+    `history_depth` and `AdamsBashforth`'s order are one axis, K, since the code requires them to
+    agree.
+- **A8 (the measurements measure)** every reading is falsified before it is trusted:
+  - device: the pool's used high-water mark must show a known allocation. A pool handle taken before
+    the first allocation is the driver's stock pool, whose statistics never move; the handle is taken
+    from `CUDA.memory_pool(device())` after one allocation. Writing 0 resets the mark to the current
+    use (confirmed);
+  - device limit: the effective limit is the requested one rounded up to a multiple of 32 MiB
+    (measured 2026-10-01: 16 MiB admits 24 and refuses 40; 64 admits 40 and refuses 72; 256 admits
+    136 and refuses 264). The script re-measures the granularity on each machine before using a
+    limit;
+  - host: the peak resident set (`VmHWM`) must show a known allocation, and writing `5` to
+    `/proc/self/clear_refs` resets it to the current resident set (confirmed);
+  - CPU rows split kept from transient with the shared frame excluded, never by subtracting a
+    `summarysize` that may count shared storage.
+- **A9 (exclusive use)** no other process uses the GPU during the run: the driver's free memory is
+  device-wide. Leg: a pre-flight check that `nvidia-smi --query-compute-apps` lists nothing else,
+  repeated at the end.
 
 ### How the check decides
 
-Measured high-water marks include garbage not yet collected, so they bound the true live peak from
-above. That makes the decision one-sided and sound:
+Both high-water marks — the device pool's and the host's peak resident set — include garbage not
+yet collected and compiled code, so they bound the live peak from above. That makes the decision
+one-sided, in each space separately:
 
-- **Pass in process.** A configuration passes when its measured device peak — the pool's used
-  high-water mark plus the driver-reported memory outside the pool — is at most P, and likewise on
-  the host. An upper estimate below the bound proves the bound holds for that run.
-- **Arbitrate in a fresh process.** A configuration whose measured peak exceeds P is inconclusive,
-  since the excess may be garbage. It reruns in a fresh `julia` process started with
-  `JULIA_CUDA_HARD_MEMORY_LIMIT` set to P plus a stated tolerance, and passes only if it completes.
-  The limit is read once per process and baked into the pool at first use (confirmed on the GPU), so
-  it cannot be set per configuration within one process. It governs the pool only; the driver
-  reading covers the rest.
-- **Tightness, so the bound cannot pass by being loose.** A fixed representative set — every
-  forcing, and each scaling axis at its largest point — also runs in fresh processes under a limit of
-  P minus a stated margin, and must fail with an out-of-memory error. The margin is stated as a
-  fraction of P, and a bound that survives at P minus the margin is a finding. The same runs test A3.
+- **Pass in process.** A configuration passes when its measured peak is at most P_σ, with the
+  device peak the pool's used high-water mark plus the memory outside the pool, defined exactly as
+  (total − free) − the pool's reserved bytes − the baseline taken before the configuration. The
+  baseline holds the CUDA context and handles, 630–690 MiB on this machine, which dwarfs a small
+  grid's fields, so a reading is always a difference over the baseline, never an absolute value.
+- **Arbitrate in a fresh process.** A configuration over P_σ in either space is inconclusive, since
+  the excess may be garbage. It reruns in a fresh process: on the device under
+  `JULIA_CUDA_HARD_MEMORY_LIMIT` set to P_device plus a tolerance (the limit is read once per
+  process, so never set inside one), with the driver's outside-pool reading also compared to its
+  share of P, since the limit governs the pool only; on the host under a cgroup cap
+  (`systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, confirmed to kill a process above
+  the cap). It passes only if it completes and the outside-pool reading holds.
+- **Tightness, so the bound cannot pass by being loose.** A fixed representative set also runs in
+  fresh processes under P_σ minus a margin and must fail. The margin is a stated fraction of P_σ and
+  must exceed the device limit's granularity several times over, so the tightness runs are at grids
+  where that holds (about 192³ and above for the default run), not at the small sweep sizes. A
+  bound that survives at P_σ minus the margin is a finding.
+- **Tolerance and margin are fixed before the run,** in the file, and changing either is a commit
+  of its own with its reason.
 
 ## Stage 1 — the instrument, before any fix
 
@@ -133,46 +161,51 @@ above. That makes the decision one-sided and sound:
    bounded below field scale by `test/allocations.jl` is cited, not repeated; every other export and
    constructor gets a row or an exemption with a reason. An exported operation that calls into the
    unexported `Phenomenology` leaf is measured through its own row; `Phenomenology`'s own functions
-   are outside the surface until it is extracted.
-2. **The missing rows**, each at three grid sizes with its scaling asserted: `FixedDomain`, per
-   `fft_flags`, with the host resident set read beside the heap; `ResolvedGenerator` per forcing;
-   `Simulation` per forcing, with seeding separated; `Tracers` and the particle buffers at three
-   particle counts and three orders K; `StochasticOU` at three bands; all ten checkpoint functions
-   (`write_`/`read_` × `domain`, `state`, `tracers`, `forcing`, `simulation`), each with the host
-   resident set read beside the heap; `kinetic_energy_and_dissipation_below_scale`; `warmup!`
-   (O(samples) growth, and the skewness temporary when that gate is on).
-3. **The walk sees everything reachable.** `collect_field_arrays!` descends into closures'
-   captures, unwraps `Core.Box` and `Ref`, and descends into the elements of an array whose element
-   type is not a number and into the values of a `Dict`. The particle sample history is then walked
-   by bytes, and its test asserts the bytes, not the slot count.
+   are outside the surface until it is extracted. The unexported `StationarityMonitor` is reached
+   through `warmup!`'s row; its histories are trimmed to a window of about 40 entries, so the row
+   asserts a bound independent of the run's length.
+2. **The missing rows**, each at three grid sizes with its scaling asserted, and each reading the
+   host resident set beside the heap: `FixedDomain` per `fft_flags` mode; `ResolvedGenerator` per
+   forcing; `Simulation` per forcing, with seeding separated; `Tracers`, `ParticleTraversal` and the
+   particle buffers at three particle counts and three orders K; `StochasticOU` at three bands; all
+   ten checkpoint functions (`write_`/`read_` × `domain`, `state`, `tracers`, `forcing`,
+   `simulation`); `kinetic_energy_and_dissipation_below_scale`; `warmup!`.
+3. **The walk sees everything reachable, once, in the right space.** `collect_field_arrays!`
+   descends into closures' captures, unwraps `Core.Box` and `Ref`, and descends into the elements of
+   an array whose element type is not a number and into a `Dict`'s values. It counts an array once
+   by its storage (a view and its parent are one), and tags each array by its storage type, so a host
+   array inside a GPU run — `StochasticOU`'s draw buffer, a host `Array` by design
+   (`src/Forcing.jl:1360–1367`) — is ledgered as host memory. The field and particle ledgers are
+   partitioned by the root each array is reached from, not by a length threshold, which can collide
+   at small grids. The particle sample history is then walked by bytes, and its test asserts the
+   bytes, not the slot count.
 4. **Floors for the working set's symbols.** Extend the frame's zero-storage demonstration to every
    resident array a forcing or the generator adds: an array that is a function of |κ|² is
    reconstructed from the axis multipliers inside the test, and its residency becomes a gap with a
    holder (`Linear`'s rate → the PF request below). The forcing deltas join the liveness bound.
-5. **The written bound.** The theorem, A1–A8, and the decision rule head the top-down file, beside
-   a function computing P per stage from the ledgers alone, so the check compares numbers of
-   independent origin: the ledger sum and a measurement.
+5. **The written bound.** The theorem, A1–A9, and the decision rule head the top-down file, beside
+   a function computing P_σ per stage from the ledgers alone.
 6. **The top-down GPU run** (this machine, not CI; before a release and whenever a ledger changes):
-   - the configurations: the full product of the categorical axes at one base scaling point, and
-     each scaling axis at its three points around that base with the other axes fixed, plus the
-     four corners of each pair of scaling axes, so additivity (A4) is tested; both precisions. The
-     script prints the enumerated count, and the first full run records its time; the estimate
-     today is hours, not minutes, dominated by compiling each new combination of types;
-   - one warm-up configuration before any baseline, so first-time kernel compilation and library
-     loading are not charged to a configuration;
-   - each configuration from a clean baseline: its objects dropped, `GC.gc(true)`, `CUDA.reclaim()`
-     (confirmed to return the pool to zero at 32³), and the baseline driver and pool readings
-     recorded;
-   - at every stage boundary `CUDA.synchronize()`, then `GC.gc(true)`, then the readings: the pool's
-     used high-water mark, reset per stage; the driver's free memory; the host heap
-     (`Base.gc_live_bytes`) and resident set. `synchronize` completes the device's work but frees
-     nothing; the collection is what returns a finished stage's garbage, and a stage's own garbage
-     still counts in its reading, which is why the reading is an upper estimate;
+   - pre-flight: the GPU is otherwise idle (A9), the limit granularity is re-measured (A8);
+   - the configurations: the full product of the categorical axes at one base scaling point; each
+     scaling axis at its three points around that base; the four corners of each pair of scaling
+     axes; and each value of each categorical axis at each scaling axis's largest point, so that both
+     scaling × scaling and categorical × scaling additivity are tested; both precisions. The script
+     prints the enumerated count, and the first full run records its time. Today's estimate is hours,
+     dominated by compiling each new combination of types;
+   - each configuration runs twice in the same process and is measured on the second run, so the
+     compiled code and the kernel caches it adds are not charged to it;
+   - each from a clean baseline: its objects dropped, `GC.gc(true)`, `CUDA.reclaim()` (confirmed to
+     return the pool to zero at 32³), and the baseline readings recorded;
+   - at every stage boundary `CUDA.synchronize()`, then `GC.gc(true)`, then the readings — the pool's
+     used high-water mark and the host's peak resident set, each reset at the boundary; the driver's
+     free memory; the pool's reserved bytes; the heap. `synchronize` completes the device's work but
+     frees nothing; the collection is what returns a finished stage's garbage;
    - the decision rule above, with the fresh-process arbitration and the tightness runs;
-   - a process-growth check: after the warm-up, the same configuration built and dropped repeatedly
-     must return to its baseline, so a cache that outlives its run (FFTW or cuFFT plans, handles) is
-     caught;
-   - a ROCm leg on Aiporetne, the same script.
+   - process-growth checks: after the warm-up, the same configuration built and dropped repeatedly,
+     and a sequence of distinct configurations, must each return to the baseline, so a cache that
+     outlives its run (FFTW or cuFFT plans, handles) is caught;
+   - a ROCm leg on Aiporetne, the same script with that backend's readings.
 7. **Planted defects**, each named with the leg that must catch it, re-planted as a regression test:
    - an unused field-sized array stored in a struct — the resident walk (CPU, every `Pkg.test()`);
    - an unused field-sized local temporary in a constructor, the shape of the real
@@ -180,11 +213,15 @@ above. That makes the decision one-sided and sound:
    - a new export that allocates a field — the derived temporary ledger (CPU, every `Pkg.test()`);
    - a temporary added to the restore path — its row (CPU, every `Pkg.test()`);
    - a resident symbol added to a forcing — the working-set floor (CPU, every `Pkg.test()`);
-   - an array held by a closure, including a boxed capture, and one held by a struct inside a
-     `Vector` — the walk (CPU, every `Pkg.test()`);
+   - arrays held by a closure over two captures, one of them boxed; by a struct inside a `Vector`; by
+     a `Dict`; and a view beside its parent, which must count once — the walk (CPU, every
+     `Pkg.test()`);
+   - a host array inside a device run — the storage-type tag (CPU, every `Pkg.test()`);
+   - a stage that throws partway, after allocating — the baseline must still be restored after the
+     caught exception (CPU rows, and the GPU leg);
    - an allocation outside the pool — the driver reading (GPU leg only);
-   - a host buffer allocated in C and retained across checkpoint calls — the host resident set (CPU
-     rows) and the process-growth check (GPU leg);
+   - a host buffer allocated in C and retained across checkpoint calls — the host peak resident set
+     (CPU rows) and the process-growth checks (GPU leg);
    - a bound made loose by doubling one ledger coefficient — the tightness runs (GPU leg only).
    The GPU-only plants are exercised only when the GPU leg runs; `Pkg.test()` says so when it skips
    them, and does not report them as passed.
@@ -218,33 +255,44 @@ above. That makes the decision one-sided and sound:
 
 - Memory a dependency allocates that neither the pool, the driver nor the process's resident set
   attributes to a stage: seen only as a change in free memory, not attributed.
-- Multi-GPU and multi-threaded runs: A1 fails there.
+- Multi-GPU and multi-threaded runs (A1 fails), and a shared GPU (A9 fails).
 - Values of a scaling axis outside its three swept points are covered by the asserted scaling (A4),
-  not by measurement; interactions beyond pairs of scaling axes are assumed additive.
+  not by measurement; interactions beyond pairs of axes are assumed additive.
+- Parameter values of an interpolation family beyond the representatives swept.
 - The full categorical product is measured at one base scaling point; the fresh-process arbitration
-  and the tightness runs cover a stated subset, not every configuration.
+  and the tightness runs cover a stated subset, and tightness only at grids large enough for the
+  device limit's granularity.
 - The GPU-only plants and legs run when someone runs the GPU leg, not on every `Pkg.test()`.
 
 ## Review record
 
-Round 1 (2026-09-30), three reviewers, every finding folded in: M, history depth and band as
-scaling axes; the checkpoint primitives named; `interpolation_scheme` an axis; plan caches outliving
-a configuration; the high-water mark demoted from verdict; the closure blindness fixed; teardown and
-synchronization; three sizes; GPU-only plants scoped; T(s) defined; the PF request's retirement set;
-a host-leak plant; the background task.
+Round 1 (2026-09-30): M, history depth and band as scaling axes; the checkpoint primitives named;
+`interpolation_scheme` an axis; plan caches outliving a configuration; the high-water mark demoted
+from verdict; the closure blindness fixed; teardown and synchronization; three sizes; GPU-only plants
+scoped; T(s) defined; the PF request's retirement set; a host-leak plant; the background task.
 
-Round 2 (2026-09-30), three reviewers, every finding folded in:
-- the hard limit is read once per process (confirmed on the GPU: a limit set after loading is
-  ignored; set before, an over-limit allocation raises `OutOfGPUMemoryError`), so the verdict is now
-  one-sided in process with fresh-process arbitration, and the sweep's cost estimate is withdrawn
-  until measured;
-- nothing showed the bound was tight: tightness runs at P minus a margin, and a loosened-bound plant;
-- the walk's element and `Core.Box` blind spots, live in today's audit, fixed with the closure one;
-- the "unused array" plant split into a stored one and a local one, since the real defect is local;
-- A8 corrected: the public pool handle works once taken after the first allocation; reset is a write
-  of 0;
-- three points on every scaling axis, coefficients derived, never fitted;
-- host memory outside Julia's heap (FFTW planner, HDF5) measured through the resident set, and
-  `fft_flags` classified;
-- `Phenomenology` scoped; a warm-up before baselines; `synchronize` versus collection distinguished;
-  the configuration count stated as enumerated by the script.
+Round 2 (2026-09-30): the hard limit is read once per process, so the verdict became one-sided in
+process with fresh-process arbitration; tightness runs; the walk's element and `Core.Box` blind
+spots; the "unused array" plant split; the pool-handle trap corrected; three points per axis; host
+memory outside the heap; `Phenomenology` scoped; a warm-up; the configuration count enumerated.
+
+Round 3 (2026-10-01), every finding folded in:
+- the device limit has a 32 MiB granularity (measured), so tightness runs only at large grids, and
+  the granularity is re-measured before use;
+- the host reading was a snapshot, not a high-water mark: now the peak resident set, reset per stage
+  (confirmed), with a cgroup-capped fresh process as the host's arbitration (confirmed);
+- the arbitration re-reads the memory outside the pool, whose definition is now exact, as a
+  difference over a baseline that holds the 630–690 MiB context;
+- exclusive use of the GPU is an assumption with a pre-flight check (A9);
+- A4 split into the derived resident half and the measured temporary half;
+- categorical × scaling corners added;
+- A2 given its legs;
+- compiled code kept out of the readings by measuring each configuration's second run;
+- the walk counts a view once, tags arrays by storage (a host array inside a GPU run), and
+  partitions field and particle ledgers by root;
+- `ParticleTraversal` added to the constructors; K made one axis; `interpolation_scheme` and
+  `fft_flags` given conventions, since the code does not enumerate them;
+- `StationarityMonitor`'s histories bounded by their window, not by the run's length;
+- an exception-path plant, a multi-capture closure plant, and a process-growth check across
+  distinct configurations;
+- the "Why" corrected: the walk's blind spots hide no field-scale array today.
