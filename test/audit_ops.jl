@@ -568,13 +568,13 @@ const TRANSFORM_PLANNING = Holder(
   "TRANSFORM PLANNING", :PF_RAISE,
   "Building a FixedDomain allocates about 5 N³ reals it does not keep, all at PF's planner: 3.06 " *
   "inside FieldTransformPlans, and the 2.03 of the scalar templates it must be handed to plan " *
-  "against. read_domain and read_simulation inherit it. The request is not yet sent.")
+  "against. read_domain and read_simulation inherit it. Requested of PF 2026-10-01, for evaluation.")
 const CHECKPOINT_STAGING_COPY = Holder(
   "CHECKPOINT STAGING COPY", :PF_RAISE,
   "write_state, read_state and the two simulation calls move the state through a host copy, about " *
   "4 N³ reals, also on the CPU where it is already host memory: PF's write_field writes " *
   "Array(field_data(field)), which copies an Array too, and PF's read_field returns a new host field " *
-  "the caller then copies into its own. The request is not yet sent.")
+  "the caller then copies into its own. Requested of PF 2026-10-01, for evaluation.")
 const SEEDING_NOISE_FIELD = Holder(
   "SEEDING NOISE FIELD", :FIX,
   "Seeding the velocity draws a full physical noise vector, about 3 N³ reals (4 with a scalar), " *
