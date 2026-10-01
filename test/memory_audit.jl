@@ -373,7 +373,7 @@ end
 # the archived OU's spectral noise, which could alias the generator's spectral registers but lived on
 # the forcing across an ownership boundary; its holder (OWNERSHIP, OU noise ↔ nonlinear/product)
 # retired with decision 90, which removed the noise from field scale altogether.
-const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, String}}()
+const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims from the one register (audit_ops.jl)
 
 
 

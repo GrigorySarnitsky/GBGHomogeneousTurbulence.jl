@@ -6,12 +6,13 @@
 #   * test/compute_audit.jl — the COST projection: the per-step transform counts and memory-pass
 #     counts (the frozen compute ledger, its minimality bounds, and the fusion gap register).
 #   * test/optimality_audit.jl — the FLOOR projection (decision 35): the synchronization ledger and
-#     the cross-axis holder register, which needs the same cost model the compute audit projects.
+#     the floors, which need the same cost model the compute audit projects.
 #
-# Two things beyond the op lists live here because more than one audit needs them: the class
+# Three things beyond the op lists live here because more than one audit needs them: the class
 # decomposition with its reflective counter (immediately below — it is the operational definition of
-# CLASSES, and all three audits measure residency through it), and the cost model at the foot of the
-# file (OP_COST and the transform / pass / fusion-bound projections, shared by the latter two).
+# CLASSES, and all three audits measure residency through it), the gap register every audit claims
+# its gaps from (`Holder`, before the cost model), and the cost model at the foot of the file
+# (OP_COST and the transform / pass / fusion-bound projections, shared by the latter two).
 #
 # Every op is transcribed from the step! bodies and the generator protocol (src/Propagator.jl,
 # src/Generator.jl, the recovery calls — PF's preserving to_physical! arity and
@@ -460,6 +461,107 @@ function peak_liveness(ops)
   end
   return NamedTuple{CLASSES}(Tuple(peaks[class] for class in CLASSES))
 end
+
+
+# ---------------------------------------------------------------- the gap register
+
+# ONE register for every audit (2026-10-01). Each audit holds a cost against a floor, and every gap
+# above a floor must be claimed by a `Holder`; a holder whose gap has gone fails too. The compute
+# audit's transform and fusion registers, the memory audit's liveness register and the optimality
+# audit's synchronization ledger all claim with these objects, so a gap is listed once whichever
+# audit finds it. (The traffic audit's holders are GBGCodingTools's `Traffic` strings, and join
+# when the register becomes an engine there.)
+#
+# The dispositions:
+#   :FIX      — a local win, kept on the frozen OPEN_LOCAL_WINS list until taken, retired in the
+#               commit that takes it;
+#   :PF_RAISE — a recorded request against a backend; the gap is not ours to close;
+#   :DESIGN   — a cost the owner adopted, citing its decision, and carrying BOTH measured sides:
+#               `cost`, what it costs and where the audit measures it, and `gain`, what it buys — a
+#               measured time, or a named property. A trade is legitimate (memory for speed, a
+#               crossing for the impossibility of a stale read); an unmeasured one is not a
+#               disposition.
+struct Holder
+  name::String
+  disposition::Symbol
+  what::String
+  cost::String
+  gain::String
+end
+Holder(name, disposition, what) = Holder(name, disposition, what, "", "")
+
+# The register's admission rule, one function so a planted holder exercises the rule itself: a known
+# disposition, a cause and not just a label, and for a trade both priced sides and the decision that
+# adopted it; a holder that is not a trade carries neither side.
+holder_admissible(h::Holder) =
+  h.disposition in (:FIX, :PF_RAISE, :DESIGN) && !isempty(h.name) && length(h.what) > 40 &&
+  (h.disposition === :DESIGN ?
+     occursin("decision", h.what) && !isempty(h.cost) && !isempty(h.gain) :
+     isempty(h.cost) && isempty(h.gain))
+
+const UNUSED_FUSION = Holder(
+  "UNFUSED STAGE PIPELINE", :PF_RAISE,
+  "Leray → dealias → accumulate → update → factor-rotate run as one kernel per operation where one " *
+  "fused per-mode kernel could read (product, state) and write (state, accumulator) once. The " *
+  "passes between those boundaries are pure intermediate traffic.")
+
+# MATERIALIZED PER-MODE SYMBOLS — RETIRED 2026-08-06 (decisions 38/39), both claims closed by the
+# PF adoption: the residency claim when the de-alias mask, the phase-shift translation kernels, and
+# |κ|² became lazy kernels (the frame ledger is zero field-scale arrays — 322.5 MiB retired at
+# 256³ / Float64), and the traffic claim when the fused exponential replaced the integrating-factor
+# register (the pass floor's second tier collapsed onto the fused bound: bound == floor in every
+# cell, asserted below). The lazy per-mode symbol apply this holder requested of the backend was
+# delivered in full.
+
+const HOST_SIDE_FORCING_SCALARS = Holder(
+  "HOST-SIDE FORCING SCALARS", :PF_RAISE,
+  "A forcing reduces its band observable to a Julia scalar, branches on it, " *
+  "and feeds it back to a kernel as a coefficient — a full round trip for a number that never " *
+  "needed to leave the device. Closing it needs a reduction into a device-resident scalar and " *
+  "kernels that accept one as a coefficient; the guard branch folds into the same kernel.")
+
+const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
+  "UNFUSED QUADRATIC REDUCTIONS", :PF_RAISE,
+  "WHAT REMAINS after the multi-weight fused reduction shipped (PF decision 72, requested " *
+  "2026-08-23, wired the same day): the scalar variance the stationarity gate samples, and the " *
+  "advance! NaN-guard's per-iteration scalar variance, are each a " *
+  "traversal of a DIFFERENT operand — φ̂ where the turnover pair sweeps û — and the delivered " *
+  "reduction fuses n weights over ONE field, so the φ² crossing cannot join the pair's barrier. " *
+  "Closing it needs a cross-FIELD fused reduction (one barrier answering weighted sums over " *
+  "several fields at once), a further and much smaller backend ask, deliberately not yet raised. " *
+  "The derivative skewness never joins: a cubic reduction over a different operand, its own pass. " *
+  "THE FORMER DOMINANT INSTANCE — VarianceController's three same-field reductions per stage, " *
+  "nine of the default run's ten crossings — is CLOSED: one fused weighted_inner(f, (1, band, " *
+  "|κ|²)) per stage took the default row from ten crossings to four, and the turnover clock's " *
+  "(k, ε) pair fused the same way in kinetic_energy_and_dissipation.")
+
+# CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the closing refresh its text
+# prescribed: the iteration now deposits the charts at its end and the step takes the same slots as
+# its substage recovery registers, so a chart and its register are one array and every unforced cell
+# sits AT its liveness bound (the two physical vectors — 768 MiB at 256³ / Float64 — banked; the
+# memory audit asserts the equality).
+
+const UNIFORM_DEPOSIT_SCHEDULE = Holder(
+  "UNIFORM DEPOSIT SCHEDULE", :DESIGN,
+  "The observables cache deposits every slot at every iteration's end — the schedule is fixed at construction " *
+  "and identical on every iteration (decision 40, the no-recompute design the user adopted) — so " *
+  "an iteration advanced with a hand-fixed Δt still reduces the maximum speed and reads it back, " *
+  "one crossing above that path's zero floor. The uniform schedule is what makes stale reads " *
+  "impossible and the frozen ledgers exact; a configuration-dependent deposit set would trade this " *
+  "one number for a schedule that varies with how the run is driven.",
+  "one host crossing per iteration on a fixed-Δt path, above that path's zero floor — the " *
+  "synchronization ledger's fixed-Δt rows",
+  "no slot can be read stale, since every slot is deposited at every iteration's end, and the " *
+  "frozen ledgers stay exact (a named property, not a time)")
+
+const ALL_HOLDERS = (UNUSED_FUSION,
+                     HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
+                     UNIFORM_DEPOSIT_SCHEDULE)
+
+# A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
+# cannot be added silently, and taking the win means deleting the entry in the same commit.
+# (Empty since CHART CONTRACT was taken, 2026-08-06.)
+const OPEN_LOCAL_WINS = ()
 
 
 # ---------------------------------------------------------------- the op cost model

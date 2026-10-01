@@ -65,73 +65,8 @@ include("audit_ops.jl")
 
 # ---------------------------------------------------------------- the holder register
 
-struct Holder
-  name::String
-  disposition::Symbol      # :FIX — a local win, retire on taking it; :PF_RAISE — a backend request;
-                           # :DESIGN — a user-adopted design cost, citing its decision
-  what::String
-end
-
-const UNUSED_FUSION = Holder(
-  "UNFUSED STAGE PIPELINE", :PF_RAISE,
-  "Leray → dealias → accumulate → update → factor-rotate run as one kernel per operation where one " *
-  "fused per-mode kernel could read (product, state) and write (state, accumulator) once. The " *
-  "passes between those boundaries are pure intermediate traffic.")
-
-# MATERIALIZED PER-MODE SYMBOLS — RETIRED 2026-08-06 (decisions 38/39), both claims closed by the
-# PF adoption: the residency claim when the de-alias mask, the phase-shift translation kernels, and
-# |κ|² became lazy kernels (the frame ledger is zero field-scale arrays — 322.5 MiB retired at
-# 256³ / Float64), and the traffic claim when the fused exponential replaced the integrating-factor
-# register (the pass floor's second tier collapsed onto the fused bound: bound == floor in every
-# cell, asserted below). The lazy per-mode symbol apply this holder requested of the backend was
-# delivered in full.
-
-const HOST_SIDE_FORCING_SCALARS = Holder(
-  "HOST-SIDE FORCING SCALARS", :PF_RAISE,
-  "A forcing reduces its band observable to a Julia scalar, branches on it, " *
-  "and feeds it back to a kernel as a coefficient — a full round trip for a number that never " *
-  "needed to leave the device. Closing it needs a reduction into a device-resident scalar and " *
-  "kernels that accept one as a coefficient; the guard branch folds into the same kernel.")
-
-const UNFUSED_QUADRATIC_REDUCTIONS = Holder(
-  "UNFUSED QUADRATIC REDUCTIONS", :PF_RAISE,
-  "WHAT REMAINS after the multi-weight fused reduction shipped (PF decision 72, requested " *
-  "2026-08-23, wired the same day): the scalar variance the stationarity gate samples, and the " *
-  "advance! NaN-guard's per-iteration scalar variance, are each a " *
-  "traversal of a DIFFERENT operand — φ̂ where the turnover pair sweeps û — and the delivered " *
-  "reduction fuses n weights over ONE field, so the φ² crossing cannot join the pair's barrier. " *
-  "Closing it needs a cross-FIELD fused reduction (one barrier answering weighted sums over " *
-  "several fields at once), a further and much smaller backend ask, deliberately not yet raised. " *
-  "The derivative skewness never joins: a cubic reduction over a different operand, its own pass. " *
-  "THE FORMER DOMINANT INSTANCE — VarianceController's three same-field reductions per stage, " *
-  "nine of the default run's ten crossings — is CLOSED: one fused weighted_inner(f, (1, band, " *
-  "|κ|²)) per stage took the default row from ten crossings to four, and the turnover clock's " *
-  "(k, ε) pair fused the same way in kinetic_energy_and_dissipation.")
-
-# CHART CONTRACT — RETIRED 2026-08-06 (decision 40), by exactly the closing refresh its text
-# prescribed: the iteration now deposits the charts at its end and the step takes the same slots as
-# its substage recovery registers, so a chart and its register are one array and every unforced cell
-# sits AT its liveness bound (the two physical vectors — 768 MiB at 256³ / Float64 — banked; the
-# memory audit asserts the equality).
-
-const UNIFORM_DEPOSIT_SCHEDULE = Holder(
-  "UNIFORM DEPOSIT SCHEDULE", :DESIGN,
-  "The observables cache deposits every slot at every iteration's end — the schedule is fixed at construction " *
-  "and identical on every iteration (decision 40, the no-recompute design the user adopted) — so " *
-  "an iteration advanced with a hand-fixed Δt still reduces the maximum speed and reads it back, " *
-  "one crossing above that path's zero floor. The uniform schedule is what makes stale reads " *
-  "impossible and the frozen ledgers exact; a configuration-dependent deposit set would trade this " *
-  "one number for a schedule that varies with how the run is driven.")
-
-const ALL_HOLDERS = (UNUSED_FUSION,
-                     HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
-                     UNIFORM_DEPOSIT_SCHEDULE)
-
-# A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
-# cannot be added silently, and taking the win means deleting the entry in the same commit.
-# (Empty since CHART CONTRACT was taken, 2026-08-06.)
-const OPEN_LOCAL_WINS = ()
-
+# `Holder`, every holder, `ALL_HOLDERS` and `OPEN_LOCAL_WINS` live in audit_ops.jl since 2026-10-01,
+# so the compute, memory and optimality audits claim their gaps with the same objects.
 
 # ---------------------------------------------------------------- the synchronization ledger
 
@@ -445,15 +380,19 @@ const SYNC_LEDGER = (
   end
 
   @testset "every holder is dispositioned and described" begin
-    for h in ALL_HOLDERS
-      @test h.disposition in (:FIX, :PF_RAISE, :DESIGN)
-      @test !isempty(h.name) && length(h.what) > 40      # a holder names the cause, not just a label
-    end
-    # A `:DESIGN` holder must cite the decision that adopted the cost — it records a user choice,
-    # never a silent acceptance.
-    for h in ALL_HOLDERS
-      h.disposition === :DESIGN && @test occursin("decision", h.what)
-    end
+    # Admitted by the register's rule (audit_ops.jl): a known disposition, a cause rather than a
+    # label, and for a `:DESIGN` trade the decision that adopted it plus both measured sides — what
+    # it costs and what it buys.
+    @test all(holder_admissible, ALL_HOLDERS)
+    # The rule refuses what it exists to refuse — each plant fails it for one reason.
+    trade = "adopted by decision 0 for a reason long enough to count as a cause, not a label"
+    @test !holder_admissible(Holder("UNPRICED TRADE", :DESIGN, trade, "one field per run", ""))
+    @test !holder_admissible(Holder("COSTLESS TRADE", :DESIGN, trade, "", "ten percent faster"))
+    @test !holder_admissible(Holder("UNCITED TRADE", :DESIGN, replace(trade, "decision" => "choice"),
+                                    "one field per run", "ten percent faster"))
+    @test !holder_admissible(Holder("PRICED REQUEST", :PF_RAISE, trade, "one field per run", ""))
+    @test !holder_admissible(Holder("LABEL", :PF_RAISE, "too short"))
+    @test holder_admissible(Holder("PRICED TRADE", :DESIGN, trade, "one field per run", "ten percent faster"))
     # A `:FIX` holder is a local win left open, and the frozen list is what stops it becoming an
     # accepted cost by default: adding one requires editing OPEN_LOCAL_WINS, and taking the win
     # requires deleting the entry in the same commit.

@@ -103,7 +103,7 @@ end
 const TRANSFORM_BOUND = Dict(key => base for (key, base) in TRANSFORMS_BASE)
 
 # (SHIFTED-VELOCITY REUSE retired 2026-08-06, decision 45 — the register empty is the assertion.)
-const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, String}()
+const TRANSFORM_GAP_HOLDERS = Dict{Tuple{Symbol, Symbol, Bool}, Holder}()
 
 
 # ---------------------------------------------------------------- the frozen pass ledger
@@ -167,9 +167,11 @@ const PASSES_BASE = Dict(
 #     (decision 39): the fused exponential computes the factor in register, exactly what the holder
 #     asked of the backend — the pre-registered round-3 candidate (the two-output stage kernel) is
 #     what remains of this class.
+# Claimed by the shared register's holder (audit_ops.jl), the same object the optimality audit's
+# pass floor names, so the gap is one entry on the list, not two.
 const FUSION_GAP_HOLDERS = Dict(
-  :spectral_vector => "UNFUSED STAGE PIPELINE (PF kernel granularity)",
-  :spectral_scalar => "UNFUSED STAGE PIPELINE (PF kernel granularity)",
+  :spectral_vector => UNUSED_FUSION,
+  :spectral_scalar => UNUSED_FUSION,
 )
 
 # The COINCIDENT-FACTORS residual (Sc = 1, both rates unarmed ⇒ ℰ_ν ≡ ℰ_κ) is RETIRED with the
@@ -317,6 +319,7 @@ end
         @test b <= a                              # a bound above the ledger is a bookkeeping error
         if a - b > 0
           @test haskey(FUSION_GAP_HOLDERS, class) # every gap carries a named holder (decision 34)
+          @test FUSION_GAP_HOLDERS[class] in ALL_HOLDERS  # …from the one register
         end
       end
     end
