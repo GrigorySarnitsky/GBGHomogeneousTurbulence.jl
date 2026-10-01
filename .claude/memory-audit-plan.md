@@ -1,7 +1,23 @@
 # Memory audit: from ledgers to a bound on the whole run
 
-Status: draft 4, 2026-10-01, after three adversarial rounds (coverage, soundness, facts each). Not
-started.
+Status: draft 5, 2026-10-01, after four adversarial rounds. Not started.
+
+## What the instrument is
+
+A tool that **lists possible memory defects**: every gap between what a run allocates and the floor
+it could reach, with its size, its stage, its configuration, and the evidence, ranked by bytes.
+Fixing them is a separate matter, decided per entry. A gap can be a legitimate trade — 10% more
+memory for 10% more speed is a fair exchange — so each listed entry carries a disposition:
+
+- **fix** — a local win, to be taken, the entry retired in the same commit;
+- **raised** — a request against a backend (PF, GBGCodingTools), the gap not ours to close;
+- **accepted trade-off** — kept for a measured gain, and the entry carries both measured sides,
+  the bytes it costs and the time it saves; a trade-off without the timing is not a disposition.
+
+The suite fails only on a gap no entry claims, or an entry whose gap has gone (the existing
+bidirectional holder register, `test/optimality_audit.jl`). A recorded gap is a listed item, not a
+failure. Everything below exists to make the list complete: a gap the instrument cannot see is a
+gap missing from the list.
 
 ## Why
 
@@ -61,8 +77,10 @@ exactly this, each part checked:
 1. **Coverage of the public surface** — every exported function and constructor has a temporary
    row, or a stated exemption. Exhaustive over a finite set derived from the export list.
 2. **Floors** — every resident cost is held against a floor argued from the mathematics, and every
-   gap above a floor carries a named holder.
-3. **The whole-run bound** — a theorem with named assumptions (below).
+   gap above a floor is a listed entry with its disposition.
+3. **The whole-run bound** — a theorem with named assumptions (below). P is what the ledgers say a
+   run needs, every listed gap included; the theorem's role is to show the ledgers miss nothing,
+   which is what makes the list complete.
 4. **The empirical check** — the top-down run, the leg each assumption rests on, and what it does
    not reach, stated in the file.
 
@@ -81,7 +99,12 @@ provided:
 - **A1 (sequential)** stages do not overlap: the run is single-threaded at the Julia level. CUDA.jl's
   background pool-trimming task only calls `reclaim()`, so it cannot raise a peak.
 - **A2 (reclaimed)** the temporaries of a finished stage are not live when a later stage allocates.
-  Leg: the collection at every stage boundary, and the process-growth checks.
+  Leg: the collection at every stage boundary, and the process-growth checks. Named exception:
+  cuFFT keeps a released plan in a process-wide cache (`idle_handles`,
+  `~/.julia/packages/cuFFT/*/src/wrappers.jl`), so its workspace survives `GC.gc(true)` and
+  `CUDA.reclaim()` (measured at 128³: 8.4 MB of 41.9 MB not returned; a second plan of the same
+  shape then cost only the difference). That retention is resident memory, and is itself a listed
+  entry.
 - **A3 (no fragmentation loss)** a request for B bytes succeeds when B bytes are free. Leg: the
   limit runs.
 - **A4a (resident scaling)** R_σ is a·N³ + b·M + c·(K − 1)·M + d·N_c³ + O(N²), with N_c a companion
@@ -124,9 +147,14 @@ provided:
     `/proc/self/clear_refs` resets it to the current resident set (confirmed);
   - CPU rows split kept from transient with the shared frame excluded, never by subtracting a
     `summarysize` that may count shared storage.
-- **A9 (exclusive use)** no other process uses the GPU during the run: the driver's free memory is
-  device-wide. Leg: a pre-flight check that `nvidia-smi --query-compute-apps` lists nothing else,
-  repeated at the end.
+- **A9 (no other use of the GPU changes during a reading)** the driver's free memory is
+  device-wide, and on this workstation the desktop holds about 280 MiB of the GPU in graphics
+  processes, which `nvidia-smi --query-compute-apps` does not list (it returned no rows while
+  `gnome-shell`, `nautilus`, `Xwayland` and others were resident). Leg: before and after the run,
+  and around each configuration, the full `nvidia-smi` process table — graphics and compute — is
+  recorded; any compute process but the run's own fails the pre-flight; the graphics total must
+  stay within a stated tolerance across each configuration, or that configuration's device reading
+  is discarded and repeated. A run on a session without a display removes the term.
 
 ### How the check decides
 
@@ -145,7 +173,12 @@ one-sided, in each space separately:
   process, so never set inside one), with the driver's outside-pool reading also compared to its
   share of P, since the limit governs the pool only; on the host under a cgroup cap
   (`systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, confirmed to kill a process above
-  the cap). It passes only if it completes and the outside-pool reading holds.
+  the cap). The host cap cannot be P_host alone: loading Julia, the package, CUDA and HDF5 already
+  takes about 1.5 GB of resident memory (measured: 268 MB bare, 358 MB with the package, 1522 MB
+  with CUDA, 1546 MB with HDF5), far above a small configuration's P_host. So a first fresh process
+  under the same cap loads everything the arbitration run loads and stops, its peak resident set is
+  the host baseline, and the arbitration cap is that baseline plus P_host plus the tolerance. It
+  passes only if it completes and the outside-pool reading holds.
 - **Tightness, so the bound cannot pass by being loose.** A fixed representative set also runs in
   fresh processes under P_σ minus a margin and must fail. The margin is a stated fraction of P_σ and
   must exceed the device limit's granularity several times over, so the tightness runs are at grids
@@ -181,20 +214,24 @@ one-sided, in each space separately:
    bytes, not the slot count.
 4. **Floors for the working set's symbols.** Extend the frame's zero-storage demonstration to every
    resident array a forcing or the generator adds: an array that is a function of |κ|² is
-   reconstructed from the axis multipliers inside the test, and its residency becomes a gap with a
-   holder (`Linear`'s rate → the PF request below). The forcing deltas join the liveness bound.
+   reconstructed from the axis multipliers inside the test, and its residency becomes a listed entry
+   (`Linear`'s rate, with the PF request below as its candidate remedy). The forcing deltas join the liveness bound.
 5. **The written bound.** The theorem, A1–A9, and the decision rule head the top-down file, beside
    a function computing P_σ per stage from the ledgers alone.
 6. **The top-down GPU run** (this machine, not CI; before a release and whenever a ledger changes):
-   - pre-flight: the GPU is otherwise idle (A9), the limit granularity is re-measured (A8);
+   - pre-flight: no other compute process on the GPU and the graphics total recorded (A9); the
+     limit granularity re-measured (A8);
    - the configurations: the full product of the categorical axes at one base scaling point; each
      scaling axis at its three points around that base; the four corners of each pair of scaling
      axes; and each value of each categorical axis at each scaling axis's largest point, so that both
      scaling × scaling and categorical × scaling additivity are tested; both precisions. The script
      prints the enumerated count, and the first full run records its time. Today's estimate is hours,
      dominated by compiling each new combination of types;
-   - each configuration runs twice in the same process and is measured on the second run, so the
-     compiled code and the kernel caches it adds are not charged to it;
+   - each configuration runs twice in the same process. The pool and heap readings are taken on the
+     second run, so compiled code is not charged to the configuration. The outside-pool reading of
+     the domain-build stage is taken on the *first* run that builds each distinct transform shape,
+     and charged to that stage, since the cuFFT workspace is a real cost a production run pays once
+     per shape and the second run would find it already cached (A2's exception);
    - each from a clean baseline: its objects dropped, `GC.gc(true)`, `CUDA.reclaim()` (confirmed to
      return the pool to zero at 32³), and the baseline readings recorded;
    - at every stage boundary `CUDA.synchronize()`, then `GC.gc(true)`, then the readings — the pool's
@@ -226,30 +263,35 @@ one-sided, in each space separately:
    The GPU-only plants are exercised only when the GPU leg runs; `Pkg.test()` says so when it skips
    them, and does not report them as passed.
 
-## Stage 2 — the fixes, measured by the instrument
+## Stage 2 — the first entries on the list (outside this plan)
 
-8. `FixedDomain`: delete the unused `velocity_physical`; build the multipliers and the mask from the
-   scalar field in spectral representation already allocated; then attribute what remains.
-9. `read_simulation`: restore without seeding a state it overwrites (a constructor route that skips
-   seeding), and read into the run's own storage rather than through staging where the backend
-   allows.
-10. The checkpoint staging: measure where it lives on the GPU (host or device); bound it, or stream
-    one component at a time.
-11. The generator's steadiness probe: probe with buffers the run already allocates.
+The gaps found while drafting are the list's first entries, recorded with candidate remedies and no
+disposition; each is decided on its own, after the instrument measures it:
+
+8. `FixedDomain`: the unused local `velocity_physical`, and the vector template where the scalar
+   one would do. Candidate: delete it; build from the scalar field.
+9. `read_simulation`: a seeded state that is then overwritten, and reading through host staging.
+   Candidate: a constructor route that skips seeding; read into the run's own storage.
+10. The checkpoint staging on the GPU: where it lives (host or device) is not yet measured.
+    Candidate: bound it, or stream one component at a time.
+11. The generator's steadiness probe: a vector probe and a second rate, discarded. Candidate: probe
+    with buffers the run already allocates.
+12. `Linear`'s resident rate (below), and cuFFT's process-wide plan cache (A2): each a candidate
+    trade-off, to be listed with both sides measured.
 
 ## Stage 3 — requests and closing
 
-12. **To PF**: let `exponential_convolve!` take its offset as a radial symbol, not only a stored
-    field. When it lands, one commit retires everything that records the rate as resident: the
-    `Linear` delta in `_forcing_delta` and its comment block in `test/memory_audit.jl`, the
-    working-set floor's holder, the traffic audit's two-call rate holder, and the probe's second
-    array.
-13. **To GBGCodingTools**: the top-down peak check is general, not physics — by the rulebook a
-    TestHarness engine HT declares, beside the GPU-timing-against-minimum-traffic check PF is
-    raising. HT writes it locally only until the engine exists, then declares it.
-14. **Close**: rerun the instrument after each fix; retire each holder in the fix's own commit; an
-    independent reviewer (a fresh agent or the GBGCodingTools session) audits the finished
-    instrument; the final report states the claim in the form above, with what it does not reach.
+13. **To PF**: let `exponential_convolve!` take its offset as a radial symbol, not only a stored
+    field — the remedy `Linear`'s entry would need if its disposition is "fix". If it lands and is
+    taken, one commit retires everything that records the rate as resident: the `Linear` delta in
+    `_forcing_delta` and its comment block in `test/memory_audit.jl`, the working-set floor's entry,
+    the traffic audit's two-call rate holder, and the probe's second array.
+14. **To GBGCodingTools**: the top-down peak check and the defect list are general, not physics —
+    by the rulebook a TestHarness engine HT declares, beside the GPU-timing-against-minimum-traffic
+    check PF is raising. HT writes it locally only until the engine exists, then declares it.
+15. **Close**: an independent reviewer (a fresh agent or the GBGCodingTools session) audits the
+    finished instrument; the first report is the list itself, ranked by bytes, with the claim in the
+    form above and what it does not reach.
 
 ## What this will not reach
 
@@ -296,3 +338,17 @@ Round 3 (2026-10-01), every finding folded in:
 - an exception-path plant, a multi-capture closure plant, and a process-growth check across
   distinct configurations;
 - the "Why" corrected: the walk's blind spots hide no field-scale array today.
+
+Round 4 (2026-10-01), one combined reviewer; three substantive findings, each verified on this
+machine, all folded in:
+- cuFFT keeps released plans in a process-wide cache that `GC.gc` and `CUDA.reclaim` do not empty,
+  so measuring only the second run would delete a real cost: the domain-build stage's outside-pool
+  reading now comes from the first run of each transform shape, and the cache is a listed entry;
+- the host cap had no baseline, and loading the stack alone takes about 1.5 GB: the cap is now a
+  measured post-load baseline plus P_host plus the tolerance;
+- the compute-only process query misses the desktop's graphics processes (about 280 MiB here): the
+  full process table is recorded, and the graphics total must hold steady across a configuration.
+
+Reframed the same day by the owner: the instrument lists possible defects; fixing them is separate,
+and a measured trade-off (memory for speed) is a legitimate disposition. Stage 2 became the list's
+first entries, without dispositions.
