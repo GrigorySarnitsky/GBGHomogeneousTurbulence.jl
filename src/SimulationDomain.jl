@@ -300,21 +300,16 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   grid = Grid3D((N, N, N), (L, L, L))
   layout = RealFourierLayout()
 
-  scalar_physical_template = ScalarFieldPhysical((x, y, z) -> zero(T), grid; array_type)
-  scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(0))), grid)
-
   # ONE plan pair serves every field since PF's decision 76 made the plans rank-blind: they
   # transform a single component and are applied per component, so the velocity (3), the scalar (1)
-  # and the strain tensor (9) share this object. Built from the scalar pair — any matching pair
-  # would do, and the scalar templates are already in hand. This retired IT decision 78's lazy
-  # rank-2 memo: laziness solved the per-rank buffer multiplication, and upstream deleted the
-  # multiplication itself (decision 81).
-  # The templates are freshly allocated zero scratch, so a timed planner (`MEASURE`), which
-  # overwrites the arrays it plans against, cannot clobber anything here by construction.
-  transform_plans = FieldTransformPlans(scalar_physical_template, scalar_spectral_storage;
+  # and the strain tensor (9) share this object. Built from the storage family and the grid alone
+  # (PF decision 93): the planner plans on one-component arrays of its own, so a timed planner
+  # (`MEASURE`) clobbers nothing of the run's, and no template field is built here for it.
+  transform_plans = FieldTransformPlans(array_type, grid, layout;
                                         fft_flags, fft_timelimit = Float64(fft_timelimit))
-  # The multipliers and the mask need a spectral field only for its grid, layout and storage type, so
-  # the planner's scalar template serves; a vector template here cost two unused fields (2026-10-01).
+  # The multipliers and the mask need a spectral field only for its storage type, but PF's
+  # constructor takes a field: one scalar template, about one N³ real's worth, freed at once.
+  scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(0))), grid)
   multipliers = FieldSpectralMultipliers(scalar_spectral_storage)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).

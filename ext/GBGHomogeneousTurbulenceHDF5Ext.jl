@@ -9,7 +9,7 @@
 module GBGHomogeneousTurbulenceHDF5Ext
 
 using HDF5
-using GBGPeriodicFields: write_field, read_field, write_points, read_points, write_scheme,
+using GBGPeriodicFields: write_field, read_field, read_field!, write_points, read_points, write_scheme,
                          read_scheme, adapt!, field_grid, field_tensor_order,
                          point_positions, point_values, npoints,
                          PointSet
@@ -74,13 +74,13 @@ function _element_type(a, name::AbstractString, who::String)
                       "does not build runs on"))
 end
 
-# Move a stored field, which `read_field` returns on the host, into the (possibly device-resident) one
-# the domain built. `adapt!` refuses any mismatch — element type, tensor order, grid, layout — naming
-# what differs; the checkpoint's context is put in front of its message.
+# Read a stored field straight into the (possibly device-resident) one the domain built: PF's
+# `read_field!` (decision 93) reads a host destination directly and fills a device one a component at
+# a time, so no host copy of the field is made. It refuses any mismatch — type, element type, grid,
+# layout, tensor order — before writing anything; the checkpoint's context is put in front.
 function _load_field!(dest, g, name::AbstractString, who::String)
-  src = read_field(g, name)
   try
-    adapt!(dest, src)
+    read_field!(dest, g, name)
   catch refusal
     refusal isa ArgumentError || rethrow()
     throw(ArgumentError("$who: the stored field \"$name\" does not fit the run the domain builds " *

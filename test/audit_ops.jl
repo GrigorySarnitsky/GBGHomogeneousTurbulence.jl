@@ -563,18 +563,15 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
 # Fixed 2026-10-01 and retired: DOMAIN CONSTRUCTION TEMPLATES (an unused vector field and a vector
 # template, −6.1 N³ reals), SEEDING DOUBLE DRAW (the host copy of the noise on the CPU, −3), and
 # RESTORE REBUILDS A SEEDED RUN (read_simulation now hands the stored state to the constructor, which
-# seeds nothing, −14 in all). What each left is below.
+# seeds nothing, −14 in all). CHECKPOINT STAGING COPY retired the same day on PF decision 93: a host
+# field is written as it stands, and read_field! reads into the run's own storage. What remains is below.
 const TRANSFORM_PLANNING = Holder(
   "TRANSFORM PLANNING", :PF_RAISE,
-  "Building a FixedDomain allocates about 5 N³ reals it does not keep, all at PF's planner: 3.06 " *
-  "inside FieldTransformPlans, and the 2.03 of the scalar templates it must be handed to plan " *
-  "against. read_domain and read_simulation inherit it. Requested of PF 2026-10-01, for evaluation.")
-const CHECKPOINT_STAGING_COPY = Holder(
-  "CHECKPOINT STAGING COPY", :PF_RAISE,
-  "write_state, read_state and the two simulation calls move the state through a host copy, about " *
-  "4 N³ reals, also on the CPU where it is already host memory: PF's write_field writes " *
-  "Array(field_data(field)), which copies an Array too, and PF's read_field returns a new host field " *
-  "the caller then copies into its own. Requested of PF 2026-10-01, for evaluation.")
+  "Building a FixedDomain allocates about 4 N³ reals it does not keep. About 3 is planning since PF " *
+  "decision 93: the two one-component arrays PF's planner must hand FFTW, and one inside FFTW.jl's " *
+  "inverse planner, beyond PF's reach. The other 1.03 is the scalar template HT builds only " *
+  "because FieldSpectralMultipliers takes a field to learn the storage type; a form taking the " *
+  "storage family would remove it, a request not yet sent. read_domain and read_simulation inherit it.")
 const SEEDING_NOISE_FIELD = Holder(
   "SEEDING NOISE FIELD", :DESIGN,
   "Seeding the velocity holds a full physical noise vector before transforming it. Drawing and " *
@@ -592,7 +589,7 @@ const FULL_STRAIN_TENSORS = Holder(
   "the strain formed by PF's whole-field symmetric_gradient, no component-wise assembly in HT (a named property)")
 
 const ALL_HOLDERS = (UNUSED_FUSION,
-                     TRANSFORM_PLANNING, CHECKPOINT_STAGING_COPY, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
+                     TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)
 

@@ -14,6 +14,8 @@ using HDF5
 using GBGPeriodicFields: field_data, point_positions, LalescuSpline
 
 
+names_both_precisions(message) = occursin(r"(Complex)?F(loat)?64", message) &&
+                                 occursin(r"(Complex)?F(loat)?32", message)
 make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,
                              array_type = Array, dealiasing = TwoThirds())
 
@@ -40,9 +42,10 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
     end
   end
   @test err isa ArgumentError
-  # The state's refusal is PF's `adapt!`, which names the two precisions (decision 100).
-  @test err !== nothing && occursin("Float64", sprint(showerror, err)) &&
-        occursin("Float32", sprint(showerror, err))
+  # The state's refusal is PF's, naming the two precisions: `adapt!`'s by their real types (decision
+  # 100), `read_field!`'s since PF decision 93 by the stored and destination element types,
+  # `ComplexF64` against `ComplexF32`.
+  @test err !== nothing && names_both_precisions(sprint(showerror, err))
 
   # ——— state, the other direction: written Float32, read against a Float64 domain ———
   path2 = tempname() * ".h5"
@@ -59,8 +62,7 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
     end
   end
   @test err2 isa ArgumentError
-  @test err2 !== nothing && occursin("Float64", sprint(showerror, err2)) &&
-        occursin("Float32", sprint(showerror, err2))
+  @test err2 !== nothing && names_both_precisions(sprint(showerror, err2))
 
   # ——— tracers: written Float64 positions, read against a Float32 domain ———
   path3 = tempname() * ".h5"
