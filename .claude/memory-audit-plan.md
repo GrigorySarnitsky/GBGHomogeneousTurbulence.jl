@@ -7,17 +7,32 @@ Status: draft 5, 2026-10-01, after four adversarial rounds. Not started.
 A tool that **lists possible memory defects**: every gap between what a run allocates and the floor
 it could reach, with its size, its stage, its configuration, and the evidence, ranked by bytes.
 Fixing them is a separate matter, decided per entry. A gap can be a legitimate trade — 10% more
-memory for 10% more speed is a fair exchange — so each listed entry carries a disposition:
+memory for 10% more speed is a fair exchange.
 
-- **fix** — a local win, to be taken, the entry retired in the same commit;
-- **raised** — a request against a backend (PF, GBGCodingTools), the gap not ours to close;
-- **accepted trade-off** — kept for a measured gain, and the entry carries both measured sides,
-  the bytes it costs and the time it saves; a trade-off without the timing is not a disposition.
+This is not a new shape. `test/optimality_audit.jl` already holds every compute and synchronization
+cell against a floor, and every gap above it needs a `Holder` with a disposition, in a register that
+fails both ways — on a gap no holder claims, and on a holder whose gap has gone. The same rule is
+implemented three more times with other spellings: the transform and fusion gap dictionaries of
+`test/compute_audit.jl`, the traffic audit's holder strings (`test/pass_audit.jl`, through
+GBGCodingTools), and the memory liveness gap register. The memory entries join that register; they
+do not start a parallel list.
 
-The suite fails only on a gap no entry claims, or an entry whose gap has gone (the existing
-bidirectional holder register, `test/optimality_audit.jl`). A recorded gap is a listed item, not a
-failure. Everything below exists to make the list complete: a gap the instrument cannot see is a
-gap missing from the list.
+The dispositions are the existing three:
+
+- **`:FIX`** — a local win, kept on the frozen open list until taken, then retired in the same
+  commit;
+- **`:PF_RAISE`** — a request against a backend, the gap not ours to close (generalised to name the
+  backend, since GBGCodingTools requests exist too);
+- **`:DESIGN`** — a cost the owner adopted, citing its decision. Strengthened for every audit, not
+  only memory: the holder carries both measured sides — what it costs (bytes, passes, transforms,
+  host crossings) and what it buys, either a measured time or a named property (the one existing
+  `:DESIGN` holder, the uniform deposit schedule, buys the impossibility of a stale read, not
+  speed). A `:DESIGN` holder without its measured cost and its stated gain fails the register.
+
+The suite fails only on a gap no holder claims, or a holder whose gap has gone. A recorded gap is a
+listed item, not a failure. The report is one list across every audit — memory, compute, traffic,
+synchronization — ranked within each by its own unit. Everything below exists to make the memory
+part of that list complete: a gap the instrument cannot see is a gap missing from the list.
 
 ## Why
 
@@ -215,7 +230,14 @@ one-sided, in each space separately:
 4. **Floors for the working set's symbols.** Extend the frame's zero-storage demonstration to every
    resident array a forcing or the generator adds: an array that is a function of |κ|² is
    reconstructed from the axis multipliers inside the test, and its residency becomes a listed entry
-   (`Linear`'s rate, with the PF request below as its candidate remedy). The forcing deltas join the liveness bound.
+   (`Linear`'s rate, with the PF request below as its candidate remedy). The forcing deltas join the
+   liveness bound.
+4a. **One register.** The memory entries use `Holder` and its two-way test. The compute audit's
+   dictionaries and the memory liveness register move onto `Holder` too, so every audit's gaps are
+   one type with one test, and `:DESIGN` is strengthened as above for all of them; the existing
+   `:DESIGN` holder gains its measured cost (one host crossing per iteration on a fixed-Δt path) and
+   its named gain. The report function prints the whole register, ranked, with each holder's
+   evidence.
 5. **The written bound.** The theorem, A1–A9, and the decision rule head the top-down file, beside
    a function computing P_σ per stage from the ledgers alone.
 6. **The top-down GPU run** (this machine, not CI; before a release and whenever a ledger changes):
@@ -286,9 +308,12 @@ disposition; each is decided on its own, after the instrument measures it:
     taken, one commit retires everything that records the rate as resident: the `Linear` delta in
     `_forcing_delta` and its comment block in `test/memory_audit.jl`, the working-set floor's entry,
     the traffic audit's two-call rate holder, and the probe's second array.
-14. **To GBGCodingTools**: the top-down peak check and the defect list are general, not physics —
-    by the rulebook a TestHarness engine HT declares, beside the GPU-timing-against-minimum-traffic
-    check PF is raising. HT writes it locally only until the engine exists, then declares it.
+14. **To GBGCodingTools**: two engines, both general, not physics — by the rulebook TestHarness
+    engines HT declares. First, the gap register: floor, achieved, holder with disposition, the
+    two-way test, the strengthened `:DESIGN` rule, and the ranked report, one engine for every audit
+    and every package (the traffic audit's holders are already there in a narrower form). Second,
+    the top-down peak check, beside the GPU-timing-against-minimum-traffic check PF is raising. HT
+    builds both locally only until the engines exist, then declares them.
 15. **Close**: an independent reviewer (a fresh agent or the GBGCodingTools session) audits the
     finished instrument; the first report is the list itself, ranked by bytes, with the claim in the
     form above and what it does not reach.
@@ -352,3 +377,8 @@ machine, all folded in:
 Reframed the same day by the owner: the instrument lists possible defects; fixing them is separate,
 and a measured trade-off (memory for speed) is a legitimate disposition. Stage 2 became the list's
 first entries, without dispositions.
+
+Amended the same day, owner-ruled: the defect list is the shape the compute side already has. The
+memory entries join `test/optimality_audit.jl`'s `Holder` register rather than a parallel list;
+every audit's register moves onto that one type; `:DESIGN` must carry its measured cost and its
+measured or named gain; and the register becomes a GBGCodingTools engine request.
