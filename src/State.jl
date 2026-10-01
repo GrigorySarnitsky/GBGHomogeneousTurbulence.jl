@@ -129,8 +129,8 @@ function Base.show(io::IO, ::MIME"text/plain", state::ResolvedFields)
 end
 
 
-# Standard normal noise drawn on the HOST, so a seed gives the same field on every backend — the rule
-# the forcing's draws keep under decision 90, the stream staying the seed's. On the CPU the drawn
+# Standard normal noise drawn on the HOST, so a seed gives the same field on every backend (decision
+# 107, which extends the forcing's rule of decision 90 to every draw). On the CPU the drawn
 # array IS the noise field's storage; on a device it is moved into a device field. The first form saved
 # a field-sized copy on the CPU (2026-10-01) and reaches no raw storage.
 function _host_noise(rng, T, domain, ::Val{R}) where {R}

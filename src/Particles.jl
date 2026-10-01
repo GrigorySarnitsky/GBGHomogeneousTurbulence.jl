@@ -169,7 +169,7 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
   if isnothing(positions)
     M = Int(number_of_particles)
     pos = domain.storage_family{T}(undef, M, 3)
-    copyto!(pos, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))
+    copyto!(pos, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))   # host draw: decision 107
   else
     positions isa PointSet ||
       throw(ArgumentError("`positions` must be a `GBGPeriodicFields` `PointSet` (wrap an (M, 3) " *

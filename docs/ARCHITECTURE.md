@@ -3186,6 +3186,19 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     `Linear`'s symbol takes the band's edges from the one helper `_shell_edges` and equals the old
     stored rate value for value.
 
+107. **(2026-10-01, user-directed) A seed determines the realization, whatever the backend.** A run
+    on the CPU and one on a GPU, given the same seed, draw the same random numbers: the initial
+    velocity and scalar fields, the tracers' initial positions, and `StochasticOU`'s forcing. Decision
+    90 stated this for the forcing alone; the other two followed it only by comment. HT gets the
+    property by drawing every random number on the host, from the `rng` the caller passes, and moving
+    the numbers to the run's backend. No device generator is used.
+
+    The mechanism fits HT's draw sizes: the initial fields once (3 or 4 ``N^3`` numbers), the
+    positions once (``M \times 3``), and the forced band's few hundred modes per step. A package that
+    draws per element at every step would want a counter-based generator instead, which gives the
+    same stream on host and device; the property, not the mechanism, is what is fixed. It is checked
+    by the memory plan's GPU leg, where a CPU and a GPU run with one seed must agree.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
