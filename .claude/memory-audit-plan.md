@@ -1,6 +1,45 @@
 # Memory audit: from ledgers to a bound on the whole run
 
-Status: draft 5, 2026-10-01, after four adversarial rounds. Not started.
+Status: draft 5, 2026-10-01, after four adversarial rounds. Stage 1's CPU part is built (below).
+
+## Progress (2026-10-01)
+
+Built and pushed, the full suite passing at each step:
+
+- **Item 3, the walk** — closures, boxed captures, arrays of structs and `Dict` values reached; each
+  buffer counted once by storage; planted fixtures; the live ledgers unchanged, the device leg
+  included.
+- **Item 4a, one register** — `Holder` and every holder in `test/audit_ops.jl`; the compute and
+  memory registers claim with it; `holder_admissible` is the one admission rule, a `:DESIGN` holder
+  carrying both measured sides; planted holders exercise it.
+- **Item 4, the working set's symbols** — `Linear`'s rate shown radial, its residency the holder
+  `RESIDENT LINEAR RATE`; the forcing list checked against the package's own subtypes.
+- **Items 1–2, the temporary ledger** (`test/temporary_audit.jl`) — every exported function and
+  concrete type a row at 16³, 32³, 64³, plus four variants; every field-scale row frozen and claimed
+  (six holders, five of them `:FIX` on the open list, one `:PF_RAISE`); a planted wasteful
+  constructor reads as field scale. The hand-written episode list is retired.
+
+Deviations from the plan, each with its reason:
+
+- **Partition of the field and particle ledgers by root: not built.** The particle checks filter on
+  the exact shape (M, 3), a 2-D array, and a field array is 3-D or 4-D, so the two cannot collide
+  at any size; the reviewer's collision needs a length-only filter, which the code does not use.
+- **The storage-space tag: deferred to the GPU leg**, the only place a host array inside a device
+  run can occur.
+- **The host reading beside the heap, per row: not built, because it does not measure.** Measured
+  2026-10-01: in one process the peak resident set cannot separate a C library's allocation from
+  Julia reusing heap pages it already freed — `FixedDomain` allocates 11.4 N³ reals on the heap and
+  the resident set does not rise at 32³; every row's "C excess" came out negative. The host's C
+  term (FFTW's planner, HDF5's buffers) moves to the top-down run, where a fresh process's whole
+  peak is compared with the prediction.
+- **The axes were never derived from the code before**: the five-axis sweep's forcing list was
+  hand-written. Deriving them needs the package's own subtypes only (`Base.moduleroot`), since test
+  fixtures elsewhere in the suite extend `AbstractForcing`.
+- **Item 5, the written bound and the function computing P**: to be built with the GPU leg, its only
+  consumer.
+
+Not sent yet, both awaiting the owner: the PF requests behind `RESIDENT LINEAR RATE` (a radial
+offset for `exponential_convolve!`) and `FULL STRAIN TENSORS` (symmetric tensor storage).
 
 ## What the instrument is
 
