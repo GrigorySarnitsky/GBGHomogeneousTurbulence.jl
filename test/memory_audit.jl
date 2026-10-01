@@ -153,7 +153,9 @@ function _forcing_delta(tag, slot)
 end
 # Only a STEADY-rate forcing carries the generator's rate array. Today that is `Linear` alone. Since
 # 2026-09-28 (decision 99) it holds no indicator: the band is evaluated from its lazy kernel straight
-# into the rate, once, when the generator is built.
+# into the rate, once, when the generator is built. The rate is a function of |κ|² alone, so its
+# floor is zero: optimality_audit.jl shows it radial and claims its residency with the holder
+# RESIDENT LINEAR RATE, which retires — with this delta — when the rate stops being stored.
 #
 # `ConstantPower` and `VarianceController` are ZERO as of 2026-08-22, and the change is a REDUCTION
 # of two field-scale arrays each. Their rates depend on the state, so folding them into the

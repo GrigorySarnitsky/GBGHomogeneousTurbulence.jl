@@ -56,6 +56,7 @@
 # decided.
 
 using GBGHomogeneousTurbulence
+using InteractiveUtils: subtypes
 using GBGPeriodicFields: point_positions
 using GBGPeriodicFields: field_data, materialize_kernel
 using Test
@@ -283,6 +284,58 @@ const SYNC_LEDGER = (
 
     # The symbol holder is retired in full (decisions 38/39): residency closed here, traffic closed
     # by the fused exponential — the "symbol tier stays closed" testset holds the equality.
+  end
+
+  @testset "the working set's symbols — held against the frame's zero floor" begin
+    # The frame's zero floor rests on one fact: an array that is a function of |κ|² alone carries no
+    # information the O(N) axis multipliers do not, so storing it is materialization. The same fact
+    # holds wherever such an array lives, and a forcing's steady rate lives in the generator, which
+    # no floor reached (2026-09-30). The generator's rate slots are the working set's configuration
+    # arrays — its other arrays are working registers, bounded by the liveness audit — so each is
+    # tested here: shown radial, its floor is zero, and its residency is a gap the register claims.
+    N = 8
+    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    m = domain.multipliers
+    κ² = [m.squared_wavenumber_1[i] + m.squared_wavenumber_2[j] + m.squared_wavenumber_3[k]
+          for i in eachindex(m.squared_wavenumber_1), j in eachindex(m.squared_wavenumber_2),
+              k in eachindex(m.squared_wavenumber_3)]
+    forcings = Dict(
+      NoForcing => NoForcing(),
+      VarianceRescaling => VarianceRescaling(domain; target = 0.5, over = :band),
+      Linear => Linear(domain; rate = 0.1),
+      ConstantPower => ConstantPower(domain; injection_rate = 0.1),
+      VarianceController => VarianceController(domain; target = 0.5, turnover_time = 1.0),
+      StochasticOU => StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5, seed = 1))
+    # The list is the code's, not this file's: a new forcing fails here until it is listed. Only the
+    # package's own subtypes count — in the full suite, other test files define forcings of their own
+    # as fixtures, and `subtypes` returns those too.
+    package_forcings = filter(t -> Base.moduleroot(parentmodule(t)) === GBGHomogeneousTurbulence,
+                              subtypes(GBGHomogeneousTurbulence.AbstractForcing))
+    @test Set(keys(forcings)) == Set(package_forcings)
+    claimed = 0
+    for (type, forcing) in forcings, slot in (:velocity, :scalar)
+      conditions = FlowConditions(; viscosity = 0.1, schmidt = 1.0,
+                                  velocity_forcing = slot === :velocity ? forcing : NoForcing(),
+                                  scalar_forcing = slot === :scalar ? forcing : NoForcing())
+      generator = ResolvedGenerator(domain, conditions; scalar = true)
+      rate = slot === :velocity ? generator.velocity_rate : generator.scalar_rate
+      rate === nothing && continue
+      data = field_data(rate)
+      @test all(iszero, imag.(data))                      # real content in a complex container
+      by_level = Dict{Float64, Float64}()
+      radial = true
+      for i in eachindex(data, κ²)
+        level, v = κ²[i], real(data[i])
+        haskey(by_level, level) ? (radial &= by_level[level] ≈ v) : (by_level[level] = v)
+      end
+      @test radial                                         # a function of |κ|² — floor zero
+      @test any(!iszero, data)                             # non-vacuous: the rate is not empty
+      @test type === Linear                                # the one strategy the holder claims
+      claimed += 1
+    end
+    # Two directions, as everywhere in the register: every resident symbol is claimed, and the
+    # holder retires when no forcing stores one.
+    @test (claimed > 0) == (RESIDENT_LINEAR_RATE in ALL_HOLDERS)
   end
 
   @testset "no stale holder — every holder still names a live gap" begin

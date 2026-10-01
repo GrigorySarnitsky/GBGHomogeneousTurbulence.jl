@@ -554,7 +554,16 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
   "no slot can be read stale, since every slot is deposited at every iteration's end, and the " *
   "frozen ledgers stay exact (a named property, not a time)")
 
-const ALL_HOLDERS = (UNUSED_FUSION,
+# Found 2026-09-30 when the working set's symbols were first held against the frame's zero floor.
+const RESIDENT_LINEAR_RATE = Holder(
+  "RESIDENT LINEAR RATE", :PF_RAISE,
+  "Linear's steady rate A(κ) is a function of |κ|² alone — the forced band's indicator times A — " *
+  "yet it is stored as one scalar field in spectral representation per Linear-forced field (about " *
+  "129 MiB at 256³ / Float64), because PF's exponential_convolve! takes its offset only as a " *
+  "stored field. Its floor is zero, as for every symbol the frame dropped. Closing it needs the " *
+  "offset as a radial symbol; the request is drafted in the memory-audit plan, not yet sent.")
+
+const ALL_HOLDERS = (UNUSED_FUSION, RESIDENT_LINEAR_RATE,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)
 
