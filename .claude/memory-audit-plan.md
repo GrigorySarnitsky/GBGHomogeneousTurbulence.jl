@@ -307,9 +307,10 @@ one-sided, in each space separately:
      and a sequence of distinct configurations, must each return to the baseline, so a cache that
      outlives its run (FFTW or cuFFT plans, handles) is caught;
    - a ROCm leg on Aiporetne, the same script with that backend's readings;
-   - the seed check of decision 107: for each random draw (the initial fields, the tracers' positions,
-     `StochasticOU`'s forcing over a few steps), a CPU run and a GPU run given one seed must agree —
-     bitwise for the draws themselves, to round-off for what the transforms make of them.
+   - the seed check of decision 107 — BUILT 2026-10-01 as `test/seed_backends.jl`: every random draw
+     from one seed on the CPU and the GPU, positions bitwise and transformed draws within 8 eps
+     (measured at most 2.43); a wrong seed is refused. Reported to GBGCodingTools in
+     `.gbg/requests/to-GBGCodingTools-2026-10-01-seed-check.md`.
 7. **Planted defects**, each named with the leg that must catch it, re-planted as a regression test:
    - an unused field-sized array stored in a struct — the resident walk (CPU, every `Pkg.test()`);
    - an unused field-sized local temporary in a constructor, the shape of the real
