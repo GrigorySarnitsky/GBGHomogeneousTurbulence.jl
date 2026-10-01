@@ -53,6 +53,9 @@ include("audit_ops.jl")
 
 const N_AUDIT = 8
 
+# A struct holding one array, for the walk's planted fixtures below.
+struct _Holder; a::Array{Float64, 3}; end
+
 
 # ---------------------------------------------------------------- the working-set ledger
 
@@ -491,6 +494,25 @@ const EPISODE_UNITS = [
     end
   end
 
+  @testset "the walk reaches every storage shape, and counts each buffer once" begin
+    # Planted fixtures, one per shape the first walk could not see (each found 0 where the truth is
+    # shown): an array a closure captures, plain and reassigned (the second sits in a `Core.Box`); an
+    # array held by a struct inside a `Vector`; an array held as a `Dict` value. And the converse
+    # failure: a view or a reshape is a new object over the same memory, and must not count again.
+    N = N_AUDIT
+    field() = zeros(N, N, N)
+    count_of(x) = length(collect_field_arrays!(AbstractArray[], x, Set{UInt}(), N))
+    captured = let A = field(), B = field(); () -> (B = B .+ A; B) end
+    @test getfield(captured, :B) isa Core.Box                    # the fixture really is boxed
+    @test count_of((closure = captured,)) == 2
+    @test count_of((holders = [_Holder(field()), _Holder(field())],)) == 2
+    @test count_of((table = Dict(:a => field()),)) == 1
+    base = field()
+    @test count_of((base, view(base, :, :, :), reshape(base, N^2, N))) == 1
+    halves = zeros(N, N, 2N)                                     # not a field shape itself
+    @test count_of((view(halves, :, :, 1:N), view(halves, :, :, N+1:2N))) == 2
+  end
+
   @testset "no field-scale storage escapes both ledgers" begin
     # The closure that keeps the frame hole shut. Walk a whole live `Simulation` — frame, state,
     # observation cache, generator, scheme registers, tracers — and require the total to equal
@@ -590,6 +612,9 @@ const EPISODE_UNITS = [
                                history_depth = K)
       buffers = allocate_buffers(AdamsBashforth(order = K), tracers, cache)
       @test length(cache.velocity_at_particles_history) == K - 1     # the whole of the order's cost
+      # …priced by the arrays the walk reaches, not by the slot count: the history is a `Vector` of
+      # point-value structs, which the first walk never descended into.
+      @test length(m_arrays(cache)) == 1 + (K - 1)
       # The scheme's OWN registers are the bootstrap pair and nothing else. Walked from `buffers`
       # the count would be one higher, because the buffers now reach the cache holding the history —
       # which is the point of the refactor, and is priced on the line above, not here.

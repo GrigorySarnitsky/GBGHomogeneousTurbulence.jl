@@ -49,21 +49,43 @@ shape_class(a::AbstractArray, N) =
 # one. They are priced as what they are — constant in N — beside the ledger instead.
 _is_field_scale(a, N) = length(a) in (N^3, 3 * N^3, N^2 * (N ÷ 2 + 1), 3 * N^2 * (N ÷ 2 + 1))
 
-# Recursively collect every distinct field-sized array reachable from `x` (dedup by identity, so an
-# aliased buffer is counted once — aliasing IS a legitimate footprint optimization). A random
-# stream's internal state is O(1) constant memory, not field-scale working memory — skipped, so the
-# audit's tiny N does not misread it as a buffer.
+# The identity of an array's STORAGE, not of the array object: a reshape or a view of a whole array
+# is a new object over the same memory, so keying on `objectid` counted one buffer twice. The data
+# identifiers name the memory and the pointer names where in it the array starts, so disjoint slices
+# of one buffer stay distinct. Hashed, so the walk's `seen` set keeps one element type.
+_storage_key(a::AbstractArray) = hash((Base.dataids(a), UInt(pointer(a))))
+
+# Recursively collect every distinct field-sized array reachable from `x`, each counted once by its
+# storage — aliasing IS a legitimate footprint optimization. A random stream's internal state is
+# O(1) constant memory, not field-scale working memory — skipped, so the audit's tiny N does not
+# misread it as a buffer.
+#
+# What the walk reaches, and why each case is here (the blind spots of the first walk, each pinned
+# by a fixture in memory_audit.jl): a struct's fields; a closure's captures, which are its fields —
+# a reassigned capture sits in a `Core.Box`, itself a struct; and the elements of an array whose
+# element type is not a number, which is how a `Vector` of structs and a `Dict`'s values hold their
+# arrays. An array of numbers is a leaf, so a device array is never indexed element by element.
 # `keep` decides what counts as storage worth collecting; the default is the run's own field shapes.
 # The particle ledgers pass their own, since an (M, 3) array is storage of a different kind.
 function collect_field_arrays!(acc, x, seen, N; keep = a -> _is_field_scale(a, N))
   x === nothing && return acc
   x isa Random.AbstractRNG && return acc
+  (x isa Type || x isa Module) && return acc
   if x isa AbstractArray
-    if keep(x) && !(objectid(x) in seen)
+    if eltype(x) <: Number
+      key = _storage_key(x)
+      if keep(x) && !(key in seen)
+        push!(seen, key)
+        push!(acc, x)
+      end
+    else
+      objectid(x) in seen && return acc
       push!(seen, objectid(x))
-      push!(acc, x)
+      for i in eachindex(x)
+        isassigned(x, i) && collect_field_arrays!(acc, x[i], seen, N; keep)
+      end
     end
-  elseif isstructtype(typeof(x)) && !(x isa Function) && !(x isa Type)
+  elseif isstructtype(typeof(x))
     objectid(x) in seen && return acc
     push!(seen, objectid(x))
     for name in fieldnames(typeof(x))
