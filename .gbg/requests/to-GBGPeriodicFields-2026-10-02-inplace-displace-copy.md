@@ -28,10 +28,13 @@ That is 12 bytes per tracer, one (M, 3) Float32 array, and it scales linearly in
 
 `_displace_pass!(destination, source, grid::Grid3D, terms)` (Points.jl:1415) assigns each axis
 column of the destination from a broadcast that reads `view(source_coordinates, :, axis)`. In place,
-destination and source are the same array. On the CPU, `_assign!` takes the hand loop for
-`Union{Array, SubArray{…, <:Array}}` (FiberSections.jl:288), which never unaliases. On a device it
-takes the generic `_assign!` (FiberSections.jl:285), and `materialize!`'s aliasing guard copies the
-source column before writing, three columns per call. A pointwise displacement reads each element
+destination and source are the same array. On the CPU, `_assign!` for
+`Union{Array, SubArray{…, <:Array}}` (FiberSections.jl:288) takes its threaded hand loop when
+`_use_threads` says the array is large enough, and that loop does not unalias; below the threshold
+it falls back to `materialize!`, as the device path does. HT measured the CPU only at 10⁴ and 10⁵
+tracers, both on the threaded path, so whether the small CPU path copies too is not measured. On a
+device the generic `_assign!` (FiberSections.jl:285) calls `materialize!`, whose aliasing guard
+copies the source column before writing, three columns per call. A pointwise displacement reads each element
 before writing that same element, so the copy protects nothing here.
 
 ## The second question
