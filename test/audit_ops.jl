@@ -571,14 +571,16 @@ const TRANSFORM_PLANNING = Holder(
   "PF's planner hands FFTW, and one inside FFTW.jl's inverse planner. PF ruled it what planning " *
   "needs and beyond its reach, and the owner accepted it as the floor (decision 109). read_domain " *
   "and read_simulation inherit it.",
-  "about 3.1 N³ reals once per construction — the temporary ledger's FixedDomain row",
+  "about 3.1 N³ reals once per construction on the CPU, 2.0 N³ elements on a GPU — the temporary " *
+  "ledger's FixedDomain row and its device column",
   "transform plans, which cannot be made without arrays to plan on (a named property)")
 const SEEDING_NOISE_FIELD = Holder(
   "SEEDING NOISE FIELD", :DESIGN,
   "Seeding the velocity holds a full physical noise vector before transforming it. Drawing and " *
   "transforming one component at a time would assemble a field outside PF's whole-field " *
   "operations, so the owner kept it (decision 108).",
-  "about 3 N³ reals (4 with a scalar), once per construction — the temporary ledger's Simulation rows",
+  "about 3 N³ reals (4 with a scalar), once per construction; on a GPU the same in device memory, " *
+  "with the host draw beside it — the temporary ledger's Simulation rows and their device column",
   "seeding stays one whole-field PF transform, no component-wise assembly in HT (a named property)")
 const FULL_STRAIN_TENSORS = Holder(
   "FULL STRAIN TENSORS", :DESIGN,

@@ -16,6 +16,7 @@ using Test
 using GBGHomogeneousTurbulence
 using Random
 using Logging
+using HDF5
 
 include("audit_ops.jl")
 
@@ -114,6 +115,83 @@ const STEP_TOLERANCE = 64 * 1024            # bytes a step may hold above the ru
         @test_broken r.step_excess <= STEP_TOLERANCE     # PF's in-place displace! copy, see device_hot_loop.jl
       else
         @test r.step_excess <= STEP_TOLERANCE
+      end
+    end
+  end
+end
+
+
+# ---------------------------------------------------------------- the device temporaries
+
+# What a call allocates on the device beyond what it keeps, in N³ elements of the run's precision —
+# the device column of the temporary ledger (`test/temporary_audit.jl` is the CPU's). The CPU
+# figures do not transfer: the domain's planning is 2.0 here against the CPU's 3.1, and seeding's
+# noise field is device memory, with the host draw beside it in host memory. The result is kept live
+# while "kept" is read; a dead result is collected, and its whole size then reads as transient (the
+# probe's first version did exactly that).
+function device_transient(p::Pool, f, N, T)
+  quiet() = with_logger(f, NullLogger())
+  quiet(); settle!(p)
+  base = used(p)
+  reset_peak!(p)
+  r = quiet()
+  Base.invokelatest(getproperty(p.cuda, :synchronize))
+  high = peak(p) - base
+  GC.gc(true)
+  Base.invokelatest(getproperty(p.cuda, :reclaim))
+  kept = used(p) - base
+  Base.donotdelete(r)
+  return (high - kept) / (sizeof(T) * N^3)
+end
+
+# Frozen 2026-10-02 on the RTX 5070 Ti at 64³ and 128³, both precisions; each holder is the CPU
+# row's (test/audit_ops.jl). Every other row measured reads zero, and must.
+const DEVICE_TEMPORARIES = Dict(
+  "FixedDomain" => 2.03,                 # TRANSFORM PLANNING: the planner's prototypes
+  "Simulation" => 3.0,                   # SEEDING NOISE FIELD: the device noise vector
+  "Simulation/scalar" => 4.0,            # …and the scalar's
+  "derivative_skewness" => 18.3,         # FULL STRAIN TENSORS
+  "read_simulation" => 2.6,              # the domain it builds, and the restore's small arrays
+)
+const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small arrays vary with N
+
+@testset "the device temporaries, measured on the pool" begin
+  if CUDA_MODULE === nothing
+    @warn "device temporaries: no functional CUDA in this environment, so they were not measured. " *
+          "It is SKIPPED, not passed."
+    @test_skip false
+  else
+    p = Pool(CUDA_MODULE)
+    cu = getproperty(CUDA_MODULE, :CuArray)
+    for T in (Float32, Float64), N in (64, 128)
+      d = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
+                      array_type = cu)
+      sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = true, number_of_particles = 64,
+                                         rng = Xoshiro(1)), NullLogger())
+      advance!(sim; dt = 1e-3)
+      û, φ̂ = sim.state.velocity_spectral, sim.state.scalar_spectral
+      path = tempname() * ".h5"
+      h5open(f -> write_simulation(f, "run", sim), path, "w")
+      rows = [
+        "FixedDomain" => () -> FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
+                                           element_type = T, array_type = cu),
+        "Simulation" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1)),
+        "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = true, rng = Xoshiro(1)),
+        "derivative_skewness" => () -> derivative_skewness(û, d),
+        "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_type = cu), path, "r"),
+        "energy_spectrum" => () -> energy_spectrum(û, d),
+        "integral_scale" => () -> integral_scale(û, d),
+        "flow_parameters" => () -> flow_parameters(sim),
+        "dissipation" => () -> dissipation(û, d, 0.05),
+        "scalar_dissipation" => () -> scalar_dissipation(φ̂, d, 0.05),
+        "write_simulation" => () -> h5open(f -> write_simulation(f, "s", sim), tempname(), "w"),
+        "read_state" => () -> h5open(f -> read_state(f, "run/state", d), path, "r"),
+      ]
+      for (name, f) in rows
+        measured = device_transient(p, f, N, T)
+        expected = get(DEVICE_TEMPORARIES, name, 0.0)
+        @info "device temporary, $name, $(N)³ $T" measured expected
+        @test abs(measured - expected) <= DEVICE_TOLERANCE
       end
     end
   end
