@@ -14,6 +14,7 @@ module TemporaryAuditTests; include("temporary_audit.jl"); end
 module SeedBackendsTests;  include("seed_backends.jl");  end
 module DeviceHotLoopTests; include("device_hot_loop.jl"); end
 module DeviceMemoryTests;  include("device_memory.jl");  end
+module DeviceLimitsTests;  include("device_limits.jl");  end
 module ComputeAuditTests;  include("compute_audit.jl");  end
 module OptimalityAuditTests; include("optimality_audit.jl"); end
 module DealiasingTests;    include("dealiasing.jl");     end
