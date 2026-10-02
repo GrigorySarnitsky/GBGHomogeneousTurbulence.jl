@@ -114,3 +114,55 @@ end
     @test abs(LAST_OUTSIDE[] / MiB - OUTSIDE_FROZEN_MiB) <= OUTSIDE_TOLERANCE_MiB
   end
 end
+
+
+# ---------------------------------------------------------------- host memory, one-sided
+
+# The host side of the same run, in a fresh process under a cgroup cap (`systemd-run --user --scope`,
+# swap off, which kills a process above the cap). The prediction is the peak resident set of the
+# same driver at 16³, where the fields are negligible and the peak is Julia, CUDA and the package
+# loaded and compiled, plus the 256³ host draw of the seeding, 3 N³ elements. Measured 2026-10-02:
+# 1874.6 + 192 = 2066.6 MiB predicted against 2062.3 measured.
+#
+# ONE-SIDED, and the reason is measured: the peak resident set is an upper estimate of what the run
+# needs, not the need. Under a cap the kernel evicts the libraries' file-backed pages and the run
+# still completes at P − 512 MiB; it stops completing only between P − 1024 and P − 512. So a fitting
+# run is meaningful and a tightness run is not; the check fails when host memory grows past the
+# prediction plus the margin.
+host_driver(n) = """
+using CUDA, GBGHomogeneousTurbulence, Random, Logging
+sim = with_logger(() -> Simulation(grid_points_per_axis = $n, viscosity = 0.05, element_type = $T,
+                                   array_type = CuArray, rng = Xoshiro(1)), NullLogger())
+for _ in 1:3
+  advance!(sim; dt = 1e-3)
+end
+CUDA.synchronize()
+hwm = parse(Int, split(only(filter(l -> startswith(l, "VmHWM"), readlines("/proc/self/status"))))[2]) * 1024
+println("HWM=", hwm)
+println("DONE")
+"""
+
+function run_host(n; cap = nothing)
+  julia = `$(Base.julia_cmd()) --project=$(Base.active_project()) --startup-file=no -e $(host_driver(n))`
+  command = cap === nothing ? julia :
+            `systemd-run --user --scope -q -p MemoryMax=$cap -p MemorySwapMax=0 $julia`
+  output = IOBuffer()
+  run(pipeline(ignorestatus(command); stdout = output, stderr = output))
+  text = String(take!(output))
+  m = match(r"HWM=(\d+)", text)
+  return (done = occursin("DONE", text), peak = m === nothing ? nothing : parse(Int, m.captures[1]))
+end
+
+@testset "the run's host memory fits the prediction" begin
+  if CUDA_MODULE === nothing || Sys.which("systemd-run") === nothing
+    @warn "host limits: no functional CUDA or no systemd-run in this environment, so the capped host " *
+          "run did not run. It is SKIPPED, not passed."
+    @test_skip false
+  else
+    baseline = run_host(16).peak
+    predicted = baseline + 3 * sizeof(T) * N^3
+    fits = run_host(N; cap = predicted + 128 * MiB)
+    @info "host limits, $(N)³ $T" baseline_MiB = baseline / MiB predicted_MiB = predicted / MiB completed_under_P_plus_128_MiB = fits.done
+    @test fits.done
+  end
+end
