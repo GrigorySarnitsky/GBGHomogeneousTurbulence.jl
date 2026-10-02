@@ -3208,6 +3208,13 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     The owner ruled both stay. Both are occasional — the skewness gate is off by default — and the
     memory audit lists them as adopted costs, not open wins.
 
+109. **(2026-10-02, user-directed) Transform planning's temporary is accepted as its floor.** Building
+    a `FixedDomain` allocates about 3 ``N^3`` reals it does not keep, all of it planning: two
+    one-component arrays PF's planner hands FFTW, and one inside FFTW.jl's inverse planner. PF ruled
+    it what planning needs and beyond its reach (its decision 93). HT builds no template field of its
+    own since PF decisions 93 and 94 (11.2 ``N^3`` reals on 2026-10-01). The cost is paid once per
+    construction, and a plan cannot be made without arrays to plan on.
+
 ## References
 
 Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,

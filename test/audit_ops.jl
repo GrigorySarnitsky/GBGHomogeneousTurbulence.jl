@@ -566,11 +566,13 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
 # seeds nothing, −14 in all). CHECKPOINT STAGING COPY retired the same day on PF decision 93: a host
 # field is written as it stands, and read_field! reads into the run's own storage. What remains is below.
 const TRANSFORM_PLANNING = Holder(
-  "TRANSFORM PLANNING", :PF_RAISE,
-  "Building a FixedDomain allocates about 3 N³ reals it does not keep, all of it planning: the two " *
-  "one-component arrays PF's planner must hand FFTW, and one inside FFTW.jl's inverse planner, " *
-  "beyond PF's reach. HT builds no template field since PF decisions 93 and 94 (11.2 N³ reals on " *
-  "2026-10-01, now 3.1). read_domain and read_simulation inherit it.")
+  "TRANSFORM PLANNING", :DESIGN,
+  "Building a FixedDomain allocates planning memory it does not keep: two one-component arrays " *
+  "PF's planner hands FFTW, and one inside FFTW.jl's inverse planner. PF ruled it what planning " *
+  "needs and beyond its reach, and the owner accepted it as the floor (decision 109). read_domain " *
+  "and read_simulation inherit it.",
+  "about 3.1 N³ reals once per construction — the temporary ledger's FixedDomain row",
+  "transform plans, which cannot be made without arrays to plan on (a named property)")
 const SEEDING_NOISE_FIELD = Holder(
   "SEEDING NOISE FIELD", :DESIGN,
   "Seeding the velocity holds a full physical noise vector before transforming it. Drawing and " *

@@ -2,7 +2,7 @@
 
 Status: draft 5, 2026-10-01, after four adversarial rounds. Stage 1's CPU part is built (below).
 
-## Progress (2026-10-01)
+## Progress (2026-10-01/02)
 
 Built and pushed, the full suite passing at each step:
 
@@ -38,11 +38,20 @@ Deviations from the plan, each with its reason:
 - **Item 5, the written bound and the function computing P**: to be built with the GPU leg, its only
   consumer.
 
-Sent 2026-10-01, for PF's evaluation: the request behind `RESIDENT LINEAR RATE` (a radial offset
-for `exponential_convolve!`). Symmetric tensor storage is ruled out by the owner (2026-10-01), and so is component-at-a-time
-assembly in HT (decision 108): `FULL STRAIN TENSORS` and `SEEDING NOISE FIELD` are adopted costs.
-The skewness's ⟨S:S⟩ now reads from û (the Dirichlet route): 1.5× faster in Float32 and 2.6× in
-Float64 at 256³ on the 5070 Ti, 24× closer to a Float64 reference in Float32; about 2% of the call.
+Since then (2026-10-01/02), every listed entry is settled; the open list of local wins is empty.
+
+- Taken, with PF's help: `Linear`'s rate is a radial symbol (decision 106, PF 92); the domain builds
+  no template (PF 93 and 94; 11.2 → 3.1 N³ reals); seeding draws once on the CPU (6 → 3); the
+  restore adopts the stored state (24.1 → 3.9); checkpoints neither copy nor stage (PF 93, 4.1 → 0).
+- Adopted costs, each a `:DESIGN` holder citing its decision: `FULL STRAIN TENSORS` and `SEEDING
+  NOISE FIELD` (decision 108, component-wise assembly ruled out), and `TRANSFORM PLANNING`
+  (decision 109, PF's ruled floor).
+- The skewness's ⟨S:S⟩ reads from û by the Dirichlet route: 1.5× faster in Float32, 2.6× in Float64.
+- The seed check of the GPU leg is built and declared as GBGCodingTools' harness contract
+  `RULE.TEST.SEED_PARITY` (rc.50, decision 107).
+
+Still to build: item 5, and the rest of item 6, the top-down GPU run. Requests to GBGCodingTools (item
+14) are sent only when the owner asks for each (`RULE.INST.PEER_MESSAGE`, rc.49).
 
 ## What the instrument is
 
