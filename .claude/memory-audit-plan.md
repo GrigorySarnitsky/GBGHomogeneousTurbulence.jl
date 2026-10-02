@@ -111,8 +111,12 @@ measure (in one process the resident set cannot separate a C allocation from reu
      overstates the need, since a capped run still completes at P − 512 MiB (the kernel evicts
      file-backed pages); a host tightness run means nothing.
 4. **Open — the ROCm leg** on Aiporetne.
-5. **Open — breadth:** the full strategy product, and the M, K and band scaling axes, in the pool
-   term and the device temporaries.
+5. **Built — breadth of the pool term.** The M, K and band axes (tracers 4096 / 32768 / 262144;
+   AdamsBashforth orders 2 and 4; bands 1–2 / 1–4 / 1–8) match the pool within 125 bytes, and the
+   full strategy product (144 configurations: scheme × dealiasing × scalar × velocity forcing, at
+   64³ and 128³, both precisions, `DEVICE_FULL_SWEEP=1`) passes 1260 of 1280, the 20 broken being
+   the tracer step excess of PF's in-place `displace!` (2026-10-02, 26 minutes on the 5070 Ti).
+   Still open: those axes in the device temporaries.
 
 ## What this will not reach
 
