@@ -93,7 +93,28 @@ const CONFIGURATIONS = [
   ("Linear", (velocity_forcing = Linear(rate = 0.1),)),
   ("StochasticOU", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5),)),
   ("tracers", (number_of_particles = 4096,)),
+  # the scaling axes beyond N: the tracer count M, the multistep order K, the stochastic band
+  ("tracers M = 32768", (number_of_particles = 32768,)),
+  ("tracers M = 262144", (number_of_particles = 262144,)),
+  ("AdamsBashforth K = 2", (number_of_particles = 4096, particle_integration_scheme = AdamsBashforth(order = 2))),
+  ("AdamsBashforth K = 4", (number_of_particles = 4096, particle_integration_scheme = AdamsBashforth(order = 4))),
+  ("StochasticOU band 1–4", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
+                                                             highest_shell = 4),)),
+  ("StochasticOU band 1–8", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
+                                                             highest_shell = 8),)),
 ]
+# The full product of the strategy axes — every field scheme, dealiasing strategy, scalar setting and
+# velocity forcing — runs only when asked for, `DEVICE_FULL_SWEEP=1`, since it builds hundreds of runs.
+if get(ENV, "DEVICE_FULL_SWEEP", "") == "1"
+  for scheme in (IFLowStorageRK3(), IFLowStorageRK4(), IFSSPRK3(), IFHeun()),
+      dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scalar in (false, true),
+      forcing in (NoForcing(), ConstantPower(injection_rate = 0.1), VarianceController(target = 1.5),
+                  VarianceRescaling(target = 1.5, over = :total), Linear(rate = 0.1),
+                  StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5))
+    push!(CONFIGURATIONS, ("$(nameof(typeof(scheme))) $(nameof(typeof(dealiasing))) scalar=$scalar $(nameof(typeof(forcing)))",
+                           (field_integration_scheme = scheme, dealiasing, scalar, velocity_forcing = forcing)))
+  end
+end
 # A held figure within this of the prediction agrees: the pool rounds an allocation to its own
 # granularity, and a run holds a few small host-side-launched arrays below the walk's notice.
 const HELD_TOLERANCE = 0.01                 # relative
@@ -111,7 +132,7 @@ const STEP_TOLERANCE = 64 * 1024            # bytes a step may hold above the ru
       r = readings(p, N, T; kwargs...)
       @info "device memory, $name, $(N)³ $T" predicted_MiB = r.predicted / 2^20 held_MiB = r.held / 2^20 step_excess_KiB = r.step_excess / 2^10
       @test abs(r.held - r.predicted) <= HELD_TOLERANCE * r.predicted
-      if name == "tracers"
+      if startswith(name, "tracers") || startswith(name, "AdamsBashforth")
         @test_broken r.step_excess <= STEP_TOLERANCE     # PF's in-place displace! copy, see device_hot_loop.jl
       else
         @test r.step_excess <= STEP_TOLERANCE
