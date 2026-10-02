@@ -307,10 +307,8 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # (`MEASURE`) clobbers nothing of the run's, and no template field is built here for it.
   transform_plans = FieldTransformPlans(array_type, grid, layout;
                                         fft_flags, fft_timelimit = Float64(fft_timelimit))
-  # The multipliers and the mask need a spectral field only for its storage type, but PF's
-  # constructor takes a field: one scalar template, about one N³ real's worth, freed at once.
-  scalar_spectral_storage = ScalarFieldSpectral(_zeros(array_type, Complex{T}, field_spectral_shape(grid, layout, Val(0))), grid)
-  multipliers = FieldSpectralMultipliers(scalar_spectral_storage)
+  # The multipliers from the storage family and the grid alone (PF decision 94): no template field.
+  multipliers = FieldSpectralMultipliers(array_type, grid, layout)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
   squared_wavenumber_kernel = radial_kernel(identity, multipliers)
@@ -319,7 +317,7 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # against the backend). A named function, not a closure: the kernel's type is then a constant
   # across constructions, which keeps every downstream specialization stable.
   unit_kernel = radial_kernel(_unit_symbol, multipliers)
-  dealias = _build_dealias(dealiasing, scalar_spectral_storage, multipliers, N, L, T)
+  dealias = _build_dealias(dealiasing, multipliers, N, L, T)
 
   return FixedDomain(grid, layout, transform_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
 end
@@ -356,10 +354,10 @@ _resolved_wavenumber(strategy, N, L, ::Type{T}) where {T} =
 # 2026-08-23 and REVERTED: it buys no exactness here and shrinks the band; the references cut
 # strictly below for their own formulations. PhaseShift's closed ball at √2·N/3 is likewise
 # oracle-exact — the shift-average cancels the single-alias images outright.
-_build_dealias(strategy::Union{TwoThirds, PhaseShift}, reference, multipliers, N, L, ::Type{T}) where {T} =
+_build_dealias(strategy::Union{TwoThirds, PhaseShift}, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(multipliers, _cutoff_wavenumber(strategy, N, L, T))
 
-function _build_dealias(strategy::HouLi, reference, multipliers, N, L, ::Type{T}) where {T}
+function _build_dealias(strategy::HouLi, multipliers, N, L, ::Type{T}) where {T}
   # The smooth filter is a closed-form radial symbol; the closure captures VALUES only (a captured
   # `Type` is not a bitstype and a GPU launch rejects it — PF's radial-kernel contract).
   inverse_nyquist = one(T) / T((N / 2) * (2π / L))

@@ -23,7 +23,7 @@ struct ProbeBare <: DealiasingStrategy end
 println("=== hooks answering for a strategy that declared NOTHING ===")
 for (name, answers) in (
       ("_retained_nyquist_fraction", hasmethod(_retained_nyquist_fraction, Tuple{ProbeBare})),
-      ("_build_dealias",             hasmethod(_build_dealias, Tuple{ProbeBare, Any, Any, Any, Any, Type{Float64}})),
+      ("_build_dealias",             hasmethod(_build_dealias, Tuple{ProbeBare, Any, Any, Any, Type{Float64}})),
       ("_velocity_nonlinear!",       hasmethod(_velocity_nonlinear!, Tuple{ProbeBare, Any, Any, Any, Any, Any, FixedDomain})),
       ("_scalar_nonlinear!",         hasmethod(_scalar_nonlinear!, Tuple{ProbeBare, Any, Any, Any, Any, Any, Any, FixedDomain, Bool})))
   println(rpad(name, 28), " hasmethod = ", answers, answers ? "   <-- ANSWERS (abstract catch-all)" : "   (refuses)")
@@ -35,7 +35,7 @@ struct ProbePad <: DealiasingStrategy end
 GBGHomogeneousTurbulence.SimulationDomain._retained_nyquist_fraction(::ProbePad) = 2 // 3
 # The resolved cutoff too: a run predicts its κ_max·η from it, and the witness is about the assembly.
 GBGHomogeneousTurbulence.SimulationDomain._resolved_nyquist_fraction(::ProbePad) = 2 // 3
-GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, reference, multipliers, N, L, ::Type{T}) where {T} =
+GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, multipliers, N, L, ::Type{T}) where {T} =
   spectral_cutoff(multipliers, T(2 // 3) * (N / 2) * (2π / L))
 
 println()

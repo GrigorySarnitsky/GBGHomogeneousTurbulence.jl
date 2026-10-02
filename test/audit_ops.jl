@@ -567,11 +567,10 @@ const UNIFORM_DEPOSIT_SCHEDULE = Holder(
 # field is written as it stands, and read_field! reads into the run's own storage. What remains is below.
 const TRANSFORM_PLANNING = Holder(
   "TRANSFORM PLANNING", :PF_RAISE,
-  "Building a FixedDomain allocates about 4 N³ reals it does not keep. About 3 is planning since PF " *
-  "decision 93: the two one-component arrays PF's planner must hand FFTW, and one inside FFTW.jl's " *
-  "inverse planner, beyond PF's reach. The other 1.03 is the scalar template HT builds only " *
-  "because FieldSpectralMultipliers takes a field to learn the storage type; a form taking the " *
-  "storage family would remove it, a request not yet sent. read_domain and read_simulation inherit it.")
+  "Building a FixedDomain allocates about 3 N³ reals it does not keep, all of it planning: the two " *
+  "one-component arrays PF's planner must hand FFTW, and one inside FFTW.jl's inverse planner, " *
+  "beyond PF's reach. HT builds no template field since PF decisions 93 and 94 (11.2 N³ reals on " *
+  "2026-10-01, now 3.1). read_domain and read_simulation inherit it.")
 const SEEDING_NOISE_FIELD = Holder(
   "SEEDING NOISE FIELD", :DESIGN,
   "Seeding the velocity holds a full physical noise vector before transforming it. Drawing and " *

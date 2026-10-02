@@ -188,9 +188,9 @@ in_place_owned(n) = endswith(String(n), "!") && n !== :warmup!
 # every other row must be listed here; a listed row that has fallen below field scale fails too.
 const FIELD_SCALE_ROWS = Dict(
   :derivative_skewness => (18.3, (FULL_STRAIN_TENSORS,)),
-  :read_simulation => (4.9, (TRANSFORM_PLANNING,)),
-  :FixedDomain => (4.1, (TRANSFORM_PLANNING,)),
-  :read_domain => (4.1, (TRANSFORM_PLANNING,)),
+  :read_simulation => (3.9, (TRANSFORM_PLANNING,)),
+  :FixedDomain => (3.1, (TRANSFORM_PLANNING,)),
+  :read_domain => (3.1, (TRANSFORM_PLANNING,)),
   Symbol("Simulation/scalar and tracers") => (4.0, (SEEDING_NOISE_FIELD,)),
   :Simulation => (3.0, (SEEDING_NOISE_FIELD,)),
 )
