@@ -93,13 +93,26 @@ The two plants of draft 5 that a CPU check was to catch — a host array inside 
 C-side host buffer — move to this run or are dropped: the per-row host reading was found not to
 measure (in one process the resident set cannot separate a C allocation from reused heap pages).
 
-## Order of work
+## Order of work, and where it stands (2026-10-02)
 
-1. The byte table and the O(N²), O(M) terms; the function computing P_pool from the ledgers;
-   compare it in process on CUDA at 64³ and 128³ for every strategy point.
-2. The device temporaries: a device column for the temporary ledger, measured on the GPU.
-3. The fresh-process legs: the outside constant, the fitting and tightness runs, the host cap.
-4. The ROCm leg on Aiporetne.
+1. **Built — the pool term** (`test/device_memory.jl`). The walk's device bytes against the pool's
+   used memory, for ten strategy points (the default; a scalar; PhaseShift; HouLi; IFHeun,
+   IFLowStorageRK4, IFSSPRK3; Linear; StochasticOU; 4096 tracers) at 64³ and 128³, both precisions:
+   equal to the byte, the tracer run 125 bytes off. A step holds at most 26 KB above the run.
+   Not yet the full strategy product, and not the M, K and band axes.
+2. **Built — the device temporaries** (same file): the domain 2.0 N³ elements, the run's
+   construction 3.0 (4.0 with a scalar), the skewness 18.3, the restore 2.6, every other row zero.
+3. **Built — the fresh-process legs** (`test/device_limits.jl`), at 256³ / Float32:
+   - the device prediction is the largest stage's resident set plus its temporary, 1287 MiB; the run
+     completes under P + 64 MiB and runs out of memory under P − 96 MiB;
+   - the memory outside the pool is 34 MiB, the same at 128³: library state, not field-sized;
+   - the host prediction (a 16³ baseline plus the host draw) is 2060 MiB against 2062 measured, and
+     the run completes under it plus 128 MiB. **One-sided, by measurement:** the peak resident set
+     overstates the need, since a capped run still completes at P − 512 MiB (the kernel evicts
+     file-backed pages); a host tightness run means nothing.
+4. **Open — the ROCm leg** on Aiporetne.
+5. **Open — breadth:** the full strategy product, and the M, K and band scaling axes, in the pool
+   term and the device temporaries.
 
 ## What this will not reach
 
