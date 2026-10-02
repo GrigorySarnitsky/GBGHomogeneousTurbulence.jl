@@ -132,11 +132,7 @@ const STEP_TOLERANCE = 64 * 1024            # bytes a step may hold above the ru
       r = readings(p, N, T; kwargs...)
       @info "device memory, $name, $(N)³ $T" predicted_MiB = r.predicted / 2^20 held_MiB = r.held / 2^20 step_excess_KiB = r.step_excess / 2^10
       @test abs(r.held - r.predicted) <= HELD_TOLERANCE * r.predicted
-      if startswith(name, "tracers") || startswith(name, "AdamsBashforth")
-        @test_broken r.step_excess <= STEP_TOLERANCE     # PF's in-place displace! copy, see device_hot_loop.jl
-      else
-        @test r.step_excess <= STEP_TOLERANCE
-      end
+      @test r.step_excess <= STEP_TOLERANCE
     end
   end
 end

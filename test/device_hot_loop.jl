@@ -5,10 +5,10 @@
 #
 # Found 2026-10-02 by the memory plan's GPU-leg review: with 10⁵ tracers at 64³ / Float32 a step
 # allocated 1.2 MB of device memory — 12 bytes per tracer, one (M, 3) Float32 array — and none on the
-# CPU. The source is PF's in-place `displace!` (the Heun corrector, `displace!(positions, grid, …)`):
-# each axis column is assigned from a broadcast reading a view of the same array, and on a device the
-# broadcast's aliasing guard copies the source column first. Recorded as broken until PF closes it;
-# a fix turns the broken test into an unexpected pass, which then becomes a plain test.
+# CPU. The source was PF's in-place `displace!` (the Heun corrector, `displace!(positions, grid, …)`):
+# each axis column was assigned from a broadcast reading a separately made view of the same array, and
+# on a device the broadcast's aliasing guard copied it first. Fixed by PF the same day (its decision
+# 95), which now checks every in-place operation for a device allocation; this is HT's own check.
 #
 # CUDA only: the measurement is `CUDA.@allocated`. With no functional CUDA the check records a visible
 # skip, never a pass.
@@ -55,6 +55,6 @@ end
     tracked = device_bytes_per_step(CUDA_MODULE, TRACERS)
     @info "device hot loop: bytes allocated per step" untracked tracked
     @test untracked < BOUND                       # the fields: nothing at field scale
-    @test_broken tracked < BOUND                  # the tracers: PF's in-place displace! copies (M, 3)
+    @test tracked < BOUND                         # the tracers: nothing of size M (PF decision 95)
   end
 end
