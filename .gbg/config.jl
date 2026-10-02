@@ -13,6 +13,7 @@ Config(
                reason = "the root Manifest is committed on purpose: it is the only place the unregistered GBGPeriodicFields git URL and pinned commit are recorded, so it must travel with the repo for a fresh clone or CI to resolve the dependency; nested environment manifests stay ignored"),
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
+    disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],
     exclusions = [
         Exclusion(files = ["src/Phenomenology.jl", "src/phenomenology/**", "docs/src/phenomenology.md",
                            "docs/src/api/phenomenology/**", "test/phenomenology.jl"],
