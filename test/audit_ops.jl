@@ -603,15 +603,24 @@ const DEVICE_PLAN_BUFFERS = Holder(
   "two spectral scalars resident on a GPU, about 135 MiB at 256³ / Float32, and every inverse " *
   "transform copying twice (14.7% slower, measured 2026-08-26) — the memory audit's DEVICE_FRAME",
   "no reliance on how the vendor FFT wrappers allocate or on their internals (a named property)")
+const TRACER_SEEDING_COPIES = Holder(
+  "TRACER SEEDING COPIES", :FIX,
+  "Building a run with M tracers allocates about 57 bytes per tracer it does not keep (Float64): " *
+  "the positions are drawn into one temporary M×3 array and scaled into a second before they are " *
+  "copied into storage (48 bytes), and the traversal order is built by PF's allocating call, which " *
+  "makes its own counting-sort scratch beside the one the run keeps (about 9). Drawing into the kept " *
+  "array and building the order in place with the kept scratch reaches zero. On a GPU the draw is " *
+  "host memory and the device keeps only the order's scratch, 9 bytes per tracer.")
 const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
                      TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
-                     UNIFORM_DEPOSIT_SCHEDULE)
+                     UNIFORM_DEPOSIT_SCHEDULE, TRACER_SEEDING_COPIES)
 
 # A `:FIX` holder is a local win recorded as OPEN, never as accepted. The set is frozen so one
 # cannot be added silently, and taking the win means deleting the entry in the same commit.
-# (Empty: the temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108.)
-const OPEN_LOCAL_WINS = ()
+# (The temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108; the tracer
+# seeding copies were found 2026-10-03, when the ledger gained the tracer-count axis.)
+const OPEN_LOCAL_WINS = ("TRACER SEEDING COPIES",)
 
 
 # ---------------------------------------------------------------- the op cost model

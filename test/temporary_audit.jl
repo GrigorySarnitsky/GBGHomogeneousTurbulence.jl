@@ -157,6 +157,12 @@ const ROWS = Dict{Symbol, Function}(
     (c.domain,)),
   Symbol("Simulation/scalar and tracers") => c -> (() -> Simulation(c.domain; viscosity = 0.05, scalar = true,
       number_of_particles = 8, rng = MersenneTwister(1)), (c.domain,)),
+  Symbol("Simulation/AdamsBashforth order 4") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
+      number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(1)),
+    (c.domain,)),
+  Symbol("Simulation/StochasticOU band 1–4") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
+      velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5, highest_shell = 4),
+      rng = MersenneTwister(1)), (c.domain,)),
   Symbol("StochasticOU/wide band") => c -> (() -> StochasticOU(c.domain; forcing_variance = 0.1,
       correlation_time = 0.5, seed = 1, highest_shell = 4), (c.domain,)),
   Symbol("ParticleIntegratorBuffers/AdamsBashforth") => c -> (() -> allocate_buffers(AdamsBashforth(order = 3),
@@ -193,6 +199,8 @@ const FIELD_SCALE_ROWS = Dict(
   :read_domain => (3.1, (TRANSFORM_PLANNING,)),
   Symbol("Simulation/scalar and tracers") => (4.0, (SEEDING_NOISE_FIELD,)),
   :Simulation => (3.0, (SEEDING_NOISE_FIELD,)),
+  Symbol("Simulation/AdamsBashforth order 4") => (3.0, (SEEDING_NOISE_FIELD,)),
+  Symbol("Simulation/StochasticOU band 1–4") => (3.0, (SEEDING_NOISE_FIELD,)),
 )
 const FROZEN_TOLERANCE = 0.3          # N³ reals at the largest size
 below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
@@ -271,4 +279,67 @@ below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
       println(rpad(String(name), 46), join((rpad(string(round(u; digits = 3)), 9) for u in units[name])))
     end
   end
+end
+
+
+# ---------------------------------------------------------------- the tracer-count axis
+
+# A row above measures in N³ reals with a fixed handful of tracers, so a cost that grows with the
+# tracer count M is invisible to it. These rows measure the other axis: at one grid, the transient
+# at two tracer counts, and their difference per added tracer, in bytes — the part of the transient
+# that grows with M, whatever the grid contributes. Below `TRACER_SCALE_FLOOR` a row is below
+# tracer scale; above it, it must be listed, frozen and claimed, exactly as a field-scale row is.
+const TRACER_COUNTS = (4096, 32768)
+const TRACER_GRID = 16
+const TRACER_SCALE_ROWS = Dict(
+  "Tracers" => (48.0, (TRACER_SEEDING_COPIES,)),
+  "Simulation" => (57.0, (TRACER_SEEDING_COPIES,)),
+  "Simulation/AdamsBashforth order 4" => (57.0, (TRACER_SEEDING_COPIES,)),
+  "Simulation/unwrapped" => (57.0, (TRACER_SEEDING_COPIES,)),
+)
+const TRACER_SCALE_FLOOR = 1.0         # bytes per tracer
+const TRACER_TOLERANCE = 2.0           # bytes per tracer
+
+function per_tracer_bytes(build, domain)
+  t = map(TRACER_COUNTS) do M
+    call = build(domain, M)
+    transient_units(call, (domain,), TRACER_GRID) * 8 * TRACER_GRID^3
+  end
+  return (t[2] - t[1]) / (TRACER_COUNTS[2] - TRACER_COUNTS[1])
+end
+
+const TRACER_ROWS = Dict(
+  "Tracers" => (d, M) -> (() -> Tracers(d; number_of_particles = M, interpolation_scheme = CatmullRom,
+                                        rng = MersenneTwister(1))),
+  "Simulation" => (d, M) -> (() -> Simulation(d; viscosity = 0.05, number_of_particles = M,
+                                              rng = MersenneTwister(1))),
+  "Simulation/AdamsBashforth order 4" => (d, M) -> (() -> Simulation(d; viscosity = 0.05,
+      number_of_particles = M, particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(1))),
+  "Simulation/unwrapped" => (d, M) -> (() -> Simulation(d; viscosity = 0.05, number_of_particles = M,
+                                                        unwrapped = true, rng = MersenneTwister(1))),
+)
+
+@testset "temporary ledger: the tracer-count axis" begin
+  domain = FixedDomain(grid_points_per_axis = TRACER_GRID, side_length = 2π, dealiasing = TwoThirds(),
+                       element_type = Float64, array_type = Array)
+  for (name, build) in TRACER_ROWS
+    b = per_tracer_bytes(build, domain)
+    PRINT_UNITS && println(rpad(name, 46), round(b; digits = 2), " bytes per tracer")
+    if b < TRACER_SCALE_FLOOR
+      @test !haskey(TRACER_SCALE_ROWS, name)                  # else retire its entry
+    else
+      @test haskey(TRACER_SCALE_ROWS, name)                   # an unlisted tracer-scale temporary
+      haskey(TRACER_SCALE_ROWS, name) || @error "temporary ledger: $name allocates $(round(b; digits = 1)) bytes per tracer and no holder claims it"
+    end
+    if haskey(TRACER_SCALE_ROWS, name)
+      frozen, holders = TRACER_SCALE_ROWS[name]
+      @test !isempty(holders) && all(h -> h in ALL_HOLDERS, holders)
+      @test abs(b - frozen) <= TRACER_TOLERANCE
+    end
+  end
+  # Planted: a builder that allocates one unkept M×3 array per call must read as tracer scale, 24
+  # bytes per tracer; one that allocates a fixed amount must not.
+  planted = per_tracer_bytes((d, M) -> (() -> (scratch = zeros(M, 3); scratch[1] = 1.0; sum(scratch))), domain)
+  @test planted ≈ 24.0 atol = 0.5
+  @test per_tracer_bytes((d, M) -> (() -> (zeros(4096); nothing)), domain) < TRACER_SCALE_FLOOR
 end

@@ -169,6 +169,8 @@ const DEVICE_TEMPORARIES = Dict(
   "Simulation/scalar" => 4.0,            # …and the scalar's
   "derivative_skewness" => 18.3,         # FULL STRAIN TENSORS
   "read_simulation" => 2.6,              # the domain it builds, and the restore's small arrays
+  "Simulation/AdamsBashforth order 4" => 3.0,   # the noise vector; the order adds nothing
+  "Simulation/StochasticOU band 1–8" => 3.0,    # the noise vector; the band's own noise is small
 )
 const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small arrays vary with N
 
@@ -196,6 +198,12 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
         "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = true, rng = Xoshiro(1)),
         "derivative_skewness" => () -> derivative_skewness(û, d),
         "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_type = cu), path, "r"),
+        "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05, number_of_particles = 64,
+                                                                particle_integration_scheme = AdamsBashforth(order = 4),
+                                                                rng = Xoshiro(1)),
+        "Simulation/StochasticOU band 1–8" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1),
+            velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
+                                            highest_shell = 8)),
         "energy_spectrum" => () -> energy_spectrum(û, d),
         "integral_scale" => () -> integral_scale(û, d),
         "flow_parameters" => () -> flow_parameters(sim),
@@ -209,6 +217,63 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
         expected = get(DEVICE_TEMPORARIES, name, 0.0)
         @info "device temporary, $name, $(N)³ $T" measured expected
         @test abs(measured - expected) <= DEVICE_TOLERANCE
+      end
+    end
+  end
+end
+
+
+# ---------------------------------------------------------------- the tracer-count axis
+
+# The rows above hold the tracer count fixed, so a cost growing with it is invisible to them. Here
+# the device transient of building a run is measured at two tracer counts on one grid, and their
+# difference per added tracer, in bytes, is the part that grows with the count — the device column
+# of the CPU ledger's tracer rows. On a GPU the positions are drawn on the host (decision 107), so
+# the seeding copies the CPU row records are host memory here; what remains on the device is the
+# traversal order's own sorting scratch, built beside the one the run keeps.
+const DEVICE_TRACER_COUNTS = (32768, 262144)
+# Frozen 2026-10-03 on the RTX 5070 Ti: 9 bytes per tracer in either precision — the sorting scratch
+# is integers — and either tracer scheme. Claimed by TRACER SEEDING COPIES (test/audit_ops.jl).
+const DEVICE_PER_TRACER = Dict(
+  Float32 => 9.0,
+  Float64 => 9.0,
+)
+const DEVICE_PER_TRACER_TOLERANCE = 1.0
+
+function device_transient_bytes(p::Pool, f)
+  quiet() = with_logger(f, NullLogger())
+  quiet(); settle!(p)
+  base = used(p)
+  reset_peak!(p)
+  r = quiet()
+  Base.invokelatest(getproperty(p.cuda, :synchronize))
+  high = peak(p) - base
+  GC.gc(true)
+  Base.invokelatest(getproperty(p.cuda, :reclaim))
+  kept = used(p) - base
+  Base.donotdelete(r)
+  return high - kept
+end
+
+@testset "the device temporaries along the tracer count" begin
+  if CUDA_MODULE === nothing
+    @warn "device tracer temporaries: no functional CUDA in this environment, so they were not " *
+          "measured. They are SKIPPED, not passed."
+    @test_skip false
+  else
+    p = Pool(CUDA_MODULE)
+    cu = getproperty(CUDA_MODULE, :CuArray)
+    for T in (Float32, Float64)
+      d = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
+                      array_type = cu)
+      for scheme in (Heun(), AdamsBashforth(order = 4))
+        t = map(DEVICE_TRACER_COUNTS) do M
+          device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05, number_of_particles = M,
+                                                     particle_integration_scheme = scheme, rng = Xoshiro(1)))
+        end
+        per = (t[2] - t[1]) / (DEVICE_TRACER_COUNTS[2] - DEVICE_TRACER_COUNTS[1])
+        @info "device temporary per tracer, $(nameof(typeof(scheme))), $T" bytes_per_tracer = per
+        @test abs(per - DEVICE_PER_TRACER[T]) <= DEVICE_PER_TRACER_TOLERANCE
       end
     end
   end
