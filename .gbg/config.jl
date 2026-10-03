@@ -5,7 +5,7 @@
 # default is wrong for this package.
 Config(
     package = "GBGHomogeneousTurbulence",
-    tool = v"2.0.0-rc.50",
+    tool = v"2.0.0-rc.55",
     docs_build = ["julia", "--project=docs", "docs/make.jl"],
     test = ["julia", "--project", "-e", "using Pkg; Pkg.test()"],
     switches = [
@@ -14,6 +14,14 @@ Config(
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
     disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],
+    rules = [
+        PatternRule(id = :lamb_sign,
+                    statement = "The Lamb vector is ω × u; u × ω is its negation.",
+                    filesets = [FileSet.CODE, FileSet.RATIONALE, FileSet.PAGES],
+                    pattern = r"\\{1,2}boldsymbol\{u\}\s*\\{1,2}times\s*\\{1,2}boldsymbol\{\\{1,2}omega\}|\bu\s*×\s*ω|cross!\(\s*ω\s*,\s*u\s*,\s*ω\s*\)",
+                    trigger = r"\b[Ll]amb(?![A-Za-z])", window = 3, escape = r"negat",
+                    skip = ["## 11." => "## References"]),
+    ],
     exclusions = [
         Exclusion(files = ["src/Phenomenology.jl", "src/phenomenology/**", "docs/src/phenomenology.md",
                            "docs/src/api/phenomenology/**", "test/phenomenology.jl"],

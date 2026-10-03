@@ -23,91 +23,9 @@ function copy_rationale_pages()
         replace(log, DECISION_LOG_HEADING => ""; count = 1))
 end
 
-# The rendered-doc source set the lints scan: every src/*.jl docstring, ARCHITECTURE.md, and every
-# docs/src page except the gitignored rationale COPY (linted from its source).
-function _doc_lint_sources()
-  sources = String[]
-  for f in readdir(joinpath(@__DIR__, "..", "src"); join = true)
-    endswith(f, ".jl") && push!(sources, f)
-  end
-  push!(sources, joinpath(@__DIR__, "ARCHITECTURE.md"))
-  generated = Set(["architecture.md", "decisions.md"])
-  for (root, _, files) in walkdir(joinpath(@__DIR__, "src")), f in files
-    endswith(f, ".md") && !(f in generated) && push!(sources, joinpath(root, f))
-  end
-  return sources
-end
-
-# Doc lint: DOCSTRING SECTION ORDER — the part of the old shape lint the rulebook does not yet check
-# by program. `RULE.DOC.HOME_ORDER` puts a docstring's caveats last among its prose, `# References`
-# after them and `# Fields` last, but it is covered by a reader; these two guards check its two
-# mechanical consequences. The length caps and the growth ratchet the old lint carried are
-# `RULE.DOC.SHAPE`'s, with its own baseline (`docs/prose_shape.csv`), and were deleted as a duplicate
-# (2026-10-03). This goes too once GBGCodingTools checks the section order itself (requested
-# 2026-10-03). Only a column-0 `!!!` counts: an indented admonition belongs to a list item.
-function lint_docstring_order()
-  problems = String[]
-  roots = [joinpath(@__DIR__, "..", "src"), joinpath(@__DIR__, "..", "src", "phenomenology")]
-  for root in roots, f in sort(readdir(root; join = true))
-    endswith(f, ".jl") || continue
-    for m in eachmatch(r"\"\"\"\n(.*?)\n\"\"\""s, read(f, String))
-      lines = split(m.captures[1], "\n")
-      key = string(basename(f), "::", strip(first(lines)))
-      tops = [i for (i, l) in enumerate(lines) if startswith(l, "!!! ")]
-      isempty(tops) && continue
-      fields = findfirst(==("# Fields"), lines)
-      args = findfirst(==("# Arguments"), lines)
-      fields !== nothing && maximum(tops) > fields && push!(problems, "$key: a caveat admonition after `# Fields`")
-      args !== nothing && args > minimum(tops) && push!(problems, "$key: `# Arguments` after a caveat admonition")
-    end
-  end
-  isempty(problems) || error("doc lint failed — docstring section order:\n  " * join(problems, "\n  "))
-  @info "doc lint: docstring section order OK"
-end
-
-
-# Doc lint: THE LAMB VECTOR IS ω × u (decision 93). Vorticity first is the literature's sign — Lamb's own
-# rotational form, Hamman, Klewicki & Kirby (2008), Sagaut & Cambon (2018), and every defining source a
-# 2026-09-24 sweep found. The rotational right-hand side carries its negation u × ω, which the solver
-# forms directly by the cross product's operand order, and the drift this guards is calling that
-# product "the Lamb vector": it stood on the landing page, in ARCHITECTURE and in the generator's
-# docstring until the sweep. A u-first cross product — in math, in Unicode, or as the `cross!(ω, u, ω)`
-# call — within three lines of the word fails unless the same window says it is the negation. The
-# decision log is exempt: it is history, and records what each entry was written against. The check
-# cannot see a sentence that calls the register's contents "the Lamb vector" with no product written
-# near it — those were swept by hand, and the glossary row is the reference.
-function lint_lamb_vector_sign()
-  u_first = (r"\\{1,2}boldsymbol\{u\}\s*\\{1,2}times\s*\\{1,2}boldsymbol\{\\{1,2}omega\}",
-             r"\bu\s*×\s*ω", r"cross!\(\s*ω\s*,\s*u\s*,\s*ω\s*\)")
-  srcs = _doc_lint_sources()
-  problems = String[]
-  mentions = 0
-  for file in srcs
-    lines = readlines(file)
-    history = 1:0
-    if endswith(file, "ARCHITECTURE.md")
-      first = findfirst(startswith("## 11."), lines)
-      last = findfirst(startswith("## References"), lines)
-      first === nothing || (history = first:something(last, length(lines)))
-    end
-    for (n, line) in enumerate(lines)
-      n in history && continue
-      occursin(r"\b[Ll]amb(?![A-Za-z])", line) || continue
-      mentions += 1
-      window = join(lines[max(1, n - 3):min(length(lines), n + 3)], "\n")
-      any(re -> occursin(re, window), u_first) && !occursin("negat", window) &&
-        push!(problems, string(relpath(file, joinpath(@__DIR__, "..")), ":", n,
-                               "  a u-first cross product named as the Lamb vector — it is ω × u; call u × ω its negation"))
-    end
-  end
-  isempty(problems) || error("doc lint failed — Lamb vector sign:\n  " * join(problems, "\n  "))
-  @info "doc lint: Lamb vector sign OK over $mentions mentions in $(length(srcs)) source files"
-end
-
-
 # ------------------------------------------------------------------ review-round closure
 #
-# An unclosed review round cannot ship. The three lints above check the PROSE; this one checks the
+# An unclosed review round cannot ship. The rulebook checks the PROSE; this one checks the
 # PROCESS — whether the round that examined the prose was ever finished. Ported in shape from the PF
 # session's `lint_review_closure()` (2026-08-27), which found it by watching its own rounds
 # self-report as done: its rates ran 16.1 → 38.7 → 54.8 % honored across three passes, every one of
@@ -198,8 +116,6 @@ function lint_review_closure()
 end
 
 copy_rationale_pages()
-lint_lamb_vector_sign()
-lint_docstring_order()
 lint_review_closure()
 
 
