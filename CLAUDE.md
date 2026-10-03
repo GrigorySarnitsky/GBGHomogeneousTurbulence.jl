@@ -147,97 +147,75 @@ the machinery inside it: `SimulationDomain` (the discretized box the run lives o
 `resolution` / `box` (is it the count or the `N³` grid? the side or the `L³` volume?). This is the
 naming counterpart of the physical-meaning-first documentation rule.
 
-**Docstrings vs comments.** Prefer docstrings; reserve plain `#` comments for non-intuitive *why* (the
+**Docstrings vs comments.** Reserve plain `#` comments for non-intuitive *why* (the
 destructive-transform copy, the rotational-form Lamb vector, the per-call tensor allocation for an
-occasional diagnostic). One docstring per operation, on the bare binding (`function f end` for
-package-owned generics, the bare imported name for extended Base / backend functions). Plain `#`
-comments stay Unicode (they are not rendered).
+occasional diagnostic). A package-owned generic carries its docstring on `function f end`; an extended
+Base / backend function on the bare imported name. Plain `#` comments stay Unicode (they are not
+rendered).
 
 ## Documentation policy — physical-meaning first
 
-The organizing spec for every user-facing docstring and API page; the rendered glossary at
-`docs/src/notation.md` is the reader's copy of the notation. Two audiences, one rule each: a **module
-docstring is a map**; a **function or type docstring is a home**.
+The rulebook (`.gbg/policy/`) holds the documentation rules; what follows is only what is HT's own —
+its examples, its physics, and the owner's rulings the rulebook does not carry. The rendered glossary
+at `docs/src/notation.md` is the reader's copy of the notation.
 
-**Two-tier structure.**
-- **Module docstring = map.** What the module is, its scope, its invariants — then a **linked one-liner per
-  operation, and no formulas** (no Mori–Zwanzig framing or architecture rationale — those live in
-  `ARCHITECTURE.md`). Every formula
-  lives in the operation's own docstring.
-- **Function docstring = home**, in this order: (1) a one-sentence identity in the user's terms; (2)
-  when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
-  (4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
-  load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
-  **named / published** method — which may open the identity sentence when the citation *names* the
-  method ("the smooth spectral filter of Hou & Li (2007) …"), the corpus-wide convention. **One link form on both surfaces** (owner-ruled 2026-08-24, adopting PF's convention): a citation carries its clickable DOI on the paper's *title* — `[*Title*](https://doi.org/…)` — identically in the `§References` bibliography and in every inline docstring copy, so the reader sees the paper's name at the point of use and the two surfaces cannot drift (`doi_crosscheck.py` verifies both the DOI, decoded, and the title). **And the inline copy is the FULL reference** (owner-ruled 2026-08-25, completing the PF parity): the linked title is followed by the journal, volume, and pages, verbatim-consistent with the `§References` entry, so a docstring's citation reads complete at the REPL — the title appears once, as the link, never doubled. A link target percent-encodes `()` and `<>`. **In-text author truncation** (PF's rule, adopted the same day): name up to three authors; four or more become `First et al.` — the full author list lives only in the `§References` entry. (The `Phenomenology` leaf is the one sanctioned exception to the title form: its self-contained `Reference` strings stay compact — author–year plus the labelled `[doi:10.…]` link, no title.) (verbatim-consistent with `ARCHITECTURE.md` §References — every such cite
-  has a §References entry and every entry a citing docstring; the extraction-bound `Phenomenology` leaf is
-  exempt, carrying its own self-contained `Reference` values), none for a classical one. **Exclude:** implementation internals (→ `#` comments) and architectural rationale
-  (→ `ARCHITECTURE.md`).
-- **Type docstring = home, constructor-first**, in this order: (1) a one-sentence identity in the
-  user's terms; (2) the constructor and its arguments — how the user builds and uses the type (the
-  primary read); (3) an example where the construction is non-obvious; (4) a demoted `# Fields` section —
-  the plain positional constructor and the field explanations. The struct's fields are reference detail,
-  not the opening; lead with the constructor the user calls. **Name the plain positional constructor
-  only where a reader might reasonably call it** — a small parameter record (`HouLi`, `FlowConditions`,
-  `Reference`, a `Phenomenology` law). Omit it for a type whose positional form takes preallocated
-  internals (`Simulation`, `ObservablesCache`, `IntegratorBuffers`, `ResolvedGenerator`): advertising
-  that form invites a caller to assemble machinery by hand, which the derived constructor exists to
-  prevent. The presence or absence is thus a *claim about who builds the value*, not a template slot.
+**Module maps.** No Mori–Zwanzig framing or architecture rationale in a module docstring — those live in
+`ARCHITECTURE.md`. HT's four-role maps stay list-first, no essay before the list (owner-ratified
+2026-08-25).
 
-**Physical meaning first — even for spectral-representation operations.** A field is a real physical
-object; spectral is only a *representation*. A docstring for an operation *computed* in spectral
-representation must still **state what it does to the real physical quantity first — with the explicit
-formula — then give the spectral form it uses.** `dissipation` is the reference: lead with
-``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle`` (the physical dissipation rate), then
-the reduction that computes it. Give the physical formula **whenever a clean one exists**; where it
-does not (the integrating factor is a spectral multiplier), say so briefly rather than forcing it. **Every diagnostic states the physical quantity
-it measures before the numerical method** — the physics-first mirror of PF's rule.
+**Function docstring = home**, in this order: (1) a one-sentence identity in the user's terms; (2)
+when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
+(4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
+load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
+**named / published** method — which may open the identity sentence when the citation *names* the
+method ("the smooth spectral filter of Hou & Li (2007) …"). **One link form on both surfaces**
+(owner-ruled 2026-08-24, adopting PF's convention): a citation carries its clickable DOI on the paper's
+*title* — `[*Title*](https://doi.org/…)` — identically in the `§References` bibliography and in every
+inline docstring copy (`doi_crosscheck.py` verifies both the DOI, decoded, and the title). **And the
+inline copy is the FULL reference** (owner-ruled 2026-08-25): the linked title is followed by the
+journal, volume, and pages, verbatim-consistent with the `§References` entry, so a docstring's citation
+reads complete at the REPL — the title appears once, as the link, never doubled. A link target
+percent-encodes `()` and `<>`. Every such cite has a §References entry and every entry a citing
+docstring.
 
-**One concept, one home.** One docstring per operation, on the bare binding; a generic carries **one**
-docstring, never one per method. Across an `f` / `f!` pair the in-place `!` form is the **home** (owns
-the formula and the kernel, listed first); the allocating form is a thin `@ref`-linking wrapper with no
-second copy of the formula and no notation that drifts across the pair (`\partial_i` vs
-`\partial_{x_i}`). PF's verbatim in-place-steer sentence is deliberately **not** adopted
+**Type docstrings.** Name the plain positional constructor only where a reader might reasonably call
+it — a small parameter record (`HouLi`, `FlowConditions`). Omit it for a type whose positional form
+takes preallocated internals (`Simulation`, `ObservablesCache`, `IntegratorBuffers`,
+`ResolvedGenerator`): advertising that form invites a caller to assemble machinery by hand, which the
+derived constructor exists to prevent. The presence or absence is a *claim about who builds the
+value*, not a template slot.
+
+**Physical meaning first** (the rulebook's `leading_identity`, HT's examples). `dissipation` is the
+reference: lead with ``\varepsilon = \nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` (the physical
+dissipation rate), then the reduction that computes it. The integrating factor is the example with no
+clean physical form: a spectral multiplier, said so briefly. Every diagnostic states the physical
+quantity it measures before the numerical method.
+
+**The steer sentence.** PF's verbatim in-place-steer sentence is deliberately **not** adopted
 (owner-ruled 2026-08-25): HT's pairs are few and non-uniform — the flagship
 `vorticity_physical!` / `vorticity_physical` pair is a compute/cached-read split, not an
 in-place/allocating pair, so PF's sentence would be false of it.
 
 **Cross-referencing — a link earns its place.** Backtick every code identifier; promote to `@ref` (or
 `@extref` for an external / cross-package object) only where a reader would genuinely jump and there is
-**one** clear destination. (1) Link a target **at most once per docstring** — its first genuine mention.
-(2) **Never** link the docstring's own binding, its argument names, option / `Symbol` tokens, or struct
-fields. (3) A **family** of related built-ins is **one** catalogue destination, not five (a glossary
-table is the exception — it maps each symbol to its own object). (4) **At-home test** — if a sentence
-would sit equally well in the *target's* own docstring, cut it and link. The storage-backend and element
-types (`Array` / `CuArray` / `ROCArray`, `Float32` / `Float64`) and the `GBGPeriodicFields` types are the
-deliberate `@extref` exception to "don't link `Base`": the GPU-backend and dependency story makes them
-worth the jump.
+**one** clear destination. **Never** link the docstring's own binding, its argument names, option /
+`Symbol` tokens, or struct fields. A **family** of related built-ins is **one** catalogue destination,
+not five (a glossary table is the exception — it maps each symbol to its own object). **At-home test**
+— if a sentence would sit equally well in the *target's* own docstring, cut it and link. The
+storage-backend and element types (`Array` / `CuArray` / `ROCArray`, `Float32` / `Float64`) and the
+`GBGPeriodicFields` types are the deliberate `@extref` exception to "don't link `Base`": the GPU-backend
+and dependency story makes them worth the jump.
 
-**No dead references on the user-facing surface.** A rendered docstring — and a thrown error message —
-must read **complete at the REPL**, where cross-links are dead: never cite an `ARCHITECTURE.md` section
-number (`§4.5`), a decision-log entry, or a repo path (`src/…`, `inspiration/…`) there. A cross-reference
-adds depth one hop away; it never carries a fact the reader needs. (Design rationale and section
-citations stay in `#` comments and `ARCHITECTURE.md`.)
+**No dead references** extends to a thrown error message, a decision-log entry and a repo path (`src/…`,
+`inspiration/…`): a cross-reference adds depth one hop away; it never carries a fact the reader needs.
 
-**Template conventions, stated so the split is checkable.** Several shapes vary across the corpus for
-reasons that were real but unwritten; they are rules now, one per line so a later round appends a
-line rather than a clause:
+**Template conventions.**
 
 - An **admonition takes a custom title** when it carries one load-bearing claim a reader should be
   able to scan for, and stays a bare `!!! note` when it is a general aside. The title is **plain
   text** — Documenter renders neither code spans nor math there.
-- A **caveat admonition is the last substantive block** of a docstring, before `# Fields` — in a
-  function docstring as in a type's.
-- A type gets a bulleted **`# Arguments`** section when its keywords are independent settings, and
-  folds them into prose when they must be read together (one keyword conditioning what another
-  *means*, or several jointly naming one object). Independence is the discriminator, not count.
-- A **function** docstring documenting three or more arguments, or any keyword argument, uses the
-  bulleted form led by "The arguments are:"; with fewer, the arguments are bound in running prose.
-  Never mix the two within one docstring. (PF's numeric rule, adopted 2026-08-24 — the corpus
-  already practiced it unwritten, which is exactly how a convention drifts.)
-  An `# Arguments` lead-in qualifier ("All keyword, all required:") appears only where it carries
-  information beyond the entries themselves; a bare "All keyword:" over entries that show their own
-  defaults says nothing and is omitted.
+- The `# Arguments` list is led by "The arguments are:". A lead-in qualifier ("All keyword, all
+  required:") appears only where it carries information beyond the entries themselves.
 - An **`# Examples`** section appears where construction is non-obvious, not on every type — hence
   none on the types a run builds for the user, and one on `FixedDomain`, `Simulation`, `Tracers`,
   `FlowParameters`.
@@ -246,141 +224,69 @@ line rather than a clause:
 - A **`Returns x.` sentence** is required of any in-place mutator whose signature carries no `-> `
   arrow, and sits **before** any caveat admonition. A *pure* function needs none; the exception is a
   return whose **shape** is not evident from the name (a named tuple), where the shape is stated.
-- A signature carries a **`-> Type` arrow** only where the return type is fixed by the signature; a
-  reduction returning *the field's own* element type says so in prose instead. A **mutator** may
-  instead carry **`-> arg`**, naming the argument it returns — the corpus-wide idiom — and then
-  needs no `Returns` sentence; arrow and sentence never both appear.
-- A **module map is identity → contents list → optional trailing remark**, in that order, with no
-  essay before the list — deliberately tighter than PF's map rule, which asks for scope-and-invariants
-  prose ahead of the list: HT's four-role maps stay list-first (owner-ratified 2026-08-25).
+- A reduction returning *the field's own* element type says so in prose rather than with an arrow; a
+  **mutator** may carry **`-> arg`**, naming the argument it returns, and then needs no `Returns`
+  sentence.
 
-**Watch the shape, not only the sentence.** These rules are how a docstring is *checked*, but a
-docstring can satisfy every one and still be unreadable, because a fix pass edits clauses and never
-re-reads the whole. Measured 2026-08-19: `VarianceRescaling` reached 861 words with four scattered
-admonitions, `# Arguments` mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode
-bullet reached a 120-word run-on with an ungrammatical clause. Every individual edit was correct.
-**When a docstring has taken three or more rounds of patches, rewrite it whole rather than append
-again** — and the build now measures this: `docs/make.jl`'s `lint_docstring_shape()` fails on a
-docstring that *grew* since `docs/docstring_shape.csv` was last written, and on a structural
-violation (`# Arguments` after a caveat, a caveat after `# Fields`). Rewrite, or re-baseline
-deliberately with `DOCSTRING_SHAPE_BASELINE=1 julia --project=docs docs/make.jl` — the signature to watch is a long paragraph, an admonition count above two, or a section
-out of the order above.
+**Rewrite, don't patch.** When a docstring has taken three or more rounds of patches, rewrite it whole
+rather than append again (`RULE.DOC.SHAPE` measures growth). Measured 2026-08-19: `VarianceRescaling`
+reached 861 words with four scattered admonitions, `# Arguments` mid-docstring and a caveat after
+`# Fields`; `Simulation`'s grid-mode bullet reached a 120-word run-on. Every individual edit was correct.
 
-**API pages are logically grouped.** Group public objects under hand-written `## Header` sections via
-explicit `@docs` blocks (never `@autodocs`, which cannot express a semantic group); each object appears
-**once**; keep an `f` / `f!` pair together with the `!` home first; a `@docs` block stays homogeneous
-(all-types or all-functions, a supertype leading its concretes). `checkdocs = :exports` guards a
-dropped export.
+**API pages.** Group public objects under hand-written `## Header` sections via explicit `@docs` blocks
+(never `@autodocs`, which cannot express a semantic group); keep an `f` / `f!` pair together with the
+`!` home first; a `@docs` block stays homogeneous (all-types or all-functions, a supertype leading its
+concretes). `checkdocs = :exports` guards a dropped export.
 
-**Notation** (glossary: `docs/src/notation.md`, the single reference — a docstring introduces a symbol
-on first use and need not repeat the convention). The load-bearing house rules: **vectors and tensors
-are bold italic ``\boldsymbol{u}`` — never upright ``\mathbf`` (build-enforced)**; the wavenumber set
-is kept distinct — ``\boldsymbol{\kappa}`` the vector, ``\kappa`` its magnitude, ``k`` the turbulent
-kinetic energy, ``\varkappa`` the scalar diffusivity; the passive scalar is ``\varphi``, **never
-``\theta``**; a partial derivative is ``\partial_{x_i}`` (subscript the coordinate — **never the
-bare-index ``\partial_i``, build-enforced**); the imaginary unit is upright ``\mathrm{i}``; the Leray
-projection is ``\mathbb P``, a Mori–Zwanzig projection ``\mathcal P``. The Reynolds number is set
-through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a field — ``\mathrm{Re}_\lambda`` is measured.
+**Notation** (the glossary, `docs/src/notation.md`, is the single reference). The house rules: vectors
+and tensors are bold italic ``\boldsymbol{u}``; the wavenumber set is kept distinct —
+``\boldsymbol{\kappa}`` the vector, ``\kappa`` its magnitude, ``k`` the turbulent kinetic energy,
+``\varkappa`` the scalar diffusivity; the passive scalar is ``\varphi``, **never ``\theta``**; the Leray
+projection is ``\mathbb P``, a Mori–Zwanzig projection ``\mathcal P``; a conditional bar is ``\mid``.
+The Reynolds number is set through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a field —
+``\mathrm{Re}_\lambda`` is measured. Long docstring signatures hand-wrap with a hanging indent under the
+first argument.
 
 **Bind each code object to its symbol on first mention** — write the correspondence explicitly so it is
 never left implicit: `dissipation` ``\equiv \varepsilon``, `kinetic_energy` ``\equiv k``, `curl`
 ``\equiv \nabla\times``, a field in spectral representation ``\hat f``. In a *rendered* docstring make the
 binding **one** LaTeX span — ``\texttt{dissipation} \equiv \varepsilon`` — never a `` `code` `` span
-abutting a math span (silent-rendering rule (b) below).
+abutting a math span. A formula is one LaTeX span — never split across a ``…`` span and an adjacent
+`` `code` `` span.
 
-**Silent-rendering micro-rules — markup KaTeX / Documenter render *wrong without failing the build*.**
-(a) A code identifier never sits inside a ``…`` / ```math``` span (it renders as a product of italic
-single letters — backtick it, or ``\texttt{}``-wrap it inside a formula). (b) A formula is one LaTeX
-span — never split across a ``…`` span and an adjacent `` `code` `` span. (c) **Inline math stays on
-ONE source line** — a wrapped continuation beginning with a CommonMark list / blockquote leader
-(`- ` / `* ` / `> ` / `1.`) is parsed as a new list item and silently drops the span out of math mode
-(`docs/make.jl`'s `lint_inline_math()` fails the build on it). (d) No horizontal scroll — hand-wrap a
-long docstring signature with a hanging indent under the first argument; break a wide display formula
-with `aligned` / `gathered` / `split` (neither a code block nor display math auto-wraps). (e) A backtick
-span holds only **well-formed Julia** — a name, type, call, or expression; math that merely looks
-code-ish (a half-open interval `[a, b)`, an inequality `κ ≥ 2`, a lone `≤` / `·` / `−` glyph) is LaTeX,
-not backticks. (f) **TeX idiom** (adopted from PF 2026-08-06; the first three build-enforced): braced
-group arguments — ``\tfrac{1}{2}``, ``\boldsymbol{u}``, never `\tfrac12` / `\boldsymbol u`; no
-``\mathbb`` on a digit; the thin space ``\,`` reserved for the differential ``\,\mathrm dx``, never
-between plain factors; no manual ``\;`` / ``\:`` spacing around relations; no ``\left``/``\right``
-auto-sizing (size by hand with ``\bigl``/``\Bigl``; the ``\left\{ \dots \right.`` system idiom and
-the arrow commands are exempt); a conditional bar is ``\mid`` (HT's own addition to the adopted set).
+**Correctness — HT's cases.** The normalizations to expand against the code: the ``1/N``, the
+``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, the Parseval / spectral factors. Two examples from
+this codebase: the derivative-skewness "divergence" bug (a repeated index read as
+``\nabla\cdot\boldsymbol{u} = 0``), and the coordinate-free skewness constant
+``C = \tfrac{4}{7}\sqrt{15/2}`` (numerically verified, a competing value ruled out). The category
+errors this physics invites: a **field** with its **representation** (say "field in spectral
+representation", never "spectral field"); the rate ``\varepsilon``, a number, with a dissipation field;
+the kinetic energy ``k`` with the spectrum ``E(\kappa)``; the integrating factor ``\mathcal E`` with
+``\nu``; ``\mathbb P`` with ``\mathcal P``; a per-unit-wavenumber density ``E(\kappa)`` with an
+energy; a dimensionally incomplete law (a bare ``\kappa^{-5/3}`` slope vs
+``C_K\varepsilon^{2/3}\kappa^{-5/3}``).
 
-**Correctness is verified, not asserted.** Check every formula, normalization (the ``1/N``, the
-``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval / spectral factors), and every "X is just Y"
-equivalence by expanding it against the code — a plausible claim is false until the expansion matches.
-Two examples from this codebase: the derivative-skewness "divergence" bug (a repeated index read as
-``\nabla\cdot\boldsymbol u = 0``), and the coordinate-free skewness constant
-``C = \tfrac47\sqrt{15/2}`` (numerically verified, a competing value ruled out).
+**Prose.** No noun-stacks, `label:`-colon tags, or comma splices; lead a sentence with a capitalized
+word ("The `dissipation` reduction…").
 
-**Category/type errors are their own class** — distinct from a normalization slip and invisible to a
-value-check: a sentence can be perfectly formatted and read true yet conflate two *kinds* of object.
-Guard against conflating a **field** with its **representation** (the physical object vs its spectral
-coefficients — say "field in spectral representation", never "spectral field"); a **diagnostic scalar**
-with the **field** it reduces (the rate ``\varepsilon = \nu\langle\lvert\boldsymbol\omega\rvert^2\rangle``,
-a number, vs a dissipation field; the kinetic energy ``k`` vs the spectrum ``E(\kappa)``); an **operator**
-with its **parameter** (the integrating factor ``\mathcal E`` vs ``\nu``; the Leray projection ``\mathbb P``
-vs a Mori–Zwanzig ``\mathcal P``); a **rate** with its **time-integral**; a per-unit-wavenumber **spectral
-density** ``E(\kappa)`` with an **energy**; and a dimensionally-incomplete reference law (a bare
-``\kappa^{-5/3}`` slope vs ``C_K\,\varepsilon^{2/3}\kappa^{-5/3}``). Type every object from the code and
-expand it — the physics mirror of the sibling backends' type-error guard.
-
-**Prose is grammatical.** Every sentence has a subject and a verb; no verbless fragments, noun-stacks,
-`label:`-colon tags, or comma splices. Concise means few words, not missing verbs. A prose sentence
-never opens with a lowercase code identifier — a bare `dissipation` at the start reads as a typo against
-the capitalization, so lead with a capitalized word ("The `dissipation` reduction…") or reword (bulleted
-`` `arg` `` entries and signatures are exempt).
-
-**Neutral reference register.** A tunable is an *option* / *setting* / *axis* / post-hoc *choice*,
-never a "knob"; keep a neutral tone across every authored surface — docstrings, `ARCHITECTURE.md`, the
-doc pages, and `@testset` names. **No invented aliases for API objects** (owner-ruled 2026-08-24):
-`Simulation` may be called *the front door* only in its own description — its docstring and its own
-api-page/§4.7 sections, where the term is introduced — and every other surface names `Simulation`
-explicitly. The same rule covers any future metaphor: an alias lives where it is defined, nowhere
-else. (The glossary keeps its *front door* row: the decision log's history uses the term, and the
-row is where a reader resolves it.)
-
-## Doc-edit checklist — run all on every documentation change (most strictly on `ARCHITECTURE.md`)
-
-The battery the `/check-docs` command (`.claude/commands/check-docs.md`) encodes; run it across
-**every** surface (every `src/*.jl` docstring, `ARCHITECTURE.md`, every `docs/src` page). Run each as a
-**positive** procedure — enumerate, then verify each item; a defect that is absent-by-omission (an
-unbound symbol, a false-but-plausible formula) does not announce itself on a read-through. A flagged
-instance is a *sample of a class* — fix the class, not the line.
+**Register.** A tunable may also be an *axis* or a post-hoc *choice*; keep a neutral tone on
+`@testset` names too. **No invented aliases for API objects** (owner-ruled 2026-08-24): `Simulation`
+may be called *the front door* only in its own description — its docstring and its own api-page/§4.7
+sections, where the term is introduced — and every other surface names `Simulation` explicitly. The
+same rule covers any future metaphor: an alias lives where it is defined, nowhere else. (The glossary
+keeps its *front door* row: the decision log's history uses the term, and the row is where a reader
+resolves it.)
 
 **Order the work: code before docs.** When a round of findings mixes renames, signature changes and
 prose, land the code first — the docs describe the code, so the reverse order writes every affected
 docstring twice. (2026-08: ten renames landed first, and the doc phase then touched each surface once.)
 
-1. **Correct** — every formula, normalization, conservation / adjoint relation, and quantifier
-   (*exact / all / never*) true and precise, verified against `src/` (quote the decisive line) or by
-   derivation; the diagnostic consistent with the physical quantity it claims to measure; and free of
-   **category/type errors** (a field vs its representation, an operator vs its parameter, a rate vs its
-   time-integral — type each object from the code).
-2. **Self-contained** — every symbol bound to its meaning at first use (or in `notation.md`); **and
-   every signature argument documented** — enumerated *from the signature* (positional + keyword), each
-   its own entry, so an "obvious" `domain` or `dt` cannot be skipped (this is how `domain` / `buffers` once
-   slipped past). A **term of art** naming a package concept is explained or `@ref`-linked, not left
-   correct only to a reader who already knows the code — the **cold read** (the docstring parsed with
-   the module source withheld) is the test.
-3. **Notation** — one symbol per concept, one concept per symbol; the house glyphs (`\boldsymbol`, the
-   `\boldsymbol{\kappa}` / `\kappa` / `k` / `\varkappa` set, `\varphi`, `\partial_{x_i}`, `\mathrm{i}`,
-   `\mathbb P` / `\mathcal P`); standard notation; the naming convention (math variables symbolic,
-   storage descriptive).
-4. **Formatted (bidirectional)** — math is LaTeX never backticks; every code identifier backticked
-   never bare; markdown tables top-level; and the *silent* failures — a code name never inside a math
-   span, a formula never split across a math / `` `code` `` boundary, inline math on one source line
-   (build-enforced), no `\mathbf` (build-enforced), no > 88-col signature or wide display block
-   (horizontal scroll).
-5. **Current & complete** — every claim matches the code's present state; no stale
-   *future / deferred / none-exist*; and a docstring or summary that names only a *subset* of what the
-   code now provides is stale even if literally true (a module docstring naming one scheme family, a
-   capability list missing a builder). Check each still names everything added since it was written,
-   against the current `export`s / method set.
-
-Plus, **across variant pairs** (the `src/` docstrings, *relational*, not per-surface): each operation's
-`f` / `f!` (getter / `set_…!`) share **one home** for the formula, the other a thin `@ref` wrapper,
-with no notation that drifts across the pair.
+**HT's checks on a doc edit**, beyond the rulebook's: quote the decisive `src/` line for a verified
+claim; a diagnostic's docstring matches the quantity it claims to measure; a docstring or summary
+naming only a *subset* of what the code now provides is stale even if literally true (a module
+docstring naming one scheme family, a capability list missing a builder) — check it against the
+current `export`s and method set. The enumeration of signature arguments exists because `domain` /
+`buffers` once slipped past.
 
 ## Verification workflow
 
@@ -398,19 +304,16 @@ with no notation that drifts across the pair.
   frame (the `FixedDomain`) **separately**, joined by a completeness test requiring their sum to
   account for every field-scale array a live `Simulation` reaches — so new residency cannot hide by
   hanging off an unwalked owner (decision 36).
-- Docs build: `julia --project=docs docs/make.jl` — `checkdocs = :exports` plus the two build lints
-  (`lint_inline_math`, `lint_notation_variants`) must be clean. After a build, revert the transient
-  dev entry with `git checkout -- docs/Project.toml` **alone** — never co-list `docs/Manifest.toml`,
-  which aborts the checkout and lets the dev entry slip into a commit (it broke the Docs CI once). CI
-  does its own `Pkg.develop`.
+- Docs build: `julia --project=docs docs/make.jl` (`checkdocs = :exports` and the rulebook's build
+  checks). `docs/Project.toml` carries the package as a `[sources]` path and the GBGCodingTools pin:
+  there is no transient dev entry, and the file is never reverted after a build.
+- The GPU checks (`test/device_hot_loop.jl`, `test/device_memory.jl`, `test/device_limits.jl`,
+  `test/seed_backends.jl`) run only where a functional GPU is present, and otherwise record a visible
+  skip, never a pass.
 - Consult `Project.toml` for dependencies and versions; do not assume.
 
 ## Working agreements
 
-- The API is not frozen; do not build backward-compatibility shims.
-- **Commit ⇒ push, on `master`.** This is a private repo in active development, synced through GitHub;
-  work is committed **directly on `master`** and **pushed in the same step**. End every commit message
-  with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; never use `[skip ci]`.
 - Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are **study-only,
   gitignored** — never copied into the package, only properly cited.
 - **`inspiration/OldCode` is not a reference clone and is not inspiration.** It is the previous
@@ -435,7 +338,7 @@ actively check for it.
   user's preference; if the only reason is "that's how it is", it is not a reason — say so and find the real
   one, or flag that there isn't one. This is the decision-making sibling of invariant 3's "*for symmetry /
   for completeness / it's convenient* is never a valid justification" and of laundering a flagged smell as
-  "by design" (see the doc policy's "Correctness is verified, not asserted"). Instances (2026-07-14):
+  "by design" (`RULE.DOC.VERIFIED`). Instances (2026-07-14):
   justifying the `Tracers(domain, …)` argument order by "the `count` form is already domain-first" (the
   sound reason is the domain-derived-constructor convention the user endorsed); the `kinetic_energy` default
   "differ by design" laundering.
@@ -447,8 +350,8 @@ actively check for it.
   `convolve!` α/β form, verified in the clone and in use on a neighboring line), and proposing a consumer
   that is not an instance of the requested op (the phase-shift chain claimed for the two-operand combine —
   a kernel on *one* operand is not `ĝ⊙(α·a + β·b)`). The rule: **before raising a request or naming a gap
-  holder, expand each candidate chain algebraically and check it against the existing exports** — the doc
-  policy's "a plausible 'X is just Y' is false until the expansion matches", applied to code shapes and
+  holder, expand each candidate chain algebraically and check it against the existing exports** — `RULE.DOC.VERIFIED`'s
+  "a plausible 'X is just Y' is false until the expansion matches", applied to code shapes and
   backend surfaces, not only docstrings. Instances (2026-07-19, both caught by PF's triage): the missed
   free win at `Generator.jl` 253–254; the item-7 phase-shift consumer misclaim.
 - **Treating what is *in place* as evidence it should be so — dismissing a flagged cost instead of
@@ -488,9 +391,8 @@ actively check for it.
   earlier, and a rewrite that purged the banned "the run stands at ``t_n``" reintroduced the identical
   construction three sentences later; (c) **the fix that contradicts itself** — a link sweep added the
   policy sentence "every Code entry naming a package object links" and left its own table disobeying
-  it, because the regex required a cell to be exactly one backticked name. The rule: **after any class
-  fix, enumerate the surfaces from the finding's own text — not from memory — and re-run the
-  verifier; a class claimed swept but not re-measured is an instance fix wearing a class's name.**
+  it, because the regex required a cell to be exactly one backticked name. A class claimed swept but
+  not re-measured is an instance fix wearing a class's name.
   Instances (2026-08-17): the eleven above, plus a scan I wrote that caught only the form I had first
   noticed (bare `` `code` `` beside math, not the linked `[`code`](@ref …)` form), certifying clean
   while three sites stood.
@@ -501,8 +403,8 @@ actively check for it.
   sibling PF session, six defects were found across the two trees, and in **every one the correct
   behaviour was already written down in the same tree**: the class-sweep rule sat in the discipline
   section while eleven of thirteen fixes were `LINE-ONLY`; `hunt.js`'s "it must assert the RIGHT
-  behaviour" sat three lines above code that accepted *any* failing test as proof; this file's own
-  doc-edit checklist names `domain` as the argument an enumeration must not skip, while
+  behaviour" sat three lines above code that accepted *any* failing test as proof; this file's
+  doc-edit checklist then named `domain` as the argument an enumeration must not skip, while
   `ResolvedFields(domain; …)` left `domain` unbound and `argcov.jl` reported `0` and **could not have
   reported otherwise** — its parser discarded the last positional argument of every signature
   carrying a `;`. PF hit the mirror image the same day: its unbound argument was the *stencil width*,
@@ -518,8 +420,6 @@ actively check for it.
 
   The rule: **when you write a rule down, name what would catch its next violation — and if the
   answer is "someone remembering this rule", it is not enforced.** A rule and its check belong in the
-  same commit. And on the checks themselves: **a sweep reporting zero is the one to distrust** —
-  falsify it against a fixture carrying a known positive before believing a clean run, because a
-  pass over a corpus is a property of the corpus, not of the code. Prefer a stated denominator to a
+  same commit. And on the checks themselves, prefer a stated denominator to a
   bare verdict: "CLEAN over 98 bindings" is falsifiable where "CLEAN" is not.
   Instances (2026-08-25/27): the six above.
