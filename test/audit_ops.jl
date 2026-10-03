@@ -607,11 +607,15 @@ const DEVICE_PLAN_BUFFERS = Holder(
 # kept array (on a device, one host array) and the traversal order is built in place with the kept
 # scratch. The tracer-count rows of the temporary ledger hold `Tracers` below tracer scale.
 const TRAVERSAL_ORDER_CHECK = Holder(
-  "TRAVERSAL ORDER CHECK", :PF_RAISE,
+  "TRAVERSAL ORDER CHECK", :DESIGN,
   "Building a run's traversal order starts from the identity permutation, and PF's order " *
-  "constructor checks it with marks it allocates itself, one byte per tracer, since it takes no " *
-  "caller-held marks as the in-place rebuild does. Not yet raised with PF: sending the request is " *
-  "the owner's decision.")
+  "constructor checks it with marks it allocates itself, since it takes no caller-held marks as the " *
+  "in-place rebuild does. The owner left it as is rather than raise it with PF (decision of " *
+  "2026-10-03).",
+  "one byte per tracer, once per run construction, on the CPU and the device — about 1 MB for a " *
+  "million tracers; the temporary ledger's tracer-count rows and their device column",
+  "the order is built only through PF's public constructor and rebuild, with no request to PF for " *
+  "a one-off byte per tracer (a named property)")
 const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
                      TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,

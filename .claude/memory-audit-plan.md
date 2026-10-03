@@ -120,7 +120,7 @@ measure (in one process the resident set cannot separate a C allocation from reu
    field, on the CPU and the device; the tracer count cost 57 bytes per tracer on the CPU (seeding
    copies and a second traversal scratch) and 9 on the device, fixed the same day. One byte per
    tracer remains on both, PF's order constructor checking the identity order with its own marks
-   (TRAVERSAL ORDER CHECK, not yet raised with PF).
+   (TRAVERSAL ORDER CHECK; the owner left it as is, 2026-10-03).
 
 ## What this will not reach
 
