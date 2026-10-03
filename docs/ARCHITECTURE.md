@@ -966,8 +966,8 @@ one usually encodes a decision.
   `ARCHITECTURE.md`, every `src/*.jl` docstring, every `docs/src` page) — run to completion in one pass
   (`.claude/commands/check-docs.md`). *Correct* extends to physical-formula and normalization checking
   (the ``1/N``, the ``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, Parseval factors) and to the
-  category/type-error class above. Two build lints (`lint_inline_math`, `lint_notation_variants`) and
-  `checkdocs = :exports` are the mechanical backstop.
+  category/type-error class above. The rulebook's programs and `checkdocs = :exports` are the
+  mechanical backstop.
 - **Citations** follow author–year; the full references are §References. Never cite an inaccessible source;
   the material under `inspiration/` is private and never referenced. A reference *block* of two or more
   citations is a bullet list — one citation per line — never a semicolon-joined paragraph.

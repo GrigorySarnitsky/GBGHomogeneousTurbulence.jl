@@ -38,174 +38,31 @@ function _doc_lint_sources()
   return sources
 end
 
-# Doc lint: an inline ``…`` math span must not be split across a source line by a CommonMark
-# list/blockquote leader. A wrapped continuation beginning "- "/"* "/"+ "/"> "/"1." (≤ 3 leading
-# spaces) is parsed as a *new list item*, which silently drops the span out of math mode — and
-# Documenter does NOT flag it (the page builds, then renders the LaTeX as literal text). This guard
-# fails the build instead; keep each inline span on one source line (break the prose, not the span).
-# Doc lint: DOCSTRING SHAPE — the accretion guard.
-#
-# A docstring can satisfy every template rule in CLAUDE.md and still be unreadable, because a review
-# round edits clauses and never re-reads the whole. Measured 2026-08-19, after five rounds of
-# patches: `VarianceRescaling` (then named `BandRescaling`) had reached 861 words with four
-# scattered admonitions, `# Arguments`
-# mid-docstring and a caveat after `# Fields`; `Simulation`'s grid-mode bullet was a 120-word run-on
-# with an ungrammatical clause. Every individual edit had been correct. Nothing measured the shape,
-# so nothing objected.
-#
-# Two guards, because the two failure modes need different treatment:
-#
-#   STRUCTURE is absolute — `# Arguments` before any top-level caveat, `# Fields` last. These are
-#   binary, the corpus satisfies them, and any violation fails the build. (Only column-0 `!!!`
-#   counts: an indented admonition is part of a list item, not a trailing caveat.)
-#
-#   LENGTH is a RATCHET against `docs/docstring_shape.csv`, not a fixed ceiling. A hard threshold
-#   would either fire on the 20-odd long docstrings that predate the rule or be set so high it never
-#   fires. The ratchet instead fails when a docstring GROWS past what it was — which is exactly the
-#   accretion signal — and lets a rewrite bank the improvement. New docstrings get the hard cap.
-#
-# When a docstring legitimately grows, rewrite it whole rather than raise its number; when it
-# shrinks, re-baseline with `DOCSTRING_SHAPE_BASELINE=1 julia --project=docs docs/make.jl`.
-const SHAPE_BASELINE = joinpath(@__DIR__, "docstring_shape.csv")
-const SHAPE_NEW_PARAGRAPH_CAP = 120
-const SHAPE_NEW_ADMONITION_CAP = 3
-
-function _docstring_shapes()
-  shapes = Dict{String,Tuple{Int,Int,Int}}()
+# Doc lint: DOCSTRING SECTION ORDER — the part of the old shape lint the rulebook does not yet check
+# by program. `RULE.DOC.HOME_ORDER` puts a docstring's caveats last among its prose, `# References`
+# after them and `# Fields` last, but it is covered by a reader; these two guards check its two
+# mechanical consequences. The length caps and the growth ratchet the old lint carried are
+# `RULE.DOC.SHAPE`'s, with its own baseline (`docs/prose_shape.csv`), and were deleted as a duplicate
+# (2026-10-03). This goes too once GBGCodingTools checks the section order itself (requested
+# 2026-10-03). Only a column-0 `!!!` counts: an indented admonition belongs to a list item.
+function lint_docstring_order()
+  problems = String[]
   roots = [joinpath(@__DIR__, "..", "src"), joinpath(@__DIR__, "..", "src", "phenomenology")]
   for root in roots, f in sort(readdir(root; join = true))
     endswith(f, ".jl") || continue
     for m in eachmatch(r"\"\"\"\n(.*?)\n\"\"\""s, read(f, String))
-      body = m.captures[1]
-      sig = strip(first(split(body, "\n")))
-      isempty(sig) && continue
-      key = string(basename(f), "::", sig)
-      admonitions = count(!isnothing, match.(r"^!!! ", split(body, "\n")))
-      longest = 0
-      for para in split(body, r"\n[ \t]*\n")
-        t = strip(para)
-        (isempty(t) || any(p -> startswith(t, p), ("-", "*", "!!!", "```", "#", "|"))) && continue
-        # A bulleted list led by its one-line "The arguments are:" sentence (the house idiom for
-        # three-plus arguments) is a list, not a paragraph: the cap measures prose run-ons, and a
-        # seven-entry argument list crossing it was the false positive that added this branch.
-        occursin(r"^[^\n]*:\n[ \t]*[-*] ", t) && continue
-        longest = max(longest, length(split(t)))
-      end
-      shapes[key] = (longest, admonitions, length(split(body)))
-      # STRUCTURE, checked here so one walk serves both guards.
-      tops = [i for (i, l) in enumerate(split(body, "\n")) if startswith(l, "!!! ")]
-      fields = findfirst(==("# Fields"), split(body, "\n"))
-      args = findfirst(==("# Arguments"), split(body, "\n"))
-      if !isempty(tops)
-        fields !== nothing && maximum(tops) > fields &&
-          error("doc lint failed — caveat admonition after `# Fields` in $key")
-        args !== nothing && args > minimum(tops) &&
-          error("doc lint failed — `# Arguments` after a caveat admonition in $key")
-      end
+      lines = split(m.captures[1], "\n")
+      key = string(basename(f), "::", strip(first(lines)))
+      tops = [i for (i, l) in enumerate(lines) if startswith(l, "!!! ")]
+      isempty(tops) && continue
+      fields = findfirst(==("# Fields"), lines)
+      args = findfirst(==("# Arguments"), lines)
+      fields !== nothing && maximum(tops) > fields && push!(problems, "$key: a caveat admonition after `# Fields`")
+      args !== nothing && args > minimum(tops) && push!(problems, "$key: `# Arguments` after a caveat admonition")
     end
   end
-  return shapes
-end
-
-function lint_docstring_shape()
-  shapes = _docstring_shapes()
-  if get(ENV, "DOCSTRING_SHAPE_BASELINE", "") == "1"
-    open(SHAPE_BASELINE, "w") do io
-      println(io, "key,longest_paragraph_words,admonitions,total_words")
-      for k in sort(collect(keys(shapes)))
-        (p, a, w) = shapes[k]
-        println(io, replace(k, "," => "，"), ",", p, ",", a, ",", w)
-      end
-    end
-    @info "docstring shape baseline rewritten" entries = length(shapes)
-    return
-  end
-  isfile(SHAPE_BASELINE) || error("doc lint failed — missing $SHAPE_BASELINE; regenerate with DOCSTRING_SHAPE_BASELINE=1")
-  base = Dict{String,Tuple{Int,Int,Int}}()
-  for line in Iterators.drop(eachline(SHAPE_BASELINE), 1)
-    isempty(strip(line)) && continue
-    parts = rsplit(line, ","; limit = 4)
-    base[replace(parts[1], "，" => ",")] = (parse(Int, parts[2]), parse(Int, parts[3]), parse(Int, parts[4]))
-  end
-  problems = String[]
-  for (key, (para, adm, words)) in shapes
-    # The caps bind ALWAYS, baselined or not. They used to apply only to an unknown key, which left
-    # two ways through: re-baselining in the same commit turned a new over-cap docstring into a known
-    # one and skipped the cap forever, and because the key is the signature string, any RENAME
-    # produced a fresh key whose over-cap shape was then frozen on the next baseline. Both were
-    # exercised at once in 2026-08. A cap is an absolute limit; the ratchet is a separate mechanism
-    # against accretion, and they compose rather than substitute.
-    para > SHAPE_NEW_PARAGRAPH_CAP &&
-      push!(problems, "$key: $para-word paragraph (cap $SHAPE_NEW_PARAGRAPH_CAP)")
-    adm > SHAPE_NEW_ADMONITION_CAP && push!(problems, "$key: $adm admonitions (cap $SHAPE_NEW_ADMONITION_CAP)")
-    if haskey(base, key)
-      bp, ba, bw = base[key]
-      para > bp && push!(problems, "$key: longest paragraph grew $bp → $para words")
-      adm > ba && push!(problems, "$key: admonitions grew $ba → $adm")
-      words > bw && push!(problems, "$key: docstring grew $bw → $words words")
-    end
-  end
-  isempty(problems) || error("doc lint failed — docstrings grew rather than being rewritten " *
-                             "(rewrite whole, or re-baseline with DOCSTRING_SHAPE_BASELINE=1):\n  " *
-                             join(sort(problems), "\n  "))
-end
-
-
-function lint_inline_math()
-  leader = r"^\s{0,3}([-*+>]|\d+[.)])\s"
-  twobacktick = r"(?<!`)``(?!`)"
-  sources = _doc_lint_sources()
-  problems = String[]
-  for file in sources
-    isjl = endswith(file, ".jl")
-    indoc = !isjl                 # .md renders entirely; .jl renders only inside """ … """ docstrings
-    infence = false
-    inspan = false                # inside an unclosed inline ``…`` span
-    for (n, line) in enumerate(eachline(file))
-      # Every docstring delimiter in this package is a lone `"""` on its own line, so toggle on that.
-      if isjl && strip(line) == "\"\"\""
-        indoc = !indoc; inspan = false; continue
-      end
-      indoc || continue
-      if startswith(strip(line), "```")
-        infence = !infence; inspan = false; continue
-      end
-      infence && continue
-      if inspan && occursin(leader, line)
-        push!(problems, string(relpath(file, joinpath(@__DIR__, "..")), ":", n,
-                               "  inline ``math`` broken across a line by a list/blockquote leader"))
-      end
-      isodd(count(twobacktick, line)) && (inspan = !inspan)
-    end
-  end
-  isempty(problems) || error("doc lint failed — keep inline math on one line:\n  " * join(problems, "\n  "))
-  @info "doc lint: inline math OK across $(length(sources)) source files"
-end
-
-# Doc lint: canonical notation. A rendered-math token with a single house spelling must never appear
-# in a banned variant (a silent drift — the source parses, the page renders, yet the notation
-# disagrees with its sibling docstring). Extend `banned` as new canonical spellings are fixed.
-function lint_notation_variants()
-  banned = [
-    (r"\\partial_[ijk]",
-     "bare-index partial — write \\partial_{x_i} (subscript the coordinate, not the fiber index)"),
-    (r"\\mathbf",
-     "upright-bold \\mathbf — vectors are bold italic \\boldsymbol{u} (\\boldsymbol{\\kappa} for the wavenumber)"),
-    (r"\\[dt]?frac\s*[^{\s]",
-     "unbraced fraction numerator — write \\tfrac{1}{2}, never \\tfrac12 or \\tfrac N2"),
-    (r"\\boldsymbol(?!\{)",
-     "unbraced \\boldsymbol argument — write \\boldsymbol{u}, never \\boldsymbol u or \\boldsymbol\\omega"),
-    (r"\\mathbb\s*\{?\s*[0-9]",
-     "\\mathbb on a digit falls back to a plain glyph — the indicator/identity is \\mathbf{1}"),
-  ]
-  srcs = _doc_lint_sources()
-  problems = String[]
-  for file in srcs, (n, line) in enumerate(eachline(file)), (re, msg) in banned
-    occursin(re, line) &&
-      push!(problems, string(relpath(file, joinpath(@__DIR__, "..")), ":", n, "  ", msg))
-  end
-  isempty(problems) || error("doc lint failed — non-canonical notation:\n  " * join(problems, "\n  "))
-  @info "doc lint: notation OK across $(length(srcs)) source files"
+  isempty(problems) || error("doc lint failed — docstring section order:\n  " * join(problems, "\n  "))
+  @info "doc lint: docstring section order OK"
 end
 
 
@@ -265,8 +122,8 @@ end
 # The escape hatch is a `closed:` line, required non-empty and not parsed further: the gate enforces
 # that a human wrote an account, never that the account is true. An enforcement mechanism with no
 # escape gets disabled the first time it is inconvenient; one whose escape leaves a committed
-# artifact stays on. (That parallel is the prose ratchet's `DOCSTRING_SHAPE_BASELINE=1` re-baseline,
-# and it is the same shape deliberately.)
+# artifact stays on. (That parallel is the prose ratchet's deliberate re-baseline, now
+# `RULE.DOC.SHAPE`'s `gbg check --rebaseline`, and it is the same shape deliberately.)
 #
 # FALSIFIED before landing, four arms, each run as a full docs build:
 #   1  no open rounds                  -> PASS, "review rounds closed (0 on record)"
@@ -341,10 +198,8 @@ function lint_review_closure()
 end
 
 copy_rationale_pages()
-lint_inline_math()
-lint_notation_variants()
 lint_lamb_vector_sign()
-lint_docstring_shape()
+lint_docstring_order()
 lint_review_closure()
 
 
