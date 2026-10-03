@@ -91,9 +91,8 @@ the same estimator post-hoc from its stored trajectories. Both codes share u(0) 
 particles, so the curves compare realization-to-realization. History of the miss (owner-caught):
 the first IT leg collected samples in RAM and computed the TIME-AVERAGED estimator batch-FFT —
 wrong estimator home AND over-engineered; my "online needs a ring buffer" claim confused the
-time-averaged form with the estimand. `.claude/ss-request-2026-08-28-online-correlator.md` is
-now OPTIONAL future work (time-averaged/multi-origin correlators for variance reduction), not on
-the comparison's path. (b) The converter
+time-averaged form with the estimand. The online-correlator request to SS was dropped (the owner,
+2026-10-03: plain Lagrangian correlations are the user's own), and was never on the comparison's path. (b) The converter
 WAITS for PF's `inverse_curl` (in preparation on the PF side) — do not hand-roll iκ×ω̂/|κ|² in IT
 (belongs-in-PF). (c) **Deliverable format (owner 2026-08-28): the reference data is ONE HDF5
 file, `turtle_reference_data.h5`, datasets named `k`, `ε`, `ρ_u` (Unicode) + axes `t`, `τ`,
