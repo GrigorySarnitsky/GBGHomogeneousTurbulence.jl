@@ -594,12 +594,15 @@ const FULL_STRAIN_TENSORS = Holder(
 # The device frame (memory_audit.jl's DEVICE_FRAME): on a GPU the transform plans' wrapper holds a
 # spectral-sized buffer per plan, and the CPU frame floor of zero is not held against them there.
 const DEVICE_PLAN_BUFFERS = Holder(
-  "DEVICE PLAN BUFFERS", :PF_RAISE,
+  "DEVICE PLAN BUFFERS", :DESIGN,
   "On a GPU, CUDA.jl's FFT wrapper allocates a spectral-sized buffer inside each of the domain's two " *
-  "plans: two spectral scalars resident, about 135 MiB at 256³ / Float32. The forward plan's buffer " *
-  "is never used (it serves an inverse route HT never takes), and the inverse plan's duplicates the " *
-  "preserving copy PF already makes, so every inverse transform copies twice (14.7% slower, " *
-  "measured 2026-08-26). The floor is zero. Requested of PF 2026-08-26, refiled 2026-10-03.")
+  "plans. The forward plan's is never used, and the inverse plan's duplicates the preserving copy " *
+  "PF already makes. The owner ruled on both as PF decision 96: the first deferred until a run " *
+  "meets its device-memory limit (768³ the likely case, where one buffer is about 1.8 GB), the " *
+  "second declined, since removing it means calling the vendor libraries beneath their wrappers.",
+  "two spectral scalars resident on a GPU, about 135 MiB at 256³ / Float32, and every inverse " *
+  "transform copying twice (14.7% slower, measured 2026-08-26) — the memory audit's DEVICE_FRAME",
+  "no reliance on how the vendor FFT wrappers allocate or on their internals (a named property)")
 const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
                      TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
