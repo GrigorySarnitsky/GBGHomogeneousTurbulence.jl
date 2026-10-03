@@ -156,27 +156,16 @@ rendered).
 ## Documentation policy — physical-meaning first
 
 The rulebook (`.gbg/policy/`) holds the documentation rules; what follows is only what is HT's own —
-its examples, its physics, and the owner's rulings the rulebook does not carry. The rendered glossary
+its examples, its physics, and the owner's rulings the rulebook does not carry. Where this text and a
+rule disagree, the rule wins and this text is the one corrected (the owner, 2026-10-03). The rendered glossary
 at `docs/src/notation.md` is the reader's copy of the notation.
 
 **Module maps.** No Mori–Zwanzig framing or architecture rationale in a module docstring — those live in
-`ARCHITECTURE.md`. HT's four-role maps stay list-first, no essay before the list (owner-ratified
-2026-08-25).
+`ARCHITECTURE.md`.
 
-**Function docstring = home**, in this order: (1) a one-sentence identity in the user's terms; (2)
-when to use it, versus the alternatives; (3) each argument (positional and keyword) and its effect;
-(4) the caveats a user needs (memory, accuracy, stability), as a `!!! warning` / `!!! note` where
-load-bearing; (5) **the physical-meaning-first formula** — see below; (6) an inline citation for a
-**named / published** method — which may open the identity sentence when the citation *names* the
-method ("the smooth spectral filter of Hou & Li (2007) …"). **One link form on both surfaces**
-(owner-ruled 2026-08-24, adopting PF's convention): a citation carries its clickable DOI on the paper's
-*title* — `[*Title*](https://doi.org/…)` — identically in the `§References` bibliography and in every
-inline docstring copy (`doi_crosscheck.py` verifies both the DOI, decoded, and the title). **And the
-inline copy is the FULL reference** (owner-ruled 2026-08-25): the linked title is followed by the
-journal, volume, and pages, verbatim-consistent with the `§References` entry, so a docstring's citation
-reads complete at the REPL — the title appears once, as the link, never doubled. A link target
-percent-encodes `()` and `<>`. Every such cite has a §References entry and every entry a citing
-docstring.
+**Citations.** A citation of a named method may open the identity sentence ("the smooth spectral
+filter of Hou & Li (2007) …"). A link target percent-encodes `()` and `<>`. Every `§References` entry
+in `ARCHITECTURE.md` has a citing docstring.
 
 **Type docstrings.** Name the plain positional constructor only where a reader might reasonably call
 it — a small parameter record (`HouLi`, `FlowConditions`). Omit it for a type whose positional form
@@ -191,29 +180,17 @@ dissipation rate), then the reduction that computes it. The integrating factor i
 clean physical form: a spectral multiplier, said so briefly. Every diagnostic states the physical
 quantity it measures before the numerical method.
 
-**The steer sentence.** PF's verbatim in-place-steer sentence is deliberately **not** adopted
-(owner-ruled 2026-08-25): HT's pairs are few and non-uniform — the flagship
-`vorticity_physical!` / `vorticity_physical` pair is a compute/cached-read split, not an
-in-place/allocating pair, so PF's sentence would be false of it.
-
-**Cross-referencing — a link earns its place.** Backtick every code identifier; promote to `@ref` (or
-`@extref` for an external / cross-package object) only where a reader would genuinely jump and there is
-**one** clear destination. **Never** link the docstring's own binding, its argument names, option /
-`Symbol` tokens, or struct fields. A **family** of related built-ins is **one** catalogue destination,
-not five (a glossary table is the exception — it maps each symbol to its own object). **At-home test**
-— if a sentence would sit equally well in the *target's* own docstring, cut it and link. The
-storage-backend and element types (`Array` / `CuArray` / `ROCArray`, `Float32` / `Float64`) and the
-`GBGPeriodicFields` types are the deliberate `@extref` exception to "don't link `Base`": the GPU-backend
-and dependency story makes them worth the jump.
+**Cross-referencing.** Never link the docstring's own binding, its argument names, option / `Symbol`
+tokens, or struct fields. A **family** of related built-ins is **one** catalogue destination, not five
+(a glossary table is the exception — it maps each symbol to its own object). **At-home test** — if a
+sentence would sit equally well in the *target's* own docstring, cut it and link.
 
 **No dead references** extends to a thrown error message, a decision-log entry and a repo path (`src/…`,
 `inspiration/…`): a cross-reference adds depth one hop away; it never carries a fact the reader needs.
 
 **Template conventions.**
 
-- An **admonition takes a custom title** when it carries one load-bearing claim a reader should be
-  able to scan for, and stays a bare `!!! note` when it is a general aside. The title is **plain
-  text** — Documenter renders neither code spans nor math there.
+- An admonition title is **plain text** — Documenter renders neither code spans nor math there.
 - The `# Arguments` list is led by "The arguments are:". A lead-in qualifier ("All keyword, all
   required:") appears only where it carries information beyond the entries themselves.
 - An **`# Examples`** section appears where construction is non-obvious, not on every type — hence
@@ -221,12 +198,9 @@ and dependency story makes them worth the jump.
   `FlowParameters`.
 - A **formula gets a display block** when it is the thing the docstring defines, and stays inline
   when it is a fragment cited in passing.
-- A **`Returns x.` sentence** is required of any in-place mutator whose signature carries no `-> `
-  arrow, and sits **before** any caveat admonition. A *pure* function needs none; the exception is a
-  return whose **shape** is not evident from the name (a named tuple), where the shape is stated.
-- A reduction returning *the field's own* element type says so in prose rather than with an arrow; a
-  **mutator** may carry **`-> arg`**, naming the argument it returns, and then needs no `Returns`
-  sentence.
+- A return whose **shape** is not evident from the name (a named tuple) is stated. A reduction
+  returning *the field's own* element type says so in prose rather than with an arrow; a mutator may
+  carry **`-> arg`**, naming the argument it returns, and then needs no `Returns` sentence.
 
 **Rewrite, don't patch.** When a docstring has taken three or more rounds of patches, rewrite it whole
 rather than append again (`RULE.DOC.SHAPE` measures growth). Measured 2026-08-19: `VarianceRescaling`
@@ -248,11 +222,8 @@ The Reynolds number is set through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a fi
 first argument.
 
 **Bind each code object to its symbol on first mention** — write the correspondence explicitly so it is
-never left implicit: `dissipation` ``\equiv \varepsilon``, `kinetic_energy` ``\equiv k``, `curl`
-``\equiv \nabla\times``, a field in spectral representation ``\hat f``. In a *rendered* docstring make the
-binding **one** LaTeX span — ``\texttt{dissipation} \equiv \varepsilon`` — never a `` `code` `` span
-abutting a math span. A formula is one LaTeX span — never split across a ``…`` span and an adjacent
-`` `code` `` span.
+never left implicit: `dissipation` (``\varepsilon``), `kinetic_energy` (``k``), `curl`
+(``\nabla\times``), a field in spectral representation ``\hat f``.
 
 **Correctness — HT's cases.** The normalizations to expand against the code: the ``1/N``, the
 ``2\varkappa``, the ``\tfrac{1}{2}`` in the energy, the Parseval / spectral factors. Two examples from
