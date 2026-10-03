@@ -591,7 +591,16 @@ const FULL_STRAIN_TENSORS = Holder(
   "about 18 N³ reals per call — the temporary ledger's derivative_skewness row",
   "the strain formed by PF's whole-field symmetric_gradient, no component-wise assembly in HT (a named property)")
 
-const ALL_HOLDERS = (UNUSED_FUSION,
+# The device frame (memory_audit.jl's DEVICE_FRAME): on a GPU the transform plans' wrapper holds a
+# spectral-sized buffer per plan, and the CPU frame floor of zero is not held against them there.
+const DEVICE_PLAN_BUFFERS = Holder(
+  "DEVICE PLAN BUFFERS", :PF_RAISE,
+  "On a GPU, CUDA.jl's FFT wrapper allocates a spectral-sized buffer inside each of the domain's two " *
+  "plans: two spectral scalars resident, about 135 MiB at 256³ / Float32. The forward plan's buffer " *
+  "is never used (it serves an inverse route HT never takes), and the inverse plan's duplicates the " *
+  "preserving copy PF already makes, so every inverse transform copies twice (14.7% slower, " *
+  "measured 2026-08-26). The floor is zero. Requested of PF 2026-08-26, refiled 2026-10-03.")
+const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
                      TRANSFORM_PLANNING, SEEDING_NOISE_FIELD, FULL_STRAIN_TENSORS,
                      HOST_SIDE_FORCING_SCALARS, UNFUSED_QUADRATIC_REDUCTIONS,
                      UNIFORM_DEPOSIT_SCHEDULE)

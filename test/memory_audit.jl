@@ -437,6 +437,10 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     # run does not carry.
     @test BASE[(:RK3, :PhaseShift, false)].spectral_scalar ==
           BASE[(:RK3, :TwoThirds, false)].spectral_scalar
+
+    # The device frame is not held to the CPU frame's zero floor by construction, so its residency is
+    # a gap the register claims, and the holder retires when the plans stop holding buffers.
+    @test (DEVICE_FRAME != ZERO) == (DEVICE_PLAN_BUFFERS in ALL_HOLDERS)
   end
 
   @testset "the frame ledger on a device backend — the plans' staging buffers, named" begin
