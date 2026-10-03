@@ -169,7 +169,13 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
   if isnothing(positions)
     M = Int(number_of_particles)
     pos = domain.storage_family{T}(undef, M, 3)
-    copyto!(pos, T(domain.grid.domain_size[1]) .* rand(rng, T, M, 3))   # host draw: decision 107
+    # Drawn on the host so one seed gives the same positions on every backend (decision 107), and
+    # scaled in place: on the CPU the kept array IS host memory and takes the draw directly; on a
+    # device one host array is drawn into and moved.
+    host = domain.storage_family === Array ? pos : Array{T}(undef, M, 3)
+    rand!(rng, host)
+    host .*= T(domain.grid.domain_size[1])
+    host === pos || copyto!(pos, host)
   else
     positions isa PointSet ||
       throw(ArgumentError("`positions` must be a `GBGPeriodicFields` `PointSet` (wrap an (M, 3) " *
@@ -235,9 +241,15 @@ struct ParticleTraversal{O, S}
 end
 
 
+# Built through the in-place rebuild with the scratch the run keeps: the allocating
+# `point_traversal_order` would make a second, temporary sorting scratch beside it. The identity
+# permutation is the starting order the rebuild overwrites.
 function ParticleTraversal(domain::FixedDomain, tracers::Tracers; automatic::Bool = true)
-  order = point_traversal_order(domain.grid, tracers.positions)
+  coordinates = point_positions(tracers.positions)
   scratch = PointTraversalOrderScratch(domain.grid, tracers.positions)
+  identity = similar(coordinates, Int32, size(coordinates, 1))
+  identity .= Int32(1):Int32(length(identity))
+  order = point_traversal_order!(PointTraversalOrder(identity), domain.grid, tracers.positions, scratch)
   return ParticleTraversal(order, scratch, automatic)
 end
 

@@ -229,16 +229,17 @@ end
 # the device transient of building a run is measured at two tracer counts on one grid, and their
 # difference per added tracer, in bytes, is the part that grows with the count — the device column
 # of the CPU ledger's tracer rows. On a GPU the positions are drawn on the host (decision 107), so
-# the seeding copies the CPU row records are host memory here; what remains on the device is the
-# traversal order's own sorting scratch, built beside the one the run keeps.
+# the one host array of the draw is not device memory.
 const DEVICE_TRACER_COUNTS = (32768, 262144)
-# Frozen 2026-10-03 on the RTX 5070 Ti: 9 bytes per tracer in either precision — the sorting scratch
-# is integers — and either tracer scheme. Claimed by TRACER SEEDING COPIES (test/audit_ops.jl).
+# Frozen 2026-10-03 on the RTX 5070 Ti, in either precision and either tracer scheme: one byte per
+# tracer, the marks PF's order constructor allocates to check the identity order the build starts
+# from (TRAVERSAL ORDER CHECK, test/audit_ops.jl). It was nine before the build reused the kept
+# sorting scratch, the same day.
 const DEVICE_PER_TRACER = Dict(
-  Float32 => 9.0,
-  Float64 => 9.0,
+  Float32 => 1.0,
+  Float64 => 1.0,
 )
-const DEVICE_PER_TRACER_TOLERANCE = 1.0
+const DEVICE_PER_TRACER_TOLERANCE = 0.25
 
 function device_transient_bytes(p::Pool, f)
   quiet() = with_logger(f, NullLogger())

@@ -117,9 +117,10 @@ measure (in one process the resident set cannot separate a C allocation from reu
    64³ and 128³, both precisions, `DEVICE_FULL_SWEEP=1`) passes 1260 of 1280, the 20 broken being
    the tracer step excess of PF's in-place `displace!` (2026-10-02, 26 minutes on the 5070 Ti).
    Those axes in the temporaries (2026-10-03): the order and the band add nothing beyond the noise
-   field, on the CPU and the device; the tracer count costs 57 bytes per tracer on the CPU (seeding
-   copies and a second traversal scratch) and 9 on the device, recorded as the open local win
-   TRACER SEEDING COPIES, its fix awaiting the owner.
+   field, on the CPU and the device; the tracer count cost 57 bytes per tracer on the CPU (seeding
+   copies and a second traversal scratch) and 9 on the device, fixed the same day. One byte per
+   tracer remains on both, PF's order constructor checking the identity order with its own marks
+   (TRAVERSAL ORDER CHECK, not yet raised with PF).
 
 ## What this will not reach
 

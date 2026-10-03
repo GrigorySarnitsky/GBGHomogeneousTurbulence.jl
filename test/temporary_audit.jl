@@ -292,13 +292,12 @@ end
 const TRACER_COUNTS = (4096, 32768)
 const TRACER_GRID = 16
 const TRACER_SCALE_ROWS = Dict(
-  "Tracers" => (48.0, (TRACER_SEEDING_COPIES,)),
-  "Simulation" => (57.0, (TRACER_SEEDING_COPIES,)),
-  "Simulation/AdamsBashforth order 4" => (57.0, (TRACER_SEEDING_COPIES,)),
-  "Simulation/unwrapped" => (57.0, (TRACER_SEEDING_COPIES,)),
+  "Simulation" => (1.0, (TRAVERSAL_ORDER_CHECK,)),
+  "Simulation/AdamsBashforth order 4" => (1.0, (TRAVERSAL_ORDER_CHECK,)),
+  "Simulation/unwrapped" => (1.0, (TRAVERSAL_ORDER_CHECK,)),
 )
-const TRACER_SCALE_FLOOR = 1.0         # bytes per tracer
-const TRACER_TOLERANCE = 2.0           # bytes per tracer
+const TRACER_SCALE_FLOOR = 0.5         # bytes per tracer: half the smallest element, a Bool
+const TRACER_TOLERANCE = 0.25          # bytes per tracer
 
 function per_tracer_bytes(build, domain)
   t = map(TRACER_COUNTS) do M
