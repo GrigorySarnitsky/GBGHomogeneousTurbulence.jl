@@ -303,16 +303,16 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
   pair `velocity_integrating_factor` / `scalar_integrating_factor` supplies its *parameters* — the coefficient on
-  ``\lvert\boldsymbol{\kappa}\rvert^2``, the rate's scale, the armed rate field — and the backend's
+  ``\lvert\boldsymbol{\kappa}\rvert^2`` and any steady forcing rate, fixed when the generator is built — and the backend's
   fused exponential convolution evaluates ``\mathcal{E}`` per mode as it applies it, advancing the
   diffusion with no stability restriction and no kernel field built or stored. ``\mathcal{E}`` is a *propagator*, a flow map over a step, not a generator;
   keeping the two apart is exactly the Generator/Propagator distinction of §4.5.
 - **The source.** ``\boldsymbol{f}`` is the forcing, an external drive that is neither seam half (§4.4).
-  When a forcing is *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``), its rate
+  When a forcing is *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``) with a steady rate, that rate
   ``A(\boldsymbol{\kappa})`` is diagonal and linear like the diffusion, so it folds into the same
   exponential ``\mathcal{E}`` for exactness — and there it *injects* energy, ``\mathcal{E} > 1`` wherever
   ``A > D\lvert\boldsymbol{\kappa}\rvert^2``. So ``\mathcal{E}`` cross-cuts the seam: it carries the
-  irreversible diffusion and, when the drive is linear, the source. The seam is a decomposition of the
+  irreversible diffusion and, when the drive is linear and steady, the source. The seam is a decomposition of the
   right-hand side, not of ``\mathcal{E}``.
 
 The passive scalar rides the same generator: the source-preserving four-argument `to_physical!` recovers the
@@ -329,10 +329,10 @@ puts on any closure: net dissipation lives in the diffusion term alone, so a sub
 
 The generator is **reified**: **`ResolvedGenerator`** bundles the `FlowConditions` with the assembly
 scratch its evaluations write through (the quadratic products' spectral image, the `PhaseShift`
-displaced-evaluation buffers, the per-mode forcing-rate arrays — in physical representation each
+displaced-evaluation buffers, any steady forcing rate — in physical representation each
 quadratic product forms in place over an operand's own register, §11 decision 41), behind a six-verb
 protocol —
-`prepare!` opens the step (advances each forcing's internal state, arms the linear rates),
+`prepare!` opens the step (advances each forcing's evolving state),
 `velocity_rhs!` / `scalar_rhs!` evaluate each field's explicit right-hand side at a stage state
 (dealiased nonlinear term plus additive forcing source), `velocity_integrating_factor` / `scalar_integrating_factor` supply
 each field's exact linear subflow, and `finalize!` closes the step (the post-step forcing projections).
@@ -765,7 +765,7 @@ generalization is built for them until a second concrete case forces the abstrac
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark). The natural first
   *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \mid \kappa_c)`` at the truncation
   wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a **per-mode linear rate**, a
-  negative linear-forcing citizen folded into the integrating factor exactly as the armed forcing rate
+  negative linear-forcing citizen folded into the integrating factor as the steady rate of a `Linear` forcing
   is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_c)/\kappa_c}`` scale updated
   per step from one shell reduction. The Hou–Li filter at ``\nu = 0`` is its crude implicit sibling
   (numerical-dissipation LES), with the known cutoff-bottleneck caveat.

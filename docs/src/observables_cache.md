@@ -283,11 +283,11 @@ transforms below.
 - **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
   ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
-  instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a field-proportional forcing's
+  instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a steady field-proportional forcing's
   rate, and ``\tau`` the sub-interval a stage advances.
-- **A forcing** takes one of three routes. A field-proportional one folds its rate into that
-  exponential; the rate array exists, the product ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` never
-  does. An additive source enters the right-hand side at each stage; a state-dependent rate — the
+- **A forcing** takes one of three routes. A steady field-proportional one folds its rate into that
+  exponential; neither a radial rate nor the product
+  ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` is stored. An additive source enters the right-hand side at each stage; a state-dependent rate — the
   default velocity forcing's among them — must take this route, because a rate frozen for the
   whole step would cost the scheme its order. A rescaling applies to the completed step as a map on
   the state, with no forcing field at all.

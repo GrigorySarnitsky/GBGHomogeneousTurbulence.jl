@@ -101,7 +101,7 @@ backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 evaluated per mode from the factor's parameters, so no
 kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
-products, the phase-shift buffers, the forcing-rate fields) lives with the generator, on the
+products, the phase-shift buffers, any steady forcing rate) lives with the generator, on the
 [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) — the buffers here
 are
 only the scheme's own spectral stage registers.
