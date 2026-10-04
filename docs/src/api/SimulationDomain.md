@@ -30,7 +30,7 @@ PhaseShift
 A strategy sets two band edges: the **retained** cutoff (the highest wavenumber kept energetic, which
 prices the advective-CFL step) and the **resolved** cutoff (the highest wavenumber whose dynamics is
 genuine Navier–Stokes — the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta`` a
-run is built to meet). The two coincide for the sharp strategies and differ under `HouLi`.
+run is built to meet). The two coincide for the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, and differ under `HouLi`.
 
 ```@docs
 max_retained_wavenumber
@@ -55,8 +55,9 @@ new_tensor_field_physical
 
 Restrict a field in spectral representation to the retained band, in place, by the domain's
 low-pass kernel. Under `PhaseShift` this is only part of the dealiasing — the averaging of two
-displaced evaluations is the other half, and the generator performs it where it assembles the
-product.
+displaced evaluations is the other half, and the
+[`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) performs it where it
+assembles the product.
 
 ```@docs
 truncate_to_band!

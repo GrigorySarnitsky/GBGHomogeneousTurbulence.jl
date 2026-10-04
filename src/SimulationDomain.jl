@@ -97,9 +97,9 @@ CFL step than the ``2/3`` rule — handled automatically by
   precision's machine epsilon; pass a value to override.
 - `materialized = false` — how the filter is *applied*, a memory-for-compute choice with no effect
   on the numbers. `false` keeps the filter as a closed-form radial symbol re-evaluated per mode in
-  every pass: zero resident storage, the minimal-footprint side. `true` evaluates the same expression
-  once into a stored coefficient array — one resident complex spectral scalar (``\\approx 17`` MB at
-  ``128^3`` `Float64`, ``\\approx 136`` MB at ``256^3``) — that the passes then merely read. Because
+  every traversal of the spectral array: zero resident storage, the minimal-footprint side. `true` evaluates the same expression
+  once into a stored coefficient array — one resident complex array of spectral-mode size (``\\approx 17`` MB at
+  ``128^3`` `Float64`, ``\\approx 136`` MB at ``256^3``) — that each traversal then merely reads. Because
   the coefficients are the same expression evaluated once, the two settings advance a run
   **bit-identically**.
 
@@ -403,8 +403,8 @@ the whole representable band.
 Retained is not resolved: a mode can carry energy while its dynamics is dominated by the filter
 rather than by Navier–Stokes — [`max_resolved_wavenumber`](@ref) bounds the trusted band. The
 retained cutoff is the one for everything that must see every energetic mode: the advective-CFL
-step ([`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl)), the random-seed
-spectrum, and the empty-shell warnings of the forcing layer.
+step ([`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl)), the
+seeders' warning on the initial spectrum's peak, and each forcing's check of its band against it.
 """
 function max_retained_wavenumber(domain::FixedDomain)
   N = field_physical_shape(domain.grid, Val(0))[1]
@@ -527,7 +527,7 @@ scalar field in spectral representation. Returns `field`.
     For `TwoThirds` this call is the whole of it; for `HouLi` the taper damps the aliases rather than
     removing them. Under `PhaseShift` it is only the second half — a product assembled without the
     displaced-evaluation average stays aliased, so a hand-built assembly must pair the two as the
-    generator does.
+    [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) does.
 """
 truncate_to_band!(field, domain::FixedDomain) = convolve!(field, field, domain.dealias)
 
