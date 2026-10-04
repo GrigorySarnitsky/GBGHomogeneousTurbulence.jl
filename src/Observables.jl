@@ -415,7 +415,7 @@ gate of the warm-up detector.
     run near its memory ceiling should size for the diagnostic rather than for the steady state.
 
 # References
-- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317). *J. Fluid Mech.* **1*
+- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317). *J. Fluid Mech.* **1**(5), 497–504.
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
