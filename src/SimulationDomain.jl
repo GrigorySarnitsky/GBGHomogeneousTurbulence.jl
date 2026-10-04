@@ -229,7 +229,8 @@ A default box, and one that keeps a wider band on the same grid:
 
 ```julia
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
-                       dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+                       dealiasing = TwoThirds(), element_type = Float64,
+                       array_type = Array)
 
 wide = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
                      dealiasing = HouLi(), element_type = Float64, array_type = Array)

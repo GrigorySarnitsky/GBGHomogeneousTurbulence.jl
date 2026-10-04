@@ -319,7 +319,8 @@ The two ways in, and the two ways to set the Reynolds number:
 # Derived viscosity — a 128³ forced-stationary run, ν set from the resolution criterion:
 sim = Simulation(grid_points_per_axis = 128)
 
-# The same, stated by its dissipation rate, or held at k by a controller taking k from the state:
+# The same, stated by its dissipation rate, or held at k by a controller
+# taking k from the state:
 sim = Simulation(grid_points_per_axis = 128, dissipation = 0.4)
 sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceController())
 
@@ -328,8 +329,8 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-taking — build the frame yourself, then hand it over:
-domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π, dealiasing = HouLi(),
-                     element_type = Float64, array_type = Array)
+domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
+                       dealiasing = HouLi(), element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 1e-2)
 ```
 
@@ -1304,7 +1305,8 @@ run!(sim) do s
     current_time(s) < 5.0                        # a span of simulation time
 end
 
-history = Float64[]                              # record k every iteration; stop at 200 steps
+# record k every iteration; stop at 200 steps
+history = Float64[]
 run!(sim) do s
     push!(history, kinetic_energy(s.state.velocity_spectral))
     current_step(s) < 200
@@ -1571,7 +1573,8 @@ budget, write the three-line budget callback instead (see [`run!`](@ref)).
 # Examples
 ```julia
 warmup!(sim)                         # detect stationarity on the ε-plateau gate
-warmup!(sim; gate_skewness = true)   # also require a developed cascade (stricter, and costlier)
+# also require a developed cascade (stricter, and costlier)
+warmup!(sim; gate_skewness = true)
 ```
 
 Returns `sim`.
