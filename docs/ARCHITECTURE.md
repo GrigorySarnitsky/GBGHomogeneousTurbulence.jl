@@ -2556,9 +2556,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     registers — Carpenter & Kennedy (1994, NASA TM-109112) reach it in five stages of the same
     Williamson 2N form. The scheme's stability function was derived exactly from the published
     rationals (the fifth coefficient collapses to ``z^{5}/200``), giving the imaginary-axis limit
-    ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407`` — ``1.93\times`` RK3's ``\sqrt{3}`` at
-    ``5/3`` the evaluations, hence ``\approx 16\%`` fewer transforms per unit time at the
-    stability limit — and MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
+    ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407``, ``1.93\times`` RK3's ``\sqrt{3}`` at
+    ``5/3`` the evaluations. That gives ``\approx 16\%`` fewer transforms per unit time at the
+    stability limit, and the gain was MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
     analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the
     ``\times 1.157`` transform-only projection; the per-stage non-transform costs scale with the stages
     just as the transforms do, so nothing is eaten. Implementation: `step!`'s 2N loop was factored into one shared
