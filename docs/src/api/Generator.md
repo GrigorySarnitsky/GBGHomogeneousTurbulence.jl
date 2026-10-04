@@ -7,8 +7,8 @@ Order   = [:module]
 
 ## Flow conditions
 
-The physical conditions the generator is built from — viscosity, Schmidt number, and the velocity and
-scalar forcings.
+These are the physical conditions the generator is built from: viscosity, Schmidt number, and the
+velocity and scalar forcings.
 
 ```@docs
 FlowConditions
@@ -16,8 +16,8 @@ FlowConditions
 
 ## The generator as one value
 
-The right-hand side as one object — the conditions bundled with the assembly scratch its evaluations
-write through. A time-marching scheme consumes it only through the protocol below.
+The right-hand side is held as one object, which bundles the conditions with the assembly scratch
+its evaluations write through. A time-marching scheme consumes it only through the protocol below.
 
 ```@docs
 ResolvedGenerator
@@ -25,8 +25,8 @@ ResolvedGenerator
 
 ## The generator protocol
 
-One step of the dynamics, as the scheme sees it: open with `prepare!`, evaluate the right-hand sides
-and the exact linear factors at each stage, close with `finalize!`.
+A scheme sees one step of the dynamics this way: it opens with `prepare!`, evaluates the right-hand
+sides and the exact linear factors at each stage, and closes with `finalize!`.
 
 ```@docs
 prepare!

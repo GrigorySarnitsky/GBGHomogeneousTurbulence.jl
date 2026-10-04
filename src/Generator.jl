@@ -11,11 +11,10 @@
 """
     Generator
 
-The flow's equations of motion — the incompressible Navier–Stokes right-hand side in rotational form
-(the dealiased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
-integrating factor.
+The module holds the flow's equations of motion — the incompressible Navier–Stokes right-hand side
+in rotational form (the dealiased, Leray-projected nonlinear term), the passive-scalar advection,
+and the exact viscous integrating factor — in these parts:
 
-Its contents (each formula lives in its operation's docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
 - [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch (its working arrays), consumed
@@ -234,7 +233,7 @@ end
 """
     ResolvedGenerator(domain, conditions; scalar = false)
 
-The flow's generator as one value a scheme can hold. It carries the
+The `ResolvedGenerator` packs the flow's generator into one value a scheme can hold. It carries the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
 through: the quadratic-product fields, any steady forcing rate, and — when the domain
 dealiases by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) — the
@@ -547,8 +546,8 @@ end
 """
     velocity_integrating_factor(generator, τ)
 
-The velocity's exact linear subflow over a substep ``\\tau`` (`τ`), as the **parameters of its
-exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
+The function gives the velocity's exact linear subflow over a substep ``\\tau`` (`τ`) as the
+**parameters of its exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
 supplies the viscosity ``\\nu`` and the linear forcing rate; `τ` is the sub-interval the stage advances.
 
 The linear part of the momentum equation — the diffusion
@@ -580,7 +579,7 @@ velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
 """
     scalar_integrating_factor(generator, τ)
 
-The passive scalar's exact linear subflow over a substep `τ` — the same exponential parameters
+The function gives the passive scalar's exact linear subflow over a substep `τ` as the same exponential parameters
 [`velocity_integrating_factor`](@ref) returns for `generator`, with the scalar diffusivity
 ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
 ``\\nu`` and the scalar forcing's linear rate in place of the velocity's.
