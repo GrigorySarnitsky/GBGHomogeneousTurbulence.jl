@@ -34,23 +34,37 @@
 """
     GBGHomogeneousTurbulence
 
-Tools for simulating homogeneous isotropic turbulence on three-dimensional periodic
-domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
-of integrating-factor time-stepping scheme, with Lagrangian particle tracking and sampling of the fields along the trajectories.
+Tools for simulating homogeneous isotropic turbulence on three-dimensional periodic domains: a
+velocity field and a single passive scalar, each optionally forced, sampled along particle
+trajectories. It has these submodules:
 
-The package produces the flow and those sampled values; accumulating statistics over them is
-the caller's own analysis, for which the two sibling packages supply the tools —
-[`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) the field reductions
-and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the
-online estimators.
+- [`SimulationDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain) — the discretized box.
 
-A run checkpoints to HDF5 and restores from it — [`write_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.write_simulation) / [`read_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.read_simulation), once the
-`HDF5` package is loaded.
+- [`State`](@ref GBGHomogeneousTurbulence.State) — the evolving fields.
 
-Built on `GBGPeriodicFields`.
+- [`Observables`](@ref GBGHomogeneousTurbulence.Observables) — the measured quantities.
 
-The `GBG` part in the name comes from the city of Göteborg (Gothenburg, Sweden), where the primary
-development took place.
+- [`Cache`](@ref GBGHomogeneousTurbulence.Cache) — the observables cache.
+
+- [`Forcing`](@ref GBGHomogeneousTurbulence.Forcing) — the energy-injection strategies.
+
+- [`Generator`](@ref GBGHomogeneousTurbulence.Generator) — the equations of motion.
+
+- [`Propagator`](@ref GBGHomogeneousTurbulence.Propagator) — the integrating-factor time-steppers.
+
+- [`Particles`](@ref GBGHomogeneousTurbulence.Particles) — the Lagrangian tracers.
+
+- [`SimulationRun`](@ref GBGHomogeneousTurbulence.SimulationRun) — the run layer, checkpointing
+  ([`write_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.write_simulation)) once `HDF5` is loaded.
+
+- [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) — reference turbulence laws, not re-exported.
+
+Statistics over the flow and its samples are the caller's analysis:
+[`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) supplies the field
+reductions, [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/)
+the online estimators.
+
+The `GBG` in the name is Göteborg (Gothenburg, Sweden), its birthplace.
 """
 module GBGHomogeneousTurbulence
 
