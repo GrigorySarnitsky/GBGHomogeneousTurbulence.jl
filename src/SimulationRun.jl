@@ -125,7 +125,7 @@ A velocity forcing whose strength is left out takes it from that state (see
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) with its injection rate filled
 so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather than supplied:
 
-  * **Derived viscosity** (no `viscosity` passed explicitly): ``\\nu`` is set so that
+  * When no `viscosity` is passed, the viscosity is **derived**: ``\\nu`` is set so that
     ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, the highest Reynolds number the grid resolves, with
     ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta = (\\nu^{3}/\\varepsilon)^{1/4}`` the
     Kolmogorov length.
@@ -159,7 +159,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), and a band
     that does not start at shell 1 or ends at shell 1.
 
-  * **Supplied viscosity**: pass `viscosity` and it is used directly; the two are alternatives, and
+  * When `viscosity` is **supplied**, it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError`. A covered forcing's state is still predicted, at the
     ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the model
     does not cover, nothing is predicted: the velocity is seeded at the stated ``k``, and an unforced
@@ -1047,8 +1047,8 @@ Advance `sim` by one timestep in place and return it.
   smallest of the advective-CFL value for the current velocity, the longest mode's diffusive-decay
   time (the same diffusive-decay bound the `Simulation` docstring states), and `max_dt`.
 
-Closes the iteration with [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so the cache
-is readable when it returns. Advects the tracers, if any, under the run's chosen particle
+Each call closes the iteration with [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), so
+the cache is readable when it returns. It advects the tracers, if any, under the run's chosen particle
 integration scheme — first rebuilding the run's
 [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) from the
 start-of-step positions when the run was built with `ordered_interpolation = true` (the default
