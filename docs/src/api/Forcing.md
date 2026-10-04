@@ -36,7 +36,7 @@ StochasticOUState
 
 ## The stationary-state model
 
-The stationary state a forcing drives: the kinetic energy in box units ``\tilde{k}`` and the share of
+Two functions model the stationary state a forcing drives: the kinetic energy in box units ``\tilde{k}`` and the share of
 the energy held in the forced band, both provisional placeholders until they are measured.
 
 ```@docs
@@ -46,8 +46,8 @@ band_energy_fraction
 
 ## Deferred forcing
 
-The operator-free deferred form a strategy's constructor returns, materialized into a concrete forcing
-once the domain exists.
+This section documents the operator-free deferred form a strategy's constructor returns, which is
+materialized into a concrete forcing once the domain exists.
 
 ```@docs
 DeferredForcing
@@ -55,7 +55,7 @@ DeferredForcing
 
 ## Forcing methods
 
-The method that starts a strategy's evolving state, then the four methods a strategy may implement
+This section documents the method that starts a strategy's evolving state, then the four methods a strategy may implement
 (each a no-op by default): the per-step `prepare_forcing!`, the rate `steady_linear_rate` the
 generator asks for once when it is built, and the per-stage and post-step hooks in the order `step!`
 fires them.
@@ -70,7 +70,8 @@ project_forcing!
 
 ## Persistence
 
-A strategy's HDF5 persistence — its defining parameters as one self-describing group, available once `HDF5` is loaded.
+This section documents a strategy's HDF5 persistence: its defining parameters as one self-describing
+group, available once `HDF5` is loaded.
 
 ```@docs
 write_forcing

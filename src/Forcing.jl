@@ -118,8 +118,8 @@ _band_is_empty(band_value, whole_value) =
 """
     AbstractForcing
 
-Supertype of the energy-injection strategies — the interchangeable ways a run drives its velocity or
-its scalar.
+This is the supertype of the energy-injection strategies — the interchangeable ways a run drives its
+velocity or its scalar.
 
 A strategy implements whichever of four hooks it needs; each defaults to doing nothing. The
 generator calls the first once, when it is built, and a step calls the other three in a fixed order:
@@ -165,7 +165,7 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A forcing named before its domain exists. The operator-free keyword constructors
+A `DeferredForcing` is a forcing named before its domain exists. The operator-free keyword constructors
 
     ConstantPower(; injection_rate = nothing, lowest_shell = 1, highest_shell = 2)
     VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
