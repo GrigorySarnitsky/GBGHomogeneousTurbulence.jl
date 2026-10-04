@@ -15,7 +15,7 @@ a direct dependency.
 | Concept | Symbol | Convention |
 |:---|:---|:---|
 | Imaginary unit | ``\mathrm{i}`` | Upright, always — never bare italic ``i``, never ``\imath``. Writing it upright frees ``i`` for use as an index. |
-| Indices | ``i, j, a, \dots`` | Italic, taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
+| Indices | ``i, j, a, \dots`` | Indices are italic and taken in order. A repeated index within a term is summed over the three components ``1,2,3`` (Einstein convention). |
 | Normalized inner product | ``\langle f, g \rangle`` | ``\frac{1}{\lvert\Omega\rvert}\int_\Omega f\cdot g\,\mathrm{d}\boldsymbol{x}``, the box average of the pointwise product. Parseval holds for it in this normalization, which is why the quadratic reductions (``k``, ``\varepsilon``, the variances) take a field in either representation and return the same number. |
 | Spatial average | ``\langle \cdot \rangle`` | The box average ``\frac{1}{\lvert\Omega\rvert}\int_\Omega(\cdot)\,\mathrm{d}\boldsymbol{x}`` over the periodic domain ``\Omega`` — the single-realization estimate of the homogeneous ensemble average (exact only in the ergodic, infinite-box limit; at a finite box it retains the large-scale statistical fluctuation). |
 | Box units | ``\tilde{q}`` | A quantity ``q`` divided by its unit built from the box side ``L`` and the dissipation rate ``\varepsilon``: length ``L``, time ``(L^{2}/\varepsilon)^{1/3}``, velocity ``(\varepsilon L)^{1/3}``. So ``\tilde{k} = k/(\varepsilon L)^{2/3}`` and ``\tilde{\nu} = \nu/(\varepsilon^{1/3}L^{4/3})``. The tilde means this and nothing else; an average is never a tilde (see the box mean below). |
@@ -86,7 +86,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 ## Derived scales
 
-Measured from the run's state, or derived from it through a `FlowParameters` bundle and its helpers.
+These scales are measured from the run's state, or derived from it through a `FlowParameters` bundle and its helpers.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
@@ -125,7 +125,7 @@ Measured from the run's state, or derived from it through a `FlowParameters` bun
 |:---|:---|:---|
 | ``A(\boldsymbol{\kappa})`` | per-mode linear forcing rate, folded into ``\mathcal{E}`` | [`steady_linear_rate`](@ref GBGHomogeneousTurbulence.Forcing.steady_linear_rate) |
 | ``\varepsilon_{\mathrm{target}}`` | the injection rate a `ConstantPower` holds: energy for the velocity, scalar variance for the scalar | `ConstantPower(injection_rate=…)` |
-| ``\sigma^{2}`` | the stationary mean square of the term a stochastic forcing ADDS — an acceleration for the velocity, a rate of change of ``\varphi`` for the scalar. Not the variance of the field, which is what a `VarianceController` holds | `StochasticOU(forcing_variance=…)` |
+| ``\sigma^{2}`` | the stationary mean square of the term a stochastic forcing ADDS — an acceleration for the velocity, a rate of change of ``\varphi`` for the scalar. It is not the variance of the field, which a `VarianceController` holds | `StochasticOU(forcing_variance=…)` |
 | ``k_{\mathrm{band}}`` | the energy in the forced band, ``\tfrac{1}{2}\sum_{\text{band}} \lvert\hat{\boldsymbol{u}}\rvert^{2}`` over the shells `lowest_shell` to `highest_shell`: the part of ``k`` the forcing acts on, and for a scalar forcing the band's part of ``\langle\varphi^{2}\rangle``. Its share of the whole is the band energy fraction ``k_{\mathrm{band}}/k`` | [`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction) |
 | ``T_L`` | the correlation time of that term: each forced mode's amplitude decays by ``e^{-\Delta t/T_L}`` per step. Short against the eddy-turnover time ``\tau``, the mean injection is close to ``\sigma^{2} T_L`` | `StochasticOU(correlation_time=…)` |
 
@@ -137,7 +137,7 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 
 | Term | Meaning |
 |:---|:---|
-| **iteration** | one advance of the run, in this order: choose the timestep, [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) the fields, [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) to close them, then advance any tracers and record their sample — the tracers come last because their second velocity sample is interpolated from the field the deposit just made current. Wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
+| **iteration** | one advance of the run, in this order: choose the timestep, [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) the fields, [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) to close them, then advance any tracers and record their sample — the tracers come last because their second velocity sample is interpolated from the field the deposit just made current. An iteration is wider than a *step*, which is only the first half, and than a *stage*, which is one Runge–Kutta substep inside it. |
 | **deposit** | to write an observable into the cache and mark the moment it belongs to, in one act — the fields and the tracer positions each advance separately, and each advance is closed by its own [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) form, the field form after the step and the particle form after the tracer push, inside the same iteration. Nothing is ever written to the cache on a read. |
 | **slot** | one storage place in the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) — an array or a number, together with the epoch its value belongs to. |
 | **epoch** | a counter of *changes to the state*, one per dynamical factor (the fields, the tracer positions) — and, for a slot, the value that counter held when the slot was filled. A slot is readable exactly while the epoch it records still equals the counter it depends on. Not an iteration number: a change to the state made outside a step and announced through [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) advances an epoch without advancing the clock. |
