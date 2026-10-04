@@ -755,7 +755,8 @@ in the band if the run depends on the controller taking hold.
   (Bassenne's convention: ``\\tfrac{2}{3}`` of the run layer's eddy-turnover unit ``k/\\varepsilon``).
   Left at `nothing` it is computed for you from that formula. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses the state it
   predicts; built on a domain, the controller takes
-  ``\\varepsilon_\\infty = (k_\\infty/\\tilde{k})^{3/2}/L`` with the placeholder ``\\tilde{k}`` of its band
+  ``\\varepsilon_\\infty = (k_\\infty/\\tilde{k})^{3/2}/L`` with ``\\tilde{k}`` its band's placeholder kinetic
+  energy in box units
   ([`kinetic_energy_in_box_units`](@ref)), and refuses a band that model does not cover. A run that
   sets ``\\nu`` against a very different regime should pass its own value. The
   derivation reads `target` as a kinetic energy, so it is valid only for the velocity: a
@@ -1007,8 +1008,9 @@ Returns a `Float64`, and refuses what `kinetic_energy_in_box_units` refuses.
     ``\\tfrac{3}{2}C_K \\varepsilon^{2/3}\\kappa_{\\mathrm{c}}^{-2/3}`` above the band's outer edge
     ``\\kappa_{\\mathrm{c}} = (h + \\tfrac{1}{2}) 2\\pi/L``, with ``h`` the `highest_shell` and
     ``C_K = 1.5``, subtracted from ``k``, so that
-    ``k_{\\mathrm{band}}/k = 1 - \\tfrac{3}{2}C_K/[\\tilde{k}(2\\pi(h + \\tfrac{1}{2}))^{2/3}]`` with the
-    placeholder ``\\tilde{k}``. It gives about 0.50 for shells 1–2 and 0.57 for shells 1–4, and it
+    ``k_{\\mathrm{band}}/k = 1 - \\tfrac{3}{2}C_K/[\\tilde{k}(2\\pi(h + \\tfrac{1}{2}))^{2/3}]`` with
+    ``\\tilde{k}`` the placeholder kinetic energy in box units. It gives about 0.50 for shells 1–2 and
+    0.57 for shells 1–4, and it
     does not depend on the Reynolds number.
 """
 function band_energy_fraction(forcing; reynolds_box = nothing, reynolds_taylor = nothing)

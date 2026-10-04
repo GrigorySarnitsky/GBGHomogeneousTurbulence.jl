@@ -36,8 +36,9 @@ StochasticOUState
 
 ## The stationary-state model
 
-Two functions model the stationary state a forcing drives: the kinetic energy in box units ``\tilde{k}`` and the share of
-the energy held in the forced band, both provisional placeholders until they are measured.
+Two functions model the stationary state a forcing drives: the kinetic energy in box units
+``\tilde{k}`` (scaled by the box side and the dissipation rate) and the forced band's share of it,
+both provisional placeholders until they are measured.
 
 ```@docs
 kinetic_energy_in_box_units
