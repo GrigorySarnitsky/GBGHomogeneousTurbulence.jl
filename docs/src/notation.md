@@ -1,7 +1,7 @@
 # Notation
 
 The symbols used throughout the docstrings and the design documents, with the code object each one
-denotes. All mathematics is rendered LaTeX; a code identifier always appears in `backticks` and never
+denotes. All mathematics is rendered LaTeX; a code identifier always appears in backticks and never
 inside a math span. An operation family is listed once, by its allocating name; the in-place
 sibling appends `!` (`curl` / `curl!`). This page is the single reference — a docstring introduces a symbol on first use
 and need not repeat the convention.
