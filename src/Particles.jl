@@ -16,7 +16,7 @@
 """
     Particles
 
-Lagrangian particle tracking — today the massless tracer:
+It tracks Lagrangian particles, today the massless tracer:
 
 - [`Tracers`](@ref) — the tracer set: the positions (a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet)), a selectable
@@ -29,7 +29,7 @@ Lagrangian particle tracking — today the massless tracer:
   velocity-at-particles history a scheme requires.
 - [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — this module adds the particle
   method: interpolate the flow velocity at the tracers' current positions and deposit it in the
-  observables cache. One value, two consumers: the Lagrangian statistics a caller accumulates,
+  observables cache. One value has two consumers: the Lagrangian statistics a caller accumulates,
   and the next advance, which reads it as its start-of-step velocity.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
   [`restart!`](@ref) discards a scheme's history after the tracers are repositioned from outside
@@ -293,7 +293,7 @@ value (`Heun()`), passed to [`advect!`](@ref) and to
 [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which builds exactly
 the working storage that scheme needs.
 
-Two members today: [`Heun`](@ref), a one-step method that buys second order with a second
+The family has two members today: [`Heun`](@ref), a one-step method that buys second order with a second
 interpolation, and [`AdamsBashforth`](@ref), a multistep method that buys more by reusing the
 Lagrangian samples the run already deposits. Which trade a run wants is for its user to measure — one
 interpolation per step against one stored array per extra order.
@@ -320,9 +320,11 @@ It needs one set of predicted positions and the velocity interpolated there
     ``\\Delta x^{d+1}``. For the default
     [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) (degree 2)
     the floor therefore falls *faster* than the time error, and the two cross over: measured on a
-    band-limited field, interpolation dominates at ``N = 16{-}32`` and the time error dominates from
-    ``N \\approx 64`` on (at ``N = 128``, floor ``1\\times10^{-5}`` against time error
-    ``6\\times10^{-5}`` — setup-specific numbers; only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is not what limits a Heun
+    band-limited field, interpolation dominates at ``N = 16{-}32``
+    and the time error dominates from ``N \\approx 64`` on (at ``N = 128`` the floor is
+    ``1\\times10^{-5}`` against a time error of ``6\\times10^{-5}``; the numbers are setup-specific,
+    and only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is
+    not what limits a Heun
     trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
     below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
     more than an order of magnitude. What governs this in a run is how well the grid resolves the
