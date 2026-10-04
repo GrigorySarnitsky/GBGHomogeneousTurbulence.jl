@@ -49,11 +49,11 @@ you — spin it up to stationarity, and advance it:
 using GBGHomogeneousTurbulence
 
 sim = Simulation(grid_points_per_axis = 64)
-# A 64³ forced-stationary run; ν is set so the grid captures the dissipation scale.
+# A 64³ forced-stationary run; the viscosity ν is set so the grid captures the dissipation scale.
 
 warmup!(sim)
 # Spin up to statistical stationarity. The default forcing holds the injection rate
-# the run was set up for, so k settles freely — see ConstantPower before measuring it.
+# the run was set up for, so the kinetic energy k settles freely — see ConstantPower before measuring it.
 
 t_end = current_time(sim) + 5.0
 run!(sim) do s              # observe and advance: the callback reads the run,
