@@ -60,8 +60,8 @@ scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and 
 Not to be confused with `Phenomenology`'s `FlowParameters`, which shares two field names: this type
 holds what a run is **configured with**, that one holds what a run has been **measured to have**.
 
-Read through the [`ResolvedGenerator`](@ref) a scheme is handed —
-[`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) never holds conditions itself.
+A scheme reads the conditions through the [`ResolvedGenerator`](@ref) it is handed;
+[`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) never holds them itself.
 
 # Arguments
 All keyword, all required:
