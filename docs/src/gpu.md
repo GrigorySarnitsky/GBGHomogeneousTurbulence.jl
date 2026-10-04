@@ -60,7 +60,7 @@ using GBGPeriodicFields: field_data
 CUDA.is_unified(field_data(sim.state.velocity_spectral))   # true once the setting is on
 ```
 
-The printed run says `CuArray` either way, so this call is the check.
+A displayed `Simulation` shows `CuArray` either way, so this call is the check.
 
 !!! warning "Unified memory changes more than where the fields live"
     The setting covers every array the Julia process allocates, not one run's fields. The cuFFT
