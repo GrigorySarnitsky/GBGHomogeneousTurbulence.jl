@@ -35,8 +35,9 @@ One forced, statistically stationary run of homogeneous isotropic turbulence:
 | particles | ``10^4`` tracers, AB4, cubic-spline interpolation | identical particles in both codes |
 | window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the frozen handoff state |
 
-The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5``: under
-the smooth filter the resolved band ends at ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
+The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (the
+resolved band's edge times the Kolmogorov microscale): under the smooth filter the resolved band ends
+at ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
 ``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's own reported `kMeta` = 1.476 is the same
