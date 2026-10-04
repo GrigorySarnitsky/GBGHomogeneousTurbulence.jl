@@ -81,7 +81,7 @@ trajectory does not, so it is the flow at no time at all. The velocity a tracer 
 position is one the probe never occupies, so as a quantity along the trajectory it belongs to no
 ``t_n`` either.
 
-**Computed — some component must produce it anyway.** This is the arithmetic axis: the iteration
+**Is it computed? Some component must produce it anyway.** This is the arithmetic axis: the iteration
 fills the cache as it produces the values, and an observable no component computes
 could enter only by making the iteration compute it, which the choice forbids. This test is where
 ``\varepsilon`` and ``k`` fall out: each is one reduction away from the cached fields, but no
@@ -95,7 +95,7 @@ observable at the iteration's end, which is what a slot must hold, so the case f
 test below rather than this one. The other constant-energy forcing, [`VarianceRescaling`](@ref) with `over = :total`, forms the same quantity once
 per step and is the same story, its value taken before the rescale it sizes.
 
-**Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
+**Is it materialized? Some component must hold it whole.** This is the traffic axis: writing out a value
 that exists only piecewise inside one traversal costs a pass the iteration does not already perform.
 The [`max_speed`](@ref) reduction is the boundary case. It sweeps ``\boldsymbol{u}`` once and keeps
 only the largest speed ``\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` — the advective-CFL
@@ -103,7 +103,7 @@ bound — so the *maximum* is materialized — one number — while the per-poin
 speed field is never whole anywhere — no field exists to cache; the number itself is what the
 cache holds.
 
-**Surviving — the schedule must leave it at the iteration's end, in a *register* the iteration already
+**Does it survive? The schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
 the register its producer computed it in — a **register** being storage a component computes one
 value into and overwrites at the next use, holding nothing a reader should trust between times. An
@@ -279,8 +279,8 @@ transforms below.
 ### 2.2 How a step treats each term
 
 - **The quadratic terms** ``-\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u})`` and
-  ``-\nabla\cdot(\boldsymbol{u}\varphi)``: evaluated as fields.
-- **The viscous terms**: never formed. Diagonal in the spectral representation, they integrate
+  ``-\nabla\cdot(\boldsymbol{u}\varphi)`` are evaluated as fields.
+- **The viscous terms** are never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
   ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a steady field-proportional forcing's
