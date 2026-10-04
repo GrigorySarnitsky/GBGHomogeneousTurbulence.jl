@@ -25,11 +25,12 @@ The run layer:
   defaults from a few numbers. It holds the present instant — plus the one bounded look-back a
   multistep particle scheme needs, the cache's Lagrangian sample history — and past instants
   otherwise exist only in what an observation recorded as the run advanced.
+- [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
   iteration — and its return decides continuation).
 - [`StationarityCriterion`](@ref), [`warmup!`](@ref) — the packaged spin-up-to-stationarity
-  observation, and `warmup!`, the one-line shorthand that runs it.
+  observation, and its one-line shorthand.
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count;
   [`every_steps`](@ref), [`every_time`](@ref) — the cadence predicates a callback acts
   periodically on.
