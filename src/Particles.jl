@@ -32,7 +32,8 @@ Lagrangian particle tracking — today the massless tracer:
   observables cache. One value, two consumers: the Lagrangian statistics a caller accumulates,
   and the next advance, which reads it as its start-of-step velocity.
 - [`advect!`](@ref) — advance the trajectories one step under the chosen scheme;
-  [`restart!`](@ref) discards a scheme's history after an out-of-band reposition.
+  [`restart!`](@ref) discards a scheme's history after the tracers are repositioned from outside
+  the iteration.
 - [`interpolate_at_particles!`](@ref) — read a field at the particle positions; [`new_vector_point_values`](@ref) /
   [`new_scalar_point_values`](@ref) allocate the output buffers it fills.
 - [`ParticleTraversal`](@ref) — the memory-locality order the gathers visit the tracers in, a
@@ -106,7 +107,7 @@ advance!(sim)
 
 # the (M, 3) positions, via the field library
 X = point_positions(sim.tracers.positions)
-# u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
+# u(tₙ, X(tₙ)), the Lagrangian velocity — throws if stale
 v = velocity_at_particles(sim.cache)
 
 out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
@@ -132,10 +133,9 @@ Read the particle state straight off the struct's own fields — the positions a
 counts come from `GBGPeriodicFields`' `point_positions` and `npoints`, never from accessors of
 this package. Passing `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
-state either way. The velocities are a *deposited observable*, not tracer state: read them from the
-run's observables cache through
-[`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles), where the
-iteration's closing deposit leaves them.
+state either way. The velocities are a *deposited observable*, not tracer state: the particle form
+of `deposit!` writes them into the run's observables cache at the end of each iteration, and
+[`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) reads them there.
 
 The particle integration scheme's own working storage is **not** here: it lives in a
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
@@ -675,9 +675,9 @@ start-of-step values the previous iteration's closing particle deposit stored, a
 with positions wrapped into ``[0, L)``. This is second-order accurate in time — advecting on the
 frozen start-of-step velocity alone would be first order.
 
-Every push also advances the cache's particles counter — the push announces itself — so the
-previously deposited velocity sample reads stale until the closing particle deposit refreshes it
-at the new positions. A hand-run loop therefore gets the same staleness protection as a run.
+Every push also advances the cache's particles epoch, its count of position changes, so a read of
+the previous velocity sample throws as stale until the particle deposit closing the iteration
+refreshes it. A hand-run loop gets the same protection as a run.
 
 Under [`AdamsBashforth`](@ref), the position update integrates over the deposited samples instead
 of interpolating a second time,
@@ -693,11 +693,12 @@ no history yet and are taken under `Heun`; `velocity_end` feeds only those boots
 pushes.
 
 !!! note "The start-of-step velocity is read, never recomputed"
-    ``\\boldsymbol{v}_1`` is read from the cache's velocity-at-particles slot, not recomputed
-    here: it must hold ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
+    The start-of-step velocity ``\\boldsymbol{v}_1`` comes from the cache's stored velocity at the
+    particles, not recomputed here: it must hold
+    ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
     form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) at the previous
-    iteration's end. The run layer reads it checked before each advance; a hand-run loop must make
-    that deposit itself between advances.
+    iteration's end. The run's `advance!` checks that it is current before each push; a hand-run
+    loop must make that deposit itself between advances.
 """
 function advect! end
 
@@ -767,7 +768,7 @@ positions cannot supply across a crossing. Accumulating such statistics over the
 `(M, 3)` array `GBGPeriodicFields`' `point_positions` extracts — is the caller's analysis.
 
 The unwrapped positions exist only when the tracer set was built with `unwrapped = true`; reading
-an untracked set throws an `ArgumentError` (which is why this checked read exists while the plain
+an untracked set throws an `ArgumentError` (which is why this throwing read exists while the plain
 state is read straight off the struct's fields). The wrapped positions remain the dynamical state either
 way — the dynamics always advance wrapped, since a coordinate that grows with winding loses
 absolute floating-point resolution, while the unwrapped positions only ever feed differences,
