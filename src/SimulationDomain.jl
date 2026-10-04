@@ -394,7 +394,7 @@ cutoff, the edge of the **retained** band
 
 with ``N`` the grid points per side, ``L`` the box side, ``f_{\\mathrm{ret}}`` the retained-Nyquist
 fraction of the [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`,
-``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`). For the sharp strategies the cutoff sits strictly
+``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`). For the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, the cutoff sits strictly
 **below** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each
 step. `HouLi` is the exception its ``f_{\\mathrm{ret}} = 1`` implies: it zeroes nothing, damping
 modes progressively as they approach the Nyquist (to machine epsilon there), so its retained band is
@@ -431,7 +431,7 @@ fraction of the [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``4/5`` f
 criterion ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipation) microscale — that a
 run is set up to meet.
 
-For the sharp strategies resolved and retained coincide: inside a sharp cutoff no mode is damped.
+For the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, resolved and retained coincide: inside a sharp cutoff no mode is damped.
 Under `HouLi` they differ, because the filter applied every step acts as an extra damping rate
 ``\\mathrm{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\mathrm{order}}/\\Delta t`` that overtakes
 the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the default
