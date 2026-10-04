@@ -118,7 +118,7 @@ forcing that holds one of the two — and the other member is predicted; stating
 [`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units
 ``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` of the velocity forcing
 ([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
-with ``L`` the box side, and the band's share of the energy
+with ``L`` the box side, and the share of the energy in the forced band, the shells the forcing acts on
 ([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)).
 
 A velocity forcing whose strength is left out takes it from that state (see
@@ -156,13 +156,13 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     variance, a `VarianceRescaling(over = :band)` target — draws a warning, since ``\\nu`` then
     describes a state the run may not reach.
 
-    A forcing the model does not cover has no stationary state to derive ``\\nu`` from, and is
+    A forcing the prediction does not cover has no stationary state to derive ``\\nu`` from, and is
     refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), and a band
     that does not start at shell 1 or ends at shell 1.
 
   * When `viscosity` is **supplied**, it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError`. A covered forcing's state is still predicted, at the
-    ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the model
+    ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the prediction
     does not cover, nothing is predicted: the velocity is seeded at the stated ``k``, and an unforced
     run may state ``\\varepsilon`` as well, since a decaying initial state has no balance tying the two.
 
@@ -215,8 +215,7 @@ The run group, `kwargs...` in both signatures
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
 - `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
-  `DeferredForcing` from an
-  operator-free constructor); `velocity_forcing` left at `nothing` means the default,
+  `DeferredForcing`, a forcing named by its keywords before the domain exists); `velocity_forcing` left at `nothing` means the default,
   `ConstantPower()` injecting the state's ``\\varepsilon``, and `scalar_forcing` defaults to
   `NoForcing()`. A deferred velocity forcing may leave its strength out for the state to fill; a
   scalar forcing states its own, since no scalar state is modelled. The velocity and scalar are forced independently.
@@ -451,7 +450,8 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
 # Arguments
 - `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain), which fixes
   the box side ``L`` and the largest resolved wavenumber ``\\kappa_{\\max}``.
-- `velocity_forcing` — the velocity forcing, built or in its deferred keyword form. A forcing that
+- `velocity_forcing` — the velocity forcing, built, or named before its domain exists as a
+  [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing). A forcing that
   states its own target (a [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) injection rate, a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) or
   `VarianceRescaling(over = :total)` target) states the state through it.
 - `kinetic_energy`, `dissipation` — the state, stated once: ``k``, ``\\varepsilon``, or neither when the
@@ -462,7 +462,7 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
   ``\\kappa_{\\max}\\eta`` follows instead.
 
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
-reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` of `Float64`s. A forcing the model does not
+reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` of `Float64`s. A forcing the prediction does not
 cover (an unforced run, a band that does not start at shell 1) has no stationary state to predict,
 and it throws an `ArgumentError`, as does a state stated twice or both `κ_max_η` and `viscosity`.
 
