@@ -22,8 +22,8 @@ This is a private, unregistered package. With repository access:
 ]add https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl
 ```
 
-(the field-library backend first — both are unregistered, so Julia cannot resolve
-`GBGPeriodicFields` on its own — and Julia ≥ 1.12)
+Add the field-library backend first: both are unregistered, so Julia cannot resolve
+`GBGPeriodicFields` on its own. Julia 1.12 or later is required.
 
 or
 
@@ -140,6 +140,6 @@ Listed in build order — each module uses the ones above it. The
   Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
-  laws, and scaling constants — to validate a run against. A separate, opt-in group (not re-exported by
-  the umbrella), designed to be extractable into a standalone package. In the actual include order
+  laws, and scaling constants — to validate a run against. It is a separate, opt-in group, not re-exported by
+  the umbrella and designed to become a standalone package. In the actual include order
   this dependency-light leaf comes *first*; it is listed last here because a user's workflow reaches it last — validating against the laws comes after running.
