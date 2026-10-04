@@ -576,7 +576,7 @@ Over it:
   the reader rebuilds through the constructor and replays the seeding deposits — and the methods
   live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency extension, so the surface exists
   only when `HDF5` is loaded.
-- **`current_time(sim)`** and **`current_step(sim)`** report the clock, and the observables applied to
+- **`current_time(sim)`** and **`current_step(sim)`** report the run's time and step count, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) are
   the current-state diagnostics, for a callback to read.
 
@@ -2231,7 +2231,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
     ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is an observable of the **flow** — a tracer has no
     velocity of its own — so `Tracers` now carries positions and the interpolation scheme only,
     and the `ObservablesCache` allocates the slot itself (a `number_of_particles` keyword sizes an
-    ``M \times 3`` point-value section on the domain's backend, plus the multistep history)
+    ``M \times 3`` array of point values on the domain's backend, plus the multistep history)
     exactly as it allocates the field charts. The write moved with it:
     `record_velocity_at_particles!(cache, tracers, u)`
     writes into the cache it is handed; `allocate_buffers(scheme, tracers, cache)` takes the cache
