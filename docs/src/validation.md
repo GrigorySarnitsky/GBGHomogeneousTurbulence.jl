@@ -6,7 +6,7 @@
     reproducible from them with the scripts in the repository's `validation/` directory.
 
 The package is validated against **TurTLE** — an independent, production pseudo-spectral DNS code
-(Lalescu, Bramas, Rampp & Wilczek,
+(Lalescu et al.,
 [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406),
 *Comput. Phys. Commun.* **278**, 108406, 2022) — run at an identical physics point, with the same
 time-stepping tableau, an exactly matched dealiasing filter, the same initial state, and the same
