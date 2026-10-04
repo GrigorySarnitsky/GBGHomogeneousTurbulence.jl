@@ -157,8 +157,8 @@ end
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
 **exactly** its working set — never a register another scheme would use. A scheme with no method
-here is a hard error; there is no over-allocating fallback. The run layer calls this when assembling
-a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation).
+here is a hard error; there is no over-allocating fallback. The constructor of
+a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) calls this for you.
 
 # Arguments
 - `scheme` — the concrete scheme dispatched on: an [`AbstractIntegrator`](@ref) in the field form,
@@ -206,7 +206,8 @@ catalogued under [`AbstractIntegrator`](@ref)).
 
 A scheme does only stage arithmetic: it opens the step with the generator's
 [`prepare!`](@ref GBGHomogeneousTurbulence.Generator.prepare!), evaluates the right-hand sides and
-exact linear factors through the generator protocol at each stage, and closes with the generator's
+exact linear factors through the generator's `velocity_rhs!`, `scalar_rhs!` and integrating-factor
+methods at each stage, and closes with the generator's
 [`finalize!`](@ref GBGHomogeneousTurbulence.Generator.finalize!) — it never assembles the physics
 itself.
 
@@ -226,7 +227,7 @@ Returns `state`.
 !!! note "A step alone leaves the cache mid-iteration"
     A `step!` alone leaves the cache mid-iteration (its slots taken as scratch): the caller closes
     the iteration with `deposit!`, which re-fills every slot, at the new epoch, from the advanced
-    state — a hand-run loop is `step!` then `deposit!`, and the run layer's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) does both.
+    state — a hand-run loop is `step!` then `deposit!`, and the run's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) does both.
 """
 function step! end
 
@@ -243,7 +244,7 @@ The diffusive integrating factor ``\\mathcal{E}_D(\\tau)`` over a substep interv
 parameters from the generator's
 [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
 [`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor) and
-is applied per mode by the backend's fused exponential convolution, never built as a field. With
+is applied per mode by [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)' fused exponential convolution, never built as a field. With
 ``\\widehat{\\boldsymbol{N}}`` each field's right-hand side, the step carries a state ``\\hat q``
 and a single accumulator ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
@@ -260,8 +261,8 @@ and a single accumulator ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 
 with stage coefficients ``A_i = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node
 increments ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are
-advanced in lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing
-is applied after the third stage.
+advanced in lockstep (the same ``A,B,d``), each with its own diffusivity, and any forcing's post-step
+projection ([`project_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.project_forcing!)) is applied after the third stage.
 
 The cost is three nonlinear evaluations per step and — in Williamson's 2N-storage count, whose
 label is unrelated to the grid's ``N`` — two registers per field: the state's own array plus one accumulator
@@ -587,7 +588,8 @@ Shu–Osher convex-combination form, each term transported to its stage's time:
 
 with abscissae ``c = (0, 1, \\tfrac{1}{2})``: the stages step forward to ``t_{n+1}``, back to the
 midpoint, forward again. The velocity and scalar are advanced in lockstep, each with its own
-diffusivity, and any post-step forcing is applied after the third stage.
+diffusivity, and any forcing's post-step projection
+([`project_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.project_forcing!)) is applied after the third stage.
 
 The cost is three nonlinear evaluations per step and two registers per field — the stage state and
 the right-hand-side register — the same count as `IFLowStorageRK3` (one pointwise pass fewer, since
@@ -810,7 +812,7 @@ the Lagrangian velocity a caller accumulates, and the start-of-step velocity the
 reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint field would cost
 ``N^{3} \\times 3``.
 
-Every iteration ends with these deposits: the run layer's
+Every iteration ends with these deposits: the run's
 [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
 `Simulation` constructor makes the first
 deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
