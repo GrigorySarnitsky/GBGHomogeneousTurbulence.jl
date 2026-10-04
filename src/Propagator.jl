@@ -29,13 +29,14 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
 - [`AbstractIntegrator`](@ref) — the scheme supertype a run's `field_integration_scheme` is chosen from.
 - [`IFLowStorageRK3`](@ref), [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref), [`IFHeun`](@ref) — the
   schemes (RK3 low-storage, the workhorse; the Carpenter–Kennedy fourth-order sibling at the same
-  two registers, for stability-limited runs; the Shu–Osher SSPRK3 in TurTLE's arrangement, for
+  two field-sized registers, for stability-limited runs; the Shu–Osher SSPRK3 as arranged in the
+  DNS code TurTLE, for
   code-to-code comparison; IFHeun a two-stage Heun — cheaper in transforms, dearer by one register
   per field, and imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
-- [`deposit!`](@ref) — close the iteration: recover the observables of the advanced state into the
-  run's observables cache.
+- [`deposit!`](@ref) — close the iteration: recover the advanced state's observables into the run's
+  cache.
 - [`recommended_cfl`](@ref) — a scheme's advective-CFL ceiling.
 """
 module Propagator

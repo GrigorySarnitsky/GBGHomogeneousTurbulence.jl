@@ -7,11 +7,11 @@ Order   = [:module]
 
 ## Integrator schemes
 
-The integrating-factor scheme supertype and its concretes — the third-order low-storage RK3; the
-fourth-order low-storage RK4 of Carpenter and Kennedy, five stages in the same two registers with
-a wider imaginary-axis stability limit; the third-order Shu–Osher SSPRK3 in TurTLE's stage
-arrangement, for code-to-code comparison at the same cost; then the second-order Heun,
-imaginary-axis unstable and cheaper in transforms but dearer in memory.
+This section documents the integrating-factor schemes: the third-order low-storage RK3; the
+fourth-order low-storage RK4 of Carpenter and Kennedy, five stages in the same two field-sized
+registers with a wider imaginary-axis stability limit; the third-order Shu–Osher SSPRK3 arranged as
+in the reference DNS code TurTLE, for code-to-code comparison at the same cost; then the
+second-order Heun, imaginary-axis unstable and cheaper in transforms but dearer in memory.
 
 ```@docs
 AbstractIntegrator
