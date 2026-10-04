@@ -229,8 +229,8 @@ The run group, `kwargs...` in both signatures
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
   sets the integral scale of the *assumed state* that model is evaluated at. Keep ``\\kappa_p`` well
-  below the dealias cutoff: a value near or above it concentrates the pre-rescale seed in shells
-  the mask holds empty; the seeders warn when the envelope's peak reaches the cutoff (a
+  below the dealias cutoff: a value near or above it concentrates the seed, before its energy
+  rescale, in shells the dealiasing holds empty; the seeders warn when the envelope's peak reaches the cutoff (a
   model-spectrum seed is shaped by its model instead and is not guarded).
 - `initial_spectrum = nothing` — draw the initial velocity from a
   [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) `EnergySpectrum` (say
@@ -288,7 +288,8 @@ The run group, `kwargs...` in both signatures
   [`rebuild_traversal!`](@ref GBGHomogeneousTurbulence.Particles.rebuild_traversal!) in the `run!`
   callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `false`
   holds no order and gathers in tracer order. The order and its rebuild scratch hold three
-  integer or Boolean vectors of the tracer count and two of the tile count — small beside the
+  integer or Boolean vectors of the tracer count and two of the number of grid tiles the order
+  groups tracers by — small beside the
   `(M, 3)` positions — and nothing of it is persisted: a restored run rebuilds it from the
   restored positions.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
@@ -309,7 +310,8 @@ The run group, `kwargs...` in both signatures
 - `tracers = nothing` — an existing `Tracers` set to adopt in place of seeding
   `number_of_particles` fresh ones. The interpolation scheme and the unwrapped record are then
   properties of the given set, so `interpolation_scheme` and `unwrapped` cannot be given with it.
-  A multistep `particle_integration_scheme` starts from its bootstrap — restoring a stored sample
+  A multistep `particle_integration_scheme` takes its first pushes under `Heun` until its history
+  fills — restoring a stored sample
   history alongside the positions is [`read_simulation`](@ref)'s job.
 
 # Examples
@@ -328,7 +330,7 @@ sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceControll
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
 
-# Domain-taking — build the frame yourself, then hand it over:
+# Domain-taking — build the domain yourself, then hand it over:
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
                        dealiasing = HouLi(), element_type = Float64, array_type = Array)
 sim = Simulation(domain; viscosity = 1e-2)
@@ -899,7 +901,8 @@ end
 The measured flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
 [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) reference law be evaluated at the run's
 measured state. The viscosity ``\\nu`` and the
-Schmidt number are read from the generator's conditions; the dissipation ``\\varepsilon``, the r.m.s. velocity
+Schmidt number are read from the run's
+[`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions); the dissipation ``\\varepsilon``, the r.m.s. velocity
 ``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), the longitudinal integral scale ``L_{11}``, and —
 when the run carries a scalar — the scalar dissipation ``\\varepsilon_\\varphi`` are measured from the
 current state (the scalar dissipation is left `NaN` only for a scalar-free run, where the scalar reference
@@ -1626,8 +1629,8 @@ function write_simulation end
 
 Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
 through its own constructor from the recorded parameters, adopting the stored state rather than
-seeding one; the positions, the deposited observables, the Lagrangian sample history (fill-aware:
-a scheme of a different order keeps what fits and bootstraps the rest) and the clock follow. The
+seeding one; the positions, the deposited observables, the Lagrangian sample history (a scheme
+of a different order keeps what fits and takes the missing first pushes under `Heun`) and the clock follow. The
 next [`advance!`](@ref) continues the run, a stochastic forcing's realization included.
 
 A group not written by `write_simulation`, or written by a newer schema version, is refused with an
