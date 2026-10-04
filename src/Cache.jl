@@ -266,8 +266,8 @@ end
 The flow velocity at the particle positions, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the
 current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at the position each tracer occupies at
 that instant: the genuine Lagrangian velocity, the input to the caller's statistics. Treat the returned array as
-read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. The
-checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
+read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. This is
+the checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
 deposited values or throws an `ErrorException`, like every cached read — the sample depends on the
 state **and** the positions, so it is current only when both counters match its own. Throws an
 `ArgumentError` when the run advects no tracers.
