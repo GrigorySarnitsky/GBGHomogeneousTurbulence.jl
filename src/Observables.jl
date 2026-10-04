@@ -167,8 +167,8 @@ of a spin-up or budget loop, which is how
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
   velocity route of `dissipation`, exact only for a solenoidal field (its docstring carries the
   condition).
-- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) whose lazy
-  reduction weights the traversal evaluates.
+- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) supplying the
+  squared-wavenumber weights.
 - `viscosity` — the kinematic viscosity ``\\nu`` scaling the dissipation.
 
 Returns a named tuple `(kinetic_energy, dissipation)`, each in the field's own real element type.
@@ -299,8 +299,7 @@ representation and transformed to physical.
 
 # Arguments
 - `ω` — the vector field in physical representation receiving the vorticity.
-- `û` — the velocity in spectral representation; only read, so unlike a pure representation
-  recovery no preservation copy is needed.
+- `û` — the velocity in spectral representation; only read, and left unchanged.
 - `domain` — the [`FixedDomain`](@ref) whose plans transform.
 - `spectral_scratch` — a vector field in spectral representation the curl is formed in; consumed —
   its coefficients are undefined on return.
@@ -389,8 +388,8 @@ invariant rather than an axis-dependent gradient.
 From `û` in spectral representation, the strain is formed with `symmetric_gradient` and the
 wavenumber `multipliers` of the [`FixedDomain`](@ref) bundle `domain`, skipping the full velocity
 gradient, and carried to physical space through the domain's transform plans; `domain` also sizes
-this per-call tensor scratch. A fused mapped mean reduces ``\\langle\\det\\boldsymbol{S}\\rangle`` with
-no determinant field, and a field with no strain returns zero.
+this per-call tensor scratch. The mean ``\\langle\\det\\boldsymbol{S}\\rangle`` forms each determinant inside the
+reduction, storing no determinant field, and a field with no strain returns zero.
 
 The denominator needs no physical field: for a solenoidal field
 ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{1}{2}\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, the Dirichlet energy, reduced from `û`.
