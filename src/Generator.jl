@@ -18,14 +18,14 @@ integrating factor.
 Its contents (each formula lives in the operation's own docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
-- [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch, consumed
+- [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch (its working arrays), consumed
   through the protocol below.
 - [`prepare!`](@ref) — open a step: advance the forcings' internal state.
 - [`velocity_rhs!`](@ref), [`scalar_rhs!`](@ref) — assemble the explicit right-hand sides (each
   dealiased term plus its additive forcing source) at a stage state.
 - [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's
   viscous/diffusive integrating factor, with any linear forcing rate folded in.
-- [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, at the deposit.
+- [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, at the deposit into the observables cache.
 
 The assemblies recover displaced fields in physical representation with the four-argument,
 source-preserving form of
@@ -240,10 +240,11 @@ through: the quadratic-product fields, any steady forcing rate, and — when the
 dealiases by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) — the
 displaced-evaluation buffers.
 
-That scratch is the **generator's own** storage, distinct from the run's observables cache. The two
+That scratch is the **generator's own** storage, distinct from the run's
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache). The two
 do meet at one point: the physical quadratic products are formed *in place over the cache's arrays*,
-the negated Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}`` over the vorticity slot and the scalar flux over the
-velocity slot, so no product field in physical representation is allocated anywhere.
+the negated Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}`` over the cached vorticity and the scalar flux over the
+cached velocity, so no product field in physical representation is allocated anywhere.
 
 A time-marching scheme consumes the generator through a fixed protocol: [`prepare!`](@ref) once per
 step, [`velocity_rhs!`](@ref) / [`scalar_rhs!`](@ref) at each stage state,
@@ -292,7 +293,7 @@ you.
   through `displaced_velocity_current` that the scratch is still fresh. The record alone can only
   force a rebuild.
 - `velocity_forcing_state`, `scalar_forcing_state` — each forcing's evolving state for the step
-  `prepare!` opened, taken from the run's state so the stage hooks receive it; `nothing` for a
+  `prepare!` opened, taken from the run's state so the per-stage forcing source hook receives it; `nothing` for a
   forcing that evolves none.
 """
 mutable struct ResolvedGenerator{C<:FlowConditions, PS, PB, RK, SR}
