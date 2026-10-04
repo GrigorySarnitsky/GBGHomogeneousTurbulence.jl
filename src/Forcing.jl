@@ -1230,7 +1230,7 @@ reason to build one by hand.
 
 Holding the force as an ordinary field is what keeps the rest simple. The draw is made real-valued and
 then transformed, so its spectrum satisfies the reality condition by construction; the transverse
-projection is the field library's; and the state is saved by the same library's field persistence.
+projection is [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)'; and the state is saved by that package's field persistence.
 
 The amplitudes are physical — the coefficients of
 ``e^{\\mathrm{i}\\boldsymbol{\\kappa}\\cdot\\boldsymbol{x}}`` in the force, with no transform

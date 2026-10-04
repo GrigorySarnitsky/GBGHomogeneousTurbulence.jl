@@ -105,7 +105,7 @@ iterations:
 sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
 advance!(sim)
 
-# the (M, 3) positions, via the field library
+# the (M, 3) positions, via GBGPeriodicFields
 X = point_positions(sim.tracers.positions)
 # u(tₙ, X(tₙ)), the Lagrangian velocity — throws if stale
 v = velocity_at_particles(sim.cache)
@@ -202,7 +202,7 @@ The memory-locality order in which a field is gathered at the tracers — a
 over the tracer set `tracers` on the grid of `domain` (a [`FixedDomain`](@ref)), together with the
 scratch that lets it be rebuilt in place. Tracers seeded at random, or mixed by the flow, visit the
 grid in no order at all, so each interpolation stencil is a cache miss; visiting them
-tile-by-tile turns the gather into a sweep, and the field library's `interpolate!` accepts such an
+tile-by-tile turns the gather into a sweep, and `GBGPeriodicFields`' `interpolate!` accepts such an
 order through its `traversal` keyword. The order only reorders the visits — it changes no value,
 so a run with and without it produces bitwise-identical trajectories and samples.
 
@@ -223,7 +223,7 @@ and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
   wrong, only progressively less useful as the flow mixes the tracers away from it.
 
 !!! note "One order serves every gather of the step"
-    The field library accepts any same-length order for a point set of the same count, so the one
+    `GBGPeriodicFields` accepts any same-length order for a point set of the same count, so the one
     order built from the tracer positions is also passed to the gather at the predicted positions
     a [`Heun`](@ref) step makes; those sit a step's displacement from the tracers, well inside the
     tiles the order groups.
@@ -295,7 +295,7 @@ the working storage that scheme needs.
 
 Two members today: [`Heun`](@ref), a one-step method that buys second order with a second
 interpolation, and [`AdamsBashforth`](@ref), a multistep method that buys more by reusing the
-Lagrangian samples the run already deposits. Which trade a run wants is a fitness question — one
+Lagrangian samples the run already deposits. Which trade a run wants is for its user to measure — one
 interpolation per step against one stored array per extra order.
 """
 abstract type AbstractParticleIntegrator end
@@ -380,8 +380,7 @@ history when the tracers are repositioned.
 - `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
-- `velocity_predictor` — the velocity interpolated at the predicted positions (the particle-side
-  counterpart of the field schemes' `velocity_predictor_spectral`). It is reachable like
+- `velocity_predictor` — the velocity interpolated at the predicted positions. It is reachable like
   any field of this type, but it is a scheme intermediate rather than a sample of the flow at any
   instant, so nothing in the package offers it as one: read
   [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) for the Lagrangian
@@ -857,7 +856,7 @@ export write_tracers, read_tracers
 
 Write the [`Tracers`](@ref) `tracers` under `parent` as one self-describing HDF5 group — the
 wrapped positions, the unwrapped positions when tracked, and the interpolation scheme, each
-persisted through the field library's own pairs. Available once the `HDF5` package is loaded; the
+persisted through `GBGPeriodicFields`' own pairs. Available once the `HDF5` package is loaded; the
 caller owns the file.
 
 # Arguments
