@@ -31,7 +31,7 @@ The **Code** column gives the name each symbol carries in the package.
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
-| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the cached field; [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
+| ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the field held in the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache); [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
 | ``\boldsymbol{\omega}\times\boldsymbol{u}`` | the Lamb vector — vorticity first, the literature's sign, so that ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) + \boldsymbol{\omega}\times\boldsymbol{u}``; the rotational form's right-hand side carries its negation, ``\boldsymbol{u}\times\boldsymbol{\omega}``, which is the product the solver forms | never stored: formed in place over the vorticity's array by [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!) |
 | ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
@@ -39,7 +39,7 @@ The **Code** column gives the name each symbol carries in the package.
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
-| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the run's current time ``t_n``, between iterations | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
+| ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the run's current time ``t_n``, between [iterations](#Vocabulary) | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
 | ``M`` | the number of tracer particles | `npoints(tracers.positions)` |
 
 ## Parameters
@@ -95,7 +95,7 @@ Measured from the run's state, or derived from it through a `FlowParameters` bun
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_time) |
-| ``\tilde{k}`` | the kinetic energy in box units, ``k/(\varepsilon L)^{2/3}``: its ``3/2`` power is the large-eddy length ``k^{3/2}/\varepsilon`` as a fraction of the box side ``L``. A run predicts its stationary state with it, from provisional values per forcing band | [`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units) |
+| ``\tilde{k}`` | the kinetic energy in box units, ``k/(\varepsilon L)^{2/3}``: its ``3/2`` power is the large-eddy length ``k^{3/2}/\varepsilon`` as a fraction of the box side ``L``. A run predicts its stationary state with it, from provisional values per forcing band (the shells a forcing acts on) | [`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units) |
 | ``\mathrm{Re}_{\mathrm{box}}`` | the box Reynolds number ``\varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``. A run whose ``\nu`` is set by ``\kappa_{\max}\eta`` has ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}`` | [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) |
 | ``G`` | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)'s dimensionless gain | — |
 | ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the unit `warmup!` measures progress in (warm-up budgets and stationarity windows accumulate ``\Delta t \varepsilon/k``). Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the argument of the integrating-factor functions | [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) |
