@@ -173,7 +173,7 @@ amplitudes, the shell-summed energy spectrum
 ``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)`` peaks at
 ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's mode count).
 Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above it puts most of the
-pre-rescale seed into shells the mask holds empty, and the seeder warns when the peak
+pre-rescale seed into shells the dealiasing truncation zeroes, and the seeder warns when the peak
 ``\\kappa_p/\\sqrt{2}`` reaches the cutoff.
 
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E(\\kappa)`` giving a target radial energy
@@ -274,7 +274,7 @@ amplitudes — zeroed, as above, at the origin — whose characteristic wavenumb
 scalar-variance spectrum ``\\propto \\kappa^{2}\\exp\\bigl(-2\\kappa^{2}/\\kappa_p^{2}\\bigr)``
 peaks at ``\\kappa_p/\\sqrt{2}``, not at ``\\kappa_p`` itself (the ``\\kappa^{2}`` is the shell's
 mode count). Keep ``\\kappa_p`` well below the dealias cutoff — a value near or above it puts most
-of the pre-rescale seed into masked shells, and the seeder warns when the peak
+of the pre-rescale seed into shells the dealiasing truncation zeroes, and the seeder warns when the peak
 ``\\kappa_p/\\sqrt{2}`` reaches the cutoff.
 
 Pass `initial_spectrum`, a function ``\\kappa \\mapsto E_\\varphi(\\kappa)`` giving a target radial
