@@ -87,7 +87,7 @@ end
     Simulation(domain; κ_max_η = nothing, kinetic_energy = nothing, dissipation = nothing,
                kwargs...)
 
-Everything the next iteration needs, bundled: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
+A `Simulation` bundles everything the next iteration needs: the [`FixedDomain`](@ref), the [`IntegratorBuffers`](@ref), the
 [`ResolvedGenerator`](@ref) (the equations of motion, carrying the [`FlowConditions`](@ref) and the
 assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@ref) state (the velocity
 ``\\hat{\\boldsymbol{u}}`` and passive scalar ``\\hat\\varphi`` in spectral representation), the

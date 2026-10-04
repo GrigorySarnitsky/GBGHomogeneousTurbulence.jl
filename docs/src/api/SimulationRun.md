@@ -7,8 +7,9 @@ Order   = [:module]
 
 ## The simulation
 
-The assembled, ready-to-run simulation — the domain-building `Simulation(; grid_points_per_axis, viscosity, …)` and the
-domain-taking `Simulation(domain; …)` constructors. Read its measured state by applying the
+This section documents the assembled, ready-to-run simulation and its two constructors, the
+domain-building `Simulation(; grid_points_per_axis, viscosity, …)` and the domain-taking
+`Simulation(domain; …)`. Read its measured state by applying the
 [`Observables`](Observables.md) to `sim.state` — for example `kinetic_energy(sim.state.velocity_spectral)` in a
 `run!` callback.
 
@@ -42,7 +43,7 @@ warmup!
 
 ## Clock accessors
 
-The elapsed simulation time and the step count.
+These accessors read the elapsed simulation time and the step count.
 
 ```@docs
 current_time
@@ -51,7 +52,7 @@ current_step
 
 ## Cadence predicates
 
-Callback helpers that fire on a schedule — every ``n`` steps, or once per crossed multiple of a
+These callback helpers fire on a schedule — every ``n`` steps, or once per crossed multiple of a
 simulation-time period — for the periodic actions a `run!` callback drives (a diagnostic, a
 checkpoint, a `rebuild_traversal!` on a manual cadence).
 
@@ -71,7 +72,7 @@ flow_parameters
 
 ## Persistence
 
-Checkpoint and restore — the restartable run as one self-describing group, available once `HDF5` is loaded.
+These functions checkpoint and restore the restartable run as one self-describing group, available once `HDF5` is loaded.
 
 ```@docs
 write_simulation
