@@ -16,7 +16,7 @@ some are values at particle positions, and some are single numbers.
 Components of a run need the same observable within one iteration. The velocity in physical
 representation is the clearest case: at ``t_n`` the timestep control needs its maximum for the
 advective CFL, the tracer set interpolates it onto the particles to start their push, and the
-generator's first stage assembles the advective term from it. Left to themselves they would each recover
+generator, the component assembling the right-hand side, forms the advective term from it at the first stage. Left to themselves they would each recover
 it from ``\hat{\boldsymbol{u}}`` and keep a copy — three recoveries and three resident fields where
 one of each suffices.
 
@@ -27,7 +27,7 @@ callback, a statistics accumulator — reads through the same door, but the cach
 own components, not for the consumer.
 
 An **iteration** is everything a run does to advance from ``t_n`` to ``t_{n+1}``: the timestep
-choice, the step, the closing deposits, and the particle push that ends on them. It strictly
+choice, the step, the closing **deposits** that write its observables into the cache, and the particle push that ends on them. It strictly
 contains the **step**, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
 divided into the **stages** of the time scheme; the particle push and the deposits sit in the
 iteration but outside the step. At each instant ``t_n`` between iterations, before the next one
@@ -88,11 +88,11 @@ could enter only by making the iteration compute it, which the choice forbids. T
 component of the iteration performs that reduction *for the cache*, so it cannot hold them — whoever
 wants one computes it at an observation (§2.4).
 
-One case looks like a counterexample and is worth stating. A `VarianceController` *does*
-form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
+One case looks like a counterexample and is worth stating. The constant-energy forcing
+[`VarianceController`](@ref) *does* form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
 **mid-step** ones — each measured at a Runge–Kutta stage's own state and discarded — not the
 observable at the iteration's end, which is what a slot must hold, so the case fails the surviving
-test below rather than this one. A `VarianceRescaling(over = :total)` forms the same quantity once
+test below rather than this one. The other constant-energy forcing, [`VarianceRescaling`](@ref) with `over = :total`, forms the same quantity once
 per step and is the same story, its value taken before the rescale it sizes.
 
 **Materialized — some component must hold it whole.** This is the traffic axis: writing out a value
