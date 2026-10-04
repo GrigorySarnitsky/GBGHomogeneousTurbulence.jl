@@ -141,5 +141,5 @@ Listed in build order — each module uses the ones above it. The
   `sim.cache`.
 - [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
   laws, and scaling constants — to validate a run against. It is a separate, opt-in group, not re-exported by
-  the umbrella and designed to become a standalone package. In the actual include order
-  this dependency-light leaf comes *first*; it is listed last here because a user's workflow reaches it last — validating against the laws comes after running.
+  the top-level module (load it with `using GBGHomogeneousTurbulence.Phenomenology`) and designed to
+  become a standalone package. Depending on no other module here, it is built *first*; it is listed last here because a user's workflow reaches it last — validating against the laws comes after running.
