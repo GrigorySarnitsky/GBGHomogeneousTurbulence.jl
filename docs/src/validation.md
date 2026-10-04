@@ -17,7 +17,7 @@ separate not from pure roundoff but from that formulation-level seed (measured `
 after one time unit), growing at the flow's Lyapunov rate — a finite window of exact tracking,
 followed by statistical agreement. Both behaviors are quantified below.
 
-TurTLE version: **8.2.1** (its current release at the time of the comparison).
+The comparison used TurTLE **8.2.1**, its current release at the time.
 
 ## The physics point
 
@@ -153,9 +153,7 @@ the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-p
 
 ![Linear-forcing pair: TurTLE (solid) vs this package (dashed)](assets/comparison_overlay_linear.png)
 
-Three findings:
-
-- **Same agreement structure.** The solutions track to eight digits at ``t = 5`` and six at
+- **The agreement has the same structure.** The solutions track to eight digits at ``t = 5`` and six at
   ``t = 10`` (relative ``\lvert\Delta k\rvert`` ``1.6 \times 10^{-9}`` at ``t = 1``,
   ``2 \times 10^{-8}`` at 5, ``3.7 \times 10^{-6}`` at 10), then separate at the Lyapunov rate.
   The divergence seed is ``\sim 500\times`` the constant-power pair's, and identifiably so: this
@@ -167,13 +165,12 @@ Three findings:
   self-amplifies until the cascade balances it: both codes migrated to a hotter state
   (``\langle k\rangle_T \approx 3.4`` from 2.5, ``\langle\varepsilon\rangle_T \approx 1.6`` from 1.0), agreeing on the new
   attractor's statistics to ``\sim 3\%`` — the larger scatter reflecting linear forcing's
-  well-known larger, slower energy fluctuations, visible in the ``k(t)`` panel.
+  larger, slower energy fluctuations, visible in the ``k(t)`` panel.
 - **The amplitude estimate illustrates why anchored forcings exist.** ``A`` was chosen from the
   *instantaneous* handoff band energy; the fixed-``A`` balance settled at a larger one
   (``\langle k_{\mathrm{band}}\rangle_T \approx 1.87`` from 1.18), so
   ``\langle\varepsilon\rangle_T = 2A\langle k_{\mathrm{band}}\rangle_T \approx 1.59`` rather than 1. Both codes agree
-  precisely on this migration —
-  it is the physics of unanchored linear forcing, not a discrepancy.
+  precisely on this migration, the physics of unanchored linear forcing rather than a discrepancy.
 
 ### Robustness across integrators: `IFLowStorageRK4` at its adaptive step
 
@@ -191,7 +188,7 @@ discrete routes.
   reference legs' fixed ``2 \times 10^{-3}``** (the fixed value was chosen for cross-code
   matching, well inside even RK3's ceiling), completing the same 36.8 time units in 174 s against
   the fixed-step leg's 265 s on the same GPU.
-- **Same agreement structure, with an instructive seed ladder.** ``k`` and ``\varepsilon`` track
+- **The agreement has the same structure, with an instructive seed ladder.** ``k`` and ``\varepsilon`` track
   at ``10^{-6}``–``10^{-5}`` relative through ``t \approx 5``, separating from a seed of
   ``\sim 6 \times 10^{-7}`` at ``t = 1`` — the *truncation-level* difference of two tableaux on
   two step sizes, against ``\sim 10^{-12}`` for the matched-tableau pair: same physics reached by
