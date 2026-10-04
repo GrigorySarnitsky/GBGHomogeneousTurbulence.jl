@@ -18,8 +18,8 @@ Simulation
 
 ## The predicted stationary state
 
-The state a forced run is set up for — ``k``, ``\varepsilon``, the band's energy, ``\nu`` and the two
-Reynolds numbers — predicted before the run is built, as `Simulation` predicts it.
+This section predicts the state a forced run is set up for — ``k``, ``\varepsilon``, the band's
+energy, ``\nu`` and the two Reynolds numbers — before the run is built, as `Simulation` predicts it.
 
 ```@docs
 predicted_stationary_state
