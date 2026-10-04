@@ -976,7 +976,7 @@ one usually encodes a decision.
 
 ## 11. Decision log
 
-Append-only; each entry stands on its own. Dates in `YYYY-MM`.
+The log is append-only, and each entry stands on its own. Dates are given as `YYYY-MM`.
 
 1. **(2026-06) Integrating-factor split with exact diffusion.** The stiff viscous/diffusive part is
    integrated exactly by ``\mathcal{E}(\boldsymbol{\kappa})``; only the advection is explicit. Removes the
@@ -3217,7 +3217,7 @@ Append-only; each entry stands on its own. Dates in `YYYY-MM`.
 
 ## References
 
-Cited author–year above; full entries here, each with its DOI where the work has one. Four do not,
+Works are cited author–year above and given in full here, each with its DOI where the work has one. Four do not,
 and the reason is stated with the entry rather than left to the reader to wonder about: two NASA
 technical memoranda, a CTR research brief and a 1932 monograph sit outside the DOI system. A DOI here has been resolved against the registry, never recalled — an unverified identifier
 is worse than none, since it silently sends the reader somewhere else.
