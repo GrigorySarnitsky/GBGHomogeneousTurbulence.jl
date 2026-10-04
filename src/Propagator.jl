@@ -206,7 +206,7 @@ catalogued under [`AbstractIntegrator`](@ref)).
 
 A scheme does only stage arithmetic: it opens the step with the generator's
 [`prepare!`](@ref GBGHomogeneousTurbulence.Generator.prepare!), evaluates the right-hand sides and
-exact linear factors through the generator's `velocity_rhs!`, `scalar_rhs!` and integrating-factor
+exact linear factors through the generator's [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!), [`scalar_rhs!`](@ref GBGHomogeneousTurbulence.Generator.scalar_rhs!) and integrating-factor
 methods at each stage, and closes with the generator's
 [`finalize!`](@ref GBGHomogeneousTurbulence.Generator.finalize!) — it never assembles the physics
 itself.
