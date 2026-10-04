@@ -21,22 +21,22 @@ The comparison used TurTLE **8.2.1**, its current release at the time.
 
 ## The physics point
 
-One forced, statistically stationary run of homogeneous isotropic turbulence:
+Both codes run one forced, stationary case of homogeneous isotropic turbulence:
 
 | quantity | value | notes |
 |:---|:---|:---|
 | grid, box side | ``128^3``, ``L = 2\pi`` | |
 | precision | `Float64` both codes | |
-| viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the resolution criterion below |
+| viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the criterion below |
 | forcing | constant power ``\varepsilon_{\mathrm{inj}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
 | dealiasing | smooth (Hou–Li) filter, exactly matched | see below |
-| field scheme | [`IFSSPRK3`](@ref) ⇔ TurTLE's native SSPRK3 | same tableau, same stage arrangement |
+| field scheme | [`IFSSPRK3`](@ref) ⇔ TurTLE's native SSPRK3 | same tableau and stage arrangement |
 | timestep | fixed ``\Delta t = 2 \times 10^{-3}`` | identical in both codes |
 | particles | ``10^4`` tracers, fourth-order Adams–Bashforth, cubic-spline interpolation | identical in both codes |
 | window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the [frozen handoff state](@ref "The shared initial state, and the import witnesses") |
 
-The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (the
-resolved band's edge times the Kolmogorov microscale): under the smooth filter that edge is 0.8 of
+The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (resolved
+edge times Kolmogorov microscale): under the smooth filter that edge is 0.8 of
 the Nyquist wavenumber, ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
@@ -87,7 +87,7 @@ Every step of that import is witnessed, not assumed:
 
 ![TurTLE (solid) vs this package (dashed): k(t), ε(t), ρ_u(τ)](assets/comparison_overlay.png)
 
-Window means ``\langle\cdot\rangle_T`` over the 14.9 turnovers (each code its own realization after decorrelation):
+The window means ``\langle\cdot\rangle_T`` over the 14.9 turnovers compare as follows (each code its own realization after decorrelation):
 
 | quantity | this package | TurTLE | relative difference |
 |:---|:---|:---|:---|
