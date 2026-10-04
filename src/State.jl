@@ -188,12 +188,12 @@ carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}
 Returns `û`.
 
 !!! note "Seeding a running simulation invalidates the observables cache"
-    The cache holds what the last deposit left, so a seed written into a live run makes every cached
-    observable wrong. Announce the change with
+    The cache holds what the last
+    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — the end-of-step write of the
+    observables — left, so a seed written into a live run makes every cached observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
     fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
-    values, then restore the cache with
-    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again. The
+    values, then restore the cache with `deposit!` before advancing again. The
     interval between the two calls is yours to close.
 """
 function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
@@ -288,12 +288,12 @@ carries its own large scale and will not generally peak at ``\\kappa_p/\\sqrt{2}
 Returns `φ̂`.
 
 !!! note "Seeding a running simulation invalidates the observables cache"
-    The cache holds what the last deposit left, so a seed written into a live run makes every cached
-    observable wrong. Announce the change with
+    The cache holds what the last
+    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) — the end-of-step write of the
+    observables — left, so a seed written into a live run makes every cached observable wrong. Announce the change with
     [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!), which advances the
     fields epoch — the cache's freshness counter — so cached reads throw rather than serve stale
-    values, then restore the cache with
-    [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) before advancing again. The
+    values, then restore the cache with `deposit!` before advancing again. The
     interval between the two calls is yours to close.
 """
 function random_scalar_spectral!(φ̂, domain::FixedDomain;
