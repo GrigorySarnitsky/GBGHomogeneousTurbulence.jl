@@ -9,8 +9,9 @@ efficient device code to the vendors' pitfalls, is on the field library's
 
 ## What a run keeps in memory
 
-The table gives everything a [`Simulation`](@ref) holds: the state, the integrator's registers, the
-assembly scratch, the observables cache, and the domain's precomputed symbols, with every setting not
+The table gives everything a [`Simulation`](@ref) holds: the state, the integrator's per-step storage
+([`IntegratorBuffers`](@ref GBGHomogeneousTurbulence.Propagator.IntegratorBuffers)), the generator's workspace for the right-hand side, the
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), and the domain's precomputed spectral multipliers, with every setting not
 named in a column at its default. On a grid of ``N^3`` points, ``N`` even, that storage is a cubic polynomial in
 ``N``. The bytes per grid point are its leading coefficient, and the three right-hand columns evaluate
 the whole polynomial, lower-order terms included.
