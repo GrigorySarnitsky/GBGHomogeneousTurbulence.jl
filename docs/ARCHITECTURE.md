@@ -99,7 +99,7 @@ interleave a bespoke measurement drops straight to §4. The run layer is a conve
 never a wall in front of it.
 
 > **Status.** The run layer is implemented (module `SimulationRun`) and covered by tests; the example
-> above runs as written — a forcing can be named operator-free (`ConstantPower(injection_rate = 0.1)`, a
+> above runs as written — a forcing can be named before its domain exists (`ConstantPower(injection_rate = 0.1)`, a
 > `DeferredForcing`) and `warmup!` detects stationarity. The API may still evolve, since setup ergonomics is
 > the package's primary quality target.
 
@@ -426,8 +426,8 @@ implementation serves both** the velocity (a vector field) and the scalar (a sca
 these methods are written through tensor-order-generic field operators; the only field-specific step a
 forcing can need is the solenoidal projection of the velocity, which the field-proportional strategies
 never need (each preserves a divergence-free velocity by construction) and `StochasticOU` applies per
-mode, drawing each amplitude perpendicular to its wavevector. Each forcing has an operator-taking constructor and an operator-free keyword form; `NoForcing`,
-taking no operators, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
+mode, drawing each amplitude perpendicular to its wavevector. Each forcing has a constructor taking the `FixedDomain` and a keyword form taking none; `NoForcing`,
+taking no domain, has only the one. The keyword form — `ConstantPower(injection_rate = 0.1)` —
 returns a `DeferredForcing`, materialized when `Simulation` builds the frame, so a case can name its
 forcing before the grid exists. A velocity forcing named so may also leave its strength out, and
 `Simulation` fills it from the run's predicted stationary state: the pair ``(k, \varepsilon)``, stated
