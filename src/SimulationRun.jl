@@ -1630,7 +1630,7 @@ function write_simulation end
 Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
 through its own constructor from the recorded parameters, adopting the stored state rather than
 seeding one; the positions, the deposited observables, the Lagrangian sample history (a scheme
-of a different order keeps what fits and takes the missing first pushes under `Heun`) and the clock follow. The
+of a different order keeps what fits and takes the missing first pushes under [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun)) and the clock follow. The
 next [`advance!`](@ref) continues the run, a stochastic forcing's realization included.
 
 A group not written by `write_simulation`, or written by a newer schema version, is refused with an
