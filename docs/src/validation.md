@@ -218,7 +218,8 @@ threads on a 12-core CPU) and this package **265 seconds** on a single AMD RX 79
 The six published files (release assets; verify the hashes):
 
 ```
-base=https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl/releases/download/turtle-comparison-v1
+repo=https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl
+base=$repo/releases/download/turtle-comparison-v1
 curl -LO $base/handoff_initial_state_iter100.h5
 curl -LO $base/turtle_reference_data.h5
 curl -LO $base/gbgit_reference_data.h5
@@ -226,12 +227,18 @@ curl -LO $base/turtle_linear_reference_data.h5
 curl -LO $base/gbgit_linear_reference_data.h5
 curl -LO $base/gbgit_rk4adaptive_reference_data.h5
 sha256sum *.h5
-# handoff_initial_state_iter100.h5        02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
-# turtle_reference_data.h5                fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
-# gbgit_reference_data.h5                 394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
-# turtle_linear_reference_data.h5         6b8d15e9944c3ec12b7a0a451805b62351623fd9830d98ea3aad303a205115cd
-# gbgit_linear_reference_data.h5          bd192fdcca3bbe75798818bf0193af17846286e7cb3cc00d95514dc6db6670c2
-# gbgit_rk4adaptive_reference_data.h5     1629764125ab00230d9a6d32fe710242075bb57264aea828113a0fe258094ca9
+# handoff_initial_state_iter100.h5
+#   02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f
+# turtle_reference_data.h5
+#   fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
+# gbgit_reference_data.h5
+#   394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
+# turtle_linear_reference_data.h5
+#   6b8d15e9944c3ec12b7a0a451805b62351623fd9830d98ea3aad303a205115cd
+# gbgit_linear_reference_data.h5
+#   bd192fdcca3bbe75798818bf0193af17846286e7cb3cc00d95514dc6db6670c2
+# gbgit_rk4adaptive_reference_data.h5
+#   1629764125ab00230d9a6d32fe710242075bb57264aea828113a0fe258094ca9
 ```
 
 Each reference file is self-describing: datasets `t`, `k`, `ε`, `τ`, `ρ_u`, with the definitions,
