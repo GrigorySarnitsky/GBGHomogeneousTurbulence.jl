@@ -261,8 +261,8 @@ increments ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The veloc
 advanced in lockstep (the same ``A,B,d``), each with its own diffusivity, and any post-step forcing
 is applied after the third stage.
 
-The cost is three nonlinear evaluations per step and — in Williamson's 2N count, where ``N`` counts
-evolved field registers — two registers per field: the state's own array plus one accumulator
+The cost is three nonlinear evaluations per step and — in Williamson's 2N-storage count, whose
+label is unrelated to the grid's ``N`` — two registers per field: the state's own array plus one accumulator
 (`stage1`). The [`IntegratorBuffers`](@ref) a run allocates also holds `nonlinear`, the register the
 right-hand-side assembly and its dealiasing pass write through: the 2N count measures the scheme,
 not the solver it is embedded in.

@@ -257,8 +257,7 @@ so no magnitude field is materialized.
 
 The second form reads the number back from an
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), where the closing deposit
-left it — the same quantity, measured once per iteration (a step plus the deposit that closes it)
-and served without a reduction (or a device readback); it throws an `ErrorException` when no
+left it — the same quantity, measured once per iteration and served without a reduction (or a device readback); it throws an `ErrorException` when no
 deposit is current, like every cached read.
 
 !!! note "A grid maximum, not a continuum supremum"

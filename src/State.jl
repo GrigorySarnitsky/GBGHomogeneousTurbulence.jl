@@ -65,9 +65,10 @@ end
 The record of what a run advances: the evolving fields in spectral representation — the single
 source of truth — and the evolving state of any forcing that carries one. The velocity, vorticity, and
 scalar in physical representation are recoveries of the fields, not part of the record — since it
-holds no derived copies, nothing in it can fall out of date. Each **iteration** — one advance of the
-run, a step plus the deposit that closes it — recovers the physical representations at its end into
-the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
+holds no derived copies, nothing in it can fall out of date. The
+[`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) that closes each step recovers the
+physical representations into the
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache).
 
 The positional form wraps existing fields without copying them, which is how a state is handed to
 [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to adopt.
