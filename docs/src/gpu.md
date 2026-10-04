@@ -29,7 +29,7 @@ the whole polynomial, lower-order terms included.
 
 The table holds for every forcing, for [`HouLi()`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) as for
 `TwoThirds()`, and for the integrators `IFLowStorageRK3`, `IFLowStorageRK4` and `IFSSPRK3`. The
-[`IFHeun`](@ref) integrator and `HouLi(materialized = true)` each add storage of their own.
+[`IFHeun`](@ref) integrator and `HouLi(materialized = true)`, which stores the filter per mode instead of re-evaluating it, each add storage of their own.
 Tracers are cheap next to the fields: with the default [`Heun`](@ref) scheme a `Float32` run holds 61 bytes per tracer and a `Float64` run 109.
 The package's test suite derives the table and every number in this paragraph from the code, so a
 change to the code that moves one of them fails the suite.
