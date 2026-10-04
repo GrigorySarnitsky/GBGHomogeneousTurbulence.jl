@@ -15,7 +15,7 @@ The flow's equations of motion — the incompressible Navier–Stokes right-hand
 (the dealiased, Leray-projected nonlinear term), the passive-scalar advection, and the exact viscous
 integrating factor.
 
-Its contents (each formula lives in the operation's own docstring):
+Its contents (each formula lives in its operation's docstring):
 - [`FlowConditions`](@ref) — the physical conditions the right-hand side is built from (the viscosity,
   the Schmidt number, the forcings).
 - [`ResolvedGenerator`](@ref) — the conditions bundled with the assembly scratch (its working arrays), consumed
@@ -27,7 +27,7 @@ Its contents (each formula lives in the operation's own docstring):
   viscous/diffusive integrating factor, with any linear forcing rate folded in.
 - [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, at the deposit into the observables cache.
 
-The assemblies recover displaced fields in physical representation with the four-argument,
+The assemblies recover displaced fields (on the half-cell-shifted grid) in physical representation with the four-argument,
 source-preserving form of
 [`to_physical!`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical!) — the extra
 argument is a scratch field the transform consumes in the source's place — and with
@@ -238,7 +238,7 @@ The flow's generator as one value a scheme can hold. It carries the
 [`FlowConditions`](@ref) parameter record together with the assembly scratch its evaluations write
 through: the quadratic-product fields, any steady forcing rate, and — when the domain
 dealiases by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) — the
-displaced-evaluation buffers.
+buffers for evaluating on the half-cell-shifted grid.
 
 That scratch is the **generator's own** storage, distinct from the run's
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache). The two
@@ -435,8 +435,8 @@ written, not one: `N̂` receives the result, and `ω_consumed` is consumed in pl
 # Arguments
 - `N̂` — the field in spectral representation receiving the assembled term.
 - `generator` — the [`ResolvedGenerator`](@ref) whose conditions and assembly scratch are used.
-- `û` — the stage velocity in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s displaced
-  evaluation; a mask strategy leaves it unused.
+- `û` — the stage velocity in spectral representation, consulted by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s evaluation
+  on the half-cell-shifted grid; a mask strategy ([`TwoThirds`](@ref), [`HouLi`](@ref)) leaves it unused.
 - `u` — the stage velocity in physical representation, only read.
 - `ω_consumed` — the stage vorticity in physical representation, consumed (see the note below).
 - `domain` — the [`FixedDomain`](@ref) whose dealiasing strategy and transforms assemble the term.
@@ -464,8 +464,7 @@ sign costs nothing: the product is formed as the negated Lamb vector
 ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, operands in the order that carries the sign.
 
 A **mask**
-strategy ([`TwoThirds`](@ref),
-[`HouLi`](@ref)) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
+strategy (`TwoThirds`, `HouLi`) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
 leaving `û` unused; [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
 recovered on a grid displaced by half a cell (using `û` and the generator's displaced-evaluation
 scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
