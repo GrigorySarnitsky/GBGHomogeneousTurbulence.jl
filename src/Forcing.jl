@@ -737,14 +737,6 @@ The two variances there are **not interchangeable**: ``k`` is the whole field's,
 left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documents), so seed content
 in the band if the run depends on the controller taking hold.
 
-The molecular-dynamics thermostats map the design space exactly, and **this controller is the
-Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
-held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
-thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
-that restores canonical fluctuations is Nosé–Hoover
-(Nosé 1984; Hoover 1985), a design this package
-does not take.
-
 # Arguments
 - `domain` — the [`FixedDomain`](@ref) the band kernel is built on (the first form; the
   operator-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
@@ -774,6 +766,14 @@ does not take.
   forcing of Lundgren (2003, *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*,
   461–473) that physical-space codes apply, where
   ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
+
+The molecular-dynamics thermostats map the design space exactly, and **this controller is the
+Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
+held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
+thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
+that restores canonical fluctuations is Nosé–Hoover
+(Nosé 1984; Hoover 1985), a design this package
+does not take.
 
 !!! note "The settling time, not the gain, is the physical parameter"
     Only the ratio ``t_\\ell/G`` is observable: it is how long the variance takes to return after a

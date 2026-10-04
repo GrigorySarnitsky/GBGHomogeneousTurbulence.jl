@@ -63,8 +63,6 @@ export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
             rng = default_rng())
     Tracers(domain; positions, interpolation_scheme, unwrapped = false)
 
-(One method, shown as the two ways it is called — keywords do not dispatch.)
-
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
 Give **exactly one** of the two. The `number_of_particles` form seeds that many tracers uniformly
