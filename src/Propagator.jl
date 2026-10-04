@@ -34,7 +34,8 @@ is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage c
   per field, and imaginary-axis unstable).
 - [`IntegratorBuffers`](@ref), [`allocate_buffers`](@ref) — the preallocated per-step scratch.
 - [`step!`](@ref) — advance the coupled velocity and passive scalar one timestep.
-- [`deposit!`](@ref) — close the iteration: recover the observables into the cache at the new epoch.
+- [`deposit!`](@ref) — close the iteration: recover the observables of the advanced state into the
+  run's observables cache.
 - [`recommended_cfl`](@ref) — a scheme's advective-CFL ceiling.
 """
 module Propagator
@@ -762,11 +763,12 @@ _recovery_scratch(sb::ScalarBuffers) =
     deposit!(cache, tracers, u; traversal = nothing)
     deposit!(sim)
 
-Close a producer's advance by depositing the observables it has just made measurable: compute them
+Close a producer's advance (the step or the tracer push) by depositing the observables it has
+just made measurable: compute them
 from the arguments, write them into `cache` (an
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache)), and record each slot at
 the current epoch (the cache's freshness counter). One generic serves both sides of the run because
-it is one concept — each dynamical factor's advance is followed by its own deposit, so an iteration
+it is one concept — each advance, of the fields or of the tracers, is followed by its own deposit, so an iteration
 closes as `step!` then `deposit!`, then
 [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) then `deposit!` again.
 
@@ -797,7 +799,8 @@ even under a hand-fixed ``\\Delta t`` that never reads it.
 
 The **particle form** deposits the one trajectory-bound slot: it interpolates `u` at the tracer
 set's current positions and stamps the slot against **both** counters — the
-fields epoch of the interpolated velocity and the particles epoch of the positions, since the
+fields epoch (its count of state changes) of the interpolated velocity and the particles epoch
+(of position changes) of the positions, since the
 velocity at the particles is a function of the two together. It therefore runs **after** the tracer
 push, which itself consumed the field form's deposit.
 
@@ -808,10 +811,10 @@ reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint f
 
 Every iteration ends with these deposits: the run layer's
 [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
-`Simulation` constructor makes the seeding
+`Simulation` constructor makes the first
 deposits so the first iteration finds the initial state's observables, and a hand-run loop calls
-each form itself after the advance it closes. After mutating the state or the positions out of
-band, announce it — [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) /
+each form itself after the advance it closes. After mutating the state or the positions from
+outside the iteration, announce it — [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) /
 [`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) — and re-deposit
 with the **`sim` form**, which performs every deposit the run's configuration carries.
 
