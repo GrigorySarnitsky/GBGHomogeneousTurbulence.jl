@@ -36,9 +36,9 @@
 
 Tools for simulating homogeneous isotropic turbulence on three-dimensional periodic
 domains: a velocity field and a single passive scalar, each optionally forced, advanced by a choice
-of integrating-factor time-stepping scheme, with Lagrangian particle tracking and field sampling.
+of integrating-factor time-stepping scheme, with Lagrangian particle tracking and sampling of the fields along the trajectories.
 
-The package produces the flow and the values sampled from it; accumulating statistics over them is
+The package produces the flow and those sampled values; accumulating statistics over them is
 the caller's own analysis, for which the two sibling packages supply the tools —
 [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) the field reductions
 and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the
