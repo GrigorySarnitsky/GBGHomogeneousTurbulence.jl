@@ -19,7 +19,7 @@ The evolving state a run advances, and how it is seeded:
   spectral representation and the forcing states as one self-describing group (available once `HDF5`
   is loaded).
 
-All sized to a [`FixedDomain`](@ref).
+All of them are sized to a [`FixedDomain`](@ref).
 
 The recoveries do not disturb the state. An inverse transform consumes the coefficients it runs from,
 which is a property of the FFT backends rather than a choice, so a naive recovery would destroy the
