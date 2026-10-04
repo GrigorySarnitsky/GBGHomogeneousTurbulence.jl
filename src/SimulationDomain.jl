@@ -140,10 +140,9 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing,
 """
     PhaseShift()
 
-Phase-shift dealiasing — Patterson & Orszag (1971), combined with the spherical truncation of
-Rogallo (1981) — *Numerical experiments in homogeneous turbulence*, NASA TM-81315 (no DOI): assemble
-each quadratic nonlinear term on the grid **and** on a grid displaced by half a cell, average the
-two, and truncate spherically at
+Phase-shift dealiasing, after Patterson & Orszag (1971) with the spherical truncation of
+Rogallo (1981), assembles each quadratic nonlinear term on the grid **and** on a half-cell-displaced
+grid, averages the two, and truncates spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber).
 
@@ -171,6 +170,7 @@ than the ``2/3`` rule — handled automatically by
 
 # References
 - Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* **14**, 2538–2541.
+- Rogallo, R. S. (1981). [*Numerical experiments in homogeneous turbulence.*](https://ntrs.nasa.gov/citations/19810022965) NASA TM-81315. *(No DOI.)*
 """
 struct PhaseShift <: DealiasingStrategy end
 
