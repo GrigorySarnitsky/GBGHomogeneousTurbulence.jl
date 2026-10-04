@@ -301,11 +301,11 @@ y_s = \\sqrt{\\tfrac{5(\\sqrt{2041} - 5)}{18}} \\approx 3.3407,
 ```
 
 a factor ``1.93`` above the ``\\sqrt{3}`` of `IFLowStorageRK3`, at ``5/3`` the nonlinear
-evaluations per step — measured on a ``128^3`` `Float64` GPU run: the step costs a factor
-``1.665`` more than `IFLowStorageRK3`'s (every per-stage cost scales with the five stages alike), so a
-stability-limited run advances ``\\approx 16\\%`` more physical time per unit compute — with
-fourth-order accuracy, which removes the field's own time error as the limit on an
-[`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer —
+evaluations per step. Measured on a ``128^3`` `Float64` GPU run, the step costs a factor
+``1.665`` more than `IFLowStorageRK3`'s, since every per-stage cost scales with the five stages
+alike. A stability-limited run therefore advances ``\\approx 16\\%`` more physical time per unit
+compute. Its fourth-order accuracy also removes the field's own time error as the limit on an
+[`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer,
 whose [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) bootstrap still caps its measured
 convergence near third order, as its docstring records.
 """
