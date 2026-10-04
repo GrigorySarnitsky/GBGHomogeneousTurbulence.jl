@@ -533,7 +533,7 @@ end
 """
     reynolds_box(side_length, dissipation, viscosity)
 
-The box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}}`` of a flow, from three scalars: the Reynolds number
+The function computes the box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}}`` from three scalars: the Reynolds number
 of an eddy the size of the box, with the Kolmogorov velocity ``(\\varepsilon L)^{1/3}`` of that eddy and
 the box side ``L``,
 
@@ -568,7 +568,7 @@ end
 """
     reynolds_taylor(kinetic_energy, dissipation, viscosity)
 
-The Taylor-microscale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of a flow, from three
+The function computes the Taylor-microscale Reynolds number ``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` from three
 scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one component and
 ``\\lambda = \\sqrt{15\\nu u'^{2}/\\varepsilon}`` the Taylor microscale, which gives
 
