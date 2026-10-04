@@ -35,18 +35,20 @@ field. Each returns
 the field's own real element type rather than a fixed `Float64`, so a `Float32` run measures in
 `Float32`.
 
-Three observables gate the automatic warm-up
+Three observables gate the warm-up
 ([`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
-the scalar is forced — the scalar variance settles too. The kinetic energy is **not** among them: a
-constant-energy forcing clamps it flat and a fixed-injection forcing makes it ring, so it is
+the scalar is forced — the scalar variance settles. The kinetic energy is **not** among them, since
+a forcing holding it fixed leaves it flat and
+[`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)'s fixed injection makes it ring; it is
 measured (it normalizes the eddy-turnover clock) but never gated on.
 
 None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
 band (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
 and the cubic skewness carries a slight aliasing residual — its docstring states, per strategy, whether
-that residual is accounted for (yes for the sharp truncations, no for `HouLi`'s taper).
+that residual is accounted for (yes for [`TwoThirds`](@ref GBGHomogeneousTurbulence.SimulationDomain.TwoThirds) and
+[`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift), no for `HouLi`'s taper).
 """
 module Observables
 
