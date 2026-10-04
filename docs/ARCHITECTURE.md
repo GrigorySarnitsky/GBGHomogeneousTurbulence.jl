@@ -793,7 +793,7 @@ generalization is built for them until a second concrete case forces the abstrac
   conservation and order-of-accuracy test on `IFLowStorageRK3` (the drift must scale with the
   scheme's order; at ``\nu = 0`` `IFHeun` is excluded — its stability rests entirely on viscous
   damping, which the oracle removes, so it would measure an instability, not an order), a second
-  witness that the sharp strategies are exactly Galerkin (an alias residue breaks the detailed
+  witness that the sharp-cutoff strategies (`TwoThirds`, `PhaseShift`) are exactly Galerkin (an alias residue breaks the detailed
   conservation of the retained triads), and a direct measurement of the Hou–Li filter's effective
   dissipation (the one deliberately non-conservative strategy). The long run is a validation target of
   its own: the truncated system thermalizes toward absolute equilibrium — an equipartition
@@ -2496,7 +2496,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     energetic — what the advective-CFL, the random-seed spectrum, and the empty-shell warnings must
     see) and the **resolved** cutoff (the highest mode whose dynamics is genuine Navier–Stokes —
     what the resolution criterion ``\kappa_{\max}\eta`` and the viscosity solve must see). For the
-    sharp strategies the two coincide; under `HouLi` they diverge, because the per-step filter is an
+    sharp-cutoff strategies the two coincide; under `HouLi` they diverge, because the per-step filter is an
     extra damping rate ``\mathrm{strength} (\kappa/\kappa_{\mathrm{Ny}})^{36}/\Delta t`` that
     overtakes ``\nu\kappa^{2}`` at
     ``\kappa/\kappa_{\mathrm{Ny}} = (\nu\kappa_{\mathrm{Ny}}^{2}\Delta t/\mathrm{strength})^{1/34} \approx 0.8``
