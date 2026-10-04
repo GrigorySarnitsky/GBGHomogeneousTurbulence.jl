@@ -8,8 +8,8 @@ tracking and field sampling.
 
 It is built on [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl), which
 supplies every field operation — transforms, differential operators, convolution,
-interpolation, and reductions. The GPU is the primary target, so each time step is in-place and
-allocation-free at field scale over preallocated buffers (occasional diagnostics allocate per call; the threaded CPU path spawns small per-pass task transients).
+interpolation, and reductions. The GPU is the primary target, so each time step works in place over
+preallocated buffers and allocates nothing that grows with the grid (occasional diagnostics allocate per call, and the threaded CPU path allocates a little per pass for its tasks).
 [Memory footprint on a GPU](gpu.md) gives what a run needs on a card, and how CUDA's unified memory
 lets a run outgrow one.
 
@@ -94,7 +94,7 @@ nonlinear term explicitly by a Runge–Kutta stage combination, and the quadrati
 dealiased by the default ``2/3`` rule (other strategies are available).
 
 !!! note "Work in progress"
-    The package is being built in vertical slices. The coupled velocity + passive-scalar solver is in
+    The package is being built one feature at a time, each end to end. The coupled velocity + passive-scalar solver is in
     place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref),
     [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref) and [`IFHeun`](@ref)), with the forcing menu
     `NoForcing`, `Linear`, `ConstantPower` (the velocity default),
@@ -117,7 +117,7 @@ Listed in build order — each module uses the ones above it. The
   `kinetic_energy_and_dissipation`, both in one pass), the developed-turbulence marker (`derivative_skewness`),
   the spectrum-derived scales, the CFL speed bound (`max_speed`), and the one field-valued
   observable, the vorticity recovery.
-- [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
+- [`State`](api/State.md): the evolving state (`ResolvedFields`, from which every other representation is recovered) a step
   advances, and the random initial conditions — a divergence-free velocity and a mean-zero scalar.
 - [`Cache`](api/Cache.md): the `ObservablesCache` — where each **iteration** (one advance of the
   run; the notation page's vocabulary gives its full anatomy) leaves the observables it produced,
