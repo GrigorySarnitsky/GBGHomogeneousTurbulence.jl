@@ -526,7 +526,7 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     on the clamp taking hold.
 
 # References
-- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6*
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6**(4), 1612–1614.
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420). *J. Chem. Phys.* **126**, 014101.
 
 # Fields
@@ -782,8 +782,8 @@ does not take.
 # References
 - Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984). [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
-- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* **81*
-- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* **31*
+- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* **81**(1), 511–519.
+- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* **31**(3), 1695–1697.
 
 # Fields
 - `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.

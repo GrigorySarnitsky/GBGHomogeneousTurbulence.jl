@@ -480,7 +480,7 @@ produce.
 
 # References
 - Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* **278**, 108406.
-- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229*
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
 
 # Fields
 The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
