@@ -27,21 +27,21 @@ One forced, statistically stationary run of homogeneous isotropic turbulence:
 |:---|:---|:---|
 | grid, box side | ``128^3``, ``L = 2\pi`` | |
 | precision | `Float64` both codes | |
-| viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the resolution criterion, see below |
+| viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the resolution criterion below |
 | forcing | constant power ``\varepsilon_{\mathrm{inj}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
 | dealiasing | smooth (Hou–Li) filter, exactly matched | see below |
 | field scheme | `IFSSPRK3` ⇔ TurTLE's native SSPRK3 | same tableau, same stage arrangement |
 | timestep | fixed ``\Delta t = 2 \times 10^{-3}`` | identical in both codes |
-| particles | ``10^4`` tracers, AB4, cubic-spline interpolation | identical particles in both codes |
+| particles | ``10^4`` tracers, AB4, cubic-spline interpolation | identical in both codes |
 | window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the frozen handoff state |
 
 The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (the
-resolved band's edge times the Kolmogorov microscale): under the smooth filter the resolved band ends
-at ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
+resolved band's edge times the Kolmogorov microscale): under the smooth filter that edge is 0.8 of
+the Nyquist wavenumber, ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
-``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's own reported `kMeta` = 1.476 is the same
-convention with its cutoff normalized by ``N/2 - 1`` instead of ``N/2``.) Because the forcing
+``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's `kMeta` = 1.476 differs in normalizing
+its cutoff by ``N/2 - 1`` instead of ``N/2``.) Because the forcing
 fixes the injection rate, ``\varepsilon`` is an *input*; the velocity scale ``u'`` and
 ``\mathrm{Re}_\lambda`` are *outputs* — their agreement is part of the test.
 
@@ -78,7 +78,7 @@ Every step of that import is witnessed, not assumed:
 |:---|:---|
 | state fidelity: ``k`` and ``\varepsilon`` of the imported state vs TurTLE's own ``t_0`` sample | relative difference **0.0** (bit-exact) |
 | curl round trip: ``\nabla\times`` applied to the recovered velocity vs the injected vorticity | ``1.4 \times 10^{-16}`` |
-| interpolation parity: ``\boldsymbol{u}(t_0, \boldsymbol{X}_0)`` sampled by this package's Catmull–Rom vs TurTLE's stored I4O3 sample | ``1.6 \times 10^{-14}`` over all ``10^4`` tracers |
+| interpolation parity: ``\boldsymbol{u}(t_0, \boldsymbol{X}_0)``, the velocity at the tracers' handoff positions, sampled by this package's Catmull–Rom vs TurTLE's stored I4O3 sample | ``1.6 \times 10^{-14}`` over all ``10^4`` tracers |
 | AB4 history slot order | pinned bitwise against TurTLE's stored per-step samples |
 
 ## Results
@@ -146,8 +146,8 @@ itself is statistical noise of that size.
 
 The whole comparison was repeated with a different forcing law — the band-limited **linear
 (Lundgren-type) forcing** ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
-**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``
-(this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
+**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``, the target
+injection rate over twice the handoff band energy (this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
 the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, nothing
 here reads the state or pins the injection: energy and dissipation are entirely outputs.
 
