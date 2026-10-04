@@ -381,7 +381,7 @@ harness whose *predicted* half is `Phenomenology` (§4.8).
 
 Forcing is the System's energy-injection strategy — the source term ``\boldsymbol{f}`` of §4.2, and the one
 deliberately designed-in extension point. `AbstractForcing` is the supertype; a forcing enters the
-step through a small interface of four per-step methods, plus `initial_forcing_state`, which starts
+step through a small interface of four methods, plus `initial_forcing_state`, which starts
 the state the first of them advances; each defaults to doing nothing:
 
 - `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
@@ -421,7 +421,7 @@ one post-step projection, kept as the reference implementation of a published me
 Mahalingam & Kerr 1994) with its first-order caveat and its Berendsen-class caveat (Bussi, Donadio &
 Parrinello 2007) documented rather than hidden. `StochasticOU` (Eswaran & Pope 1988) is the one
 strategy independent of the flow it drives: an exact Ornstein–Uhlenbeck process on the band's conjugate
-mode pairs, advanced on the host and added at every stage, holding nothing field-sized. **One
+mode pairs, drawn on the host, advanced on the run's backend and added at every stage, holding nothing field-sized. **One
 implementation serves both** the velocity (a vector field) and the scalar (a scalar field), because
 these methods are written through tensor-order-generic field operators; the only field-specific step a
 forcing can need is the solenoidal projection of the velocity, which the field-proportional strategies

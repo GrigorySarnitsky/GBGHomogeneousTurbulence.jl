@@ -98,8 +98,8 @@ CFL step than the ``2/3`` rule — handled automatically by
 - `materialized = false` — how the filter is *applied*, a memory-for-compute choice with no effect
   on the numbers. `false` keeps the filter as a closed-form radial symbol re-evaluated per mode in
   every pass: zero resident storage, the minimal-footprint side. `true` evaluates the same expression
-  once into a stored coefficient array — one resident complex spectral scalar (``\\approx 17`` MiB at
-  ``128^3`` `Float64`, ``\\approx 136`` MiB at ``256^3``) — that the passes then merely read. Because
+  once into a stored coefficient array — one resident complex spectral scalar (``\\approx 17`` MB at
+  ``128^3`` `Float64`, ``\\approx 136`` MB at ``256^3``) — that the passes then merely read. Because
   the coefficients are the same expression evaluated once, the two settings advance a run
   **bit-identically**.
 

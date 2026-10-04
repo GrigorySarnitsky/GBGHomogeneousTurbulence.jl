@@ -121,14 +121,14 @@ _band_is_empty(band_value, whole_value) =
 Supertype of the energy-injection strategies — the interchangeable ways a run drives its velocity or
 its scalar.
 
-A strategy implements whichever of four hooks it needs; each defaults to doing nothing. A step calls
-them in one fixed order:
+A strategy implements whichever of four hooks it needs; each defaults to doing nothing. The
+generator calls the first once, when it is built, and a step calls the other three in a fixed order:
 
+- [`steady_linear_rate`](@ref) — once, when the generator is built: return a per-mode rate that
+  stays fixed for the whole run, which the scheme folds exactly into the integrating factor.
 - [`prepare_forcing!`](@ref) — once, before the stages: advance the strategy's own evolving state,
   such as a stochastic forcing's random process. [`initial_forcing_state`](@ref) creates that state
   and the run's [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields) holds it.
-- [`steady_linear_rate`](@ref) — once, when the generator is built: return a per-mode rate that
-  stays fixed for the whole run, which the scheme folds exactly into the integrating factor.
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
 - [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 

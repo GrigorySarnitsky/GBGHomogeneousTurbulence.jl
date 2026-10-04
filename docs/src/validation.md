@@ -2,7 +2,7 @@
 
 !!! note "Comparison completed 2026-08-28"
     Both legs of the comparison have run and the results below are measured. The initial state
-    and both reference-data files are published as release assets; every number on this page is
+    and all five reference-data files are published as release assets; every number on this page is
     reproducible from them with the scripts in the repository's `validation/` directory.
 
 The package is validated against **TurTLE** — an independent, production pseudo-spectral DNS code
@@ -215,7 +215,7 @@ threads on a 12-core CPU) and this package **265 seconds** on a single AMD RX 79
 
 ## Reproducing the comparison
 
-The three published files (release assets; verify the hashes):
+The six published files (release assets; verify the hashes):
 
 ```
 base=https://github.com/GrigorySarnitsky/GBGHomogeneousTurbulence.jl/releases/download/turtle-comparison-v1

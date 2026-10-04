@@ -77,8 +77,8 @@ The positional form wraps existing fields without copying them, which is how a s
 - `scalar = false` — `true` to carry a passive scalar.
 - `velocity_spectral`, `scalar_spectral` — existing fields in spectral representation, in the second
   form, wrapped as they are; `scalar_spectral` is `nothing` for a run without a scalar.
-- `modeled` — the forcing states. Both forms leave it empty; a `Simulation` fills it from its
-  forcings, starting any forcing state the record does not already carry.
+- `modeled` — the forcing states, in the second form. The first form, and the second without it,
+  leave it empty; a `Simulation` fills it from its forcings, starting any forcing state the record does not already carry.
 
 # Fields
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
