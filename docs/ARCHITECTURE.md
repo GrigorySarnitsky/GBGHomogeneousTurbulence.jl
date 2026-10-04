@@ -448,7 +448,7 @@ Method (§3).
   the same Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
-- **`IFLowStorageRK3`** (the Williamson 1980 2N / RKW3 workhorse) is third-order and imaginary-axis stable;
+- **`IFLowStorageRK3`** (the Williamson 1980 2N-storage / RKW3 workhorse) is third-order and imaginary-axis stable;
   **`IFHeun`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
   three) but *dearer* in memory and imaginary-axis unstable, leaning on viscous damping. The memory
   comparison counts the solver's scratch registers per field: `IFHeun` carries three (a predictor
@@ -458,7 +458,7 @@ Method (§3).
   `IFLowStorageRK3` docstring keeps that ledger); the two bookkeepings agree on the point that
   matters, one register in `IFHeun`'s disfavor. Two more schemes share `IFLowStorageRK3`'s two
   registers: **`IFLowStorageRK4`** (Carpenter & Kennedy 1994) is fourth-order in five stages of the
-  same 2N form, its ``1.93\times`` wider imaginary-axis stability limit buying fewer transforms per
+  same 2N-storage form, its ``1.93\times`` wider imaginary-axis stability limit buying fewer transforms per
   unit time on a stability-limited run (decision 85); **`IFSSPRK3`** is the Shu–Osher third-order
   SSP scheme in TurTLE's stage arrangement, kept for code-to-code validation against that
   reference (decision 80). The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
@@ -986,7 +986,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
    credited to the form is really the sharp mask's: under a truncating band the truncation is exactly
    Galerkin, so the discrete advection conserves kinetic energy — `HouLi`, which tapers rather than
    truncates, is deliberately non-conservative. §4.2.)*
-3. **(2026-06) `IFLowStorageRK3` (Williamson 2N / RKW3) is the default; per-scheme CFL.** Third-order,
+3. **(2026-06) `IFLowStorageRK3` (Williamson 2N-storage / RKW3) is the default; per-scheme CFL.** Third-order,
    imaginary-axis stable, two registers per field; `IFRK2` kept as a cheaper, viscously-stabilized
    option.
 4. **(2026-06) One passive scalar ``\varphi``, coupled in-stage.** Velocity and scalar advance through
@@ -2554,14 +2554,14 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     registers, for stability-limited runs.** The time-integration report's storage taxonomy
     corrected a mis-belief this log should record being corrected: fourth order does NOT cost more
     registers — Carpenter & Kennedy (1994, NASA TM-109112) reach it in five stages of the same
-    Williamson 2N form. The scheme's stability function was derived exactly from the published
+    Williamson 2N-storage form. The scheme's stability function was derived exactly from the published
     rationals (the fifth coefficient collapses to ``z^{5}/200``), giving the imaginary-axis limit
     ``y_s = \sqrt{5(\sqrt{2041}-5)/18} \approx 3.3407``, ``1.93\times`` RK3's ``\sqrt{3}`` at
     ``5/3`` the evaluations. That gives ``\approx 16\%`` fewer transforms per unit time at the
     stability limit, and the gain was MEASURED at exactly that: step cost ``\times 1.665`` (vs ``5/3``
     analytic) on a ``128^3`` `Float64` GPU run, throughput ``\times 1.159`` vs the
     ``\times 1.157`` transform-only projection; the per-stage non-transform costs scale with the stages
-    just as the transforms do, so nothing is eaten. Implementation: `step!`'s 2N loop was factored into one shared
+    just as the transforms do, so nothing is eaten. Implementation: `step!`'s 2N-storage loop was factored into one shared
     `_low_storage_2n_step!` both schemes instantiate with their coefficient tuples — the S = 3
     op sequence is bit-identical to the pre-refactor body — and the audit op model mirrors the
     same factoring (`rk4_ops` = the RK3 iteration at five stages). All three audits extended:
