@@ -51,7 +51,7 @@ AMD's `AMDGPU` has no unified memory, so a run on a ROCm card has to fit in the 
 The package itself needs no change. It never chooses a memory kind where it allocates, so every array a
 run holds follows the setting: the state, the scalar, the tracers, and a run restored by
 [`read_simulation`](@ref) with `array_type = CuArray`. Each of those was checked once, on one CUDA card. To confirm the setting took
-effect in your own run, read the memory kind of the velocity:
+effect in your own run, a `Simulation` `sim`, read the memory kind of its velocity:
 
 ```julia
 using CUDA
