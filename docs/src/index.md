@@ -52,18 +52,18 @@ sim = Simulation(grid_points_per_axis = 64)
 # A 64³ forced-stationary run; the viscosity ν is set so the grid captures the dissipation scale.
 
 warmup!(sim)
-# Spin up to statistical stationarity. The default forcing holds the injection rate
-# the run was set up for, so the kinetic energy k settles freely — see ConstantPower before measuring it.
+# Spin up to statistical stationarity. The default forcing, ConstantPower, holds the energy injection
+# rate the run was set up for, so the kinetic energy k settles freely — read its docstring before measuring k.
 
 t_end = current_time(sim) + 5.0
 run!(sim) do s              # observe and advance: the callback reads the run,
     current_time(s) < t_end # records what it wants, and decides continuation
 end
 
-# The state is always current; the cache serves what the last iteration recorded
-# at its end — a stale read throws rather than serving an old value.
+# The state is always current. The observables cache serves what the last iteration (one advance of
+# the run) stored at its end; a read made stale by a later change to the state throws instead.
 kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
-velocity_physical(sim.cache)                 # the field the last iteration recorded
+velocity_physical(sim.cache)                 # the field the last iteration stored
 flow_parameters(sim)                          # the run's measured flow state
 ```
 
