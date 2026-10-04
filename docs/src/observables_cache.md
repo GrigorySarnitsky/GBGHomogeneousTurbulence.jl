@@ -124,7 +124,7 @@ internal or on request — by which reading causes a computation.
 
 That is what makes the rules below refusals rather than inconveniences. A cache that quietly rebuilt
 a stale value could never report a scheduling error; it would convert one into a doubled transform
-count that no ledger catches, since a ledger freezes the intended schedule. Because the schedule is
+count that no **ledger** (the test suite's frozen table of measured costs) catches, since a ledger freezes the intended schedule. Because the schedule is
 fixed, an iteration's transform and traffic counts are exact constants of the configuration rather
 than averages over a run, and the frozen ledgers report the true cost.
 
@@ -177,7 +177,7 @@ recover anyway. What it costs is reads: a slot taken before the last reader of t
 that read throw, so the schedule must order the two.
 
 **Every slot is deposited on every iteration**, and the completeness check throws if any slot's
-epoch is still at the cleared sentinel — an un-redeposited slot. Through today's API no caller can cause this — a slot exists only because the schedule fills it
+epoch is still at the value that marks it cleared — an un-redeposited slot. Through today's API no caller can cause this — a slot exists only because the schedule fills it
 — so the check guards the solver against its own future edits: a slot nobody refilled would hold scratch for the
 rest of the run and throw on every later read, and the completeness check names the fault where it
 happened.
@@ -200,7 +200,7 @@ end — the qualification §1.2 draws.
 
 ### 1.4 What caching costs
 
-It costs nothing on the memory axis, nothing on the transform axis, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. Each clause of that is an accounting statement: every slot is a
+It costs nothing on the memory axis, no extra transform, and — with one exception — nothing on the traffic axis: the closing deposit's maximum-speed reduction is one physical-vector pass every iteration, paid even by a hand-fixed-``\Delta t`` run that never reads the number, the price of a schedule that never varies with how the run is driven. Each clause of that is an accounting statement: every slot is a
 register the iteration fills anyway (§1.2), every deposit is work the next first stage was about to do
 (§1.3), and no
 read computes. The cache is otherwise a naming-and-dating layer over storage the run already owns:
@@ -226,8 +226,8 @@ in spectral representation and two in physical — about 2.3 GiB at ``256^{3}`` 
 before the scalar-shaped registers. It carried ten before this design landed: two physical vectors
 existed only because a slot and its producer's register were separate arrays, a spectral one was the
 cache's private recovery scratch, and a fourth held the quadratic products that now form in place
-over the slots (§2.3) — all four are gone, and the ledger sits at the schedule's own lower bound in
-every class.
+over the slots (§2.3) — all four are gone, and the ledger sits at the schedule's own lower bound for
+every array shape.
 
 ---
 
@@ -370,8 +370,8 @@ there is no moment to date it to, so no act at an observation builds it either.
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
 | ``E(\kappa_n)``, the spectral density | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | not computed: no iteration forms it |
-| ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the skewness gate of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed per point in registers by a fused mapped mean and never materialized at all, at its own cadence |
-| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | not computed as a field: [`max_speed`](@ref) forms the magnitude per grid point in registers and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
+| the strain-rate tensor ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the derivative-skewness stopping test of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed point by point inside one averaging pass and never materialized at all, at its own cadence |
+| the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | not computed as a field: [`max_speed`](@ref) forms the magnitude point by point inside its reduction and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
 | ``\nu\nabla^{2}\boldsymbol{u}``, ``\varkappa\nabla^{2}\varphi`` | — | no | not computed: the step multiplies by the integrating factor instead of forming the term (§2.2) |
 | ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` | — | no | not computed: the rate is folded into the integrating factor and the product never exists (§2.2) |
 | a rescaling forcing's equivalent field | — | never | not an observable: defined only through the step it rescales, so it carries ``\Delta t`` |
@@ -442,10 +442,10 @@ cache   = ObservablesCache(domain; scalar = true, number_of_particles = 1024)
 The cache itself is built as §§1–2 describe: automatic contents, closing deposits recorded at the new
 epoch — the velocity sample included, against both epochs — three-valued slot epochs that
 throw on a stale, taken, or never-deposited read, the seeding deposit at construction, the
-deposit-completeness check, and the slot=register merge. The loop is the observation-first loop of §1.3:
+deposit-completeness check, and each slot doubling as its producer's register. The loop is the observation-first loop of §1.3:
 `run!(callback, sim)` observes the run after every iteration and once before the first — ``n`` iterations, ``n + 1``
 observations, the seeded ``t_0`` included — and the callback's return decides continuation, so
-stopping is the caller's decision on observables and the budget vocabulary is gone. What §1.3
+stopping is the caller's decision on observables, not a run option. What §1.3
 records as the storage decision — the nonlinear terms stay in the first stage because the in-place
 products would otherwise destroy the deposited fields — closes the list: every mechanism this page describes exists in the code, and none exists that this
 page omits. The decision record is in the [architecture notes](architecture.md).
