@@ -113,8 +113,8 @@ Listed in build order — each module uses the ones above it. The
 - [`SimulationDomain`](api/SimulationDomain.md): the discretized periodic box a run lives on — the
   `FixedDomain`, its choice of `DealiasingStrategy`, and the scratch-field allocators.
 - [`Observables`](api/Observables.md): the measured functions of state — the energy and dissipation
-  diagnostics of the flow and the scalar (including the fused pair
-  `kinetic_energy_and_dissipation`), the developed-turbulence marker (`derivative_skewness`),
+  diagnostics of the flow and the scalar (including
+  `kinetic_energy_and_dissipation`, both in one pass), the developed-turbulence marker (`derivative_skewness`),
   the spectrum-derived scales, the CFL speed bound (`max_speed`), and the one field-valued
   observable, the vorticity recovery.
 - [`State`](api/State.md): the evolving state (`ResolvedFields`, the single source of truth) a step
