@@ -23,8 +23,8 @@ The run layer:
   fields at the current instant, the observables cache, the equations of motion with their
   forcing, the integration schemes with their scratch, any tracers, and the clock — built with
   defaults from a few numbers. It holds the present instant — plus the one bounded look-back a
-  multistep particle scheme needs, the cache's Lagrangian sample history — and past instants
-  otherwise exist only in what an observation recorded as the run advanced.
+  multistep particle scheme needs, the cache's Lagrangian sample history of earlier tracer
+  velocities — and past instants exist only in what an observation recorded.
 - [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
@@ -38,8 +38,9 @@ The run layer:
 - [`write_simulation`](@ref) / [`read_simulation`](@ref) — checkpoint and restore: the restartable
   run as one self-describing HDF5 group (available once `HDF5` is loaded).
 
-Read a run's state through `sim.state` and its deposited observables through `sim.cache`, with the
-observables and cache accessors that own them; the run layer adds no forwarding methods of its own.
+Read a run's state through `sim.state` and the observables each iteration
+[deposits](@ref GBGHomogeneousTurbulence.Propagator.deposit!) through `sim.cache`, with the
+observables and cache accessors that own them; the run layer adds no forwarding methods.
 """
 module SimulationRun
 
@@ -929,9 +930,10 @@ current_time(sim::Simulation) = sim.clock.time
 The number of steps `sim` has taken — how far the run has gone.
 
 Distinct from the observables cache's **epoch**, which counts *changes to the state* rather than
-advances of the run: a completed step advances the epoch, but so does any announced out-of-band
-mutation. The constructor's seeding deposit already leaves the fields epoch at 1, so after two steps
-and one announced mutation the clock reads
+advances of the run: a completed step advances the epoch, but so does any state change announced
+with [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!). The constructor's
+deposit of the seeded fields already leaves their epoch at 1, so after two steps
+and one announced change the clock reads
 step 2 and the fields epoch reads 4. Use this to ask how far the run has gone, and the epoch to ask
 whether a cached value is still the right one.
 """
