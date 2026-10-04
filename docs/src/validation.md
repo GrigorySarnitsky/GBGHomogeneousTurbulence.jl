@@ -25,7 +25,7 @@ One forced, statistically stationary run of homogeneous isotropic turbulence:
 
 | quantity | value | notes |
 |:---|:---|:---|
-| grid, box | ``128^3``, ``L = 2\pi`` | |
+| grid, box side | ``128^3``, ``L = 2\pi`` | |
 | precision | `Float64` both codes | |
 | viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the resolution criterion, see below |
 | forcing | constant power ``\varepsilon_{\mathrm{inj}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
