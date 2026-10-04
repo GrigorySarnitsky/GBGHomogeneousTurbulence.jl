@@ -45,8 +45,8 @@ measured (it normalizes the eddy-turnover clock) but never gated on.
 None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
 band (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
-and the cubic skewness carries a slight aliasing residual — its docstring states the per-strategy
-standing (priced for the sharp truncations, unpriced for `HouLi`'s taper).
+and the cubic skewness carries a slight aliasing residual — its docstring states, per strategy, whether
+that residual is accounted for (yes for the sharp truncations, no for `HouLi`'s taper).
 """
 module Observables
 
@@ -264,7 +264,7 @@ value is not current, like every cached read.
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
     value, which makes the sampled maximum an under-estimate — one of the two loosenesses
-    [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) prices when it sets
+    [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) accounts for when it sets
     its margin. A CFL condition bounds the *stability* of the explicit advective term; it is not by
     itself a guarantee of accuracy.
 
@@ -396,9 +396,9 @@ The denominator needs no physical field: for a solenoidal field
 
 Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
-quadratic reductions, not exactly alias-free. That pricing is the sharp-truncation one: the wider
+quadratic reductions, not exactly alias-free. That account covers the sharp truncations: the wider
 [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi)'s
-smooth taper leaves a residual of its own shape that no bound here prices — on every strategy,
+smooth taper leaves a residual of its own shape that no bound here accounts for — on every strategy,
 treat the skewness as an indicator, not an alias-controlled measurement.
 
 The skewness ``S`` is the classic marker of *developed* turbulence: a random-phase (Gaussian) field has ``S \\approx 0``
