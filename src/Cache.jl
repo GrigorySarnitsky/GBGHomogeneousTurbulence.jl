@@ -45,7 +45,7 @@ and a slot is readable exactly when its own epoch equals the counter it depends 
 An epoch is not a step count: a completed
 [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) advances the fields epoch, but so does any
 announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value still the
-right one?"; the clock's
+right one?"; the run's step counter
 [`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) answers "how far has the run
 gone?".
 """
@@ -97,7 +97,7 @@ and seeds one for you; a hand-assembled run constructs it here.
   ([`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)) refuses a cache
   whose depth differs from it.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
-  the velocity-at-particles slot (an ``M \\times 3`` point-value section) and its sample history.
+  the velocity-at-particles slot (an ``M \\times 3`` array of point values) and its sample history.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
@@ -118,8 +118,8 @@ was filled. A slot is readable exactly while the epoch it records still equals t
 depends on.
 
 - `velocity_physical`, `vorticity_physical` — the cached velocity and vorticity in physical
-  representation. Mid-iteration the step also computes its stage recoveries *into these same
-  arrays*, which is why they are not readable then.
+  representation. Mid-iteration the step also writes each stage's velocity and vorticity *into
+  these same arrays*, which is why they are not readable then.
 - `scalar_physical` — the cached scalar in physical representation, or `nothing` for a scalar-free run.
 - `max_speed` — the cached fastest flow speed (a host number in the field's own element type).
 - `velocity_at_particles` — the velocity sampled at the particle positions, or `nothing` for a tracer-free run.
@@ -265,7 +265,7 @@ end
 
 The flow velocity at the particle positions, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the
 current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at the position each tracer occupies at
-that instant: the genuine Lagrangian velocity the statistics accumulate. Treat the returned array as
+that instant: the genuine Lagrangian velocity, the input to the caller's statistics. Treat the returned array as
 read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. The
 checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
 deposited values or throws an `ErrorException`, like every cached read — the sample depends on the
@@ -401,9 +401,9 @@ integration scheme starts over from the new positions rather than integrating ac
 why the history lives here and not in the scheme's own per-step buffers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.
 
-A sanctioned push never needs this verb:
-[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) moves the particles epoch itself, a
-history-keeping announcement — the push *extends* the history this verb discards.
+The run's own tracer advance never needs this verb:
+[`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!) moves the particles epoch itself and
+keeps the history — the advance *extends* the history this verb discards.
 
 A hand-run loop that repositions tracers itself calls this and then makes the particle deposit —
 `deposit!(cache, tracers, u)` — from the
