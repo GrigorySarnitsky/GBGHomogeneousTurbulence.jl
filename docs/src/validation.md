@@ -30,10 +30,10 @@ One forced, statistically stationary run of homogeneous isotropic turbulence:
 | viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the resolution criterion below |
 | forcing | constant power ``\varepsilon_{\mathrm{inj}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
 | dealiasing | smooth (Hou–Li) filter, exactly matched | see below |
-| field scheme | `IFSSPRK3` ⇔ TurTLE's native SSPRK3 | same tableau, same stage arrangement |
+| field scheme | [`IFSSPRK3`](@ref) ⇔ TurTLE's native SSPRK3 | same tableau, same stage arrangement |
 | timestep | fixed ``\Delta t = 2 \times 10^{-3}`` | identical in both codes |
-| particles | ``10^4`` tracers, AB4, cubic-spline interpolation | identical in both codes |
-| window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the frozen handoff state |
+| particles | ``10^4`` tracers, fourth-order Adams–Bashforth, cubic-spline interpolation | identical in both codes |
+| window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the [frozen handoff state](@ref "The shared initial state, and the import witnesses") |
 
 The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (the
 resolved band's edge times the Kolmogorov microscale): under the smooth filter that edge is 0.8 of
@@ -43,7 +43,7 @@ the Nyquist wavenumber, ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.
 ``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's `kMeta` = 1.476 differs in normalizing
 its cutoff by ``N/2 - 1`` instead of ``N/2``.) Because the forcing
 fixes the injection rate, ``\varepsilon`` is an *input*; the velocity scale ``u'`` and
-``\mathrm{Re}_\lambda`` are *outputs* — their agreement is part of the test.
+``\mathrm{Re}_\lambda`` are *outputs* — their agreement is tested.
 
 ## Matching the smooth filter exactly
 
@@ -70,7 +70,7 @@ an axis permutation between the storage layouts, an amplitude rescale (TurTLE st
 *mode amplitudes*; this package stores the unnormalized-transform convention — a factor
 ``N^{3}``), the inverse curl
 ``\hat{\boldsymbol{u}} = \mathrm{i} \boldsymbol{\kappa} \times \hat{\boldsymbol{\omega}} / \lvert\boldsymbol{\kappa}\rvert^{2}``,
-and the tracer positions and history into the particle integrator's registers.
+and the tracer positions and history into the run's tracers and [observables cache](observables_cache.md).
 
 Every step of that import is witnessed, not assumed:
 
@@ -78,8 +78,8 @@ Every step of that import is witnessed, not assumed:
 |:---|:---|
 | state fidelity: ``k`` and ``\varepsilon`` of the imported state vs TurTLE's own ``t_0`` sample | relative difference **0.0** (bit-exact) |
 | curl round trip: ``\nabla\times`` applied to the recovered velocity vs the injected vorticity | ``1.4 \times 10^{-16}`` |
-| interpolation parity: ``\boldsymbol{u}(t_0, \boldsymbol{X}_0)``, the velocity at the tracers' handoff positions, sampled by this package's Catmull–Rom vs TurTLE's stored I4O3 sample | ``1.6 \times 10^{-14}`` over all ``10^4`` tracers |
-| AB4 history slot order | pinned bitwise against TurTLE's stored per-step samples |
+| interpolation parity: ``\boldsymbol{u}(t_0, \boldsymbol{X}_0)``, the velocity at the tracers' handoff positions, sampled by this package's Catmull–Rom vs TurTLE's stored I4O3-kernel sample | ``1.6 \times 10^{-14}`` over all ``10^4`` tracers |
+| Adams–Bashforth history slot order | pinned bitwise against TurTLE's stored per-step samples |
 
 ## Results
 
@@ -125,7 +125,7 @@ The estimator is the single-origin ensemble form,
 ```
 
 the dot product averaged over the ``10^4`` tracers with ``\boldsymbol{u}(0)`` frozen at the
-handoff instant. This package computes it **online in the run's observation callback** (the
+handoff instant. This package computes it **online in the callback passed to [`run!`](@ref)** (the
 initial sample is stored once; each instant contributes one scalar); TurTLE's curve is computed
 from its stored trajectory samples with the identical formula. Because both codes share
 ``\boldsymbol{u}(0)`` and the particles, the curves are comparable realization to realization:
@@ -148,8 +148,8 @@ The whole comparison was repeated with a different forcing law — the band-limi
 (Lundgren-type) forcing** ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
 **fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``, the target
 injection rate over twice the handoff band energy (this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
-the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, nothing
-here reads the state or pins the injection: energy and dissipation are entirely outputs.
+the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, this
+*unanchored* forcing neither reads the state nor pins the injection, so energy and dissipation are entirely outputs.
 
 ![Linear-forcing pair: TurTLE (solid) vs this package (dashed)](assets/comparison_overlay_linear.png)
 
