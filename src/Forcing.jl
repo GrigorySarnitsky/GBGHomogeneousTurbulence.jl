@@ -55,7 +55,7 @@ to four hook methods, each defaulting to doing nothing. The module provides:
   (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
 - [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the stationary state a
   forcing drives, as the kinetic energy in box units ``\\tilde{k}`` and the band's share of it.
-- [`DeferredForcing`](@ref) — the operator-free keyword form of a strategy, built into the concrete strategy once the
+- [`DeferredForcing`](@ref) — the keyword form of a strategy, taken without a domain and built into the concrete strategy once the
   [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
@@ -165,7 +165,8 @@ abstract type AbstractForcing end
 """
     DeferredForcing
 
-A `DeferredForcing` is a forcing named before its domain exists. The operator-free keyword constructors
+A `DeferredForcing` is a forcing named before its domain exists. The keyword constructors,
+which take no domain,
 
     ConstantPower(; injection_rate = nothing, lowest_shell = 1, highest_shell = 2)
     VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
@@ -603,16 +604,18 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `rate` — the fixed linear rate ``A``. A positive value amplifies the field. The deferred form may
-  leave it out, and a run then supplies ``A = \\varepsilon/(2 k_{\\mathrm{band}})`` from its predicted state.
-  The balance is not anchored, so the run settles near that state rather than exactly at it.
+  leave it out, and a run then supplies ``A = \\varepsilon/(2 k_{\\mathrm{band}})`` from the state
+  [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state) returns.
+  The rate is fixed, not fed back from the measured state, so the run settles near that state rather
+  than exactly at it.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``. `highest_shell = Inf` lifts the band limit: every retained mode but the
   mean is forced, on any grid, and this is Lundgren's forcing itself — the form a physical-space code
   applies.
 
 # Fields
-- `band` — the band-pass kernel, lazy; the rate is a radial kernel on the same edges, so neither is
-  stored.
+- `band` — the band-pass kernel, evaluated per mode where used rather than stored, as is the rate
+  on the same edges.
 - `rate` — the fixed linear rate ``A``.
 - `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
   from.
@@ -688,7 +691,7 @@ rather than the integrating factor, where freezing it would cost the scheme its 
     if a run needs the forcing to take hold.
 
 # Fields
-- `band` — the band-pass kernel, lazy: the per-stage source both weights the band observable with it
+- `band` — the band-pass kernel, evaluated per mode where used: the per-stage source both weights the band observable with it
   and convolves against it, so no indicator array is stored.
 - `injection_rate` — the held rate.
 - `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
@@ -741,7 +744,7 @@ in the band if the run depends on the controller taking hold.
 
 # Arguments
 - `domain` — the [`FixedDomain`](@ref) the band kernel is built on (the first form; the
-  operator-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
+  domain-free second form defers that to the run, as a [`DeferredForcing`](@ref)).
 - `target` — the whole-field variance ``k_\\infty`` to hold, in the field's own convention: the
   kinetic energy for the velocity, ``\\langle\\varphi^{2}\\rangle`` for the scalar. The deferred
   velocity form may leave it out, and the run then supplies its stationary ``k``.
@@ -788,10 +791,11 @@ does not take.
 - Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* **31**(3), 1695–1697.
 
 # Fields
-- `band` — the band-pass kernel, lazy; the controller convolves against it and stores nothing.
+- `band` — the band-pass kernel, evaluated per mode where used; the controller convolves against it and stores nothing.
 - `target`, `gain`, `turnover_time` — ``k_\\infty``, ``G`` and ``t_\\ell``.
 - `turnover_time_derived` — `true` when ``t_\\ell`` came from the kinetic-energy default rather
-  than the caller; the scalar binding refuses such a controller.
+  than the caller; `FlowConditions` refuses such a controller as a `scalar_forcing` at a
+  positive gain.
 - `lowest_shell`, `highest_shell` — the forced band's shell bounds: the parameters `band` is derived
   from.
 """

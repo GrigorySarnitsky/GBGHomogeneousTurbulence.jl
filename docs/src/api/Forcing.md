@@ -46,7 +46,7 @@ band_energy_fraction
 
 ## Deferred forcing
 
-This section documents the operator-free deferred form a strategy's constructor returns, which is
+This section documents the domain-free deferred form a strategy's constructor returns, which is
 materialized into a concrete forcing once the domain exists.
 
 ```@docs
