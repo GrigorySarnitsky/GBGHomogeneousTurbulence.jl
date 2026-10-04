@@ -18,7 +18,8 @@ The measured functions of the flow state:
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
   developed cascade.
 - [`max_speed`](@ref) — the fastest flow speed on the grid, which sets the advective-CFL step (one
-  generic shared with `Cache`: the field reduction is homed here, the cached read there).
+  generic: the reduction lives here; its [`Cache`](@ref GBGHomogeneousTurbulence.Cache) method reads
+  the value stored at each iteration's end).
 - [`vorticity_physical!`](@ref) — the vorticity recovered in physical representation from the
   state's spectral representation, the one field-valued observable
   (its cached read, [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical),
@@ -256,9 +257,9 @@ The magnitude is formed one grid point at a time and consumed by the maximum imm
 so no magnitude field is materialized.
 
 The second form reads the number back from an
-[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), where the closing deposit
-left it — the same quantity, measured once per iteration and served without a reduction (or a device readback); it throws an `ErrorException` when no
-deposit is current, like every cached read.
+[`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), where each iteration writes
+it at its end — the same quantity, measured once per iteration and served without a reduction (or a device readback); it throws an `ErrorException` when that
+value is not current, like every cached read.
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
@@ -292,7 +293,7 @@ max_speed(u) = sqrt(maximum(_speed_squared, u))
     vorticity_physical!(ω, û, domain, spectral_scratch)
 
 Compute the vorticity ``\\boldsymbol{\\omega} = \\nabla\\times\\boldsymbol{u}`` in physical
-representation into `ω` — the field-valued observable the iteration deposits into its cache. The
+representation into `ω` — the field-valued observable each iteration writes into the run's observables cache at its end. The
 curl is formed as ``\\mathrm{i}\\boldsymbol{\\kappa}\\times\\hat{\\boldsymbol{u}}`` in spectral
 representation and transformed to physical.
 
@@ -307,8 +308,8 @@ representation and transformed to physical.
 Returns `ω`.
 
 The deposited value is read back with
-[`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical), which serves the
-iteration's deposit or throws — measure with this function, read with that one.
+[`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical), which serves that
+cached value or throws — measure with this function, read with that one.
 """
 function vorticity_physical!(ω, û, domain::FixedDomain, spectral_scratch)
   curl!(spectral_scratch, û, domain.multipliers)
