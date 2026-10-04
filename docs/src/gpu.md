@@ -4,7 +4,7 @@ A run goes on a GPU through its `array_type`: `CuArray` for an NVIDIA card, with
 environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` sets the precision. This
 page answers the question a GPU run meets first, whether a grid fits on the card; it also describes how
 CUDA's unified memory lets a run outgrow the card. Everything else about driving a device, from writing
-efficient device code to the vendors' pitfalls, is on the field library's
+efficient device code to the vendors' pitfalls, is on the field library [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)'s
 [Running on a GPU](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/dev/gpu/) page.
 
 ## What a run keeps in memory
@@ -35,7 +35,7 @@ The package's test suite derives the table and every number in this paragraph fr
 change to the code that moves one of them fails the suite.
 
 On a GPU two costs come on top, and neither is in the table: the CUDA context, fixed in size, and the
-transform library's workspace. On an RTX 5070 Ti the whole footprint on the card measured 5 to 38
+FFT library's (cuFFT's) workspace. On an RTX 5070 Ti the whole footprint on the card measured 5 to 38
 bytes per grid point above the table across its eight rows, the allocator's rounding included.
 That figure was measured once, on one card, and nothing checks it.
 
@@ -63,8 +63,8 @@ CUDA.is_unified(field_data(sim.state.velocity_spectral))   # true once the setti
 The printed run says `CuArray` either way, so this call is the check.
 
 !!! warning "Unified memory changes more than where the fields live"
-    The setting covers every array the Julia process allocates, not one run's fields. The transform
-    library's workspace stays in device memory, so it still has to fit on the card. Unified arrays
+    The setting covers every array the Julia process allocates, not one run's fields. The cuFFT
+    workspace stays in device memory, so it still has to fit on the card. Unified arrays
     ignore `CUDA.allowscalar(false)`, so a scalar index into a unified array runs, slowly, instead of
     raising an error; develop in device memory. The package's own test suite runs only on the CPU. The
     field library's GPU test suites, one of which runs in unified memory, cover the operations a run is
