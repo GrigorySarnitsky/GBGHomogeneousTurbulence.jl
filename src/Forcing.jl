@@ -208,11 +208,13 @@ sim = Simulation(grid_points_per_axis = 64, kinetic_energy = 1.5,
                  velocity_forcing = ConstantPower())
 
 # Or state it, and the forcing's target is the run's state:
-sim = Simulation(grid_points_per_axis = 64, velocity_forcing = ConstantPower(injection_rate = 0.4))
+sim = Simulation(grid_points_per_axis = 64,
+                 velocity_forcing = ConstantPower(injection_rate = 0.4))
 
 # Or build it directly, once the domain is in hand:
-domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(),
-                     element_type = Float64, array_type = Array)
+domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π,
+                     dealiasing = TwoThirds(), element_type = Float64,
+                     array_type = Array)
 forcing = ConstantPower(domain; injection_rate = 0.4)
 ```
 

@@ -104,8 +104,10 @@ iterations:
 sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
 advance!(sim)
 
-X = point_positions(sim.tracers.positions)   # the (M, 3) positions, via the field library
-v = velocity_at_particles(sim.cache)          # u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
+# the (M, 3) positions, via the field library
+X = point_positions(sim.tracers.positions)
+# u(tₙ, X(tₙ)), the Lagrangian velocity — a checked read
+v = velocity_at_particles(sim.cache)
 
 out = new_scalar_point_values(sim.tracers)  # allocate once, then reuse every iteration
 interpolate_at_particles!(out, scalar_physical(sim.cache), sim.tracers)
@@ -120,7 +122,8 @@ tracers = Tracers(domain; positions = PointSet([0.1 0.2 0.3; 1.0 1.0 1.0]),
 cache   = ObservablesCache(domain; number_of_particles = npoints(tracers.positions))
 buffers = allocate_buffers(Heun(), tracers, cache)
 
-deposit!(cache, tracers, u)                 # u(tₙ) at the current positions — do this first
+# u(tₙ) at the current positions — do this first
+deposit!(cache, tracers, u)
 advect!(Heun(), tracers, u_end, domain, buffers, dt)
 ```
 
