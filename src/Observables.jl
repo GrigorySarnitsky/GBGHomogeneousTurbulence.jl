@@ -68,7 +68,8 @@ The turbulent kinetic energy
 of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as
 ``\\tfrac{1}{2}\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with the normalized inner product,
 so by Parseval's theorem it accepts the velocity in either representation — the physical field
-``\\boldsymbol{u}`` or its spectral coefficients ``\\hat{\\boldsymbol{u}}`` — to the same value.
+``\\boldsymbol{u}`` or its spectral coefficients ``\\hat{\\boldsymbol{u}}`` — to the same value. On
+point values (a `VectorPointValues`) it averages over the points.
 
 Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_dissipation`), it
 needs no dealiasing of its own: the sum over spectral coefficients is exact, and the equivalent
@@ -103,7 +104,8 @@ the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
 # Arguments
-- `ω` — first form: a vorticity field, in either representation.
+- `ω` — first form: a vorticity field, in either representation, or its point values (then
+  averaged over the points).
 - `û` — second form: the velocity in spectral representation.
 - `domain` — second form: the [`FixedDomain`](@ref) supplying the
   ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` multiplier.
@@ -249,7 +251,8 @@ end
 
 The fastest flow speed on the grid, ``\\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}(\\boldsymbol{x})\\rvert``,
 of the velocity field `u` in physical representation — the speed that sets the advective-CFL
-timestep. The magnitude is formed one grid point at a time and consumed by the maximum immediately,
+timestep. On `VectorPointValues` the maximum runs over the points instead.
+The magnitude is formed one grid point at a time and consumed by the maximum immediately,
 so no magnitude field is materialized.
 
 The second form reads the number back from an
@@ -321,7 +324,8 @@ end
 
 The scalar variance ``\\langle\\varphi^{2}\\rangle`` of the scalar field `φ` (for a mean-zero
 ``\\varphi``). Computed as ``\\langle\\varphi,\\varphi\\rangle`` with the normalized inner product,
-so by Parseval's theorem it accepts `φ` in either representation.
+so by Parseval's theorem it accepts `φ` in either representation; on `ScalarPointValues` the mean
+runs over the points.
 """
 scalar_variance(φ) = inner(φ, φ)
 
