@@ -49,7 +49,7 @@ with one; it fixes the `domain.dealias` kernel and, through
 [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl), the advective-CFL
 ceiling. They come in two families: a **mask** strategy
 acts on the assembled product alone, while a **shift** strategy also changes how that product is
-evaluated. Concrete strategies: [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
+evaluated. The concrete strategies are [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The
 [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor that builds a whole
@@ -64,8 +64,8 @@ The sharp isotropic ``2/3``-rule truncation of Orszag (1971).
 Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
 ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
-``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. Exact dealiasing
-of the quadratic nonlinearity, with the narrowest retained band of the three and no taper to evaluate.
+``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. It dealiases
+the quadratic nonlinearity exactly, with the narrowest retained band of the three and no taper to evaluate.
 
 # References
 - Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074.
