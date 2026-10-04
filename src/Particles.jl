@@ -134,7 +134,7 @@ counts come from `GBGPeriodicFields`' `point_positions` and `npoints`, never fro
 this package. Passing `unwrapped = true` additionally tracks the winding-preserving
 unwrapped positions `unwrapped_positions` serves — the wrapped positions stay the dynamical
 state either way. The velocities are a *deposited observable*, not tracer state: the particle form
-of `deposit!` writes them into the run's observables cache at the end of each iteration, and
+of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) writes them into the run's observables cache at the end of each iteration, and
 [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) reads them there.
 
 The particle integration scheme's own working storage is **not** here: it lives in a
@@ -698,7 +698,7 @@ pushes.
     particles, not recomputed here: it must hold
     ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, deposited by the particle
     form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) at the previous
-    iteration's end. The run's `advance!` checks that it is current before each push; a hand-run
+    iteration's end. The run's [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) checks that it is current before each push; a hand-run
     loop must make that deposit itself between advances.
 """
 function advect! end
