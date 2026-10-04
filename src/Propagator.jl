@@ -257,7 +257,8 @@ and a single accumulator ``\\boldsymbol{h}`` through three stages ``i = 1,2,3``,
 \\end{aligned}
 ```
 
-(the accumulator's rotation is skipped at the last stage, where nothing reads it again),
+(the accumulator's transport by the integrating factor is skipped at the last stage, where nothing
+reads it again),
 
 with stage coefficients ``A_i = (0, -5/9, -153/128)``, ``B = (1/3, 15/16, 8/15)``, and node
 increments ``d = (1/3, 5/12, 1/4)`` (abscissae ``c = (0, 1/3, 3/4)``). The velocity and scalar are
@@ -593,7 +594,7 @@ diffusivity, and any forcing's post-step projection
 
 The cost is three nonlinear evaluations per step and two registers per field — the stage state and
 the right-hand-side register — the same count as `IFLowStorageRK3` (one pointwise pass fewer, since
-no accumulator is rotated).
+no accumulator is transported by the integrating factor).
 
 !!! note "The midpoint stage transports backward"
     The ``\\mathcal{E}(-\\Delta t/2)`` factor is ``\\mathrm{e}^{+\\nu\\kappa^{2}\\Delta t/2}`` — a growing
