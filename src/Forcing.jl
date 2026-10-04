@@ -34,7 +34,7 @@
 
 The interchangeable energy-injection strategies — one implementation each serving both the velocity
 and the scalar through tensor-order-generic field operators. A strategy acts on the step through up
-to four hook methods, each defaulting to doing nothing, called in the order listed:
+to four hook methods, each defaulting to doing nothing. The module provides:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
 - [`initial_forcing_state`](@ref) — the evolving state a forcing starts with, kept in the run's state
