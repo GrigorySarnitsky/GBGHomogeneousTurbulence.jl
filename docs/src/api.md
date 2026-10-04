@@ -17,8 +17,8 @@ surface of the listed submodules, so `using GBGHomogeneousTurbulence` brings tha
 - [Forcing](api/Forcing.md): the interchangeable energy-injection strategies under `AbstractForcing`, chosen independently for the velocity and the scalar.
 - [Generator](api/Generator.md): the flow's equations of motion — the rotational-form Navier–Stokes right-hand side, the passive-scalar advection, and the exact viscous integrating factor — gathered into one object, the `ResolvedGenerator`, which a scheme consumes through a fixed set of functions.
 - [Propagator](api/Propagator.md): the integrating-factor time-stepping schemes under `AbstractIntegrator` — the low-storage `IFLowStorageRK3` and `IFLowStorageRK4`, the Shu–Osher `IFSSPRK3`, and `IFHeun` (Heun).
-- [Particles](api/Particles.md): Lagrangian particle tracking — today the massless `Tracers`; `advect!` under a selectable particle integration scheme (`Heun` default, `AdamsBashforth` available), and `interpolate_at_particles!` for the Lagrangian statistics.
-- [Phenomenology](phenomenology.md): the reference turbulence laws — model spectra, structure-function laws, and scaling constants — to validate a run against. A separate, opt-in group: not re-exported by the umbrella, and designed to be extractable into a standalone package.
+- [Particles](api/Particles.md): Lagrangian tracking of massless `Tracers`: `advect!` moves them under a selectable scheme (`Heun` by default, or `AdamsBashforth`), and `interpolate_at_particles!` samples fields at their positions.
+- [Phenomenology](phenomenology.md): the reference turbulence laws — model spectra, structure-function laws, and scaling constants — to validate a run against. It is opt-in: the umbrella does not re-export it, and it is designed to become a standalone package.
 
 ```@contents
 Pages = [
