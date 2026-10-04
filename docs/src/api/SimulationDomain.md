@@ -64,7 +64,7 @@ truncate_to_band!
 
 ## Persistence
 
-The domain's HDF5 persistence — its defining parameters as one self-describing group, available once `HDF5` is loaded.
+The domain persists to HDF5 as its defining parameters in one self-describing group, available once `HDF5` is loaded.
 
 ```@docs
 write_domain
