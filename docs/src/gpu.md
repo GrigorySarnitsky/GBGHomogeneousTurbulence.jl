@@ -1,7 +1,7 @@
 # Memory footprint on a GPU
 
-A run goes on a GPU through its `array_type`: `CuArray` for an NVIDIA card, with `CUDA` added to your
-environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` sets the precision. This
+A run goes on a GPU through the `array_type` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with `CUDA` added to your
+environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` keyword sets the precision. This
 page answers the question a GPU run meets first, whether a grid fits on the card; it also describes how
 CUDA's unified memory lets a run outgrow the card. Everything else about driving a device, from writing
 efficient device code to the vendors' pitfalls, is on the field library [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)'s
@@ -9,7 +9,7 @@ efficient device code to the vendors' pitfalls, is on the field library [`GBGPer
 
 ## What a run keeps in memory
 
-The table gives everything a [`Simulation`](@ref) holds: the state, the integrator's per-step storage
+The table gives everything a `Simulation` holds: the state, the integrator's per-step storage
 ([`IntegratorBuffers`](@ref GBGHomogeneousTurbulence.Propagator.IntegratorBuffers)), the generator's workspace for the right-hand side, the
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache), and the domain's precomputed spectral multipliers, with every setting not
 named in a column at its default. On a grid of ``N^3`` points, ``N`` even, that storage is a cubic polynomial in
