@@ -307,7 +307,7 @@ alike. A stability-limited run therefore advances ``\\approx 16\\%`` more physic
 compute. Its fourth-order accuracy also removes the field's own time error as the limit on an
 [`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer,
 whose [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) bootstrap still caps its measured
-convergence near third order, as its docstring records.
+convergence near third order.
 """
 struct IFLowStorageRK4 <: AbstractIntegrator end
 
