@@ -12,7 +12,8 @@
 
 The observables cache — where the iteration leaves the observables it produces, for the run's own
 components and for any **observation** to read: a measurement the caller makes between iterations,
-from the values the run has already computed.
+from the values the run has already computed. Each value is **deposited** — written together with
+its **epoch**, a count of changes to the state.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
@@ -33,7 +34,7 @@ rather than served stale.
 
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
 iteration's end (the velocity-at-particles slot is filled by the same generic's particle form,
-after the tracer push) and sets
+after the tracers advance) and sets
 its epoch. A caller reads through the accessors and deposits only to re-seed the cache after an
 out-of-band mutation it announced (`fields_modified!`); the iteration's own deposits are the
 solver's.
@@ -41,7 +42,7 @@ solver's.
 The cache keeps one epoch counter per dynamical factor — the resolved fields, the tracer positions —
 and a slot is readable exactly when its own epoch equals the counter it depends on.
 
-An epoch counts *changes to the state*, not advances of the run: a completed
+An epoch is not a step count: a completed
 [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) advances the fields epoch, but so does any
 announced out-of-band mutation, so the two counts diverge. The epoch answers "is this value still the
 right one?"; the clock's
