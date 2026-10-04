@@ -30,13 +30,13 @@ The **Code** column gives the name each symbol carries in the package.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | the velocity state |
+| ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | `state.velocity_spectral`, in spectral representation |
 | ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the field held in the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache); [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
 | ``\boldsymbol{\omega}\times\boldsymbol{u}`` | the Lamb vector — vorticity first, the literature's sign, so that ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) + \boldsymbol{\omega}\times\boldsymbol{u}``; the rotational form's right-hand side carries its negation, ``\boldsymbol{u}\times\boldsymbol{\omega}``, which is the product the solver forms | never stored: formed in place over the vorticity's array by [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!) |
-| ``\varphi`` | the passive scalar (never ``\theta``) | the scalar state |
+| ``\varphi`` | the passive scalar (never ``\theta``) | `state.scalar_spectral`, in spectral representation |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) |
-| ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) (via `scalar_forcing`) |
+| ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) (the `scalar_forcing` keyword of `Simulation`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
 | ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the run's current time ``t_n``, between [iterations](#Vocabulary) | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
@@ -46,8 +46,8 @@ The **Code** column gives the name each symbol carries in the package.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `conditions.viscosity` |
-| ``\mathrm{Sc}`` | Schmidt number | `conditions.schmidt` |
+| ``\nu`` | kinematic viscosity (sets the Reynolds number) | `viscosity`, a field of [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) |
+| ``\mathrm{Sc}`` | Schmidt number | `schmidt`, likewise |
 | ``\varkappa`` | scalar diffusivity ``\nu/\mathrm{Sc}`` | `ν / schmidt` |
 | ``\mathrm{Re}`` | Reynolds number, set through the viscosity on the box's order-one reference scales (the default initial condition seeds ``u' = 1``, and the large scales are of order the box side — the ``U`` and ``L`` of ``UL/\nu`` are units, not inputs; the measured value is ``\mathrm{Re}_\lambda``) | `1 / ν` (``\mathrm{Re} = u'L/\nu`` with the box side as the unit of length; on the shipped defaults ``u' = 1``, ``L = 2\pi``, the box-scale value is ``2\pi/\nu``) |
 
@@ -60,7 +60,7 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``\boldsymbol{\kappa}`` | wavenumber vector, components ``\kappa_a`` | [`FieldSpectralMultipliers`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldSpectralMultipliers) |
 | ``\kappa`` | wavenumber magnitude ``\lvert\boldsymbol{\kappa}\rvert`` (spectrum coordinate) | — |
-| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^{2}`` acts as multiplication by it | `domain.squared_wavenumber_kernel` |
+| ``\lvert\boldsymbol{\kappa}\rvert^2`` | squared wavenumber; in spectral space ``-\nabla^{2}`` acts as multiplication by it | `squared_wavenumber_kernel`, a field of [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) |
 | ``\mathcal{F}``, ``\mathcal{F}^{-1}`` | forward / inverse real transform | `to_spectral`, [`to_physical`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_physical) |
 | ``\nabla\times``, ``\nabla\cdot`` | curl, divergence | [`curl`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.curl), [`divergence`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.divergence) |
 | ``\mathbb{P}`` | the Leray–Helmholtz projection onto divergence-free fields | [`helmholtz_projection`](@extref GBGPeriodicFields GBGPeriodicFields.DifferentialOperators.helmholtz_projection) |
@@ -113,11 +113,11 @@ Measured from the run's state, or derived from it through a `FlowParameters` bun
 | ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert`` | [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) |
 | ``\kappa_{\mathrm{Ny}}`` | the grid Nyquist wavenumber ``\tfrac{N}{2}\tfrac{2\pi}{L}`` — the highest a grid can represent, before dealiasing | — |
 | ``\kappa_p`` | the envelope wavenumber of the default random initial condition (the shell-summed spectrum peaks at ``\kappa_p/\sqrt{2}``) | `envelope_wavenumber` |
-| ``\kappa_{\max}^{\mathrm{ret}}`` | retained-band edge — the highest wavenumber the `dealiasing` strategy keeps energetic (``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule, the Nyquist for `HouLi`, ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for `PhaseShift`); prices the advective-CFL step | [`max_retained_wavenumber`](@ref) |
+| ``\kappa_{\max}^{\mathrm{ret}}`` | retained-band edge — the highest wavenumber the `dealiasing` strategy keeps energetic (``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule, the Nyquist for [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi), ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)); prices the advective-CFL step | [`max_retained_wavenumber`](@ref) |
 | ``\kappa_{\max}`` | resolved-band edge — the highest wavenumber whose dynamics is genuine Navier–Stokes, the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta``; equals the retained edge for the sharp-cutoff strategies, ``\tfrac{4}{5}`` of Nyquist for `HouLi` | [`max_resolved_wavenumber`](@ref) |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3) |
 | ``y_{\mathrm{s}}`` | a scheme's imaginary-axis stability limit (``\sqrt{3}`` for `IFLowStorageRK3` and `IFSSPRK3`; ``\approx 3.34`` for `IFLowStorageRK4`; ``0`` for the imaginary-axis-unstable `IFHeun`) | [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) |
-| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | `element_type` |
+| ``T`` | the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) / [`Float64`](@extref Julia :jl:type:Core.Float64)) | the `element_type` keyword of `Simulation` |
 
 ## Forcing
 
