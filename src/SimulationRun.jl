@@ -115,8 +115,9 @@ settle in: the kinetic energy ``k`` and the dissipation rate ``\\varepsilon``.
 State that state **once** — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
 forcing that holds one of the two — and the other member is predicted; stating it twice is an
 `ArgumentError`, and stating nothing means ``k = 1.5``. The prediction is
-[`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units
-``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` of the velocity forcing
+[`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units (lengths
+in the box side ``L``, velocities in ``(\\varepsilon L)^{1/3}``),
+``\\tilde{k} = k/(\\varepsilon L)^{2/3}``, of the velocity forcing
 ([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
 with ``L`` the box side, and the share of the energy in the forced band, the shells the forcing acts on
 ([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)).
@@ -443,7 +444,8 @@ The stationary state a forced run on `domain` is predicted to settle in: the kin
 the dissipation rate ``\\varepsilon``, the energy ``k_{\\mathrm{band}}`` held in the forced band, the
 viscosity ``\\nu`` and the two Reynolds numbers. It is what [`Simulation`](@ref) sets a run up for, so
 calling it first shows what a run will be given, and it serves a study that plans its runs. The
-prediction goes through the kinetic energy in box units
+prediction goes through the kinetic energy in box units — lengths in the box side ``L``,
+velocities in ``(\\varepsilon L)^{1/3}`` —
 ([`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units)),
 ``k = \\tilde{k} (\\varepsilon L)^{2/3}``, and the band's share of it
 ([`band_energy_fraction`](@ref GBGHomogeneousTurbulence.Forcing.band_energy_fraction)), both taken at
