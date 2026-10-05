@@ -1,6 +1,6 @@
 unit,words,longest_paragraph,admonitions
-"ARCHITECTURE.md § 1. Identity",318,173,0
-"ARCHITECTURE.md § 10. Conventions",617,616,0
+"ARCHITECTURE.md § 1. Identity",329,173,0
+"ARCHITECTURE.md § 10. Conventions",615,614,0
 "ARCHITECTURE.md § 11. Decision log",16,16,0
 "ARCHITECTURE.md § 11. Decision log / item 1",33,33,0
 "ARCHITECTURE.md § 11. Decision log / item 10",23,23,0
@@ -10,6 +10,10 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 11. Decision log / item 103",98,98,0
 "ARCHITECTURE.md § 11. Decision log / item 104",136,136,0
 "ARCHITECTURE.md § 11. Decision log / item 105",287,287,0
+"ARCHITECTURE.md § 11. Decision log / item 106",203,102,0
+"ARCHITECTURE.md § 11. Decision log / item 107",172,90,0
+"ARCHITECTURE.md § 11. Decision log / item 108",106,106,0
+"ARCHITECTURE.md § 11. Decision log / item 109",90,90,0
 "ARCHITECTURE.md § 11. Decision log / item 11",34,34,0
 "ARCHITECTURE.md § 11. Decision log / item 12",24,24,0
 "ARCHITECTURE.md § 11. Decision log / item 13",123,123,0
@@ -18,9 +22,9 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 11. Decision log / item 16",89,89,0
 "ARCHITECTURE.md § 11. Decision log / item 17",139,139,0
 "ARCHITECTURE.md § 11. Decision log / item 18",132,132,0
-"ARCHITECTURE.md § 11. Decision log / item 19",219,219,0
+"ARCHITECTURE.md § 11. Decision log / item 19",223,223,0
 "ARCHITECTURE.md § 11. Decision log / item 2",59,59,0
-"ARCHITECTURE.md § 11. Decision log / item 20",270,270,0
+"ARCHITECTURE.md § 11. Decision log / item 20",276,276,0
 "ARCHITECTURE.md § 11. Decision log / item 21",235,235,0
 "ARCHITECTURE.md § 11. Decision log / item 22",197,197,0
 "ARCHITECTURE.md § 11. Decision log / item 23",229,229,0
@@ -110,12 +114,12 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 2. Running a simulation",297,150,0
 "ARCHITECTURE.md § 3. The organizing frame",26,26,0
 "ARCHITECTURE.md § 4. Modules",94,94,0
-"ARCHITECTURE.md § 4.1 `State` and `SimulationDomain` — the field and the frame",798,337,0
-"ARCHITECTURE.md § 4.2 `Generator` — the evolution, split reversible and irreve",787,344,0
+"ARCHITECTURE.md § 4.1 `State` and `SimulationDomain` — the field and the frame",804,337,0
+"ARCHITECTURE.md § 4.2 `Generator` — the evolution, split reversible and irreve",800,349,0
 "ARCHITECTURE.md § 4.3 `Observables` — the measured functions of the state",231,169,0
 "ARCHITECTURE.md § 4.4 `Forcing` — the source",716,391,0
-"ARCHITECTURE.md § 4.5 `Propagator` — the map that advances the state in time",472,441,0
-"ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",519,217,0
+"ARCHITECTURE.md § 4.5 `Propagator` — the map that advances the state in time",476,445,0
+"ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",526,217,0
 "ARCHITECTURE.md § 4.7 `SimulationRun` — the front door",576,476,0
 "ARCHITECTURE.md § 4.8 `Phenomenology` — the reference laws (extraction-bound)",876,143,0
 "ARCHITECTURE.md § 4.9 Layout summary",73,72,0
@@ -141,24 +145,24 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § The comparison machine",202,113,0
 "ARCHITECTURE.md § The foundation — one dynamics under a ladder of projections",231,114,0
 "Cache.jl :: Cache",348,103,0
-"Cache.jl :: ObservablesCache(domain; scalar = false, number_of_particles",700,220,1
+"Cache.jl :: ObservablesCache(domain; scalar = false, number_of_particles",709,220,1
 "Cache.jl :: fields_modified!(cache)",257,69,1
 "Cache.jl :: particles_modified!(cache)",252,74,0
 "Cache.jl :: scalar_physical(cache)",55,54,0
-"Cache.jl :: velocity_at_particles(cache)",116,115,0
+"Cache.jl :: velocity_at_particles(cache)",120,119,0
 "Cache.jl :: velocity_physical(cache)",82,81,0
 "Cache.jl :: vorticity_physical(cache)",49,48,0
 "Cache.md § The checked reads",26,26,0
 "Cache.md § The observables cache",30,30,0
-"Forcing.jl :: AbstractForcing",442,100,1
+"Forcing.jl :: AbstractForcing",399,83,1
 "Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",453,115,1
 "Forcing.jl :: DeferredForcing",402,68,0
-"Forcing.jl :: Forcing",498,220,0
-"Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",253,113,0
+"Forcing.jl :: Forcing",493,217,0
+"Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",263,123,0
 "Forcing.jl :: NoForcing()",16,15,0
 "Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",906,135,1
-"Forcing.jl :: StochasticOUState",180,67,0
-"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",890,333,1
+"Forcing.jl :: StochasticOUState",177,67,0
+"Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",901,333,1
 "Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",872,288,1
 "Forcing.jl :: add_forcing_source!(forcing, forcing_state, N̂, field, domai",288,81,1
 "Forcing.jl :: band_energy_fraction(forcing; reynolds_box = nothing, reynol",224,74,1
@@ -167,70 +171,69 @@ unit,words,longest_paragraph,admonitions
 "Forcing.jl :: prepare_forcing!(forcing, forcing_state, field, domain, dt) ",127,66,0
 "Forcing.jl :: project_forcing!(forcing, advanced_field, domain) -> advance",86,64,0
 "Forcing.jl :: read_forcing(parent::HDF5.H5DataStore, name::AbstractString,",81,51,0
-"Forcing.jl :: set_forcing_rate!(forcing, rate, field, domain) -> rate",129,54,0
-"Forcing.jl :: uses_steady_linear_rate(forcing) -> Bool",163,72,0
+"Forcing.jl :: steady_linear_rate(forcing, domain)",170,61,0
 "Forcing.jl :: write_forcing(parent::HDF5.H5DataStore, name::AbstractString",124,91,0
 "Forcing.md § Deferred forcing",22,22,0
-"Forcing.md § Forcing methods",76,76,0
+"Forcing.md § Forcing methods",51,51,0
 "Forcing.md § Forcing state",32,32,0
 "Forcing.md § Forcing strategies",95,95,0
 "Forcing.md § Persistence",19,19,0
 "Forcing.md § The stationary-state model",39,39,0
-"GBGHomogeneousTurbulence.jl :: GBGHomogeneousTurbulence",121,38,0
+"GBGHomogeneousTurbulence.jl :: GBGHomogeneousTurbulence",121,29,0
 "GBGHomogeneousTurbulence.md § GBGHomogeneousTurbulence",15,15,0
-"Generator.jl :: FlowConditions(; viscosity, schmidt, velocity_forcing, scala",307,69,2
-"Generator.jl :: Generator",169,106,0
-"Generator.jl :: ResolvedGenerator(domain, conditions; scalar = false)",603,235,2
+"Generator.jl :: FlowConditions(; viscosity, schmidt, velocity_forcing, scala",312,74,2
+"Generator.jl :: Generator",166,93,0
+"Generator.jl :: ResolvedGenerator(domain, conditions; scalar = false)",542,225,1
 "Generator.jl :: finalize!(generator, state, domain)",109,81,0
 "Generator.jl :: prepare!(generator, state, domain, dt)",100,58,0
 "Generator.jl :: scalar_diffusivity(conditions) -> Float64",15,12,0
 "Generator.jl :: scalar_integrating_factor(generator, τ)",44,42,0
 "Generator.jl :: scalar_rhs!(N̂, generator, û, φ̂, u_consumed, φ, domain;",536,102,1
-"Generator.jl :: velocity_integrating_factor(generator, τ)",189,78,0
-"Generator.jl :: velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)",491,86,1
+"Generator.jl :: velocity_integrating_factor(generator, τ)",176,63,0
+"Generator.jl :: velocity_rhs!(N̂, generator, û, u, ω_consumed, domain)",502,92,1
 "Generator.md § Flow conditions",19,19,0
 "Generator.md § The generator as one value",30,30,0
 "Generator.md § The generator protocol",30,30,0
-"Observables.jl :: Observables",325,140,0
-"Observables.jl :: derivative_skewness(û, domain)",411,94,1
+"Observables.jl :: Observables",327,140,0
+"Observables.jl :: derivative_skewness(û, domain)",410,94,1
 "Observables.jl :: dissipation(ω, viscosity)",276,73,1
-"Observables.jl :: energy_spectrum(û, domain)",162,59,0
+"Observables.jl :: energy_spectrum(û, domain)",171,59,0
 "Observables.jl :: integral_scale(û, domain)",202,65,0
-"Observables.jl :: kinetic_energy(u)",156,64,0
-"Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,96,0
+"Observables.jl :: kinetic_energy(u)",155,67,0
+"Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,99,0
 "Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",395,73,1
-"Observables.jl :: max_speed(u)",315,142,2
-"Observables.jl :: reynolds_box(side_length, dissipation, viscosity)",154,54,0
-"Observables.jl :: reynolds_taylor(kinetic_energy, dissipation, viscosity)",121,36,0
+"Observables.jl :: max_speed(u)",316,143,2
+"Observables.jl :: reynolds_box(side_length, dissipation, viscosity)",162,62,0
+"Observables.jl :: reynolds_taylor(kinetic_energy, dissipation, viscosity)",126,41,0
 "Observables.jl :: scalar_dissipation(φ̂, domain, diffusivity)",107,43,0
 "Observables.jl :: scalar_variance(φ)",41,39,0
-"Observables.jl :: vorticity_physical!(ω, û, domain, spectral_scratch)",117,56,0
+"Observables.jl :: vorticity_physical!(ω, û, domain, spectral_scratch)",114,48,0
 "Observables.md § Derivative skewness",12,12,0
 "Observables.md § Dissipation rates",11,11,0
 "Observables.md § Energy and dissipation below a scale",35,35,0
 "Observables.md § Energy and variance",16,16,0
 "Observables.md § Reynolds numbers",27,27,0
 "Observables.md § Spectrum and length scale",19,19,0
-"Observables.md § The fused energy–dissipation pair",13,13,0
+"Observables.md § The fused energy–dissipation pair",19,19,0
 "Observables.md § Timestep control",19,19,0
 "Observables.md § Vorticity recovery",26,26,0
 "Particles.jl :: AbstractParticleIntegrator",105,57,0
 "Particles.jl :: AdamsBashforth(; order = 4)",693,164,1
-"Particles.jl :: Heun()",247,166,1
-"Particles.jl :: ParticleIntegratorBuffers",258,107,0
-"Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",359,108,1
+"Particles.jl :: Heun()",260,179,1
+"Particles.jl :: ParticleIntegratorBuffers",254,103,0
+"Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",355,106,1
 "Particles.jl :: Particles",204,195,0
-"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",626,90,0
+"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",618,90,0
 "Particles.jl :: advect!(scheme, tracers, velocity_end, domain, buffers, dt;",328,84,1
 "Particles.jl :: history_depth(scheme) -> Int",47,28,0
 "Particles.jl :: interpolate_at_particles!(out, field, tracers; traversal = n",106,67,0
-"Particles.jl :: new_scalar_point_values(tracers)",30,29,0
+"Particles.jl :: new_scalar_point_values(tracers)",33,32,0
 "Particles.jl :: new_vector_point_values(tracers)",30,29,0
 "Particles.jl :: read_tracers(parent::HDF5.H5DataStore, name::AbstractString,",82,50,0
 "Particles.jl :: rebuild_traversal!(traversal, domain, tracers) -> traversal",133,71,0
 "Particles.jl :: restart!(scheme, buffers) -> buffers",168,82,0
-"Particles.jl :: unwrapped_positions(tracers)",183,106,0
-"Particles.jl :: write_tracers(parent::HDF5.H5DataStore, name::AbstractString",76,43,0
+"Particles.jl :: unwrapped_positions(tracers)",190,106,0
+"Particles.jl :: write_tracers(parent::HDF5.H5DataStore, name::AbstractString",74,41,0
 "Particles.md § Persistence",22,22,0
 "Particles.md § Point-value buffers",20,20,0
 "Particles.md § The particle integration scheme",53,53,0
@@ -239,27 +242,27 @@ unit,words,longest_paragraph,admonitions
 "Particles.md § The traversal order",66,66,0
 "Particles.md § Wiring tracers into a run",30,30,0
 "Propagator.jl :: AbstractIntegrator",45,44,0
-"Propagator.jl :: IFHeun()",138,60,1
-"Propagator.jl :: IFLowStorageRK3()",228,66,0
-"Propagator.jl :: IFLowStorageRK4()",165,88,0
-"Propagator.jl :: IFSSPRK3()",304,81,1
+"Propagator.jl :: IFHeun()",139,60,1
+"Propagator.jl :: IFLowStorageRK3()",228,65,0
+"Propagator.jl :: IFLowStorageRK4()",162,85,0
+"Propagator.jl :: IFSSPRK3()",308,81,1
 "Propagator.jl :: IntegratorBuffers",334,128,0
-"Propagator.jl :: Propagator",138,96,0
+"Propagator.jl :: Propagator",141,96,0
 "Propagator.jl :: allocate_buffers(scheme, domain; scalar = false) -> Integrat",203,86,0
-"Propagator.jl :: deposit!(cache, state, domain, buffers)",489,129,0
-"Propagator.jl :: recommended_cfl(scheme, domain)",439,115,1
+"Propagator.jl :: deposit!(cache, state, domain, buffers)",497,129,0
+"Propagator.jl :: recommended_cfl(scheme, domain)",450,115,1
 "Propagator.jl :: step!(scheme, state, generator, domain, buffers, cache, dt)",316,78,1
 "Propagator.md § Integrator schemes",65,65,0
-"Propagator.md § Step scratch",21,21,0
-"Propagator.md § Time stepping",23,23,0
-"Propagator.md § Timestep ceiling",4,4,0
+"Propagator.md § Step scratch",27,27,0
+"Propagator.md § Time stepping",26,26,0
+"Propagator.md § Timestep ceiling",7,7,0
 "SimulationDomain.jl :: DealiasingStrategy",98,97,0
-"SimulationDomain.jl :: FixedDomain(; grid_points_per_axis, side_length, dealiasing,",541,213,1
-"SimulationDomain.jl :: HouLi(; order = 36, strength = nothing, materialized = false",441,165,1
-"SimulationDomain.jl :: PhaseShift()",260,67,1
+"SimulationDomain.jl :: FixedDomain(; grid_points_per_axis, side_length, dealiasing,",548,220,1
+"SimulationDomain.jl :: HouLi(; order = 36, strength = nothing, materialized = false",457,165,1
+"SimulationDomain.jl :: PhaseShift()",270,67,1
 "SimulationDomain.jl :: SimulationDomain",116,105,0
-"SimulationDomain.jl :: TwoThirds()",77,53,0
-"SimulationDomain.jl :: max_resolved_wavenumber(domain)",209,74,0
+"SimulationDomain.jl :: TwoThirds()",85,61,0
+"SimulationDomain.jl :: max_resolved_wavenumber(domain)",212,74,0
 "SimulationDomain.jl :: max_retained_wavenumber(domain)",164,82,0
 "SimulationDomain.jl :: new_scalar_field_physical(domain)",18,17,0
 "SimulationDomain.jl :: new_scalar_field_spectral(domain)",18,17,0
@@ -271,22 +274,22 @@ unit,words,longest_paragraph,admonitions
 "SimulationDomain.jl :: truncate_to_band!(field, domain)",133,69,1
 "SimulationDomain.jl :: write_domain(parent::HDF5.H5DataStore, name::AbstractString,",92,60,0
 "SimulationDomain.md § Band truncation",47,47,0
-"SimulationDomain.md § Dealiasing strategies",83,58,0
+"SimulationDomain.md § Dealiasing strategies",88,63,0
 "SimulationDomain.md § Persistence",18,18,0
 "SimulationDomain.md § Scratch-field allocators",16,16,0
 "SimulationDomain.md § The discretized box",21,21,0
-"SimulationRun.jl :: Simulation(; grid_points_per_axis, κ_max_η = nothing, kineti",2792,1416,3
+"SimulationRun.jl :: Simulation(; grid_points_per_axis, κ_max_η = nothing, kineti",2832,1432,3
 "SimulationRun.jl :: SimulationRun",217,182,0
-"SimulationRun.jl :: StationarityCriterion(; gate_scalar = true, gate_skewness = ",626,294,0
+"SimulationRun.jl :: StationarityCriterion(; gate_scalar = true, gate_skewness = ",631,295,0
 "SimulationRun.jl :: advance!(sim; dt = nothing)",120,56,0
 "SimulationRun.jl :: current_step(sim)",104,90,0
 "SimulationRun.jl :: current_time(sim)",7,6,0
 "SimulationRun.jl :: every_steps(n)",106,52,0
 "SimulationRun.jl :: every_time(period)",194,75,0
 "SimulationRun.jl :: flow_parameters(sim)",93,92,0
-"SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",332,112,1
-"SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",192,96,0
-"SimulationRun.jl :: run!(callback, sim; dt = nothing)",300,73,0
+"SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",341,112,1
+"SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",191,86,0
+"SimulationRun.jl :: run!(callback, sim; dt = nothing)",304,77,0
 "SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",141,55,0
 "SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",149,94,0
 "SimulationRun.md § Advancing the run",27,27,0
@@ -296,7 +299,7 @@ unit,words,longest_paragraph,admonitions
 "SimulationRun.md § Persistence",17,17,0
 "SimulationRun.md § The predicted stationary state",32,32,0
 "SimulationRun.md § The simulation",39,39,0
-"State.jl :: ResolvedFields(domain; scalar = false)",299,105,0
+"State.jl :: ResolvedFields(domain; scalar = false)",298,105,0
 "State.jl :: State",172,86,0
 "State.jl :: random_scalar_spectral!(φ̂, domain; scalar_variance, envelop",369,94,1
 "State.jl :: random_solenoidal_velocity_spectral!(û, domain; kinetic_ener",380,97,1
@@ -314,25 +317,25 @@ unit,words,longest_paragraph,admonitions
 "index.md § Installation",33,22,0
 "index.md § Quick start",21,21,0
 "index.md § What it solves",197,95,1
-"notation.md § Conventions",313,313,0
-"notation.md § Derived scales",293,274,0
-"notation.md § Diagnostics",273,273,0
+"notation.md § Conventions",317,317,0
+"notation.md § Derived scales",301,282,0
+"notation.md § Diagnostics",279,279,0
 "notation.md § Forcing",169,169,0
 "notation.md § Notation",95,73,0
-"notation.md § Numerics",216,216,0
-"notation.md § Parameters",137,117,0
+"notation.md § Numerics",221,221,0
+"notation.md § Parameters",142,122,0
 "notation.md § Physical variables",233,221,0
-"notation.md § Spectral representation and operators",183,183,0
+"notation.md § Spectral representation and operators",189,189,0
 "notation.md § Vocabulary",698,651,0
 "observables_cache.md § 1.1 What it is for",670,127,0
-"observables_cache.md § 1.2 What the cache holds",670,170,0
+"observables_cache.md § 1.2 What the cache holds",676,170,0
 "observables_cache.md § 1.3 When a cached value is valid",1099,223,0
-"observables_cache.md § 1.4 What caching costs",410,143,0
+"observables_cache.md § 1.4 What caching costs",414,141,0
 "observables_cache.md § 2. The system",89,89,0
-"observables_cache.md § 2.1 The equations",124,74,0
+"observables_cache.md § 2.1 The equations",130,80,0
 "observables_cache.md § 2.2 How a step treats each term",131,131,0
-"observables_cache.md § 2.3 Transforms and arrays",542,110,0
-"observables_cache.md § 2.4 What it caches",704,592,0
+"observables_cache.md § 2.3 Transforms and arrays",545,110,0
+"observables_cache.md § 2.4 What it caches",708,596,0
 "observables_cache.md § 2.5 Three points the table alone does not settle",215,107,0
 "observables_cache.md § 3. The code",26,26,1
 "observables_cache.md § 3.1 The calls",126,126,0
@@ -345,6 +348,6 @@ unit,words,longest_paragraph,admonitions
 "validation.md § Reproducing the comparison",93,60,0
 "validation.md § Robustness across forcings: the Linear (Lundgren) pair",284,196,0
 "validation.md § Robustness across integrators: `IFLowStorageRK4` at its adap",249,158,0
-"validation.md § The physics point",226,131,0
+"validation.md § The physics point",232,131,0
 "validation.md § The shared initial state, and the import witnesses",197,102,0
-"validation.md § Validation — code-to-code comparison against TurTLE",193,134,1
+"validation.md § Validation — code-to-code comparison against TurTLE",191,132,1

@@ -120,9 +120,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-021-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -147,9 +147,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-034-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -174,9 +174,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-036-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -201,9 +201,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-041-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -228,9 +228,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-044-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -255,9 +255,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-058-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -282,9 +282,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-062-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -309,9 +309,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-079-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -336,9 +336,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-088-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "A clause that defines in words a symbol already used in a formula may write that symbol as a math span; restating what a formula already says (k/ε for the eddy-turnover clock, û and φ̂ as math) is allowed under the same ruling. No formula's content changes.",
             "context": "Binding a symbol in words at its first use (for example: with k_band the energy in the forced band) needs a new one-symbol math span, which the change guard counts as changing mathematics.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
