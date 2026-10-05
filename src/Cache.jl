@@ -74,8 +74,8 @@ observables its own schedule produces: the velocity ``\\boldsymbol{u}`` and vort
 ``\\boldsymbol{\\omega}`` in physical representation, the scalar ``\\varphi`` in physical
 representation when the run carries one, the fastest flow speed on the grid (the
 [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed) number the next timestep choice
-reads), and — when the run advects tracers — the flow velocity at the particle positions,
-``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
+reads), and — when the run advects tracers — the flow velocity at the tracer positions
+``\\boldsymbol{X}`` at the current time ``t_n``, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``.
 
 The contents are automatic, derived from the configuration: the cache holds
 exactly what the iteration computes, materializes, and leaves alive at its end, and nothing more.
@@ -97,7 +97,7 @@ and seeds one for you; a hand-assembled run constructs it here.
   ([`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers)) refuses a cache
   whose depth differs from it.
 - `number_of_particles = 0` — the number of tracers the run advects; a positive count allocates
-  the velocity-at-particles slot (an ``M \\times 3`` array of point values) and its sample history.
+  the velocity-at-particles slot (an ``M \\times 3`` array of point values, ``M`` this count) and its sample history.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
@@ -263,8 +263,8 @@ end
 """
     velocity_at_particles(cache)
 
-The flow velocity at the particle positions, ``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the
-current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at the position each tracer occupies at
+The flow velocity at the tracer positions ``\\boldsymbol{X}`` at the current time ``t_n``,
+``\\boldsymbol{u}(t_n, \\boldsymbol{X}(t_n))``, at the current epoch — the ``(M, 3)`` array (``M`` the tracer count) of the velocity sampled at each tracer's position at
 that instant: the genuine Lagrangian velocity, the input to the caller's statistics. Treat the returned array as
 read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. This is
 the checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
