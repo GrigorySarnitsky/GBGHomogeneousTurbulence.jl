@@ -266,7 +266,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
 
 `Generator` realizes the Mori–Zwanzig generator: the right-hand side the propagator advances. Its physical
 inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} = u'L/\nu``:
-``2\pi/\nu`` on the shipped defaults ``u' = 1``, ``L = 2\pi``, and ``1/\nu`` with the box side as the unit of length), the Schmidt number
+``2\pi/\nu`` on the shipped defaults, velocity scale ``u' = 1`` and box side ``L = 2\pi``, and ``1/\nu`` with the box side as the unit of length), the Schmidt number
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
@@ -277,7 +277,7 @@ advanced in **rotational (Lamb-vector) form**: writing the convective term throu
 (with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` and the Lamb vector
 ``\boldsymbol{\omega}\times\boldsymbol{u}``, the literature's sign, decision 93) and letting the Leray–Helmholtz
 projection ``\mathbb{P}`` onto divergence-free fields absorb the pressure and the kinetic-energy gradient,
-the equation becomes
+the equation with forcing ``\boldsymbol{f}`` becomes
 
 ```math
 \partial_t\boldsymbol{u} = -\mathbb{P} (\boldsymbol{\omega}\times\boldsymbol{u}) + \nu\nabla^{2}\boldsymbol{u} + \boldsymbol{f}.
@@ -503,7 +503,7 @@ any field along the trajectories for Lagrangian statistics.
 
 The sample deposit is what keeps an instrument of ``M`` tracers at ``M``-point cost: depositing the sample
 at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
-``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
+``N^{3}\times3`` resident buffer and copy (``N`` grid points per axis). Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
 recorded as **forbidden**: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
 differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so reusing it as the next
