@@ -40,7 +40,7 @@ constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carr
 over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains most
 of what follows.
 
-**The first scientific goal** is to measure the kinetic energy in box units
+**The first scientific goal** is to measure the kinetic energy in box units (built from the box side ``L`` and the dissipation rate ``\varepsilon``)
 ``\tilde{k} = k/(\varepsilon L)^{2/3}`` as a law ``\tilde{k}(\text{forcing}, \mathrm{Re}, \text{band})``,
 integrate it so that a run's derived viscosity is calibrated for the forcing it actually uses, and
 publish it (decisions 94 and 101). This ``\tilde{k}`` is the constant by which the run layer turns a requested
