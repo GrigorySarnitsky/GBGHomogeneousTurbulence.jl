@@ -72,18 +72,19 @@ of the velocity field ``\\boldsymbol{u}`` (the `u` argument). Computed as
 ``\\tfrac{1}{2}\\langle\\boldsymbol{u},\\boldsymbol{u}\\rangle`` with the normalized inner product,
 so by Parseval's theorem it accepts the velocity in either representation — the physical field
 ``\\boldsymbol{u}`` or its spectral coefficients ``\\hat{\\boldsymbol{u}}`` — to the same value. On
-point values (a `VectorPointValues`) it averages over the points.
+`VectorPointValues` it averages over the points.
 
-Like every quadratic reduction here (`dissipation`, `scalar_variance`, `scalar_dissipation`), it
+Like every quadratic reduction here, it
 needs no dealiasing of its own: the sum over spectral coefficients is exact, and the equivalent
-physical-space mean picks up no aliasing either, because a quadratic's zero mode folds in nothing
-when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` — satisfied by the ``2/3``
+physical-space mean is alias-free too, because a quadratic's zero mode folds in nothing
+when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` (``N`` points per side ``L``,
+band edge ``\\kappa_{\\max}``) — satisfied by the ``2/3``
 rule, by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s wider
 ``\\sqrt{2}N/3`` band, and by every narrower band.
 
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) retains the full band out to the
 Nyquist ``N/2``, where the only pairs that fold to zero are Nyquist modes its taper has
-already damped to machine precision — alias-free in practice, not exactly.
+damped to machine precision — alias-free in practice, not exactly.
 """
 kinetic_energy(u) = inner(u, u) / 2
 
@@ -453,8 +454,8 @@ return with the reduction, so a caller needs no transfer of its own.
 
 Each value is the shell's energy — half the [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/) radial spectrum, which sums
 ``\\lvert\\hat{\\boldsymbol{u}}\\rvert^2`` — divided by the shell width
-``\\Delta\\kappa = 2\\pi/L``, making Parseval the quadrature
-``k = \\sum_n E(\\kappa_n) \\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
+``\\Delta\\kappa = 2\\pi/L`` (``L`` the box side), making Parseval the quadrature over the shell
+centres ``\\kappa_n``, ``k = \\sum_n E(\\kappa_n) \\Delta\\kappa`` (exact by construction). At low ``\\kappa`` the
 integer shells hold few lattice modes, so the density estimate is correspondingly lumpy there.
 """
 function energy_spectrum(û, domain::FixedDomain)
@@ -544,8 +545,8 @@ the box side ``L``,
 with ``\\tilde{\\nu}`` the viscosity in box units (length unit ``L``, velocity unit
 ``(\\varepsilon L)^{1/3}``). Use it to place a run on the Reynolds axis the
 kinetic energy in box units ``\\tilde{k}`` is stated against; [`reynolds_taylor`](@ref) gives the
-Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by the resolution
-``\\kappa_{\\max}\\eta`` has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
+Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by
+``\\kappa_{\\max}\\eta`` (``\\kappa_{\\max}`` the resolved-band edge) has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
 
 # Arguments
 - `side_length` — the box side ``L``.
