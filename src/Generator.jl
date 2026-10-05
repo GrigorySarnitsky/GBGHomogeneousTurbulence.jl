@@ -50,7 +50,7 @@ export FlowConditions, ResolvedGenerator,
     FlowConditions(; viscosity, schmidt, velocity_forcing, scalar_forcing)
 
 The physical conditions the generator is built from — the kinematic viscosity ``\\nu`` (`viscosity`;
-``\\mathrm{Re} = u'L/\\nu``: with ``u' = 1`` and the shipped ``L = 2\\pi`` the box-scale value is
+``\\mathrm{Re} = u'L/\\nu``: with the velocity scale ``u' = 1`` and the shipped box side ``L = 2\\pi`` the box-scale value is
 ``2\\pi/\\nu``, and ``1/\\nu`` with the box side as the unit of length; the Reynolds number
 built on the integral scale is smaller still), the Schmidt number ``\\mathrm{Sc}`` (`schmidt`; the
 scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and scalar forcing strategies
@@ -455,7 +455,7 @@ becomes
 \\partial_t\\boldsymbol{u} = -\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u}) + \\nu\\nabla^{2}\\boldsymbol{u} + \\boldsymbol{f}.
 ```
 
-The term computed is the spectral image of ``-\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u})``,
+Here ``\\boldsymbol{f}`` is the forcing. The term computed is the spectral image of ``-\\mathbb{P} (\\boldsymbol{\\omega}\\times\\boldsymbol{u})``,
 dealiased by the domain's [`DealiasingStrategy`](@ref), plus the per-stage additive source of the
 generator's velocity forcing (its
 [`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook). Its minus
@@ -482,7 +482,7 @@ Returns `N̂`.
     write into one of its operands — so `ω_consumed` must hold the vorticity on entry and no longer
     does on return, while `u` is only read. This is what keeps a product field in physical
     representation from existing at all; passing a copy instead would cost a resident ``N^{3}``
-    vector, which the package's preference for the smallest working set forbids.
+    vector (``N`` the grid points per axis), which the package's preference for the smallest working set forbids.
 
     Which operand is consumed follows the **physics**, not the argument position: the negated Lamb
     vector forms over the vorticity here, and the scalar flux over the velocity in
