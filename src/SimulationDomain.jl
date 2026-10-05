@@ -63,8 +63,8 @@ abstract type DealiasingStrategy end
 The sharp isotropic ``2/3``-rule truncation of Orszag (1971).
 Keep the modes
 ``\\kappa \\le \\kappa_{\\max} = \\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}`` and zero the rest, where
-``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber and
-``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. It dealiases
+``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` is the Nyquist wavenumber of ``N``
+points per side of length ``L``, and ``\\kappa_{\\max}`` the dealiased maximum — two-thirds of the way out to Nyquist. It dealiases
 the quadratic nonlinearity exactly, with the narrowest retained band of the three and no taper to evaluate.
 
 # References
@@ -79,7 +79,8 @@ The smooth spectral filter of Hou & Li (2007). Each mode is multiplied
 by the transfer function
 ``\\exp\\bigl(- \\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}\\bigr)``,
 applied isotropically in ``\\kappa``, with
-``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber. It keeps more
+``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber of ``N`` points per
+side of length ``L``. It keeps more
 modes than the ``2/3`` rule but only *damps* aliasing rather than removing it exactly — a
 stabilization.
 
@@ -144,7 +145,8 @@ Phase-shift dealiasing, after Patterson & Orszag (1971) with the spherical trunc
 Rogallo (1981), assembles each quadratic nonlinear term on the grid **and** on a half-cell-displaced
 grid, averages the two, and truncates spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
-(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber).
+(with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber of ``N`` points
+per side of length ``L``).
 
 The half-cell average cancels the aliasing images that wrap in an odd number of axes — the spurious
 spectral replicas the under-resolved quadratic product folds back into the resolved band — and the

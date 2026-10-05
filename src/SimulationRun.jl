@@ -135,7 +135,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     The resolution fixes ``\\eta``, hence the box Reynolds number
     ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, at which ``\\tilde{k}`` is read, and then
     ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. Since ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the
-    resolved-Nyquist fraction and ``\\Delta x = L/N`` the grid spacing, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
+    resolved-Nyquist fraction and ``\\Delta x = L/N`` the spacing of ``N`` grid points per side, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
     ``2/3`` rule. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda`` are logged, with what
     the forcing guarantees.
 
