@@ -41,7 +41,7 @@ the Nyquist wavenumber, ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
 ``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's `kMeta` = 1.476 differs in normalizing
-its cutoff by ``N/2 - 1`` instead of ``N/2``.) Because the forcing
+its cutoff by ``N/2 - 1`` instead of ``N/2``, for ``N`` grid points per axis.) Because the forcing
 fixes the injection rate, ``\varepsilon`` is an *input*; the velocity scale ``u'`` and
 ``\mathrm{Re}_\lambda`` are *outputs* — their agreement is tested.
 
