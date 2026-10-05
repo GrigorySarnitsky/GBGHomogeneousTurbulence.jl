@@ -135,14 +135,15 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     The resolution fixes ``\\eta``, hence the box Reynolds number
     ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, at which ``\\tilde{k}`` is read, and then
     ``\\nu = \\varepsilon^{1/3}\\eta^{4/3}``. Since ``\\kappa_{\\max}\\eta = f\\pi\\eta/\\Delta x`` with ``f`` the
-    resolved-Nyquist fraction, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
+    resolved-Nyquist fraction and ``\\Delta x = L/N`` the grid spacing, `κ_max_η = 2` gives ``\\Delta x \\approx \\eta`` under the default
     ``2/3`` rule. The chosen ``\\nu``, ``k``, ``\\varepsilon`` and ``\\mathrm{Re}_\\lambda`` are logged, with what
     the forcing guarantees.
 
     !!! note "The criterion measures the resolved band, strategy by strategy"
         ``\\kappa_{\\max}`` here is each strategy's **resolved** cutoff — for
         [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) that is
-        ``\\tfrac{4}{5}\\kappa_{\\mathrm{Ny}}``, where its per-step damping overtakes viscosity,
+        ``\\tfrac{4}{5}\\kappa_{\\mathrm{Ny}}``, with ``\\kappa_{\\mathrm{Ny}} = N\\pi/L`` the Nyquist
+        wavenumber, where its per-step damping overtakes viscosity,
         not the Nyquist its energetic band reaches — so equal `κ_max_η` means equally trusted
         dynamics across strategies. Strategies still reach different Reynolds numbers on the same
         grid, but for the honest reason that their resolved bands differ: with
@@ -253,7 +254,8 @@ The run group, `kwargs...` in both signatures
   advective-CFL ceiling (adapts to `dealiasing`).
 - `max_dt = Inf` — a further ceiling on the adaptive timestep, stated in the run's own time units,
   and off unless set. The adaptive step is the smallest of three bounds:
-  the advective rule ``\\Delta t = C\\Delta x / u_{\\max}``, the longest mode's diffusive-decay
+  the advective rule ``\\Delta t = C\\Delta x / u_{\\max}`` (``C`` the `cfl` coefficient, ``u_{\\max}``
+  the largest velocity-component magnitude in the box), the longest mode's diffusive-decay
   time ``1/(D\\kappa_{\\min}^{2})`` — with ``\\kappa_{\\min} = 2\\pi/L`` the box's fundamental
   wavenumber and ``D`` the **larger** of the run's diffusivities (``\\nu``,
   and ``\\varkappa = \\nu/\\mathrm{Sc}`` when a scalar rides), since the faster-diffusing field
@@ -291,7 +293,7 @@ The run group, `kwargs...` in both signatures
   holds no order and gathers in tracer order. The order and its rebuild scratch hold three
   integer or Boolean vectors of the tracer count and two of the number of grid tiles the order
   groups tracers by — small beside the
-  `(M, 3)` positions — and nothing of it is persisted: a restored run rebuilds it from the
+  `(M, 3)` positions of the ``M`` tracers — and nothing of it is persisted: a restored run rebuilds it from the
   restored positions.
 - `rng` — the random stream for the initial condition and the tracer seeding (defaults to
   `Random.default_rng()`).
@@ -1450,7 +1452,7 @@ flatness would certify the forcing, not the flow.
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).
-- `gate_skewness` — also require the velocity-derivative skewness to have plateaued **and** reached
+- `gate_skewness` — also require the velocity-derivative skewness ``S`` to have plateaued **and** reached
   ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal, exactly as
   strict as its floor (see `skew_floor` below): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
