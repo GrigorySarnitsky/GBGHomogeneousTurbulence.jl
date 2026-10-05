@@ -74,7 +74,7 @@ single-``t_n`` rule.
 
 This is where the artifacts of the discretization fall out, and they are worth naming because they
 look observable and are not. A Runge–Kutta stage value
-``\boldsymbol{u}^{*} = \boldsymbol{u}_n + a \Delta t \boldsymbol{f}(\boldsymbol{u}_n)`` carries
+``\boldsymbol{u}^{*} = \boldsymbol{u}_n + a \Delta t \boldsymbol{f}(\boldsymbol{u}_n)``, with ``\boldsymbol{f}`` here the right-hand side, carries
 ``\Delta t`` and the scheme's coefficient ``a``; change the coefficients and it changes while the
 trajectory does not, so it is the flow at no time at all. The velocity a tracer scheme evaluates at a
 *predicted* position is the same failure in different clothes: the field value is genuine, but the
@@ -217,7 +217,7 @@ and the package version, not an interface a reader chooses from.
 
 A reader who needs an absent observable computes it at an observation, from the state or the cached
 fields, with the exported reductions and the backend's recoveries — in storage they own. The sizes say when that is
-a real decision: a vector field on the grid is ``3N^{3}`` reals, 384 MiB at ``N = 256`` in double
+a real decision: a vector field on a grid of ``N`` points per axis is ``3N^{3}`` reals, 384 MiB at ``N = 256`` in double
 precision and 192 MiB in single, so a callback materializing a field-sized diagnostic is buying a
 third of a gigabyte; a number costs nothing worth counting.
 
@@ -273,7 +273,7 @@ viscosity, ``\varkappa = \nu/\mathrm{Sc}`` the scalar diffusivity, ``\boldsymbol
 the forcings, and ``\boldsymbol{X}(t)`` a tracer position. No projection acts on ``\boldsymbol{f}``:
 every velocity forcing the package provides is already divergence-free, since a field-proportional one
 scales a divergence-free field mode by mode and a stochastic source is projected as it is drawn. The
-conservative scalar form holds the ``\boldsymbol{\kappa} = 0`` tendency at zero and fixes the split of
+conservative scalar form holds the tendency of the mean, at wavenumber vector ``\boldsymbol{\kappa} = 0``, at zero and fixes the split of
 transforms below.
 
 ### 2.2 How a step treats each term
@@ -335,7 +335,7 @@ The tracer scheme consumes two velocity samples per push. The first — the **ve
 particles**, ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
 cache's deposit from the previous closing deposit; the
 second is evaluated at ``t_{n+1}``, at a predicted position the particle never
-reaches. Both are ``M\times3`` arrays, interpolated with the tracer set's scheme — a Catmull–Rom
+reaches. Both are ``M\times3`` arrays, for ``M`` tracers, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
@@ -368,7 +368,7 @@ there is no moment to date it to, so no act at an observation builds it either.
 | ``-\nabla\cdot(\boldsymbol{u}\varphi)``, dealiased | spectral, grid | no | not surviving, for the same reason as the row above |
 | ``\boldsymbol{u}\times\boldsymbol{\omega}``, the negated Lamb vector | physical, grid | no | not materialized as its own array: it forms in place over the vorticity slot and is consumed by the projection's transform (§2.3) |
 | ``\varepsilon``, ``k``, ``\langle\varphi^{2}\rangle``, the derivative skewness | one number | no | not surviving: no component of the iteration holds one at its end; each is one reduction at an observation (a constant-energy forcing forms ``k`` mid-step and discards it) |
-| ``E(\kappa_n)``, the spectral density | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
+| ``E(\kappa_n)``, the spectral density at wavenumber shell ``n`` | per shell | no | not computed: no iteration forms it, and it needs its own binning pass |
 | the integral scale | one number | no | not computed: no iteration forms it |
 | the strain-rate tensor ``\boldsymbol{S}``, ``\det\boldsymbol{S}`` | physical, grid | no | not computed in an iteration; the derivative-skewness stopping test of `warmup!` materializes ``\boldsymbol{S}`` and discards it, while ``\det\boldsymbol{S}`` is formed point by point inside one averaging pass and never materialized at all, at its own cadence |
 | the speed ``\lvert\boldsymbol{u}\rvert`` | physical, grid | no | not computed as a field: [`max_speed`](@ref) forms the magnitude point by point inside its reduction and consumes it immediately, so it is never whole anywhere; materializing it would cost a pass the iteration does not perform (§1.2) |
