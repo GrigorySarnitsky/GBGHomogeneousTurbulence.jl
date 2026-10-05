@@ -26,7 +26,7 @@ scalar_dissipation
 
 ## The fused energy–dissipation pair
 
-One traversal measures both quadratic reductions of the velocity — the eddy-turnover clock's pair.
+One traversal measures both quadratic reductions of the velocity — the pair that clocks a run in eddy turnovers ``k/\varepsilon``.
 
 ```@docs
 kinetic_energy_and_dissipation

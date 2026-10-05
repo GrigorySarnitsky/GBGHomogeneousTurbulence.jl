@@ -32,7 +32,7 @@ The measured functions of the flow state:
 All but the two Reynolds numbers are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
 the spectral density sampled on the wavenumber shells, and the vorticity recovery alone produces a
 field. Each returns
-the field's own real element type rather than a fixed `Float64`, so a `Float32` run measures in
+the field's own real element type, not a fixed `Float64`, so a `Float32` run measures in
 `Float32`.
 
 Three observables gate the warm-up
@@ -41,7 +41,7 @@ dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its
 the scalar is forced — the scalar variance settles. The kinetic energy is **not** among them, since
 a forcing holding it fixed leaves it flat and
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)'s fixed injection makes it ring; it is
-measured (it normalizes the eddy-turnover clock) but never gated on.
+measured (the eddy-turnover clock counts in units of ``k/\\varepsilon``) but never gated on.
 
 None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
 band (see `kinetic_energy` for the condition;
