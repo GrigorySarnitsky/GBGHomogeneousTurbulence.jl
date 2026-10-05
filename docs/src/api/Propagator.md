@@ -23,8 +23,8 @@ IFHeun
 
 ## Step scratch
 
-The preallocated per-step working set the scheme writes into — built per concrete scheme, sized so
-a step allocates no field-sized memory.
+This section documents the preallocated per-step working set the scheme writes into, which is built
+per concrete scheme and sized so a step allocates no field-sized memory.
 
 ```@docs
 IntegratorBuffers
@@ -36,7 +36,7 @@ allocate_buffers
 
 ## Time stepping
 
-One in-place step of the coupled velocity and passive scalar together through the shared RK stages,
+This section documents one in-place step of the coupled velocity and passive scalar together through the shared RK stages,
 and the deposit that closes the iteration.
 
 ```@docs
@@ -46,7 +46,7 @@ deposit!
 
 ## Timestep ceiling
 
-A scheme's advective-CFL ceiling.
+This section documents a scheme's advective-CFL ceiling.
 
 ```@docs
 recommended_cfl

@@ -21,7 +21,7 @@
 """
     Propagator
 
-The interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
+This module holds the interchangeable time-marching schemes, concrete `AbstractIntegrator` subtypes; a run chooses one as
 the `field_integration_scheme` of its [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation). All
 are of the integrating-factor family: the stiff diffusive part
 is advanced exactly and the nonlinear term explicitly by a Runge–Kutta stage combination.
@@ -455,7 +455,7 @@ integrating factor ``\\mathcal{E}`` is
 
 with ``\\widehat{\\boldsymbol{N}}_1`` at ``\\hat q_n`` and ``\\widehat{\\boldsymbol{N}}_2`` at the predictor
 ``\\hat q^{*}``; velocity and scalar use ``\\mathcal{E}_\\nu`` and ``\\mathcal{E}_\\varkappa``
-respectively, then the forcings are applied. Two nonlinear evaluations per step.
+respectively, then the forcings are applied. A step costs two nonlinear evaluations.
 
 !!! note "Unstable on the imaginary axis without viscous damping"
     Every second-order two-stage explicit Runge–Kutta has stability function
