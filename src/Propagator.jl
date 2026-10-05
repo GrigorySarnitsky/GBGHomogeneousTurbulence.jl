@@ -597,7 +597,8 @@ the right-hand-side register — the same count as `IFLowStorageRK3` (one pointw
 no accumulator is transported by the integrating factor).
 
 !!! note "The midpoint stage transports backward"
-    The ``\\mathcal{E}(-\\Delta t/2)`` factor is ``\\mathrm{e}^{+\\nu\\kappa^{2}\\Delta t/2}`` — a growing
+    At wavenumber magnitude ``\\kappa``, the ``\\mathcal{E}(-\\Delta t/2)`` factor is
+    ``\\mathrm{e}^{+\\nu\\kappa^{2}\\Delta t/2}`` — a growing
     exponential, exact but amplifying at large ``\\nu\\kappa^{2}\\Delta t`` before the convex
     combination cancels it. Under an advective CFL step this exponent is small and the loss is
     roundoff-level; a run driven with a hand-fixed ``\\Delta t \\gg`` the advective step would
@@ -811,7 +812,7 @@ push, which itself consumed the field form's deposit.
 The deposited values serve twice: they are
 the Lagrangian velocity a caller accumulates, and the start-of-step velocity the next `advect!`
 reads — ``M \\times 3`` values for ``M`` tracers, where keeping the endpoint field would cost
-``N^{3} \\times 3``.
+``N^{3} \\times 3`` on a grid of ``N`` points per axis.
 
 Every iteration ends with these deposits: the run's
 [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) performs them for you, the
@@ -867,7 +868,8 @@ end
 A conservative advective-CFL (Courant–Friedrichs–Lewy) ceiling ``C_{\\mathrm{CFL}}`` for the scheme
 `scheme` on the [`FixedDomain`](@ref) `domain`, for a timestep
 ``\\Delta t = C_{\\mathrm{CFL}} \\Delta x / \\max_{\\boldsymbol{x}}\\lvert\\boldsymbol{u}\\rvert``,
-with ``\\Delta x = L/N`` the grid spacing.
+with ``\\Delta x = L/N`` the grid spacing, ``L`` the box side and ``N`` the grid points per
+axis.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
 ``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert`` — a rate. Stability needs that rate times the
