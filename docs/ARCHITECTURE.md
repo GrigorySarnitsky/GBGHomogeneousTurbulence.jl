@@ -298,8 +298,8 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
   ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\bigr)``
-  — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep
-  ``d_i\Delta t``, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
+  — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep, the fraction
+  ``d_i\Delta t`` of the step, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
   pair `velocity_integrating_factor` / `scalar_integrating_factor` supplies its *parameters* — the coefficient on
@@ -463,7 +463,7 @@ Method (§3).
   SSP scheme in TurTLE's stage arrangement, kept for code-to-code validation against that
   reference (decision 80). The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
-  ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``), which the run layer uses with `max_speed` to choose
+  ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``, with grid spacing ``\Delta x``), which the run layer uses with `max_speed` to choose
   ``\Delta t``.
 - **Two linear constraints are re-imposed on the advanced state at every step's exit**, after the
   forcing's post-step hook: the divergence-free condition, by the field library's
