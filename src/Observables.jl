@@ -162,7 +162,7 @@ viscosity)`](@ref GBGHomogeneousTurbulence.Observables.dissipation) — each for
 call, the kinetic energy equal to within summation-order roundoff (a few ulp: the single reduces
 on a threaded tree, the fused pass serially) — but the pair costs one read of the coefficients and
 one blocking device-to-host readback instead of two. Reach for it wherever both are
-wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t \\varepsilon/k``
+wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t \\varepsilon/k`` (``\\Delta t`` the timestep)
 of a spin-up or budget loop, which is how
 [`StationarityCriterion`](@ref GBGHomogeneousTurbulence.SimulationRun.StationarityCriterion) measures it.
 
@@ -275,7 +275,7 @@ value is not current, like every cached read.
     The cache holds exactly what the iteration already computes and leaves alive at its end; its
     contents follow from the run's fixed computation schedule. The maximum speed qualifies because the
     run itself needs it: on the adaptive-CFL path the next timestep is chosen from it, so the
-    reduction happens whether or not anyone reads the value. Under a hand-fixed ``\\Delta t`` nothing
+    reduction happens whether or not anyone reads the value. Under a hand-fixed timestep ``\\Delta t`` nothing
     consumes it and the pass is spent anyway — the schedule is fixed when the cache is built and does
     not vary with how the run is driven. The observables [`kinetic_energy`](@ref) and [`dissipation`](@ref) have no cached form
     because no part of the iteration leaves one alive at its end; caching either would mean adding a
