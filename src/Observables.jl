@@ -541,7 +541,8 @@ the box side ``L``,
 \\mathrm{Re}_{\\mathrm{box}} = \\frac{(\\varepsilon L)^{1/3} L}{\\nu} = \\frac{\\varepsilon^{1/3} L^{4/3}}{\\nu} = \\frac{1}{\\tilde{\\nu}},
 ```
 
-with ``\\tilde{\\nu}`` the viscosity in box units. Use it to place a run on the Reynolds axis the
+with ``\\tilde{\\nu}`` the viscosity in box units (length unit ``L``, velocity unit
+``(\\varepsilon L)^{1/3}``). Use it to place a run on the Reynolds axis the
 kinetic energy in box units ``\\tilde{k}`` is stated against; [`reynolds_taylor`](@ref) gives the
 Taylor-microscale Reynolds number of the same run. A run whose viscosity is set by the resolution
 ``\\kappa_{\\max}\\eta`` has ``\\mathrm{Re}_{\\mathrm{box}} = (L/\\eta)^{4/3}``, with ``\\eta`` the Kolmogorov length.
@@ -577,7 +578,8 @@ scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one compone
 ```
 
 It is the Reynolds number turbulence results are usually compared on. Its companion [`reynolds_box`](@ref) gives the
-box Reynolds number of the same run, and the two are tied by the kinetic energy in box units,
+box Reynolds number of the same run, and the two are tied by the kinetic energy in box units
+``\\tilde{k} = k/(\\varepsilon L)^{2/3}`` (``L`` the box side),
 ``\\mathrm{Re}_\\lambda = \\tilde{k}\\sqrt{(20/3)\\mathrm{Re}_{\\mathrm{box}}}``.
 
 # Arguments
