@@ -1072,7 +1072,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     spectrum evaluated at that state, returning a named tuple of the measured and predicted spectra and
     their relative ``L^2`` discrepancy. The two sides are not the same kind of object and the
     comparison must convert: `energy_spectrum` returns the per-shell energy ``E_n``, a model returns
-    the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n) \Delta\kappa`` with
+    the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n) \Delta\kappa``, ``\kappa_n`` the shell's wavenumber, with
     ``\Delta\kappa = 2\pi/L``. The factor is invisible on the default ``L = 2\pi`` box, where it is
     ``1``, and silently wrong on any other. *(Superseded 2026-08-23, owner-directed:
     `energy_spectrum` now returns the **density** — the shell energy over ``\Delta\kappa`` — so the
@@ -1086,7 +1086,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     run.** `Simulation` now sets ``\nu`` from the grid by default (no `viscosity`): it reads the
     dissipation the box sustains from the box-normalized dissipation law `Scalings.Li2008`
     (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2} C_\varepsilon^{-2/3}`` — calibrated to
-    JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` equals the `κ_max_η`
+    JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` (largest resolved wavenumber times Kolmogorov length) equals the `κ_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
     **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
     validate them.
