@@ -320,7 +320,7 @@ It needs one set of predicted positions and the velocity interpolated there
     ``\\Delta x^{d+1}``. For the default
     [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) (degree 2)
     the floor therefore falls *faster* than the time error, and the two cross over: measured on a
-    band-limited field, interpolation dominates at ``N = 16{-}32``
+    band-limited field of ``N`` grid points per axis, interpolation dominates at ``N = 16{-}32``
     and the time error dominates from ``N \\approx 64`` on (at ``N = 128`` the floor is
     ``1\\times10^{-5}`` against a time error of ``6\\times10^{-5}``; the numbers are setup-specific,
     and only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is
@@ -328,7 +328,8 @@ It needs one set of predicted positions and the velocity interpolated there
     trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
     below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
     more than an order of magnitude. What governs this in a run is how well the grid resolves the
-    dissipation scale, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``.
+    Kolmogorov length ``\\eta``, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``, with
+    ``\\kappa_{\\max}`` the largest resolved wavenumber.
 """
 struct Heun <: AbstractParticleIntegrator end
 
@@ -379,7 +380,7 @@ they extend, which is what lets
 history when the tracers are repositioned.
 
 # Fields
-- `predictor` — the `(M, 3)` predicted positions, which no tracer ever occupies.
+- `predictor` — the `(M, 3)` predicted positions of the ``M`` tracers, which no tracer ever occupies.
 - `predictor_points` — a
   [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) wrapping `predictor`.
 - `velocity_predictor` — the velocity interpolated at the predicted positions. It is reachable like
@@ -764,7 +765,8 @@ The **unwrapped** positions of the tracer set `tracers`, as a
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) — the trajectory with its
 winding kept, each coordinate the literal sum of every displacement since seeding, never reduced to
 the periodic box. These are the positions a mean-square-displacement or dispersion diagnostic
-needs: those are functions of ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, which box-wrapped
+needs: those are functions of the displacement ``\\boldsymbol{X}(t) - \\boldsymbol{X}(0)``, with
+``\\boldsymbol{X}`` a tracer's position, which box-wrapped
 positions cannot supply across a crossing. Accumulating such statistics over them — on the raw
 `(M, 3)` array `GBGPeriodicFields`' `point_positions` extracts — is the caller's analysis.
 
@@ -799,7 +801,7 @@ new_vector_point_values(tracers::Tracers) = VectorPointValues(similar(point_posi
     new_scalar_point_values(tracers)
 
 Allocate a [`ScalarPointValues`](@extref GBGPeriodicFields GBGPeriodicFields.Points.ScalarPointValues) of
-length ``M`` matching the tracer set `tracers`, for use as the `out` of
+length ``M``, the number of tracers in the set `tracers`, for use as the `out` of
 [`interpolate_at_particles!`](@ref) when sampling the scalar ``\\varphi`` at the particle positions.
 """
 new_scalar_point_values(tracers::Tracers) =
