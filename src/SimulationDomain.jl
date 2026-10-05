@@ -110,7 +110,7 @@ Prefer `true` when compute is the scarce resource, `false` when memory is.
 
 !!! note "Retained is not resolved"
     The filter keeps every mode energetic ([`max_retained_wavenumber`](@ref) is the Nyquist), but
-    applying it every step adds a damping rate
+    applying it every step of length ``\\Delta t`` adds a damping rate
     ``\\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}/\\Delta t`` that
     overtakes the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the
     default `order`; beyond that, mode amplitudes are set by the filter, not by Navier–Stokes.
@@ -433,7 +433,8 @@ criterion ``\\kappa_{\\max}\\eta`` — with ``\\eta`` the Kolmogorov (dissipatio
 run is set up to meet.
 
 For the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, resolved and retained coincide: inside a sharp cutoff no mode is damped.
-Under `HouLi` they differ, because the filter applied every step acts as an extra damping rate
+Under `HouLi` they differ, because the filter applied every step of length ``\\Delta t`` acts as an
+extra damping rate
 ``\\mathrm{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\mathrm{order}}/\\Delta t`` that overtakes
 the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the default
 `order = 36` — beyond that crossover the dynamics is filter-dominated and the energy there is

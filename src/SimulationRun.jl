@@ -1295,7 +1295,7 @@ before the stop.
 
 Stopping is the observation's decision on observables, never a run option. A span of simulation
 time compares [`current_time`](@ref) against a target; a step budget compares
-[`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` from the
+[`current_step`](@ref); an eddy-turnover budget accumulates ``\\Delta t \\varepsilon/k`` over each timestep ``\\Delta t`` from the
 observables it computes; spin-up to stationarity is the packaged [`StationarityCriterion`](@ref).
 Whatever the callback needs beyond the cached observables it computes itself, at its own cadence,
 with the exported reductions and recoveries; [`every_steps`](@ref) and [`every_time`](@ref) are
@@ -1441,7 +1441,7 @@ seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary s
 decaying run a fixed-length loop instead, which is a three-line callback (see `run!`).
 
 At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic energy ``k``, accumulates
-the eddy-turnover clock ``\\Delta t \\varepsilon/k``, and tests ``\\varepsilon`` for flatness over a
+the eddy-turnover clock ``\\Delta t \\varepsilon/k`` over the timestep ``\\Delta t``, and tests ``\\varepsilon`` for flatness over a
 trailing window; it stops the run when every gate holds, or gives up with a warning at
 `max_turnovers`. The gate reads ``\\varepsilon`` alone: the small scales settle last, so a flat
 ``\\varepsilon`` is the strict indicator — where ``k`` is whatever the forcing shapes: clamped by a
