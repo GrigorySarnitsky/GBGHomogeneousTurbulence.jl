@@ -225,7 +225,7 @@ The run group, `kwargs...` in both signatures
   derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
   explicitly there.
   A velocity forcing's stated target is a statement of the run's state, so giving
-  `kinetic_energy` or `dissipation` beside it is refused; under a derived ν, one that holds neither
+  `kinetic_energy` or `dissipation` beside it is refused; under a derived ``\\nu``, one that holds neither
   quantity draws the warning above.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
@@ -363,7 +363,7 @@ Three of these are what a user reads — `state`, `cache`, and `tracers`. The re
 on: they hold partial values while a step is in flight, so read them only between steps, and treat
 their contents as the scheme's business rather than the run's state.
 
-- `state` — the `ResolvedFields` (the evolving `û`, `φ̂`).
+- `state` — the `ResolvedFields` (the evolving ``\\hat{\\boldsymbol{u}}``, ``\\hat\\varphi``).
 - `cache` — the `ObservablesCache`: the observables the iteration deposits at its end.
 - `domain`, `buffers`, `generator`, `field_integration_scheme` — the `FixedDomain`, `IntegratorBuffers`,
   the `ResolvedGenerator` (whose `conditions` field is the run's `FlowConditions`), and
