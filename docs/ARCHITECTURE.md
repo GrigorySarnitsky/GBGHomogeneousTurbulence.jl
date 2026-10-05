@@ -232,7 +232,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   The recovered values land in the **`ObservablesCache`** — its own module, `Cache`, included after
   `Observables`. That is the storage each iteration fills at its end with its observables: the
   physical velocity, vorticity and scalar, the maximum speed, and, when tracers ride the run, the
-  velocity at the particles ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``. It fills them under the
+  velocity at the particles ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` (tracer positions ``\boldsymbol{X}``, current time ``t_n``). It fills them under the
   no-recompute rule (`docs/src/observables_cache.md` is the design page; §11 decision 40).
 
   A slot IS its producer's register: the step takes the chart arrays as its
@@ -501,7 +501,7 @@ stamps it at the current epochs — one closing act per dynamical factor, `step!
 `advect!` then `deposit!` — completing the iteration's deposits; `interpolate_at_particles!` reads
 any field along the trajectories for Lagrangian statistics.
 
-The sample deposit is what keeps an ``M``-point instrument at ``M``-point cost: depositing the sample
+The sample deposit is what keeps an instrument of ``M`` tracers at ``M``-point cost: depositing the sample
 at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
 ``N^{3}\times3`` resident buffer and copy. Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
