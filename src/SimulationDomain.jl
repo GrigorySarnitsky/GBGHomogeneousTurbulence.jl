@@ -114,7 +114,7 @@ Prefer `true` when compute is the scarce resource, `false` when memory is.
     ``\\texttt{strength} (\\kappa/\\kappa_{\\mathrm{Ny}})^{\\texttt{order}}/\\Delta t`` that
     overtakes the viscous rate ``\\nu\\kappa^{2}`` near ``0.8 \\kappa_{\\mathrm{Ny}}`` at the
     default `order`; beyond that, mode amplitudes are set by the filter, not by Navier–Stokes.
-    The resolution criterion ``\\kappa_{\\max}\\eta`` therefore uses
+    The resolution criterion ``\\kappa_{\\max}\\eta``, with ``\\eta`` the Kolmogorov microscale, therefore uses
     [`max_resolved_wavenumber`](@ref), which is ``\\tfrac{4}{5} \\kappa_{\\mathrm{Ny}}`` under
     this strategy whatever the `order` — not the Nyquist (its docstring scopes the convention).
 
@@ -163,9 +163,10 @@ than the ``2/3`` rule — handled automatically by
 [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 
 !!! note "A half-cell shift attenuates the Nyquist mode"
-    A half-cell displacement cannot translate the Nyquist mode of a real field — it *attenuates* it by
-    ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. This never bites here: the spherical
-    cutoff at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves the field with no
+    A half-cell displacement cannot translate the Nyquist mode of a real field — a displacement
+    ``h_a`` along axis ``a``, of grid spacing ``\\Delta x_a = L/N``, *attenuates* it by
+    ``\\cos(\\pi h_a/\\Delta x_a)``, which vanishes at half a cell. The spherical
+    cutoff at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} < \\kappa_{\\mathrm{Ny}}`` leaves no
     Nyquist content to mistranslate.
 
 # References
@@ -262,7 +263,7 @@ objects, each linked to its own documentation.
   with no array allocated.
 - `unit_kernel` — the constant weight ``1``, the same lazy form: the identity weight that lets a plain
   variance join a multi-weight fused reduction (one traversal answering several weighted sums at
-  once), since ``\\langle f, 1\\cdot f\\rangle`` is the mean square — the variance of a
+  once), since for a field ``f`` the inner product ``\\langle f, 1\\cdot f\\rangle`` is the mean square — the variance of a
   mean-zero field.
 - `storage_family` — the storage family (`Array` /
   `CuArray` / `ROCArray`) the run's arrays live in — a type,
