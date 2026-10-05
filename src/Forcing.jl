@@ -604,7 +604,8 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
 # Arguments
 - `domain` — the `FixedDomain` the band is built on.
 - `rate` — the fixed linear rate ``A``. A positive value amplifies the field. The deferred form may
-  leave it out, and a run then supplies ``A = \\varepsilon/(2 k_{\\mathrm{band}})`` from the state
+  leave it out, and a run then supplies ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, with
+  ``k_{\\mathrm{band}}`` the kinetic energy held in the forced band, from the state
   [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state) returns.
   The rate is fixed, not fed back from the measured state, so the run settles near that state rather
   than exactly at it.
@@ -726,7 +727,8 @@ A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\e
 \\quad\\text{in the band, } 0 \\text{ outside,}
 ```
 
-so that ``\\mathrm{d}k/\\mathrm{d}t = -G(k - k_\\infty)/t_\\ell`` exactly: the variance relaxes
+with ``k_\\infty`` the `target`, ``G`` the `gain` and ``t_\\ell`` the `turnover_time`, so that
+``\\mathrm{d}k/\\mathrm{d}t = -G(k - k_\\infty)/t_\\ell`` exactly: the variance relaxes
 exponentially to a **stable attractor** with settling time ``t_\\ell/G``.
 
 The limit `gain = 0` is the bare **marginal law**, and it is allowed: exact reinjection of the
