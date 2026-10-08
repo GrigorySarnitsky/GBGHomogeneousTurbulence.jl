@@ -23,7 +23,7 @@ const O  = GBGHomogeneousTurbulence.Observables
 @testset "Forcing._target_factor measures in the field's own element type on a Float32 run" begin
   domain = SD.FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
                             dealiasing = SD.TwoThirds(),
-                            element_type = Float32, array_type = Array)
+                            element_type = Float32, array_family = Array)
 
   û = SD.new_vector_field_spectral(domain)
   rng = MersenneTwister(1234)

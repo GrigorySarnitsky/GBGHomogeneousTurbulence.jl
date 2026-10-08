@@ -31,7 +31,7 @@ end
 @testset "VarianceRescaling(over = :band) drives the band observable to `target`" begin
   N, L, T = 24, 2π, Float64
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   @testset "velocity: the band kinetic energy equals `target`" begin
     for target in (0.3, 1.7)

@@ -10,7 +10,7 @@ using GBGHomogeneousTurbulence.Observables: derivative_skewness
 @testset "derivative_skewness returns the field's element type on the degenerate-strain branch" begin
   for T in (Float32, Float64)
     d = FixedDomain(grid_points_per_axis = 8, side_length = T(2π), element_type = T,
-                    array_type = Array, dealiasing = TwoThirds())
+                    array_family = Array, dealiasing = TwoThirds())
 
     # (1) A freshly allocated velocity field: zero everywhere, so S ≡ 0 and ⟨S:S⟩ = 0.
     û = new_vector_field_spectral(d)

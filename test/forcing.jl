@@ -56,7 +56,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
   N = 24
   L = 2π
   ν = 0.05
-  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_family = Array)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)
@@ -355,7 +355,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # the predicted state's turnover time. The placeholder k̃ is flat in Re, so the two coincide.
     for highest_shell in (2, 4, Inf)
       d = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64,
-                      dealiasing = TwoThirds(), array_type = Array)
+                      dealiasing = TwoThirds(), array_family = Array)
       by_hand = VarianceController(d; target = 1.5, highest_shell)
       run = Simulation(d; κ_max_η = 1.5, velocity_forcing = VarianceController(; highest_shell))
       @test by_hand.turnover_time ≈ run.generator.conditions.velocity_forcing.turnover_time rtol = 1e-12
@@ -365,7 +365,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     end
     # A band the model does not cover has no default settling time: it must be stated.
     d = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64,
-                    dealiasing = TwoThirds(), array_type = Array)
+                    dealiasing = TwoThirds(), array_family = Array)
     @test_throws ArgumentError VarianceController(d; target = 1.5, lowest_shell = 2, highest_shell = 3)
     @test VarianceController(d; target = 1.5, lowest_shell = 2, highest_shell = 3,
                              turnover_time = 1.0).turnover_time == 1.0
@@ -378,7 +378,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # controller is the DEFAULT velocity forcing, so the leak would be on every run's path.
     for T in (Float32, Float64)
       d = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = T,
-                      dealiasing = TwoThirds(), array_type = Array)
+                      dealiasing = TwoThirds(), array_family = Array)
       @test typeof(VarianceController(d; target = T(1.5))).parameters[2] === T
       @test typeof(VarianceController(d; target = T(1.5), gain = 2, turnover_time = 3)).parameters[2] === T
     end
@@ -415,7 +415,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # construction warns (entirely above: "will do NOTHING"; partially: "retained part"), and the
     # default band stays silent. N = 16 under TwoThirds puts the cutoff at shell ≈ 5.3.
     d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                      dealiasing = TwoThirds(), array_type = Array)
+                      dealiasing = TwoThirds(), array_family = Array)
     warns(f) = begin
       buf = IOBuffer()
       Logging.with_logger(Logging.SimpleLogger(buf, Logging.Warn)) do; f(); end
@@ -440,7 +440,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     end
     for n in (16, 24)                 # even and not a power of two: the corner shell differs
       d = FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
-                      dealiasing = TwoThirds(), array_type = Array)
+                      dealiasing = TwoThirds(), array_family = Array)
       u = new_vector_field_spectral(d)
       random_solenoidal_velocity_spectral!(u, d; kinetic_energy = 0.7, envelope_wavenumber = 3.0,
                                            rng = MersenneTwister(n))
@@ -463,7 +463,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     end
     # The deferred form carries it through to whichever grid the run builds.
     d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                      dealiasing = TwoThirds(), array_type = Array)
+                      dealiasing = TwoThirds(), array_family = Array)
     @test VarianceController(; target = 1.0, highest_shell = Inf)(d16).highest_shell === Inf
     @test occursin("shells 1 to Inf", repr(ConstantPower(d16; injection_rate = 0.1, highest_shell = Inf)))
     # An integer-valued float is that shell — `[2, 4, Inf]` promotes 2 to 2.0 — and must never
@@ -493,7 +493,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # controller's spelling drifted from `scalar_dissipation` (a lost 2, a wrong factor), the two
     # amplitudes part.
     domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                         dealiasing = TwoThirds(), array_type = Array)
+                         dealiasing = TwoThirds(), array_family = Array)
     φ̂ = new_scalar_field_spectral(domain)
     random_scalar_spectral!(φ̂, domain; scalar_variance = 0.4, envelope_wavenumber = 2.0,
                             rng = MersenneTwister(31))

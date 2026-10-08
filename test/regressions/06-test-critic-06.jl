@@ -13,12 +13,12 @@ using Test
 
   kernel_of(strategy) = real.(field_data(materialize_kernel(
     FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = strategy,
-                element_type = Float64, array_type = Array).dealias).field))
+                element_type = Float64, array_family = Array).dealias).field))
 
   # |κ|² per mode, from the domain's own squared-wavenumber symbol.
   k2 = real.(field_data(materialize_kernel(
     FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = TwoThirds(),
-                element_type = Float64, array_type = Array).squared_wavenumber_kernel).field))
+                element_type = Float64, array_family = Array).squared_wavenumber_kernel).field))
 
   # keyword constructor stores what it was given
   @test HouLi(order = 4, strength = 2.0).order == 4

@@ -27,7 +27,7 @@ using GBGPeriodicFields: field_data
 # Returns the post-step scalar field in spectral representation, or the exception thrown.
 function step_once(dealiasing, generator_scalar::Bool)
   domain = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, dealiasing,
-                       element_type = Float64, array_type = Array)
+                       element_type = Float64, array_family = Array)
   conditions = FlowConditions(; viscosity = 0.05, schmidt = 1.0,
                               velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
   state = ResolvedFields(domain; scalar = true)

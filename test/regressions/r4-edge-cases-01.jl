@@ -14,7 +14,7 @@ using Test, Random, GBGHomogeneousTurbulence
 
 @testset "a negative forcing variance is rejected at construction, not as a downstream sqrt DomainError" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
 
   # (1) The construction guard the codebase's own pattern calls for.
   @test_throws ArgumentError StochasticOU(domain; forcing_variance = -1.0, correlation_time = 0.3)
@@ -54,7 +54,7 @@ end
 # `over = :band` passes the raw target straight into `sqrt`. Fix the class, not the line.
 @testset "a negative VarianceRescaling target is rejected at construction, not as a downstream sqrt DomainError" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
 
   @test_throws ArgumentError VarianceRescaling(domain; target = -1.0, over = :band)
 

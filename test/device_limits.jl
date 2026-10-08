@@ -45,7 +45,7 @@ pool = CUDA.memory_pool(CUDA.device())
 reserved() = Int(CUDA.attribute(UInt64, pool, CUDA.MEMPOOL_ATTR_RESERVED_MEM_CURRENT))
 reserved_before = reserved()
 sim = with_logger(() -> Simulation(grid_points_per_axis = $N, viscosity = 0.05, element_type = $T,
-                                   array_type = CuArray, rng = Xoshiro(1)), NullLogger())
+                                   array_family = CuArray, rng = Xoshiro(1)), NullLogger())
 for _ in 1:3
   advance!(sim; dt = 1e-3)
 end
@@ -88,7 +88,7 @@ device_bytes(x) = sum(sizeof, collect_field_arrays!(AbstractArray[], x, Set{UInt
 function predicted_bytes(cuda)
   sim = with_logger(NullLogger()) do
     Simulation(grid_points_per_axis = N, viscosity = 0.05, element_type = T,
-               array_type = getproperty(cuda, :CuArray), rng = Xoshiro(1))
+               array_family = getproperty(cuda, :CuArray), rng = Xoshiro(1))
   end
   seeding_stage = device_bytes((sim.domain, sim.state)) + 3 * sizeof(T) * N^3
   whole_run = device_bytes(sim)
@@ -132,7 +132,7 @@ end
 host_driver(n) = """
 using CUDA, GBGHomogeneousTurbulence, Random, Logging
 sim = with_logger(() -> Simulation(grid_points_per_axis = $n, viscosity = 0.05, element_type = $T,
-                                   array_type = CuArray, rng = Xoshiro(1)), NullLogger())
+                                   array_family = CuArray, rng = Xoshiro(1)), NullLogger())
 for _ in 1:3
   advance!(sim; dt = 1e-3)
 end

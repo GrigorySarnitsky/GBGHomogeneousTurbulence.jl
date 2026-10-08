@@ -215,7 +215,7 @@ sim = Simulation(grid_points_per_axis = 64,
 # Or build it directly, once the domain is in hand:
 domain = FixedDomain(; grid_points_per_axis = 64, side_length = 2π,
                      dealiasing = TwoThirds(), element_type = Float64,
-                     array_type = Array)
+                     array_family = Array)
 forcing = ConstantPower(domain; injection_rate = 0.4)
 ```
 
@@ -1321,7 +1321,7 @@ function StochasticOU(domain::FixedDomain; forcing_variance::Real, correlation_t
   # frequency, whose modes a transfer between resolutions cannot carry (one coarse Nyquist mode
   # describes a wave the finer grid splits in two).
   companion = FixedDomain(; grid_points_per_axis = 2 * (Int(highest_shell) + 1), side_length = L,
-                          dealiasing = TwoThirds(), element_type = T, array_type = domain.storage_family)
+                          dealiasing = TwoThirds(), element_type = T, array_family = domain.array_family)
   modes = _count_band_modes(companion, low, high)
   modes > 0 ||
     throw(ArgumentError("the band (shells $(lowest_shell)–$(highest_shell)) holds no lattice " *

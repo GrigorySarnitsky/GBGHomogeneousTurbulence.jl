@@ -38,10 +38,10 @@ const BACKENDS = DEVICE_ARRAY === nothing ? [Array] : [Array, DEVICE_ARRAY]
 
 const N = 32
 
-# Every random draw of a run from `seed`, on the storage family `backend`, in element type `T`.
+# Every random draw of a run from `seed`, on the array family `backend`, in element type `T`.
 function draws(seed, backend, T)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                       element_type = T, array_type = backend)
+                       element_type = T, array_family = backend)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
                                        rng = Xoshiro(seed))

@@ -235,7 +235,7 @@ function step! end
 """
     IFLowStorageRK3()
 
-Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980) 2N-storage family. The
+Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980) 2N-array family. The
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
 unlike [`IFHeun`](@ref).
 

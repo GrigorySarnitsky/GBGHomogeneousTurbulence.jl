@@ -15,7 +15,7 @@ using Random
 @testset "_scalar_flux_divergence! honours α on the kernel === nothing branch" begin
   N = 8
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   # A fixed physical velocity and scalar; the velocity is CONSUMED by the flux, so rebuild it.
   rng = MersenneTwister(11)

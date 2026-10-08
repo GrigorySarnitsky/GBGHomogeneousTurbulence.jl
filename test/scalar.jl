@@ -36,7 +36,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_family = Array)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   @testset "diffusion exactness (u = 0)" begin
@@ -98,7 +98,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     # exact zero may be −0.0.
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift())
       d = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = dealiasing,
-                      element_type = Float64, array_type = Array)
+                      element_type = Float64, array_family = Array)
       û = new_vector_field_spectral(d)
       random_solenoidal_velocity_spectral!(û, d; kinetic_energy = 0.5, envelope_wavenumber = 3.0,
                                            rng = MersenneTwister(7))

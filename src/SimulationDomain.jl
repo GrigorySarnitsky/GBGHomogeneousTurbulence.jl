@@ -1,7 +1,7 @@
 # SimulationDomain — the discretized, periodic, cubic box a run lives on: the grid, the real–Fourier
 # layout, the transform plans, the spectral multipliers, and the lazy per-mode kernels (|k|² and the
 # dealias mask — compressed symbols, never materialized as arrays; decision 38).
-# Reusable and read-only; precision and backend enter here (element_type / array_type) and flow
+# Reusable and read-only; precision and backend enter here (element_type / array_family) and flow
 # everywhere from here. The concrete frame is `FixedDomain` (fixed, orthogonal, unsheared); a sheared
 # (Rogallo) frame is deferred (ARCHITECTURE §7). Field-sized allocators (new_vector_field_spectral, …) build
 # scratch fields sized to the domain.
@@ -198,7 +198,7 @@ _resolved_nyquist_fraction(::PhaseShift) = 2 * sqrt(2) / 3
 
 """
     FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type,
-                array_type, fft_flags = nothing, fft_timelimit = Inf)
+                array_family, fft_flags = nothing, fft_timelimit = Inf)
 
 The discretized periodic box a run lives on — the reusable, read-only frame: a cube of side length
 `side_length` sampled with `grid_points_per_axis` points along each axis, holding everything the
@@ -215,7 +215,7 @@ All keyword; the five naming the box are required:
   advective-CFL ceiling through
   [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl).
 - `element_type` — the real element type ([`Float32`](@extref Julia :jl:type:Core.Float32) is GPU-friendly).
-- `array_type` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
+- `array_family` — the storage backend: [`Array`](@extref Julia :jl:type:Core.Array) (CPU) or
   [`CuArray`](@extref CUDA The-CuArray-type) / [`ROCArray`](@extref AMDGPU AMDGPU.ROCArray) (GPU);
   [Memory footprint on a GPU](@ref) sizes a run.
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to
@@ -233,10 +233,10 @@ A default box, and one that keeps a wider band on the same grid:
 ```julia
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
                        dealiasing = TwoThirds(), element_type = Float64,
-                       array_type = Array)
+                       array_family = Array)
 
 wide = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
-                     dealiasing = HouLi(), element_type = Float64, array_type = Array)
+                     dealiasing = HouLi(), element_type = Float64, array_family = Array)
 ```
 
 !!! note "Nothing here defaults"
@@ -267,7 +267,7 @@ objects, each linked to its own documentation.
   variance join a multi-weight fused reduction (one traversal answering several weighted sums at
   once), since for a field ``f`` the inner product ``\\langle f, 1\\cdot f\\rangle`` is the mean square — the variance of a
   mean-zero field.
-- `storage_family` — the storage family (`Array` /
+- `array_family` — the array family (`Array` /
   `CuArray` / `ROCArray`) the run's arrays live in — a type,
   not an array; the allocators hand it to `GBGPeriodicFields`' family-taking field constructors.
 - `dealias`, `dealiasing` — the dealias kernel (a compressed
@@ -283,12 +283,12 @@ struct FixedDomain{G, L, TP, M, SK, UK, D, DS, SF}
   unit_kernel::UK                  # the constant-1 weight, same lazy form — lets a variance join a fused multi-weight reduction
   dealias::D                       # isotropic low-pass kernel (compressed, per-mode), built by `dealiasing`
   dealiasing::DS                   # the DealiasingStrategy that built `dealias` (TwoThirds / HouLi / PhaseShift)
-  storage_family::SF               # the storage family (`Array`, `CuArray`, `ROCArray`) — a TYPE, not an array:
+  array_family::SF               # the array family (`Array`, `CuArray`, `ROCArray`) — a TYPE, not an array:
                                    # what the allocators hand PF's family-taking constructors (PF decision 74)
 end
 
 
-_zeros(array_type, ::Type{S}, dims::Tuple) where {S} = fill!(array_type{S}(undef, dims...), zero(S))
+_zeros(array_family, ::Type{S}, dims::Tuple) where {S} = fill!(array_family{S}(undef, dims...), zero(S))
 
 
 _unit_symbol(κ²) = one(κ²)
@@ -297,7 +297,7 @@ _unit_symbol(κ²) = one(κ²)
 function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
                        dealiasing::DealiasingStrategy,
                        element_type::Type{T},
-                       array_type,
+                       array_family,
                        fft_flags = nothing, fft_timelimit::Real = Inf) where {T<:AbstractFloat}
   N = Int(grid_points_per_axis)
   L = T(side_length)
@@ -306,13 +306,13 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
 
   # ONE plan pair serves every field since PF's decision 76 made the plans rank-blind: they
   # transform a single component and are applied per component, so the velocity (3), the scalar (1)
-  # and the strain tensor (9) share this object. Built from the storage family and the grid alone
+  # and the strain tensor (9) share this object. Built from the array family and the grid alone
   # (PF decision 93): the planner plans on one-component arrays of its own, so a timed planner
   # (`MEASURE`) clobbers nothing of the run's, and no template field is built here for it.
-  transform_plans = FieldTransformPlans(array_type, grid; layout,
+  transform_plans = FieldTransformPlans(array_family, grid; layout,
                                         fft_flags, fft_timelimit = Float64(fft_timelimit))
-  # The multipliers from the storage family and the grid alone (PF decision 94): no template field.
-  multipliers = FieldSpectralMultipliers(array_type, grid; layout)
+  # The multipliers from the array family and the grid alone (PF decision 94): no template field.
+  multipliers = FieldSpectralMultipliers(array_family, grid; layout)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
   squared_wavenumber_kernel = radial_kernel(identity, multipliers)
@@ -323,7 +323,7 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   unit_kernel = radial_kernel(_unit_symbol, multipliers)
   dealias = _build_dealias(dealiasing, multipliers, N, L, T)
 
-  return FixedDomain(grid, layout, transform_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_type)
+  return FixedDomain(grid, layout, transform_plans, multipliers, squared_wavenumber_kernel, unit_kernel, dealias, dealiasing, array_family)
 end
 
 
@@ -462,7 +462,7 @@ end
 Allocate a single zeroed vector field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_spectral(domain::FixedDomain) =
-  (f = VectorFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = VectorFieldSpectral(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -472,7 +472,7 @@ new_vector_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed vector field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_physical(domain::FixedDomain) =
-  (f = VectorFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = VectorFieldPhysical(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -482,7 +482,7 @@ new_vector_field_physical(domain::FixedDomain) =
 Allocate a single zeroed scalar field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_spectral(domain::FixedDomain) =
-  (f = ScalarFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = ScalarFieldSpectral(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -492,7 +492,7 @@ new_scalar_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed scalar field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_physical(domain::FixedDomain) =
-  (f = ScalarFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = ScalarFieldPhysical(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -502,7 +502,7 @@ new_scalar_field_physical(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_spectral(domain::FixedDomain) =
-  (f = TensorFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = TensorFieldSpectral(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -512,7 +512,7 @@ new_tensor_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_physical(domain::FixedDomain) =
-  (f = TensorFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
+  (f = TensorFieldPhysical(domain.array_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -559,19 +559,19 @@ function Base.show(io::IO, strategy::HouLi)
   print(io, "HouLi(", join(parts, ", "), ")")
 end
 
-# The grid (size, extent, element type — the library's spelling) and the storage family, which a run
-# checks a state against before adopting it (a tracer set against the storage family alone), and
+# The grid (size, extent, element type — the library's spelling) and the array family, which a run
+# checks a state against before adopting it (a tracer set against the array family alone), and
 # the dealiasing strategy, which decides what assembly scratch a generator is built with. The REPL
 # form adds the resolved wavenumber the strategy leaves — the one number the resolution checks
 # (``\kappa_{\max}\eta``) read a strategy through — beside the grid and strategy it derives from.
 Base.show(io::IO, domain::FixedDomain) =
-  print(io, "FixedDomain(", domain.grid, ", ", domain.dealiasing, ", ", nameof(domain.storage_family), ")")
+  print(io, "FixedDomain(", domain.grid, ", ", domain.dealiasing, ", ", nameof(domain.array_family), ")")
 
 function Base.show(io::IO, ::MIME"text/plain", domain::FixedDomain)
   print(io, "FixedDomain")
   print(io, "\n  grid        ", domain.grid)
   print(io, "\n  dealiasing  ", domain.dealiasing, ", max_resolved_wavenumber ", max_resolved_wavenumber(domain))
-  print(io, "\n  storage     ", nameof(domain.storage_family))
+  print(io, "\n  storage     ", nameof(domain.array_family))
 end
 
 
@@ -606,7 +606,7 @@ function write_domain end
 
 """
     read_domain(parent::HDF5.H5DataStore, name::AbstractString;
-                array_type = Array) -> FixedDomain
+                array_family = Array) -> FixedDomain
 
 Rebuild a [`FixedDomain`](@ref) from the group [`write_domain`](@ref) wrote — the recorded
 parameters through the ordinary constructor, so the transform plans, multipliers and kernels are
@@ -616,7 +616,7 @@ schema version, is refused with an `ArgumentError`. Available once the `HDF5` pa
 # Arguments
 - `parent` — the open HDF5 file or group holding the domain group.
 - `name` — the group's name.
-- `array_type = Array` — the storage backend the rebuilt domain lives on. The backend is
+- `array_family = Array` — the storage backend the rebuilt domain lives on. The backend is
   deliberately not taken from the file: a checkpoint written on one backend loads on any other, so
   the reader, not the writer, names it.
 """

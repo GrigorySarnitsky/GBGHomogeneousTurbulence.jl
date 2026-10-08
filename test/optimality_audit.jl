@@ -254,7 +254,7 @@ const SYNC_LEDGER = (
     # that is genuinely N³ of information, the walk below stops being zero and the floor must move.
     N = 8
     for strategy in (TwoThirds(), HouLi(), PhaseShift())
-      domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = strategy, element_type = Float64, array_type = Array)
+      domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = strategy, element_type = Float64, array_family = Array)
       m = domain.multipliers
 
       # (a) The frame holds nothing at field scale — the achieved floor, per strategy.
@@ -294,7 +294,7 @@ const SYNC_LEDGER = (
     # 129 MiB at 256³ / Float64 — and claimed by RESIDENT LINEAR RATE; since decision 106 (on PF
     # decision 92) it is a radial symbol, and the floor is ACHIEVED: no rate slot holds storage.
     N = 8
-    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
     m = domain.multipliers
     κ² = [m.squared_wavenumber_1[i] + m.squared_wavenumber_2[j] + m.squared_wavenumber_3[k]
           for i in eachindex(m.squared_wavenumber_1), j in eachindex(m.squared_wavenumber_2),
@@ -370,7 +370,7 @@ const SYNC_LEDGER = (
     # no bound had ever been held against, and both are now zero. A regression here would mean a
     # closed gap has reopened without a holder being written for it.
     #
-    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
 
     # (a) Tracers cost nothing at field scale: the start-of-step velocity is interpolated onto the
     #     tracers before the step rather than retained as a field, so nothing the instrument owns

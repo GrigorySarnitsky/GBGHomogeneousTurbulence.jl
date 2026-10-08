@@ -24,7 +24,7 @@ using GBGHomogeneousTurbulence.Propagator: deposit!
 
 
 small_domain() = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(),
-                             element_type = Float64, array_type = Array)
+                             element_type = Float64, array_family = Array)
 
 
 @testset "deposit! names a scalar/buffers mispairing instead of dying in a private helper" begin

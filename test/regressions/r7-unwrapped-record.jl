@@ -18,7 +18,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   N = 16
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   u = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
   set_uniform_x!(u, 1.0)                                # steady uniform flow: Heun is exact
 

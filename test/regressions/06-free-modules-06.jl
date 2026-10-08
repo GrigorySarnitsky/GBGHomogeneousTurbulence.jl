@@ -16,7 +16,7 @@ include(joinpath((let d = @__DIR__; while !isfile(joinpath(d, "src", "GBGHomogen
 
 M = 4
 domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                     array_type = Array, dealiasing = TwoThirds())
+                     array_family = Array, dealiasing = TwoThirds())
 
 m_arrays(owner) = (acc = AbstractArray[];
                    collect_field_arrays!(acc, owner, Set{UInt}(), 2);

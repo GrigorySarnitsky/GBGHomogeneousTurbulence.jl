@@ -4,7 +4,7 @@ using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "allocate_buffers rejects a cache whose sample history is too short for the scheme" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,
-                       dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+                       dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
   tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
   u = new_vector_field_physical(domain)

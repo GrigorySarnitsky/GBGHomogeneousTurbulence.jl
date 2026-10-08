@@ -12,7 +12,7 @@ using GBGHomogeneousTurbulence
 @testset "derivative_skewness returns the field's own element type on the degenerate zero-field path" begin
   for T in (Float32, Float64)
     domain = FixedDomain(; grid_points_per_axis = 8, side_length = 2π,
-                           dealiasing = TwoThirds(), element_type = T, array_type = Array)
+                           dealiasing = TwoThirds(), element_type = T, array_family = Array)
     state = ResolvedFields(domain)                     # velocity left at its zeroed default
 
     S = derivative_skewness(state.velocity_spectral, domain)

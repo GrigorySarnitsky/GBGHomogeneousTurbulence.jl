@@ -9,7 +9,7 @@ using Random
 
 quietly(f) = with_logger(f, NullLogger())
 domain_of(N) = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                           element_type = Float64, array_type = Array)
+                           element_type = Float64, array_family = Array)
 
 
 @testset "the model: k̃ and k_band/k per forcing band" begin

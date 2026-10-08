@@ -11,7 +11,7 @@ using Random
 
 @testset "VarianceController restores k toward target from BOTH sides" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   target = 1.5
   gap_closed(k0; steps = 300, seed) = begin
     # Seeded at k0 through an adopted state: `kinetic_energy` beside the controller's target would

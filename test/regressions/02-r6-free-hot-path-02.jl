@@ -15,7 +15,7 @@ using GBGPeriodicFields: VectorFieldPhysical, field_data, PointSet, CatmullRom, 
   N = 16
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   X0 = T[0.1 0.2 0.3; 1.0 2.0 3.0; 2.0 3.0 4.0; 4.0 5.0 6.0]
   tracers = Tracers(domain; positions = PointSet(copy(X0)), interpolation_scheme = CatmullRom)
   # A cache sized for a deeper scheme (history_depth = 5 → 4 past samples), handed to order = 3.

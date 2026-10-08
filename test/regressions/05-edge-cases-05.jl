@@ -21,7 +21,7 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
   @testset "a coarse grid whose dealias band excludes every nonzero mode must not silently seed a zero-energy field" begin
     N, L = 2, 2π
     domain = FixedDomain(; grid_points_per_axis = N, side_length = L,
-                         dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+                         dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
 
     # Precondition of the claim: the band really is empty of nonzero modes.
     lowest_nonzero_wavenumber = 2π / L
@@ -68,7 +68,7 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
   # No dealiasing degeneracy is needed — this is the general shape of the defect.
   @testset "an initial_spectrum that vanishes over the resolved band must not silently seed a zero-energy field" begin
     domain = FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
-                         dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+                         dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
     û = new_vector_field_spectral(domain)
     requested = 1.5
     threw = false

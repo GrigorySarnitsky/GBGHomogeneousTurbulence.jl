@@ -19,7 +19,7 @@ using Test
   T = Float64
   N = 16
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   @testset "wrap! preserves non-finiteness" begin
     X = [NaN 1.0 1.0

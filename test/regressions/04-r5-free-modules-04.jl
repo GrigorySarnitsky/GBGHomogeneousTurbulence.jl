@@ -26,7 +26,7 @@ using GBGPeriodicFields: field_data
 const N = 8
 const DOMAIN = FixedDomain(grid_points_per_axis = N, side_length = 2π,
                            dealiasing = TwoThirds(), element_type = Float64,
-                           array_type = Array)
+                           array_family = Array)
 
 # The outcome of a call, without letting a (legitimate) throw abort the testset.
 attempt(f) = try

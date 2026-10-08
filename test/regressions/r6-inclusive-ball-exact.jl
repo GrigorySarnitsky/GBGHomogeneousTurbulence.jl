@@ -18,9 +18,9 @@ const GEN6 = GBGHomogeneousTurbulence.Generator
 @testset "the inclusive 2/3 ball is exact on a 3|N grid, boundary shell populated" begin
   Np, L = 12, 2π
   d23 = FixedDomain(grid_points_per_axis = Np, side_length = L, dealiasing = TwoThirds(),
-                    element_type = Float64, array_type = Array)
+                    element_type = Float64, array_family = Array)
   d2 = FixedDomain(grid_points_per_axis = 2Np, side_length = L, dealiasing = TwoThirds(),
-                   element_type = Float64, array_type = Array)
+                   element_type = Float64, array_family = Array)
   û = SD6.new_vector_field_spectral(d23)
   random_solenoidal_velocity_spectral!(û, d23; kinetic_energy = 0.5, envelope_wavenumber = 3.0,
                                        rng = MersenneTwister(3))

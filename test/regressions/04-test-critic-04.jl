@@ -21,7 +21,7 @@ using Test
   N = 24
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   k0 = 2π / L
   band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)  # shells 1–2

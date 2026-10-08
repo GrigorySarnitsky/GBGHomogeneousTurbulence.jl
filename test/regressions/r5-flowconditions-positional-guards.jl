@@ -51,7 +51,7 @@ end
 
 
 small_domain() = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(),
-                             element_type = Float64, array_type = Array)
+                             element_type = Float64, array_family = Array)
 
 
 # How the shared-mutable-forcing misconfiguration surfaces when it is built positionally and run:

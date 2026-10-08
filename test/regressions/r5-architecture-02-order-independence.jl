@@ -7,7 +7,7 @@ using GBGHomogeneousTurbulence.Observables: vorticity_physical!
 
 @testset "the two recovery calls are order-independent on a shared scratch" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(7))

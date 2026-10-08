@@ -27,7 +27,7 @@ mean_mode_of(sim) = mean_mode(sim.state.velocity_spectral)
   @testset "the assembled velocity RHS vanishes identically at κ=0 (⟨u×ω⟩ = 0)" begin
     N = 32
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                         array_type = Array, dealiasing = TwoThirds())
+                         array_family = Array, dealiasing = TwoThirds())
     conditions = FlowConditions(viscosity = 0.02, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
     generator = ResolvedGenerator(domain, conditions)
@@ -65,7 +65,7 @@ mean_mode_of(sim) = mean_mode(sim.state.velocity_spectral)
   @testset "a forced run keeps ⟨u⟩ = 0 exactly, in both precisions" begin
     for (T, steps) in ((Float64, 1000), (Float32, 1000))
       domain = FixedDomain(grid_points_per_axis = 32, side_length = 2π, element_type = T,
-                           array_type = Array, dealiasing = TwoThirds())
+                           array_family = Array, dealiasing = TwoThirds())
       sim = Simulation(domain; viscosity = 0.02,
                        velocity_forcing = ConstantPower(injection_rate = 0.1),
                        rng = MersenneTwister(1))

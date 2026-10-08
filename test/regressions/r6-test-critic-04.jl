@@ -15,7 +15,7 @@ using Test
 
 @testset "a seed envelope peaking at or beyond the dealias cutoff warns; an ordinary seed is silent" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
   φ̂ = new_scalar_field_spectral(domain)
 

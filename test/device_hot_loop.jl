@@ -34,7 +34,7 @@ const BOUND = 64 * 1024
 function device_bytes_per_step(cuda, M)
   sim = with_logger(NullLogger()) do
     Simulation(grid_points_per_axis = 64, viscosity = 0.05, number_of_particles = M,
-               element_type = Float32, array_type = getproperty(cuda, :CuArray), rng = Xoshiro(1))
+               element_type = Float32, array_family = getproperty(cuda, :CuArray), rng = Xoshiro(1))
   end
   step!() = (advance!(sim; dt = 1e-3); Base.invokelatest(getproperty(cuda, :synchronize)))
   for _ in 1:3

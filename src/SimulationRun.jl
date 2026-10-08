@@ -84,7 +84,7 @@ end
 """
     Simulation(; grid_points_per_axis, κ_max_η = nothing, kinetic_energy = nothing,
                  dissipation = nothing, side_length = 2π, element_type = Float64,
-                 array_type = Array, dealiasing = TwoThirds(), kwargs...)
+                 array_family = Array, dealiasing = TwoThirds(), kwargs...)
     Simulation(domain; κ_max_η = nothing, kinetic_energy = nothing, dissipation = nothing,
                kwargs...)
 
@@ -180,7 +180,7 @@ The domain group:
   standing in for every other keyword of this group.
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
 - `side_length = 2π` — the box side ``L``.
-- `element_type = Float64`, `array_type = Array` — the real element type and storage backend
+- `element_type = Float64`, `array_family = Array` — the real element type and storage backend
   ([Memory footprint on a GPU](@ref) sizes a run).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
@@ -335,7 +335,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
 
 # Domain-taking — build the domain yourself, then hand it over:
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
-                       dealiasing = HouLi(), element_type = Float64, array_type = Array)
+                       dealiasing = HouLi(), element_type = Float64, array_family = Array)
 sim = Simulation(domain; viscosity = 1e-2)
 ```
 
@@ -638,7 +638,7 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("the given `state` lives on a different grid than `domain`: grid " *
                           "size, box size, and element type must all agree for the state to be " *
                           "adopted."))
-    state.velocity_spectral.fourier_coefficients isa domain.storage_family ||
+    state.velocity_spectral.fourier_coefficients isa domain.array_family ||
       throw(ArgumentError("the given `state` lives on a different storage backend than " *
                           "`domain`: move it, or build the domain, on the matching backend."))
   end
@@ -655,7 +655,7 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("`unwrapped = true` was given together with `tracers`, but the " *
                           "unwrapped record is a property of the given tracer set. Drop the " *
                           "setting."))
-    point_positions(tracers.positions) isa domain.storage_family ||
+    point_positions(tracers.positions) isa domain.array_family ||
       throw(ArgumentError("the given `tracers` live on a different storage backend than " *
                           "`domain`: move them, or build the domain, on the matching backend."))
   end
@@ -873,11 +873,11 @@ _traversal_order(::Nothing) = nothing
 _traversal_order(traversal::ParticleTraversal) = traversal.order
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
-                    element_type::Type = Float64, array_type = Array,
+                    element_type::Type = Float64, array_family = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(),
                     fft_flags = nothing, fft_timelimit::Real = Inf, kwargs...)
   return Simulation(FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type,
-                                  array_type, fft_flags, fft_timelimit); kwargs...)
+                                  array_family, fft_flags, fft_timelimit); kwargs...)
 end
 
 
@@ -1629,7 +1629,7 @@ function write_simulation end
 
 """
     read_simulation(parent::HDF5.H5DataStore, name::AbstractString;
-                    array_type = Array, ordered_interpolation = nothing) -> Simulation
+                    array_family = Array, ordered_interpolation = nothing) -> Simulation
 
 Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
 through its own constructor from the recorded parameters, adopting the stored state rather than
@@ -1643,7 +1643,7 @@ A group not written by `write_simulation`, or written by a newer schema version,
 # Arguments
 - `parent` — the open HDF5 file or group holding the checkpoint group.
 - `name` — the group's name.
-- `array_type = Array` — the storage backend the restored run lives on; the reader names it, so a
+- `array_family = Array` — the storage backend the restored run lives on; the reader names it, so a
   checkpoint written on one backend loads on any other.
 - `ordered_interpolation = nothing` — the tracer traversal-order setting of the restored run,
   forwarded to `Simulation`. The order is a derived accelerator, not state: nothing of it is

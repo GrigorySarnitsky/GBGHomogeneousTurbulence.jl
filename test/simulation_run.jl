@@ -110,7 +110,7 @@ using Test
   end
 
   @testset "bring-your-own domain + fixed dt" begin
-    domain = FixedDomain(grid_points_per_axis = 16, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 16, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
     sim = Simulation(domain; viscosity = 0.02, rng = MersenneTwister(3))
     advance!(sim; dt = 0.001)
     @test current_step(sim) == 1
@@ -229,7 +229,7 @@ using Test
   end
 
   @testset "derivative skewness" begin
-    domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 24, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
     buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(30))
@@ -266,7 +266,7 @@ using Test
     # Seeded away from the target through an adopted state: `kinetic_energy` beside the forcing's
     # target would state the stationary state twice.
     d16 = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
-                      element_type = Float64, array_type = Array)
+                      element_type = Float64, array_family = Array)
     seeded = ResolvedFields(d16)
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d16; kinetic_energy = 0.5,
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(40))
@@ -282,7 +282,7 @@ using Test
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb.state.velocity_spectral)) && kinetic_energy(simb.state.velocity_spectral) > 0
     # the target symbol is validated at construction
-    domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
     @test_throws ArgumentError VarianceRescaling(domain; target = 0.5, over = :bogus)
   end
 end
@@ -327,7 +327,7 @@ end
     # mutated behind its back, and `kinetic_energy` beside the target would state the state twice —
     # so the run has to climb, which a band-restoring controller would not do to the whole field.
     d24 = FixedDomain(grid_points_per_axis = 24, side_length = 2π, dealiasing = TwoThirds(),
-                      element_type = Float64, array_type = Array)
+                      element_type = Float64, array_family = Array)
     seeded = ResolvedFields(d24)
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d24; kinetic_energy = 0.4,
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(5))
@@ -369,7 +369,7 @@ end
 # outlives it — the gate's cost is transforms and a field-scale episode, not plan residency.
 @testset "one rank-blind plan pair serves every field (decision 81)" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   sim = Simulation(domain; viscosity = 0.05)
   advance!(sim)                                            # velocity through the pair
   # The strain-tensor diagnostic — rank 2 — goes through the SAME object, with no memo and no

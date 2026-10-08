@@ -15,7 +15,7 @@ const SD = GBGHomogeneousTurbulence.SimulationDomain
 @testset "scalar_rhs! reuse is keyed on the CONTENTS of û, not on the buffer object" begin
   L, N = 2π, 12
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = Float64,
-                       dealiasing = PhaseShift(), array_type = Array)
+                       dealiasing = PhaseShift(), array_family = Array)
   conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                               velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
 

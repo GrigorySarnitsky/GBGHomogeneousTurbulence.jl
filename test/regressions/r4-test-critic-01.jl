@@ -20,7 +20,7 @@ prepare_forcing!(f::SharedCounter, forcing_state, field, domain, dt::Real) = (f.
 
 @testset "a shared mutable forcing instance is rejected for both fields" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
   counter = SharedCounter(0)
   @test ismutable(counter)                  # the guard's predicate holds for this strategy
 

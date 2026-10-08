@@ -212,7 +212,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
   from here**: `element_type` fixes the real element type
   ([`Float32`](@extref Julia Core.Float32) or `Float64`)
-  and `array_type` the storage ([`Array`](@extref Julia Core.Array), `CuArray`, `ROCArray`), and every buffer is allocated `similar`
+  and `array_family` its arrays ([`Array`](@extref Julia Core.Array), `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
 - **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
   record of the evolving fields in spectral representation — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries

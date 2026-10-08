@@ -368,7 +368,7 @@ end
     # behavioral fork, so it is pinned here: unarmed gives `offset === nothing`; an armed velocity
     # rate reaches ONLY the velocity's parameters (the guard lesson of the retired coincident-factor
     # holder — a bare `Sc == 1` dedup would have handed the velocity's rate to φ).
-    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+    domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
     factors(sc, force) = begin
       conditions = FlowConditions(; viscosity = 0.1, schmidt = sc, scalar_forcing = NoForcing(),
                                   velocity_forcing = force)

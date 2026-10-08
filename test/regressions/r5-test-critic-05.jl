@@ -20,7 +20,7 @@ using Test
 
 const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
                            dealiasing = TwoThirds(), element_type = Float64,
-                           array_type = Array)
+                           array_family = Array)
 
 
 @testset "the seeders refuse a request whose every mode the envelope annihilates" begin

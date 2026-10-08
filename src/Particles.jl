@@ -169,11 +169,11 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
   T = _real_type(domain)
   if isnothing(positions)
     M = Int(number_of_particles)
-    pos = domain.storage_family{T}(undef, M, 3)
+    pos = domain.array_family{T}(undef, M, 3)
     # Drawn on the host so one seed gives the same positions on every backend (decision 107), and
     # scaled in place: on the CPU the kept array IS host memory and takes the draw directly; on a
     # device one host array is drawn into and moved.
-    host = domain.storage_family === Array ? pos : Array{T}(undef, M, 3)
+    host = domain.array_family === Array ? pos : Array{T}(undef, M, 3)
     rand!(rng, host)
     host .*= T(domain.grid.domain_size[1])
     host === pos || copyto!(pos, host)
@@ -183,7 +183,7 @@ function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,
                           "array with `PointSet(array)`); got a $(typeof(positions)). Raw arrays " *
                           "cross into the package only through the `GBGPeriodicFields` point types."))
     supplied = point_positions(positions)
-    pos = domain.storage_family{T}(undef, size(supplied)...)    # the domain's backend + element type
+    pos = domain.array_family{T}(undef, size(supplied)...)    # the domain's backend + element type
     copyto!(pos, supplied)
   end
   # The unwrapped record starts equal to the wrapped positions and thereafter receives the same

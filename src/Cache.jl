@@ -176,7 +176,7 @@ function ObservablesCache(domain::FixedDomain; scalar::Bool = false,
   # M×3 point-value section on the domain's backend, plus `history_depth - 1` past samples for a
   # multistep scheme. A one-step scheme asks for 1 and gets no history.
   velocity_at_particles = number_of_particles > 0 ?
-    VectorPointValues(domain.storage_family{T}(undef, Int(number_of_particles), 3)) : nothing
+    VectorPointValues(domain.array_family{T}(undef, Int(number_of_particles), 3)) : nothing
   past = velocity_at_particles === nothing ? typeof(velocity_at_particles)[] :
          [deepcopy(velocity_at_particles) for _ in 1:max(history_depth - 1, 0)]
   return ObservablesCache(velocity, new_vector_field_physical(domain),

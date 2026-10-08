@@ -35,7 +35,7 @@ end
 
 @testset "a scalar-carrying state paired with a scalar-less cache is rejected, not silently skipped" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   # --- the mismatch: the state evolves φ̂, the hand-built cache has no slot to receive φ ---
   rng = MersenneTwister(1)

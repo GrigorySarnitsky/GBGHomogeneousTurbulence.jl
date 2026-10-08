@@ -9,7 +9,7 @@ using GBGPeriodicFields: field_data, CatmullRom, point_values
 
 @testset "advect! refuses a scheme order that its buffers were not built for" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
-                       element_type = Float64, array_type = Array)
+                       element_type = Float64, array_family = Array)
   u = new_vector_field_physical(domain)
   field_data(u) .= 0.2
 

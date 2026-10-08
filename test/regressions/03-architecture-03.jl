@@ -18,7 +18,7 @@ struct ProbeScheme <: AbstractIntegrator end
 
 @testset "an undeclared scheme is refused by every per-scheme generic, not guessed at" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                       array_type = Array, dealiasing = TwoThirds())
+                       array_family = Array, dealiasing = TwoThirds())
 
   # Both generics ask the scheme for something only the scheme knows: its register set, and its
   # stability limit. Neither may invent an answer.

@@ -10,7 +10,7 @@ using GBGPeriodicFields: field_data, convolve!, to_physical, to_spectral
 
 @testset "owner-ruled guards: envelope-vs-cutoff and the floor's one-time signal" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   # κ_max = (2/3)·(N/2)·(2π/L) = 16/3 ≈ 5.33 here; κ_p = 8 puts the peak 8/√2 ≈ 5.66 beyond it.
   û = new_vector_field_spectral(domain)
   @test_logs (:warn, r"dealias cutoff") match_mode=:any random_solenoidal_velocity_spectral!(

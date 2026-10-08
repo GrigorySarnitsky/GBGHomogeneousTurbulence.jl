@@ -27,7 +27,7 @@ end
 @testset "AdamsBashforth restarts on a tracer reseed, as its docstring promises" begin
   T, N, L = Float64, 16, 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   u0 = varying_field(domain, N, L, T, 0.0)     # the field at tₙ
   u1 = varying_field(domain, N, L, T, 0.15)    # the field at tₙ₊₁
   dt = 0.02

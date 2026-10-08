@@ -65,7 +65,7 @@ function readings(p::Pool, N, T; kwargs...)
   baseline = used(p)
   sim = with_logger(NullLogger()) do
     Simulation(grid_points_per_axis = N, viscosity = 0.05, element_type = T,
-               array_type = getproperty(p.cuda, :CuArray), rng = Xoshiro(1); kwargs...)
+               array_family = getproperty(p.cuda, :CuArray), rng = Xoshiro(1); kwargs...)
   end
   advance!(sim; dt = 1e-3)                  # compile and fill every slot before measuring
   settle!(p)
@@ -184,7 +184,7 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
     cu = getproperty(CUDA_MODULE, :CuArray)
     for T in (Float32, Float64), N in (64, 128)
       d = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
-                      array_type = cu)
+                      array_family = cu)
       sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = true, number_of_particles = 64,
                                          rng = Xoshiro(1)), NullLogger())
       advance!(sim; dt = 1e-3)
@@ -193,11 +193,11 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
       h5open(f -> write_simulation(f, "run", sim), path, "w")
       rows = [
         "FixedDomain" => () -> FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                                           element_type = T, array_type = cu),
+                                           element_type = T, array_family = cu),
         "Simulation" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1)),
         "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = true, rng = Xoshiro(1)),
         "derivative_skewness" => () -> derivative_skewness(û, d),
-        "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_type = cu), path, "r"),
+        "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_family = cu), path, "r"),
         "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05, number_of_particles = 64,
                                                                 particle_integration_scheme = AdamsBashforth(order = 4),
                                                                 rng = Xoshiro(1)),
@@ -266,7 +266,7 @@ end
     cu = getproperty(CUDA_MODULE, :CuArray)
     for T in (Float32, Float64)
       d = FixedDomain(grid_points_per_axis = 64, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
-                      array_type = cu)
+                      array_family = cu)
       for scheme in (Heun(), AdamsBashforth(order = 4))
         t = map(DEVICE_TRACER_COUNTS) do M
           device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05, number_of_particles = M,

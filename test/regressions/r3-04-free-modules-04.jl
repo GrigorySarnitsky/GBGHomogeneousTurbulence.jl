@@ -25,7 +25,7 @@ end
 @testset "max_retained_wavenumber reports exactly the band the domain builds" begin
   for T in (Float64, Float32), N in (12, 24, 48, 96)
     domain = FixedDomain(; grid_points_per_axis = N, side_length = 2π,
-                           dealiasing = TwoThirds(), element_type = T, array_type = Array)
+                           dealiasing = TwoThirds(), element_type = T, array_family = Array)
     κ = wavenumber_magnitude(domain)
     κmax = max_retained_wavenumber(domain)
     built = retained_band(domain)

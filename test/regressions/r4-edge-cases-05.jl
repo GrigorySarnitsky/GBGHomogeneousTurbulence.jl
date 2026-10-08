@@ -13,7 +13,7 @@ using GBGHomogeneousTurbulence.Forcing: ConstantPower, Linear, VarianceRescaling
 
 @testset "A forcing constructor rejects lowest_shell > highest_shell instead of building an empty band" begin
   domain = FixedDomain(; grid_points_per_axis = 8, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
 
   # Sanity: the ordered pair builds fine, so the throw below is about the ORDER, not the shells.
   @test ConstantPower(domain; injection_rate = 0.5, lowest_shell = 2, highest_shell = 5) isa ConstantPower

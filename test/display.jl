@@ -101,7 +101,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
 
   N = 16
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                       dealiasing = PhaseShift(), array_type = Array)
+                       dealiasing = PhaseShift(), array_family = Array)
   M = 12
   sim = Simulation(domain; viscosity = 0.05, scalar = true, number_of_particles = M,
                    particle_integration_scheme = AdamsBashforth(order = 3),
@@ -163,9 +163,9 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # A state on another grid, or of another element type, is refused adoption by `Simulation`;
     # a state with a scalar is refused by a run built without one.
     other = FixedDomain(grid_points_per_axis = 2N, side_length = 2π, element_type = Float64,
-                        dealiasing = PhaseShift(), array_type = Array)
+                        dealiasing = PhaseShift(), array_family = Array)
     f32 = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float32,
-                      dealiasing = PhaseShift(), array_type = Array)
+                      dealiasing = PhaseShift(), array_family = Array)
     @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = ResolvedFields(other))
     @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = ResolvedFields(f32))
     @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = ResolvedFields(domain; scalar = true))
@@ -176,10 +176,10 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     @test repr(domain) != repr(other)
     @test repr(domain) != repr(f32)
     @test repr(domain) != repr(FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                                           dealiasing = TwoThirds(), array_type = Array))
+                                           dealiasing = TwoThirds(), array_family = Array))
     # A box differing in the last digit is a different grid to the equality check, and must not collide.
     near = FixedDomain(grid_points_per_axis = N, side_length = 2π + 1e-9, element_type = Float64,
-                       dealiasing = PhaseShift(), array_type = Array)
+                       dealiasing = PhaseShift(), array_family = Array)
     @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = ResolvedFields(near))
     @test repr(domain) != repr(near)
 
@@ -304,7 +304,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # dozen tracers would allocate a few hundred bytes and slip under a field-scale floor.
     n, m = 32, 20000
     big = Simulation(FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
-                                 dealiasing = PhaseShift(), array_type = Array);
+                                 dealiasing = PhaseShift(), array_family = Array);
                      viscosity = 0.05, scalar = true, number_of_particles = m,
                      particle_integration_scheme = AdamsBashforth(order = 3),
                      velocity_forcing = ConstantPower(injection_rate = 0.1),

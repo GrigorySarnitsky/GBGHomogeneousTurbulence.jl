@@ -57,7 +57,7 @@ end
 
 function context(N)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                       element_type = Float64, array_type = Array)
+                       element_type = Float64, array_family = Array)
   sim = quiet(() -> Simulation(domain; viscosity = 0.05, scalar = true, number_of_particles = 8, unwrapped = true,
                                velocity_forcing = ConstantPower(domain; injection_rate = 0.1),
                                rng = MersenneTwister(1)))
@@ -122,7 +122,7 @@ const ROWS = Dict{Symbol, Function}(
   :allocate_buffers => c -> (() -> allocate_buffers(IFLowStorageRK3(), c.domain; scalar = true), (c.domain,)),
   # ---- the constructors
   :FixedDomain => c -> (() -> FixedDomain(grid_points_per_axis = c.N, side_length = 2π, dealiasing = TwoThirds(),
-                                          element_type = Float64, array_type = Array), ()),
+                                          element_type = Float64, array_family = Array), ()),
   :Simulation => c -> (() -> Simulation(c.domain; viscosity = 0.05, rng = MersenneTwister(1)), (c.domain,)),
   :ResolvedGenerator => c -> (() -> ResolvedGenerator(c.domain, c.conditions; scalar = true), (c.domain,)),
   :ResolvedFields => c -> (() -> ResolvedFields(c.domain; scalar = true), (c.domain,)),
@@ -320,7 +320,7 @@ const TRACER_ROWS = Dict(
 
 @testset "temporary ledger: the tracer-count axis" begin
   domain = FixedDomain(grid_points_per_axis = TRACER_GRID, side_length = 2π, dealiasing = TwoThirds(),
-                       element_type = Float64, array_type = Array)
+                       element_type = Float64, array_family = Array)
   for (name, build) in TRACER_ROWS
     b = per_tracer_bytes(build, domain)
     PRINT_UNITS && println(rpad(name, 46), round(b; digits = 2), " bytes per tracer")

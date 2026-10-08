@@ -25,7 +25,7 @@ using GBGPeriodicFields: VectorPointValues, point_values, CatmullRom
   K = 4                                        # AdamsBashforth{4} ⇒ K-1 = 3 past slots
 
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
   cache = ObservablesCache(domain; number_of_particles = npoints(tracers.positions),

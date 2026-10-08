@@ -138,7 +138,7 @@ function _host_noise(rng, T, domain, ::Val{R}) where {R}
   host = randn(rng, T, field_physical_shape(domain.grid, Val(R))...)
   drawn = R == 0 ? ScalarFieldPhysical(host, domain.grid; layout = domain.layout) :
                    VectorFieldPhysical(host, domain.grid; layout = domain.layout)
-  domain.storage_family === Array && return drawn
+  domain.array_family === Array && return drawn
   noise = R == 0 ? new_scalar_field_physical(domain) : new_vector_field_physical(domain)
   adapt!(noise, drawn)
   return noise

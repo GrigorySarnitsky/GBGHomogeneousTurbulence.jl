@@ -62,7 +62,7 @@ end
 @testset "VarianceRescaling(over = :total) reduces the whole field once per forced step" begin
   domain = SD.FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
                             dealiasing = SD.TwoThirds(),
-                            element_type = Float64, array_type = Array)
+                            element_type = Float64, array_family = Array)
   rng = MersenneTwister(20260821)
 
   # --- control: `over = :band` needs the whole-field value NOT AT ALL ---------------------------

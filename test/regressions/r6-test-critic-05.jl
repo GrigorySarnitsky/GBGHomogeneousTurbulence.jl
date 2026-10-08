@@ -15,7 +15,7 @@ using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "a cache built without number_of_particles is refused by name at allocate_buffers and at the particle deposit!" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   tracers = Tracers(domain; number_of_particles = 5, interpolation_scheme = CatmullRom,
                     rng = MersenneTwister(1))
   cache = ObservablesCache(domain)                # no number_of_particles ⇒ slot is `nothing`

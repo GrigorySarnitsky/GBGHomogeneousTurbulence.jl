@@ -33,7 +33,7 @@ const SCHEME  = IFLowStorageRK3()
 
 
 domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                     dealiasing = TwoThirds(), array_type = Array)
+                     dealiasing = TwoThirds(), array_family = Array)
 
 # One seeded initial condition, reused verbatim by every run below.
 const û0 = new_vector_field_spectral(domain)

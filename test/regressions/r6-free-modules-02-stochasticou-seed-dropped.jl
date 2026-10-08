@@ -18,7 +18,7 @@ using HDF5
 
 @testset "read_forcing(StochasticOU) restores neither the written seed nor an independent stream" begin
   domain = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                       array_type = Array, dealiasing = TwoThirds())
+                       array_family = Array, dealiasing = TwoThirds())
   a = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5, seed = 7)
   b = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5, seed = 8)
 

@@ -119,7 +119,7 @@ end
 @testset "every observable returns the field's own element type" begin
   for T in (Float32, Float64)
     d = FixedDomain(grid_points_per_axis = 16, side_length = T(2π), element_type = T,
-                    array_type = Array, dealiasing = TwoThirds())
+                    array_family = Array, dealiasing = TwoThirds())
     û = new_vector_field_spectral(d)
     random_solenoidal_velocity_spectral!(û, d; kinetic_energy = T(0.5), envelope_wavenumber = T(2),
                                          rng = MersenneTwister(1))

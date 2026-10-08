@@ -24,7 +24,7 @@ using Test
   N = 24
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   φ̂ = new_scalar_field_spectral(domain)
   random_scalar_spectral!(φ̂, domain; scalar_variance = 0.4, envelope_wavenumber = 2.0,

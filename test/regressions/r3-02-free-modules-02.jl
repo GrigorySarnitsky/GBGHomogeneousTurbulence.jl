@@ -46,9 +46,9 @@ end
   if HAVE_CUDA
     # The control: the default seed launches on the device.
     @test Simulation(; grid_points_per_axis = 8, viscosity = 0.05,
-                     array_type = CuArray, rng = Random.Xoshiro(1)) isa Simulation
+                     array_family = CuArray, rng = Random.Xoshiro(1)) isa Simulation
     # The claim: so must the documented Phenomenology seed.
-    @test Simulation(; grid_points_per_axis = 8, viscosity = 0.05, array_type = CuArray,
+    @test Simulation(; grid_points_per_axis = 8, viscosity = 0.05, array_family = CuArray,
                      initial_spectrum = VonKarman1948(), rng = Random.Xoshiro(1)) isa Simulation
   else
     @info "no CUDA device: the GPU-launch half of the witness was skipped"

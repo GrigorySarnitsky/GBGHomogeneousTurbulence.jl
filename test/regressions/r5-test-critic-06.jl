@@ -43,7 +43,7 @@ strip_band!(field, band) = convolve!(field, field, band, -1, 1)
 @testset "VarianceRescaling's two edge-case branches behave as documented" begin
   N, L, T = 24, 2π, Float64
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   @testset ":total with the out-of-band value above `target` empties the band" begin
     û = new_vector_field_spectral(domain)

@@ -14,7 +14,7 @@ using GBGPeriodicFields: field_data, CatmullRom
 
 @testset "a cache too shallow for an AdamsBashforth scheme is refused at allocate_buffers, not by a later BoundsError" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   u = new_vector_field_physical(domain)
   field_data(u) .= 0.3
 

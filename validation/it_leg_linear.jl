@@ -37,7 +37,7 @@ end
 println("== building the domain and converting (axis permutation + inverse curl)")
 domain = FixedDomain(grid_points_per_axis = N, side_length = 2π,
                      dealiasing = HouLi(order = 36, strength = 63.463),
-                     element_type = Float64, array_type = ROCArray)
+                     element_type = Float64, array_family = ROCArray)
 # PF layout (kx, ky, kz, comp) from the file's (comp, kx, kz, ky) as Julia reads it.
 ω̂ = VectorFieldSpectral(ROCArray(permutedims(raw, (2, 4, 3, 1))), domain.grid)
 state = ResolvedFields(domain)

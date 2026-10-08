@@ -61,7 +61,7 @@ PF.weighted_inner(a::CF, k) = (a.weighted_inner += 1; PF.weighted_inner(a.f, k))
 PF.convolve!(o::CF, a::CF, k, α, β) = (o.convolve += 1; PF.convolve!(o.f, a.f, k, α, β); o)
 
 const DOMAIN = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasing = TwoThirds(),
-                           element_type = Float64, array_type = Array)
+                           element_type = Float64, array_family = Array)
 
 function measure(forcing, kind)
   û = new_vector_field_spectral(DOMAIN)

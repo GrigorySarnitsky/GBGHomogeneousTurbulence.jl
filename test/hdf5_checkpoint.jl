@@ -11,7 +11,7 @@ using GBGPeriodicFields: CatmullRom, LalescuSpline, PointSet, point_positions, p
 
 make_domain(; T = Float64, dealiasing = TwoThirds()) =
   FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,
-              array_type = Array, dealiasing)
+              array_family = Array, dealiasing)
 
 
 @testset "write_domain / read_domain round-trip the defining parameters" begin
@@ -53,7 +53,7 @@ end
   @test field_data(back.velocity_spectral) == field_data(state.velocity_spectral)
   @test field_data(back.scalar_spectral) == field_data(state.scalar_spectral)
   bigger = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       array_type = Array, dealiasing = TwoThirds())
+                       array_family = Array, dealiasing = TwoThirds())
   h5open(path, "r") do io
     @test_throws ArgumentError read_state(io, "s", bigger)
   end
@@ -255,7 +255,7 @@ end
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, tracers = tr, unwrapped = true)
   # A state from a different grid is refused before anything is built from it.
   bigger = FixedDomain(; grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       array_type = Array, dealiasing = TwoThirds())
+                       array_family = Array, dealiasing = TwoThirds())
   @test_throws ArgumentError Simulation(bigger; viscosity = 0.05, state = st)
   # Derived ν + an adopted state whose energy is not the calibration's: warned, not silent.
   seeded = Simulation(domain; viscosity = 0.05, rng = MersenneTwister(6))   # k = 1.5 by default

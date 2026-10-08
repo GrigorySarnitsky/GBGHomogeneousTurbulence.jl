@@ -95,7 +95,7 @@ function _points_on_backend(domain::FixedDomain, host_points)
   X_host = point_positions(host_points)
   eltype(X_host) == T || throw(ArgumentError(
     "the stored positions have element type $(eltype(X_host)), but the domain builds $T"))
-  X = domain.storage_family{T}(undef, size(X_host)...)
+  X = domain.array_family{T}(undef, size(X_host)...)
   copyto!(X, X_host)
   return PointSet(X)
 end
@@ -128,7 +128,7 @@ function write_domain(parent::HDF5.H5DataStore, name::AbstractString, domain::Fi
   return g
 end
 
-function read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array)
+function read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_family = Array)
   g = _require_group(parent, name, "read_domain")
   a = _require_tag(g, name, "read_domain", "GBGHomogeneousTurbulence.FixedDomain")
   tag = a["dealiasing"]
@@ -144,7 +144,7 @@ function read_domain(parent::HDF5.H5DataStore, name::AbstractString; array_type 
   return FixedDomain(; grid_points_per_axis = Int(a["grid_points_per_axis"]),
                      side_length = a["side_length"],
                      element_type = _element_type(a, name, "read_domain"),
-                     array_type, dealiasing)
+                     array_family, dealiasing)
 end
 
 
@@ -374,7 +374,7 @@ function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::S
   a["max_dt"] = sim.max_dt
   a["scalar"] = sim.state.scalar_spectral !== nothing
   a["field_integration_scheme"] = _field_scheme_tag(sim.field_integration_scheme)
-  a["storage_family"] = string(nameof(sim.domain.storage_family))   # informational, never read back
+  a["array_family"] = string(nameof(sim.domain.array_family))   # informational, never read back
   write_domain(g, "domain", sim.domain)
   write_state(g, "state", sim.state)
   write_forcing(g, "velocity_forcing", conditions.velocity_forcing)
@@ -396,11 +396,11 @@ function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::S
   return g
 end
 
-function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_type = Array,
+function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_family = Array,
                          ordered_interpolation = nothing)
   g = _require_group(parent, name, "read_simulation")
   a = _require_tag(g, name, "read_simulation", "GBGHomogeneousTurbulence.Simulation")
-  domain = read_domain(g, "domain"; array_type)
+  domain = read_domain(g, "domain"; array_family)
   scalar = Bool(a["scalar"])
   velocity_forcing = read_forcing(g, "velocity_forcing", domain)
   scalar_forcing = read_forcing(g, "scalar_forcing", domain)

@@ -6,7 +6,7 @@ using Test, GBGHomogeneousTurbulence
 
 @testset "VarianceController's turnover_time guard reports the checked derived value, not `nothing`" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
   err = try
     VarianceController(domain; target = 1e-300)   # derived tℓ = Inf → the guard fires
     nothing

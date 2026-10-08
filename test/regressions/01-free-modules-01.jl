@@ -29,7 +29,7 @@ using GBGPeriodicFields: field_data, to_physical!, combine!
   # that carries the cache, once on a fresh generator that must rebuild.  Returns the two results.
   function cached_versus_fresh(dealiasing; mutate::Bool)
     domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = Float64,
-                         dealiasing = dealiasing, array_type = Array)
+                         dealiasing = dealiasing, array_family = Array)
     û = new_vector_field_spectral(domain)
     φ̂ = new_scalar_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,

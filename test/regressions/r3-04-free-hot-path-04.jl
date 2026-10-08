@@ -41,7 +41,7 @@ GBGHomogeneousTurbulence.SimulationDomain._build_dealias(::ProbePad, multipliers
 println()
 println("=== a run on the undeclared strategy, with only the two refusing hooks supplied ===")
 domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π,
-                     dealiasing = ProbePad(), element_type = Float64, array_type = Array)
+                     dealiasing = ProbePad(), element_type = Float64, array_family = Array)
 sim = Simulation(domain; viscosity = 0.05)
 advance!(sim); advance!(sim)
 println("Simulation(domain; viscosity = 0.05) + advance! x2 -> COMPLETED, no error")

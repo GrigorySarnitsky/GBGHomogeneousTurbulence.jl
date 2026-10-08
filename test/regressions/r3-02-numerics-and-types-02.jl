@@ -18,7 +18,7 @@ using Random
 @testset "the empty-band floor must be a numerical test, not an amplitude test" begin
   N, L, T = 16, 2π, Float64
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   k0 = 2π / L
   band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)
 

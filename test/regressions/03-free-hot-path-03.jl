@@ -27,7 +27,7 @@ const N = 16
 # Advance one step with a poisoned velocity; return (:ok, positions) or (:rejected, err).
 function poisoned_step(poison)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π,
-                       element_type = Float64, dealiasing = TwoThirds(), array_type = Array)
+                       element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
   u = new_vector_field_physical(domain)
   field_data(u) .= poison
   tracers = Tracers(domain; positions = PointSet([1.0 2.0 3.0; 0.5 0.5 0.5]),

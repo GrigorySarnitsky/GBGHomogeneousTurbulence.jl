@@ -1,6 +1,6 @@
 # Memory footprint on a GPU
 
-A run goes on a GPU through the `array_type` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with `CUDA` added to your
+A run goes on a GPU through the `array_family` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with `CUDA` added to your
 environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` keyword sets the precision. This
 page answers the question a GPU run meets first, whether a grid fits on the card; it also describes how
 CUDA's unified memory lets a run outgrow the card. Everything else about driving a device, from writing
@@ -50,7 +50,7 @@ AMD's `AMDGPU` has no unified memory, so a run on a ROCm card has to fit in the 
 
 The package itself needs no change. It never chooses a memory kind where it allocates, so every array a
 run holds follows the setting: the state, the scalar, the tracers, and a run restored by
-[`read_simulation`](@ref) with `array_type = CuArray`. Each of those was checked once, on one CUDA card. To confirm the setting took
+[`read_simulation`](@ref) with `array_family = CuArray`. Each of those was checked once, on one CUDA card. To confirm the setting took
 effect in your own run, a `Simulation` `sim`, read the memory kind of its velocity:
 
 ```julia

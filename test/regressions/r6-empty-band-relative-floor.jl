@@ -13,7 +13,7 @@ using Random
 
 @testset "an emptied band takes no kick; a genuinely weak band still forces, at any scale" begin
   domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   forcing = ConstantPower(domain; injection_rate = 0.1)
   û = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,

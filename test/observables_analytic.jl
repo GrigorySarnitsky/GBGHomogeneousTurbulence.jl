@@ -23,7 +23,7 @@ const A, B, C, D = 0.7, -0.4, 1.1, 0.9
 const ν, ϰ = 0.03, 0.05
 
 domain_for(strategy) = FixedDomain(grid_points_per_axis = N, side_length = L, dealiasing = strategy,
-                                   element_type = Float64, array_type = Array)
+                                   element_type = Float64, array_family = Array)
 
 function analytic_velocity(d)
   u = VectorFieldPhysical((x, y, z) -> (A * sin(y), B * sin(z), C * sin(x)), d.grid; layout = d.layout)
@@ -90,7 +90,7 @@ end
   # direct route is computed here explicitly, from the strain in physical representation.
   for (T, tolerance) in ((Float64, 1e-12), (Float32, 1e-5))
     d = FixedDomain(grid_points_per_axis = 32, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
-                    array_type = Array)
+                    array_family = Array)
     û = new_vector_field_spectral(d)
     random_solenoidal_velocity_spectral!(û, d; kinetic_energy = 1.5, envelope_wavenumber = 4.0)
     S = new_tensor_field_physical(d)

@@ -13,7 +13,7 @@ using Test
 function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   scheme = IFHeun()
   buffers = allocate_buffers(scheme, domain; scalar = scalar)
   conditions = FlowConditions(viscosity = 5.0e-2, schmidt = 1.0,

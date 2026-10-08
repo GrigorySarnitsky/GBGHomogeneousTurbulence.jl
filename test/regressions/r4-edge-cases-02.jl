@@ -39,7 +39,7 @@ end
 @testset "VarianceRescaling rejects a negative `target` instead of taking sqrt of a negative ratio" begin
   N, L, T = 24, 2π, Float64
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   seeded_velocity() = begin
     û = new_vector_field_spectral(domain)

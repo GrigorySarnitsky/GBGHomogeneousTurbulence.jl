@@ -37,7 +37,7 @@ const OWNED_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, 
 # A forced run with a scalar and tracers on a small CPU grid: every operation reaches its hot path.
 const N = 16
 const DOMAIN = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                           element_type = Float64, array_type = Array)
+                           element_type = Float64, array_family = Array)
 const SIM = with_logger(NullLogger()) do
   Simulation(DOMAIN; viscosity = 0.05, scalar = true, number_of_particles = 8,
              velocity_forcing = ConstantPower(injection_rate = 0.1),

@@ -16,7 +16,7 @@ using Test
   N = 16
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   # A spatially varying, band-limited velocity: the value at x = 0 differs from a neighbouring cell,
   # so an off-by-one-cell read would show up immediately.

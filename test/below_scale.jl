@@ -44,7 +44,7 @@ end
 function physical_oracle(û, domain; refine = 8)
   N = domain.grid.grid_size[1]; M = refine * N
   fine = FixedDomain(grid_points_per_axis = M, side_length = domain.grid.domain_size[1],
-                     dealiasing = TwoThirds(), element_type = Float64, array_type = Array)
+                     dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
   û_fine = new_vector_field_spectral(fine)
   embed_modes!(û_fine, û)                             # the band-limited field, exactly, on the fine grid
   u = new_vector_field_physical(fine)
@@ -66,7 +66,7 @@ end
 @testset "kinetic_energy_and_dissipation_below_scale" begin
   for N in (16, 12)
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
-                         element_type = Float64, array_type = Array)
+                         element_type = Float64, array_family = Array)
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
                                          rng = MersenneTwister(N))
@@ -98,7 +98,7 @@ end
 
   @testset "a Float32 run measures in Float32" begin
     domain = FixedDomain(grid_points_per_axis = 12, side_length = 2π, dealiasing = TwoThirds(),
-                         element_type = Float32, array_type = Array)
+                         element_type = Float32, array_family = Array)
     û = new_vector_field_spectral(domain)
     random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
                                          rng = MersenneTwister(3))

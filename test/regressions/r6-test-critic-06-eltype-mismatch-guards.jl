@@ -16,7 +16,7 @@ using GBGPeriodicFields: field_data, point_positions, LalescuSpline
 
 names_both_precisions(message) = occursin(r"\bFloat64\b", message) && occursin(r"\bFloat32\b", message)
 make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,
-                             array_type = Array, dealiasing = TwoThirds())
+                             array_family = Array, dealiasing = TwoThirds())
 
 
 @testset "read_state / read_tracers refuse an element-type mismatch by name" begin

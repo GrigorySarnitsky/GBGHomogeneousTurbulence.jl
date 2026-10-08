@@ -14,7 +14,7 @@ using Test
 
 @testset "Tracers demands exactly one of `positions` / `number_of_particles`, and an (M, 3) shape" begin
   domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   # Both keywords: ambiguous, must be rejected — never silently preferring one.
   @test_throws ArgumentError Tracers(domain; number_of_particles = 4, positions = PointSet(zeros(4, 3)),
