@@ -10,6 +10,7 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
+GBGPeriodicFields = {rev = "c66e8a7ad1adf9c166619c3f8ddf87d2890086fd", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
 GBGCodingTools = {rev = "v2.0.0-rc.66", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
 
 [compat]

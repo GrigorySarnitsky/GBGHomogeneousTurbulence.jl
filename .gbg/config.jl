@@ -9,8 +9,8 @@ Config(
     docs_build = ["julia", "--project=docs", "docs/make.jl"],
     test = ["julia", "--project", "-e", "using Pkg; Pkg.test()"],
     switches = [
-        Switch(target = Symbol("RULE.GIT.MANIFEST_TRACKED"), files = ["Manifest.toml"],
-               reason = "the root Manifest is committed on purpose: it is the only place the unregistered GBGPeriodicFields git URL and pinned commit are recorded, so it must travel with the repo for a fresh clone or CI to resolve the dependency; nested environment manifests stay ignored"),
+        Switch(target = Symbol("RULE.GIT.TRACKED"), files = ["validation/**"],
+               reason = "the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08)"),
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
     disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],

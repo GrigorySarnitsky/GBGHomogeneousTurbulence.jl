@@ -4,7 +4,7 @@
 Each entry names a rule this package does not hold itself to, and why. A rule listed
 here is read as the entry states it.
 
-- `RULE.GIT.MANIFEST_TRACKED` — the root Manifest is committed on purpose: it is the only place the unregistered GBGPeriodicFields git URL and pinned commit are recorded, so it must travel with the repo for a fresh clone or CI to resolve the dependency; nested environment manifests stay ignored (`Manifest.toml`)
+- `RULE.GIT.TRACKED` — the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08) (`validation/**`)
 
 Excluded from every rule: no rule reads these files, and no reader is given them.
 

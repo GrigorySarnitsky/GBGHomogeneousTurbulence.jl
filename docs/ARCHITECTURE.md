@@ -950,9 +950,9 @@ one usually encodes a decision.
   imaginary-axis stability, mean conservation — and are pinned by numerical oracle tests (a Taylor–Green
   order study, unforced energy decay, exact diffusion). This is why the package follows the
   `GBGCloudPhysics` consumer pattern with **no `FORMALIZATION.md`**; a typed-statement ledger is a
-  backend's need. The design's *structure* — the module carving and role wiring — is separately checked
-  against a relational-logic model (`docs/architecture.als`, decisions 21–22); that model carries no
-  dynamics, so it complements the oracle rather than becoming the ledger. Revisit only if a built Model
+  backend's need. The design's *structure* — the module carving and role wiring — was checked at design
+  time against a relational-logic model (decisions 21–22), which carries no dynamics and so complemented
+  the oracle rather than becoming the ledger. Revisit only if a built Model
   rung introduces genuinely package-specific formalism.
 - **Category/type errors are their own correctness class.** A claim can be perfectly formatted and read
   true yet conflate two *kinds* of object — a field with its representation (physical vs spectral); a
@@ -1105,8 +1105,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``\kappa_{\max}`` is now the **resolved** cutoff `max_resolved_wavenumber` — under `HouLi` the
     ``4/5``-of-Nyquist crossover, not the retained Nyquist this entry's ``f`` implied.)*
 21. **(2026-07) The physics-first carving is checked against a formal structural model
-    (`docs/architecture.als`).** The module carving and the Mori–Zwanzig role wiring were re-examined
-    against an explicit relational-logic model (built and checked in Alloy) under an adversarial multi-lens
+    (in Alloy, kept outside the repository).** The module carving and the Mori–Zwanzig role wiring were re-examined
+    against an explicit relational-logic model under an adversarial multi-lens
     review — a design-time artifact, deliberately not a shipped ledger — to counter a pull toward
     software-shaped, object-first structure. The model carries only **structure**: the dependency graph
     (checked against the actual `using` edges), the state as one product of typed slots on a single module,

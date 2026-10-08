@@ -11,11 +11,7 @@ inspiration/
 # gbg:managed end
 
 .ipynb_checkpoints/
-# The root Manifest is committed on purpose: it is the only place the unregistered
-# GBGPeriodicFields git URL + pinned commit are recorded, so it must travel with the
-# repo for a fresh clone / CI to resolve the dependency. Nested env Manifests stay ignored.
 Manifest.toml
-!/Manifest.toml
 docs/build/
 docs/site/
 # Rationale doc copied into the Documenter source tree at build time (docs/make.jl); the
