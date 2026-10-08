@@ -82,7 +82,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "pluggable scheme" begin
     set_uniform_x!(uniform, 0.3)
-    for scheme in (CatmullRom, LagrangeSpline(2))
+    for scheme in (CatmullRom, LagrangeSpline(6))
       tracers = Tracers(domain; number_of_particles = 50, interpolation_scheme = scheme, rng = MersenneTwister(1))
       cache = ObservablesCache(domain; number_of_particles = 50)
       buffers = allocate_buffers(Heun(), tracers, cache)

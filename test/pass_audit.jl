@@ -53,8 +53,8 @@ const OU_RUN = quiet(() -> Simulation(DOMAIN; viscosity = 0.05,
                                                                       correlation_time_in_box_units = 0.3),
                                       rng = MersenneTwister(2)))
 
-counting_spectral(f) = VectorFieldSpectral(counting(copy(field_data(f))), DOMAIN.grid, DOMAIN.layout)
-counting_physical(f) = VectorFieldPhysical(counting(copy(field_data(f))), DOMAIN.grid, DOMAIN.layout)
+counting_spectral(f) = VectorFieldSpectral(counting(copy(field_data(f))), DOMAIN.grid; layout = DOMAIN.layout)
+counting_physical(f) = VectorFieldPhysical(counting(copy(field_data(f))), DOMAIN.grid; layout = DOMAIN.layout)
 
 const Û = counting_spectral(RUN.state.velocity_spectral)
 const N̂ = counting_spectral(new_vector_field_spectral(DOMAIN))

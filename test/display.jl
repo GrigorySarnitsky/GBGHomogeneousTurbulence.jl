@@ -107,7 +107,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
                    particle_integration_scheme = AdamsBashforth(order = 3),
                    velocity_forcing = ConstantPower(injection_rate = 0.1),
                    scalar_forcing = VarianceRescaling(target = 0.5, over = :band))
-  tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(1, 1),
+  tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(4),
                     rng = MersenneTwister(1))
 
   @testset "no display floods" begin
@@ -138,7 +138,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     end
     # The particle count never reaches a display as an array: the largest tracer set the old
     # default printed in full is the one this bound is for.
-    many = Tracers(domain; number_of_particles = 20000, interpolation_scheme = LalescuSpline(1, 1),
+    many = Tracers(domain; number_of_particles = 20000, interpolation_scheme = LalescuSpline(4),
                    rng = MersenneTwister(1))
     big = ObservablesCache(domain; number_of_particles = 20000, history_depth = 3)
     @test length(repr(many)) ≤ 300
@@ -230,12 +230,12 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     @test repr(AdamsBashforth(order = 2)) != repr(AdamsBashforth(order = 3))
 
     # A tracer set without the unwrapped record is refused the unwrapped read.
-    kept = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(1, 1),
+    kept = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(4),
                    unwrapped = true, rng = MersenneTwister(1))
     @test_throws ArgumentError unwrapped_positions(tracers)
     @test repr(tracers) != repr(kept)
     @test repr(tracers) != repr(Tracers(domain; number_of_particles = 2M,
-                                        interpolation_scheme = LalescuSpline(1, 1), rng = MersenneTwister(1)))
+                                        interpolation_scheme = LalescuSpline(4), rng = MersenneTwister(1)))
 
     # The forcings: each parameter and the shell band are the constructor's, so two forcings that
     # would drive a run differently print differently.

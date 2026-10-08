@@ -26,14 +26,14 @@ domain_for(strategy) = FixedDomain(grid_points_per_axis = N, side_length = L, de
                                    element_type = Float64, array_type = Array)
 
 function analytic_velocity(d)
-  u = VectorFieldPhysical((x, y, z) -> (A * sin(y), B * sin(z), C * sin(x)), d.grid, d.layout)
+  u = VectorFieldPhysical((x, y, z) -> (A * sin(y), B * sin(z), C * sin(x)), d.grid; layout = d.layout)
   û = new_vector_field_spectral(d)
   to_spectral!(û, u, d.transform_plans)
   return û
 end
 
 function analytic_scalar(d)
-  φ = ScalarFieldPhysical((x, y, z) -> D * sin(x), d.grid, d.layout)
+  φ = ScalarFieldPhysical((x, y, z) -> D * sin(x), d.grid; layout = d.layout)
   φ̂ = new_scalar_field_spectral(d)
   to_spectral!(φ̂, φ, d.transform_plans)
   return φ̂

@@ -107,7 +107,7 @@ version = "0.1.0"
 
 [[deps.GBGPeriodicFields]]
 deps = ["AbstractFFTs", "Adapt", "Atomix", "FFTW", "KernelAbstractions", "LinearAlgebra", "StaticArrays", "Statistics"]
-git-tree-sha1 = "5b913de2236ec2fe59a9390812713bbacb26e932"
+git-tree-sha1 = "22071b7f67a23cf57faf1c67df2d75847d23ba2c"
 repo-rev = "master"
 repo-url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"
 uuid = "f1da9c2b-0ac1-4736-96f9-af1c25aedab1"

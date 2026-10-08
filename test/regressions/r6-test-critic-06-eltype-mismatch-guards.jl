@@ -14,8 +14,7 @@ using HDF5
 using GBGPeriodicFields: field_data, point_positions, LalescuSpline
 
 
-names_both_precisions(message) = occursin(r"(Complex)?F(loat)?64", message) &&
-                                 occursin(r"(Complex)?F(loat)?32", message)
+names_both_precisions(message) = occursin(r"\bFloat64\b", message) && occursin(r"\bFloat32\b", message)
 make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, element_type = T,
                              array_type = Array, dealiasing = TwoThirds())
 
@@ -43,8 +42,8 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
   end
   @test err isa ArgumentError
   # The state's refusal is PF's, naming the two precisions: `adapt!`'s by their real types (decision
-  # 100), `read_field!`'s since PF decision 93 by the stored and destination element types,
-  # `ComplexF64` against `ComplexF32`.
+  # 100), `read_field!`'s by the precisions too since PF decision 100 ("holds a Float64 field, but the
+  # destination is Float32"), no longer the complex element types.
   @test err !== nothing && names_both_precisions(sprint(showerror, err))
 
   # ——— state, the other direction: written Float32, read against a Float64 domain ———
@@ -67,7 +66,7 @@ make_domain(T) = FixedDomain(; grid_points_per_axis = 8, side_length = 2π, elem
   # ——— tracers: written Float64 positions, read against a Float32 domain ———
   path3 = tempname() * ".h5"
   tracers = Tracers(domain64; number_of_particles = 5,
-                    interpolation_scheme = LalescuSpline(2, 1), unwrapped = true,
+                    interpolation_scheme = LalescuSpline(6; smoothness = 1), unwrapped = true,
                     rng = MersenneTwister(12))
   h5open(io -> write_tracers(io, "t", tracers), path3, "w")
   err3 = nothing

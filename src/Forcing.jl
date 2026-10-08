@@ -1264,9 +1264,9 @@ function _ou_slots(companion::FixedDomain, modes::Integer, ::Val{R}) where {R}
   retained = R == 1 ? 2 * modes : modes
   return (physical = physical, spectral = spectral,
           draws = R == 1 ? VectorFieldPhysical(Array{T}(undef, field_physical_shape(companion.grid, Val(1))),
-                                               companion.grid, companion.layout) :
+                                               companion.grid; layout = companion.layout) :
                            ScalarFieldPhysical(Array{T}(undef, field_physical_shape(companion.grid, Val(0))),
-                                               companion.grid, companion.layout),
+                                               companion.grid; layout = companion.layout),
           scale = one(T) / sqrt(T(retained) / T(points)))
 end
 

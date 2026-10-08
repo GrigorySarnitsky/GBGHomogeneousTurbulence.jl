@@ -309,10 +309,10 @@ function FixedDomain(; grid_points_per_axis::Integer, side_length::Real,
   # and the strain tensor (9) share this object. Built from the storage family and the grid alone
   # (PF decision 93): the planner plans on one-component arrays of its own, so a timed planner
   # (`MEASURE`) clobbers nothing of the run's, and no template field is built here for it.
-  transform_plans = FieldTransformPlans(array_type, grid, layout;
+  transform_plans = FieldTransformPlans(array_type, grid; layout,
                                         fft_flags, fft_timelimit = Float64(fft_timelimit))
   # The multipliers from the storage family and the grid alone (PF decision 94): no template field.
-  multipliers = FieldSpectralMultipliers(array_type, grid, layout)
+  multipliers = FieldSpectralMultipliers(array_type, grid; layout)
   # |κ|² as the identity radial symbol — evaluated per mode from the multipliers' axis arrays, so it
   # occupies no field (the stored |κ|² arrays this frame once carried are gone with PF's decision 60).
   squared_wavenumber_kernel = radial_kernel(identity, multipliers)
@@ -462,7 +462,7 @@ end
 Allocate a single zeroed vector field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_spectral(domain::FixedDomain) =
-  (f = VectorFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+  (f = VectorFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -472,7 +472,7 @@ new_vector_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed vector field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_vector_field_physical(domain::FixedDomain) =
-  (f = VectorFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+  (f = VectorFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -482,7 +482,7 @@ new_vector_field_physical(domain::FixedDomain) =
 Allocate a single zeroed scalar field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_spectral(domain::FixedDomain) =
-  (f = ScalarFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+  (f = ScalarFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -492,7 +492,7 @@ new_scalar_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed scalar field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_scalar_field_physical(domain::FixedDomain) =
-  (f = ScalarFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+  (f = ScalarFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -502,7 +502,7 @@ new_scalar_field_physical(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in spectral representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_spectral(domain::FixedDomain) =
-  (f = TensorFieldSpectral(domain.storage_family, domain.grid, domain.layout);
+  (f = TensorFieldSpectral(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 
@@ -512,7 +512,7 @@ new_tensor_field_spectral(domain::FixedDomain) =
 Allocate a single zeroed second-order tensor field in physical representation on the [`FixedDomain`](@ref) `domain`'s backend and element type.
 """
 new_tensor_field_physical(domain::FixedDomain) =
-  (f = TensorFieldPhysical(domain.storage_family, domain.grid, domain.layout);
+  (f = TensorFieldPhysical(domain.storage_family, domain.grid; layout = domain.layout);
    fill!(field_data(f), zero(eltype(field_data(f)))); f)
 
 

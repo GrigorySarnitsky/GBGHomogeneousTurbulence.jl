@@ -63,7 +63,7 @@ end
 @testset "write_tracers / read_tracers keep positions, scheme, and the unwrapped record" begin
   path = tempname() * ".h5"
   domain = make_domain()
-  tracers = Tracers(domain; number_of_particles = 5, interpolation_scheme = LalescuSpline(2, 1),
+  tracers = Tracers(domain; number_of_particles = 5, interpolation_scheme = LalescuSpline(6; smoothness = 1),
                     unwrapped = true, rng = MersenneTwister(4))
   h5open(io -> (io["t"] = tracers), path, "w")
   back = h5open(io -> read_tracers(io, "t", domain), path, "r")
