@@ -7,12 +7,14 @@ using GBGPeriodicFields: field_data
 using Random
 using Test
 
+include(joinpath(@__DIR__, "..", "audit_ops.jl"))   # `thread_allowance`
+
 
 function step_allocation(scheme, N::Int)
   T = Float64
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
   buffers = allocate_buffers(scheme, domain; scalar = false)
   conditions = FlowConditions(viscosity = 5.0e-2, velocity_forcing = NoForcing(),
                               schmidt = 1.0, scalar_forcing = NoForcing())
@@ -42,7 +44,8 @@ end
     for N in (8, 16, 32)
       bytes = step_allocation(scheme, N)
       @info "step! allocation" scheme N bytes
-      @test bytes == 0
+      # A true zero at one thread; a threaded run adds only its task state (`thread_allowance`).
+      @test bytes <= thread_allowance(sum(_transforms(_ops(scheme isa IFHeun ? :RK2 : :RK3, :TwoThirds, false))))
     end
   end
 end

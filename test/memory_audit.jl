@@ -23,7 +23,7 @@
 #     requires their sum to account for every field-scale array a live `Simulation` can reach, so
 #     nothing can fall between them again. The gap that survives is not one of REACH — the walk
 #     recurses through any struct's fields and would descend into a transform plan's buffer — but
-#     one of BACKEND: every domain built below passes `array_type = Array`, and the plan buffers
+#     one of BACKEND: every domain built below passes `array_family = Array`, and the plan buffers
 #     exist only on a GPU. See the named exclusion at the frame ledger; the once-open item G2 was closed by decision 79 (the DEVICE_FRAME leg below).
 #
 #  3. THE LIVENESS AUDIT — the step as a straight-line program: each op's reads and writes, taken
@@ -300,7 +300,7 @@ frame_ledger(domain) = _counts((domain,), N_AUDIT)
 
 # ---------------------------------------------------------------- the device backend
 
-# Every ledger above is measured with `array_type = Array`, and the frame's all-zero table is a
+# Every ledger above is measured with `array_family = Array`, and the frame's all-zero table is a
 # CPU FACT: an FFTW plan reaches no Julia array, so the walk finds nothing to count. On a GPU
 # backend the same walk, over the same objects, finds the transform plans' staging buffers — one
 # spectral-shaped device array per plan, allocated eagerly by the backend's plan constructor. The
@@ -391,7 +391,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
   domains = Dict(tag => FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = Float64,
                                     dealiasing = tag === :TwoThirds ? TwoThirds() :
                                                  tag === :HouLi ? HouLi() : PhaseShift(),
-                                    array_type = Array)
+                                    array_family = Array)
                  for tag in (:TwoThirds, :HouLi, :PhaseShift))
 
   @testset "ledger — the frozen base (unforced, tracer-free)" begin
@@ -420,7 +420,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
 
   @testset "frame ledger — the frozen per-mode symbols, invariant in strategy and precision" begin
     for tag in (:TwoThirds, :HouLi, :PhaseShift), T in (Float64, Float32)
-      domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = T, array_type = Array,
+      domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = T, array_family = Array,
                            dealiasing = tag === :TwoThirds ? TwoThirds() :
                                         tag === :HouLi ? HouLi() : PhaseShift())
       @test frame_ledger(domain) == FRAME
@@ -451,17 +451,17 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
             "all-zero on CPU and $(DEVICE_FRAME) on a GPU. This leg is SKIPPED, not passed."
       @test_skip false
     else
-      name, array_type = backend
+      name, array_family = backend
       for tag in (:TwoThirds, :PhaseShift), T in (Float64, Float32)
         domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = T,
-                             array_type = array_type,
+                             array_family = array_family,
                              dealiasing = tag === :TwoThirds ? TwoThirds() : PhaseShift())
         @test frame_ledger(domain) == DEVICE_FRAME
       end
       # The completeness invariant, on the backend that has something to complete: working set plus
       # the DEVICE frame must still account for every field-scale array a live run reaches.
       domain = FixedDomain(grid_points_per_axis = N_AUDIT, side_length = 2π, element_type = Float64,
-                           array_type = array_type, dealiasing = TwoThirds())
+                           array_family = array_family, dealiasing = TwoThirds())
       sim = Simulation(domain; viscosity = 0.1, velocity_forcing = NoForcing(),
                        rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
@@ -578,7 +578,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
   # works in two `order`-element host vectors and its bootstrap reuses the one-step registers.
   @testset "the multistep particle integration scheme prices its history, and nothing else" begin
     domain = FixedDomain(grid_points_per_axis = 8, side_length = 2π, element_type = Float64,
-                         array_type = Array, dealiasing = TwoThirds())
+                         array_family = Array, dealiasing = TwoThirds())
     tracers = Tracers(domain; number_of_particles = 4, interpolation_scheme = CatmullRom)
     m_arrays(owner) = (acc = AbstractArray[];
                        collect_field_arrays!(acc, owner, Set{UInt}(), 2; keep = a -> length(a) >= 4);
@@ -629,7 +629,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     # scales with N. Measured against ONE of the run's own spectral vectors at a realistic grid.
     N = 64
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
-                         dealiasing = TwoThirds(), array_type = Array)
+                         dealiasing = TwoThirds(), array_family = Array)
     ou = StochasticOU(domain; forcing_variance = 0.1, correlation_time = 0.5, seed = 1)
     û = new_vector_field_spectral(domain)
     state = initial_forcing_state(ou, û, domain)
@@ -691,7 +691,8 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     unit = 8 * N^3
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
     advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)
-    @test (@allocated advance!(sim; dt = 1e-3)) < 0.2 * unit
+    @test (@allocated advance!(sim; dt = 1e-3)) <
+          0.2 * unit + thread_allowance(sum(_transforms(_ops(:RK3, :TwoThirds, true))))
   end
 
   @testset "the hot loop is allocation-free on EVERY dealiasing strategy" begin
@@ -704,15 +705,17 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     # The scope of this test is the point: the axes a step's code path actually branches on, not one
     # representative configuration. A per-stage transient of one field-scale array reads as ≈ 3 units
     # here, so the 0.5-unit ceiling separates "allocation-free" from "one field per stage" by a wide
-    # margin without being brittle about small run-layer bookkeeping.
-    N = 16
-    unit = 8 * N^3
+    # margin. A threaded run adds the task state of `thread_allowance`, up to about 5 units at four
+    # threads for the PhaseShift run with a scalar against 6–9 for the defect; at 16³ the allowance
+    # would exceed it, which is why the grid is 32³.
+    N = 32
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFHeun()),
         scalar in (false, true)
       sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
                        field_integration_scheme = scheme, rng = MersenneTwister(1))
       advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
-      @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * unit
+      transforms = sum(_transforms(_ops(scheme isa IFHeun ? :RK2 : :RK3, nameof(typeof(dealiasing)), scalar)))
+      @test (@allocated advance!(sim; dt = 1e-3)) < 0.5 * 8 * N^3 + thread_allowance(transforms)
     end
   end
 end

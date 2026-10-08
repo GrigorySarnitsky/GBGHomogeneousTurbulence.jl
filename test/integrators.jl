@@ -9,6 +9,8 @@ using GBGPeriodicFields: divergence, l2norm, field_data
 using Random
 using Test
 
+include("audit_ops.jl")   # `thread_allowance`, and the transform count it is priced at
+
 
 # Integrate the velocity from a copy of `û0` with a fixed `dt` for `nsteps`, carrying a zero scalar.
 function integrate_fixed(scheme, domain, û0, conditions, dt, nsteps)
@@ -34,7 +36,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
   N = 16
   L = 2π
   ν = 0.1
-  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_family = Array)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)
@@ -106,7 +108,7 @@ diffnorm(a, b) = sqrt(sum(abs2, field_data(a) .- field_data(b)))
     bytes = @allocated step!(scheme, state, generator, domain, buffers, cache, dt)
     deposit_bytes = @allocated deposit!(cache, state, domain, buffers)
     field_bytes = length(field_data(û)) * sizeof(eltype(field_data(û)))
-    @test bytes + deposit_bytes < field_bytes
+    @test bytes + deposit_bytes < field_bytes + thread_allowance(sum(_transforms(_ops(:RK3, :TwoThirds, true))))
   end
 
   @testset "recommended_cfl" begin
@@ -164,7 +166,7 @@ end
   T = Float64
   N = 32; L = 2π; ν = 0.02
   domain = FixedDomain(; grid_points_per_axis = N, side_length = L, dealiasing = TwoThirds(),
-                       element_type = T, array_type = Array)
+                       element_type = T, array_family = Array)
   û0 = new_vector_field_spectral(domain)
   random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(7))

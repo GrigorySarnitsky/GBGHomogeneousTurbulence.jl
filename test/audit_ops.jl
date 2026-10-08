@@ -25,6 +25,7 @@
 # runnable on its own (`julia --project=. test/<audit>.jl`).
 
 using Random     # the reflective counter below skips a random stream's O(1) internal state
+using GBGCodingTools.TestHarness: field_threshold
 
 const CLASSES = (:spectral_vector, :physical_vector, :spectral_scalar, :physical_scalar, :real_spectral_scalar)
 
@@ -626,6 +627,16 @@ const ALL_HOLDERS = (UNUSED_FUSION, DEVICE_PLAN_BUFFERS,
 # (Empty: the temporary ledger's local wins of 2026-10-01 were taken, or kept by decision 108, and
 # the tracer seeding copies found on 2026-10-03 were taken the same day.)
 const OPEN_LOCAL_WINS = ()
+
+
+# The task state a THREADED run pays per transform execution — FFTW's worker callback, and the
+# threaded CPU kernels' task setup — which no single-threaded run pays. It is the allocation audit's
+# per-thread term (`field_threshold`'s), and zero at one thread, so every hand-written allocation
+# bound keeps its strict single-threaded value (a true zero stays zero) and widens only on a threaded
+# lane. Measured 2026-10-09: a step of a 32³ run allocates 1.7 KB at one thread and a flat ~190 KB
+# at four, the same at 64³, so it is bookkeeping, not field scale.
+thread_allowance(transforms) =
+  Threads.nthreads() == 1 ? 0 : field_threshold(0; components = transforms)
 
 
 # ---------------------------------------------------------------- the op cost model

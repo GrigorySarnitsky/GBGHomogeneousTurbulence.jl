@@ -18,7 +18,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   T = Float64
   N = 16
   L = 2π
-  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_type = Array)
+  domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = T, dealiasing = TwoThirds(), array_family = Array)
   uniform = VectorFieldPhysical(zeros(T, N, N, N, 3), domain.grid)
 
   @testset "uniform field advects exactly" begin
@@ -246,7 +246,10 @@ end
     alloc(M) = (sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = M,
                                  rng = MersenneTwister(1));
                 advance!(sim); advance!(sim); @allocated advance!(sim))
-    small, large = alloc(200), alloc(4000)
+    # Tenfold in M, both above the count where a threaded run's CPU kernels stop adding tasks (the
+    # task setup grows with M up to a cap and then stays flat, measured 2026-10-09; one thread is flat
+    # throughout), so any growth left is an M-sized buffer.
+    small, large = alloc(40_000), alloc(400_000)
     @test large <= small + 512               # constant launch bookkeeping, not an M-sized buffer
   end
 

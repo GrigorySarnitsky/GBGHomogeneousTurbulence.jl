@@ -12,12 +12,14 @@ using Test
 using Random
 using GBGHomogeneousTurbulence
 
+include(joinpath(@__DIR__, "..", "audit_ops.jl"))   # `thread_allowance`
+
 @testset "StochasticOU.prepare_forcing! allocates nothing at field scale" begin
   T = Float64
   N = 16
   unit = sizeof(T) * N^3                       # one field-scale real array
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = T,
-                       dealiasing = TwoThirds(), array_type = Array)
+                       dealiasing = TwoThirds(), array_family = Array)
 
   ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5)
   û = new_vector_field_spectral(domain)
@@ -32,7 +34,7 @@ using GBGHomogeneousTurbulence
   @info "prepare_forcing! steady-state allocation" bytes units = bytes / unit
   # Half a field-scale array is a wide margin over the reseed's fixed allocation and far below the
   # 3 units a physical vector costs.
-  @test bytes < 0.5 * unit
+  @test bytes < 0.5 * unit + thread_allowance(3)          # one transform per component of the draw
 
   # …and the same must hold through the run layer, the way memory_audit.jl guards every other cell.
   sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(2),
@@ -40,5 +42,5 @@ using GBGHomogeneousTurbulence
   advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
   step_bytes = @allocated advance!(sim; dt = 1e-3)
   @info "advance! with StochasticOU forcing" step_bytes units = step_bytes / unit
-  @test step_bytes < 0.5 * unit
+  @test step_bytes < 0.5 * unit + thread_allowance(sum(_transforms(_ops(:RK3, :TwoThirds, false; ou = true))))
 end
