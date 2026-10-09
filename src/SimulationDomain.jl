@@ -104,10 +104,9 @@ CFL step than the ``2/3`` rule — handled automatically by
   the coefficients are the same expression evaluated once, the two settings advance a run
   **bit-identically**.
 
-Measured at ``128^3`` `Float64` on a GPU with `order = 36`: the on-the-fly evaluation costs
-``\\approx 14\\%`` of the step, of which `materialized = true` recovers ``\\approx 7\\%`` — the
-filter factor becomes an array read, while the integrating factor's own exponential remains.
-Prefer `true` when compute is the scarce resource, `false` when memory is.
+On the fly, every traversal recomputes the filter's exponential and power per mode;
+`materialized = true` makes that an array read, but the integrating factor's exponential stays
+per mode, so only part of the cost is recovered. Prefer `true` when compute is the scarce resource, `false` when memory is.
 
 !!! note "Retained is not resolved"
     The filter keeps every mode energetic ([`max_retained_wavenumber`](@ref) is the Nyquist), but
@@ -221,9 +220,8 @@ All keyword; the five naming the box are required:
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to
   [`FieldTransformPlans`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.FieldTransformPlans).
   On the CPU the default is FFTW's instant `ESTIMATE` heuristic, which can
-  mis-plan single-precision transforms (measured 2–5× slow at ``256^3`` `Float32`; see the
-  planner warning on `FieldTransformPlans`); for a long CPU run pass `FFTW.MEASURE` — the
-  one-time plan search costs seconds. The GPU FFT libraries take no planner flag, so on a
+  mis-plan single-precision transforms (the planner warning on `FieldTransformPlans` gives
+  figures); for a long CPU run pass `FFTW.MEASURE`, whose plan search is paid once. The GPU FFT libraries take no planner flag, so on a
   GPU backend the setting is inert.
 
 # Examples
