@@ -312,7 +312,18 @@ end-of-step velocity field the solver has just produced, so it needs nothing fro
 scheme's stages.
 
 It needs one set of predicted positions and the velocity interpolated there
-([`ParticleIntegratorBuffers`](@ref)); the formula is given with [`advect!`](@ref).
+([`ParticleIntegratorBuffers`](@ref)). One step of [`advect!`](@ref) over ``\\Delta t`` is
+
+```math
+\\begin{aligned}
+\\boldsymbol{v}_1 &= \\boldsymbol{u}(t_n, \\boldsymbol{X}), &
+\\boldsymbol{X}^{*} &= \\boldsymbol{X} + \\Delta t \\boldsymbol{v}_1, \\\\
+\\boldsymbol{v}_2 &= \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}), &
+\\boldsymbol{X} &\\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
+\\end{aligned}
+```
+
+with positions wrapped into ``[0, L)``, ``L`` the box side.
 
 !!! note "Pair it with the default interpolant unless the grid is coarse"
     Under the advective-CFL loop ``\\Delta t \\propto \\Delta x``, so this scheme's error falls as
@@ -435,8 +446,15 @@ time at **no extra field evaluation and no extra interpolation** per step.
 Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
 buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
 reuses the Lagrangian samples the run has already deposited at earlier instants. The trade is one
-stored array per extra order against one interpolation per step; the update formula is given with
-[`advect!`](@ref).
+stored array per extra order against one interpolation per step. One step of [`advect!`](@ref) is
+
+```math
+\\boldsymbol{X} \\leftarrow \\boldsymbol{X}
+  + \\sum_{j=0}^{K-1} b_j \\boldsymbol{u}(t_{n-j}, \\boldsymbol{X}(t_{n-j})),
+```
+
+with ``K`` the order and the weights ``b_j`` re-solved each step by integrating the Lagrange basis
+on the recorded step history.
 
 The steps are **not** assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
 which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each
@@ -657,42 +675,23 @@ Advance the positions of a tracer set by one step, in place.
 - `domain` — the [`FixedDomain`](@ref), which supplies the box side the positions are wrapped into.
 - `buffers` — the scheme's working storage, the [`ParticleIntegratorBuffers`](@ref) that
   [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for it.
-- `dt` — the step size, written ``\\Delta t`` below.
+- `dt` — the step size ``\\Delta t``.
 - `traversal = nothing` — the `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order`
   field), to gather the velocity in memory-locality order; `nothing` gathers in tracer order, with
   identical values.
 
-Under [`Heun`](@ref), the scheme is Heun-in-time on the velocity at the two ends of the step — the
-start-of-step values the previous iteration's closing particle deposit stored, and `velocity_end`:
-
-```math
-\\begin{aligned}
-\\boldsymbol{v}_1 &= \\boldsymbol{u}(t_n, \\boldsymbol{X}), &
-\\boldsymbol{X}^{*} &= \\boldsymbol{X} + \\Delta t \\boldsymbol{v}_1, \\\\
-\\boldsymbol{v}_2 &= \\boldsymbol{u}(t_{n+1}, \\boldsymbol{X}^{*}), &
-\\boldsymbol{X} &\\leftarrow \\boldsymbol{X} + \\tfrac{\\Delta t}{2}(\\boldsymbol{v}_1 + \\boldsymbol{v}_2),
-\\end{aligned}
-```
-
-with positions wrapped into ``[0, L)``. This is second-order accurate in time — advecting on the
-frozen start-of-step velocity alone would be first order.
+Under [`Heun`](@ref), whose docstring gives the update, the scheme is Heun-in-time on the velocity
+at the two ends of the step — the start-of-step values the previous iteration's closing particle
+deposit stored, and `velocity_end`.
 
 Every push also advances the cache's particles epoch, its count of position changes, so a read of
 the previous velocity sample throws as stale until the particle deposit closing the iteration
 refreshes it. A hand-run loop gets the same protection as a run.
 
-Under [`AdamsBashforth`](@ref), the position update integrates over the deposited samples instead
-of interpolating a second time,
-
-```math
-\\boldsymbol{X} \\leftarrow \\boldsymbol{X}
-  + \\sum_{j=0}^{K-1} b_j \\boldsymbol{u}(t_{n-j}, \\boldsymbol{X}(t_{n-j})),
-```
-
-with ``K`` the order and the weights ``b_j`` re-solved each step by integrating the Lagrange basis
-on the recorded step history (the steps are not assumed uniform). The first ``K - 1`` pushes have
-no history yet and are taken under `Heun`; `velocity_end` feeds only those bootstrap
-pushes.
+Under [`AdamsBashforth`](@ref), whose docstring gives the update, the position update integrates
+over the deposited samples instead of interpolating a second time. The first ``K - 1`` pushes, with
+``K`` the order, have no history yet and are taken under `Heun`; `velocity_end` feeds only those
+bootstrap pushes.
 
 !!! note "The start-of-step velocity is read, never recomputed"
     The start-of-step velocity ``\\boldsymbol{v}_1`` comes from the cache's stored velocity at the

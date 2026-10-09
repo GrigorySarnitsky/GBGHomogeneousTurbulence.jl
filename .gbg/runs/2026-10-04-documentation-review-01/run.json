@@ -3,7 +3,8 @@
     ],
     "model": "session",
     "ruled": [
-        "2026-10-04-documentation-review-01-004"
+        "2026-10-04-documentation-review-01-004",
+        "2026-10-04-documentation-review-01-006"
     ],
     "first_commit": "f2ee28d9cae9d81315dbe5439a457686e2157325",
     "dropped": 0,
@@ -69,9 +70,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-006-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Move the Heun and Adams–Bashforth updates into their scheme docstrings; advect! keeps what all schemes share and links to them (owner, 2026-10-09).",
             "context": "Moving the Heun and Adams–Bashforth update formulas from the generic advect! docstring into each scheme's own docstring moves mathematics between docstrings, which the change guard treats as a formula change.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [

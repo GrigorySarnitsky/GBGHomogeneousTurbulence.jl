@@ -218,8 +218,8 @@ unit,words,longest_paragraph,admonitions
 "Observables.md § Timestep control",19,19,0
 "Observables.md § Vorticity recovery",26,26,0
 "Particles.jl :: AbstractParticleIntegrator",105,57,0
-"Particles.jl :: AdamsBashforth(; order = 4)",693,164,1
-"Particles.jl :: Heun()",260,179,1
+"Particles.jl :: AdamsBashforth(; order = 4)",713,164,1
+"Particles.jl :: Heun()",271,179,1
 "Particles.jl :: ParticleIntegratorBuffers",254,103,0
 "Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",355,106,1
 "Particles.jl :: Particles",204,195,0

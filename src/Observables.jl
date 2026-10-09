@@ -107,6 +107,12 @@ boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\bold
 the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
+Two routes reach the same rate; take the one whose input is already in hand. The first form measures
+from the vorticity as the normalized inner product (Parseval) — use it where
+``\\boldsymbol{\\omega}`` exists for its own sake, as the cached vorticity does. The second
+measures straight from the velocity, with no vorticity formed at all — use it to measure off the
+state, where a ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
+
 # Arguments
 - `ω` — first form: a vorticity field, in either representation, or its point values (then
   averaged over the points).
@@ -114,12 +120,6 @@ the Leray-projected state a run advances), with the strain-rate tensor
 - `domain` — second form: the [`FixedDomain`](@ref) supplying the
   ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` multiplier.
 - `viscosity` — both forms: the kinematic viscosity ``\\nu``.
-
-Two routes reach the same rate; take the one whose input is already in hand. The first form measures
-from the vorticity as the normalized inner product (Parseval) — use it where
-``\\boldsymbol{\\omega}`` exists for its own sake, as the cached vorticity does. The second
-measures straight from the velocity, with no vorticity formed at all — use it to measure off the
-state, where a ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
 
 The second route trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral
 inner product against the `domain.squared_wavenumber_kernel` multiplier: from
