@@ -103,6 +103,11 @@ end
 
 const NO_FORCING_STATE = (velocity_forcing = nothing, scalar_forcing = nothing)
 
+# The seeders' default envelope wavenumber κ_p, which `Simulation` forwards as its own default, so
+# the two cannot drift apart: in the 2π box it puts the seed spectrum's peak, at κ_p/√2, on the
+# largest scales.
+const DEFAULT_ENVELOPE_WAVENUMBER = 2.0
+
 ResolvedFields(velocity_spectral, scalar_spectral) =
   ResolvedFields(velocity_spectral, scalar_spectral, NO_FORCING_STATE)
 
@@ -146,8 +151,10 @@ end
 
 
 """
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy, envelope_wavenumber,
-                                initial_spectrum = nothing, rng = default_rng())
+    random_solenoidal_velocity_spectral!(û, domain, kinetic_energy;
+                                         envelope_wavenumber = 2.0,
+                                         initial_spectrum = nothing,
+                                         rng = default_rng())
 
 Fill `û` (a velocity field in spectral representation) with a random, divergence-free velocity
 ``\\boldsymbol{u}`` of a chosen energy spectrum, dealiased and rescaled so the kinetic energy
@@ -159,7 +166,7 @@ Fill `û` (a velocity field in spectral representation) with a random, divergenc
 - `û` — the velocity field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `kinetic_energy` — the kinetic energy the seeded field is rescaled to.
-- `envelope_wavenumber` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
+- `envelope_wavenumber = 2.0` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
   default branch below); inert when `initial_spectrum` is given.
 - `initial_spectrum = nothing` — a target radial energy spectrum ``\\kappa \\mapsto E(\\kappa)``
   (the second branch below).
@@ -196,8 +203,8 @@ Returns `û`.
     values, then restore the cache with `deposit!` before advancing again. The
     interval between the two calls is yours to close.
 """
-function random_solenoidal_velocity_spectral!(û, domain::FixedDomain;
-                                     kinetic_energy::Real, envelope_wavenumber::Real,
+function random_solenoidal_velocity_spectral!(û, domain::FixedDomain, kinetic_energy::Real;
+                                     envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER,
                                      initial_spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)
@@ -248,8 +255,8 @@ end
 
 
 """
-    random_scalar_spectral!(φ̂, domain; scalar_variance, envelope_wavenumber,
-                   initial_spectrum = nothing, rng = default_rng())
+    random_scalar_spectral!(φ̂, domain, scalar_variance; envelope_wavenumber = 2.0,
+                            initial_spectrum = nothing, rng = default_rng())
 
 Fill `φ̂` (the scalar ``\\varphi`` in spectral representation) with a random, mean-zero scalar of a
 chosen spectrum, dealiased and rescaled so the variance ``\\langle\\varphi^{2}\\rangle`` equals the
@@ -261,7 +268,7 @@ requested `scalar_variance`. The mean vanishes by construction: the envelope is 
 - `φ̂` — the scalar field in spectral representation to fill.
 - `domain` — the [`FixedDomain`](@ref) the field is generated on.
 - `scalar_variance` — the variance the seeded field is rescaled to.
-- `envelope_wavenumber` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
+- `envelope_wavenumber = 2.0` — the Gaussian envelope's characteristic wavenumber ``\\kappa_p`` (the
   default branch below); inert when `initial_spectrum` is given.
 - `initial_spectrum = nothing` — a target radial scalar-variance spectrum
   ``\\kappa \\mapsto E_\\varphi(\\kappa)`` (the second branch below).
@@ -296,8 +303,8 @@ Returns `φ̂`.
     values, then restore the cache with `deposit!` before advancing again. The
     interval between the two calls is yours to close.
 """
-function random_scalar_spectral!(φ̂, domain::FixedDomain;
-                        scalar_variance::Real, envelope_wavenumber::Real,
+function random_scalar_spectral!(φ̂, domain::FixedDomain, scalar_variance::Real;
+                        envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER,
                         initial_spectrum = nothing, rng = Random.default_rng())
   T = _real_type(domain)
   isnothing(initial_spectrum) && _warn_envelope_beyond_cutoff(domain, envelope_wavenumber)

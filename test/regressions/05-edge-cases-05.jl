@@ -35,8 +35,7 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
     seeded = nothing
     warned = false
     try
-      seeded = random_solenoidal_velocity_spectral!(û, domain;
-                          kinetic_energy = requested, envelope_wavenumber = 2.0,
+      seeded = random_solenoidal_velocity_spectral!(û, domain, requested; envelope_wavenumber = 2.0,
                           rng = MersenneTwister(1))
     catch err
       warned = true                                # an explicit error is acceptable behaviour
@@ -74,8 +73,7 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
     threw = false
     local seeded
     try
-      seeded = random_solenoidal_velocity_spectral!(û, domain;
-                          kinetic_energy = requested, envelope_wavenumber = 2.0,
+      seeded = random_solenoidal_velocity_spectral!(û, domain, requested; envelope_wavenumber = 2.0,
                           initial_spectrum = κ -> exp(-1000 * κ),   # underflows to 0 for every κ ≥ 1
                           rng = MersenneTwister(1))
     catch err

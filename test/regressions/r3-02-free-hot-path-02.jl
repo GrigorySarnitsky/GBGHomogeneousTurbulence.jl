@@ -22,8 +22,7 @@ function warmed_run(seed)
 end
 
 function announced_reseed!(s)
-  random_solenoidal_velocity_spectral!(s.state.velocity_spectral, s.domain;
-                                       kinetic_energy = 1.5, envelope_wavenumber = 3.0,
+  random_solenoidal_velocity_spectral!(s.state.velocity_spectral, s.domain, 1.5; envelope_wavenumber = 3.0,
                                        rng = MersenneTwister(99))
   fields_modified!(s.cache)
   deposit!(s)

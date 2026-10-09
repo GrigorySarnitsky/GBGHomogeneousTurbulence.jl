@@ -17,7 +17,7 @@ using Random
     # Seeded at k0 through an adopted state: `kinetic_energy` beside the controller's target would
     # state the run's stationary state twice (decision 95).
     seeded = ResolvedFields(domain)
-    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain; kinetic_energy = k0,
+    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain, k0;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(seed))
     sim = Simulation(domain; viscosity = 0.05,
                      velocity_forcing = VarianceController(domain; target), state = seeded)

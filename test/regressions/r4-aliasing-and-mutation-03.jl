@@ -32,10 +32,8 @@ function step_once(dealiasing, generator_scalar::Bool)
                               velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
   state = ResolvedFields(domain; scalar = true)
   rng = MersenneTwister(20260821)
-  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain;
-                                       kinetic_energy = 1.5, envelope_wavenumber = 2, rng)
-  random_scalar_spectral!(state.scalar_spectral, domain;
-                          scalar_variance = 1.0, envelope_wavenumber = 2, rng)
+  random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, 1.5; envelope_wavenumber = 2, rng)
+  random_scalar_spectral!(state.scalar_spectral, domain, 1.0; envelope_wavenumber = 2, rng)
   scheme = IFLowStorageRK3()
   buffers = allocate_buffers(scheme, domain; scalar = true)
   cache = ObservablesCache(domain; scalar = true)

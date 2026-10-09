@@ -21,7 +21,7 @@ function step_allocation(scheme, N::Int)
   generator = ResolvedGenerator(domain, conditions; scalar = false)
 
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.6,
+  random_solenoidal_velocity_spectral!(û, domain, 0.6;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(42))
   truncate_to_band!(û, domain)
   state = ResolvedFields(û, nothing)

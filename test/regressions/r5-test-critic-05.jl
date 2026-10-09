@@ -31,7 +31,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
     # (Reproduce the pre-rescale pipeline by catching the guard and inspecting nothing — instead
     #  assert the observable consequence: the call must throw.)
     thrown = try
-      random_solenoidal_velocity_spectral!(û, DOMAIN; kinetic_energy = 1.0,
+      random_solenoidal_velocity_spectral!(û, DOMAIN, 1.0;
                                            envelope_wavenumber = 1.0e-8,
                                            rng = MersenneTwister(20260821))
       nothing
@@ -48,7 +48,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
   @testset "scalar: the same guard, on the twin" begin
     φ̂ = new_scalar_field_spectral(DOMAIN)
     thrown = try
-      random_scalar_spectral!(φ̂, DOMAIN; scalar_variance = 1.0,
+      random_scalar_spectral!(φ̂, DOMAIN, 1.0;
                               envelope_wavenumber = 1.0e-8,
                               rng = MersenneTwister(20260822))
       nothing
@@ -62,13 +62,13 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π,
 
   @testset "control: the guard has not over-fired on a normal seed" begin
     û = new_vector_field_spectral(DOMAIN)
-    random_solenoidal_velocity_spectral!(û, DOMAIN; kinetic_energy = 0.5,
+    random_solenoidal_velocity_spectral!(û, DOMAIN, 0.5;
                                          envelope_wavenumber = 2.0,
                                          rng = MersenneTwister(1))
     @test kinetic_energy(û) ≈ 0.5
 
     φ̂ = new_scalar_field_spectral(DOMAIN)
-    random_scalar_spectral!(φ̂, DOMAIN; scalar_variance = 1.0,
+    random_scalar_spectral!(φ̂, DOMAIN, 1.0;
                             envelope_wavenumber = 2.0, rng = MersenneTwister(2))
     @test scalar_variance(φ̂) ≈ 1.0
   end

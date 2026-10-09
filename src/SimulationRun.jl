@@ -48,7 +48,8 @@ using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
                           DealiasingStrategy, TwoThirds, max_resolved_wavenumber
-using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!
+using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
+                  DEFAULT_ENVELOPE_WAVENUMBER
 import ..Cache: particles_modified!, fields_modified!
 using ..Cache: ObservablesCache, check_deposits,
                advance_fields_epoch!,
@@ -607,7 +608,7 @@ function Simulation(domain::FixedDomain;
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Bool = false, scalar_variance::Real = 1.0,
-                    envelope_wavenumber::Real = 2.0, initial_spectrum = nothing,
+                    envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER, initial_spectrum = nothing,
                     state::Union{Nothing, ResolvedFields} = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = nothing,
                     unwrapped::Bool = false,
@@ -758,9 +759,9 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     elseif !isnothing(initial_spectrum)
       ic_spectrum = initial_spectrum           # a raw κ -> E(κ) function
     end
-    random_solenoidal_velocity_spectral!(state.velocity_spectral, domain; kinetic_energy = k_design,
+    random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, k_design;
                                          envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
-    scalar && random_scalar_spectral!(state.scalar_spectral, domain; scalar_variance, envelope_wavenumber, rng)
+    scalar && random_scalar_spectral!(state.scalar_spectral, domain, scalar_variance; envelope_wavenumber, rng)
   end
   state = _with_forcing_states(state, conditions, domain)
   if scalar

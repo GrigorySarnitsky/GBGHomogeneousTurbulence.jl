@@ -68,7 +68,7 @@ end
     domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                          element_type = Float64, array_family = Array)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
+    random_solenoidal_velocity_spectral!(û, domain, 1.5; envelope_wavenumber = 3.0,
                                          rng = MersenneTwister(N))
     ν = 0.02
     r = kinetic_energy_and_dissipation_below_scale(û, domain, ν)
@@ -100,7 +100,7 @@ end
     domain = FixedDomain(grid_points_per_axis = 12, side_length = 2π, dealiasing = TwoThirds(),
                          element_type = Float32, array_family = Array)
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
+    random_solenoidal_velocity_spectral!(û, domain, 1.5; envelope_wavenumber = 3.0,
                                          rng = MersenneTwister(3))
     r = kinetic_energy_and_dissipation_below_scale(û, domain, 0.02)
     @test eltype(r.scales) === eltype(r.kinetic_energy) === eltype(r.dissipation) === Float32

@@ -27,35 +27,35 @@ using Test
 
   # κ_max ≈ 5.33; κ_p = 12 puts the spectrum peak κ_p/√2 ≈ 8.49 beyond it — must warn.
   @test occursin("beyond the dealias cutoff",
-                 warns(() -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+                 warns(() -> random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                                                   envelope_wavenumber = 12.0,
                                                                   rng = MersenneTwister(1))))
   @test occursin("beyond the dealias cutoff",
-                 warns(() -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
+                 warns(() -> random_scalar_spectral!(φ̂, domain, 1.0;
                                                      envelope_wavenumber = 12.0,
                                                      rng = MersenneTwister(2))))
 
   # The boundary is the peak κ_p/√2, not κ_p itself: κ_p = 6 exceeds κ_max, but its peak
   # 6/√2 ≈ 4.24 < 5.33 — must stay silent (a dropped /√2 factor would warn here).
-  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                                                  envelope_wavenumber = 6.0,
                                                                  rng = MersenneTwister(3))))
 
   # An ordinary seed — the value every suite test uses — must stay silent.
-  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                                                  envelope_wavenumber = 2.0,
                                                                  rng = MersenneTwister(4))))
-  @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
+  @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain, 1.0;
                                                     envelope_wavenumber = 2.0,
                                                     rng = MersenneTwister(5))))
 
   # The initial_spectrum branch carries its own large scale; envelope_wavenumber is inert there,
   # so even an absurd value must stay silent.
-  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                                                  envelope_wavenumber = 12.0,
                                                                  initial_spectrum = κ -> exp(-κ^2),
                                                                  rng = MersenneTwister(6))))
-  @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
+  @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain, 1.0;
                                                     envelope_wavenumber = 12.0,
                                                     initial_spectrum = κ -> exp(-κ^2),
                                                     rng = MersenneTwister(7))))

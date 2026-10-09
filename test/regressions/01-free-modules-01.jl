@@ -32,9 +32,9 @@ using GBGPeriodicFields: field_data, to_physical!, combine!
                          dealiasing = dealiasing, array_family = Array)
     û = new_vector_field_spectral(domain)
     φ̂ = new_scalar_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
+    random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_wavenumber = 2.0,
                                          rng = MersenneTwister(1))
-    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0,
+    random_scalar_spectral!(φ̂, domain, 1.0; envelope_wavenumber = 2.0,
                             rng = MersenneTwister(2))
     state = ResolvedFields(û, φ̂)
     conditions = FlowConditions(viscosity = ν, schmidt = 1.0,

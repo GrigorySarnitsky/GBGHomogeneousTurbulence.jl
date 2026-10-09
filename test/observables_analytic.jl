@@ -66,7 +66,7 @@ end
   # the skewness vanishes for this field, and is odd in the velocity for any field
   @test abs(derivative_skewness(û, d)) < 1e-12
   seeded = new_vector_field_spectral(d)
-  random_solenoidal_velocity_spectral!(seeded, d; kinetic_energy = 1.0, envelope_wavenumber = 3.0)
+  random_solenoidal_velocity_spectral!(seeded, d, 1.0; envelope_wavenumber = 3.0)
   S = derivative_skewness(seeded, d)
   negated = multiply!(deepcopy(seeded), -1.0, seeded)
   @test S != 0
@@ -92,7 +92,7 @@ end
     d = FixedDomain(grid_points_per_axis = 32, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
                     array_family = Array)
     û = new_vector_field_spectral(d)
-    random_solenoidal_velocity_spectral!(û, d; kinetic_energy = 1.5, envelope_wavenumber = 4.0)
+    random_solenoidal_velocity_spectral!(û, d, 1.5; envelope_wavenumber = 4.0)
     S = new_tensor_field_physical(d)
     to_physical!(S, symmetric_gradient(û, d.multipliers), d.transform_plans)
     @test weighted_inner(û, d.squared_wavenumber_kernel) / 2 ≈ inner(S, S) rtol = tolerance

@@ -50,7 +50,7 @@ domain = FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
 
 function seeded_field()
   û = GBGHomogeneousTurbulence.SimulationDomain.new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.0,
+  random_solenoidal_velocity_spectral!(û, domain, 1.0;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(20260821))
   return CountingField(û)
 end

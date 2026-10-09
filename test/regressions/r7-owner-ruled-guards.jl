@@ -14,18 +14,18 @@ using GBGPeriodicFields: field_data, convolve!, to_physical, to_spectral
   # κ_max = (2/3)·(N/2)·(2π/L) = 16/3 ≈ 5.33 here; κ_p = 8 puts the peak 8/√2 ≈ 5.66 beyond it.
   û = new_vector_field_spectral(domain)
   @test_logs (:warn, r"dealias cutoff") match_mode=:any random_solenoidal_velocity_spectral!(
-      û, domain; kinetic_energy = 0.5, envelope_wavenumber = 8.0, rng = MersenneTwister(1))
+      û, domain, 0.5; envelope_wavenumber = 8.0, rng = MersenneTwister(1))
   φ̂ = new_scalar_field_spectral(domain)
   @test_logs (:warn, r"dealias cutoff") match_mode=:any random_scalar_spectral!(
-      φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 8.0, rng = MersenneTwister(2))
+      φ̂, domain, 1.0; envelope_wavenumber = 8.0, rng = MersenneTwister(2))
   # The default κ_p = 2 stays silent.
   @test_logs min_level=Logging.Warn random_solenoidal_velocity_spectral!(
-      û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(3))
+      û, domain, 0.5; envelope_wavenumber = 2.0, rng = MersenneTwister(3))
 
   # The floor's signal: empty the forced band (subtract + transform round trip leaves positive
   # roundoff), then the first clamped stage warns; the run stays usable (no throw, zero source).
   forcing = ConstantPower(domain; injection_rate = 0.1)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+  random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(5))
   convolve!(û, û, forcing.band, -1.0, 1.0)
   field_data(û) .= field_data(to_spectral(to_physical(û, domain.transform_plans),

@@ -38,9 +38,9 @@ domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type =
 # One seeded initial condition, reused verbatim by every run below.
 const û0 = new_vector_field_spectral(domain)
 const φ̂0 = new_scalar_field_spectral(domain)
-random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
+random_solenoidal_velocity_spectral!(û0, domain, 0.5; envelope_wavenumber = 2.0,
                                      rng = MersenneTwister(11))
-random_scalar_spectral!(φ̂0, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0,
+random_scalar_spectral!(φ̂0, domain, 1.0; envelope_wavenumber = 2.0,
                         rng = MersenneTwister(12))
 
 

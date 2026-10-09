@@ -29,7 +29,7 @@ using Test
   band_variance(φ̂) = (tmp = new_scalar_field_spectral(domain); convolve!(tmp, φ̂, band); inner(tmp, tmp))
 
   φ̂0 = new_scalar_field_spectral(domain)
-  random_scalar_spectral!(φ̂0, domain; scalar_variance = 0.4, envelope_wavenumber = 2.0,
+  random_scalar_spectral!(φ̂0, domain, 0.4; envelope_wavenumber = 2.0,
                           rng = MersenneTwister(11))
   truncate_to_band!(φ̂0, domain)
 

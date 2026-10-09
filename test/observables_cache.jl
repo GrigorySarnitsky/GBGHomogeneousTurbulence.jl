@@ -15,7 +15,7 @@ using Test
   L = 2π
   domain = FixedDomain(grid_points_per_axis = N, side_length = L, element_type = Float64, dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(1))
+  random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_wavenumber = 2.0, rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)
 
@@ -50,7 +50,7 @@ using Test
     cache = ObservablesCache(domain)
     deposit!(cache, state, domain, buffers)
     before = copy(field_data(velocity_physical(cache)))
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.7, envelope_wavenumber = 3.0, rng = MersenneTwister(2))
+    random_solenoidal_velocity_spectral!(û, domain, 0.7; envelope_wavenumber = 3.0, rng = MersenneTwister(2))
     fields_modified!(cache)
     @test_throws ErrorException velocity_physical(cache)         # stale: nothing is recomputed
     deposit!(cache, state, domain, buffers)
@@ -92,7 +92,7 @@ using Test
     sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = false, rng = MersenneTwister(4))
     u = velocity_physical(sim.cache)                                # the constructor's seeding deposit
     @test u === velocity_physical(sim.cache)
-    random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain; kinetic_energy = 0.9,
+    random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain, 0.9;
                                 envelope_wavenumber = 2.0, rng = MersenneTwister(5))
     fields_modified!(sim.cache)
     @test_throws ErrorException velocity_physical(sim.cache)

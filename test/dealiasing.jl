@@ -76,7 +76,7 @@ using Test
     SD  = GBGHomogeneousTurbulence.SimulationDomain
     GEN = GBGHomogeneousTurbulence.Generator
     û = SD.new_vector_field_spectral(dps)
-    random_solenoidal_velocity_spectral!(û, dps; kinetic_energy = 0.5, envelope_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
+    random_solenoidal_velocity_spectral!(û, dps, 0.5; envelope_wavenumber = 4.0, rng = MersenneTwister(3))  # energy near the edge
     half = Np ÷ 2
     mapidx(i) = i ≤ half + 1 ? i : i + Np                           # fft-freq index map, N → 2N
     embed(A) = (B = zeros(eltype(A), Np + 1, 2Np, 2Np, 3);          # zero-pad ×(2N/N)³ = 8
@@ -121,9 +121,9 @@ using Test
     Nc = 16
     domain = FixedDomain(grid_points_per_axis = Nc, side_length = L, element_type = Float64, dealiasing = PhaseShift(), array_family = Array)
     û0 = GBGHomogeneousTurbulence.SimulationDomain.new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(1))
+    random_solenoidal_velocity_spectral!(û0, domain, 0.5; envelope_wavenumber = 2.0, rng = MersenneTwister(1))
     φ̂0 = GBGHomogeneousTurbulence.SimulationDomain.new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂0, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = MersenneTwister(2))
+    random_scalar_spectral!(φ̂0, domain, 1.0; envelope_wavenumber = 2.0, rng = MersenneTwister(2))
     conditions = FlowConditions(viscosity = 0.1, schmidt = 1.0,
                                 velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
 

@@ -14,7 +14,7 @@ using Test
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float32,
                        dealiasing = TwoThirds(), array_family = Array)
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
+  random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(1))
   state = ResolvedFields(û, nothing)
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = false)

@@ -186,7 +186,7 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # A scalar state is refused a cache without a scalar slot, and buffers without a scalar set — the
     # two guards at the deposit that closes every iteration.
     scalar_state = ResolvedFields(domain; scalar = true)
-    random_solenoidal_velocity_spectral!(scalar_state.velocity_spectral, domain; kinetic_energy = 0.5,
+    random_solenoidal_velocity_spectral!(scalar_state.velocity_spectral, domain, 0.5;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(1))
     scalar_buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
     @test_throws ArgumentError deposit!(ObservablesCache(domain), scalar_state, domain, scalar_buffers)

@@ -23,7 +23,7 @@ using Random
   band = spectral_band(domain.multipliers, 0.5 * k0, 2.5 * k0)
 
   φ0 = new_scalar_field_spectral(domain)
-  random_scalar_spectral!(φ0, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0,
+  random_scalar_spectral!(φ0, domain, 1.0; envelope_wavenumber = 2.0,
                           rng = MersenneTwister(7))
   scaled(s) = (ψ = new_scalar_field_spectral(domain);
                copyto!(field_data(ψ), field_data(φ0)); field_data(ψ) .*= T(s); ψ)

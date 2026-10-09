@@ -43,10 +43,10 @@ function draws(seed, backend, T)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                        element_type = T, array_family = backend)
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 1.5, envelope_wavenumber = 3.0,
+  random_solenoidal_velocity_spectral!(û, domain, 1.5; envelope_wavenumber = 3.0,
                                        rng = Xoshiro(seed))
   φ̂ = new_scalar_field_spectral(domain)
-  random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 3.0,
+  random_scalar_spectral!(φ̂, domain, 1.0; envelope_wavenumber = 3.0,
                           rng = Xoshiro(seed + 1))
   tracers = Tracers(domain; number_of_particles = 64, interpolation_scheme = CatmullRom,
                     rng = Xoshiro(seed + 2))

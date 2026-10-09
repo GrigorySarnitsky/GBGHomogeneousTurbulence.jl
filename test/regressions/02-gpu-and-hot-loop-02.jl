@@ -23,7 +23,7 @@ include(joinpath(@__DIR__, "..", "audit_ops.jl"))   # `thread_allowance`
 
   ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5)
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0,
+  random_solenoidal_velocity_spectral!(û, domain, 0.5; envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(1))
   state = initial_forcing_state(ou, û, domain)
 

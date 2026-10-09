@@ -65,7 +65,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = 8, side_length = 2π, dealiasi
 
 function measure(forcing, kind)
   û = new_vector_field_spectral(DOMAIN)
-  random_solenoidal_velocity_spectral!(û, DOMAIN; kinetic_energy = 0.5,
+  random_solenoidal_velocity_spectral!(û, DOMAIN, 0.5;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(11))
   field = CF(û)
   # BOTH sides are counted and BOTH are returned. The source hook accumulates into a DIFFERENT field

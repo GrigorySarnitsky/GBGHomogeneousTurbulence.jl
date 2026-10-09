@@ -22,7 +22,7 @@ const GEN6 = GBGHomogeneousTurbulence.Generator
   d2 = FixedDomain(grid_points_per_axis = 2Np, side_length = L, dealiasing = TwoThirds(),
                    element_type = Float64, array_family = Array)
   û = SD6.new_vector_field_spectral(d23)
-  random_solenoidal_velocity_spectral!(û, d23; kinetic_energy = 0.5, envelope_wavenumber = 3.0,
+  random_solenoidal_velocity_spectral!(û, d23, 0.5; envelope_wavenumber = 3.0,
                                        rng = MersenneTwister(3))
   A = field_data(û)
   rng = MersenneTwister(11)

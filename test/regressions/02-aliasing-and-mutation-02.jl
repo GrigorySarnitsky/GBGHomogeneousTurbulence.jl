@@ -18,12 +18,12 @@ const SD = GBGHomogeneousTurbulence.SimulationDomain
                               velocity_forcing = NoForcing(), scalar_forcing = NoForcing())
 
   spectral_velocity(seed, κ0) = (û = SD.new_vector_field_spectral(domain);
-                                 random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+                                 random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                    envelope_wavenumber = κ0, rng = MersenneTwister(seed)); û)
   û_a = spectral_velocity(11, 2.0)
   û_b = spectral_velocity(22, 3.0)                       # a DIFFERENT stage state
   φ̂ = SD.new_scalar_field_spectral(domain)
-  random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0, rng = MersenneTwister(33))
+  random_scalar_spectral!(φ̂, domain, 1.0; envelope_wavenumber = 2.0, rng = MersenneTwister(33))
 
   # fresh physical recoveries — both assemblies CONSUME their velocity/vorticity arguments
   function physical_velocity(û)

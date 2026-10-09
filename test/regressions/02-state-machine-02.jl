@@ -66,8 +66,7 @@ end
     advance!(sim)
   end
   @test sim.cache.history_filled == K - 1
-  random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain;
-                                       kinetic_energy = 1.5, envelope_wavenumber = 2.0,
+  random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain, 1.5; envelope_wavenumber = 2.0,
                                        rng = MersenneTwister(999))
   fields_modified!(sim.cache)                        # announce …
   deposit!(sim)                                      # … and restore the cache

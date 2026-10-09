@@ -121,10 +121,10 @@ end
     d = FixedDomain(grid_points_per_axis = 16, side_length = T(2π), element_type = T,
                     array_family = Array, dealiasing = TwoThirds())
     û = new_vector_field_spectral(d)
-    random_solenoidal_velocity_spectral!(û, d; kinetic_energy = T(0.5), envelope_wavenumber = T(2),
+    random_solenoidal_velocity_spectral!(û, d, T(0.5); envelope_wavenumber = T(2),
                                          rng = MersenneTwister(1))
     φ̂ = new_scalar_field_spectral(d)
-    random_scalar_spectral!(φ̂, d; scalar_variance = T(1), envelope_wavenumber = T(2),
+    random_scalar_spectral!(φ̂, d, T(1); envelope_wavenumber = T(2),
                             rng = MersenneTwister(2))
     @test typeof(kinetic_energy(û))            === T
     @test typeof(dissipation(û, d, 0.001))     === T   # a Float64 parameter must not promote

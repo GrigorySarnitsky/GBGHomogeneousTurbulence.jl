@@ -60,7 +60,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
   buffers = allocate_buffers(IFLowStorageRK3(), domain; scalar = true)
 
   û0 = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û0, domain; kinetic_energy = 0.5, envelope_wavenumber = 2.0, rng = MersenneTwister(11))
+  random_solenoidal_velocity_spectral!(û0, domain, 0.5; envelope_wavenumber = 2.0, rng = MersenneTwister(11))
   truncate_to_band!(û0, domain)
 
   run_velocity(conditions, nsteps; dt = 0.01) = begin
@@ -124,7 +124,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
   @testset "scalar Linear forcing builds variance" begin
     û_zero = new_vector_field_spectral(domain)             # no velocity ⇒ pure linear growth of the scalar band
     φ̂0 = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂0, domain; scalar_variance = 0.1, envelope_wavenumber = 2.0, rng = MersenneTwister(9))
+    random_scalar_spectral!(φ̂0, domain, 0.1; envelope_wavenumber = 2.0, rng = MersenneTwister(9))
     conditions = FlowConditions(viscosity = ν,
                       scalar_forcing = Linear(domain; rate = 1.0, lowest_shell = 1, highest_shell = 2), schmidt = 1.0, velocity_forcing = NoForcing())
     φ̂ = new_scalar_field_spectral(domain); copyto!(field_data(φ̂), field_data(φ̂0))
@@ -255,7 +255,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     ou = StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.3, lowest_shell = 1, highest_shell = 2, seed = 5)
     conditions = FlowConditions(viscosity = ν, velocity_forcing = ou, schmidt = 1.0, scalar_forcing = NoForcing())
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.1, envelope_wavenumber = 2.0, rng = MersenneTwister(3))
+    random_solenoidal_velocity_spectral!(û, domain, 0.1; envelope_wavenumber = 2.0, rng = MersenneTwister(3))
     truncate_to_band!(û, domain)
     φ̂ = new_scalar_field_spectral(domain)
     state = ResolvedFields(û, φ̂, (velocity_forcing = initial_forcing_state(ou, û, domain), scalar_forcing = nothing))
@@ -394,7 +394,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     # stationary state (`kinetic_energy` alongside a forcing target is refused as stating it twice).
     marginal = VarianceController(domain; target = 1.5, gain = 0)
     seeded = ResolvedFields(domain)
-    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain; kinetic_energy = 0.5,
+    random_solenoidal_velocity_spectral!(seeded.velocity_spectral, domain, 0.5;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(3))
     sim = Simulation(domain; viscosity = 0.05, velocity_forcing = marginal, state = seeded)
     k0 = kinetic_energy(sim.state.velocity_spectral)
@@ -442,7 +442,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
       d = FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
                       dealiasing = TwoThirds(), array_family = Array)
       u = new_vector_field_spectral(d)
-      random_solenoidal_velocity_spectral!(u, d; kinetic_energy = 0.7, envelope_wavenumber = 3.0,
+      random_solenoidal_velocity_spectral!(u, d, 0.7; envelope_wavenumber = 3.0,
                                            rng = MersenneTwister(n))
       expected = field_data(u) .* sqrt(1.3 / kinetic_energy(u))
       for over in (:band, :total)
@@ -495,7 +495,7 @@ GBGHomogeneousTurbulence.Forcing.add_forcing_source!(::KeptLegacyForcing, N̂, f
     domain = FixedDomain(grid_points_per_axis = 16, side_length = 2π, element_type = Float64,
                          dealiasing = TwoThirds(), array_family = Array)
     φ̂ = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂, domain; scalar_variance = 0.4, envelope_wavenumber = 2.0,
+    random_scalar_spectral!(φ̂, domain, 0.4; envelope_wavenumber = 2.0,
                             rng = MersenneTwister(31))
     ϰ = 0.05 / 0.7
     εφ = scalar_dissipation(φ̂, domain, ϰ)

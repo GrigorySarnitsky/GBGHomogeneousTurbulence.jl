@@ -23,13 +23,13 @@ function step_deposit_bytes(; scalar::Bool, N = 16, T = Float64)
   generator = ResolvedGenerator(domain, conditions; scalar = scalar)
 
   û = new_vector_field_spectral(domain)
-  random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.6,
+  random_solenoidal_velocity_spectral!(û, domain, 0.6;
                                        envelope_wavenumber = 2.0, rng = MersenneTwister(42))
   truncate_to_band!(û, domain)
   φ̂ = nothing
   if scalar
     φ̂ = new_scalar_field_spectral(domain)
-    random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0,
+    random_scalar_spectral!(φ̂, domain, 1.0;
                             envelope_wavenumber = 2.0, rng = MersenneTwister(43))
     truncate_to_band!(φ̂, domain)
   end

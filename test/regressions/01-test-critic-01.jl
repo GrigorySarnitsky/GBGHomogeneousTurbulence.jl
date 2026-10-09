@@ -36,7 +36,7 @@ end
   @testset "velocity: the band kinetic energy equals `target`" begin
     for target in (0.3, 1.7)
       û = new_vector_field_spectral(domain)
-      random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+      random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                            envelope_wavenumber = 2.0, rng = MersenneTwister(11))
       forcing = VarianceRescaling(domain; target = target, over = :band)
 
@@ -51,7 +51,7 @@ end
 
   @testset "velocity: modes outside the band are untouched" begin
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+    random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(12))
     forcing = VarianceRescaling(domain; target = 0.9, over = :band)
 
@@ -64,7 +64,7 @@ end
   @testset "scalar: the band variance equals `target` (the factor-1 dispatch)" begin
     for target in (0.4, 2.5)
       φ̂ = new_scalar_field_spectral(domain)
-      random_scalar_spectral!(φ̂, domain; scalar_variance = 1.0, envelope_wavenumber = 2.0,
+      random_scalar_spectral!(φ̂, domain, 1.0; envelope_wavenumber = 2.0,
                               rng = MersenneTwister(13))
       forcing = VarianceRescaling(domain; target = target, over = :band)
 
@@ -77,7 +77,7 @@ end
 
   @testset "idempotence: a second application is a no-op" begin
     û = new_vector_field_spectral(domain)
-    random_solenoidal_velocity_spectral!(û, domain; kinetic_energy = 0.5,
+    random_solenoidal_velocity_spectral!(û, domain, 0.5;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(14))
     forcing = VarianceRescaling(domain; target = 0.6, over = :band)
 
