@@ -239,7 +239,7 @@ Integrating-factor third-order low-storage Runge–Kutta of the Williamson (1980
 general-purpose workhorse: third-order and stable on the imaginary axis (limit ``\\sqrt{3}``),
 unlike [`IFHeun`](@ref).
 
-The diffusive integrating factor ``\\mathcal{E}_D(\\tau)`` over a substep interval ``\\tau``
+The diffusive integrating factor ``\\mathcal{E}_D(\\delta t)`` over a substep interval ``\\delta t``
 (``D = \\nu`` for the velocity, ``\\varkappa = \\nu/\\mathrm{Sc}`` for the scalar) takes its
 parameters from the generator's
 [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
@@ -570,7 +570,7 @@ field, and the **same linear stability** (every three-stage third-order explicit
 stability function ``R(z) = 1 + z + z^2/2 + z^3/6``, imaginary-axis limit ``\\sqrt{3}``), differing
 only in the nonlinear error constants.
 
-With ``\\mathcal{E}(\\tau)`` the diffusive integrating factor over a span ``\\tau`` (from the generator's
+With ``\\mathcal{E}(\\delta t)`` the diffusive integrating factor over a span ``\\delta t`` (from the generator's
 [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor) /
 [`scalar_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.scalar_integrating_factor);
 applied per mode by the fused exponential convolution, never built as a field) and
@@ -872,8 +872,9 @@ with ``\\Delta x = L/N`` the grid spacing, ``L`` the box side and ``N`` the grid
 axis.
 
 The advective eigenvalues of the dealiased system are imaginary, of magnitude up to
-``\\kappa_{\\max}\\sup\\lvert\\boldsymbol{u}\\rvert`` — a rate. Stability needs that rate times the
-step, which once ``\\Delta t`` is substituted is ``C_{\\mathrm{CFL}} \\kappa_{\\max}\\Delta x``, to
+``\\kappa_{\\max}^{\\mathrm{ret}}\\sup\\lvert\\boldsymbol{u}\\rvert``, with ``\\kappa_{\\max}^{\\mathrm{ret}}`` the highest
+wavenumber the dealiasing keeps — a rate. Stability needs that rate times the
+step, which once ``\\Delta t`` is substituted is ``C_{\\mathrm{CFL}} \\kappa_{\\max}^{\\mathrm{ret}}\\Delta x``, to
 stay inside the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, a pure number.
 
 Two loosenesses sit in that estimate and they pull in **opposite** directions. The speed in the
@@ -883,7 +884,7 @@ Against it, the eigenvalue bound over-estimates the true spectral radius, since 
 carries the peak speed — making the ceiling too small. They are independent, so the second is not
 guaranteed to cover the first, which is why the base ceiling carries a margin.
 
-That base is calibrated for the ``2/3`` rule, where ``\\kappa_{\\max}\\Delta x = 2\\pi/3 \\approx 2.09``.
+That base is calibrated for the ``2/3`` rule, where ``\\kappa_{\\max}^{\\mathrm{ret}}\\Delta x = 2\\pi/3 \\approx 2.09``.
 For [`IFLowStorageRK3`](@ref) the limit ``y_{\\mathrm{s}} = \\sqrt{3}`` gives
 ``C_{\\mathrm{CFL}} \\lesssim 0.83``, taken conservatively as ``0.5``; [`IFSSPRK3`](@ref) shares
 that ``0.5`` exactly, every three-stage third-order explicit scheme having the same stability
@@ -894,9 +895,9 @@ damping), which makes the formula degenerate: its ``0.25`` is an empirical margi
 computed limit.
 
 The base is then scaled by the domain's dealiasing: a strategy that keeps modes to a higher
-``\\kappa_{\\max}`` (e.g. [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi), out to the
+``\\kappa_{\\max}^{\\mathrm{ret}}`` (e.g. [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi), out to the
 Nyquist wavenumber) takes a proportionally smaller step,
-``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}``. That scaling applies to every scheme's base,
+``C_{\\mathrm{CFL}} \\propto 1/\\kappa_{\\max}^{\\mathrm{ret}}``. That scaling applies to every scheme's base,
 `IFHeun`'s empirical one included: for a computed base it is the geometry of the retained band; for
 the empirical base it is an extrapolation in the same proportion, not a derived limit — and the
 scaled value is only as trustworthy as its base. This is the value [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) uses;

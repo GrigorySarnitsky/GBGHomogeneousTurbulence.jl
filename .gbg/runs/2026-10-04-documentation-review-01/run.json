@@ -2,6 +2,9 @@
     "unreverted": [
     ],
     "model": "session",
+    "ruled": [
+        "2026-10-04-documentation-review-01-004"
+    ],
     "first_commit": "f2ee28d9cae9d81315dbe5439a457686e2157325",
     "dropped": 0,
     "id": "2026-10-04-documentation-review-01",
@@ -93,9 +96,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-004-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Retained edge κ_max^ret in kinetic_energy's aliasing condition and recommended_cfl; bare κ_max for the resolved edge in max_resolved_wavenumber and on the validation page (owner, 2026-10-09).",
             "context": "Writing the retained edge as kappa_max with the ret superscript, and the resolved edge as bare kappa_max (not res or eff), changes the symbols inside formulas in kinetic_energy, recommended_cfl, max_resolved_wavenumber and the validation page.",
-            "answer": null
+            "answer": "fix it on my ruling"
         },
         {
             "options": [
@@ -9393,6 +9396,8 @@
         }
     ],
     "already_failing": [
+    ],
+    "licences": [
     ],
     "fixes": [
         {

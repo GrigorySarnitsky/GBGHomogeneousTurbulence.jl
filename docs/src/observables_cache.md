@@ -282,9 +282,9 @@ transforms below.
   ``-\nabla\cdot(\boldsymbol{u}\varphi)`` are evaluated as fields.
 - **The viscous terms** are never formed. Diagonal in the spectral representation, they integrate
   exactly, and the step multiplies by
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\tau\bigr)``
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^{2})\delta t\bigr)``
   instead, with ``D = \nu`` or ``\varkappa``, ``A(\boldsymbol{\kappa})`` a steady field-proportional forcing's
-  rate, and ``\tau`` the sub-interval a stage advances.
+  rate, and ``\delta t`` the sub-interval a stage advances.
 - **A forcing** takes one of three routes. A steady field-proportional one folds its rate into that
   exponential; neither a radial rate nor the product
   ``A(\boldsymbol{\kappa})\hat{\boldsymbol{u}}`` is stored. An additive source enters the right-hand side at each stage; a state-dependent rate — the

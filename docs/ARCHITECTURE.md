@@ -297,8 +297,8 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   energy-conserving generator, stepped explicitly.
 - **The irreversible term.** The diffusion ``\nu\nabla^{2}\boldsymbol{u}`` is the flow's *irreversible*,
   net-dissipative generator. Being diagonal in Fourier, it is integrated *exactly* through the flow map
-  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \tau\bigr)``
-  — the exact propagator of the linear part over an interval ``\tau`` (a Runge–Kutta stage substep, the fraction
+  ``\mathcal{E}(\boldsymbol{\kappa}) = \exp\bigl((A(\boldsymbol{\kappa}) - D\lvert\boldsymbol{\kappa}\rvert^2) \delta t\bigr)``
+  — the exact propagator of the linear part over an interval ``\delta t`` (a Runge–Kutta stage substep, the fraction
   ``d_i\Delta t`` of the step, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
   forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
@@ -483,8 +483,8 @@ Method (§3).
 ### 4.6 `Particles` — Lagrangian instruments
 
 Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
-state-carrying trajectory object: today a tracer (position ``\boldsymbol{x}``); the deferred ladder is
-inertial (``\boldsymbol{x}, \boldsymbol{v}``) and oriented (``\boldsymbol{x}, \boldsymbol{v}, \boldsymbol{L}``)
+state-carrying trajectory object: today a tracer (position ``\boldsymbol{X}``); the deferred ladder is
+inertial (``\boldsymbol{X}, \boldsymbol{v}``) and oriented (``\boldsymbol{X}, \boldsymbol{v}, \boldsymbol{L}``)
 probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
 with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
@@ -750,8 +750,8 @@ generalization is built for them until a second concrete case forces the abstrac
   composed recursively on the field library's persistence groups, restore a run that continues
   bitwise (§4.7), a stochastically forced run included: its process and its position in the stream
   are part of the stored state.
-- **Inertial and oriented particles** — ``(\boldsymbol{x},\boldsymbol{v})`` with matrix drag, then
-  ``(\boldsymbol{x},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
+- **Inertial and oriented particles** — ``(\boldsymbol{X},\boldsymbol{v})`` with matrix drag, then
+  ``(\boldsymbol{X},\boldsymbol{v},\boldsymbol{L})`` with torque. The translational drag reuses the
   integrating-factor split; orientation needs a geometric scheme (§4.6, §8).
 - **The sheared frame (Rogallo), a `ShearedDomain`.** A uniform mean velocity gradient makes the
   wavenumbers time-dependent (``\mathrm{d}\boldsymbol{\kappa}/\mathrm{d}t = -\boldsymbol{A}^{\!\top}\boldsymbol{\kappa}``)

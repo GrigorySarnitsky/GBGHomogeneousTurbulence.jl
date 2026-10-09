@@ -28,7 +28,7 @@ Both codes run one forced, stationary case of homogeneous isotropic turbulence:
 | grid, box side | ``128^3``, ``L = 2\pi`` | |
 | precision | `Float64` both codes | |
 | viscosity | ``\nu = 9.032 \times 10^{-3}`` | from the criterion below |
-| forcing | constant power ``\varepsilon_{\mathrm{inj}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
+| forcing | constant power ``\varepsilon_{\mathrm{target}} = 1`` into shells 1–2 | ``\varepsilon = 1`` exactly at stationarity |
 | dealiasing | smooth (Hou–Li) filter, exactly matched | see below |
 | field scheme | [`IFSSPRK3`](@ref) ⇔ TurTLE's native SSPRK3 | same tableau and stage arrangement |
 | timestep | fixed ``\Delta t = 2 \times 10^{-3}`` | identical in both codes |
@@ -37,7 +37,7 @@ Both codes run one forced, stationary case of homogeneous isotropic turbulence:
 
 The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (resolved
 edge times Kolmogorov microscale): under the smooth filter that edge is 0.8 of
-the Nyquist wavenumber, ``\kappa_{\mathrm{eff}} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
+the Nyquist wavenumber, ``\kappa_{\max} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
 ``\eta = 1.5/51.2`` and ``\nu = (\varepsilon\eta^{4})^{1/3} = \eta^{4/3}``. The grid-band figure is
 ``\kappa_{\mathrm{Ny}}\eta = 1.875``. (TurTLE's `kMeta` = 1.476 differs in normalizing
@@ -85,7 +85,7 @@ Every step of that import is witnessed, not assumed:
 
 ### Energy and dissipation, ``k(t)`` and ``\varepsilon(t)``
 
-![TurTLE (solid) vs this package (dashed): k(t), ε(t), ρ_u(τ)](assets/comparison_overlay.png)
+![TurTLE (solid) vs this package (dashed): k(t), ε(t), ρ_u(s)](assets/comparison_overlay.png)
 
 The window means ``\langle\cdot\rangle_T`` over the 14.9 turnovers compare as follows (each code its own realization after decorrelation):
 
@@ -116,12 +116,12 @@ growth is the flow's Lyapunov divergence acting on the ``\sim 10^{-12}`` formula
 saturation level is the flow's own fluctuation amplitude — the two curves ride the same band with
 independent phases.
 
-### Lagrangian velocity autocorrelation, ``\rho_u(\tau)``
+### Lagrangian velocity autocorrelation, ``\rho_u(s)``
 
 The estimator is the single-origin ensemble form,
 
 ```math
-\rho_u(\tau) = \frac{\langle \boldsymbol{u}(\tau)\cdot\boldsymbol{u}(0) \rangle}{\langle \lvert\boldsymbol{u}(0)\rvert^{2} \rangle},
+\rho_u(s) = \frac{\langle \boldsymbol{u}(s)\cdot\boldsymbol{u}(0) \rangle}{\langle \lvert\boldsymbol{u}(0)\rvert^{2} \rangle},
 ```
 
 the dot product averaged over the ``10^4`` tracers with ``\boldsymbol{u}(0)`` frozen at the
@@ -130,7 +130,7 @@ initial sample is stored once; each instant contributes one scalar); TurTLE's cu
 from its stored trajectory samples with the identical formula. Because both codes share
 ``\boldsymbol{u}(0)`` and the particles, the curves are comparable realization to realization:
 
-| ``\tau`` | ``\rho_u`` (both codes) | ``\lvert\Delta\rho_u\rvert`` |
+| ``s`` | ``\rho_u`` (both codes) | ``\lvert\Delta\rho_u\rvert`` |
 |:---|:---|:---|
 | 0.5 | 0.490 | ``1.3 \times 10^{-11}`` |
 | 1.0 | 0.241 | ``4.7 \times 10^{-10}`` |
@@ -139,7 +139,7 @@ from its stored trajectory samples with the identical formula. Because both code
 
 The ensemble average is far more robust to the trajectory-level phase scrambling than any single
 trajectory: the curves are indistinguishable through the entire physical decay, and the largest
-differences (``\sim 2 \times 10^{-2}``) occur only beyond ``\tau \approx 10``, where ``\rho_u``
+differences (``\sim 2 \times 10^{-2}``) occur only beyond ``s \approx 10``, where ``\rho_u``
 itself is statistical noise of that size.
 
 ### Robustness across forcings: the Linear (Lundgren) pair
@@ -160,7 +160,7 @@ the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-p
   package folds the steady ``A`` into its integrating factor (exact), TurTLE carries the term
   explicitly through the Runge–Kutta stages — the same continuous physics along two discrete
   routes, differing at that term's truncation level. ``\rho_u`` again overlays to
-  ``2 \times 10^{-10}`` at ``\tau = 0.5`` and ``8 \times 10^{-6}`` at ``\tau = 5``.
+  ``2 \times 10^{-10}`` at ``s = 0.5`` and ``8 \times 10^{-6}`` at ``s = 5``.
 - **The unanchored equilibrium wandered — identically in both codes.** With fixed ``A`` the band
   self-amplifies until the cascade balances it: both codes migrated to a hotter state
   (``\langle k\rangle_T \approx 3.4`` from 2.5, ``\langle\varepsilon\rangle_T \approx 1.6`` from 1.0), agreeing on the new
@@ -196,7 +196,7 @@ discrete routes.
   predicts. Window means agree to ``0.2\%`` in ``\langle\varepsilon\rangle_T`` and ``3\%`` in ``\langle k\rangle_T``
   (two 15-turnover realizations of the same statistics).
 - **``\rho_u`` is again indistinguishable** through the physical decay: ``5 \times 10^{-6}`` at
-  ``\tau = 0.5``, ``2 \times 10^{-6}`` at ``\tau = 1``, ``10^{-5}`` at ``\tau = 2`` — computed
+  ``s = 0.5``, ``2 \times 10^{-6}`` at ``s = 1``, ``10^{-5}`` at ``s = 2`` — computed
   in the run's callback on the *irregular* adaptive time grid, against TurTLE's fixed-grid
   post-hoc curve.
 
@@ -239,7 +239,7 @@ sha256sum *.h5
 #   1629764125ab00230d9a6d32fe710242075bb57264aea828113a0fe258094ca9
 ```
 
-Each reference file is self-describing: datasets `t`, `k`, `ε`, `τ`, `ρ_u`, with the definitions,
+Each reference file is self-describing: datasets `t`, `k`, `ε`, `τ` (the lag ``s``, labelled τ on the plots), `ρ_u`, with the definitions,
 run provenance, and the initial state's hash in its attributes.
 
 The scripts live in the repository's `validation/` directory and run in a working directory

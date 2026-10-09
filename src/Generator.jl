@@ -544,11 +544,11 @@ end
 
 
 """
-    velocity_integrating_factor(generator, τ)
+    velocity_integrating_factor(generator, δt)
 
-The function gives the velocity's exact linear subflow over a substep ``\\tau`` (`τ`) as the
+The function gives the velocity's exact linear subflow over a substep ``\\delta t`` (`δt`) as the
 **parameters of its exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
-supplies the viscosity ``\\nu`` and the linear forcing rate; `τ` is the sub-interval the stage advances.
+supplies the viscosity ``\\nu`` and the linear forcing rate; `δt` is the sub-interval the stage advances.
 
 The linear part of the momentum equation — the diffusion
 ``\\partial_t\\boldsymbol{u} = \\nu\\nabla^{2}\\boldsymbol{u}``, plus any linear forcing rate
@@ -556,7 +556,7 @@ The linear part of the momentum equation — the diffusion
 representation by the per-mode multiplier
 
 ```math
-\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\tau\\bigr),
+\\mathcal{E}(\\boldsymbol{\\kappa}) = \\exp\\bigl((A(\\boldsymbol{\\kappa}) - \\nu\\lvert\\boldsymbol{\\kappa}\\rvert^{2}) \\delta t\\bigr),
 ```
 
 with ``A = 0`` when no linear forcing is active. Multiplying a field by ``\\mathcal{E}`` advances its
@@ -567,26 +567,26 @@ A scheme applies the multiplier through the backend's fused exponential convolut
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 which evaluates it per mode from the wavenumber arrays: nothing is built, stored, or swept for it.
 Returns the named tuple `(; coefficient, offset_scale, offset)` that function takes:
-``\\texttt{coefficient} = -\\nu\\tau`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
-``\\texttt{offset\\_scale} = \\tau``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})``, a radial
+``\\texttt{coefficient} = -\\nu\\delta t`` (the factor on ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``),
+``\\texttt{offset\\_scale} = \\delta t``, and ``\\texttt{offset} = A(\\boldsymbol{\\kappa})``, a radial
 kernel or a stored field, or `nothing` without a linear forcing.
 """
-velocity_integrating_factor(generator::ResolvedGenerator, τ::Real) =
-  (coefficient = -generator.conditions.viscosity * τ, offset_scale = τ,
+velocity_integrating_factor(generator::ResolvedGenerator, δt::Real) =
+  (coefficient = -generator.conditions.viscosity * δt, offset_scale = δt,
    offset = generator.velocity_rate)
 
 
 """
-    scalar_integrating_factor(generator, τ)
+    scalar_integrating_factor(generator, δt)
 
-The function gives the passive scalar's exact linear subflow over a substep `τ` as the same exponential parameters
+The function gives the passive scalar's exact linear subflow over a substep `δt` as the same exponential parameters
 [`velocity_integrating_factor`](@ref) returns for `generator`, with the scalar diffusivity
 ``\\varkappa = \\nu/\\mathrm{Sc}`` in place of
 ``\\nu`` and the scalar forcing's linear rate in place of the velocity's.
 """
-scalar_integrating_factor(generator::ResolvedGenerator, τ::Real) =
-  (coefficient = -scalar_diffusivity(generator.conditions) * τ,
-   offset_scale = τ,
+scalar_integrating_factor(generator::ResolvedGenerator, δt::Real) =
+  (coefficient = -scalar_diffusivity(generator.conditions) * δt,
+   offset_scale = δt,
    offset = generator.scalar_rate)
 
 

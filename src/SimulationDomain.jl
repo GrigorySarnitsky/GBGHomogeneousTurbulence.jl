@@ -425,7 +425,7 @@ The highest wavenumber magnitude whose dynamics `domain` (a [`FixedDomain`](@ref
 genuine Navier–Stokes — the **resolved**-band edge
 
 ```math
-\\kappa_{\\max}^{\\mathrm{res}} = f_{\\mathrm{res}} \\frac{N}{2} \\frac{2\\pi}{L},
+\\kappa_{\\max} = f_{\\mathrm{res}} \\frac{N}{2} \\frac{2\\pi}{L},
 ```
 
 with ``N`` the grid points per side, ``L`` the box side, ``f_{\\mathrm{res}}`` the resolved-Nyquist

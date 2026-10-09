@@ -250,7 +250,7 @@ unit,words,longest_paragraph,admonitions
 "Propagator.jl :: Propagator",141,96,0
 "Propagator.jl :: allocate_buffers(scheme, domain; scalar = false) -> Integrat",203,86,0
 "Propagator.jl :: deposit!(cache, state, domain, buffers)",497,129,0
-"Propagator.jl :: recommended_cfl(scheme, domain)",450,115,1
+"Propagator.jl :: recommended_cfl(scheme, domain)",458,115,1
 "Propagator.jl :: step!(scheme, state, generator, domain, buffers, cache, dt)",316,78,1
 "Propagator.md § Integrator schemes",65,65,0
 "Propagator.md § Step scratch",27,27,0
@@ -345,7 +345,7 @@ unit,words,longest_paragraph,admonitions
 "validation.md § Energy and dissipation, ``k(t)`` and ``\varepsilon(t)``",208,48,0
 "validation.md § Lagrangian velocity autocorrelation, ``\rho_u(\tau)``",153,65,0
 "validation.md § Matching the smooth filter exactly",60,43,0
-"validation.md § Reproducing the comparison",93,60,0
+"validation.md § Reproducing the comparison",101,60,0
 "validation.md § Robustness across forcings: the Linear (Lundgren) pair",284,196,0
 "validation.md § Robustness across integrators: `IFLowStorageRK4` at its adap",249,158,0
 "validation.md § The physics point",232,131,0

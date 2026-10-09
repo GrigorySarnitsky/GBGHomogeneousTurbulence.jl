@@ -77,8 +77,8 @@ so by Parseval's theorem it accepts the velocity in either representation — th
 Like every quadratic reduction here, it
 needs no dealiasing of its own: the sum over spectral coefficients is exact, and the equivalent
 physical-space mean is alias-free too, because a quadratic's zero mode folds in nothing
-when ``2\\kappa_{\\max} < N`` in units of the fundamental ``2\\pi/L`` (``N`` points per side ``L``,
-band edge ``\\kappa_{\\max}``) — satisfied by the ``2/3``
+when ``2\\kappa_{\\max}^{\\mathrm{ret}} < N`` in units of the fundamental ``2\\pi/L`` (``N`` points per side ``L``,
+retained-band edge ``\\kappa_{\\max}^{\\mathrm{ret}}``) — satisfied by the ``2/3``
 rule, by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)'s wider
 ``\\sqrt{2}N/3`` band, and by every narrower band.
 
