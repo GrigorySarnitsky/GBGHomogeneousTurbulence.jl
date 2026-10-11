@@ -182,7 +182,7 @@ unit,words,longest_paragraph,admonitions
 "GBGHomogeneousTurbulence.jl :: GBGHomogeneousTurbulence",121,29,0
 "GBGHomogeneousTurbulence.md § GBGHomogeneousTurbulence",15,15,0
 "Generator.jl :: FlowConditions(; viscosity, schmidt, velocity_forcing, scala",312,74,2
-"Generator.jl :: Generator",166,93,0
+"Generator.jl :: Generator",170,97,0
 "Generator.jl :: ResolvedGenerator(domain, conditions; scalar = false)",542,225,1
 "Generator.jl :: finalize!(generator, state, domain)",109,81,0
 "Generator.jl :: prepare!(generator, state, domain, dt)",100,58,0
@@ -194,7 +194,7 @@ unit,words,longest_paragraph,admonitions
 "Generator.md § Flow conditions",19,19,0
 "Generator.md § The generator as one value",30,30,0
 "Generator.md § The generator protocol",30,30,0
-"Observables.jl :: Observables",327,140,0
+"Observables.jl :: Observables",330,140,0
 "Observables.jl :: derivative_skewness(û, domain)",410,94,1
 "Observables.jl :: dissipation(ω, viscosity)",276,73,1
 "Observables.jl :: energy_spectrum(û, domain)",171,59,0
@@ -219,11 +219,11 @@ unit,words,longest_paragraph,admonitions
 "Observables.md § Vorticity recovery",26,26,0
 "Particles.jl :: AbstractParticleIntegrator",105,57,0
 "Particles.jl :: AdamsBashforth(; order = 4)",713,164,1
-"Particles.jl :: Heun()",271,179,1
+"Particles.jl :: Heun()",273,181,1
 "Particles.jl :: ParticleIntegratorBuffers",254,103,0
 "Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",355,106,1
 "Particles.jl :: Particles",204,195,0
-"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",618,90,0
+"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",631,94,0
 "Particles.jl :: advect!(scheme, tracers, velocity_end, domain, buffers, dt;",328,84,1
 "Particles.jl :: history_depth(scheme) -> Int",47,28,0
 "Particles.jl :: interpolate_at_particles!(out, field, tracers; traversal = n",106,67,0
@@ -290,7 +290,7 @@ unit,words,longest_paragraph,admonitions
 "SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",341,112,1
 "SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",191,86,0
 "SimulationRun.jl :: run!(callback, sim; dt = nothing)",304,77,0
-"SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",141,55,0
+"SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",150,55,0
 "SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",149,94,0
 "SimulationRun.md § Advancing the run",27,27,0
 "SimulationRun.md § Cadence predicates",37,37,0
@@ -322,9 +322,9 @@ unit,words,longest_paragraph,admonitions
 "notation.md § Diagnostics",279,279,0
 "notation.md § Forcing",169,169,0
 "notation.md § Notation",95,73,0
-"notation.md § Numerics",240,240,0
+"notation.md § Numerics",252,252,0
 "notation.md § Parameters",142,122,0
-"notation.md § Physical variables",233,221,0
+"notation.md § Physical variables",244,232,0
 "notation.md § Spectral representation and operators",189,189,0
 "notation.md § Vocabulary",698,651,0
 "observables_cache.md § 1.1 What it is for",670,127,0
