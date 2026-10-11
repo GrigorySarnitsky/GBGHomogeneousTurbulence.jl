@@ -24,7 +24,8 @@ and the exact viscous integrating factor — in these parts:
   dealiased term plus its additive forcing source) at a stage state.
 - [`velocity_integrating_factor`](@ref), [`scalar_integrating_factor`](@ref) — supply each field's
   viscous/diffusive integrating factor, with any linear forcing rate folded in.
-- [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, at the deposit into the observables cache.
+- [`finalize!`](@ref) — apply the post-step forcing projections; the *iteration* closes later, when
+  [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) writes the step's observables into the observables cache.
 
 The assemblies recover displaced fields (on the half-cell-shifted grid) in physical representation with the four-argument,
 source-preserving form of
