@@ -100,7 +100,7 @@ CFL step than the ``2/3`` rule — handled automatically by
   on the numbers. `false` keeps the filter as a closed-form radial symbol re-evaluated per mode in
   every traversal of the spectral array: zero resident storage, the minimal-footprint side. `true` evaluates the same expression
   once into a stored coefficient array — one resident complex array of spectral-mode size (``\\approx 17`` MB at
-  ``128^3`` `Float64`, ``\\approx 136`` MB at ``256^3``) — that each traversal then merely reads. Because
+  ``128^3`` `Float64`, ``\\approx 135`` MB at ``256^3``) — that each traversal then merely reads. Because
   the coefficients are the same expression evaluated once, the two settings advance a run
   **bit-identically**.
 
