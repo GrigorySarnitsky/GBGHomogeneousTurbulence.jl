@@ -367,9 +367,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-023-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Already fixed by finding 008's commit, which restored the truncated references verbatim (owner, 2026-10-11).",
             "context": "Already fixed: the four truncated inline references, including Sullivan, Nose and Hoover in the forcing docstrings, were restored by the commit for finding 008.",
-            "answer": null
+            "answer": "not a defect"
         },
         {
             "options": [
@@ -394,9 +394,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-043-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Already fixed by finding 008's commit, which restored the truncated references verbatim (owner, 2026-10-11).",
             "context": "Already fixed: the truncated Lalescu 2010 reference in the particle docstrings was restored by the commit for finding 008.",
-            "answer": null
+            "answer": "not a defect"
         },
         {
             "options": [
@@ -421,9 +421,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-038-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Already fixed by finding 008's commit, which restored the truncated references verbatim (owner, 2026-10-11).",
             "context": "A duplicate of finding 008 (same location and fix), already fixed by its commit.",
-            "answer": null
+            "answer": "not a defect"
         },
         {
             "options": [
@@ -448,9 +448,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-093-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "Already fixed by finding 003's commit: the page counts six published files (owner, 2026-10-11).",
             "context": "A duplicate of finding 003: its commit already gives the validation page's count of six published files.",
-            "answer": null
+            "answer": "not a defect"
         },
         {
             "options": [
@@ -475,9 +475,9 @@
             ],
             "id": "2026-10-04-documentation-review-01-073-code",
             "decision": "This finding needs a change only you may make. Will you make it?",
-            "direction": "",
+            "direction": "The components are bulleted list entries, a name and its contents, not sentences; the list form is the finding's own remedy (owner, 2026-10-11).",
             "context": "False positive: the Components entries on the index page are already a bulleted list, the second remedy the finding offers.",
-            "answer": null
+            "answer": "not a defect"
         }
     ],
     "rulebook": "f5bbda4bcdf382f41127d607a3c476e4868fbdf0b6f07bd0a7d93825d05c8406",
