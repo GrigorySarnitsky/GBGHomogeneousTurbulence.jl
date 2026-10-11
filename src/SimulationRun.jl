@@ -1569,7 +1569,8 @@ run!(StationarityCriterion(; kwargs...), sim; dt)
 ```
 
 — it spins `sim` up to a statistically stationary state before measurement and returns it, by
-running the observation-first loop with the packaged stationarity observation. For a fixed spin-up
+running `run!`'s loop, which observes the seeded state and then each completed iteration, with the
+packaged stationarity observation. For a fixed spin-up
 budget, write the three-line budget callback instead (see [`run!`](@ref)).
 
 # Arguments
