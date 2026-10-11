@@ -30,17 +30,17 @@ The **Code** column gives the name each symbol carries in the package.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | `state.velocity_spectral`, in spectral representation |
+| ``\boldsymbol{u}`` | the incompressible velocity field, ``\nabla\cdot\boldsymbol{u} = 0`` | `velocity_spectral`, a field of [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), in spectral representation |
 | ``\boldsymbol{\omega}`` | the vorticity ``\nabla\times\boldsymbol{u}`` | [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical) (the field held in the [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache); [`vorticity_physical!`](@ref GBGHomogeneousTurbulence.Observables.vorticity_physical!) recovers it) |
 | ``\boldsymbol{\omega}\times\boldsymbol{u}`` | the Lamb vector — vorticity first, the literature's sign, so that ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla\bigl(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^{2}\bigr) + \boldsymbol{\omega}\times\boldsymbol{u}``; the rotational form's right-hand side carries its negation, ``\boldsymbol{u}\times\boldsymbol{\omega}``, which is the product the solver forms | never stored: formed in place over the vorticity's array by [`velocity_rhs!`](@ref GBGHomogeneousTurbulence.Generator.velocity_rhs!) |
-| ``\varphi`` | the passive scalar (never ``\theta``) | `state.scalar_spectral`, in spectral representation |
+| ``\varphi`` | the passive scalar (never ``\theta``) | `scalar_spectral`, likewise |
 | ``p`` | the pressure (absorbed by the Leray–Helmholtz projection, never stored) | — |
 | ``\boldsymbol{f}`` | a body forcing on the momentum equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) |
 | ``f_\varphi`` | a body forcing on the passive-scalar equation | [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing) (the `scalar_forcing` keyword of `Simulation`) |
 | ``\boldsymbol{x}``, ``t`` | position in the box ``\Omega``; time | — |
-| ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `tracers.positions` |
+| ``\boldsymbol{X}(t)`` | the position of a tracer particle (capitalised, to keep it distinct from the Eulerian coordinate ``\boldsymbol{x}``) | `positions`, a field of [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers) |
 | ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` | the velocity at the particles — the flow velocity sampled at each tracer's position at the run's current time ``t_n``, between [iterations](#Vocabulary) | [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) |
-| ``M`` | the number of tracer particles | `npoints(tracers.positions)` |
+| ``M`` | the number of tracer particles | `npoints` of those `positions` |
 
 ## Parameters
 
@@ -107,12 +107,12 @@ These scales are measured from the run's state, or derived from it through a `Fl
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``N`` | grid points per side | `grid_points_per_axis` |
-| ``L`` | box side (``\Omega = [0,L)^3``) | `side_length` |
-| ``\Delta t`` | timestep | `dt` |
+| ``N`` | grid points per side | the `grid_points_per_axis` keyword of [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) and `Simulation` |
+| ``L`` | box side (``\Omega = [0,L)^3``) | the `side_length` keyword, likewise |
+| ``\Delta t`` | timestep | the `dt` keyword of [`advance!`](@ref GBGHomogeneousTurbulence.SimulationRun.advance!) and `run!` |
 | ``C_{\mathrm{CFL}}`` | advective-CFL (Courant–Friedrichs–Lewy) ceiling, ``\Delta t = C_{\mathrm{CFL}} \Delta x/\max_{\boldsymbol{x}}\lvert\boldsymbol{u}\rvert``, with ``\Delta x`` the grid spacing | [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) |
 | ``\kappa_{\mathrm{Ny}}`` | the grid Nyquist wavenumber ``\tfrac{N}{2}\tfrac{2\pi}{L}`` — the highest a grid can represent, before dealiasing | — |
-| ``\kappa_p`` | the envelope wavenumber of the default random initial condition (the shell-summed spectrum peaks at ``\kappa_p/\sqrt{2}``) | `envelope_wavenumber` |
+| ``\kappa_p`` | the envelope wavenumber of the default random initial condition (the shell-summed spectrum peaks at ``\kappa_p/\sqrt{2}``) | the `envelope_wavenumber` keyword of `Simulation` and of the seeder [`random_solenoidal_velocity_spectral!`](@ref GBGHomogeneousTurbulence.State.random_solenoidal_velocity_spectral!) |
 | ``\kappa_{\max}^{\mathrm{ret}}`` | retained-band edge ``f_{\mathrm{ret}}\kappa_{\mathrm{Ny}}``, ``f_{\mathrm{ret}}`` the retained fraction (Lambert, Reneuve & Augier's (2026) ``C_t``, Fluidsim's `coef_dealiasing`) — the highest wavenumber the `dealiasing` strategy keeps energetic (``\tfrac{2}{3}\cdot\tfrac{N}{2}\cdot\tfrac{2\pi}{L}`` for the default ``2/3`` rule, the Nyquist for [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi), ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}`` for [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift)); prices the advective-CFL step | [`max_retained_wavenumber`](@ref) |
 | ``\kappa_{\max}`` | resolved-band edge ``f_{\mathrm{res}}\kappa_{\mathrm{Ny}}``, with ``f_{\mathrm{res}}`` the resolved fraction — the highest wavenumber whose dynamics is genuine Navier–Stokes, the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta``; equals the retained edge for the sharp-cutoff strategies, ``\tfrac{4}{5}`` of Nyquist for `HouLi` | [`max_resolved_wavenumber`](@ref) |
 | ``A_i, B_i, d_i`` | the low-storage Runge–Kutta stage coefficients and node increments | [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3) |
