@@ -304,8 +304,8 @@ Use it when the run is stability-limited and the transforms dominate: its stabil
 y_s = \\sqrt{\\tfrac{5(\\sqrt{2041} - 5)}{18}} \\approx 3.3407,
 ```
 
-a factor ``1.93`` above the ``\\sqrt{3}`` of `IFLowStorageRK3`, at ``5/3`` the nonlinear
-evaluations per step. Every per-stage cost scales with the five stages alike, so a step costs
+That limit is a factor ``1.93`` above the ``\\sqrt{3}`` of `IFLowStorageRK3`, and a step makes ``5/3``
+as many nonlinear evaluations. Every per-stage cost scales with the five stages alike, so a step costs
 ``5/3`` of `IFLowStorageRK3`'s, and a stability-limited run advances ``1.93/(5/3) \\approx 1.16``
 times the physical time per unit compute. Its fourth-order accuracy also removes the field's own time error as the limit on an
 [`AdamsBashforth(order = 4)`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) tracer,
