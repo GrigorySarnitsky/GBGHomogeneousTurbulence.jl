@@ -77,11 +77,12 @@ The `interpolation_scheme` is the `GBGPeriodicFields` scheme used to evaluate th
 sampled field — at the tracer positions.
 [`CatmullRom`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.CatmullRom) is the ``C^1``
 choice and [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)'s default; it is a ready-made value rather than a type, so it is passed
-bare. [`LalescuSpline(n, m)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
-and [`LagrangeSpline(n)`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
+bare. [`LalescuSpline`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LalescuSpline)
+and [`LagrangeSpline`](@extref GBGPeriodicFields GBGPeriodicFields.Interpolation.LagrangeSpline)
 offer higher smoothness or interpolation order at a wider stencil — useful for derivative-sensitive
-readouts such as acceleration statistics — with `n` (and, for `LalescuSpline`, `m`) the stencil and
-smoothness parameters.
+readouts such as acceleration statistics. Each takes its stencil width in grid points per axis
+(`CatmullRom` is `LalescuSpline(4)`), and `LalescuSpline` also takes its order of continuity as the
+`smoothness` keyword.
 
 # Arguments
 
@@ -337,7 +338,7 @@ with positions wrapped into ``[0, L)``, ``L`` the box side.
     and only the ``\\Delta x^{d+1}`` trend generalizes). So at production resolutions `CatmullRom` is
     not what limits a Heun
     trajectory and a wider stencil buys nothing; at coarse resolution, or with ``\\Delta t`` cut well
-    below the CFL value, `LalescuSpline(3, 1)` — same ``C^1``, degree 3 — moves the floor down by
+    below the CFL value, `LalescuSpline(8; smoothness = 1)` — same ``C^1``, degree 3 — moves the floor down by
     more than an order of magnitude. What governs this in a run is how well the grid resolves the
     Kolmogorov length ``\\eta``, so read ``N`` here as a stand-in for ``\\kappa_{\\max}\\eta``, with
     ``\\kappa_{\\max}`` the largest resolved wavenumber.
