@@ -3245,6 +3245,7 @@ cites.
 - Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
+- Lambert, C., Reneuve, J. & Augier, P. (2026). [*Aliasing and phase shifting in pseudo-spectral simulations of the incompressible Navier-Stokes equations*](https://doi.org/10.48550/arXiv.2603.08892). arXiv:2603.08892.
 - Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
   *(The interpolation family `LalescuSpline` implements,
   and the source for choosing interpolation order in particle tracking — decision 57's floor.)*
