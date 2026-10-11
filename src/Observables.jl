@@ -43,8 +43,8 @@ a forcing holding it fixed leaves it flat and
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)'s fixed injection makes it ring; it is
 measured (the eddy-turnover clock counts in units of ``k/\\varepsilon``) but never gated on.
 
-None dealiases first: the quadratic reductions are exactly alias-free under a truncating dealiasing
-band (see `kinetic_energy` for the condition;
+None dealiases first: the quadratic reductions are exactly alias-free when the dealiasing leaves
+the Nyquist modes empty (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
 and the cubic skewness carries a slight aliasing residual — its docstring states, per strategy, whether
 that residual is accounted for (yes for [`TwoThirds`](@ref GBGHomogeneousTurbulence.SimulationDomain.TwoThirds) and
