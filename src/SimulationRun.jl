@@ -47,7 +47,7 @@ module SimulationRun
 using GBGPeriodicFields
 using Random
 using ..SimulationDomain: FixedDomain, new_vector_field_spectral, new_scalar_field_spectral, new_vector_field_physical,
-                          DealiasingStrategy, TwoThirds, max_resolved_wavenumber
+                          DealiasingStrategy, TwoThirds, max_resolved_wavenumber, _real_type
 using ..State: ResolvedFields, random_solenoidal_velocity_spectral!, random_scalar_spectral!,
                   DEFAULT_ENVELOPE_WAVENUMBER
 import ..Cache: particles_modified!, fields_modified!
@@ -469,7 +469,7 @@ the run's box Reynolds number ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3
   ``\\kappa_{\\max}\\eta`` follows instead.
 
 Returns a named tuple `(; kinetic_energy, dissipation, band_kinetic_energy, viscosity, reynolds_box,
-reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` of `Float64`s. A forcing the prediction does not
+reynolds_taylor, kinetic_energy_in_box_units, κ_max_η)` in the domain's element type. A forcing the prediction does not
 cover (an unforced run, a band that does not start at shell 1) has no stationary state to predict,
 and it throws an `ArgumentError`, as does a state stated twice or both `κ_max_η` and `viscosity`.
 
@@ -481,6 +481,16 @@ and it throws an `ArgumentError`, as does a state stated twice or both `κ_max_�
 function predicted_stationary_state(domain::FixedDomain; velocity_forcing = ConstantPower(),
                                     kinetic_energy = nothing, dissipation = nothing,
                                     κ_max_η = nothing, viscosity = nothing)
+  prediction = _predicted_stationary_state(domain; velocity_forcing, kinetic_energy, dissipation,
+                                           κ_max_η, viscosity)
+  return map(_real_type(domain), prediction)
+end
+
+# The prediction in Float64, whatever the domain's precision: `Simulation` sets ν from it, and a
+# Float32 run's ν must not be the Float64 value rounded through Float32.
+function _predicted_stationary_state(domain::FixedDomain; velocity_forcing = ConstantPower(),
+                                     kinetic_energy = nothing, dissipation = nothing,
+                                     κ_max_η = nothing, viscosity = nothing)
   reason = _uncovered_reason(velocity_forcing)
   reason === nothing || throw(ArgumentError("predicted_stationary_state: $reason"))
   stated = _stated_state(velocity_forcing)
@@ -689,8 +699,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   uncovered = _uncovered_reason(velocity_spec)
   if uncovered === nothing
     # The model covers this forcing: the state is predicted, and a derived ν is solved from it.
-    prediction = predicted_stationary_state(domain; velocity_forcing = velocity_spec, kinetic_energy,
-                                            dissipation, κ_max_η, viscosity)
+    prediction = _predicted_stationary_state(domain; velocity_forcing = velocity_spec, kinetic_energy,
+                                             dissipation, κ_max_η, viscosity)
     ν = prediction.viscosity
     design = (; prediction.kinetic_energy, prediction.dissipation, prediction.band_kinetic_energy,
               box_time = cbrt(side_length^2 / prediction.dissipation))

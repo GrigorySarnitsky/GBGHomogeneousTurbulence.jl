@@ -494,4 +494,4 @@ Forcing = 74
 Generator = 25
 Propagator = 22
 Particles = 21
-SimulationRun = 42
+SimulationRun = 43  # +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type

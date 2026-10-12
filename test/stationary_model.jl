@@ -82,6 +82,12 @@ end
   @test_throws ArgumentError predicted_stationary_state(d; kinetic_energy = 1.0, dissipation = 0.3)
   @test_throws ArgumentError predicted_stationary_state(d; κ_max_η = 1.5, viscosity = 0.01)
   @test_throws ArgumentError predicted_stationary_state(d; velocity_forcing = NoForcing(), viscosity = 0.01)
+  # The prediction is returned in the domain's precision (its side is the Float32 2π, hence the rtol).
+  d32 = FixedDomain(grid_points_per_axis = 48, side_length = 2π, dealiasing = TwoThirds(),
+                    element_type = Float32, array_family = Array)
+  p64, p32 = predicted_stationary_state(d; κ_max_η = 1.5), predicted_stationary_state(d32; κ_max_η = 1.5)
+  @test all(v -> v isa Float64, p64) && all(v -> v isa Float32, p32)
+  @test all(name -> isapprox(getfield(p32, name), getfield(p64, name); rtol = 1e-6), keys(p64))
 end
 
 
