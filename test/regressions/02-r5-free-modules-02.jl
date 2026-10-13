@@ -9,7 +9,7 @@
 # the problem, and a run that reports success must actually be integrating something.
 
 using Test, Random, GBGHomogeneousTurbulence
-const IT = GBGHomogeneousTurbulence
+const HT = GBGHomogeneousTurbulence
 
 @testset "an unforced decaying run keeps a bounded timestep and a meaningful clock" begin
   ν = 0.02
@@ -23,7 +23,7 @@ const IT = GBGHomogeneousTurbulence
 
   largest_step = 0.0
   for _ in 1:200
-    largest_step = max(largest_step, IT.SimulationRun.cfl_timestep(sim))
+    largest_step = max(largest_step, HT.SimulationRun.cfl_timestep(sim))
     advance!(sim)
   end
 

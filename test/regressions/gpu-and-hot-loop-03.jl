@@ -13,7 +13,7 @@
 
 using Test, Random, GBGHomogeneousTurbulence
 
-const IT = GBGHomogeneousTurbulence
+const HT = GBGHomogeneousTurbulence
 
 # @allocated inside a function body, on concrete arguments, so the measurement is of the callee
 # alone and not of global-scope boxing.
@@ -25,14 +25,14 @@ end
 
 @testset "the multistep tracer advance allocates nothing once its history is full" begin
 
-  # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not IT's.
+  # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not HT's.
   heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
                     particle_integration_scheme = Heun(), rng = MersenneTwister(11))
   for _ in 1:3; advance!(heun); end
   heun_bytes = allocations_of(advect!, heun.particle_integration_scheme, heun.tracers,
                               velocity_physical(heun.cache), heun.domain,
                               heun.particle_buffers, 1.0e-3)
-  interp_bytes = allocations_of(IT.Particles.deposit!, heun.cache, heun.tracers,
+  interp_bytes = allocations_of(HT.Particles.deposit!, heun.cache, heun.tracers,
                                 velocity_physical(heun.cache))
   @info "reference: one-step advance and its interpolation" heun_bytes interp_bytes
 
@@ -49,7 +49,7 @@ end
   @test ab_bytes == 0
 
   # ---- and the weight solve itself, isolated: the whole of the above ------------------------
-  weight_bytes = allocations_of(IT.Particles._adams_bashforth_weights,
+  weight_bytes = allocations_of(HT.Particles._adams_bashforth_weights,
                                 zeros(Float64, 4), zeros(Float64, 4), 1.0e-3,
                                 [1.0e-3, 1.0e-3, 1.0e-3], 4)
   @info "weight-solve host allocations" weight_bytes

@@ -10,7 +10,7 @@ the two reference-data files); the page carries the download commands and the SH
 - `collect_analysis.py` — builds `turtle_reference_data.h5` (k, ε from TurTLE's canonical
   series; the ρ_u dataset was subsequently replaced by the single-origin estimator of
   `overlay_plots.py`'s legs — see the Validation page for the estimator definition).
-- `it_leg.jl` — this package's leg: imports the handoff (axis permutation, amplitude rescale,
+- `ht_leg.jl` — this package's leg: imports the handoff (axis permutation, amplitude rescale,
   PF's `inverse_curl`, tracer positions and AB4 history), verifies the three witnesses, runs
   18,400 fixed steps collecting k, ε and the in-callback ρ_u, writes
   `gbgit_reference_data.h5`. Backend is `ROCArray`; substitute `CuArray` or `Array` to taste.
@@ -18,8 +18,8 @@ the two reference-data files); the page carries the download commands and the SH
 
 The `*_linear*` variants are the second pair — the same comparison under the band-limited
 linear (Lundgren) forcing with fixed rate `A = 0.42386263`: `lincollect_driver.py` /
-`lincollect_analysis.py` (TurTLE leg), `it_leg_linear.jl`, `overlay_plots_linear.py`.
+`lincollect_analysis.py` (TurTLE leg), `ht_leg_linear.jl`, `overlay_plots_linear.py`.
 
 The `*_rk4*` variants are the third repetition — this package on `IFLowStorageRK4` under its
 adaptive CFL step against TurTLE's original fixed-step reference leg (no TurTLE rerun needed):
-`it_leg_rk4.jl`, `overlay_plots_rk4.py`.
+`ht_leg_rk4.jl`, `overlay_plots_rk4.py`.

@@ -1,11 +1,11 @@
 # Witness: the periodic wrap must not fabricate a finite coordinate out of a non-finite one.
 #
-# The contract was IT's `_wrap!` and is now PF's (`wrap!` and the grid form of `displace!`, their
+# The contract was HT's `_wrap!` and is now PF's (`wrap!` and the grid form of `displace!`, their
 # decision 73, adopted verbatim from this witness's findings): the excluded endpoint `L` folds to
 # `0` (floating-point `mod` can return exactly `L` for a hair-below-zero coordinate), and the fold
 # tests equality — an order test is false for NaN/Inf and would silently relocate a blown-up
 # trajectory to a tidy in-box position, destroying the one signal a run has diverged. This witness
-# pins that contract AT IT'S BOUNDARY — the surface `advect!` actually calls — so a PF regression
+# pins that contract AT HT'S BOUNDARY — the surface `advect!` actually calls — so a PF regression
 # on either half fails here, not just in PF's own suite.
 
 using GBGHomogeneousTurbulence

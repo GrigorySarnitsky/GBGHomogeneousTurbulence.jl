@@ -11,7 +11,7 @@ G = h5py.File('gbgit_reference_data.h5', 'r')
 
 tT, kT, eT = T['t'][()], T['k'][()], T['ε'][()]
 uT, rT = T['τ'][()], T['ρ_u'][()]
-# IT's clock starts at the handoff instant = TurTLE absolute t = 0.2
+# HT's clock starts at the handoff instant = TurTLE absolute t = 0.2
 tG, kG, eG = G['t'][()] + 0.2, G['k'][()], G['ε'][()]
 uG, rG = G['τ'][()], G['ρ_u'][()]
 

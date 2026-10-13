@@ -244,7 +244,7 @@ run provenance, and the initial state's hash in its attributes.
 
 The scripts live in the repository's `validation/` directory and run in a working directory
 holding the downloaded files: `collect_driver.py` (TurTLE's leg; needs a TurTLE 8.2.1
-installation with MPI, parallel HDF5, and FFTW), `it_leg.jl` (this package's leg — the import,
+installation with MPI, parallel HDF5, and FFTW), `ht_leg.jl` (this package's leg — the import,
 the witnesses above, and the instrumented run; the storage backend is one constant), and
 `overlay_plots.py` (the figure). This package's leg in outline:
 

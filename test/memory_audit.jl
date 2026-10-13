@@ -130,7 +130,7 @@ const BASE = Dict(
 # product scratch and REVERTED (2026-07-31) — the then-guarded `cross!` allocated per stage; the
 # alias-safe kernel has since landed PF-side and the retake is the Lamb-into-vorticity candidate of
 # the cache strand. PF adoption 2026-08-05/06: the stored translation kernels and the
-# integrating-factor register left the cells (PF decision 50, IT decision 39).)
+# integrating-factor register left the cells (PF decision 50, HT decision 39).)
 
 # What the stochastic forcing holds instead of field-scale arrays: its process and draw scratch live on
 # a companion grid sized by the forced band, so their cost is constant in N and vanishes against the run
@@ -225,7 +225,7 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 #
 # BOTH are spectral-sized — the buffer holds the transform's complex side in each case. They exist
 # because an out-of-place complex-to-real transform always overwrites its input, so `mul!` copies
-# the input into the buffer before executing. IT therefore builds TWO spectral-sized device arrays
+# the input into the buffer before executing. HT therefore builds TWO spectral-sized device arrays
 # PER PLAN COMPONENT: velocity 3 + scalar 1 + tensor 9 = 13 components, 26 buffers.
 #
 # The prediction is 26 × one spectral scalar, and it holds across every configuration measured:
@@ -282,7 +282,7 @@ const FRAME = (spectral_vector = 0, physical_vector = 0, spectral_scalar = 0,
 #      78, 868 MiB at 384³/Float32). And the THREE-argument `to_physical!`, the one PF documents as
 #      consuming its source, was measured to PRESERVE it on CUDA and destroy it on CPU — so the
 #      four-argument form's copy buys, on GPU, a guarantee the backend already provides, at 14.7% of
-#      inverse-transform time. Both fixes are upstream of IT, which is invariant 2's shape one level
+#      inverse-transform time. Both fixes are upstream of HT, which is invariant 2's shape one level
 #      further out.
 #
 # POSTMORTEM, kept because the failure is the instructive part. From 2026-08-25 this note asserted

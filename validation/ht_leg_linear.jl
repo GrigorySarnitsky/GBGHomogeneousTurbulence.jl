@@ -1,11 +1,11 @@
-# IT's comparison leg: import the frozen TurTLE handoff, run 18400 fixed steps on the GPU,
+# HT's comparison leg: import the frozen TurTLE handoff, run 18400 fixed steps on the GPU,
 # collect k(t), ε(t) and the tracer velocities in the run! callback, compute ρ_u(τ) with the
-# reference file's estimator, write gbgit_reference_data.h5.
+# reference file's estimator, write gbgit_linear_reference_data.h5.
 #
 # Witnesses before the run (each printed, each must pass):
 #   W1 scaling+layout: k and ε of the converted state match TurTLE's t₀ statistics sample.
 #   W2 round trip:     curl(inverse_curl(ω̂)) == ω̂ to machine precision.
-#   W3 interpolation:  IT's own u(t₀, X₀) sample matches TurTLE's stored velocity/100.
+#   W3 interpolation:  HT's own u(t₀, X₀) sample matches TurTLE's stored velocity/100.
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields
 using GBGPeriodicFields: inverse_curl!, point_values, PointSet, CatmullRom,
@@ -59,8 +59,8 @@ end
 k0 = kinetic_energy(state.velocity_spectral)
 ε0 = dissipation(state.velocity_spectral, domain, NU)
 @printf("   W1: stored-coefficient scale = %s\n", scale == 1.0 ? "1 (TurTLE stores PF's convention)" : "N³ (TurTLE stores mode amplitudes)")
-@printf("   W1: k(t₀)  IT %.12f  vs TurTLE %.12f  rel %.2e\n", k0, k_ref[1], abs(k0 - k_ref[1]) / k_ref[1])
-@printf("   W1: ε(t₀)  IT %.12f  vs TurTLE %.12f  rel %.2e\n", ε0, ε_ref[1], abs(ε0 - ε_ref[1]) / ε_ref[1])
+@printf("   W1: k(t₀)  HT %.12f  vs TurTLE %.12f  rel %.2e\n", k0, k_ref[1], abs(k0 - k_ref[1]) / k_ref[1])
+@printf("   W1: ε(t₀)  HT %.12f  vs TurTLE %.12f  rel %.2e\n", ε0, ε_ref[1], abs(ε0 - ε_ref[1]) / ε_ref[1])
 abs(k0 - k_ref[1]) / k_ref[1] < 1e-8 || error("W1 FAILED on k")
 abs(ε0 - ε_ref[1]) / ε_ref[1] < 1e-6 || error("W1 FAILED on ε")
 
@@ -75,22 +75,22 @@ println("== tracers and the Simulation (injection door)")
 X = mod.(permutedims(Xraw, (2, 1)), 2π)   # TurTLE keeps trajectories unwrapped; wrap into the box
 tracers = Tracers(domain; positions = PointSet(X), interpolation_scheme = CatmullRom)
 sim = Simulation(domain; viscosity = NU,
-                 velocity_forcing = ConstantPower(injection_rate = 1.0,
+                 velocity_forcing = Linear(rate = 0.42386263,
                                                   lowest_shell = 1, highest_shell = 2),
                  field_integration_scheme = IFSSPRK3(),
                  particle_integration_scheme = AdamsBashforth(order = 4),
                  state = state, tracers = tracers)
 
-# W3 — interpolation parity: IT's own t₀ Lagrangian sample vs TurTLE's stored one.
+# W3 — interpolation parity: HT's own t₀ Lagrangian sample vs TurTLE's stored one.
 vturtle = h5open(joinpath(DIR, "fill_particles.h5"), "r") do io
   read(io["tracers0/velocity/100"])
 end
 w3err = maximum(abs, Array(velocity_at_particles(sim.cache)) .- permutedims(vturtle, (2, 1)))
-@printf("   W3: u(t₀, X₀) IT vs TurTLE max abs diff = %.2e\n", w3err)
+@printf("   W3: u(t₀, X₀) HT vs TurTLE max abs diff = %.2e\n", w3err)
 w3err < 1e-10 || @warn "W3 above 1e-10 — interpolant mismatch would grow into the trajectories" w3err
 
 # AB4 history: TurTLE rhs rows 1–3 are u(t₋₁), u(t₋₂), u(t₋₃) — pinned bitwise against
-# fill_particles velocities at iterations 99/98/97. IT's past[j] is the same order.
+# fill_particles velocities at iterations 99/98/97. HT's past[j] is the same order.
 for j in 1:3
   copyto!(point_values(sim.cache.velocity_at_particles_history[j]),
           ROCArray(permutedims(rhs[:, :, j + 1], (2, 1))))
@@ -132,13 +132,13 @@ i[] == NSAMPLE || error("sample count mismatch: $(i[]) vs $NSAMPLE")
 @printf("   ρ_u(0) = %.6f   ρ_u(0.5) = %.4f   ρ_u(1.0) = %.4f\n",
         ρ[1], ρ[1 + round(Int, 0.5 / 0.01)], ρ[1 + round(Int, 1.0 / 0.01)])
 
-println("== writing gbgit_reference_data.h5")
-t = DT .* collect(0:STRIDE:NSTEPS)   # IT clock; t₀ here = TurTLE's absolute t = 0.2
-h5open(joinpath(DIR, "gbgit_reference_data.h5"), "w") do io
+println("== writing gbgit_linear_reference_data.h5")
+t = DT .* collect(0:STRIDE:NSTEPS)   # HT clock; t₀ here = TurTLE's absolute t = 0.2
+h5open(joinpath(DIR, "gbgit_linear_reference_data.h5"), "w") do io
   io["t"] = t; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
   a = HDF5.attributes(io)   # qualified: CUDA.jl exports an `attributes` too, and the bare name is then ambiguous
   a["code"] = "GBGHomogeneousTurbulence (IFSSPRK3, HouLi order 36 strength 63.463), Float64, ROCm GPU"
-  a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, ConstantPower ε_inj = 1 shells 1–2; " *
+  a["run"] = "128^3, L = 2π, ν = 9.032e-3, dt = 2e-3, Linear (Lundgren band) forcing, rate A = 0.42386263 = ε̄/(2E_band(t₀)) on shells 1–2; " *
              "18400 steps = 36.8 time units from the same frozen handoff as TurTLE's collect run; " *
              "same 10^4 tracers, AB4 warm-started from TurTLE's history, Catmull–Rom interpolation"
   a["initial_state"] = "handoff_initial_state_iter100.h5, sha256 02c2d2530a731f0701608b4fb219f28bc9006f8d2ac39f4c02daef228823e82f"
