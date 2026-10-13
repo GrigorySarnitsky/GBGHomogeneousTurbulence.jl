@@ -97,7 +97,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
 
   @testset "interpolate_at_particles! reads a field along trajectories" begin
     tracers = Tracers(domain; number_of_particles = 40, interpolation_scheme = CatmullRom, rng = MersenneTwister(2))
-    constant = ScalarFieldPhysical((x, y, z) -> 2.5, domain.grid)
+    constant = ScalarFieldPhysical(Array, (x, y, z) -> 2.5, domain.grid)
     samples = new_scalar_point_values(tracers)
     interpolate_at_particles!(samples, constant, tracers)
     @test all(≈(2.5), point_values(samples))                  # a constant field samples exactly

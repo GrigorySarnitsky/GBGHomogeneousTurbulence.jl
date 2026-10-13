@@ -132,22 +132,20 @@ struct IntegratorBuffers{VS, ST2, VSS, NL, SB}
 end
 
 
-# The two shapes the fused exponential serves in a stage, branching once on whether a linear forcing
-# rate is present (the factor's `offset`): the update fuses a weighted combination with the factor —
-# dest ← E ⊙ (α a + β b) — and the rotation applies the factor alone. Both evaluate
-# E = exp(coefficient·|κ|² [+ offset_scale·Â]) per mode from the wavenumber arrays; no kernel field
+# The two shapes the fused exponential serves in a stage: the update fuses a weighted combination
+# with the factor — dest ← E ⊙ (α a + β b) — and the rotation applies the factor alone. Both evaluate
+# E = exp(coefficient·|κ|² [+ offset_scale·Â]) per mode from the wavenumber arrays, the bracket only
+# when a linear forcing rate is present (the factor's `offset`, else `nothing`); no kernel field
 # exists.
 function _exponential_update!(dest, α, a, β, b, domain::FixedDomain, ℰ)
-  ℰ.offset === nothing ?
-    exponential_convolve!(dest, α, a, β, b, domain.multipliers, ℰ.coefficient) :
-    exponential_convolve!(dest, α, a, β, b, domain.multipliers, ℰ.coefficient, ℰ.offset_scale, ℰ.offset)
+  exponential_convolve!(dest, α, a, β, b, domain.multipliers;
+                        coefficient = ℰ.coefficient, offset = ℰ.offset, offset_scale = ℰ.offset_scale)
   return dest
 end
 
 function _exponential_rotate!(field, domain::FixedDomain, ℰ)
-  ℰ.offset === nothing ?
-    exponential_convolve!(field, field, domain.multipliers, ℰ.coefficient) :
-    exponential_convolve!(field, field, domain.multipliers, ℰ.coefficient, ℰ.offset_scale, ℰ.offset)
+  exponential_convolve!(field, field, domain.multipliers;
+                        coefficient = ℰ.coefficient, offset = ℰ.offset, offset_scale = ℰ.offset_scale)
   return field
 end
 

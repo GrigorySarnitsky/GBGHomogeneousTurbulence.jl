@@ -168,7 +168,7 @@ needs matched PRECISION (float64 both sides).
 
 ## PF axis convention — VERIFIED (2026-08-28, single-mode witness on Aiporetne)
 
-Witness: `ScalarFieldPhysical((x,y,z)->cos(m·x+φ), grid)` at N=16, L=2π, transformed with
+Witness: `ScalarFieldPhysical(Array, (x,y,z)->cos(m·x+φ), grid)` at N=16, L=2π, transformed with
 PF's `to_spectral!`; every probe (axis modes, mixed mode (2,3,5), negative-ky mode
 (2,−3,5), phase 0.3) landed exactly as predicted; round trip 1e-15.
 
