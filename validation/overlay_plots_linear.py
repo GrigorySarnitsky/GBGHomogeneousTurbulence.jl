@@ -7,7 +7,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 T = h5py.File('turtle_linear_reference_data.h5', 'r')
-G = h5py.File('gbgit_linear_reference_data.h5', 'r')
+G = h5py.File('ht_linear_reference_data.h5', 'r')
 
 tT, kT, eT = T['t'][()], T['k'][()], T['ε'][()]
 uT, rT = T['τ'][()], T['ρ_u'][()]

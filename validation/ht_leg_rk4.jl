@@ -1,6 +1,6 @@
 # HT's comparison leg: import the frozen TurTLE handoff, run 18400 fixed steps on the GPU,
 # collect k(t), ε(t) and the tracer velocities in the run! callback, compute ρ_u(τ) with the
-# reference file's estimator, write gbgit_rk4adaptive_reference_data.h5.
+# reference file's estimator, write ht_rk4adaptive_reference_data.h5.
 #
 # Witnesses before the run (each printed, each must pass):
 #   W1 scaling+layout: k and ε of the converted state match TurTLE's t₀ statistics sample.
@@ -128,8 +128,8 @@ nst = length(ts) - 1
 @printf("   ρ_u(0) = %.6f   ρ_u(0.5) = %.4f   ρ_u(1.0) = %.4f\n",
         ρ[1], ρ[1 + round(Int, 0.5 / 0.01)], ρ[1 + round(Int, 1.0 / 0.01)])
 
-println("== writing gbgit_rk4adaptive_reference_data.h5")
-h5open(joinpath(DIR, "gbgit_rk4adaptive_reference_data.h5"), "w") do io
+println("== writing ht_rk4adaptive_reference_data.h5")
+h5open(joinpath(DIR, "ht_rk4adaptive_reference_data.h5"), "w") do io
   io["t"] = ts; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
   a = HDF5.attributes(io)   # qualified: CUDA.jl exports an `attributes` too, and the bare name is then ambiguous
   a["code"] = "GBGHomogeneousTurbulence (IFLowStorageRK4, ADAPTIVE CFL step, HouLi order 36 strength 63.463), Float64, ROCm GPU"

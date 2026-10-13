@@ -6,7 +6,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 T = h5py.File('turtle_reference_data.h5', 'r')
-G = h5py.File('gbgit_rk4adaptive_reference_data.h5', 'r')
+G = h5py.File('ht_rk4adaptive_reference_data.h5', 'r')
 tT, kT, eT, uT, rT = T['t'][()], T['k'][()], T['ε'][()], T['τ'][()], T['ρ_u'][()]
 tG, kG, eG, uG, rG = G['t'][()] + 0.2, G['k'][()], G['ε'][()], G['τ'][()], G['ρ_u'][()]
 

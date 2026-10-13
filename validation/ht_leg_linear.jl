@@ -1,6 +1,6 @@
 # HT's comparison leg: import the frozen TurTLE handoff, run 18400 fixed steps on the GPU,
 # collect k(t), ε(t) and the tracer velocities in the run! callback, compute ρ_u(τ) with the
-# reference file's estimator, write gbgit_linear_reference_data.h5.
+# reference file's estimator, write ht_linear_reference_data.h5.
 #
 # Witnesses before the run (each printed, each must pass):
 #   W1 scaling+layout: k and ε of the converted state match TurTLE's t₀ statistics sample.
@@ -132,9 +132,9 @@ i[] == NSAMPLE || error("sample count mismatch: $(i[]) vs $NSAMPLE")
 @printf("   ρ_u(0) = %.6f   ρ_u(0.5) = %.4f   ρ_u(1.0) = %.4f\n",
         ρ[1], ρ[1 + round(Int, 0.5 / 0.01)], ρ[1 + round(Int, 1.0 / 0.01)])
 
-println("== writing gbgit_linear_reference_data.h5")
+println("== writing ht_linear_reference_data.h5")
 t = DT .* collect(0:STRIDE:NSTEPS)   # HT clock; t₀ here = TurTLE's absolute t = 0.2
-h5open(joinpath(DIR, "gbgit_linear_reference_data.h5"), "w") do io
+h5open(joinpath(DIR, "ht_linear_reference_data.h5"), "w") do io
   io["t"] = t; io["k"] = K; io["ε"] = E; io["τ"] = τ; io["ρ_u"] = ρ
   a = HDF5.attributes(io)   # qualified: CUDA.jl exports an `attributes` too, and the bare name is then ambiguous
   a["code"] = "GBGHomogeneousTurbulence (IFSSPRK3, HouLi order 36 strength 63.463), Float64, ROCm GPU"

@@ -61,7 +61,7 @@ t.u. ≈ 0.3 T_E. **The download set** (all in `runs/warmup128/`):
 `handoff_initial_state_iter100.h5` sha256 02c2d253…;
 `turtle_reference_data.h5` sha256 fa9633599e2f86411a9712ad75c0fad69cb047626d4f59e02de5a2802ca42211
 (ρ_u REPLACED 2026-08-28 with the owner's single-origin estimator, matching HT's callback);
-`gbgit_reference_data.h5` sha256 394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
+`ht_reference_data.h5` sha256 394d68ca9f6bd066eb34b484f826c684df605c6901e1eb7364d756ae1b04bf28
 (HT's leg, same datasets t/k/ε/τ/ρ_u; t offset +0.2 to TurTLE absolute time, stated in attrs).
 Overlay: `comparison_overlay.png`. **RESULTS (both legs done 2026-08-28)**: k/ε identical at t₀,
 1e-10 relative through t ≈ 5, Lyapunov growth to the ±fluctuation level by t ≈ 20 (divergence
@@ -273,7 +273,7 @@ chosen for matching, not stability), wall 174 s vs the fixed-dt HT leg's 265 s =
 for the same 36.8 t.u. RESULTS: statistical identity — ρ_u within 5e-6…1e-5 through the decay;
 k/ε track at 1e-6–1e-5 rel through t ≈ 5 (truncation-seeded ~6e-7 at t = 1: different tableaux
 at different steps — vs 1e-12 for the matched pair, a clean seed ladder), window ε̄ within 0.2%,
-k̄ within 3%. Files: `gbgit_rk4adaptive_reference_data.h5` (irregular t grid = τ grid;
+k̄ within 3%. Files: `ht_rk4adaptive_reference_data.h5` (irregular t grid = τ grid;
 self-describing attrs), overlay `comparison_overlay_rk4.png`, leg script `ht_leg_rk4.jl`.
 PUBLISHED (owner-directed 2026-08-31): the page's "Robustness across integrators" section,
 scripts in `validation/` (`ht_leg_rk4.jl`, `overlay_plots_rk4.py`), overlay in `docs/src/assets/`,
