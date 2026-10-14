@@ -113,8 +113,26 @@ end
   @test ou.forcing_variance ≈ s.dissipation / ou.correlation_time rtol = 1e-12
   # A stated strength is kept, not overwritten.
   @test run(Linear(rate = 0.25)).rate == 0.25
-  # The deferred StochasticOU needs the run to convert its time; built alone it is refused by name.
+  # The deferred StochasticOU needs the run to convert a time in box units; built alone it is refused
+  # by name, while one stating the time itself builds anywhere.
   @test_throws ArgumentError StochasticOU(; correlation_time_in_box_units = 0.3)(d)
+  @test StochasticOU(; forcing_variance = 0.1, correlation_time = 0.3)(d).correlation_time == 0.3
+  @test run(StochasticOU(; correlation_time = 0.3)).correlation_time == 0.3
+  @test_throws ArgumentError StochasticOU(; correlation_time = 0.3, correlation_time_in_box_units = 0.3)
+  @test_throws ArgumentError StochasticOU(; forcing_variance = 0.1)
+end
+
+
+@testset "a StochasticOU seed left out follows the run's rng" begin
+  d = domain_of(24)
+  seed_of(rng; kw...) = quietly(() -> Simulation(d; κ_max_η = 1.5, rng,
+    velocity_forcing = StochasticOU(; correlation_time_in_box_units = 0.3, kw...))).generator.conditions.velocity_forcing.seed
+  @test seed_of(Xoshiro(5)) == seed_of(Xoshiro(5))       # one stream repeats the whole run
+  @test seed_of(Xoshiro(5)) != seed_of(Xoshiro(6))       # another stream is another realization
+  @test seed_of(Xoshiro(5); seed = 11) == 11             # a stated seed is kept
+  # Built on a domain, an omitted seed is a fresh draw rather than one shared by every run.
+  @test StochasticOU(d; forcing_variance = 0.1, correlation_time = 0.3).seed !=
+        StochasticOU(d; forcing_variance = 0.1, correlation_time = 0.3).seed
 end
 
 

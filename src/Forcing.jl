@@ -65,8 +65,10 @@ Which keywords carry defaults follows one test: **does the value come from the m
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
 the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
-equally valid realization, so it defaults, and naming it is how a run is repeated. A default at this
-layer never hides a choice you needed to make.
+equally valid realization, so one omitted is drawn — from the run's `rng` when a
+[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds the forcing, from the
+global stream otherwise — and naming it is how a run is repeated. A default at this layer never
+hides a choice you needed to make.
 
 The one relaxation is the run's own: a deferred velocity forcing may leave its target out, and the
 run fills it from the stationary state it is set up for — the value still comes from the run, not
@@ -172,8 +174,9 @@ which take no domain,
     VarianceController(; target = nothing, gain = 1, turnover_time = nothing,
                        lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target = nothing, over, lowest_shell = 1, highest_shell = 2)
-    StochasticOU(; forcing_variance = nothing, correlation_time_in_box_units,
-                 lowest_shell = 1, highest_shell = 2, seed = 42)
+    StochasticOU(; forcing_variance = nothing, correlation_time = nothing,
+                 correlation_time_in_box_units = nothing, lowest_shell = 1, highest_shell = 2,
+                 seed = nothing)
     Linear(; rate = nothing, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` holding their keywords. It is built into the concrete
@@ -197,10 +200,11 @@ run is set up for:
 
 The state, and ``k_{\\mathrm{band}}`` with it, is the one
 [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state)
-returns. The deferred `StochasticOU` states its correlation time in box units, as a multiple of
+returns. The deferred `StochasticOU` may state its correlation time in box units, as a multiple of
 ``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_L`` the strategy
-holds. A scalar forcing states its target, since the run models no scalar state. Otherwise the
-keywords and defaults are those of the `domain`-taking forms documented on each strategy.
+holds; its `seed`, left out, is drawn from the run's `rng`. A scalar forcing states its target,
+since the run models no scalar state. Otherwise the keywords and defaults are those of the
+`domain`-taking forms documented on each strategy.
 
 # Examples
 ```julia
@@ -1107,9 +1111,10 @@ end
 
 """
     StochasticOU(domain; forcing_variance, correlation_time, lowest_shell = 1,
-                 highest_shell = 2, seed = 42)
-    StochasticOU(; forcing_variance = nothing, correlation_time_in_box_units,
-                 lowest_shell = 1, highest_shell = 2, seed = 42)
+                 highest_shell = 2, seed = rand(Int))
+    StochasticOU(; forcing_variance = nothing, correlation_time = nothing,
+                 correlation_time_in_box_units = nothing, lowest_shell = 1, highest_shell = 2,
+                 seed = nothing)
 
 The stochastic forcing of Eswaran & Pope (1988), built on the [`FixedDomain`](@ref) `domain`: a random term,
 correlated over a finite time, added to the right-hand side on a band of low wavenumbers.
@@ -1165,13 +1170,17 @@ order, but the forcing itself is resolved in time only step by step, so ``T_L`` 
   deferred velocity forcing may leave it out, and the run then supplies ``\\varepsilon/T_L``, the
   variance whose estimated injection matches its stationary ``\\varepsilon``.
 - `correlation_time` — the correlation time ``T_L`` of each amplitude. The deferred form takes
-  `correlation_time_in_box_units` instead, a multiple ``\\tilde{T}_L`` of ``(L^{2}/\\varepsilon)^{1/3}``, and
-  a run converts it once into ``T_L = \\tilde{T}_L (L^{2}/\\varepsilon)^{1/3}`` from its predicted ``\\varepsilon``.
+  either it or `correlation_time_in_box_units`, a multiple ``\\tilde{T}_L`` of
+  ``(L^{2}/\\varepsilon)^{1/3}`` that a run converts once into
+  ``T_L = \\tilde{T}_L (L^{2}/\\varepsilon)^{1/3}`` from its predicted ``\\varepsilon``; exactly one of
+  the two.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of ``\\kappa_0``;
   every mode of the band must lie inside the dealias cutoff, so the `Inf` the field-multiplying
   strategies accept is refused here.
-- `seed = 42` — fixes the random stream. A velocity and a scalar forcing given the same seed still draw
-  independent streams.
+- `seed` — fixes the random stream; left out, it is drawn from the run's `rng` when a
+  [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds the forcing, and
+  from the global stream (`rand(Int)`) when the forcing is built on a domain. A velocity and a
+  scalar forcing given the same seed still draw independent streams.
 
 The process lives in the run's state, not in this strategy. A run keeps it as a
 [`StochasticOUState`](@ref) — the `modeled` entry of its
@@ -1281,7 +1290,7 @@ end
 
 
 function StochasticOU(domain::FixedDomain; forcing_variance::Real, correlation_time::Real,
-                      lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42)
+                      lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = rand(Int))
   # Cast to the domain's element type FIRST, so the guards certify the stored values. Both are
   # documented non-negative: every draw is scaled by the variance's square root, so a negative one
   # surfaced as a bare `DomainError` from `sqrt` two frames away, naming nothing the caller had typed.
@@ -1428,20 +1437,26 @@ _completed(d::DeferredForcing{Linear}, design) =
     _fill(d.parameters, :rate, _from_design(design, :dissipation, :Linear, :rate) /
                                (2 * _from_design(design, :band_kinetic_energy, :Linear, :rate))) :
     d.parameters
-# The correlation time is stated in box units, (L²/ε)^{1/3}, and converted once here; the strategy then
-# holds a constant time, as its exact decay factor exp(−Δt/T_L) needs.
+# A correlation time stated in box units, (L²/ε)^{1/3}, is converted once here; the strategy then
+# holds a constant time, as its exact decay factor exp(−Δt/T_L) needs. A seed left out is drawn here
+# from the global stream; a `Simulation` has filled it from its own `rng` before this runs.
 function _completed(d::DeferredForcing{StochasticOU}, design)
-  (design === nothing || !haskey(design, :box_time) || design.box_time === nothing) &&
-    throw(ArgumentError("`StochasticOU(; …)` states its correlation time in box units, (L²/ε)^{1/3}, " *
-                        "and nothing here supplies ε to convert it: only a `Simulation` does, from " *
-                        "the stationary state it sets up for the velocity. Build it on a domain " *
-                        "with `correlation_time` instead."))
   p = d.parameters
-  correlation_time = p.correlation_time_in_box_units * design.box_time
+  if p.correlation_time !== nothing
+    correlation_time = p.correlation_time
+  else
+    (design === nothing || !haskey(design, :box_time) || design.box_time === nothing) &&
+      throw(ArgumentError("`StochasticOU(; …)` states its correlation time in box units, (L²/ε)^{1/3}, " *
+                          "and nothing here supplies ε to convert it: only a `Simulation` does, from " *
+                          "the stationary state it sets up for the velocity. State `correlation_time` " *
+                          "instead."))
+    correlation_time = p.correlation_time_in_box_units * design.box_time
+  end
   forcing_variance = p.forcing_variance === nothing ?
     _from_design(design, :dissipation, :StochasticOU, :forcing_variance) / correlation_time :
     p.forcing_variance
-  return (; forcing_variance, correlation_time, p.lowest_shell, p.highest_shell, p.seed)
+  seed = p.seed === nothing ? rand(Int) : p.seed
+  return (; forcing_variance, correlation_time, p.lowest_shell, p.highest_shell, seed)
 end
 
 # What a forcing states about the run's stationary state: `(; kinetic_energy = k)` or
@@ -1488,10 +1503,19 @@ VarianceController(; target::Union{Nothing, Real} = nothing, gain::Real = 1, tur
                    lowest_shell::Integer = 1, highest_shell::Real = 2) =
   DeferredForcing{VarianceController}((; target, gain, turnover_time, lowest_shell, highest_shell))
 
-StochasticOU(; forcing_variance::Union{Nothing, Real} = nothing, correlation_time_in_box_units::Real,
-             lowest_shell::Integer = 1, highest_shell::Real = 2, seed::Integer = 42) =
-  DeferredForcing{StochasticOU}((; forcing_variance, correlation_time_in_box_units, lowest_shell,
-                                 highest_shell, seed))
+function StochasticOU(; forcing_variance::Union{Nothing, Real} = nothing,
+                      correlation_time::Union{Nothing, Real} = nothing,
+                      correlation_time_in_box_units::Union{Nothing, Real} = nothing,
+                      lowest_shell::Integer = 1, highest_shell::Real = 2,
+                      seed::Union{Nothing, Integer} = nothing)
+  # Exactly one statement of the correlation time, checked at naming rather than at the run.
+  count(!isnothing, (correlation_time, correlation_time_in_box_units)) == 1 ||
+    throw(ArgumentError("give exactly one of `correlation_time` (the time T_L itself) or " *
+                        "`correlation_time_in_box_units` (a multiple of (L²/ε)^{1/3} the run converts)"))
+  return DeferredForcing{StochasticOU}((; forcing_variance, correlation_time,
+                                       correlation_time_in_box_units, lowest_shell, highest_shell,
+                                       seed))
+end
 
 
 
@@ -1541,17 +1565,24 @@ Base.show(io::IO, state::StochasticOUState) =
         state.draws == 1 ? " draw" : " draws", ")")
 
 # The closure has no readable form; the display says what the value is waiting for.
-# The one keyword a run can fill, per strategy — so only that `nothing` reads "from the run"; any
-# other `nothing` (a controller's `turnover_time`) is the strategy's own default and prints as given.
-_design_keyword(::Type) = nothing
-_design_keyword(::Type{ConstantPower}) = :injection_rate
-_design_keyword(::Type{VarianceController}) = :target
-_design_keyword(::Type{VarianceRescaling}) = :target
-_design_keyword(::Type{StochasticOU}) = :forcing_variance
+# The keywords a run fills, per strategy — so only those `nothing`s read "from the run"; any other
+# `nothing` (a controller's `turnover_time`) is the strategy's own default and prints as given. The
+# member of an either-or pair that was not given is left out rather than printed as `nothing`.
+_run_filled(::Type) = ()
+_run_filled(::Type{ConstantPower}) = (:injection_rate,)
+_run_filled(::Type{VarianceController}) = (:target,)
+_run_filled(::Type{VarianceRescaling}) = (:target,)
+_run_filled(::Type{Linear}) = (:rate,)
+_run_filled(::Type{StochasticOU}) = (:forcing_variance, :seed)
+_either_or(::Type) = ()
+_either_or(::Type{StochasticOU}) = (:correlation_time, :correlation_time_in_box_units)
 
 function Base.show(io::IO, d::DeferredForcing{F}) where {F}
-  parts = [v === nothing && k === _design_keyword(F) ? "$k from the run" : "$k = $(repr(v))"
-           for (k, v) in pairs(d.parameters)]
+  parts = String[]
+  for (k, v) in pairs(d.parameters)
+    v === nothing && k in _either_or(F) && continue
+    push!(parts, v === nothing && k in _run_filled(F) ? "$k from the run" : "$k = $(repr(v))")
+  end
   print(io, "DeferredForcing(", nameof(F), "(", join(parts, ", "), "))")
 end
 

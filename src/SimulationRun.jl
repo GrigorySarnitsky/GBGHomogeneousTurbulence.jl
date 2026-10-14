@@ -58,7 +58,7 @@ using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness,
                      reynolds_box, reynolds_taylor
 using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, VarianceRescaling,
-                 VarianceController, StochasticOUState, initial_forcing_state,
+                 VarianceController, StochasticOU, StochasticOUState, initial_forcing_state,
                  kinetic_energy_in_box_units, band_energy_fraction, _uncovered_reason, _stated_state,
                  _takes_design
 using ..Generator: FlowConditions, ResolvedGenerator, scalar_diffusivity
@@ -295,8 +295,8 @@ The run group, `kwargs...` in both signatures
   groups tracers by — small beside the
   `(M, 3)` positions of the ``M`` tracers — and nothing of it is persisted: a restored run rebuilds it from the
   restored positions.
-- `rng` — the random stream for the initial condition and the tracer seeding (defaults to
-  `Random.default_rng()`).
+- `rng` — the random stream for the initial condition, the tracer seeding, and the seed of a
+  `StochasticOU` forcing named without one (defaults to `Random.default_rng()`).
 - `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in place of the
   random seed, which is how a run continues from a stored or externally imported field. Its arrays
   become the run's own and are not copied, so two runs must not adopt one state object. Four rules
@@ -400,6 +400,13 @@ end
 _materialize_forcing(f::AbstractForcing, ::FixedDomain, design) = f
 _materialize_forcing(f::DeferredForcing, domain::FixedDomain, design) = f(domain, design)
 _materialize_forcing(f, domain::FixedDomain, design) = f(domain)
+
+# A deferred `StochasticOU` named without a seed takes one from the run's `rng`, so that one stream
+# varies or repeats the whole run — the fields, the tracers and the forcing together (decision 107).
+_seeded(spec, rng) = spec
+_seeded(d::DeferredForcing{StochasticOU}, rng) =
+  d.parameters.seed === nothing ?
+    DeferredForcing{StochasticOU}(merge(d.parameters, (; seed = rand(rng, Int)))) : d
 
 
 # The member of the run's state the velocity forcing holds exactly — whether it states it or takes it
@@ -688,6 +695,7 @@ function Simulation(domain::FixedDomain;
   # returns; a built strategy states its own strength.
   velocity_spec = velocity_forcing isa Union{AbstractForcing, DeferredForcing} ? velocity_forcing :
                   velocity_forcing(domain)
+  velocity_spec = _seeded(velocity_spec, rng)
   # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
   if !isnothing(viscosity) && !isnothing(κ_max_η)
     throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
@@ -738,7 +746,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     _warn_derived_viscosity_forcing_mismatch(vf, design)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = vf,
-                    scalar_forcing = _materialize_forcing(scalar_forcing, domain,
+                    scalar_forcing = _materialize_forcing(_seeded(scalar_forcing, rng), domain,
                                                           (; box_time = design.box_time)))
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).
