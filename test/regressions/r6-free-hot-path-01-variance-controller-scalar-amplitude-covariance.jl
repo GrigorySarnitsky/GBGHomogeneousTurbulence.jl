@@ -16,8 +16,8 @@ function scaled_scalar_pair(turnover_time)
   # scalar by sqrt(scalar_variance/current), a power-of-two ratio here, so φ_B(0) = 2·φ_A(0)
   # bit-exactly. The scalar is passive, so velocities and the CFL dt stay bit-identical.
   make(scalar_variance, target) =
-    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2, scalar = true, scalar_variance,
-               scalar_forcing = VarianceController(; target, turnover_time),
+    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2,
+               scalar = PassiveScalar(variance = scalar_variance, forcing = VarianceController(; target, turnover_time)),
                rng = MersenneTwister(42))
   simA = make(1.0, 1.0)
   simB = make(4.0, 4.0)
@@ -48,8 +48,8 @@ end
   # The ruling: a defaulted-turnover_time controller bound as `scalar_forcing` is refused with a
   # named ArgumentError at the one seam every construction path crosses (`FlowConditions`).
   err = try
-    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2, scalar = true,
-               scalar_forcing = VarianceController(; target = 1.0), rng = MersenneTwister(42))
+    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2,
+               scalar = PassiveScalar(forcing = VarianceController(; target = 1.0)), rng = MersenneTwister(42))
     nothing
   catch e
     e

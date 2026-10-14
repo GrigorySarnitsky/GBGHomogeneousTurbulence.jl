@@ -22,8 +22,8 @@ carrying a NaN scalar field). Only the last is a defect.
 function schmidt_outcome(schmidt)
   local sim
   try
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.01, schmidt = schmidt,
-                     scalar = true, velocity_forcing = NoForcing(), scalar_forcing = NoForcing(),
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.01,
+                     scalar = PassiveScalar(schmidt = schmidt, forcing = NoForcing()), velocity_forcing = NoForcing(),
                      rng = MersenneTwister(1))
     advance!(sim)
   catch
@@ -44,13 +44,11 @@ end
   # bad argument is named at its source rather than surfacing far downstream. Sc = ν/ϰ is positive
   # by definition, so the same guard belongs on it.
   @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.01,
-                                        schmidt = 0.0, scalar = true,
+                                        scalar = PassiveScalar(schmidt = 0.0, forcing = NoForcing()),
                                         velocity_forcing = NoForcing(),
-                                        scalar_forcing = NoForcing(),
                                         rng = MersenneTwister(1))
   @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.01,
-                                        schmidt = -1.0, scalar = true,
+                                        scalar = PassiveScalar(schmidt = -1.0, forcing = NoForcing()),
                                         velocity_forcing = NoForcing(),
-                                        scalar_forcing = NoForcing(),
                                         rng = MersenneTwister(1))
 end

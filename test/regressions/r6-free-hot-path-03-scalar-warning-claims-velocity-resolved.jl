@@ -8,7 +8,7 @@ using Test: collect_test_logs
 # under-resolution, shared equally by the velocity, to the scalar's Batchelor scale.
 @testset "the scalar under-resolution warning never claims the velocity resolved at a κ_max·η below its own 1.5 floor" begin
   logs, _ = collect_test_logs(min_level = Base.CoreLogging.Warn) do
-    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2, scalar = true,
+    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2, scalar = PassiveScalar(),
                  rng = MersenneTwister(1))
   end
   warnings = [l.message for l in logs if occursin("under-resolved", l.message)]

@@ -116,7 +116,7 @@ end
   # A multistep tracer scheme past its bootstrap, a scalar, and the unwrapped record: the
   # configuration where every stored piece — state, positions, unwrapped record, and the sample
   # history — is load-bearing for the continuation below.
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    number_of_particles = 6, unwrapped = true,
                    particle_integration_scheme = AdamsBashforth(order = 2),
                    rng = MersenneTwister(7))
@@ -212,7 +212,7 @@ end
 
 @testset "an adopted state and tracer set continue a run bitwise (decision 83)" begin
   path = tempname() * ".h5"
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    number_of_particles = 5, rng = MersenneTwister(21))
   for _ in 1:3
     advance!(sim; dt = 0.01)
@@ -225,7 +225,7 @@ end
   tr = h5open(io -> read_tracers(io, "t", sim.domain), path, "r")
   # Same physics settings, the evolved state and positions ADOPTED: from here the two runs are the
   # same discrete system, so three more steps must agree bitwise (deterministic default forcing).
-  sim2 = Simulation(sim.domain; viscosity = 0.05, scalar = true, state = st, tracers = tr)
+  sim2 = Simulation(sim.domain; viscosity = 0.05, scalar = PassiveScalar(), state = st, tracers = tr)
   for _ in 1:3
     advance!(sim; dt = 0.01)
     advance!(sim2; dt = 0.01)
@@ -246,7 +246,7 @@ end
   # Two ways to set the same thing, and property-of-the-adopted-object settings:
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st,
                                         initial_spectrum = κ -> κ^-2)
-  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st, scalar = true)
+  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st, scalar = PassiveScalar())
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st_scalar)
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, tracers = tr,
                                         number_of_particles = 3)
@@ -286,9 +286,10 @@ end
 
 @testset "a stochastically forced run continues the same realization bitwise (decision 90)" begin
   path = tempname() * ".h5"
-  build() = Simulation(make_domain(); viscosity = 0.05, scalar = true, rng = MersenneTwister(4),
-                       velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3, seed = 2),
-                       scalar_forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3, seed = 2))
+  build() = Simulation(make_domain(); viscosity = 0.05,
+                       scalar = PassiveScalar(forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3, seed = 2)),
+                       rng = MersenneTwister(4),
+                       velocity_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3, seed = 2))
   uninterrupted = build()
   checkpointed = build()
   for _ in 1:4

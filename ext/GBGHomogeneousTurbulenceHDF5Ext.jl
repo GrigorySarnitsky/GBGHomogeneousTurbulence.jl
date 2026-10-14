@@ -26,7 +26,7 @@ using GBGHomogeneousTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForc
 import GBGHomogeneousTurbulence.Forcing: write_forcing, read_forcing
 using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
 using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
-using GBGHomogeneousTurbulence.SimulationRun: Simulation
+using GBGHomogeneousTurbulence.SimulationRun: Simulation, PassiveScalar
 import GBGHomogeneousTurbulence.SimulationRun: write_simulation, read_simulation
 
 const SCHEMA_VERSION = 2
@@ -401,9 +401,13 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
   g = _require_group(parent, name, "read_simulation")
   a = _require_tag(g, name, "read_simulation", "GBGHomogeneousTurbulence.Simulation")
   domain = read_domain(g, "domain"; array_family)
-  scalar = Bool(a["scalar"])
+  carries_scalar = Bool(a["scalar"])
   velocity_forcing = read_forcing(g, "velocity_forcing", domain)
-  scalar_forcing = read_forcing(g, "scalar_forcing", domain)
+  # The state is adopted below, so the stored scalar's variance is its own; the settings carry
+  # what the run needs beside it, the Schmidt number and the forcing.
+  scalar = carries_scalar ?
+    PassiveScalar(schmidt = a["schmidt"], forcing = read_forcing(g, "scalar_forcing", domain)) :
+    nothing
   ftag = a["field_integration_scheme"]
   field_integration_scheme = ftag == "IFLowStorageRK3" ? IFLowStorageRK3() :
                              ftag == "IFHeun" ? IFHeun() :
@@ -416,9 +420,9 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
   # used (2026-10-01).
   sg = _require_group(g, "state", "read_simulation")
   _require_tag(sg, "state", "read_simulation", "GBGHomogeneousTurbulence.ResolvedFields")
-  state = ResolvedFields(domain; scalar)
+  state = ResolvedFields(domain; scalar = carries_scalar)
   _load_field!(state.velocity_spectral, sg, "velocity_spectral", "read_simulation")
-  scalar && _load_field!(state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
+  carries_scalar && _load_field!(state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
   has_tracers = haskey(g, "tracers")
   if has_tracers
     tg = _require_group(g, "tracers", "read_simulation")
@@ -431,17 +435,16 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
       ptag == "AdamsBashforth" ? AdamsBashforth(order = Int(a["particle_scheme_order"])) :
       throw(ArgumentError("read_simulation: unrecognized particle scheme tag \"$ptag\" in " *
                           "group \"$name\""))
-    sim = Simulation(domain; viscosity = a["viscosity"], schmidt = a["schmidt"], scalar,
-                     velocity_forcing, scalar_forcing, field_integration_scheme,
-                     cfl = a["cfl"], max_dt = a["max_dt"],
+    sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
+                     field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"],
                      number_of_particles = npoints(positions_host), interpolation_scheme,
                      unwrapped, particle_integration_scheme, ordered_interpolation, state)
   else
     # Forwarded here too, so a traversal setting on a tracer-free file meets the constructor's
     # by-name refusal rather than being silently dropped.
-    sim = Simulation(domain; viscosity = a["viscosity"], schmidt = a["schmidt"], scalar,
-                     velocity_forcing, scalar_forcing, field_integration_scheme,
-                     cfl = a["cfl"], max_dt = a["max_dt"], ordered_interpolation, state)
+    sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
+                     field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"],
+                     ordered_interpolation, state)
   end
   # The announcements and the closing deposits replay the constructor's schedule over the adopted
   # state, so every derived slot is recomputed rather than read. Order is load-bearing:

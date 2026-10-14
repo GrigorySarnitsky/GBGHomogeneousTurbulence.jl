@@ -89,7 +89,7 @@ using Test
   # reaches a deposited observable through `sim.cache` and the state through `sim.state`, so this
   # exercises the out-of-band announce/re-deposit cycle on those two directly.
   @testset "the announce/re-deposit cycle on a live run" begin
-    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = false, rng = MersenneTwister(4))
+    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; rng = MersenneTwister(4))
     u = velocity_physical(sim.cache)                                # the constructor's seeding deposit
     @test u === velocity_physical(sim.cache)
     random_solenoidal_velocity_spectral!(sim.state.velocity_spectral, sim.domain, 0.9;

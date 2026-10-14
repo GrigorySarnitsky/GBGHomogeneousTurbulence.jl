@@ -20,7 +20,7 @@ using GBGHomogeneousTurbulence
   @test step!(s3.field_integration_scheme, s3.state, s3.generator, s3.domain, s3.buffers, s3.cache, 1e-3) === s3.state
 
   # IFHeun, with the passive scalar — the second in-tree method, same promise.
-  s2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+  s2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                   field_integration_scheme = IFHeun(), rng = MersenneTwister(1))
   @test step!(s2.field_integration_scheme, s2.state, s2.generator, s2.domain, s2.buffers, s2.cache, 1e-3) === s2.state
 end

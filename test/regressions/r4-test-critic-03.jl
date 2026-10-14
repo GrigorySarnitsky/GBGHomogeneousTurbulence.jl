@@ -5,38 +5,39 @@
 # guard, which has test/regressions/r3-02-edge-cases-02.jl. This file asserts the behaviour the
 # guard is supposed to have: a negative ⟨φ²⟩ is rejected with an `ArgumentError` naming the
 # keyword, and the boundary value 0 — a physically valid zero-variance scalar — is accepted, so
-# that a later `>` -for- `>=` slip cannot pass in silence.
+# that a later `>` -for- `>=` slip cannot pass in silence. Since 2026-10-14 the variance is
+# `PassiveScalar`'s `variance`, and the guard lives there.
 
 using Test, GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
-@testset "`Simulation` rejects a negative `scalar_variance` and accepts the zero boundary" begin
+@testset "a negative scalar `variance` is rejected and the zero boundary accepted" begin
   # Explicit-viscosity mode.
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
-                                        scalar = true, scalar_variance = -1.0)
+                                        scalar = PassiveScalar(variance = -1.0))
 
   # The ν derivation (the default route) must reject it just as early.
   @test_throws ArgumentError Simulation(grid_points_per_axis = 8,
-                                        scalar = true, scalar_variance = -1.0)
+                                        scalar = PassiveScalar(variance = -1.0))
 
-  # The check is a precondition of the keyword, not of the `scalar` switch: it must fire even
-  # when no scalar field is allocated, so a typo cannot be silently ignored.
-  @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
-                                        scalar_variance = -1.0)
+  # The old `scalar_variance` keyword no longer exists on `Simulation`, so a variance given to a
+  # scalar-free run is a call error rather than a setting silently ignored.
+  @test_throws MethodError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
+                                      scalar_variance = -1.0)
 
   # The message must name the keyword at fault.
   msg = try
-    Simulation(grid_points_per_axis = 8, viscosity = 0.05, scalar = true, scalar_variance = -1.0)
+    Simulation(grid_points_per_axis = 8, viscosity = 0.05, scalar = PassiveScalar(variance = -1.0))
     ""
   catch e
     sprint(showerror, e)
   end
-  @test occursin("scalar_variance", msg)
+  @test occursin("variance", msg)
 
   # The boundary: ⟨φ²⟩ = 0 is a valid state (an identically-zero passive scalar), so `>=` must
   # admit it — and the resulting field must be finite, not a 0/0 from the seeder's rescaling.
   sim = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
-                   scalar = true, scalar_variance = 0.0)
+                   scalar = PassiveScalar(variance = 0.0))
   @test scalar_variance(sim.state.scalar_spectral) == 0.0
   @test all(isfinite, Array(field_data(sim.state.scalar_spectral)))
 end

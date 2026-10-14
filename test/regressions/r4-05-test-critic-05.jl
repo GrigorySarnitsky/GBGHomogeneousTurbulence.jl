@@ -19,8 +19,8 @@ using Test
 @testset "flow_parameters composes the scalar diffusivity as ϰ = ν/Sc on a scalar-carrying run" begin
   ν  = 0.02
   Sc = 0.7                                   # away from 1: ν/Sc ≠ ν·Sc ≠ ν
-  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, schmidt = Sc,
-                   scalar = true, scalar_variance = 1.0,
+  sim = Simulation(grid_points_per_axis = 16, viscosity = ν,
+                   scalar = PassiveScalar(schmidt = Sc, variance = 1.0),
                    velocity_forcing = ConstantPower(injection_rate = 0.1),
                    rng = MersenneTwister(1234))
   for _ in 1:5

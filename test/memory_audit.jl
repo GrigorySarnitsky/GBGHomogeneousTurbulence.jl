@@ -496,7 +496,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     # whichever object it hangs off, so residency can no longer be added anywhere unnoticed.
     for scheme in (:RK3, :RK4, :SSPRK3, :RK2), dealiasing in (:TwoThirds, :HouLi, :PhaseShift),
         scalar in (false, true), tracers in (0, 4)
-      sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar,
+      sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar = scalar ? PassiveScalar() : nothing,
                        velocity_forcing = NoForcing(), field_integration_scheme = _scheme(scheme),
                        number_of_particles = tracers, rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
@@ -689,7 +689,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
   @testset "the hot loop allocates nothing at field scale at the run layer" begin
     N = 32
     unit = 8 * N^3
-    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = true, rng = MersenneTwister(3))
+    sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; scalar = PassiveScalar(), rng = MersenneTwister(3))
     advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)
     @test (@allocated advance!(sim; dt = 1e-3)) <
           0.2 * unit + thread_allowance(sum(_transforms(_ops(:RK3, :TwoThirds, true))))
@@ -711,7 +711,8 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     N = 32
     for dealiasing in (TwoThirds(), HouLi(), PhaseShift()), scheme in (IFLowStorageRK3(), IFHeun()),
         scalar in (false, true)
-      sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing, scalar,
+      sim = Simulation(grid_points_per_axis = N, viscosity = 0.05; dealiasing,
+                       scalar = scalar ? PassiveScalar() : nothing,
                        field_integration_scheme = scheme, rng = MersenneTwister(1))
       advance!(sim; dt = 1e-3); advance!(sim; dt = 1e-3)          # warm before measuring
       transforms = sum(_transforms(_ops(scheme isa IFHeun ? :RK2 : :RK3, nameof(typeof(dealiasing)), scalar)))

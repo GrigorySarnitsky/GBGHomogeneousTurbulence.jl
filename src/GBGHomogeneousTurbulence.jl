@@ -190,6 +190,7 @@ using .Particles:
 
 using .SimulationRun:
   Simulation,
+  PassiveScalar,
   advance!,
   run!,
   warmup!,
@@ -288,6 +289,7 @@ export FixedDomain,
        new_vector_point_values,
        new_scalar_point_values,
        Simulation,
+       PassiveScalar,
        advance!,
        run!,
        warmup!,

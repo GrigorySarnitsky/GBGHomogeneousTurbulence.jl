@@ -31,7 +31,7 @@ physical_energy(u) = sum(abs2, field_data(u)) / (2 * prod(size(field_data(u))[1:
 
 @testset "the advanced state is projected onto real-field spectra: the parasitic mode cannot grow" begin
   @testset "a planted violation is removed by the next step, exactly, velocity and scalar" begin
-    sim = Simulation(grid_points_per_axis = 32, κ_max_η = 1.5, scalar = true, rng = MersenneTwister(1))
+    sim = Simulation(grid_points_per_axis = 32, κ_max_η = 1.5, scalar = PassiveScalar(), rng = MersenneTwister(1))
     û, φ̂ = sim.state.velocity_spectral, sim.state.scalar_spectral
     plant!(û, 2e-6)
     let data = field_data(φ̂), N = size(data, 2), δ = 2e-6 * maximum(abs, @view data[1, :, :])

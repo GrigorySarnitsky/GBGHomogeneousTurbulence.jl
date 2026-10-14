@@ -63,7 +63,7 @@ using GBGHomogeneousTurbulence
 # scheme, state, and initial condition — is built with defaults from a few numbers.
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  velocity_forcing = ConstantPower(injection_rate = 0.1),
-                 scalar = true, schmidt = 1.0)
+                 scalar = PassiveScalar(schmidt = 1.0))
 
 # Spin past the transient: advance until the running dissipation ε(t) stops drifting
 # (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).

@@ -155,6 +155,6 @@ end
   @test_throws ArgumentError Simulation(d; viscosity = 0.05, velocity_forcing = NoForcing(),
                                         initial_spectrum = model)
   # The scalar check measures the seeded field's ε instead of predicting one, and still runs.
-  @test (quietly(() -> Simulation(d; viscosity = 0.05, velocity_forcing = NoForcing(), scalar = true));
+  @test (quietly(() -> Simulation(d; viscosity = 0.05, velocity_forcing = NoForcing(), scalar = PassiveScalar()));
          true)
 end

@@ -31,7 +31,7 @@ end
 
 
 @testset "advance! refuses a non-finite scalar, naming the scalar rather than the velocity" begin
-  sim = Simulation(grid_points_per_axis = 12, viscosity = 0.05, scalar = true,
+  sim = Simulation(grid_points_per_axis = 12, viscosity = 0.05, scalar = PassiveScalar(),
                    rng = MersenneTwister(2))
   advance!(sim; dt = 1e-3)
   step_before, time_before = current_step(sim), current_time(sim)

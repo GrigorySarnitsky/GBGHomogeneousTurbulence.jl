@@ -19,7 +19,7 @@ using Test
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
                      velocity_forcing = domain -> ConstantPower(domain; injection_rate = 0.1),
-                     scalar = true, number_of_particles = 50, rng = MersenneTwister(1))
+                     scalar = PassiveScalar(), number_of_particles = 50, rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -52,8 +52,7 @@ using Test
   end
 
   @testset "free decay loses energy" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                     scalar = false, velocity_forcing = NoForcing(), rng = MersenneTwister(2))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; velocity_forcing = NoForcing(), rng = MersenneTwister(2))
     k0 = kinetic_energy(sim.state.velocity_spectral)
     run!(s -> current_step(s) < 40, sim)
     @test current_step(sim) == 40
@@ -99,7 +98,7 @@ using Test
   end
 
   @testset "the observation fires after every iteration — n iterations, n+1 observations" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(7))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(7))
     count = Ref(0)
     run!(sim) do s
       count[] += 1
@@ -118,14 +117,13 @@ using Test
   end
 
   @testset "Float32 case runs" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; element_type = Float32,
-                     scalar = false, rng = MersenneTwister(4))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; element_type = Float32, rng = MersenneTwister(4))
     run!(s -> current_step(s) < 10, sim)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
   end
 
   @testset "the display lists the run's settings and every callback read, and touches no slot" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = true,
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = PassiveScalar(),
                      number_of_particles = 8, rng = MersenneTwister(6))
     shown = sprint(show, MIME"text/plain"(), sim)
     @test occursin("16×16×16 cells", shown) && occursin("0.05", shown) && occursin("8 points", shown)
@@ -139,7 +137,7 @@ using Test
       @test occursin(read, shown)
     end
     @test occursin("φ̂ — the scalar", shown)
-    bare = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(6))
+    bare = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(6))
     shown = sprint(show, MIME"text/plain"(), bare)
     # A run without a scalar or particles shows no row about them — no placeholders — and nothing
     # that would compute is offered.
@@ -155,7 +153,7 @@ using Test
   end
 
   @testset "the observation must decide — a non-Bool return throws" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(5))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(5))
     @test_throws ArgumentError run!(s -> nothing, sim)     # recorded but did not decide
     @test current_step(sim) == 0                           # nothing advanced
   end
@@ -167,7 +165,7 @@ using Test
     end
     # ConstantPower(power=0.1) — no domain — works as a Simulation forcing
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1),
                      rng = MersenneTwister(20))
     run!(s -> current_step(s) < 5, sim)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -202,13 +200,13 @@ using Test
 
   @testset "warmup! detects stationarity" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.1),
                      rng = MersenneTwister(21))
     warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tolerance = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test current_step(sim) > 0
     # the criterion is an ordinary run! observation
-    sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(22))
+    sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(22))
     run!(StationarityCriterion(; gate_skewness = false, min_turnovers = 1, window_turnovers = 1,
                                tolerance = 0.5, max_turnovers = 4), sim2)
     @test current_step(sim2) > 0
@@ -218,13 +216,13 @@ using Test
     D = GBGHomogeneousTurbulence.SimulationRun
     forced = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                         velocity_forcing = ConstantPower(injection_rate = 0.1),
-                        scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3),
-                        scalar = true, rng = MersenneTwister(23))
+                        scalar = PassiveScalar(forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3)),
+                        rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
     warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tolerance = 0.35, max_turnovers = 10)
     @test isfinite(scalar_variance(forced.state.scalar_spectral)) && scalar_variance(forced.state.scalar_spectral) > 0
     @test current_step(forced) > 0
-    plain = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(24))
+    plain = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(24))
     @test !D._scalar_forced(plain)                                        # unforced scalar not gated
   end
 
@@ -253,7 +251,7 @@ using Test
 
   @testset "warmup! skewness gate runs" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
-                     velocity_forcing = ConstantPower(injection_rate = 0.15), scalar = false,
+                     velocity_forcing = ConstantPower(injection_rate = 0.15),
                      rng = MersenneTwister(31))
     warmup!(sim; min_turnovers = 2, window_turnovers = 2, tolerance = 0.3, skewness_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -271,14 +269,12 @@ using Test
     random_solenoidal_velocity_spectral!(seeded.velocity_spectral, d16, 0.5;
                                          envelope_wavenumber = 2.0, rng = MersenneTwister(40))
     sim = Simulation(d16; viscosity = 0.05,
-                     velocity_forcing = VarianceRescaling(target = 0.8, over = :total),
-                     scalar = false, state = seeded)
+                     velocity_forcing = VarianceRescaling(target = 0.8, over = :total), state = seeded)
     advance!(sim; dt = 0.01)
     @test kinetic_energy(sim.state.velocity_spectral) ≈ 0.8 rtol = 1e-3
     # :band (default) holds the band energy; the total is free to float
     simb = Simulation(grid_points_per_axis = 16, viscosity = 0.05;
-                      velocity_forcing = VarianceRescaling(target = 0.3, over = :band),
-                      scalar = false, kinetic_energy = 0.5, rng = MersenneTwister(40))
+                      velocity_forcing = VarianceRescaling(target = 0.3, over = :band), kinetic_energy = 0.5, rng = MersenneTwister(40))
     advance!(simb; dt = 0.01)
     @test isfinite(kinetic_energy(simb.state.velocity_spectral)) && kinetic_energy(simb.state.velocity_spectral) > 0
     # the target symbol is validated at construction

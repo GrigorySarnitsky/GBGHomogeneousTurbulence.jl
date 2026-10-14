@@ -35,46 +35,25 @@ const STEPS = 3
 
   # Control 1 — the instrument is sound: with `scalar = true` the generator does reach the hooks.
   spy_on = HookSpy()
-  sim_on = Simulation(grid_points_per_axis = N, viscosity = NU, scalar = true, scalar_forcing = spy_on)
+  sim_on = Simulation(grid_points_per_axis = N, viscosity = NU, scalar = PassiveScalar(forcing = spy_on))
   for _ in 1:STEPS
     advance!(sim_on)
   end
   @test spy_on.prepares == STEPS
   @test spy_on.applies == STEPS
 
-  # Control 2 — the matched configuration is untouched: `NoForcing()` with `scalar = false` builds.
-  @test Simulation(grid_points_per_axis = N, viscosity = NU, scalar = false,
-                   scalar_forcing = NoForcing()) isa Simulation
+  # Control 2 — the matched configuration is untouched: a scalar-free run builds.
+  @test Simulation(grid_points_per_axis = N, viscosity = NU) isa Simulation
 
-  # The claim. A non-`NoForcing` scalar forcing with `scalar = false` must be either rejected at
-  # construction or actually honoured — never accepted and left uninvoked.
+  # The claim. Since 2026-10-14 the scalar's forcing travels inside `PassiveScalar`, so a scalar
+  # forcing cannot be written for a scalar-free run at all: `Simulation` has no `scalar_forcing`
+  # keyword, and a scalar forcing given a scalar-free generator by hand is still refused by name.
   spy_off = HookSpy()
-  built = try
-    Simulation(grid_points_per_axis = N, viscosity = NU, scalar = false, scalar_forcing = spy_off)
-  catch err
-    err
-  end
-
-  if built isa ArgumentError
-    @test true                                    # rejected at construction: correct
-  else
-    @test built isa Simulation                    # anything else thrown is a different defect
-    for _ in 1:STEPS
-      advance!(built)
-    end
-    # Not rejected ⇒ it must have been honoured.
-    @test spy_off.prepares > 0
-    @test spy_off.applies > 0
-  end
-
-  # And the same statement made on the shipped strategy the hunter's plan names, without any spy:
-  # the run must not end up holding a `ConstantPower` it can never apply.
-  built2 = try
-    Simulation(grid_points_per_axis = N, viscosity = NU, scalar = false,
-               scalar_forcing = ConstantPower(injection_rate = 0.5))
-  catch err
-    err
-  end
-  @test built2 isa ArgumentError ||
-        (built2 isa Simulation && built2.state.scalar_spectral !== nothing)
+  @test_throws MethodError Simulation(grid_points_per_axis = N, viscosity = NU, scalar_forcing = spy_off)
+  @test spy_off.prepares == 0 && spy_off.applies == 0
+  domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
+                       element_type = Float64, array_family = Array)
+  conditions = FlowConditions(viscosity = NU, schmidt = 1.0, velocity_forcing = NoForcing(),
+                              scalar_forcing = ConstantPower(domain; injection_rate = 0.5))
+  @test_throws ArgumentError ResolvedGenerator(domain, conditions; scalar = false)
 end

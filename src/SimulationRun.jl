@@ -25,6 +25,8 @@ The run layer:
   defaults from a few numbers. It holds the present instant — plus the one bounded look-back a
   multistep particle scheme needs, the cache's Lagrangian sample history of earlier tracer
   velocities — and past instants exist only in what an observation recorded.
+- [`PassiveScalar`](@ref) — the passive scalar a run carries, with its Schmidt number, variance
+  and forcing, as `Simulation`'s `scalar` setting.
 - [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
@@ -83,6 +85,63 @@ end
 
 
 """
+    PassiveScalar(; schmidt = 1.0, variance = 1.0, forcing = NoForcing())
+
+The passive scalar ``\\varphi`` a run carries, given as the `scalar` setting of
+[`Simulation`](@ref): the run then advects a mean-zero scalar beside the velocity. A run built
+with `scalar = nothing` carries none, and no scalar setting can be given to it.
+
+# Arguments
+- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
+  ``\\varkappa = \\nu/\\mathrm{Sc}``). **The run's resolution criterion covers the velocity, not the
+  scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
+  ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
+  grid, with [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation)
+  then measuring a truncated field. The package targets ``\\mathrm{Sc} = O(1)``, with no
+  Batchelor-range machinery. `Simulation` **warns** when the run's ``\\kappa_{\\max}\\eta_B`` falls
+  below the ``1.5`` well-resolved floor — in either viscosity mode, since the check reads the
+  resolved ``\\nu`` however it was obtained — a warning, not an error, so a deliberately
+  under-resolved scalar stays reachable but not silent; the remedy is `κ_max_η` raised by
+  ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
+- `variance = 1.0` — the scalar variance ``\\langle\\varphi^{2}\\rangle``: the value the scalar is
+  seeded at, and the target a `forcing` holding the whole field's variance takes when its own is
+  left out — a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)
+  or a `VarianceRescaling(over = :total)` — as the velocity's `kinetic_energy` fills its forcing
+  (see [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). An adopted
+  `state` keeps the variance it holds.
+- `forcing = NoForcing()` — the scalar's forcing, an [`AbstractForcing`](@ref) or a
+  `DeferredForcing`; the velocity and the scalar are forced independently. No scalar stationary
+  state is modelled, so a forcing needing one — a `VarianceRescaling(over = :band)` target, a
+  `Linear` rate, a `StochasticOU` variance — states it. A deferred `StochasticOU` takes the
+  flow's box time for a correlation time in box units.
+
+# Fields
+- `schmidt`, `variance`, `forcing` — the settings above.
+"""
+struct PassiveScalar{F}
+  schmidt::Float64
+  variance::Float64
+  forcing::F
+end
+
+function PassiveScalar(; schmidt::Real = 1.0, variance::Real = 1.0, forcing = NoForcing())
+  # Both are checked where they are named: the diffusivity is ν/Sc, and the seeder scales the draw
+  # by √(variance/current), so a bad value would otherwise surface as a DomainError far downstream.
+  schmidt > 0 ||
+    throw(ArgumentError("`schmidt` must be positive, got $schmidt: the scalar diffusivity is ν/Sc"))
+  variance >= 0 ||
+    throw(ArgumentError("`variance` must be non-negative, got $variance: it is ⟨φ²⟩"))
+  return PassiveScalar(Float64(schmidt), Float64(variance), forcing)
+end
+
+# Display (the convention is stated once, at `SimulationDomain`'s display section): the
+# round-tripping constructor call, the forcing through its own display.
+Base.show(io::IO, scalar::PassiveScalar) =
+  print(io, "PassiveScalar(schmidt = ", scalar.schmidt, ", variance = ", scalar.variance,
+        ", forcing = ", scalar.forcing, ")")
+
+
+"""
     Simulation(; grid_points_per_axis, κ_max_η = nothing, kinetic_energy = nothing,
                  dissipation = nothing, side_length = 2π, dealiasing = TwoThirds(),
                  element_type = Float64, array_family = Array, kwargs...)
@@ -98,8 +157,8 @@ clock.
 
 The two forms differ only in where the `FixedDomain` comes from. The first is
 **domain-building**: from `grid_points_per_axis` and `side_length` it builds the domain and every
-piece above it, seeds a divergence-free velocity (and, with `scalar = true`,
-a mean-zero scalar ``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
+piece above it, seeds a divergence-free velocity (and, given a `scalar`, a mean-zero scalar
+``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
 **domain-taking**: the same assembly on a `FixedDomain` you built yourself.
 
 Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref). Read its measured state by
@@ -205,28 +264,15 @@ The run group, `kwargs...` in both signatures
   ``u' = \\sqrt{2k/3} = 1``. The member not given is predicted through ``\\tilde{k}``. An unforced run
   may give both, as its initial state. The velocity is seeded at the state's ``k``; to start from
   another energy, adopt a `state`.
-- `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
-  ``\\varkappa = \\nu/\\mathrm{Sc}``). **The resolution criterion covers the velocity, not the
-  scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
-  ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
-  grid, with [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation) then measuring a truncated field. The package targets
-  ``\\mathrm{Sc} = O(1)``, with no Batchelor-range machinery. The constructor **warns** when the
-  run's ``\\kappa_{\\max}\\eta_B`` falls below the ``1.5`` well-resolved floor — in **either**
-  viscosity mode, since the check reads the resolved ``\\nu`` however it was obtained — a warning,
-  not an error, so a deliberately under-resolved scalar stays reachable but not silent; the remedy
-  is `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
-- `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
-  ``\\varphi``), and its initial variance.
-- `velocity_forcing = ConstantPower()`, `scalar_forcing = NoForcing()` — an
-  [`AbstractForcing`](@ref) (or a `DeferredForcing`, a forcing named by its keywords before the
-  domain exists); the default velocity forcing injects the state's ``\\varepsilon``. A deferred velocity forcing may leave its strength out for the state to fill; a
-  scalar forcing states its own, since no scalar state is modelled. The velocity and scalar are forced independently.
-  A [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) with a defaulted `turnover_time` is refused as `scalar_forcing` (its
-  derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
-  explicitly there.
-  A velocity forcing's stated target is a statement of the run's state, so giving
-  `kinetic_energy` or `dissipation` beside it is refused; under a derived ``\\nu``, one that holds neither
-  quantity draws the warning above.
+- `scalar = nothing` — the passive scalar the run carries, a [`PassiveScalar`](@ref) with its
+  Schmidt number, seeded variance and forcing; `nothing` carries none, and no scalar setting can
+  then be given.
+- `velocity_forcing = ConstantPower()` — the velocity forcing, an [`AbstractForcing`](@ref) (or a
+  `DeferredForcing`, a forcing named by its keywords before the domain exists); the default injects
+  the state's ``\\varepsilon``. A deferred forcing may leave its strength out for the state to fill.
+  A stated target is a statement of the run's state, so giving `kinetic_energy` or `dissipation`
+  beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
+  warning above.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
   condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
@@ -331,7 +377,7 @@ sim = Simulation(grid_points_per_axis = 128, velocity_forcing = VarianceControll
 
 # Supplied viscosity — set ν directly, carry a passive scalar, force at constant power:
 sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
-                 scalar = true, velocity_forcing = ConstantPower(injection_rate = 0.1))
+                 scalar = PassiveScalar(), velocity_forcing = ConstantPower(injection_rate = 0.1))
 
 # Domain-taking — build the domain yourself, then hand it over:
 domain = FixedDomain(; grid_points_per_axis = 128, side_length = 2π,
@@ -618,12 +664,10 @@ function Simulation(domain::FixedDomain;
                     kinetic_energy::Union{Nothing, Real} = nothing,
                     dissipation::Union{Nothing, Real} = nothing,
                     κ_max_η = nothing, viscosity = nothing,
-                    schmidt::Real = 1.0,
                     velocity_forcing = ConstantPower(),
-                    scalar_forcing = NoForcing(),
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
-                    scalar::Bool = false, scalar_variance::Real = 1.0,
+                    scalar::Union{Nothing, PassiveScalar} = nothing,
                     envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER, initial_spectrum = nothing,
                     state::Union{Nothing, ResolvedFields} = nothing,
                     number_of_particles::Integer = 0, interpolation_scheme = nothing,
@@ -637,6 +681,10 @@ function Simulation(domain::FixedDomain;
   ordered_interpolation in (nothing, true, false, :manual) ||
     throw(ArgumentError("`ordered_interpolation` must be `nothing`, `true`, `false`, or `:manual`; " *
                         "got $(repr(ordered_interpolation))"))
+  # The scalar's settings travel as one value, so a run without a scalar can be given none of them;
+  # a scalar-free run's conditions carry the inert Sc = 1 and no scalar forcing.
+  carries_scalar = scalar !== nothing
+  schmidt = carries_scalar ? scalar.schmidt : 1.0
   # The injection door (decision 83): an existing state or tracer set is ADOPTED — its arrays
   # become the run's own, no copy — so a continuation or an external import skips the seeding.
   # Validated here, before anything is built from the settings the adoption overrides.
@@ -645,12 +693,12 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("`initial_spectrum` and `state` are two ways to set the initial " *
                           "condition — `initial_spectrum` shapes the random seed, `state` adopts " *
                           "an existing field set. Pass one, not both."))
-    (state.scalar_spectral !== nothing) == scalar ||
-      throw(ArgumentError(scalar ?
-        "`scalar = true` but the given `state` carries no scalar: the run would advect a scalar " *
-        "the state does not hold. Build the state with a scalar, or drop `scalar`." :
-        "the given `state` carries a scalar but `scalar = false`: the run would silently ignore " *
-        "it. Pass `scalar = true`, or hand over a velocity-only state."))
+    (state.scalar_spectral !== nothing) == carries_scalar ||
+      throw(ArgumentError(carries_scalar ?
+        "`scalar` was given but the given `state` carries no scalar: the run would advect a " *
+        "scalar the state does not hold. Build the state with a scalar, or drop `scalar`." :
+        "the given `state` carries a scalar but no `scalar` was given: the run would silently " *
+        "ignore it. Give `scalar = PassiveScalar()`, or hand over a velocity-only state."))
     state.velocity_spectral.grid == domain.grid ||
       throw(ArgumentError("the given `state` lives on a different grid than `domain`: grid " *
                           "size, box size, and element type must all agree for the state to be " *
@@ -678,7 +726,7 @@ function Simulation(domain::FixedDomain;
   end
   # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
   # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
-  # argument that caused it. Likewise a scalar variance, ⟨φ²⟩ ≥ 0.
+  # argument that caused it.
   number_of_particles >= 0 ||
     throw(ArgumentError("`number_of_particles` must be non-negative, got $number_of_particles: a " *
                         "negative count was silently routed to the tracer-free branch, so the run " *
@@ -688,8 +736,6 @@ function Simulation(domain::FixedDomain;
   cfl > 0 ||
     throw(ArgumentError("`cfl` must be positive, got $cfl: it scales the advective timestep " *
                         "Δt = cfl·Δx/u_max, so a non-positive value stops or reverses the clock"))
-  scalar_variance >= 0 ||
-    throw(ArgumentError("`scalar_variance` must be non-negative, got $scalar_variance: it is ⟨φ²⟩"))
   side_length = domain.grid.domain_size[1]
   # A forcing given as a function of the domain is built now, so the model can read the strategy it
   # returns; a built strategy states its own strength.
@@ -736,18 +782,22 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   viscosity === nothing && state !== nothing &&
     _warn_adopted_state_energy_mismatch(state, k_design)
 
-  buffers = allocate_buffers(field_integration_scheme, domain; scalar)
+  buffers = allocate_buffers(field_integration_scheme, domain; scalar = carries_scalar)
   # The velocity forcing is built against the run's predicted state, filling an omitted strength from
-  # it; the scalar has no modelled state, so its forcing states its own, and takes from the velocity's
-  # state only the box time a correlation time in box units is converted with. A derived ν warns only for a forcing
-  # that neither holds a member of the state nor takes its strength from it (owner-ruled 2026-08-24).
+  # it. The scalar has no modelled state: its forcing takes an omitted whole-field target from the
+  # stated `variance`, and from the velocity's state only the box time a correlation time in box
+  # units is converted with. A derived ν warns only for a forcing that neither holds a member of
+  # the state nor takes its strength from it (owner-ruled 2026-08-24).
+  design = merge(design, (; variance = design.kinetic_energy))
   vf = _materialize_forcing(velocity_spec, domain, design)
   viscosity === nothing && _held_quantity(velocity_spec) === nothing && !_takes_design(velocity_spec) &&
     _warn_derived_viscosity_forcing_mismatch(vf, design)
   conditions = FlowConditions(; viscosity = ν, schmidt,
                     velocity_forcing = vf,
-                    scalar_forcing = _materialize_forcing(_seeded(scalar_forcing, rng), domain,
-                                                          (; box_time = design.box_time)))
+                    scalar_forcing = carries_scalar ?
+                      _materialize_forcing(_seeded(scalar.forcing, rng), domain,
+                                           (; variance = scalar.variance, box_time = design.box_time)) :
+                      NoForcing())
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).
   # The velocity's criterion does not cover it. ν was derived or supplied
@@ -762,7 +812,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 
 
   if state === nothing
-    state = ResolvedFields(domain; scalar)
+    state = ResolvedFields(domain; scalar = carries_scalar)
     ic_spectrum = nothing
     if initial_spectrum isa EnergySpectrum     # a `Phenomenology` model → evaluate at the run's state
       ε === nothing &&
@@ -776,10 +826,11 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
     end
     random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, k_design;
                                          envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
-    scalar && random_scalar_spectral!(state.scalar_spectral, domain, scalar_variance; envelope_wavenumber, rng)
+    carries_scalar &&
+      random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; envelope_wavenumber, rng)
   end
   state = _with_forcing_states(state, conditions, domain)
-  if scalar
+  if carries_scalar
     # The predicted stationary ε where there is one; the seeded field's own ε where nothing is predicted.
     ε_check = ε !== nothing ? ε : _seeded_dissipation(state, domain, ν)
     η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_check,
@@ -830,7 +881,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
             unwrapped, rng) : nothing
   # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
   # integrates over, so the scheme's registers are allocated against it.
-  cache = ObservablesCache(domain; scalar,
+  cache = ObservablesCache(domain; scalar = carries_scalar,
                            number_of_particles = tracers === nothing ? 0 : npoints(tracers.positions),
                            history_depth = history_depth(pscheme))
   particle_buffers = tracers === nothing ? nothing :
@@ -843,7 +894,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     deposit!(cache, tracers, velocity_physical(cache); traversal = particle_traversal)
-  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
+  return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar = carries_scalar),
+                    field_integration_scheme, state, cache,
                     tracers, tracers === nothing ? nothing : pscheme, particle_buffers, particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end

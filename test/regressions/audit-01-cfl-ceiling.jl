@@ -27,7 +27,7 @@ end
 
 @testset "a scalar that diffuses faster than the velocity sets the tighter bound" begin
   ν, Sc = 0.05, 0.25                                   # scalar diffusivity ν/Sc = 4x the velocity's
-  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, schmidt = Sc, scalar = true,
+  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, scalar = PassiveScalar(schmidt = Sc),
                    kinetic_energy = 1e-10, velocity_forcing = NoForcing(), rng = MersenneTwister(3))
   @test SR.cfl_timestep(sim) <= 1 / ((ν / Sc) * 1.0) * (1 + 1e-9)
 end

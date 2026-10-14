@@ -191,7 +191,8 @@ run is set up for:
 
 - `ConstantPower` its `injection_rate`, from the dissipation rate ``\\varepsilon``;
 - `VarianceController` and `VarianceRescaling(over = :total)` their `target`, from the kinetic
-  energy ``k``, and the controller its `turnover_time`, from ``2k/(3\\varepsilon)``;
+  energy ``k`` — or, bound to the scalar, from the scalar's stated `variance` — and the velocity's
+  controller its `turnover_time`, from ``2k/(3\\varepsilon)``;
 - `VarianceRescaling(over = :band)` its `target`, from the predicted energy in the band
   ``k_{\\mathrm{band}}``;
 - `Linear` its `rate`, from ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, the rate that injects ``\\varepsilon``;
@@ -202,8 +203,9 @@ The state, and ``k_{\\mathrm{band}}`` with it, is the one
 [`predicted_stationary_state`](@ref GBGHomogeneousTurbulence.SimulationRun.predicted_stationary_state)
 returns. The deferred `StochasticOU` may state its correlation time in box units, as a multiple of
 ``(L^{2}/\\varepsilon)^{1/3}``, which the run converts once into the constant time ``T_L`` the strategy
-holds; its `seed`, left out, is drawn from the run's `rng`. A scalar forcing states its target,
-since the run models no scalar state. Otherwise the keywords and defaults are those of the
+holds; its `seed`, left out, is drawn from the run's `rng`. A scalar forcing takes only a
+whole-field target from the run, the scalar's stated `variance`, since no scalar stationary state
+is modelled; anything else it states. Otherwise the keywords and defaults are those of the
 `domain`-taking forms documented on each strategy.
 
 # Examples
@@ -245,8 +247,9 @@ function _from_design(design, quantity::Symbol, strategy, keyword::Symbol)
   (design === nothing || !haskey(design, quantity) || getfield(design, quantity) === nothing) &&
     throw(ArgumentError("`$strategy(; …)` was given no `$keyword`, and nothing supplies one here: " *
                         "only a `Simulation` fills an omitted target, from the stationary state it " *
-                        "sets up for the velocity. A scalar forcing, or one built on a domain by " *
-                        "hand, must state `$keyword`."))
+                        "sets up for the velocity or from the scalar's stated `variance`. A forcing " *
+                        "built on a domain by hand, or a scalar forcing needing a quantity no scalar " *
+                        "state models, must state `$keyword`."))
   return getfield(design, quantity)
 end
 
@@ -1416,7 +1419,7 @@ _completed(d::DeferredForcing{ConstantPower}, design) =
 # predicted state, so it follows the Reynolds number the model is evaluated at.
 function _completed(d::DeferredForcing{VarianceController}, design)
   p = d.parameters.target === nothing ?
-    _fill(d.parameters, :target, _from_design(design, :kinetic_energy, :VarianceController, :target)) :
+    _fill(d.parameters, :target, _from_design(design, :variance, :VarianceController, :target)) :
     d.parameters
   design === nothing || p.turnover_time !== nothing || !haskey(design, :dissipation) ||
     design.dissipation === nothing ||
@@ -1428,7 +1431,7 @@ _completed(d::DeferredForcing{VarianceRescaling}, design) =
   d.parameters.target === nothing ?
     _fill(d.parameters, :target,
           d.parameters.over === :total ?
-            _from_design(design, :kinetic_energy, :VarianceRescaling, :target) :
+            _from_design(design, :variance, :VarianceRescaling, :target) :
             _from_design(design, :band_kinetic_energy, :VarianceRescaling, :target)) :
     d.parameters
 # The rate that injects the predicted ε into the predicted band energy: ε = 2A k_band.

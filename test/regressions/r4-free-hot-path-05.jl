@@ -11,7 +11,7 @@ using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "an iteration does not report success on a state whose scalar it has made non-finite" begin
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = true,
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, scalar = PassiveScalar(),
                    rng = MersenneTwister(2))
 
   # The sanctioned out-of-band route: write the state's storage directly, announce it, re-deposit.

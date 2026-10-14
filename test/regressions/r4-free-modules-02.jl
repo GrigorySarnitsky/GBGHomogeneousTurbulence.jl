@@ -10,8 +10,8 @@ using GBGHomogeneousTurbulence
 using GBGPeriodicFields: field_data
 
 @testset "negative control — the velocity twin does raise" begin
-  sim = Simulation(grid_points_per_axis = 12; scalar = true, viscosity = 0.05,
-                   schmidt = 1.0, rng = MersenneTwister(1))
+  sim = Simulation(grid_points_per_axis = 12; scalar = PassiveScalar(schmidt = 1.0),
+  viscosity = 0.05, rng = MersenneTwister(1))
   advance!(sim; dt = 1e-3)
   # Force a non-finite velocity out of band, exactly as the guard's comment envisages.
   # Poked in the state, not the cache: the step consumes it, the closing deposit re-measures, and
@@ -31,8 +31,8 @@ end
 @testset "a run must not report success on a NaN scalar produced by schmidt = 0" begin
 
   built = try
-    Simulation(grid_points_per_axis = 12; scalar = true, viscosity = 0.05,
-               schmidt = 0.0, rng = MersenneTwister(1))
+    Simulation(grid_points_per_axis = 12; scalar = PassiveScalar(schmidt = 0.0),
+    viscosity = 0.05, rng = MersenneTwister(1))
   catch err
     err
   end

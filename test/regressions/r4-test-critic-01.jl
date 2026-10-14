@@ -29,8 +29,9 @@ prepare_forcing!(f::SharedCounter, forcing_state, field, domain, dt::Real) = (f.
                                             velocity_forcing = counter, scalar_forcing = counter)
 
   # (2) the front door, which passes an already-built forcing straight through
-  @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05, scalar = true,
-                                        velocity_forcing = counter, scalar_forcing = counter)
+  @test_throws ArgumentError Simulation(grid_points_per_axis = 8, viscosity = 0.05,
+                                        scalar = PassiveScalar(forcing = counter),
+                                        velocity_forcing = counter)
 
   # (3) the guard is narrow: two separately-built mutable instances are fine, …
   @test FlowConditions(viscosity = 0.05, schmidt = 1.0, velocity_forcing = counter,
@@ -46,7 +47,7 @@ prepare_forcing!(f::SharedCounter, forcing_state, field, domain, dt::Real) = (f.
   #     own state in the record and its own stream.
   ou = StochasticOU(domain; forcing_variance = 0.3, correlation_time = 0.4, seed = 1)
   @test !ismutable(ou)
-  sim = Simulation(domain; viscosity = 0.05, scalar = true, velocity_forcing = ou, scalar_forcing = ou,
+  sim = Simulation(domain; viscosity = 0.05, scalar = PassiveScalar(forcing = ou), velocity_forcing = ou,
                    rng = MersenneTwister(1))
   for _ in 1:3
     advance!(sim)

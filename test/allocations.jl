@@ -39,9 +39,10 @@ const N = 16
 const DOMAIN = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                            element_type = Float64, array_family = Array)
 const SIM = with_logger(NullLogger()) do
-  Simulation(DOMAIN; viscosity = 0.05, scalar = true, number_of_particles = 8,
+  Simulation(DOMAIN; viscosity = 0.05,
+             scalar = PassiveScalar(forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3)),
+             number_of_particles = 8,
              velocity_forcing = ConstantPower(injection_rate = 0.1),
-             scalar_forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3),
              rng = MersenneTwister(1))
 end
 const STATE, GENERATOR, BUFFERS, CACHE = SIM.state, SIM.generator, SIM.buffers, SIM.cache

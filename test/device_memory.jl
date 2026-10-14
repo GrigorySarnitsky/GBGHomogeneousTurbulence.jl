@@ -185,7 +185,7 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
     for T in (Float32, Float64), N in (64, 128)
       d = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
                       array_family = cu)
-      sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = true, number_of_particles = 64,
+      sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(), number_of_particles = 64,
                                          rng = Xoshiro(1)), NullLogger())
       advance!(sim; dt = 1e-3)
       û, φ̂ = sim.state.velocity_spectral, sim.state.scalar_spectral
@@ -195,7 +195,7 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
         "FixedDomain" => () -> FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                                            element_type = T, array_family = cu),
         "Simulation" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1)),
-        "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = true, rng = Xoshiro(1)),
+        "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(), rng = Xoshiro(1)),
         "derivative_skewness" => () -> derivative_skewness(û, d),
         "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_family = cu), path, "r"),
         "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05, number_of_particles = 64,

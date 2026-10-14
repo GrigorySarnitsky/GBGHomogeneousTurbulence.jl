@@ -7,9 +7,9 @@ using GBGHomogeneousTurbulence
 @testset "flow_parameters reports the scalar dissipation at ϰ = ν/Sc, not ν·Sc" begin
   ν  = 0.05
   Sc = 4.0
-  sim = Simulation(grid_points_per_axis = 16, viscosity = ν, schmidt = Sc,
-                   scalar = true, velocity_forcing = NoForcing(),
-                   scalar_forcing = NoForcing(), rng = MersenneTwister(3))
+  sim = Simulation(grid_points_per_axis = 16, viscosity = ν,
+                   scalar = PassiveScalar(schmidt = Sc, forcing = NoForcing()),
+                   velocity_forcing = NoForcing(), rng = MersenneTwister(3))
   for _ in 1:3; advance!(sim); end
 
   fp = flow_parameters(sim)

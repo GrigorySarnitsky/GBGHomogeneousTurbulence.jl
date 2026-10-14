@@ -58,7 +58,8 @@ end
 function context(N)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                        element_type = Float64, array_family = Array)
-  sim = quiet(() -> Simulation(domain; viscosity = 0.05, scalar = true, number_of_particles = 8, unwrapped = true,
+  sim = quiet(() -> Simulation(domain; viscosity = 0.05,
+                               scalar = PassiveScalar(), number_of_particles = 8, unwrapped = true,
                                velocity_forcing = ConstantPower(domain; injection_rate = 0.1),
                                rng = MersenneTwister(1)))
   conditions = FlowConditions(viscosity = 0.05, schmidt = 1.0, velocity_forcing = NoForcing(),
@@ -155,7 +156,8 @@ const ROWS = Dict{Symbol, Function}(
   Symbol("ResolvedGenerator/Linear") => c -> (() -> ResolvedGenerator(c.domain, FlowConditions(viscosity = 0.05,
       schmidt = 1.0, velocity_forcing = Linear(c.domain; rate = 0.1), scalar_forcing = NoForcing()); scalar = true),
     (c.domain,)),
-  Symbol("Simulation/scalar and tracers") => c -> (() -> Simulation(c.domain; viscosity = 0.05, scalar = true,
+  Symbol("Simulation/scalar and tracers") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
+                                                                    scalar = PassiveScalar(),
       number_of_particles = 8, rng = MersenneTwister(1)), (c.domain,)),
   Symbol("Simulation/AdamsBashforth order 4") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
       number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(1)),

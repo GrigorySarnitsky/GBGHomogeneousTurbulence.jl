@@ -103,10 +103,11 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, element_type = Float64,
                        dealiasing = PhaseShift(), array_family = Array)
   M = 12
-  sim = Simulation(domain; viscosity = 0.05, scalar = true, number_of_particles = M,
+  sim = Simulation(domain; viscosity = 0.05,
+                   scalar = PassiveScalar(forcing = VarianceRescaling(target = 0.5, over = :band)),
+                   number_of_particles = M,
                    particle_integration_scheme = AdamsBashforth(order = 3),
-                   velocity_forcing = ConstantPower(injection_rate = 0.1),
-                   scalar_forcing = VarianceRescaling(target = 0.5, over = :band))
+                   velocity_forcing = ConstantPower(injection_rate = 0.1))
   tracers = Tracers(domain; number_of_particles = M, interpolation_scheme = LalescuSpline(4),
                     rng = MersenneTwister(1))
 
@@ -305,10 +306,11 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     n, m = 32, 20000
     big = Simulation(FixedDomain(grid_points_per_axis = n, side_length = 2π, element_type = Float64,
                                  dealiasing = PhaseShift(), array_family = Array);
-                     viscosity = 0.05, scalar = true, number_of_particles = m,
+                     viscosity = 0.05,
+                     scalar = PassiveScalar(forcing = VarianceRescaling(target = 0.5, over = :band)),
+                     number_of_particles = m,
                      particle_integration_scheme = AdamsBashforth(order = 3),
-                     velocity_forcing = ConstantPower(injection_rate = 0.1),
-                     scalar_forcing = VarianceRescaling(target = 0.5, over = :band))
+                     velocity_forcing = ConstantPower(injection_rate = 0.1))
     floor = n^3 * sizeof(Float64) ÷ 2
     @test m * 3 * sizeof(Float64) > floor   # the particle arrays are field-scale here, by construction
     for sample in (big.domain, big.state, big.cache, big.tracers, big.buffers, big.generator,
