@@ -209,9 +209,10 @@ so a run with and without it produces bitwise-identical trajectories and samples
 
 A run builds one for you: [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)'s
 `ordered_interpolation` keyword decides whether, and whether the run or the caller rebuilds it.
-Building it by hand belongs with a hand-run loop, where it is passed on to
+Building it by hand belongs with a hand-run loop, where the `ParticleTraversal` itself is passed on to
 [`advect!`](@ref), the particle form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
-and [`interpolate_at_particles!`](@ref) through their `traversal` keyword.
+and [`interpolate_at_particles!`](@ref) through their `traversal` keyword; on a run, that is
+`sim.particle_traversal`.
 
 # Arguments
 
@@ -277,6 +278,12 @@ mode the run rebuilds every iteration and the call is never needed. The rebuild 
 at the tracer scale; a run without a traversal order refuses the call with an `ArgumentError`.
 """
 function rebuild_traversal! end
+
+# The order a gather hands to the field library: the `traversal` keyword takes the `ParticleTraversal`
+# itself, or `nothing` for a gather in tracer order.
+_order(::Nothing) = nothing
+_order(traversal::ParticleTraversal) = traversal.order
+
 
 function rebuild_traversal!(traversal::ParticleTraversal, domain::FixedDomain, tracers::Tracers)
   point_traversal_order!(traversal.order, domain.grid, tracers.positions, traversal.scratch)
@@ -657,7 +664,7 @@ function deposit!(cache::ObservablesCache, tracers::Tracers, u; traversal = noth
     throw(ArgumentError("this cache carries no velocity-at-particles slot: build it with " *
                         "`number_of_particles` matching the tracer set"))
   interpolate!(cache.velocity_at_particles, u, tracers.positions, tracers.interpolation_scheme;
-               traversal)
+               traversal = _order(traversal))
   deposit_velocity_at_particles!(cache)
   return cache
 end
@@ -677,9 +684,8 @@ Advance the positions of a tracer set by one step, in place.
 - `buffers` — the scheme's working storage, the [`ParticleIntegratorBuffers`](@ref) that
   [`allocate_buffers`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers) builds for it.
 - `dt` — the step size ``\\Delta t``.
-- `traversal = nothing` — the `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order`
-  field), to gather the velocity in memory-locality order; `nothing` gathers in tracer order, with
-  identical values.
+- `traversal = nothing` — a [`ParticleTraversal`](@ref), to gather the velocity in its
+  memory-locality order; `nothing` gathers in tracer order, with identical values.
 
 Under [`Heun`](@ref), whose docstring gives the update, the scheme is Heun-in-time on the velocity
 at the two ends of the step — the start-of-step values the previous iteration's closing particle
@@ -718,7 +724,7 @@ function advect!(::Heun, tracers::Tracers, velocity_end, domain::FixedDomain,
   # predictor positions sit one step's displacement from them, inside the tiles the order groups,
   # and the field library admits any same-length order.
   interpolate!(buffers.velocity_predictor, velocity_end, buffers.predictor_points,
-               tracers.interpolation_scheme; traversal)
+               tracers.interpolation_scheme; traversal = _order(traversal))
   # The corrector: one fused two-term displacement, wrap included.
   displace!(tracers.positions, domain.grid,
             (Δt / 2, v₁), (Δt / 2, buffers.velocity_predictor))
@@ -748,12 +754,11 @@ trajectories; what is then accumulated over those values is the caller's own ana
   for the scalar ``\\varphi``.
 - `field` — the field in physical representation.
 - `tracers` — the tracer set, whose positions and interpolation scheme are used.
-- `traversal = nothing` — the `PointTraversalOrder` of a [`ParticleTraversal`](@ref) (its `order`
-  field), to gather in memory-locality order — on a run, `sim.particle_traversal.order`; `nothing`
-  gathers in tracer order, with identical values.
+- `traversal = nothing` — a [`ParticleTraversal`](@ref), to gather in its memory-locality order
+  (on a run, `sim.particle_traversal`); `nothing` gathers in tracer order, with identical values.
 """
 function interpolate_at_particles!(out, field, tracers::Tracers; traversal = nothing)
-  interpolate!(out, field, tracers.positions, tracers.interpolation_scheme; traversal)
+  interpolate!(out, field, tracers.positions, tracers.interpolation_scheme; traversal = _order(traversal))
   return out
 end
 

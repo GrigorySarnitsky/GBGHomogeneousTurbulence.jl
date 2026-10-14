@@ -220,7 +220,7 @@ end
     on = tracked(nothing); off = tracked(false)
     a = new_vector_point_values(on.tracers); b = new_vector_point_values(off.tracers)
     interpolate_at_particles!(a, velocity_physical(on.cache), on.tracers;
-                              traversal = on.particle_traversal.order)
+                              traversal = on.particle_traversal)
     interpolate_at_particles!(b, velocity_physical(off.cache), off.tracers)
     @test point_values(a) == point_values(b)
 

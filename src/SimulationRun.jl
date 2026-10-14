@@ -834,7 +834,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                        ParticleTraversal(domain, tracers; automatic = ordered_interpolation !== :manual)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
-    deposit!(cache, tracers, velocity_physical(cache); traversal = _traversal_order(particle_traversal))
+    deposit!(cache, tracers, velocity_physical(cache); traversal = particle_traversal)
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar), field_integration_scheme, state, cache,
                     tracers, tracers === nothing ? nothing : pscheme, particle_buffers, particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
@@ -875,11 +875,6 @@ _fits(started::StochasticOUState, carried::StochasticOUState) =
   field_grid(started.process).grid_size == field_grid(carried.process).grid_size
 
 
-# The order the gathers take: the traversal's, or none. Keeping the `nothing` case here lets every
-# consuming site pass one keyword unconditionally.
-_traversal_order(::Nothing) = nothing
-_traversal_order(traversal::ParticleTraversal) = traversal.order
-
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
                     dealiasing::DealiasingStrategy = TwoThirds(),
                     element_type::Type = Float64, array_family = Array,
@@ -901,8 +896,7 @@ function deposit!(sim::Simulation)
   # The velocity sample rides the same re-deposit: the positions are unchanged, so re-depositing
   # from the freshly deposited velocity restores the values the announcement made stale.
   sim.tracers === nothing ||
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache);
-             traversal = _traversal_order(sim.particle_traversal))
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal = sim.particle_traversal)
   return sim
 end
 
@@ -1105,12 +1099,11 @@ function advance!(sim::Simulation; dt = nothing)
     # displacement stays inside the tiles it groups. Under `:manual` the callback owns the cadence.
     traversal = sim.particle_traversal
     (traversal !== nothing && traversal.automatic) && rebuild_traversal!(traversal, sim.domain, sim.tracers)
-    order = _traversal_order(traversal)
     advect!(sim.particle_integration_scheme, sim.tracers, velocity_physical(sim.cache), sim.domain,
-            sim.particle_buffers, Δt; traversal = order)
+            sim.particle_buffers, Δt; traversal)
     # `advect!` announced the push itself (decision 76), so the previous sample already reads
     # stale; the closing particle deposit refreshes it at the new positions.
-    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal = order)
+    deposit!(sim.cache, sim.tracers, velocity_physical(sim.cache); traversal)
   end
   check_deposits(sim.cache)
 
