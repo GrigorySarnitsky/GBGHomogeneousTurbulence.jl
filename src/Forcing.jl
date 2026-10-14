@@ -65,9 +65,8 @@ Which keywords carry defaults follows one test: **does the value come from the m
 run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
 the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
-equally valid realization, so one omitted is drawn — from the run's `rng` when a
-[`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds the forcing, from the
-global stream otherwise — and naming it is how a run is repeated. A default at this layer never
+equally valid realization, so one omitted is drawn — from the run's `rng` when a `Simulation`
+builds the forcing, from the global stream otherwise — and naming it is how a run is repeated. A default at this layer never
 hides a choice you needed to make.
 
 The one relaxation is the run's own: a deferred velocity forcing may leave its target out, and the
@@ -175,8 +174,8 @@ which take no domain,
                        lowest_shell = 1, highest_shell = 2)
     VarianceRescaling(; target = nothing, over, lowest_shell = 1, highest_shell = 2)
     StochasticOU(; forcing_variance = nothing, correlation_time = nothing,
-                 correlation_time_in_box_units = nothing, lowest_shell = 1, highest_shell = 2,
-                 seed = nothing)
+                 correlation_time_in_box_units = nothing, lowest_shell = 1,
+                 highest_shell = 2, seed = nothing)
     Linear(; rate = nothing, lowest_shell = 1, highest_shell = 2)
 
 each return a `DeferredForcing` holding their keywords. It is built into the concrete
@@ -1116,8 +1115,8 @@ end
     StochasticOU(domain; forcing_variance, correlation_time, lowest_shell = 1,
                  highest_shell = 2, seed = rand(Int))
     StochasticOU(; forcing_variance = nothing, correlation_time = nothing,
-                 correlation_time_in_box_units = nothing, lowest_shell = 1, highest_shell = 2,
-                 seed = nothing)
+                 correlation_time_in_box_units = nothing, lowest_shell = 1,
+                 highest_shell = 2, seed = nothing)
 
 The stochastic forcing of Eswaran & Pope (1988), built on the [`FixedDomain`](@ref) `domain`: a random term,
 correlated over a finite time, added to the right-hand side on a band of low wavenumbers.
@@ -1194,8 +1193,8 @@ resumes the same realization. This strategy holds its parameters and the scratch
 draw, so one instance may drive both fields.
 
 A `ResolvedFields` built by hand that carries no state for this forcing is refused: preparing it
-throws an `ArgumentError` rather than leave the run unforced without saying so. A [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) builds
-it for you.
+throws an `ArgumentError` rather than leave the run unforced without saying so. A `Simulation`
+builds it for you.
 
 !!! warning "The band must lie inside the dealias cutoff"
     A forcing that multiplies the field injects nothing where the dealiasing mask holds the modes

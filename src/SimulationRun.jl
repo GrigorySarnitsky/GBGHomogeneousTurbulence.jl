@@ -105,17 +105,20 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
   resolved ``\\nu`` however it was obtained — a warning, not an error, so a deliberately
   under-resolved scalar stays reachable but not silent; the remedy is `κ_max_η` raised by
   ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
+
 - `variance = 1.0` — the scalar variance ``\\langle\\varphi^{2}\\rangle``: the value the scalar is
   seeded at, and the target a `forcing` holding the whole field's variance takes when its own is
   left out — a [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)
-  or a `VarianceRescaling(over = :total)` — as the velocity's `kinetic_energy` fills its forcing
-  (see [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)). An adopted
-  `state` keeps the variance it holds.
+  or a `VarianceRescaling(over = :total)` — as the run's stated kinetic energy fills the
+  velocity's forcing (see [`DeferredForcing`](@ref GBGHomogeneousTurbulence.Forcing.DeferredForcing)).
+  An adopted `state` keeps the variance it holds.
+
 - `forcing = NoForcing()` — the scalar's forcing, an [`AbstractForcing`](@ref) or a
   `DeferredForcing`; the velocity and the scalar are forced independently. No scalar stationary
   state is modelled, so a forcing needing one — a `VarianceRescaling(over = :band)` target, a
-  `Linear` rate, a `StochasticOU` variance — states it. A deferred `StochasticOU` takes the
-  flow's box time for a correlation time in box units.
+  [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a
+  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) variance — states it. A
+  deferred `StochasticOU` takes the flow's box time for a correlation time in box units.
 
 # Fields
 - `schmidt`, `variance`, `forcing` — the settings above.
@@ -144,9 +147,11 @@ Base.show(io::IO, scalar::PassiveScalar) =
 
 
 """
-    ParticleTracking(; number_of_particles, interpolation_scheme = CatmullRom, unwrapped = false,
-                       particle_integration_scheme = Heun(), traversal_mode = :automatic)
-    ParticleTracking(tracers; particle_integration_scheme = Heun(), traversal_mode = :automatic)
+    ParticleTracking(; number_of_particles, interpolation_scheme = CatmullRom,
+                       unwrapped = false, particle_integration_scheme = Heun(),
+                       traversal_mode = :automatic)
+    ParticleTracking(tracers; particle_integration_scheme = Heun(),
+                     traversal_mode = :automatic)
 
 The Lagrangian tracking a run carries, given as the `particles` setting of [`Simulation`](@ref):
 the run then advects a tracer set every iteration and records the Lagrangian velocity sample. The
@@ -158,17 +163,21 @@ tracking setting can be given to it.
 
 # Arguments
 - `number_of_particles` — how many tracers to seed.
+
 - `interpolation_scheme = CatmullRom` — the **spatial** scheme that evaluates a field at the
-  tracer positions, a `GBGPeriodicFields` scheme; forwarded to `Tracers`, whose docstring compares
-  the schemes.
+  tracer positions, a [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)
+  scheme; forwarded to `Tracers`, whose docstring compares the schemes.
+
 - `unwrapped = false` — whether to also track the winding-preserving unwrapped positions (read
   with [`unwrapped_positions`](@ref GBGHomogeneousTurbulence.Particles.unwrapped_positions) —
   what a mean-square-displacement diagnostic needs).
+
 - `tracers` — the tracer set to adopt, in the second form. Its arrays become the run's own and
   are not copied, so two runs must not adopt one set, and it must live on the domain's storage
-  backend. A multistep `particle_integration_scheme` takes its first pushes under `Heun` until
-  its history fills — restoring a stored sample history alongside the positions is
-  [`read_simulation`](@ref)'s job.
+  backend. A multistep `particle_integration_scheme` takes its first pushes under
+  [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun) until its history fills — restoring a
+  stored sample history alongside the positions is [`read_simulation`](@ref)'s job.
+
 - `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator);
   its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
@@ -176,20 +185,18 @@ tracking setting can be given to it.
   [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
   accuracy in time limits a measurement: it costs one stored array per extra order and saves an
   interpolation per step.
+
 - `traversal_mode = :automatic` — whether the gathers at the tracers (the velocity for the
   advance and the Lagrangian sample, and any field the caller samples) visit them in the
   memory-locality order of a
-  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal). The order
-  changes no value — a run with and without it is bitwise identical — only the time the gathers
-  take. `:automatic` builds the order at seeding and rebuilds it from the start-of-step positions
-  every iteration, a cost small against the gather it accelerates; `:manual` builds it and leaves
-  every rebuild to the caller, through
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal), which changes
+  no value, only the time the gathers take. `:automatic` builds the order at seeding and rebuilds
+  it from the start-of-step positions every iteration, a cost small against the gather it
+  accelerates; `:manual` builds it and leaves every rebuild to the caller, through
   [`rebuild_traversal!`](@ref GBGHomogeneousTurbulence.Particles.rebuild_traversal!) in the `run!`
-  callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `:none`
-  holds no order and gathers in tracer order. The order and its rebuild scratch hold three
-  integer or Boolean vectors of the tracer count and two of the number of grid tiles the order
-  groups tracers by — small beside the `(M, 3)` positions of the ``M`` tracers — and nothing of
-  it is persisted: a restored run rebuilds it from the restored positions.
+  callback ([`every_steps`](@ref) / [`every_time`](@ref) set the cadence); `:none` holds no order
+  and gathers in tracer order. The order is small and never persisted; a restored run rebuilds
+  it.
 
 # Fields
 - `tracers` — the set to adopt, or the seeding request (the count, the interpolation scheme and
@@ -472,7 +479,7 @@ and the tracer positions.
     `ConstantPower` injects the state's ``\\varepsilon`` at every stage and never measures ``k``,
     which settles where the true ``\\tilde{k}`` puts it and fluctuates with the cascade. It was chosen as the
     default because it has no gain or settling time to choose. To hold ``k`` instead, force with a
-    `VarianceController` whose target is
+    [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) whose target is
     left out: it takes the target from the state and restores ``k`` exponentially, its gain setting
     the fluctuation it leaves.
 
@@ -494,8 +501,9 @@ their contents as the scheme's business rather than the run's state.
   the chosen scheme.
 - `tracers`, `particle_integration_scheme`, `particle_buffers`, `particle_traversal` — the
   `Tracers` being advected along with the fields, the scheme advancing them along their
-  trajectories, that scheme's registers, and the `ParticleTraversal` the gathers visit the tracers
-  in (`nothing` under `traversal_mode = :none`). All `nothing` when the run carries no
+  trajectories, that scheme's registers, and the
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) the gathers
+  visit the tracers in (`nothing` under `traversal_mode = :none`). All `nothing` when the run carries no
   tracers.
 - `cfl`, `max_dt`, `clock` — the advective-CFL coefficient, the caller's ceiling on the adaptive
   step in the run's own time units (`Inf` when none), and the time/step counter.

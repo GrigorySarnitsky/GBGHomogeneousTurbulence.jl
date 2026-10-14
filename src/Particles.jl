@@ -103,7 +103,8 @@ fields and records the Lagrangian velocity each iteration, so both reads below a
 iterations:
 
 ```julia
-sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096, scalar = true)
+sim = Simulation(grid_points_per_axis = 64, scalar = PassiveScalar(),
+                 particles = ParticleTracking(number_of_particles = 4096))
 advance!(sim)
 
 # the (M, 3) positions, via GBGPeriodicFields

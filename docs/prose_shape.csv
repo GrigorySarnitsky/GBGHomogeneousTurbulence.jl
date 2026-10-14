@@ -119,8 +119,8 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 4.3 `Observables` — the measured functions of the state",231,169,0
 "ARCHITECTURE.md § 4.4 `Forcing` — the source",716,391,0
 "ARCHITECTURE.md § 4.5 `Propagator` — the map that advances the state in time",476,445,0
-"ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",526,217,0
-"ARCHITECTURE.md § 4.7 `SimulationRun` — the front door",576,476,0
+"ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",528,217,0
+"ARCHITECTURE.md § 4.7 `SimulationRun` — the front door",605,505,0
 "ARCHITECTURE.md § 4.8 `Phenomenology` — the reference laws (extraction-bound)",876,143,0
 "ARCHITECTURE.md § 4.9 Layout summary",73,72,0
 "ARCHITECTURE.md § 5. The consumer boundary — what belongs here, and what does ",122,102,0
@@ -156,11 +156,11 @@ unit,words,longest_paragraph,admonitions
 "Cache.md § The observables cache",30,30,0
 "Forcing.jl :: AbstractForcing",399,83,1
 "Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",453,115,1
-"Forcing.jl :: DeferredForcing",402,68,0
-"Forcing.jl :: Forcing",493,217,0
+"Forcing.jl :: DeferredForcing",442,92,0
+"Forcing.jl :: Forcing",510,217,0
 "Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",263,123,0
 "Forcing.jl :: NoForcing()",16,15,0
-"Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",906,135,1
+"Forcing.jl :: StochasticOU(domain; forcing_variance, correlation_time, low",944,169,1
 "Forcing.jl :: StochasticOUState",177,67,0
 "Forcing.jl :: VarianceController(domain; target, gain = 1, turnover_time =",901,333,1
 "Forcing.jl :: VarianceRescaling(domain; target, over, lowest_shell = 1, hi",872,288,1
@@ -221,9 +221,9 @@ unit,words,longest_paragraph,admonitions
 "Particles.jl :: AdamsBashforth(; order = 4)",713,164,1
 "Particles.jl :: Heun()",273,181,1
 "Particles.jl :: ParticleIntegratorBuffers",254,103,0
-"Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",355,106,1
+"Particles.jl :: ParticleTraversal(domain, tracers; automatic = true)",365,106,1
 "Particles.jl :: Particles",204,195,0
-"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",631,94,0
+"Particles.jl :: Tracers(domain; number_of_particles, interpolation_scheme, u",633,94,0
 "Particles.jl :: advect!(scheme, tracers, velocity_end, domain, buffers, dt;",328,84,1
 "Particles.jl :: history_depth(scheme) -> Int",47,28,0
 "Particles.jl :: interpolate_at_particles!(out, field, tracers; traversal = n",106,67,0
@@ -240,7 +240,7 @@ unit,words,longest_paragraph,admonitions
 "Particles.md § The tracer set",33,33,0
 "Particles.md § The tracking loop",80,80,0
 "Particles.md § The traversal order",66,66,0
-"Particles.md § Wiring tracers into a run",30,30,0
+"Particles.md § Wiring tracers into a run",31,31,0
 "Propagator.jl :: AbstractIntegrator",45,44,0
 "Propagator.jl :: IFHeun()",139,60,1
 "Propagator.jl :: IFLowStorageRK3()",228,65,0
@@ -279,7 +279,7 @@ unit,words,longest_paragraph,admonitions
 "SimulationDomain.md § Scratch-field allocators",16,16,0
 "SimulationDomain.md § The discretized box",21,21,0
 "SimulationRun.jl :: Simulation(; grid_points_per_axis, κ_max_η = nothing, kineti",2832,1432,3
-"SimulationRun.jl :: SimulationRun",217,182,0
+"SimulationRun.jl :: SimulationRun",259,224,0
 "SimulationRun.jl :: StationarityCriterion(; gate_scalar = true, gate_skewness = ",631,295,0
 "SimulationRun.jl :: advance!(sim; dt = nothing)",120,56,0
 "SimulationRun.jl :: current_step(sim)",104,90,0
@@ -288,7 +288,7 @@ unit,words,longest_paragraph,admonitions
 "SimulationRun.jl :: every_time(period)",194,75,0
 "SimulationRun.jl :: flow_parameters(sim)",93,92,0
 "SimulationRun.jl :: predicted_stationary_state(domain; velocity_forcing = Consta",344,112,1
-"SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",191,86,0
+"SimulationRun.jl :: read_simulation(parent::HDF5.H5DataStore, name::AbstractStri",204,99,0
 "SimulationRun.jl :: run!(callback, sim; dt = nothing)",304,77,0
 "SimulationRun.jl :: warmup!(sim; dt = nothing, kwargs...)",150,55,0
 "SimulationRun.jl :: write_simulation(parent::HDF5.H5DataStore, name::AbstractStr",149,94,0

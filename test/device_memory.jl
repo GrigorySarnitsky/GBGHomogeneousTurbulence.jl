@@ -84,7 +84,7 @@ end
 
 const CONFIGURATIONS = [
   ("default", ()),
-  ("scalar", (scalar = true,)),
+  ("scalar", (scalar = PassiveScalar(),)),
   ("PhaseShift", (dealiasing = PhaseShift(),)),
   ("HouLi", (dealiasing = HouLi(),)),
   ("IFHeun", (field_integration_scheme = IFHeun(),)),
@@ -92,12 +92,14 @@ const CONFIGURATIONS = [
   ("IFSSPRK3", (field_integration_scheme = IFSSPRK3(),)),
   ("Linear", (velocity_forcing = Linear(rate = 0.1),)),
   ("StochasticOU", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5),)),
-  ("tracers", (number_of_particles = 4096,)),
+  ("tracers", (particles = ParticleTracking(number_of_particles = 4096),)),
   # the scaling axes beyond N: the tracer count M, the multistep order K, the stochastic band
-  ("tracers M = 32768", (number_of_particles = 32768,)),
-  ("tracers M = 262144", (number_of_particles = 262144,)),
-  ("AdamsBashforth K = 2", (number_of_particles = 4096, particle_integration_scheme = AdamsBashforth(order = 2))),
-  ("AdamsBashforth K = 4", (number_of_particles = 4096, particle_integration_scheme = AdamsBashforth(order = 4))),
+  ("tracers M = 32768", (particles = ParticleTracking(number_of_particles = 32768),)),
+  ("tracers M = 262144", (particles = ParticleTracking(number_of_particles = 262144),)),
+  ("AdamsBashforth K = 2", (particles = ParticleTracking(number_of_particles = 4096,
+                                                        particle_integration_scheme = AdamsBashforth(order = 2)),)),
+  ("AdamsBashforth K = 4", (particles = ParticleTracking(number_of_particles = 4096,
+                                                        particle_integration_scheme = AdamsBashforth(order = 4)),)),
   ("StochasticOU band 1–4", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
                                                              highest_shell = 4),)),
   ("StochasticOU band 1–8", (velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
@@ -112,7 +114,8 @@ if get(ENV, "DEVICE_FULL_SWEEP", "") == "1"
                   VarianceRescaling(target = 1.5, over = :total), Linear(rate = 0.1),
                   StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5))
     push!(CONFIGURATIONS, ("$(nameof(typeof(scheme))) $(nameof(typeof(dealiasing))) scalar=$scalar $(nameof(typeof(forcing)))",
-                           (field_integration_scheme = scheme, dealiasing, scalar, velocity_forcing = forcing)))
+                           (field_integration_scheme = scheme, dealiasing,
+                            scalar = scalar ? PassiveScalar() : nothing, velocity_forcing = forcing)))
   end
 end
 # A held figure within this of the prediction agrees: the pool rounds an allocation to its own
@@ -272,8 +275,9 @@ end
       for scheme in (Heun(), AdamsBashforth(order = 4))
         t = map(DEVICE_TRACER_COUNTS) do M
           device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05,
-                                                     particles = ParticleTracking(number_of_particles = M,
-                                                                                  particle_integration_scheme = scheme),
+                                                     particles = M == 0 ? nothing :
+                                                       ParticleTracking(number_of_particles = M,
+                                                                        particle_integration_scheme = scheme),
                                                      rng = Xoshiro(1)))
         end
         per = (t[2] - t[1]) / (DEVICE_TRACER_COUNTS[2] - DEVICE_TRACER_COUNTS[1])

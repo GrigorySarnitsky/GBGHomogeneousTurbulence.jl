@@ -549,7 +549,9 @@ Over it:
   mean; one holding k leaves the resolution predicted through ``\tilde{k}``. A forcing the model does not
   cover — an unforced run, a band not starting at shell 1 — has nothing to derive ν from and must
   supply it.
-  Setup is a few numbers.
+  Setup is a few numbers. A passive scalar and the Lagrangian tracking are each one setting
+  value, `PassiveScalar` and `ParticleTracking` (decision 110), so neither's settings can be given
+  to a run without the feature.
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
   the tracer advance on the sample and the deposited endpoint field, the new sample, and the
@@ -3214,6 +3216,31 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     it what planning needs and beyond its reach (its decision 93). HT builds no template field of its
     own since PF decisions 93 and 94 (11.2 ``N^3`` reals on 2026-10-01). The cost is paid once per
     construction, and a plan cannot be made without arrays to plan on.
+
+110. **(2026-10-14, user-directed) A keyword shows its real default; a feature's settings are one
+    value.** The owner adopted the rule from Julia's own practice: a keyword's default is written in
+    the signature whenever one exists, as a constant or an expression in earlier arguments, and
+    `nothing` is the default only where not giving the argument means something no value could —
+    one of an either-or group (`kinetic_energy` / `dissipation`), a value the run supplies later (a
+    deferred forcing's strength), or a genuine absence.
+
+    A placeholder whose only job was to record "was it set" is gone: the scalar's four keywords are one `PassiveScalar(; schmidt, variance,
+    forcing)`, and the six particle keywords one `ParticleTracking` — seeded by count, or adopting a
+    `Tracers` set, with `particle_integration_scheme` and a `traversal_mode` of `:automatic`,
+    `:manual` or `:none` — so a setting cannot be given to a run lacking the feature, and the
+    by-name refusals that detected it are deleted rather than kept.
+
+    With it: `velocity_forcing = ConstantPower()` replaces a sentinel dead since decision 95 moved its detection onto the
+    forcing; the gather keyword `traversal` takes the `ParticleTraversal`, never its order.
+
+    A `StochasticOU` seed left out is drawn — `rand(Int)` on a domain, the run's `rng` when deferred
+    (decision 107) — instead of a 42 every run shared, and the deferred form takes either
+    correlation time. The scalar's `variance` fills an omitted whole-field forcing target as
+    `kinetic_energy` does (decision 95), the scalar's own stationary model remaining future work;
+    `tol` and `skew_floor` are `tolerance` and `skewness_floor`.
+
+    The domain-building `Simulation` keeps `kwargs...` forwarding, since one source of defaults beats a full signature line and the
+    signature-fidelity rule forbids displaying what the method does not define.
 
 ## References
 
