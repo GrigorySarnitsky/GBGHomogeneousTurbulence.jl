@@ -130,6 +130,15 @@ end
   @test seed_of(Xoshiro(5)) == seed_of(Xoshiro(5))       # one stream repeats the whole run
   @test seed_of(Xoshiro(5)) != seed_of(Xoshiro(6))       # another stream is another realization
   @test seed_of(Xoshiro(5); seed = 11) == 11             # a stated seed is kept
+  # The scalar's stated variance fills a whole-field target, and the flow's turnover time the
+  # controller's settling time (owner-ruled 2026-10-14).
+  s = predicted_stationary_state(d; κ_max_η = 1.5)
+  scalar_forcing(f) = quietly(() -> Simulation(d; κ_max_η = 1.5,
+    scalar = PassiveScalar(variance = 2.0, forcing = f))).generator.conditions.scalar_forcing
+  @test scalar_forcing(VarianceController()).target == 2.0
+  @test scalar_forcing(VarianceController()).turnover_time ≈ 2 * s.kinetic_energy / (3 * s.dissipation) rtol = 1e-12
+  @test scalar_forcing(VarianceRescaling(over = :total)).target == 2.0
+  @test_throws ArgumentError scalar_forcing(VarianceRescaling(over = :band))
   # Built on a domain, an omitted seed is a fresh draw rather than one shared by every run.
   @test StochasticOU(d; forcing_variance = 0.1, correlation_time = 0.3).seed !=
         StochasticOU(d; forcing_variance = 0.1, correlation_time = 0.3).seed

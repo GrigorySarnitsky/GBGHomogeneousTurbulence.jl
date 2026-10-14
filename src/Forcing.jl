@@ -190,8 +190,8 @@ run is set up for:
 
 - `ConstantPower` its `injection_rate`, from the dissipation rate ``\\varepsilon``;
 - `VarianceController` and `VarianceRescaling(over = :total)` their `target`, from the kinetic
-  energy ``k`` — or, bound to the scalar, from the scalar's stated `variance` — and the velocity's
-  controller its `turnover_time`, from ``2k/(3\\varepsilon)``;
+  energy ``k`` — or, bound to the scalar, from the scalar's stated `variance` — and a controller
+  its `turnover_time`, from the flow's ``2k/(3\\varepsilon)`` whichever field it drives;
 - `VarianceRescaling(over = :band)` its `target`, from the predicted energy in the band
   ``k_{\\mathrm{band}}``;
 - `Linear` its `rate`, from ``A = \\varepsilon/(2 k_{\\mathrm{band}})``, the rate that injects ``\\varepsilon``;
@@ -1414,15 +1414,16 @@ _completed(d::DeferredForcing{ConstantPower}, design) =
   d.parameters.injection_rate === nothing ?
     _fill(d.parameters, :injection_rate, _from_design(design, :dissipation, :ConstantPower, :injection_rate)) :
     d.parameters
-# The controller's omitted settling time is the run's own large-eddy turnover time 2k/3ε, from the
-# predicted state, so it follows the Reynolds number the model is evaluated at.
+# The controller's omitted settling time is the flow's large-eddy turnover time 2k/3ε, which the run
+# supplies for the velocity and the scalar alike (owner-ruled 2026-10-14): it follows the Reynolds
+# number the model is evaluated at, and never the scalar's amplitude.
 function _completed(d::DeferredForcing{VarianceController}, design)
   p = d.parameters.target === nothing ?
     _fill(d.parameters, :target, _from_design(design, :variance, :VarianceController, :target)) :
     d.parameters
-  design === nothing || p.turnover_time !== nothing || !haskey(design, :dissipation) ||
-    design.dissipation === nothing ||
-    (p = _fill(p, :turnover_time, 2 * design.kinetic_energy / (3 * design.dissipation)))
+  design === nothing || p.turnover_time !== nothing || !haskey(design, :turnover_time) ||
+    design.turnover_time === nothing ||
+    (p = _fill(p, :turnover_time, design.turnover_time))
   return p
 end
 # `:total` holds the whole field's energy, `:band` the band's own, which the model predicts.

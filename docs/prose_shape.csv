@@ -156,7 +156,7 @@ unit,words,longest_paragraph,admonitions
 "Cache.md § The observables cache",30,30,0
 "Forcing.jl :: AbstractForcing",399,83,1
 "Forcing.jl :: ConstantPower(domain; injection_rate, lowest_shell = 1, high",453,115,1
-"Forcing.jl :: DeferredForcing",442,92,0
+"Forcing.jl :: DeferredForcing",447,92,0
 "Forcing.jl :: Forcing",510,217,0
 "Forcing.jl :: Linear(domain; rate, lowest_shell = 1, highest_shell = 2)",263,123,0
 "Forcing.jl :: NoForcing()",16,15,0

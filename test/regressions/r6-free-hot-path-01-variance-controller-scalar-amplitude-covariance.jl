@@ -38,23 +38,34 @@ function covariance_violation(turnover_time; steps = 5)
   return maximum(abs.(φB .- 2 .* φA)) / maximum(abs.(φB))
 end
 
-@testset "a defaulted turnover_time is refused at the scalar binding; explicit covariance is exact" begin
+@testset "a scalar controller's omitted turnover_time is the flow's; explicit covariance is exact" begin
   # Control: with the SAME explicit turnover_time on both controllers, every term of the forced
   # scalar problem is homogeneous of degree one in φ and the covariance holds to the last bit.
   # This pins the rest of the scalar path (advection, diffusion, amplitude formula) as exactly
   # linear.
   @test covariance_violation(3.0) == 0.0
 
-  # The ruling: a defaulted-turnover_time controller bound as `scalar_forcing` is refused with a
-  # named ArgumentError at the one seam every construction path crosses (`FlowConditions`).
+  # The ruling, amended 2026-10-14 (decision 110): a run fills a scalar controller's omitted
+  # turnover_time with the FLOW's large-eddy time 2k/(3ε) — the value the refusal below names as the
+  # physical choice — which depends on nothing scalar, so the covariance holds under it too.
+  filled = Simulation(; grid_points_per_axis = 16, viscosity = 5e-2,
+                      scalar = PassiveScalar(forcing = VarianceController(; target = 1.0)),
+                      rng = MersenneTwister(42))
+  tℓ = filled.generator.conditions.scalar_forcing.turnover_time
+  flow = predicted_stationary_state(filled.domain; viscosity = 5e-2)
+  @test !filled.generator.conditions.scalar_forcing.turnover_time_derived
+  @test tℓ ≈ 2 * flow.kinetic_energy / (3 * flow.dissipation)
+  @test covariance_violation(tℓ) == 0.0
+  # A hand-built conditions record still meets the refusal at `FlowConditions`: nothing supplies
+  # the flow's time there, and the derived default reads the target as a kinetic energy.
+  domain = filled.domain
   err = try
-    Simulation(; grid_points_per_axis = 16, viscosity = 5e-2,
-               scalar = PassiveScalar(forcing = VarianceController(; target = 1.0)), rng = MersenneTwister(42))
+    FlowConditions(viscosity = 5e-2, schmidt = 1.0, velocity_forcing = NoForcing(),
+                   scalar_forcing = VarianceController(domain; target = 1.0))
     nothing
   catch e
     e
   end
-  @test err isa ArgumentError
   @test err isa ArgumentError && occursin("turnover_time", err.msg)
 
   # The velocity binding keeps its derived default — the target there IS a kinetic energy — so

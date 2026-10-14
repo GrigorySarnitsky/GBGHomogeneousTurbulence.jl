@@ -117,8 +117,10 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
   `DeferredForcing`; the velocity and the scalar are forced independently. No scalar stationary
   state is modelled, so a forcing needing one — a `VarianceRescaling(over = :band)` target, a
   [`Linear`](@ref GBGHomogeneousTurbulence.Forcing.Linear) rate, a
-  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) variance — states it. A
-  deferred `StochasticOU` takes the flow's box time for a correlation time in box units.
+  [`StochasticOU`](@ref GBGHomogeneousTurbulence.Forcing.StochasticOU) variance — states it. From
+  the flow's state a deferred forcing takes only what is the flow's: a `VarianceController` its
+  omitted `turnover_time`, the large-eddy time ``2k/(3\\varepsilon)``, and a `StochasticOU` the box
+  time a correlation time in box units is converted with.
 
 # Fields
 - `schmidt`, `variance`, `forcing` — the settings above.
@@ -709,6 +711,10 @@ end
 # At module scope, so the `dissipation` keyword of `Simulation` cannot shadow the reduction.
 _seeded_dissipation(state, domain, ν) = dissipation(state.velocity_spectral, domain, ν)
 
+# The flow's large-eddy turnover time 2k/(3ε), Bassenne's convention, which a `VarianceController`
+# left without one takes whichever field it drives; `nothing` where no ε is known.
+_turnover_time(k, ε) = (k === nothing || ε === nothing) ? nothing : 2 * k / (3 * ε)
+
 
 # The adopted-state sibling of the forcing check below: ν was derived assuming k =
 # `kinetic_energy`, and an injected state may hold something else entirely. Measured (one
@@ -847,7 +853,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   # stated `variance`, and from the velocity's state only the box time a correlation time in box
   # units is converted with. A derived ν warns only for a forcing that neither holds a member of
   # the state nor takes its strength from it (owner-ruled 2026-08-24).
-  design = merge(design, (; variance = design.kinetic_energy))
+  design = merge(design, (; variance = design.kinetic_energy,
+                            turnover_time = _turnover_time(design.kinetic_energy, design.dissipation)))
   vf = _materialize_forcing(velocity_spec, domain, design)
   viscosity === nothing && _held_quantity(velocity_spec) === nothing && !_takes_design(velocity_spec) &&
     _warn_derived_viscosity_forcing_mismatch(vf, design)
@@ -855,7 +862,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
                     velocity_forcing = vf,
                     scalar_forcing = carries_scalar ?
                       _materialize_forcing(_seeded(scalar.forcing, rng), domain,
-                                           (; variance = scalar.variance, box_time = design.box_time)) :
+                                           (; variance = scalar.variance, design.turnover_time,
+                                              box_time = design.box_time)) :
                       NoForcing())
   # The scalar's resolution check — AFTER `FlowConditions`, whose guard validates `schmidt > 0`
   # first (the √Sc below would turn a negative Sc into an unnamed DomainError otherwise).

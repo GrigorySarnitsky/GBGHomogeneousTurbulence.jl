@@ -3236,7 +3236,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     A `StochasticOU` seed left out is drawn — `rand(Int)` on a domain, the run's `rng` when deferred
     (decision 107) — instead of a 42 every run shared, and the deferred form takes either
     correlation time. The scalar's `variance` fills an omitted whole-field forcing target as
-    `kinetic_energy` does (decision 95), the scalar's own stationary model remaining future work;
+    `kinetic_energy` does (decision 95), and a scalar `VarianceController` left without a
+    `turnover_time` takes the flow's ``2k/(3\varepsilon)`` — the value the 2026-08-25 refusal
+    (`FlowConditions`) named as the physical choice, which it still demands of a hand-built one —
+    the scalar's own stationary model remaining future work;
     `tol` and `skew_floor` are `tolerance` and `skewness_floor`.
 
     The domain-building `Simulation` keeps `kwargs...` forwarding, since one source of defaults beats a full signature line and the
