@@ -288,10 +288,8 @@ dissipation_factor(::SaffmanDissipation, κη) = exp(-2 * κη^2)
 
 # The `Reference` is NOT a field. It is a property of the parametrization — the (large-scale,
 # dissipation) pair that names a published model — not of a particular instance's coefficients, and
-# holding it here made the struct a non-bitstype: a `Reference` carries strings. That blocked the one
-# place a model is evaluated on a device, the `initial_spectrum` seeding closure, because a lazy
-# radial kernel captures its σ by value and a device rejects a non-bitstype capture at launch. So a
-# `Phenomenology`-seeded run could not start on a GPU at all.
+# holding it here would make the struct a non-bitstype (a `Reference` carries strings), which a
+# device kernel capturing the model by value would reject at launch.
 """
     ModelSpectrum(C_K, large_scale, dissipation)
 

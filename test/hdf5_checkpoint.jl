@@ -244,9 +244,7 @@ end
   st_scalar = ResolvedFields(domain; scalar = true)
   tr = Tracers(domain; number_of_particles = 3, interpolation_scheme = CatmullRom,
                rng = MersenneTwister(5))
-  # Two ways to set the same thing, and property-of-the-adopted-object settings:
-  @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st,
-                                        initial_spectrum = κ -> κ^-2)
+  # A `scalar` setting disagreeing with the adopted state's contents:
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st, scalar = PassiveScalar())
   @test_throws ArgumentError Simulation(domain; viscosity = 0.05, state = st_scalar)
   # An adopted set's interpolation scheme and unwrapped record are its own: `ParticleTracking`'s

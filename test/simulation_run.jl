@@ -6,7 +6,6 @@
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
-using GBGHomogeneousTurbulence.Phenomenology.Spectra: VonKarman1948
 using GBGPeriodicFields: field_data
 using Random
 using Logging
@@ -83,20 +82,6 @@ using Test
     @test Simulation(grid_points_per_axis = 32, viscosity = 0.01).generator.conditions.viscosity == 0.01
   end
 
-  @testset "initial condition from a spectrum" begin
-    sim = Simulation(grid_points_per_axis = 48, viscosity = 0.01,
-                     initial_spectrum = VonKarman1948(), rng = MersenneTwister(4))
-    κ, E = energy_spectrum(sim.state.velocity_spectral, sim.domain)
-    @test all(≥(0), E)
-    @test isapprox(sum(E), kinetic_energy(sim.state.velocity_spectral); rtol = 1e-5)   # shape normalized to `energy`
-    @test κ[argmax(E)] < κ[end] / 2                            # energy concentrated at large scales
-
-    # a raw κ -> E(κ) function is also accepted
-    sim2 = Simulation(grid_points_per_axis = 32, viscosity = 0.02,
-                      initial_spectrum = κ -> κ^4 * exp(-κ), rng = MersenneTwister(4))
-    @test kinetic_energy(sim2.state.velocity_spectral) > 0
-    @test isapprox(sum(last(energy_spectrum(sim2.state.velocity_spectral, sim2.domain))) * (2π / sim2.domain.grid.domain_size[1]), kinetic_energy(sim2.state.velocity_spectral); rtol = 1e-5)
-  end
 
   @testset "the observation fires after every iteration — n iterations, n+1 observations" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; rng = MersenneTwister(7))

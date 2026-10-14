@@ -73,7 +73,6 @@ using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
                    restart!, history_depth, ParticleTraversal
 import ..Particles: rebuild_traversal!
 using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
-using ..Phenomenology.Spectra: EnergySpectrum, spectrum
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
        current_time, current_step, flow_parameters, every_steps, every_time,
@@ -393,28 +392,14 @@ The run group, `kwargs...` in both signatures
   A stated target is a statement of the run's state, so giving `kinetic_energy` or `dissipation`
   beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
   warning above.
-- `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the initial
-  condition, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
-  ``\\kappa_p/\\sqrt{2}``); it does **not** shape the profile when `initial_spectrum` is given (the model does), but it still
-  sets the integral scale of the *assumed state* that model is evaluated at. Keep ``\\kappa_p`` well
-  below the dealias cutoff: a value near or above it concentrates the seed, before its energy
-  rescale, in shells the dealiasing holds empty; the seeders warn when the envelope's peak reaches the cutoff (a
-  model-spectrum seed is shaped by its model instead and is not guarded).
-- `initial_spectrum = nothing` — draw the initial velocity from a
-  [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) `EnergySpectrum` (say
-  `VonKarman1948()`) instead of the default large-scale Gaussian. A model spectrum needs a flow
-  state, and at ``t = 0`` there is nothing measured yet, so one is *assumed* — a stand-in, not a
-  measurement of the field about to be seeded. The assumed state reads: ``\\varepsilon`` and ``u'``
-  from the run's stationary state, ``\\nu`` as resolved above, and `1/envelope_wavenumber` for the integral scale
-  (rather than the ``L_{11}`` the seeded field will actually have). A run with nothing predicted,
-  such as an unforced one, must state `dissipation` for the model to be evaluated at, and is refused
-  otherwise.
-  The seeded field is then normalized to the state's ``k``, so the model fixes the *shape* and the
-  assumed state only positions it. This shapes the **velocity** only; a scalar is always seeded from
-  the default Gaussian envelope, and a scalar-spectrum initial condition is reached by calling
-  [`random_scalar_spectral!`](@ref GBGHomogeneousTurbulence.State.random_scalar_spectral!) on the
-  built run and announcing the change with
-  [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!).
+- `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random
+  seed, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
+  ``\\kappa_p/\\sqrt{2}``). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above
+  it concentrates the seed, before its energy rescale, in shells the dealiasing holds empty, and the
+  seeders warn when the envelope's peak reaches the cutoff. The seed's shape is deliberately the
+  only one offered: the initial condition this package vouches for is the state the warm-up has
+  brought to stationarity, not the seed, and a seed shaped to a reference spectrum is a research
+  question of its own, outside this package.
 - `field_integration_scheme = IFLowStorageRK3()`, `cfl = recommended_cfl(field_integration_scheme, domain)` — the
   [`AbstractIntegrator`](@ref) scheme (its docstring catalogues the alternatives) and its
   advective-CFL ceiling (adapts to `dealiasing`).
@@ -438,10 +423,9 @@ The run group, `kwargs...` in both signatures
   `StochasticOU` forcing named without one (defaults to `Random.default_rng()`).
 - `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in place of the
   random seed, which is how a run continues from a stored or externally imported field. Its arrays
-  become the run's own and are not copied, so two runs must not adopt one state object. Four rules
+  become the run's own and are not copied, so two runs must not adopt one state object. Three rules
   apply to it:
     - it must live on the domain's grid and storage backend, and agree with `scalar`;
-    - `initial_spectrum` cannot be given with it, since the field is no longer being seeded;
     - a forcing state it carries in its `modeled` entry — as a checkpoint of a
       `StochasticOU` run does — continues where it
       left off, while a forcing whose entry is empty starts a fresh one. An entry that does not fit
@@ -760,7 +744,7 @@ function Simulation(domain::FixedDomain;
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
                     scalar::Union{Nothing, PassiveScalar} = nothing,
-                    envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER, initial_spectrum = nothing,
+                    envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER,
                     state::Union{Nothing, ResolvedFields} = nothing,
                     particles::Union{Nothing, ParticleTracking} = nothing,
                     rng = Random.default_rng())
@@ -772,10 +756,6 @@ function Simulation(domain::FixedDomain;
   # become the run's own, no copy — so a continuation or an external import skips the seeding.
   # Validated here, before anything is built from the settings the adoption overrides.
   if state !== nothing
-    initial_spectrum === nothing ||
-      throw(ArgumentError("`initial_spectrum` and `state` are two ways to set the initial " *
-                          "condition — `initial_spectrum` shapes the random seed, `state` adopts " *
-                          "an existing field set. Pass one, not both."))
     (state.scalar_spectral !== nothing) == carries_scalar ||
       throw(ArgumentError(carries_scalar ?
         "`scalar` was given but the given `state` carries no scalar: the run would advect a " *
@@ -880,19 +860,8 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
 
   if state === nothing
     state = ResolvedFields(domain; scalar = carries_scalar)
-    ic_spectrum = nothing
-    if initial_spectrum isa EnergySpectrum     # a `Phenomenology` model → evaluate at the run's state
-      ε === nothing &&
-        throw(ArgumentError("a `Phenomenology` `initial_spectrum` is evaluated at the run's dissipation " *
-                            "rate, and this run has none predicted ($uncovered). State `dissipation`."))
-      fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2 * k_design / 3),
-                          integral_scale = inv(envelope_wavenumber), schmidt)
-      ic_spectrum = κ -> spectrum(initial_spectrum, κ, fp)
-    elseif !isnothing(initial_spectrum)
-      ic_spectrum = initial_spectrum           # a raw κ -> E(κ) function
-    end
     random_solenoidal_velocity_spectral!(state.velocity_spectral, domain, k_design;
-                                         envelope_wavenumber, initial_spectrum = ic_spectrum, rng)
+                                         envelope_wavenumber, rng)
     carries_scalar &&
       random_scalar_spectral!(state.scalar_spectral, domain, scalar.variance; envelope_wavenumber, rng)
   end

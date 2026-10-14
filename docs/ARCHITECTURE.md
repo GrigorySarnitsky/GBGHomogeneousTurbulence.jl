@@ -3245,6 +3245,23 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     The domain-building `Simulation` keeps `kwargs...` forwarding, since one source of defaults beats a full signature line and the
     signature-fidelity rule forbids displaying what the method does not define.
 
+111. **(2026-10-14, user-directed) The random seed is the only initial condition built; the
+    spectrum-shaped seed is removed.** `Simulation` and both seeders took an `initial_spectrum` — a
+    raw ``\kappa \mapsto E(\kappa)``, or a `Phenomenology` law evaluated at an *assumed* flow state
+    whose integral scale was `1/envelope_wavenumber` — and shaped the seed to it before the energy
+    rescale. The owner removed it, a decision and not a deferral: the initial condition this package
+    vouches for is the state the warm-up has brought to stationarity, which erases the seed's
+    shape, and a seed matched to a reference spectrum is a research question of its own, outside
+    the package's scope.
+
+    With it went the keyword on `Simulation` and both seeders (the Gaussian envelope is the one
+    branch, its cutoff warning unconditional), the adoption refusal of `initial_spectrum` beside
+    `state` (decision 83's list is one shorter), the run layer's only evaluation of a `Spectra` law,
+    and the witnesses that pinned the branch. Decision 110's rule is met by the deletion:
+    `envelope_wavenumber = 2.0` has one meaning again and shows its default, and no either-or with
+    `state` remains to be detected. The `Reference` stays off the `ModelSpectrum` struct on its own
+    grounds, a property of the parametrization rather than of an instance.
+
 ## References
 
 Works are cited author–year above and given in full here, each with its DOI where the work has one. Four do not,

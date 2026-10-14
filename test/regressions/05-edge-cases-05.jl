@@ -60,26 +60,4 @@ using GBGHomogeneousTurbulence: FixedDomain, TwoThirds, max_retained_wavenumber,
       @test kinetic_energy(sim.state.velocity_spectral) ≈ requested
     end
   end
-
-
-  # The same silent-zero path on an ordinary grid: an `initial_spectrum` whose values underflow across
-  # the whole resolved band leaves every mode at 0, so the `current_energy > 0` guard is skipped again.
-  # No dealiasing degeneracy is needed — this is the general shape of the defect.
-  @testset "an initial_spectrum that vanishes over the resolved band must not silently seed a zero-energy field" begin
-    domain = FixedDomain(; grid_points_per_axis = 16, side_length = 2π,
-                         dealiasing = TwoThirds(), element_type = Float64, array_family = Array)
-    û = new_vector_field_spectral(domain)
-    requested = 1.5
-    threw = false
-    local seeded
-    try
-      seeded = random_solenoidal_velocity_spectral!(û, domain, requested; envelope_wavenumber = 2.0,
-                          initial_spectrum = κ -> exp(-1000 * κ),   # underflows to 0 for every κ ≥ 1
-                          rng = MersenneTwister(1))
-    catch err
-      threw = true
-      @info "seeding threw (acceptable)" err
-    end
-    threw || @test kinetic_energy(seeded) ≈ requested
-  end
 end

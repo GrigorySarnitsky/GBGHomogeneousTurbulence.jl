@@ -2,8 +2,7 @@
 # The sibling of the forcing-band-cutoff warning test in test/forcing.jl ("a band above the dealias
 # cutoff warns"). Mirrors its warns(f) capture helper. N = 16 under TwoThirds puts the dealias
 # cutoff at κ_max ≈ 5.33; the seeded spectrum peaks at κ_p/√2, so envelope_wavenumber = 12
-# (peak ≈ 8.49) must warn, envelope_wavenumber = 2 must stay silent, and the initial_spectrum
-# branch must stay silent regardless (the guard is gated on the default-envelope branch only).
+# (peak ≈ 8.49) must warn and envelope_wavenumber = 2 must stay silent.
 
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.State: random_solenoidal_velocity_spectral!, random_scalar_spectral!
@@ -48,15 +47,4 @@ using Test
   @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain, 1.0;
                                                     envelope_wavenumber = 2.0,
                                                     rng = MersenneTwister(5))))
-
-  # The initial_spectrum branch carries its own large scale; envelope_wavenumber is inert there,
-  # so even an absurd value must stay silent.
-  @test isempty(warns(() -> random_solenoidal_velocity_spectral!(û, domain, 0.5;
-                                                                 envelope_wavenumber = 12.0,
-                                                                 initial_spectrum = κ -> exp(-κ^2),
-                                                                 rng = MersenneTwister(6))))
-  @test isempty(warns(() -> random_scalar_spectral!(φ̂, domain, 1.0;
-                                                    envelope_wavenumber = 12.0,
-                                                    initial_spectrum = κ -> exp(-κ^2),
-                                                    rng = MersenneTwister(7))))
 end

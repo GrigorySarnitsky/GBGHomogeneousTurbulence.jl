@@ -159,10 +159,6 @@ end
   @test_throws ArgumentError Simulation(d; viscosity = 0.05, kinetic_energy = 1.0,
                                         velocity_forcing = ConstantPower(injection_rate = 0.1, lowest_shell = 2,
                                                                          highest_shell = 3))
-  # A model initial spectrum needs a dissipation rate, and none is predicted here.
-  model = GBGHomogeneousTurbulence.Phenomenology.Spectra.VonKarman1948()
-  @test_throws ArgumentError Simulation(d; viscosity = 0.05, velocity_forcing = NoForcing(),
-                                        initial_spectrum = model)
   # The scalar check measures the seeded field's ε instead of predicting one, and still runs.
   @test (quietly(() -> Simulation(d; viscosity = 0.05, velocity_forcing = NoForcing(), scalar = PassiveScalar()));
          true)
