@@ -160,11 +160,11 @@ end
   # run rebuilds it under the reader's setting, and the continuation is bitwise under any of them.
   h5open(path, "r") do io
     @test !haskey(io["run"], "particle_traversal")
-    @test !haskey(attributes(io["run"]), "ordered_interpolation")
+    @test !haskey(attributes(io["run"]), "traversal_mode")
   end
   @test sim2.particle_traversal isa ParticleTraversal && sim2.particle_traversal.automatic
-  manual = h5open(io -> read_simulation(io, "run"; ordered_interpolation = :manual), path, "r")
-  off = h5open(io -> read_simulation(io, "run"; ordered_interpolation = false), path, "r")
+  manual = h5open(io -> read_simulation(io, "run"; traversal_mode = :manual), path, "r")
+  off = h5open(io -> read_simulation(io, "run"; traversal_mode = :none), path, "r")
   @test !manual.particle_traversal.automatic
   @test off.particle_traversal === nothing
   for _ in 1:3

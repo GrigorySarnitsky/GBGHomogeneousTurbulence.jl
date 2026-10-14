@@ -350,12 +350,12 @@ end
       end
       occursin("under-resolved", String(take!(buf)))
     end
-    @test !fires(; scalar = true)                                       # Sc = 1: resolved
-    @test !fires(; scalar = true, schmidt = 1.5)                        # κ_max·η_B ≈ 1.63: above floor
-    @test fires(; scalar = true, schmidt = 2.0)                         # ≈ 1.41: below floor
-    @test fires(; scalar = true, schmidt = 7.0)                         # ≈ 0.76: clearly under-resolved
-    @test !fires(; schmidt = 7.0)                                       # no scalar, nothing to resolve
-    @test fires(; scalar = true, schmidt = 7.0, viscosity = 0.08)       # explicit ν is checked too
+    @test !fires(; scalar = PassiveScalar())                            # Sc = 1: resolved
+    @test !fires(; scalar = PassiveScalar(schmidt = 1.5))               # κ_max·η_B ≈ 1.63: above floor
+    @test fires(; scalar = PassiveScalar(schmidt = 2.0))                # ≈ 1.41: below floor
+    @test fires(; scalar = PassiveScalar(schmidt = 7.0))                # ≈ 0.76: clearly under-resolved
+    @test !fires()                                                      # no scalar, nothing to resolve
+    @test fires(; scalar = PassiveScalar(schmidt = 7.0), viscosity = 0.08)  # explicit ν is checked too
   end
 end
 

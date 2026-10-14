@@ -63,7 +63,7 @@ const PRECISION = Dict("Float32" => Float32, "Float64" => Float64)
 
   printing = get(ENV, "GPU_MEMORY_PRINT", "") == "1"
   for m in rows
-    settings = (dealiasing = DEALIASING[m[1]], element_type = PRECISION[m[2]], scalar = m[3] == "yes")
+    settings = (dealiasing = DEALIASING[m[1]], element_type = PRECISION[m[2]], scalar = m[3] == "yes" ? PassiveScalar() : nothing)
     poly = resident_polynomial(; settings...)
     @testset "$(m[1]) $(m[2]) scalar=$(m[3])" begin
       @test poly.evaluate(CHECK_SIZE) == resident_bytes(CHECK_SIZE; settings...)   # the cubic is exact
@@ -126,8 +126,8 @@ const TRACER_SENTENCE = r"a `Float32` run holds (\d+) bytes per tracer and a `Fl
   m = match(TRACER_SENTENCE, read(PAGE, String))
   @test m !== nothing
   for (T, stated) in ((Float32, m[1]), (Float64, m[2]))
-    per_tracer = (resident_bytes(32; element_type = T, number_of_particles = 40_000) -
-                  resident_bytes(32; element_type = T, number_of_particles = 10_000)) / 30_000
+    per_tracer = (resident_bytes(32; element_type = T, particles = ParticleTracking(number_of_particles = 40_000)) -
+                  resident_bytes(32; element_type = T, particles = ParticleTracking(number_of_particles = 10_000))) / 30_000
     @test per_tracer == parse(Int, stated)
   end
 end

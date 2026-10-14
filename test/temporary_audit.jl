@@ -137,6 +137,8 @@ const ROWS = Dict{Symbol, Function}(
   :FlowConditions => c -> (() -> FlowConditions(viscosity = 0.05, schmidt = 1.0, velocity_forcing = NoForcing(),
                                                   scalar_forcing = NoForcing()), ()),
   :StationarityCriterion => c -> (() -> StationarityCriterion(), ()),
+  :PassiveScalar => c -> (() -> PassiveScalar(), ()),
+  :ParticleTracking => c -> (() -> ParticleTracking(number_of_particles = 8), ()),
   :DeferredForcing => c -> (() -> ConstantPower(), ()),
   :StochasticOUState => c -> (() -> initial_forcing_state(
       StochasticOU(c.domain; forcing_variance = 0.1, correlation_time = 0.5, seed = 1), c.û, c.domain), (c.sim,)),

@@ -222,7 +222,7 @@ end
     end
 
     # A caller's gather takes the same order, with the same values.
-    on = tracked(nothing); off = tracked(false)
+    on = tracked(:automatic); off = tracked(:none)
     a = new_vector_point_values(on.tracers); b = new_vector_point_values(off.tracers)
     interpolate_at_particles!(a, velocity_physical(on.cache), on.tracers;
                               traversal = on.particle_traversal)
@@ -238,7 +238,7 @@ end
 
     # A reposition then an advance still matches the run without an order: the automatic rebuild
     # reads the start-of-step positions, so an announced reseed needs no traversal verb of its own.
-    on = tracked(nothing; steps = 2); off = tracked(false; steps = 2)
+    on = tracked(:automatic; steps = 2); off = tracked(:none; steps = 2)
     for s in (on, off)
       copyto!(point_positions(s.tracers.positions),
               s.domain.grid.domain_size[1] .* rand(MersenneTwister(11), 300, 3))
