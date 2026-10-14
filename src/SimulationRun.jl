@@ -84,8 +84,8 @@ end
 
 """
     Simulation(; grid_points_per_axis, κ_max_η = nothing, kinetic_energy = nothing,
-                 dissipation = nothing, side_length = 2π, element_type = Float64,
-                 array_family = Array, dealiasing = TwoThirds(), kwargs...)
+                 dissipation = nothing, side_length = 2π, dealiasing = TwoThirds(),
+                 element_type = Float64, array_family = Array, kwargs...)
     Simulation(domain; κ_max_η = nothing, kinetic_energy = nothing, dissipation = nothing,
                kwargs...)
 
@@ -181,11 +181,11 @@ The domain group:
   standing in for every other keyword of this group.
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
 - `side_length = 2π` — the box side ``L``.
-- `element_type = Float64`, `array_family = Array` — the real element type and storage backend
-  ([Memory footprint on a GPU](@ref) sizes a run).
 - `dealiasing = TwoThirds()` — the [`DealiasingStrategy`](@ref) (``2/3`` sharp, `HouLi` smooth, or
   `PhaseShift`); it sets the retained band (hence the CFL step) and the resolved band (hence the
   ``\\kappa_{\\max}`` of `κ_max_η`).
+- `element_type = Float64`, `array_family = Array` — the real element type and storage backend
+  ([Memory footprint on a GPU](@ref) sizes a run).
 - `fft_flags = nothing`, `fft_timelimit = Inf` — the FFT planner request, forwarded to the
   `FixedDomain` being built (pass `FFTW.MEASURE` for a long CPU run — the planner note
   there explains why; inert on a GPU backend).
@@ -217,10 +217,9 @@ The run group, `kwargs...` in both signatures
   is `κ_max_η` raised by ``\\sqrt{\\mathrm{Sc}}``, or `viscosity` set by hand.
 - `scalar = false`, `scalar_variance = 1.0` — whether to evolve a passive scalar (a mean-zero
   ``\\varphi``), and its initial variance.
-- `velocity_forcing`, `scalar_forcing` — an [`AbstractForcing`](@ref) (or a
-  `DeferredForcing`, a forcing named by its keywords before the domain exists); `velocity_forcing` left at `nothing` means the default,
-  `ConstantPower()` injecting the state's ``\\varepsilon``, and `scalar_forcing` defaults to
-  `NoForcing()`. A deferred velocity forcing may leave its strength out for the state to fill; a
+- `velocity_forcing = ConstantPower()`, `scalar_forcing = NoForcing()` — an
+  [`AbstractForcing`](@ref) (or a `DeferredForcing`, a forcing named by its keywords before the
+  domain exists); the default velocity forcing injects the state's ``\\varepsilon``. A deferred velocity forcing may leave its strength out for the state to fill; a
   scalar forcing states its own, since no scalar state is modelled. The velocity and scalar are forced independently.
   A [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) with a defaulted `turnover_time` is refused as `scalar_forcing` (its
   derived settling time reads the target as a kinetic energy) — pass the flow's turnover time
@@ -613,7 +612,7 @@ function Simulation(domain::FixedDomain;
                     dissipation::Union{Nothing, Real} = nothing,
                     κ_max_η = nothing, viscosity = nothing,
                     schmidt::Real = 1.0,
-                    velocity_forcing = nothing,
+                    velocity_forcing = ConstantPower(),
                     scalar_forcing = NoForcing(),
                     field_integration_scheme::AbstractIntegrator = IFLowStorageRK3(),
                     cfl::Real = recommended_cfl(field_integration_scheme, domain), max_dt::Real = Inf,
@@ -685,12 +684,10 @@ function Simulation(domain::FixedDomain;
   scalar_variance >= 0 ||
     throw(ArgumentError("`scalar_variance` must be non-negative, got $scalar_variance: it is ⟨φ²⟩"))
   side_length = domain.grid.domain_size[1]
-  # The default forcing needs no gain or settling time to choose — it holds the injection rate, which
-  # it takes from the run's state. `nothing` stays the sentinel so a hand-built forcing is detectable.
-  velocity_spec = velocity_forcing === nothing ? ConstantPower() : velocity_forcing
   # A forcing given as a function of the domain is built now, so the model can read the strategy it
   # returns; a built strategy states its own strength.
-  velocity_spec isa Union{AbstractForcing, DeferredForcing} || (velocity_spec = velocity_spec(domain))
+  velocity_spec = velocity_forcing isa Union{AbstractForcing, DeferredForcing} ? velocity_forcing :
+                  velocity_forcing(domain)
   # Both arguments set ν, by different routes, so accepting both would silently honour one of them.
   if !isnothing(viscosity) && !isnothing(κ_max_η)
     throw(ArgumentError("`viscosity` and `κ_max_η` are two ways to set ν — `viscosity` fixes it \
@@ -800,9 +797,9 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
 
 
-  # `nothing` sentinels, like `velocity_forcing`'s: a particle-only setting configured on a
-  # particle-free run would be silently discarded, which is the quiet-wrong-configuration shape
-  # `ResolvedGenerator` refuses for a scalar forcing without a scalar.
+  # A particle-only setting configured on a particle-free run would be silently discarded, which is
+  # the quiet-wrong-configuration shape `ResolvedGenerator` refuses for a scalar forcing without a
+  # scalar; the `nothing` defaults exist so that "given at all" is detectable here.
   if number_of_particles == 0 && tracers === nothing
     for (name, value) in (("interpolation_scheme", interpolation_scheme),
                           ("particle_integration_scheme", particle_integration_scheme),
@@ -884,8 +881,8 @@ _traversal_order(::Nothing) = nothing
 _traversal_order(traversal::ParticleTraversal) = traversal.order
 
 function Simulation(; grid_points_per_axis::Integer, side_length::Real = 2π,
-                    element_type::Type = Float64, array_family = Array,
                     dealiasing::DealiasingStrategy = TwoThirds(),
+                    element_type::Type = Float64, array_family = Array,
                     fft_flags = nothing, fft_timelimit::Real = Inf, kwargs...)
   return Simulation(FixedDomain(; grid_points_per_axis, side_length, dealiasing, element_type,
                                   array_family, fft_flags, fft_timelimit); kwargs...)
@@ -1356,15 +1353,15 @@ end
 # fixed-injection forcing; the small scales settle last, so a flat ε is the strict indicator. Flatness
 # is a two-half-window mean comparison over a trailing window in eddy-turnover units. The strict gate
 # is the velocity-derivative skewness S(t) (≈0 for a random-phase field, →−0.5 for a developed
-# cascade): a flat S with |S| ≥ skew_floor marks real turbulence. The transform-heavy skewness is
+# cascade): a flat S with |S| ≥ skewness_floor marks real turbulence. The transform-heavy skewness is
 # sampled only at the storage cadence.
 mutable struct StationarityMonitor
   min_turnovers::Float64        # do not test before this (past the start-up overshoot)
   window_turnovers::Float64     # trailing window for the flatness test
-  tol::Float64                  # relative-drift threshold
+  tolerance::Float64                  # relative-drift threshold
   gate_scalar::Bool             # also require ⟨φ²⟩ to be flat
-  gate_skewness::Bool               # also require S to have plateaued (and |S| ≥ skew_floor)
-  skew_floor::Float64           # minimum |S| for a plateau to count as developed turbulence
+  gate_skewness::Bool               # also require S to have plateaued (and |S| ≥ skewness_floor)
+  skewness_floor::Float64           # minimum |S| for a plateau to count as developed turbulence
   sample_gap::Float64           # min turnover spacing between stored samples
   turn::Vector{Float64}
   eps::Vector{Float64}
@@ -1373,14 +1370,14 @@ mutable struct StationarityMonitor
   converged::Bool
 end
 
-StationarityMonitor(; min_turnovers, window_turnovers, tol, gate_scalar, gate_skewness, skew_floor) =
-  StationarityMonitor(Float64(min_turnovers), Float64(window_turnovers), Float64(tol),
-                      gate_scalar, gate_skewness, Float64(skew_floor), Float64(window_turnovers) / 40,
+StationarityMonitor(; min_turnovers, window_turnovers, tolerance, gate_scalar, gate_skewness, skewness_floor) =
+  StationarityMonitor(Float64(min_turnovers), Float64(window_turnovers), Float64(tolerance),
+                      gate_scalar, gate_skewness, Float64(skewness_floor), Float64(window_turnovers) / 40,
                       Float64[], Float64[], Float64[], Float64[], false)
 
 # No net drift of the series y(turn) across the trailing window [now−W, now]:
-# |mean(2nd half) − mean(1st half)| / |mean| < tol.
-function _is_flat(turn, y, now, W, tol)
+# |mean(2nd half) − mean(1st half)| / |mean| < tolerance.
+function _is_flat(turn, y, now, W, tolerance)
   mid = now - W / 2
   s1 = 0.0; n1 = 0; s2 = 0.0; n2 = 0
   @inbounds for i in eachindex(turn)
@@ -1394,7 +1391,7 @@ function _is_flat(turn, y, now, W, tol)
   (n1 == 0 || n2 == 0) && return false
   mean_all = (s1 + s2) / (n1 + n2)
   abs(mean_all) < 1e-30 && return true
-  return abs(s2 / n2 - s1 / n1) / abs(mean_all) < tol
+  return abs(s2 / n2 - s1 / n1) / abs(mean_all) < tolerance
 end
 
 # Mean of the series `y(turn)` over the trailing window `[now-W, now]`.
@@ -1418,11 +1415,11 @@ function _push_and_test!(m::StationarityMonitor, elapsed_turn, ε, φ2, S)
   end
   elapsed_turn ≥ m.min_turnovers || return false
   m.turn[1] ≤ elapsed_turn - m.window_turnovers || return false
-  flat_v = _is_flat(m.turn, m.eps, elapsed_turn, m.window_turnovers, m.tol)
-  flat_s = !m.gate_scalar || _is_flat(m.turn, m.phi2, elapsed_turn, m.window_turnovers, m.tol)
+  flat_v = _is_flat(m.turn, m.eps, elapsed_turn, m.window_turnovers, m.tolerance)
+  flat_s = !m.gate_scalar || _is_flat(m.turn, m.phi2, elapsed_turn, m.window_turnovers, m.tolerance)
   flat_k = !m.gate_skewness ||
-           (_is_flat(m.turn, m.skew, elapsed_turn, m.window_turnovers, m.tol) &&
-            abs(_window_mean(m.turn, m.skew, elapsed_turn, m.window_turnovers)) ≥ m.skew_floor)
+           (_is_flat(m.turn, m.skew, elapsed_turn, m.window_turnovers, m.tolerance) &&
+            abs(_window_mean(m.turn, m.skew, elapsed_turn, m.window_turnovers)) ≥ m.skewness_floor)
   m.converged = flat_v && flat_s && flat_k
   return m.converged
 end
@@ -1441,8 +1438,8 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 
 """
     StationarityCriterion(; gate_scalar = true, gate_skewness = false,
-                            min_turnovers = 5, window_turnovers = 4, tol = 0.05,
-                            skew_floor = 0.1, max_turnovers = 60)
+                            min_turnovers = 5, window_turnovers = 4, tolerance = 0.05,
+                            skewness_floor = 0.1, max_turnovers = 60)
 
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
@@ -1464,8 +1461,8 @@ flatness would certify the forcing, not the flow.
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).
 - `gate_skewness` — also require the velocity-derivative skewness ``S`` to have plateaued **and** reached
-  ``\\lvert S\\rvert \\ge \\texttt{skew\\_floor}`` — the "real turbulence yet" signal, exactly as
-  strict as its floor (see `skew_floor` below): a
+  ``\\lvert S\\rvert \\ge \\texttt{skewness\\_floor}`` — the "real turbulence yet" signal, exactly as
+  strict as its floor (see `skewness_floor` below): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
   ``S \\approx -0.5``. It is **off by default**, and turning it on is the stricter spin-up: the
   ``\\varepsilon`` gate alone can be satisfied by a field whose cascade is not yet developed, so a
@@ -1476,10 +1473,10 @@ flatness would certify the forcing, not the flow.
   is on, the skewness is measured on the criterion's own sampling interval — one
   sample per `window_turnovers / 40` of turnover time, giving about forty samples across the
   trailing window — rather than every iteration.
-- `min_turnovers`, `window_turnovers`, `tol` — do not test before `min_turnovers` eddy-turnover
+- `min_turnovers`, `window_turnovers`, `tolerance` — do not test before `min_turnovers` eddy-turnover
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
-  trailing `window_turnovers`, relative drift below `tol`.
-- `skew_floor` — the minimum ``\\lvert S\\rvert`` for a plateau to count as developed turbulence.
+  trailing `window_turnovers`, relative drift below `tolerance`.
+- `skewness_floor` — the minimum ``\\lvert S\\rvert`` for a plateau to count as developed turbulence.
   The default `0.1` is a **floor against a random-phase field**, which starts at ``S \\approx 0``; it
   is a fifth of the ``\\lvert S\\rvert \\approx 0.5`` of a developed cascade, so clearing it means
   "no longer Gaussian", not "fully developed". Raise it toward `0.4` when the run's statistics
@@ -1491,8 +1488,8 @@ The criterion carries its own observation state (the sampled signals and the tur
 build a fresh one per run.
 
 # Fields
-The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tol` and
-`skew_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
+The fields are not the keywords: `gate_skewness`, `min_turnovers`, `window_turnovers`, `tolerance` and
+`skewness_floor` all live inside `monitor`, which holds the sampled series together with the thresholds
 that judge them. Build one through the keyword constructor above.
 - `monitor` — the sampled signal series (``\\varepsilon``, the scalar variance, the skewness — not
   ``k``, which this criterion deliberately never gates on), each recorded against the turnover
@@ -1513,10 +1510,10 @@ end
 
 function StationarityCriterion(; gate_scalar::Bool = true, gate_skewness::Bool = false,
                                min_turnovers::Real = 5, window_turnovers::Real = 4,
-                               tol::Real = 0.05, skew_floor::Real = 0.1,
+                               tolerance::Real = 0.05, skewness_floor::Real = 0.1,
                                max_turnovers::Real = 60)
-  monitor = StationarityMonitor(; min_turnovers, window_turnovers, tol,
-                                gate_scalar, gate_skewness = gate_skewness, skew_floor)
+  monitor = StationarityMonitor(; min_turnovers, window_turnovers, tolerance,
+                                gate_scalar, gate_skewness = gate_skewness, skewness_floor)
   return StationarityCriterion(monitor, Float64(max_turnovers), gate_scalar, 0.0, NaN, false)
 end
 
@@ -1525,8 +1522,8 @@ end
 # never the series; the criterion nests it and adds its own cap and progress.
 function Base.show(io::IO, monitor::StationarityMonitor)
   print(io, "StationarityMonitor(min_turnovers ", monitor.min_turnovers, ", window_turnovers ",
-        monitor.window_turnovers, ", tol ", monitor.tol, ", gate_scalar ", monitor.gate_scalar,
-        ", gate_skewness ", monitor.gate_skewness, ", skew_floor ", monitor.skew_floor,
+        monitor.window_turnovers, ", tolerance ", monitor.tolerance, ", gate_scalar ", monitor.gate_scalar,
+        ", gate_skewness ", monitor.gate_skewness, ", skewness_floor ", monitor.skewness_floor,
         ", ", length(monitor.turn), " samples", monitor.converged ? ", converged" : "", ")")
 end
 

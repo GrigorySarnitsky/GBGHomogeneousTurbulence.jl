@@ -178,8 +178,8 @@ using Test
     turn = collect(0.0:0.1:10.0)
     @test D._is_flat(turn, fill(2.0, length(turn)) .+ 0.001 .* sin.(turn), 10.0, 4.0, 0.05)  # flat
     @test !D._is_flat(turn, 1.0 .+ 0.1 .* turn, 10.0, 4.0, 0.05)                              # drifting
-    mon(; gk = false) = D.StationarityMonitor(; min_turnovers = 3, window_turnovers = 3, tol = 0.05,
-                                              gate_scalar = false, gate_skewness = gk, skew_floor = 0.1)
+    mon(; gk = false) = D.StationarityMonitor(; min_turnovers = 3, window_turnovers = 3, tolerance = 0.05,
+                                              gate_scalar = false, gate_skewness = gk, skewness_floor = 0.1)
     # flat ε converges; drifting ε does not
     mflat = mon()
     for et in 0.0:0.05:12.0; D._push_and_test!(mflat, et, 2.0 + 0.001 * sin(et), 0.0, 0.0); end
@@ -197,20 +197,20 @@ using Test
     @test mplat.converged
     mzero = mon(; gk = true)
     for et in 0.0:0.05:12.0; D._push_and_test!(mzero, et, 2.0, 0.0, 0.001 * sin(et)); end
-    @test !mzero.converged                                                # flat but below skew_floor
+    @test !mzero.converged                                                # flat but below skewness_floor
   end
 
   @testset "warmup! detects stationarity" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                      velocity_forcing = ConstantPower(injection_rate = 0.1), scalar = false,
                      rng = MersenneTwister(21))
-    warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.3, max_turnovers = 10)
+    warmup!(sim; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tolerance = 0.3, max_turnovers = 10)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test current_step(sim) > 0
     # the criterion is an ordinary run! observation
     sim2 = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(22))
     run!(StationarityCriterion(; gate_skewness = false, min_turnovers = 1, window_turnovers = 1,
-                               tol = 0.5, max_turnovers = 4), sim2)
+                               tolerance = 0.5, max_turnovers = 4), sim2)
     @test current_step(sim2) > 0
   end
 
@@ -221,7 +221,7 @@ using Test
                         scalar_forcing = StochasticOU(forcing_variance = 1.0, correlation_time_in_box_units = 0.3),
                         scalar = true, rng = MersenneTwister(23))
     @test D._scalar_forced(forced)                                        # scalar gate active
-    warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tol = 0.35, max_turnovers = 10)
+    warmup!(forced; gate_skewness = false, min_turnovers = 2, window_turnovers = 2, tolerance = 0.35, max_turnovers = 10)
     @test isfinite(scalar_variance(forced.state.scalar_spectral)) && scalar_variance(forced.state.scalar_spectral) > 0
     @test current_step(forced) > 0
     plain = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = false, rng = MersenneTwister(24))
@@ -255,7 +255,7 @@ using Test
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.03;
                      velocity_forcing = ConstantPower(injection_rate = 0.15), scalar = false,
                      rng = MersenneTwister(31))
-    warmup!(sim; min_turnovers = 2, window_turnovers = 2, tol = 0.3, skew_floor = 0.1, max_turnovers = 8)
+    warmup!(sim; min_turnovers = 2, window_turnovers = 2, tolerance = 0.3, skewness_floor = 0.1, max_turnovers = 8)
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
     @test isfinite(derivative_skewness(sim.state.velocity_spectral, sim.domain))
     @test current_step(sim) > 0
