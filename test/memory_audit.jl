@@ -498,7 +498,8 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
         scalar in (false, true), tracers in (0, 4)
       sim = Simulation(domains[dealiasing]; viscosity = 0.1, scalar = scalar ? PassiveScalar() : nothing,
                        velocity_forcing = NoForcing(), field_integration_scheme = _scheme(scheme),
-                       number_of_particles = tracers, rng = MersenneTwister(1))
+                       particles = tracers == 0 ? nothing : ParticleTracking(number_of_particles = tracers),
+                       rng = MersenneTwister(1))
       @test _counts((sim,), N_AUDIT) ==
             _add(FRAME, _add(BASE[(scheme, dealiasing, scalar)],
                              tracers > 0 ? TRACER_DELTA : ZERO))
@@ -544,7 +545,7 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
     # array joins the four above, and no field-scale array appears: the `FRAME + BASE + TRACER_DELTA`
     # ledger over a tracked run holds with TRACER_DELTA still ZERO (asserted above).
     M = 4
-    sim = Simulation(domains[:TwoThirds]; viscosity = 0.1, number_of_particles = M,
+    sim = Simulation(domains[:TwoThirds]; viscosity = 0.1, particles = ParticleTracking(number_of_particles = M),
                      rng = MersenneTwister(1))
     traversal = sim.particle_traversal
     @test traversal isa ParticleTraversal && traversal.automatic
@@ -567,8 +568,9 @@ const GAP_HOLDERS = Dict{Tuple{Symbol, Bool}, Dict{Symbol, Holder}}()   # claims
       @test isempty([a for a in _m_arrays(owner) if objectid(a) in traversal_ids])
     end
     # Opted out, the run holds nothing of it.
-    off = Simulation(domains[:TwoThirds]; viscosity = 0.1, number_of_particles = M,
-                     ordered_interpolation = false, rng = MersenneTwister(1))
+    off = Simulation(domains[:TwoThirds]; viscosity = 0.1,
+                     particles = ParticleTracking(number_of_particles = M, traversal_mode = :none),
+                     rng = MersenneTwister(1))
     @test off.particle_traversal === nothing
   end
 

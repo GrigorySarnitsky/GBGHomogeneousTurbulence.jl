@@ -18,8 +18,9 @@ const SEED = 11
 const NPART = 24
 
 function build(scheme)
-  Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = NPART,
-             particle_integration_scheme = scheme, rng = MersenneTwister(SEED))
+  Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+             particles = ParticleTracking(number_of_particles = NPART, particle_integration_scheme = scheme),
+             rng = MersenneTwister(SEED))
 end
 
 @testset "AdamsBashforth restarts its history when the tracers are reseeded" begin

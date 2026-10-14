@@ -27,7 +27,7 @@ using GBGHomogeneousTurbulence
 
 @testset "velocity_at_particles is checked against BOTH epochs, so advance!'s guard fires after a reposition" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                   number_of_particles = 8, rng = MersenneTwister(1))
+                   particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(1))
   advance!(sim)
 
   # Precondition — a closed iteration leaves the slot current on both counters and the read serves.

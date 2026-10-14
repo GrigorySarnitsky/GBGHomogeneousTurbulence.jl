@@ -15,8 +15,10 @@ using Test
 
 @testset "an announced tracer reposition restarts the AdamsBashforth history" begin
   K = 4
-  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
-                   particle_integration_scheme = AdamsBashforth(order = K), rng = MersenneTwister(7))
+  sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                   particles = ParticleTracking(number_of_particles = 8,
+                                                particle_integration_scheme = AdamsBashforth(order = K)),
+                   rng = MersenneTwister(7))
   for _ in 1:5
     advance!(sim)
   end

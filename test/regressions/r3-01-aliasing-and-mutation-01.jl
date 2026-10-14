@@ -14,7 +14,7 @@ using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
 
 @testset "velocity_at_particles throws when only the particles epoch has advanced" begin
   rng = MersenneTwister(20260820)
-  sim = Simulation(; grid_points_per_axis = 16, number_of_particles = 4,
+  sim = Simulation(; grid_points_per_axis = 16, particles = ParticleTracking(number_of_particles = 4),
                    kinetic_energy = 1.5, rng)
   advance!(sim)                                   # a full iteration: every slot deposited
   v_before = copy(Array(velocity_at_particles(sim.cache)))   # readable here, by construction
@@ -32,7 +32,7 @@ using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
 
   # (b) the same window the run itself passes through mid-iteration: the epoch bump that precedes
   #     the closing particle `deposit!`
-  sim2 = Simulation(; grid_points_per_axis = 16, number_of_particles = 4,
+  sim2 = Simulation(; grid_points_per_axis = 16, particles = ParticleTracking(number_of_particles = 4),
                     kinetic_energy = 1.5, rng = MersenneTwister(20260821))
   advance!(sim2)
   advance_particles_epoch!(sim2.cache)

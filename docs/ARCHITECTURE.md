@@ -521,7 +521,7 @@ relative to the field's spectral accuracy (`CatmullRom` by default, higher-order
 The gathers themselves visit the tracers in a memory-locality order, the `ParticleTraversal` — a
 value-preserving accelerator (the interpolated values are bit-identical with or without it) that
 `Simulation` owns beside the tracer set and rebuilds every iteration by default, the
-`ordered_interpolation` setting choosing a manual cadence instead (decision 86).
+`traversal_mode` of its `ParticleTracking` choosing a manual cadence instead (decision 86).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same
 linear-exact move), while **orientation dynamics on the rotation group is a distinct geometric
@@ -2594,7 +2594,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     a break-even of two to six steps, so the every-iteration rebuild sits within ``0.3\%`` of the
     optimum, and that is the default (`ordered_interpolation = nothing` resolves to `true`
     whenever the run carries tracers). A stale order is never wrong, only progressively less
-    useful, which is what makes a user-chosen cadence safe: `ordered_interpolation = :manual`
+    useful, which is what makes a user-chosen cadence safe: `traversal_mode = :manual`
     keeps the order resident and rebuilds it only through `rebuild_traversal!(sim)`, `false`
     allocates nothing, and naming the setting on a tracer-free run is refused (the by-name
     guard of decision 83, extended to one more setting). The verbs a caller drives directly take the same order

@@ -13,8 +13,9 @@ using Random
 
 @testset "a particle_integration_scheme requested through Simulation is never silently discarded" begin
   # Control 1: with particles asked for, the requested scheme is honoured.
-  with_particles = Simulation(grid_points_per_axis = 16, number_of_particles = 4,
-                              particle_integration_scheme = AdamsBashforth(order = 4),
+  with_particles = Simulation(grid_points_per_axis = 16,
+                              particles = ParticleTracking(number_of_particles = 4,
+                                                           particle_integration_scheme = AdamsBashforth(order = 4)),
                               rng = MersenneTwister(1))
   @test with_particles.particle_integration_scheme isa AdamsBashforth
 
@@ -23,14 +24,10 @@ using Random
   plain = Simulation(grid_points_per_axis = 16, rng = MersenneTwister(1))
   @test plain.tracers === nothing
 
-  # The claim: an explicitly requested scheme with `number_of_particles` left at its default.
-  honoured = try
-    dropped = Simulation(grid_points_per_axis = 16,
-                         particle_integration_scheme = AdamsBashforth(order = 4),
-                         rng = MersenneTwister(1))
-    dropped.particle_integration_scheme isa AdamsBashforth   # kept → the request survived
-  catch err
-    err isa ArgumentError                          # refused → the request was answered
-  end
-  @test honoured
+  # The claim: a particle scheme requested without particles. Since 2026-10-14 the scheme travels
+  # inside `ParticleTracking`, which always carries a tracer set, so the request cannot be written
+  # for a tracer-free run: `Simulation` has no such keyword.
+  @test_throws MethodError Simulation(grid_points_per_axis = 16,
+                                      particle_integration_scheme = AdamsBashforth(order = 4),
+                                      rng = MersenneTwister(1))
 end

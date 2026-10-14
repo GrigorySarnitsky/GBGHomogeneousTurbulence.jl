@@ -34,8 +34,9 @@ println("audit-pinned:      tracers=", length(m_arrays(tracers)),
 # What a live front-door run holds on each point of the (unswept) trajectory-scheme axis.
 for scheme in (Heun(), AdamsBashforth(order = 2), AdamsBashforth(order = 4),
                AdamsBashforth(order = 8))
-  sim = Simulation(domain; viscosity = 0.1, number_of_particles = M,
-                   particle_integration_scheme = scheme, rng = MersenneTwister(1))
+  sim = Simulation(domain; viscosity = 0.1,
+                   particles = ParticleTracking(number_of_particles = M, particle_integration_scheme = scheme),
+                   rng = MersenneTwister(1))
   acc = AbstractArray[]
   collect_field_arrays!(acc, sim, Set{UInt}(), 2)
   n = count(a -> size(a) == (M, 3), acc)
@@ -45,8 +46,10 @@ end
 
 # Why the count above does not move: the reflective walk stops at an `AbstractArray`, so a
 # `Vector{<:AbstractArray}` (the history container) is counted as ONE array and never recursed into.
-sim8 = Simulation(domain; viscosity = 0.1, number_of_particles = M,
-                  particle_integration_scheme = AdamsBashforth(order = 8), rng = MersenneTwister(1))
+sim8 = Simulation(domain; viscosity = 0.1,
+                  particles = ParticleTracking(number_of_particles = M,
+                                               particle_integration_scheme = AdamsBashforth(order = 8)),
+                  rng = MersenneTwister(1))
 acc = AbstractArray[]
 collect_field_arrays!(acc, sim8, Set{UInt}(), 2)
 println("AB8 walk, all reached array shapes: ", sort(string.(size.(acc))))

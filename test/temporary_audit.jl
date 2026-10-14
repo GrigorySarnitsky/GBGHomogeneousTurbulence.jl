@@ -59,7 +59,8 @@ function context(N)
   domain = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(),
                        element_type = Float64, array_family = Array)
   sim = quiet(() -> Simulation(domain; viscosity = 0.05,
-                               scalar = PassiveScalar(), number_of_particles = 8, unwrapped = true,
+                               scalar = PassiveScalar(),
+                               particles = ParticleTracking(number_of_particles = 8, unwrapped = true),
                                velocity_forcing = ConstantPower(domain; injection_rate = 0.1),
                                rng = MersenneTwister(1)))
   conditions = FlowConditions(viscosity = 0.05, schmidt = 1.0, velocity_forcing = NoForcing(),
@@ -158,9 +159,10 @@ const ROWS = Dict{Symbol, Function}(
     (c.domain,)),
   Symbol("Simulation/scalar and tracers") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
                                                                     scalar = PassiveScalar(),
-      number_of_particles = 8, rng = MersenneTwister(1)), (c.domain,)),
+      particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(1)), (c.domain,)),
   Symbol("Simulation/AdamsBashforth order 4") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
-      number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(1)),
+      particles = ParticleTracking(number_of_particles = 8, particle_integration_scheme = AdamsBashforth(order = 4)),
+      rng = MersenneTwister(1)),
     (c.domain,)),
   Symbol("Simulation/StochasticOU band 1–4") => c -> (() -> Simulation(c.domain; viscosity = 0.05,
       velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5, highest_shell = 4),
@@ -312,12 +314,16 @@ end
 const TRACER_ROWS = Dict(
   "Tracers" => (d, M) -> (() -> Tracers(d; number_of_particles = M, interpolation_scheme = CatmullRom,
                                         rng = MersenneTwister(1))),
-  "Simulation" => (d, M) -> (() -> Simulation(d; viscosity = 0.05, number_of_particles = M,
+  "Simulation" => (d, M) -> (() -> Simulation(d; viscosity = 0.05,
+                                              particles = ParticleTracking(number_of_particles = M),
                                               rng = MersenneTwister(1))),
   "Simulation/AdamsBashforth order 4" => (d, M) -> (() -> Simulation(d; viscosity = 0.05,
-      number_of_particles = M, particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(1))),
-  "Simulation/unwrapped" => (d, M) -> (() -> Simulation(d; viscosity = 0.05, number_of_particles = M,
-                                                        unwrapped = true, rng = MersenneTwister(1))),
+      particles = ParticleTracking(number_of_particles = M, particle_integration_scheme = AdamsBashforth(order = 4)),
+      rng = MersenneTwister(1))),
+  "Simulation/unwrapped" => (d, M) -> (() -> Simulation(d; viscosity = 0.05,
+                                                        particles = ParticleTracking(number_of_particles = M,
+                                                                                     unwrapped = true),
+                                                        rng = MersenneTwister(1))),
 )
 
 @testset "temporary ledger: the tracer-count axis" begin

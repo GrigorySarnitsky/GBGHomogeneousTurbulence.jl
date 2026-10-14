@@ -27,6 +27,8 @@ The run layer:
   velocities — and past instants exist only in what an observation recorded.
 - [`PassiveScalar`](@ref) — the passive scalar a run carries, with its Schmidt number, variance
   and forcing, as `Simulation`'s `scalar` setting.
+- [`ParticleTracking`](@ref) — the Lagrangian tracking a run carries: the tracer set, seeded or
+  adopted, its integration scheme and its traversal mode, as `Simulation`'s `particles` setting.
 - [`predicted_stationary_state`](@ref) — the stationary state a forced run is set up for.
 - [`advance!`](@ref), [`run!`](@ref) — advance one iteration; observe and advance until the
   callback stops the run (the callback *is* the observation — the function the loop calls to read the run each
@@ -139,6 +141,115 @@ end
 Base.show(io::IO, scalar::PassiveScalar) =
   print(io, "PassiveScalar(schmidt = ", scalar.schmidt, ", variance = ", scalar.variance,
         ", forcing = ", scalar.forcing, ")")
+
+
+"""
+    ParticleTracking(; number_of_particles, interpolation_scheme = CatmullRom, unwrapped = false,
+                       particle_integration_scheme = Heun(), traversal_mode = :automatic)
+    ParticleTracking(tracers; particle_integration_scheme = Heun(), traversal_mode = :automatic)
+
+The Lagrangian tracking a run carries, given as the `particles` setting of [`Simulation`](@ref):
+the run then advects a tracer set every iteration and records the Lagrangian velocity sample. The
+first form seeds `number_of_particles` tracers uniformly at random in the box, from the run's
+`rng`; the second adopts an existing [`Tracers`](@ref GBGHomogeneousTurbulence.Particles.Tracers)
+set (the injection door, decision 83), whose interpolation scheme and unwrapped record are its own
+and are not given again. A run built with `particles = nothing` carries no tracers, and no
+tracking setting can be given to it.
+
+# Arguments
+- `number_of_particles` — how many tracers to seed.
+- `interpolation_scheme = CatmullRom` — the **spatial** scheme that evaluates a field at the
+  tracer positions, a `GBGPeriodicFields` scheme; forwarded to `Tracers`, whose docstring compares
+  the schemes.
+- `unwrapped = false` — whether to also track the winding-preserving unwrapped positions (read
+  with [`unwrapped_positions`](@ref GBGHomogeneousTurbulence.Particles.unwrapped_positions) —
+  what a mean-square-displacement diagnostic needs).
+- `tracers` — the tracer set to adopt, in the second form. Its arrays become the run's own and
+  are not copied, so two runs must not adopt one set, and it must live on the domain's storage
+  backend. A multistep `particle_integration_scheme` takes its first pushes under `Heun` until
+  its history fills — restoring a stored sample history alongside the positions is
+  [`read_simulation`](@ref)'s job.
+- `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
+  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator);
+  its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
+  are allocated for you. Pass
+  [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
+  accuracy in time limits a measurement: it costs one stored array per extra order and saves an
+  interpolation per step.
+- `traversal_mode = :automatic` — whether the gathers at the tracers (the velocity for the
+  advance and the Lagrangian sample, and any field the caller samples) visit them in the
+  memory-locality order of a
+  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal). The order
+  changes no value — a run with and without it is bitwise identical — only the time the gathers
+  take. `:automatic` builds the order at seeding and rebuilds it from the start-of-step positions
+  every iteration, a cost small against the gather it accelerates; `:manual` builds it and leaves
+  every rebuild to the caller, through
+  [`rebuild_traversal!`](@ref GBGHomogeneousTurbulence.Particles.rebuild_traversal!) in the `run!`
+  callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `:none`
+  holds no order and gathers in tracer order. The order and its rebuild scratch hold three
+  integer or Boolean vectors of the tracer count and two of the number of grid tiles the order
+  groups tracers by — small beside the `(M, 3)` positions of the ``M`` tracers — and nothing of
+  it is persisted: a restored run rebuilds it from the restored positions.
+
+# Fields
+- `tracers` — the set to adopt, or the seeding request (the count, the interpolation scheme and
+  whether to keep the unwrapped record) the run builds one from.
+- `particle_integration_scheme`, `traversal_mode` — the settings above.
+"""
+struct ParticleTracking{T, P <: AbstractParticleIntegrator}
+  tracers::T
+  particle_integration_scheme::P
+  traversal_mode::Symbol
+end
+
+# The seeding a `ParticleTracking` asks the run for when it adopts no set; private to the run layer.
+struct TracerSeeding{S}
+  number_of_particles::Int
+  interpolation_scheme::S
+  unwrapped::Bool
+end
+
+function ParticleTracking(; number_of_particles::Integer, interpolation_scheme = CatmullRom,
+                          unwrapped::Bool = false,
+                          particle_integration_scheme::AbstractParticleIntegrator = Heun(),
+                          traversal_mode::Symbol = :automatic)
+  number_of_particles > 0 ||
+    throw(ArgumentError("`number_of_particles` must be positive, got $number_of_particles: a run " *
+                        "without tracers is built without `particles`"))
+  _check_traversal_mode(traversal_mode)
+  return ParticleTracking(TracerSeeding(Int(number_of_particles), interpolation_scheme, unwrapped),
+                          particle_integration_scheme, traversal_mode)
+end
+
+function ParticleTracking(tracers::Tracers;
+                          particle_integration_scheme::AbstractParticleIntegrator = Heun(),
+                          traversal_mode::Symbol = :automatic)
+  _check_traversal_mode(traversal_mode)
+  return ParticleTracking(tracers, particle_integration_scheme, traversal_mode)
+end
+
+# Checked where it is named: a typo would otherwise be read as a mode, silently.
+_check_traversal_mode(mode::Symbol) =
+  mode in (:automatic, :manual, :none) ||
+    throw(ArgumentError("`traversal_mode` must be `:automatic`, `:manual` or `:none`; got $(repr(mode))"))
+
+# Display (the convention is stated once, at `SimulationDomain`'s display section): the
+# round-tripping constructor call of each form.
+function Base.show(io::IO, particles::ParticleTracking)
+  print(io, "ParticleTracking(")
+  if particles.tracers isa TracerSeeding
+    print(io, "number_of_particles = ", particles.tracers.number_of_particles,
+          ", interpolation_scheme = ", particles.tracers.interpolation_scheme,
+          ", unwrapped = ", particles.tracers.unwrapped, ", ")
+  else
+    print(io, particles.tracers, "; ")
+  end
+  print(io, "particle_integration_scheme = ", particles.particle_integration_scheme,
+        ", traversal_mode = ", repr(particles.traversal_mode), ")")
+end
+Base.show(io::IO, seeding::TracerSeeding) =
+  print(io, "TracerSeeding(", seeding.number_of_particles, ", ", seeding.interpolation_scheme,
+        seeding.unwrapped ? ", unwrapped" : ", wrapped", ")")
 
 
 """
@@ -311,36 +422,9 @@ The run group, `kwargs...` in both signatures
   diffusive-decay bound that stops that, needing no constant from the caller. The `max_dt`
   setting is for a ceiling only the caller knows, since any *default* constant would be a claim about the velocity
   scale they happened to choose.
-- `number_of_particles = 0`, `interpolation_scheme = nothing`, `unwrapped = false` — the number
-  of Lagrangian `Tracers`, the **spatial** scheme that evaluates a field at their positions
-  (`nothing` means the default `CatmullRom`), and whether to also track the winding-preserving
-  unwrapped positions (read with
-  [`unwrapped_positions`](@ref GBGHomogeneousTurbulence.Particles.unwrapped_positions) — what a
-  mean-square-displacement diagnostic needs); all three forwarded to the `Tracers` constructor.
-  A particle-only setting given on a particle-free run is refused rather than silently discarded.
-- `particle_integration_scheme = nothing` — the scheme that advances the trajectories in time, an
-  [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator)
-  (`nothing` means the default [`Heun`](@ref GBGHomogeneousTurbulence.Particles.Heun));
-  its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
-  are allocated for you. Pass
-  [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
-  accuracy in time limits a measurement: it costs one stored array per extra order and saves an
-  interpolation per step.
-- `ordered_interpolation = nothing` — whether the gathers at the tracers (the velocity for the
-  advance and the Lagrangian sample, and any field the caller samples) visit them in the
-  memory-locality order of a
-  [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal). The order
-  changes no value — a run with and without it is bitwise identical — only the time the gathers
-  take. The default `nothing` means `true` whenever the run carries tracers: the order is built at seeding and
-  rebuilt from the start-of-step positions every iteration, a cost small against the gather it
-  accelerates. `:manual` builds it and leaves every rebuild to the caller, through
-  [`rebuild_traversal!`](@ref GBGHomogeneousTurbulence.Particles.rebuild_traversal!) in the `run!`
-  callback at a cadence of their choosing ([`every_steps`](@ref) / [`every_time`](@ref)); `false`
-  holds no order and gathers in tracer order. The order and its rebuild scratch hold three
-  integer or Boolean vectors of the tracer count and two of the number of grid tiles the order
-  groups tracers by — small beside the
-  `(M, 3)` positions of the ``M`` tracers — and nothing of it is persisted: a restored run rebuilds it from the
-  restored positions.
+- `particles = nothing` — the Lagrangian tracking the run carries, a [`ParticleTracking`](@ref)
+  with its tracer set (seeded, or adopted), its particle integration scheme and its traversal
+  mode; `nothing` carries none, and no tracking setting can then be given.
 - `rng` — the random stream for the initial condition, the tracer seeding, and the seed of a
   `StochasticOU` forcing named without one (defaults to `Random.default_rng()`).
 - `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in place of the
@@ -356,12 +440,6 @@ The run group, `kwargs...` in both signatures
     - with a derived ``\\nu``, the constructor measures the adopted state's kinetic energy and warns
       when it is far from the ``k`` of the run's stationary state. Adopting a state is also how a run
       starts from an energy other than the one it will hold.
-- `tracers = nothing` — an existing `Tracers` set to adopt in place of seeding
-  `number_of_particles` fresh ones. The interpolation scheme and the unwrapped record are then
-  properties of the given set, so `interpolation_scheme` and `unwrapped` cannot be given with it.
-  A multistep `particle_integration_scheme` takes its first pushes under `Heun` until its history
-  fills — restoring a stored sample
-  history alongside the positions is [`read_simulation`](@ref)'s job.
 
 # Examples
 The two ways in, and the two ways to set the Reynolds number:
@@ -417,7 +495,7 @@ their contents as the scheme's business rather than the run's state.
 - `tracers`, `particle_integration_scheme`, `particle_buffers`, `particle_traversal` — the
   `Tracers` being advected along with the fields, the scheme advancing them along their
   trajectories, that scheme's registers, and the `ParticleTraversal` the gathers visit the tracers
-  in (`nothing` under `ordered_interpolation = false`). All `nothing` when the run carries no
+  in (`nothing` under `traversal_mode = :none`). All `nothing` when the run carries no
   tracers.
 - `cfl`, `max_dt`, `clock` — the advective-CFL coefficient, the caller's ceiling on the adaptive
   step in the run's own time units (`Inf` when none), and the time/step counter.
@@ -670,17 +748,8 @@ function Simulation(domain::FixedDomain;
                     scalar::Union{Nothing, PassiveScalar} = nothing,
                     envelope_wavenumber::Real = DEFAULT_ENVELOPE_WAVENUMBER, initial_spectrum = nothing,
                     state::Union{Nothing, ResolvedFields} = nothing,
-                    number_of_particles::Integer = 0, interpolation_scheme = nothing,
-                    unwrapped::Bool = false,
-                    tracers::Union{Nothing, Tracers} = nothing,
-                    particle_integration_scheme::Union{Nothing, AbstractParticleIntegrator} = nothing,
-                    ordered_interpolation::Union{Nothing, Bool, Symbol} = nothing,
+                    particles::Union{Nothing, ParticleTracking} = nothing,
                     rng = Random.default_rng())
-  # Validated first: the symbol form has exactly one admissible value, and a typo would otherwise
-  # be read as "resident, rebuilt by the caller" — a silently wrong mode.
-  ordered_interpolation in (nothing, true, false, :manual) ||
-    throw(ArgumentError("`ordered_interpolation` must be `nothing`, `true`, `false`, or `:manual`; " *
-                        "got $(repr(ordered_interpolation))"))
   # The scalar's settings travel as one value, so a run without a scalar can be given none of them;
   # a scalar-free run's conditions carry the inert Sc = 1 and no scalar forcing.
   carries_scalar = scalar !== nothing
@@ -707,30 +776,12 @@ function Simulation(domain::FixedDomain;
       throw(ArgumentError("the given `state` lives on a different storage backend than " *
                           "`domain`: move it, or build the domain, on the matching backend."))
   end
-  if tracers !== nothing
-    number_of_particles == 0 ||
-      throw(ArgumentError("`number_of_particles` and `tracers` are two ways to ask for " *
-                          "particles — the count seeds a fresh set, `tracers` adopts an " *
-                          "existing one. Pass one, not both."))
-    interpolation_scheme === nothing ||
-      throw(ArgumentError("`interpolation_scheme` was given together with `tracers`, but the " *
-                          "interpolation scheme is a property of the given tracer set. Drop " *
-                          "the setting."))
-    !unwrapped ||
-      throw(ArgumentError("`unwrapped = true` was given together with `tracers`, but the " *
-                          "unwrapped record is a property of the given tracer set. Drop the " *
-                          "setting."))
-    point_positions(tracers.positions) isa domain.array_family ||
-      throw(ArgumentError("the given `tracers` live on a different storage backend than " *
-                          "`domain`: move them, or build the domain, on the matching backend."))
-  end
-  # k = ½⟨|u|²⟩ is non-negative by construction, and the seeder rescales by √(k/current), so a
-  # negative value surfaced far downstream as a DomainError out of `sqrt` with nothing naming the
-  # argument that caused it.
-  number_of_particles >= 0 ||
-    throw(ArgumentError("`number_of_particles` must be non-negative, got $number_of_particles: a " *
-                        "negative count was silently routed to the tracer-free branch, so the run " *
-                        "carried no tracers and never said so"))
+  # The tracking's settings travel as one value too; an adopted set must already live where the
+  # run does, since its arrays become the run's own.
+  particles !== nothing && particles.tracers isa Tracers &&
+    !(point_positions(particles.tracers.positions) isa domain.array_family) &&
+    throw(ArgumentError("the given `tracers` live on a different storage backend than " *
+                        "`domain`: move them, or build the domain, on the matching backend."))
   max_dt > 0 ||
     throw(ArgumentError("`max_dt` must be positive, got $max_dt"))
   cfl > 0 ||
@@ -856,47 +907,30 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   end
 
 
-  # A particle-only setting configured on a particle-free run would be silently discarded, which is
-  # the quiet-wrong-configuration shape `ResolvedGenerator` refuses for a scalar forcing without a
-  # scalar; the `nothing` defaults exist so that "given at all" is detectable here.
-  if number_of_particles == 0 && tracers === nothing
-    for (name, value) in (("interpolation_scheme", interpolation_scheme),
-                          ("particle_integration_scheme", particle_integration_scheme),
-                          ("ordered_interpolation", ordered_interpolation))
-      value === nothing ||
-        throw(ArgumentError("`$name` was given but `number_of_particles = 0`: the run advects no " *
-                            "tracers, so the setting would be silently discarded. Ask for " *
-                            "particles, or drop the setting."))
-    end
-    unwrapped &&
-      throw(ArgumentError("`unwrapped = true` but `number_of_particles = 0`: the run advects no " *
-                          "tracers, so there are no positions to unwrap. Ask for particles, or " *
-                          "drop the setting."))
-  end
-  pscheme = particle_integration_scheme === nothing ? Heun() : particle_integration_scheme
-  tracers = tracers !== nothing ? tracers :
-            number_of_particles > 0 ?
-    Tracers(domain; number_of_particles,
-            interpolation_scheme = interpolation_scheme === nothing ? CatmullRom : interpolation_scheme,
-            unwrapped, rng) : nothing
+  # The tracer set is adopted, or seeded from the run's `rng` as the tracking asks.
+  pscheme = particles === nothing ? nothing : particles.particle_integration_scheme
+  tracers = particles === nothing ? nothing :
+            particles.tracers isa Tracers ? particles.tracers :
+            Tracers(domain; particles.tracers.number_of_particles,
+                    particles.tracers.interpolation_scheme, particles.tracers.unwrapped, rng)
   # The cache is built first: it carries the Lagrangian sample history a multistep particle integration scheme
   # integrates over, so the scheme's registers are allocated against it.
   cache = ObservablesCache(domain; scalar = carries_scalar,
                            number_of_particles = tracers === nothing ? 0 : npoints(tracers.positions),
-                           history_depth = history_depth(pscheme))
+                           history_depth = pscheme === nothing ? 1 : history_depth(pscheme))
   particle_buffers = tracers === nothing ? nothing :
                      allocate_buffers(pscheme, tracers, cache)
   # The traversal order is on by default (decision 86): a value-preserving accelerator whose
   # every-iteration rebuild costs a small fraction of the gather it speeds up. `:manual` keeps it
-  # resident and leaves the rebuild cadence to the caller's callback; `false` allocates nothing.
-  particle_traversal = (tracers === nothing || ordered_interpolation === false) ? nothing :
-                       ParticleTraversal(domain, tracers; automatic = ordered_interpolation !== :manual)
+  # resident and leaves the rebuild cadence to the caller's callback; `:none` allocates nothing.
+  particle_traversal = (tracers === nothing || particles.traversal_mode === :none) ? nothing :
+                       ParticleTraversal(domain, tracers; automatic = particles.traversal_mode === :automatic)
   deposit!(cache, state, domain, buffers)        # the seeding deposit: the first instant observed is t₀
   tracers === nothing ||
     deposit!(cache, tracers, velocity_physical(cache); traversal = particle_traversal)
   return Simulation(domain, buffers, ResolvedGenerator(domain, conditions; scalar = carries_scalar),
                     field_integration_scheme, state, cache,
-                    tracers, tracers === nothing ? nothing : pscheme, particle_buffers, particle_traversal,
+                    tracers, pscheme, particle_buffers, particle_traversal,
                     Float64(cfl), Float64(max_dt), Clock(0.0, 0))
 end
 
@@ -1122,7 +1156,7 @@ Each call closes the iteration with [`deposit!`](@ref GBGHomogeneousTurbulence.P
 the cache is readable when it returns. It advects the tracers, if any, under the run's chosen particle
 integration scheme — first rebuilding the run's
 [`ParticleTraversal`](@ref GBGHomogeneousTurbulence.Particles.ParticleTraversal) from the
-start-of-step positions when the run was built with `ordered_interpolation = true` (the default
+start-of-step positions when the run was built with `traversal_mode = :automatic` (the default
 with tracers) — and updates the clock.
 
 Returns `sim`.
@@ -1245,15 +1279,15 @@ end
 
 
 # The run form of the rebuild verb (the docstring is the generic's, in `Particles`): the callback's
-# handle under `ordered_interpolation = :manual`. A run without an order refuses by name rather than
+# handle under `traversal_mode = :manual`. A run without an order refuses by name rather than
 # silently doing nothing — the caller asked for a cadence the run cannot honour.
 function rebuild_traversal!(sim::Simulation)
   sim.particle_traversal === nothing &&
     throw(ArgumentError("this run carries no particle traversal order to rebuild: it was built " *
                         (sim.tracers === nothing ? "without tracers" :
-                         "with `ordered_interpolation = false`") *
-                        ". Build it with `ordered_interpolation = :manual` to rebuild by hand, " *
-                        "or leave the default, which rebuilds every iteration."))
+                         "with `traversal_mode = :none`") *
+                        ". Build it with `traversal_mode = :manual` to rebuild by hand, or leave " *
+                        "the default, which rebuilds every iteration."))
   rebuild_traversal!(sim.particle_traversal, sim.domain, sim.tracers)
   return sim
 end
@@ -1264,7 +1298,7 @@ end
 
 A predicate on a run that is `true` on every `n`-th step — the cadence test a
 [`run!`](@ref) callback uses to do something periodically: rebuild the tracer traversal order under
-`ordered_interpolation = :manual`, record a spectrum, write a checkpoint.
+`traversal_mode = :manual`, record a spectrum, write a checkpoint.
 
 The argument `n` is the period in steps, a positive integer; the returned function `fires(sim)` is
 `true` when [`current_step(sim)`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step) is a multiple of `n` — including at step `0`, the seeded
@@ -1293,7 +1327,7 @@ end
 A predicate on a run that is `true` once each time the run crosses a multiple of `period` in
 simulation time — the cadence test a [`run!`](@ref) callback uses to do something at (roughly)
 fixed intervals of time under the adaptive step: sample a Lagrangian statistic every so much time,
-record a spectrum, rebuild the tracer traversal order under `ordered_interpolation = :manual`.
+record a spectrum, rebuild the tracer traversal order under `traversal_mode = :manual`.
 
 The argument `period` is the interval in simulation time, positive. The returned function
 `fires(sim)` is `true` at the first observation at or past each multiple
@@ -1691,7 +1725,7 @@ function write_simulation end
 
 """
     read_simulation(parent::HDF5.H5DataStore, name::AbstractString;
-                    array_family = Array, ordered_interpolation = nothing) -> Simulation
+                    array_family = Array, traversal_mode = :automatic) -> Simulation
 
 Restore a run from the group [`write_simulation`](@ref) wrote. The [`Simulation`](@ref) is rebuilt
 through its own constructor from the recorded parameters, adopting the stored state rather than
@@ -1707,10 +1741,10 @@ A group not written by `write_simulation`, or written by a newer schema version,
 - `name` — the group's name.
 - `array_family = Array` — the storage backend the restored run lives on; the reader names it, so a
   checkpoint written on one backend loads on any other.
-- `ordered_interpolation = nothing` — the tracer traversal-order setting of the restored run,
-  forwarded to `Simulation`. The order is a derived accelerator, not state: nothing of it is
-  stored, and the restored run rebuilds it from the restored positions under whatever setting the
-  reader names.
+- `traversal_mode = :automatic` — the traversal mode of the restored run's
+  [`ParticleTracking`](@ref). The order is a derived accelerator, not state: nothing of it is
+  stored, and the restored run rebuilds it from the restored positions under whatever mode the
+  reader names. A mode other than the default given for a file without tracers is refused by name.
 """
 function read_simulation end
 

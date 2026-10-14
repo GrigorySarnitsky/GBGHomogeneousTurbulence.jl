@@ -19,7 +19,8 @@ using Test
   @testset "assemble, warm up, run (forced) with tracers" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.02;
                      velocity_forcing = domain -> ConstantPower(domain; injection_rate = 0.1),
-                     scalar = PassiveScalar(), number_of_particles = 50, rng = MersenneTwister(1))
+                     scalar = PassiveScalar(),
+                     particles = ParticleTracking(number_of_particles = 50), rng = MersenneTwister(1))
     @test current_time(sim) == 0.0
     @test current_step(sim) == 0
     @test isfinite(kinetic_energy(sim.state.velocity_spectral)) && kinetic_energy(sim.state.velocity_spectral) > 0
@@ -124,7 +125,7 @@ using Test
 
   @testset "the display lists the run's settings and every callback read, and touches no slot" begin
     sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05; scalar = PassiveScalar(),
-                     number_of_particles = 8, rng = MersenneTwister(6))
+                     particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(6))
     shown = sprint(show, MIME"text/plain"(), sim)
     @test occursin("16×16×16 cells", shown) && occursin("0.05", shown) && occursin("8 points", shown)
     @test occursin("sim.particle_integration_scheme", shown) && occursin("Heun()", shown)

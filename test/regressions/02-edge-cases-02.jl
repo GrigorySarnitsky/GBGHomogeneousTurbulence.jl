@@ -19,8 +19,9 @@ using GBGHomogeneousTurbulence.Particles: AdamsBashforth
 const N = 16
 const M = 4
 
-build() = Simulation(grid_points_per_axis = N, number_of_particles = M,
-                     particle_integration_scheme = AdamsBashforth(order = 4),
+build() = Simulation(grid_points_per_axis = N,
+                     particles = ParticleTracking(number_of_particles = M,
+                                                  particle_integration_scheme = AdamsBashforth(order = 4)),
                      rng = MersenneTwister(1234))
 
 # Take the sequence of steps, returning (:ok, positions), (:rejected,) if a zero step was refused

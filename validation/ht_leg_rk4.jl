@@ -76,8 +76,8 @@ sim = Simulation(domain; viscosity = NU,
                  velocity_forcing = ConstantPower(injection_rate = 1.0,
                                                   lowest_shell = 1, highest_shell = 2),
                  field_integration_scheme = IFLowStorageRK4(),
-                 particle_integration_scheme = AdamsBashforth(order = 4),
-                 state = state, tracers = tracers)
+                 particles = ParticleTracking(tracers; particle_integration_scheme = AdamsBashforth(order = 4)),
+                 state = state)
 
 # W3 — interpolation parity: HT's own t₀ Lagrangian sample vs TurTLE's stored one.
 vturtle = h5open(joinpath(DIR, "fill_particles.h5"), "r") do io

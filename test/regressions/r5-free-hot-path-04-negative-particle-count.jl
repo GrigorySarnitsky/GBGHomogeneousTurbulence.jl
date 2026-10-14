@@ -19,12 +19,13 @@ using GBGPeriodicFields: npoints
 
 @testset "a negative `number_of_particles` is rejected at construction, not read as zero" begin
   build(n) = Simulation(; grid_points_per_axis = 8, viscosity = 0.1,
-                        number_of_particles = n, rng = MersenneTwister(1))
+                        particles = ParticleTracking(number_of_particles = n), rng = MersenneTwister(1))
 
   # The correct behaviour: a negative count is a user error and is reported as one.
   @test_throws ArgumentError build(-5)
 
-  # The neighbouring cases must keep working exactly as before.
-  @test build(0).tracers === nothing                        # zero honestly means "no tracers"
-  @test npoints(build(4).tracers.positions) == 4            # a positive count seeds that many
+  # The neighbouring cases: a positive count seeds that many, and since 2026-10-14 a zero count is
+  # refused too, since a run without tracers is built without `particles`.
+  @test_throws ArgumentError build(0)
+  @test npoints(build(4).tracers.positions) == 4
 end

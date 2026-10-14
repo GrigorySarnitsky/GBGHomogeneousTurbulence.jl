@@ -58,7 +58,7 @@ interpolate_at_particles!
 
 The memory-locality order the gathers visit the tracers in — a value-preserving accelerator: the
 interpolated values are bit-identical with or without it, only the visiting order changes. A run
-builds and refreshes it for you (the `ordered_interpolation` setting of `Simulation`); the type and
+builds and refreshes it for you (the `traversal_mode` of a `ParticleTracking`); the type and
 its rebuild verb are here for a caller driving the tracking loop by hand, or refreshing on a chosen
 cadence from a `run!` callback.
 
@@ -84,12 +84,12 @@ new_scalar_point_values
 
 ## Wiring tracers into a run
 
-Pass `number_of_particles` to `Simulation` and the run carries a tracer set: `advance!` pushes it
-every iteration and records the Lagrangian sample, so the reads below are always current between
-iterations.
+Give `Simulation` a [`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking)
+and the run carries a tracer set: `advance!` pushes it every iteration and records the Lagrangian
+sample, so the reads below are always current between iterations.
 
 ```julia
-sim = Simulation(grid_points_per_axis = 64, number_of_particles = 4096)
+sim = Simulation(grid_points_per_axis = 64, particles = ParticleTracking(number_of_particles = 4096))
 warmup!(sim)
 advance!(sim)
 

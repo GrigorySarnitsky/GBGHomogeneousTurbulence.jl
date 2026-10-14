@@ -16,7 +16,7 @@ using GBGHomogeneousTurbulence.SimulationRun: Simulation, advance!
 
 function fresh_run()
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                   number_of_particles = 8, rng = MersenneTwister(1))
+                   particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(1))
   advance!(sim)
   return sim
 end

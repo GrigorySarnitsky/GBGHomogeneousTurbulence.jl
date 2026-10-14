@@ -26,7 +26,7 @@ using GBGHomogeneousTurbulence.Forcing: AbstractForcing, DeferredForcing, NoForc
 import GBGHomogeneousTurbulence.Forcing: write_forcing, read_forcing
 using GBGHomogeneousTurbulence.Cache: fields_modified!, particles_modified!
 using GBGHomogeneousTurbulence.Propagator: IFLowStorageRK3, IFLowStorageRK4, IFSSPRK3, IFHeun, deposit!
-using GBGHomogeneousTurbulence.SimulationRun: Simulation, PassiveScalar
+using GBGHomogeneousTurbulence.SimulationRun: Simulation, PassiveScalar, ParticleTracking
 import GBGHomogeneousTurbulence.SimulationRun: write_simulation, read_simulation
 
 const SCHEMA_VERSION = 2
@@ -397,7 +397,7 @@ function write_simulation(parent::HDF5.H5DataStore, name::AbstractString, sim::S
 end
 
 function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_family = Array,
-                         ordered_interpolation = nothing)
+                         traversal_mode = :automatic)
   g = _require_group(parent, name, "read_simulation")
   a = _require_tag(g, name, "read_simulation", "GBGHomogeneousTurbulence.Simulation")
   domain = read_domain(g, "domain"; array_family)
@@ -425,32 +425,29 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
   carries_scalar && _load_field!(state.scalar_spectral, sg, "scalar_spectral", "read_simulation")
   has_tracers = haskey(g, "tracers")
   if has_tracers
-    tg = _require_group(g, "tracers", "read_simulation")
-    positions_host = read_points(tg, "positions")
-    interpolation_scheme = read_scheme(tg, "interpolation_scheme")
-    unwrapped = haskey(tg, "unwrapped_positions")
+    # The stored set is read onto the run's backend and ADOPTED, positions and unwrapped record
+    # alike, so nothing is seeded only to be overwritten.
     ptag = a["particle_integration_scheme"]
     particle_integration_scheme =
       ptag == "Heun" ? Heun() :
       ptag == "AdamsBashforth" ? AdamsBashforth(order = Int(a["particle_scheme_order"])) :
       throw(ArgumentError("read_simulation: unrecognized particle scheme tag \"$ptag\" in " *
                           "group \"$name\""))
-    sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
-                     field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"],
-                     number_of_particles = npoints(positions_host), interpolation_scheme,
-                     unwrapped, particle_integration_scheme, ordered_interpolation, state)
+    particles = ParticleTracking(read_tracers(g, "tracers", domain);
+                                 particle_integration_scheme, traversal_mode)
   else
-    # Forwarded here too, so a traversal setting on a tracer-free file meets the constructor's
-    # by-name refusal rather than being silently dropped.
-    sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
-                     field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"],
-                     ordered_interpolation, state)
+    # A traversal setting on a tracer-free file has nothing to apply to, and is refused by name
+    # rather than silently dropped; the default is the one value that asks for nothing.
+    traversal_mode === :automatic ||
+      throw(ArgumentError("read_simulation: `traversal_mode = $(repr(traversal_mode))` was given, " *
+                          "but group \"$name\" stores no tracers to order the gathers over"))
+    particles = nothing
   end
-  # The announcements and the closing deposits replay the constructor's schedule over the adopted
-  # state, so every derived slot is recomputed rather than read. Order is load-bearing:
-  # `particles_modified!` restarts the unwrapped record at the wrapped positions, so the stored
-  # unwrapped positions are copied AFTER it — and it discards the sample history, so the stored
-  # history is restored after it too.
+  sim = Simulation(domain; viscosity = a["viscosity"], scalar, velocity_forcing,
+                   field_integration_scheme, cfl = a["cfl"], max_dt = a["max_dt"], particles, state)
+  # The announcement and the closing deposits replay the constructor's schedule over the adopted
+  # state and tracers, so every derived slot is recomputed rather than read; the stored sample
+  # history is restored after them.
   # The forcing states continue where they were written. The constructor started fresh ones on the
   # stored forcings; each is overwritten in place, so the run's record keeps its own objects.
   for (entry, key) in FORCING_STATE_GROUPS
@@ -466,14 +463,6 @@ function read_simulation(parent::HDF5.H5DataStore, name::AbstractString; array_f
     current.draws = stored.draws
   end
   fields_modified!(sim)
-  if has_tracers
-    copyto!(point_positions(sim.tracers.positions), point_positions(positions_host))
-    particles_modified!(sim)
-    if haskey(tg, "unwrapped_positions")
-      copyto!(point_positions(sim.tracers.unwrapped_positions),
-              point_positions(read_points(tg, "unwrapped_positions")))
-    end
-  end
   deposit!(sim)
   if has_tracers && haskey(g, "sample_history")
     hg = _require_group(g, "sample_history", "read_simulation")

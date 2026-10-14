@@ -10,7 +10,8 @@
 using Test, Random, GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: advance_particles_epoch!
 
-build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
+build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 4),
                      rng = MersenneTwister(1))
 
 @testset "velocity_at_particles refuses a stale read on either epoch" begin

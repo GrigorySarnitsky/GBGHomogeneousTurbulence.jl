@@ -56,7 +56,7 @@ set_uniform_x!(uf, cx) = (d = field_data(uf); d .= 0; @views(d[:, :, :, 1] .= cx
   @test_throws ArgumentError point_positions(unwrapped_positions(bare))
 
   # A reposition through the run's announcement restarts the record at the new positions.
-  sim = Simulation(domain; viscosity = 0.05, number_of_particles = 4, unwrapped = true,
+  sim = Simulation(domain; viscosity = 0.05, particles = ParticleTracking(number_of_particles = 4, unwrapped = true),
                    rng = MersenneTwister(1))
   for _ in 1:3; advance!(sim); end
   point_positions(sim.tracers.positions) .= 0.5                 # hand reposition (out-of-band)

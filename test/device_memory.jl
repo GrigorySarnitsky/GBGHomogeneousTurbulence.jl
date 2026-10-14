@@ -185,7 +185,8 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
     for T in (Float32, Float64), N in (64, 128)
       d = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasing = TwoThirds(), element_type = T,
                       array_family = cu)
-      sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(), number_of_particles = 64,
+      sim = with_logger(() -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(),
+                                         particles = ParticleTracking(number_of_particles = 64),
                                          rng = Xoshiro(1)), NullLogger())
       advance!(sim; dt = 1e-3)
       û, φ̂ = sim.state.velocity_spectral, sim.state.scalar_spectral
@@ -198,8 +199,9 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
         "Simulation/scalar" => () -> Simulation(d; viscosity = 0.05, scalar = PassiveScalar(), rng = Xoshiro(1)),
         "derivative_skewness" => () -> derivative_skewness(û, d),
         "read_simulation" => () -> h5open(f -> read_simulation(f, "run"; array_family = cu), path, "r"),
-        "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05, number_of_particles = 64,
-                                                                particle_integration_scheme = AdamsBashforth(order = 4),
+        "Simulation/AdamsBashforth order 4" => () -> Simulation(d; viscosity = 0.05,
+                                                                particles = ParticleTracking(number_of_particles = 64,
+                                                                                             particle_integration_scheme = AdamsBashforth(order = 4)),
                                                                 rng = Xoshiro(1)),
         "Simulation/StochasticOU band 1–8" => () -> Simulation(d; viscosity = 0.05, rng = Xoshiro(1),
             velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
@@ -269,8 +271,10 @@ end
                       array_family = cu)
       for scheme in (Heun(), AdamsBashforth(order = 4))
         t = map(DEVICE_TRACER_COUNTS) do M
-          device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05, number_of_particles = M,
-                                                     particle_integration_scheme = scheme, rng = Xoshiro(1)))
+          device_transient_bytes(p, () -> Simulation(d; viscosity = 0.05,
+                                                     particles = ParticleTracking(number_of_particles = M,
+                                                                                  particle_integration_scheme = scheme),
+                                                     rng = Xoshiro(1)))
         end
         per = (t[2] - t[1]) / (DEVICE_TRACER_COUNTS[2] - DEVICE_TRACER_COUNTS[1])
         @info "device temporary per tracer, $(nameof(typeof(scheme))), $T" bytes_per_tracer = per

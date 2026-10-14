@@ -33,8 +33,10 @@ const N = 16
 const K = 4
 const M = 8
 
-fresh_sim() = Simulation(grid_points_per_axis = N, viscosity = 0.05, number_of_particles = M,
-                         particle_integration_scheme = AdamsBashforth(order = K), rng = MersenneTwister(3))
+fresh_sim() = Simulation(grid_points_per_axis = N, viscosity = 0.05,
+                         particles = ParticleTracking(number_of_particles = M,
+                                                      particle_integration_scheme = AdamsBashforth(order = K)),
+                         rng = MersenneTwister(3))
 
 # Relative departure of one tracer step from the explicit-Euler displacement built on the velocity
 # the tracers actually sample in the field they are moving in.  Dimensionless, and small for any

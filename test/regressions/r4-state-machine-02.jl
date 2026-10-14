@@ -18,7 +18,7 @@ using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: particles_modified!, velocity_at_particles
 
 build() = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                     number_of_particles = 8, rng = MersenneTwister(1))
+                     particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(1))
 
 @testset "the reposition protocol serves a genuine post-reposition sample" begin
   sim = build()

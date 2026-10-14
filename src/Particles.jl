@@ -207,8 +207,9 @@ tile-by-tile turns the gather into a sweep, and `GBGPeriodicFields`' `interpolat
 order through its `traversal` keyword. The order only reorders the visits — it changes no value,
 so a run with and without it produces bitwise-identical trajectories and samples.
 
-A run builds one for you: [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)'s
-`ordered_interpolation` keyword decides whether, and whether the run or the caller rebuilds it.
+A run builds one for you: the `traversal_mode` of its
+[`ParticleTracking`](@ref GBGHomogeneousTurbulence.SimulationRun.ParticleTracking) decides whether,
+and whether the run or the caller rebuilds it.
 Building it by hand belongs with a hand-run loop, where the `ParticleTraversal` itself is passed on to
 [`advect!`](@ref), the particle form of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!)
 and [`interpolate_at_particles!`](@ref) through their `traversal` keyword; on a run, that is
@@ -270,7 +271,7 @@ Rebuild the tracer traversal order from the current tracer positions, in place.
 - `sim` — a run ([`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation)), in the second
   form: the traversal it carries as `sim.particle_traversal` is rebuilt.
 
-Call it from a run's callback when the run was built with `ordered_interpolation = :manual`, at
+Call it from a run's callback when the run was built with `traversal_mode = :manual`, at
 whatever cadence you choose — every so many steps with
 [`every_steps`](@ref GBGHomogeneousTurbulence.SimulationRun.every_steps), or every so much time with
 [`every_time`](@ref GBGHomogeneousTurbulence.SimulationRun.every_time). With the default automatic

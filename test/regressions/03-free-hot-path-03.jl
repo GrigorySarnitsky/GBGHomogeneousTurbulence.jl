@@ -57,7 +57,7 @@ end
   end
 
   @testset "front door: advance! with a hand-fixed dt" begin
-    sim = Simulation(grid_points_per_axis = N, number_of_particles = 4,
+    sim = Simulation(grid_points_per_axis = N, particles = ParticleTracking(number_of_particles = 4),
                      rng = MersenneTwister(1234))
     field_data(sim.state.velocity_spectral) .= NaN
     fields_modified!(sim.cache)        # announce the out-of-band mutation …

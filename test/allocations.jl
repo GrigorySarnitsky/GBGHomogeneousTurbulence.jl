@@ -41,7 +41,7 @@ const DOMAIN = FixedDomain(grid_points_per_axis = N, side_length = 2π, dealiasi
 const SIM = with_logger(NullLogger()) do
   Simulation(DOMAIN; viscosity = 0.05,
              scalar = PassiveScalar(forcing = StochasticOU(forcing_variance = 0.5, correlation_time_in_box_units = 0.3)),
-             number_of_particles = 8,
+             particles = ParticleTracking(number_of_particles = 8),
              velocity_forcing = ConstantPower(injection_rate = 0.1),
              rng = MersenneTwister(1))
 end

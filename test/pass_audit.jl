@@ -46,7 +46,7 @@ const PRINT_COUNTS = get(ENV, "PASS_AUDIT_PRINT", "0") == "1"
 const DOMAIN = FixedDomain(grid_points_per_axis = 16, side_length = 2π, dealiasing = TwoThirds(),
                            element_type = Float64, array_family = Array)
 quiet(f) = with_logger(f, NullLogger())
-const RUN = quiet(() -> Simulation(DOMAIN; viscosity = 0.05, number_of_particles = 8,
+const RUN = quiet(() -> Simulation(DOMAIN; viscosity = 0.05, particles = ParticleTracking(number_of_particles = 8),
                                    velocity_forcing = ConstantPower(injection_rate = 0.1), rng = MersenneTwister(1)))
 const OU_RUN = quiet(() -> Simulation(DOMAIN; viscosity = 0.05,
                                       velocity_forcing = StochasticOU(forcing_variance = 0.5,

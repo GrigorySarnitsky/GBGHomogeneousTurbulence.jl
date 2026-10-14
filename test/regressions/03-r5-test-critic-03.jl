@@ -20,7 +20,8 @@ using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence.Cache: velocity_at_particles, fields_modified!, particles_modified!
 
 
-build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
+build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 4),
                      rng = MersenneTwister(20260821))
 
 

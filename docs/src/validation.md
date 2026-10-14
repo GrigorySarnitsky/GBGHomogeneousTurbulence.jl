@@ -254,7 +254,7 @@ sim = Simulation(domain; viscosity = 9.032e-3,
                  velocity_forcing = ConstantPower(injection_rate = 1.0,
                                                   lowest_shell = 1, highest_shell = 2),
                  field_integration_scheme = IFSSPRK3(),
-                 particle_integration_scheme = AdamsBashforth(order = 4),
-                 state = imported_state, tracers = imported_tracers)
+                 particles = ParticleTracking(imported_tracers; particle_integration_scheme = AdamsBashforth(order = 4)),
+                 state = imported_state)
 run!(observation, sim; dt = 0.002)   # the callback records k, ε, and ρ_u online
 ```

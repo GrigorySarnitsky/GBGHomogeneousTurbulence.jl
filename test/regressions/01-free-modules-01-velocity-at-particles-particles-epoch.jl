@@ -20,7 +20,7 @@ using GBGHomogeneousTurbulence
 
 @testset "velocity_at_particles(cache) throws after an announced reposition (both epochs checked)" begin
   sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                   number_of_particles = 8, rng = MersenneTwister(3))
+                   particles = ParticleTracking(number_of_particles = 8), rng = MersenneTwister(3))
   advance!(sim)
 
   # Baseline: after a plain advance! the slot is current on BOTH counters, so the read serves.

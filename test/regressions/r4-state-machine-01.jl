@@ -26,7 +26,8 @@ using Test
 
 
 function fresh_sim(seed)
-  return Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
+  return Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                    particles = ParticleTracking(number_of_particles = 8),
                     rng = MersenneTwister(seed))
 end
 

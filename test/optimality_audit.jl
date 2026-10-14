@@ -376,7 +376,7 @@ const SYNC_LEDGER = (
     #     tracers before the step rather than retained as a field, so nothing the instrument owns
     #     scales with the grid and the run holds no second velocity field for it.
     tracer_count = 8
-    sim = Simulation(domain; viscosity = 0.1, number_of_particles = tracer_count)
+    sim = Simulation(domain; viscosity = 0.1, particles = ParticleTracking(number_of_particles = tracer_count))
     @test :tracers in fieldnames(typeof(sim))                    # the check below is not vacuous
     @test !(:tracer_velocity in fieldnames(typeof(sim)))
     owned = (getfield(sim.tracers, f) for f in fieldnames(typeof(sim.tracers)))

@@ -26,8 +26,9 @@ end
 @testset "the multistep tracer advance allocates nothing once its history is full" begin
 
   # Reference measurement only: the one-step scheme's cost is PF's `interpolate!`, not HT's.
-  heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                    particle_integration_scheme = Heun(), rng = MersenneTwister(11))
+  heun = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                    particles = ParticleTracking(number_of_particles = 32, particle_integration_scheme = Heun()),
+                    rng = MersenneTwister(11))
   for _ in 1:3; advance!(heun); end
   heun_bytes = allocations_of(advect!, heun.particle_integration_scheme, heun.tracers,
                               velocity_physical(heun.cache), heun.domain,
@@ -37,8 +38,10 @@ end
   @info "reference: one-step advance and its interpolation" heun_bytes interp_bytes
 
   # ---- the claim: AdamsBashforth(4), history full (filled == order - 1 == 3), no interpolation --
-  ab = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                  particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(11))
+  ab = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                  particles = ParticleTracking(number_of_particles = 32,
+                                               particle_integration_scheme = AdamsBashforth(order = 4)),
+                  rng = MersenneTwister(11))
   for _ in 1:5; advance!(ab); end
   @test ab.cache.history_filled == 3                      # the multistep branch is the live one
 

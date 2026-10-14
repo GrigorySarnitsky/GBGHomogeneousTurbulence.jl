@@ -157,8 +157,10 @@ end
   end
 
   @testset "the history fills and the scheme takes over" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                     particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(7))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 32,
+                                                  particle_integration_scheme = AdamsBashforth(order = 4)),
+                     rng = MersenneTwister(7))
     # The sample history is the cache's: it holds earlier values of a deposited observable, so an
     # announced reposition invalidates it where the epoch lives rather than in the scheme's registers.
     @test sim.particle_buffers isa ParticleIntegratorBuffers
@@ -181,8 +183,10 @@ end
   end
 
   @testset "positions stay in the box and tracers actually move" begin
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 32,
-                     particle_integration_scheme = AdamsBashforth(order = 2), rng = MersenneTwister(8))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 32,
+                                                  particle_integration_scheme = AdamsBashforth(order = 2)),
+                     rng = MersenneTwister(8))
     X0 = copy(point_positions(sim.tracers.positions))
     for _ in 1:5; advance!(sim); end
     X = point_positions(sim.tracers.positions)
@@ -195,16 +199,17 @@ end
   # the right gathers and nothing else. Under `:manual` the order goes stale as the tracers move,
   # which the field library documents as never wrong; the identical assertion holds unrebuilt.
   @testset "the traversal order is a value-preserving accelerator (decision 86)" begin
-    function tracked(mode; scheme = nothing, steps = 6, M = 300)
-      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = M,
-                       unwrapped = true, particle_integration_scheme = scheme,
-                       ordered_interpolation = mode, rng = MersenneTwister(3))
+    function tracked(mode; scheme = Heun(), steps = 6, M = 300)
+      sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, rng = MersenneTwister(3),
+                       particles = ParticleTracking(number_of_particles = M, unwrapped = true,
+                                                    particle_integration_scheme = scheme,
+                                                    traversal_mode = mode))
       for _ in 1:steps; advance!(sim); end
       sim
     end
-    for scheme in (nothing, AdamsBashforth(order = 3))
-      off = tracked(false; scheme)
-      for mode in (nothing, true, :manual)
+    for scheme in (Heun(), AdamsBashforth(order = 3))
+      off = tracked(:none; scheme)
+      for mode in (:automatic, :manual)
         on = tracked(mode; scheme)
         @test point_positions(on.tracers.positions) == point_positions(off.tracers.positions)
         @test point_positions(unwrapped_positions(on.tracers)) ==
@@ -243,7 +248,8 @@ end
   end
 
   @testset "the traversal order adds no per-step allocation that scales with M" begin
-    alloc(M) = (sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = M,
+    alloc(M) = (sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                 particles = ParticleTracking(number_of_particles = M),
                                  rng = MersenneTwister(1));
                 advance!(sim); advance!(sim); @allocated advance!(sim))
     # Tenfold in M, both above the count where a threaded run's CPU kernels stop adding tasks (the
@@ -254,21 +260,18 @@ end
   end
 
   @testset "the traversal setting is refused by name where it cannot apply" begin
-    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                                          ordered_interpolation = true)
-    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                                          ordered_interpolation = :manual)
-    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                                          number_of_particles = 8, ordered_interpolation = :sometimes)
+    # Since 2026-10-14 the mode travels inside `ParticleTracking`, so it cannot be written for a
+    # tracer-free run at all; a mode that is not one of the three is refused where it is named.
+    @test_throws MethodError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                                        traversal_mode = :manual)
+    @test_throws ArgumentError ParticleTracking(number_of_particles = 8, traversal_mode = :sometimes)
+    @test_throws ArgumentError ParticleTracking(number_of_particles = 0)
     @test_throws ArgumentError rebuild_traversal!(Simulation(grid_points_per_axis = 16, viscosity = 0.05))
     @test_throws ArgumentError rebuild_traversal!(Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                                                             number_of_particles = 8,
-                                                             ordered_interpolation = false))
-    # `false` on a tracer-free run is a non-`nothing` particle setting too, and is refused alike.
-    @test_throws ArgumentError Simulation(grid_points_per_axis = 16, viscosity = 0.05,
-                                          ordered_interpolation = false)
-    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 8,
-                     ordered_interpolation = :manual)
+                                                             particles = ParticleTracking(number_of_particles = 8,
+                                                                                          traversal_mode = :none)))
+    sim = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 8, traversal_mode = :manual))
     @test rebuild_traversal!(sim) === sim
   end
 end

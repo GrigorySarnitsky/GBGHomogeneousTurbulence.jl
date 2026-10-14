@@ -13,8 +13,10 @@ using Random: MersenneTwister
 using GBGHomogeneousTurbulence
 
 function warmed_run(seed)
-  s = Simulation(grid_points_per_axis = 16, viscosity = 0.05, number_of_particles = 6,
-                 particle_integration_scheme = AdamsBashforth(order = 4), rng = MersenneTwister(seed))
+  s = Simulation(grid_points_per_axis = 16, viscosity = 0.05,
+                 particles = ParticleTracking(number_of_particles = 6,
+                                              particle_integration_scheme = AdamsBashforth(order = 4)),
+                 rng = MersenneTwister(seed))
   for _ in 1:6
     advance!(s; dt = 2e-3)
   end

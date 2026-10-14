@@ -12,7 +12,8 @@
 using Test, Random, GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
 
-build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05, number_of_particles = 4,
+build() = Simulation(grid_points_per_axis = 8, viscosity = 0.05,
+                     particles = ParticleTracking(number_of_particles = 4),
                      rng = MersenneTwister(1))
 
 @testset "advance!'s opening guard refuses an un-completed tracer reposition" begin

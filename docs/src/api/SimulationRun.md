@@ -16,6 +16,7 @@ domain-building `Simulation(; grid_points_per_axis, viscosity, …)` and the dom
 ```@docs
 Simulation
 PassiveScalar
+ParticleTracking
 ```
 
 ## The predicted stationary state
