@@ -56,7 +56,7 @@ DeferredForcing
 
 ## Forcing methods
 
-This section documents the method that starts a strategy's evolving state, then the four methods a strategy may implement
+This section documents the method that creates a strategy's evolving state, then the four methods a strategy may implement
 (each a no-op by default): the per-step `prepare_forcing!`, the rate `steady_linear_rate` the
 generator asks for once when it is built, and the per-stage and post-step hooks in the order `step!`
 fires them.

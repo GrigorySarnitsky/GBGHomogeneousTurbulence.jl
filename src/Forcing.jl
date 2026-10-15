@@ -38,8 +38,8 @@ and the scalar through tensor-order-generic field operators.
 The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`initial_forcing_state`](@ref) — the evolving state a forcing starts with, kept in the run's state
-  record.
+- [`initial_forcing_state`](@ref) — create a forcing's evolving state, which the run keeps as it
+  advances: the current value, never the initial one.
 - [`prepare_forcing!`](@ref) — advance that state, once per step.
 - [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
@@ -75,8 +75,7 @@ run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method'
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
 the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
 equally valid realization, so one omitted is drawn — from the run's `rng` when a `Simulation`
-builds the forcing, from the global stream otherwise — and naming it is how a run is repeated. A default at this layer never
-hides a choice you needed to make.
+builds the forcing, from the global stream otherwise — and naming it is how a run is repeated.
 
 The one relaxation is the run's own: a deferred velocity forcing may leave its target out, and the
 run fills it from the stationary state it is set up for — the value still comes from the run, not
@@ -309,7 +308,7 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 """
     initial_forcing_state(forcing, field, domain)
 
-Create the state a forcing strategy begins from when it drives a field.
+Create a forcing strategy's evolving state at its starting value.
 
 # Arguments
 - `forcing` — the strategy.
@@ -321,10 +320,11 @@ Returns `nothing` for a strategy that evolves no state of its own: the default, 
 strategy but [`StochasticOU`](@ref), which returns a
 [`StochasticOUState`](@ref) holding its random process.
 
-A run calls this once per forced field, keeps what it returns as the `modeled` entry of its
-[`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), and hands that value to
-[`prepare_forcing!`](@ref) every step, which advances it in place. The strategy itself holds only its
-parameters and its scratch, so a checkpoint of the state is enough to resume a forced run exactly.
+A run calls this once per forced field and keeps the result as the `modeled` entry of its
+[`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), which
+[`prepare_forcing!`](@ref) advances in place every step: the record holds the current state, never
+the starting one. The strategy holds only its parameters and scratch, so a checkpoint of the state
+resumes a forced run exactly.
 """
 initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 

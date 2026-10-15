@@ -381,11 +381,11 @@ harness whose *predicted* half is `Phenomenology` (§4.8).
 
 Forcing is the System's energy-injection strategy — the source term ``\boldsymbol{f}`` of §4.2, and the one
 deliberately designed-in extension point. `AbstractForcing` is the supertype; a forcing enters the
-step through a small interface of four methods, plus `initial_forcing_state`, which starts
-the state the first of them advances; each defaults to doing nothing:
+step through a small interface of four methods, plus `initial_forcing_state`, starting the
+state the first advances; each defaults to doing nothing:
 
 - `prepare_forcing!` — advance the forcing's evolving state once per step (a stochastic process),
-  a state `initial_forcing_state` starts and the run's `ResolvedFields` keeps;
+  a state `initial_forcing_state` starts and the run's `ResolvedFields` keeps as it advances;
 - `steady_linear_rate` — for a forcing *linear* in the field (``\boldsymbol{f} = A \boldsymbol{u}``) and steady in
   time: return the rate ``A(\boldsymbol{\kappa})``, folded into the integrating factor; handed no field,
   it is steady by construction;
