@@ -45,7 +45,7 @@ The lifecycle, four hook methods a strategy may act on, each defaulting to doing
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
 
-The strategies; all but the first act on a **band**, an annulus of integer Fourier shells:
+The strategies; each but `NoForcing` acts on a **band**, an annulus of integer Fourier shells:
 
 - [`NoForcing`](@ref) — leave the field undriven.
 - [`Linear`](@ref) — a fixed linear rate on the band.
