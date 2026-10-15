@@ -38,8 +38,7 @@ and the scalar through tensor-order-generic field operators.
 The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`initial_forcing_state`](@ref) — create a forcing's evolving state at its starting value; the
-  run's record holds that state as it stands now.
+- [`initial_forcing_state`](@ref) — initialize a forcing's state.
 - [`prepare_forcing!`](@ref) — advance that state, once per step.
 - [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
@@ -308,7 +307,7 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 """
     initial_forcing_state(forcing, field, domain)
 
-Create a forcing strategy's evolving state at its starting value.
+Initialize a forcing strategy's state.
 
 # Arguments
 - `forcing` — the strategy.
@@ -322,9 +321,8 @@ strategy but [`StochasticOU`](@ref), which returns a
 
 A run calls this once per forced field and keeps the result as the `modeled` entry of its
 [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), which
-[`prepare_forcing!`](@ref) advances in place every step, so the record holds the state as it stands
-now. The strategy holds only parameters and scratch, so a checkpoint of the state resumes a forced
-run exactly.
+[`prepare_forcing!`](@ref) advances in place every step. The strategy holds only parameters and
+scratch, so a checkpoint of the state resumes a forced run exactly.
 """
 initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 
@@ -341,8 +339,8 @@ Everything the stages will need must be ready when this returns, since
 
 # Arguments
 - `forcing` — the strategy whose state advances.
-- `forcing_state` — that state as it stands now, not as it started:
-  [`initial_forcing_state`](@ref) created it once, and this hook has advanced it on every step since.
+- `forcing_state` — the state [`initial_forcing_state`](@ref) created once and this hook has
+  advanced on every step since.
   It is `nothing` for a strategy that evolves no state.
 - `field` — the start-of-step velocity or scalar, in spectral representation.
 - `domain` — the [`FixedDomain`](@ref) the run advances on.

@@ -85,7 +85,7 @@ The positional form wraps existing fields without copying them, which is how a s
 - `velocity_spectral` — the velocity in spectral representation, ``\\hat{\\boldsymbol{u}}``.
 - `scalar_spectral` — the scalar in spectral representation, ``\\hat\\varphi``, or `nothing` when the
   run carries no passive scalar.
-- `modeled` — each forcing's evolving state, as it stands now:
+- `modeled` — each forcing's evolving state:
   `(velocity_forcing = …, scalar_forcing = …)`. A forcing's
   [`initial_forcing_state`](@ref GBGHomogeneousTurbulence.Forcing.initial_forcing_state) creates the
   entry and its [`prepare_forcing!`](@ref GBGHomogeneousTurbulence.Forcing.prepare_forcing!) advances it
