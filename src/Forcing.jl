@@ -33,8 +33,9 @@
     Forcing
 
 The interchangeable energy-injection strategies — one implementation each serving both the velocity
-and the scalar through tensor-order-generic field operators. A strategy acts on the step through up
-to four hook methods, each defaulting to doing nothing. The module provides:
+and the scalar through tensor-order-generic field operators.
+
+The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
 - [`initial_forcing_state`](@ref) — the evolving state a forcing starts with, kept in the run's state
@@ -43,9 +44,11 @@ to four hook methods, each defaulting to doing nothing. The module provides:
 - [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
+
+The strategies; all but the first act on a **band**, an annulus of integer Fourier shells:
+
 - [`NoForcing`](@ref) — leave the field undriven.
-- [`Linear`](@ref) — a fixed linear rate on a **band**, an annulus of integer Fourier shells (the
-  convention every strategy shares).
+- [`Linear`](@ref) — a fixed linear rate on the band.
 - [`ConstantPower`](@ref) — a band amplitude re-solved each stage to hold the injection rate; the
   velocity default.
 - [`VarianceController`](@ref) — drive the field's variance to a target by feedback.
@@ -53,9 +56,15 @@ to four hook methods, each defaulting to doing nothing. The module provides:
   deterministic rescaling, at first order.
 - [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
   (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
-- [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the stationary state a
-  forcing drives, as the kinetic energy in box units ``\\tilde{k}`` and the band's share of it.
-- [`DeferredForcing`](@ref) — the keyword form of a strategy, taken without a domain and built into the concrete strategy once the
+
+The stationary state a forcing drives:
+
+- [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the kinetic energy in box
+  units ``\\tilde{k}`` and the band's share of it.
+
+Construction and persistence:
+
+- [`DeferredForcing`](@ref) — the keyword form of a strategy, built into the concrete strategy once the
   [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) has built the domain; a
   construction-time object, not a lifecycle hook.
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
