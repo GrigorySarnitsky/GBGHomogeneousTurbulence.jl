@@ -38,7 +38,7 @@ and the scalar through tensor-order-generic field operators.
 The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`initial_forcing_state`](@ref) — initialize a forcing's state.
+- [`initial_forcing_state`](@ref) — create a forcing's initial state.
 - [`prepare_forcing!`](@ref) — advance that state, once per step.
 - [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
@@ -307,7 +307,7 @@ project_forcing!(::AbstractForcing, advanced_field, domain::FixedDomain) = advan
 """
     initial_forcing_state(forcing, field, domain)
 
-Initialize a forcing strategy's state.
+Create a forcing strategy's initial state.
 
 # Arguments
 - `forcing` — the strategy.
