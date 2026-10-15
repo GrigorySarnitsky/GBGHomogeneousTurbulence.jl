@@ -38,8 +38,8 @@ and the scalar through tensor-order-generic field operators.
 The lifecycle, four hook methods a strategy may act on, each defaulting to doing nothing:
 
 - [`AbstractForcing`](@ref) — the strategy supertype, defining the four-hook lifecycle.
-- [`initial_forcing_state`](@ref) — create a forcing's evolving state, which the run keeps as it
-  advances: the current value, never the initial one.
+- [`initial_forcing_state`](@ref) — create a forcing's evolving state at its starting value; the
+  run's record holds that state as it stands now.
 - [`prepare_forcing!`](@ref) — advance that state, once per step.
 - [`steady_linear_rate`](@ref) — supply a *steady* linear rate, folded into the integrating factor.
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
@@ -57,10 +57,10 @@ The strategies; each but `NoForcing` acts on a **band**, an annulus of integer F
 - [`StochasticOU`](@ref) — a random force correlated over a finite time, independent of the flow
   (Eswaran & Pope); its evolving state is a [`StochasticOUState`](@ref).
 
-The stationary state a forcing drives:
+The stationary state a run predicts for its forcing, from provisional values:
 
-- [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the kinetic energy in box
-  units ``\\tilde{k}`` and the band's share of it.
+- [`kinetic_energy_in_box_units`](@ref), [`band_energy_fraction`](@ref) — the predicted kinetic
+  energy in box units ``\\tilde{k}`` and the band's predicted share of it.
 
 Construction and persistence:
 
@@ -322,9 +322,9 @@ strategy but [`StochasticOU`](@ref), which returns a
 
 A run calls this once per forced field and keeps the result as the `modeled` entry of its
 [`ResolvedFields`](@ref GBGHomogeneousTurbulence.State.ResolvedFields), which
-[`prepare_forcing!`](@ref) advances in place every step: the record holds the current state, never
-the starting one. The strategy holds only its parameters and scratch, so a checkpoint of the state
-resumes a forced run exactly.
+[`prepare_forcing!`](@ref) advances in place every step, so the record holds the state as it stands
+now. The strategy holds only parameters and scratch, so a checkpoint of the state resumes a forced
+run exactly.
 """
 initial_forcing_state(::AbstractForcing, field, domain::FixedDomain) = nothing
 
