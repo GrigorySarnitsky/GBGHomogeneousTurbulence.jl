@@ -211,7 +211,6 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
                                             highest_shell = 8)),
         "energy_spectrum" => () -> energy_spectrum(û, d),
         "integral_scale" => () -> integral_scale(û, d),
-        "flow_parameters" => () -> flow_parameters(sim),
         "dissipation" => () -> dissipation(û, d, 0.05),
         "scalar_dissipation" => () -> scalar_dissipation(φ̂, d, 0.05),
         "write_simulation" => () -> h5open(f -> write_simulation(f, "s", sim), tempname(), "w"),

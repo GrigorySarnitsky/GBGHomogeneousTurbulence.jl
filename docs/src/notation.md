@@ -86,14 +86,14 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 ## Derived scales
 
-These scales are measured from the run's state, or derived from it through a `FlowParameters` bundle and its helpers.
+These scales are computed from measured scalars; the rows pointing into `Phenomenology` are that leaf's own helpers.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
-| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | [`flow_parameters`](@ref GBGHomogeneousTurbulence.SimulationRun.flow_parameters) |
+| ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | — |
 | ``\ell`` | the length a large-scale roll-off is evaluated against (``L_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.large_scale_length) |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
-| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length) |
+| ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_time) |
 | ``\tilde{k}`` | the kinetic energy in box units, ``k/(\varepsilon L)^{2/3}``: its ``3/2`` power is the large-eddy length ``k^{3/2}/\varepsilon`` as a fraction of the box side ``L``. A run predicts its stationary state with it, from provisional values per forcing band (the shells a forcing acts on) | [`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units) |
 | ``\mathrm{Re}_{\mathrm{box}}`` | the box Reynolds number ``\varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``. A run whose ``\nu`` is set by ``\kappa_{\max}\eta``, with ``\kappa_{\max}`` the resolved-band edge of *Numerics* below, has ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}`` | [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) |

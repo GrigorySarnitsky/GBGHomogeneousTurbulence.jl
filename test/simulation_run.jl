@@ -5,7 +5,6 @@
 
 using GBGHomogeneousTurbulence
 using GBGPeriodicFields: point_positions
-using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, kolmogorov_length
 using GBGPeriodicFields: field_data
 using Random
 using Logging
@@ -127,7 +126,7 @@ using Test
     shown = sprint(show, MIME"text/plain"(), bare)
     # A run without a scalar or particles shows no row about them — no placeholders — and nothing
     # that would compute is offered.
-    for absent in ("scalar", "schmidt", "particle", "tracers", "flow_parameters", "kinetic_energy")
+    for absent in ("scalar", "schmidt", "particle", "tracers", "kinetic_energy")
       @test !occursin(absent, shown)
     end
     # A slot taken as a producer's register mid-iteration makes its checked read throw; the
@@ -282,9 +281,7 @@ end
     # The constructor solved with its stationary ESTIMATE, not the measured dissipation of the
     # seeded state, so the round trip must use the same estimate.
     ε_design = predicted_stationary_state(sim.domain; kinetic_energy = k, κ_max_η = target).dissipation
-    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_design,
-                                         rms_velocity = sqrt(2k / 3), integral_scale = 1.0,
-                                         schmidt = 1.0))
+    η = kolmogorov_length(ε_design, ν)
     @test max_resolved_wavenumber(sim.domain) * η ≈ target rtol = 1e-10
   end
 
@@ -298,9 +295,7 @@ end
       sim = Simulation(grid_points_per_axis = 24, kinetic_energy = k_target)
       ε = predicted_stationary_state(sim.domain; kinetic_energy = k_target).dissipation
       @test sim.generator.conditions.velocity_forcing.injection_rate ≈ ε
-      η = kolmogorov_length(FlowParameters(; viscosity = sim.generator.conditions.viscosity,
-                                           dissipation = ε, rms_velocity = 1.0,
-                                           integral_scale = 1.0, schmidt = 1.0))
+      η = kolmogorov_length(ε, sim.generator.conditions.viscosity)
       @test max_resolved_wavenumber(sim.domain) * η ≈ 2.0 rtol = 1e-10
     end
 

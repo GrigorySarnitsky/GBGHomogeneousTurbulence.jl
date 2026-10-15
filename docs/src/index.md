@@ -64,7 +64,6 @@ end
 # the run) stored at its end; a read made stale by a later change to the state throws instead.
 kinetic_energy(sim.state.velocity_spectral)  # a measured observable, read off the state
 velocity_physical(sim.cache)                 # the field the last iteration stored
-flow_parameters(sim)                          # the run's measured flow state
 ```
 
 ## What it solves

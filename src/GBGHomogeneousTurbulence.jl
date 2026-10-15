@@ -134,6 +134,7 @@ using .Observables:
   kinetic_energy_and_dissipation_below_scale,
   reynolds_box,
   reynolds_taylor,
+  kolmogorov_length,
   max_speed,
   vorticity_physical!,
   scalar_variance,
@@ -198,7 +199,6 @@ using .SimulationRun:
   StationarityCriterion,
   current_time,
   current_step,
-  flow_parameters,
   every_steps,
   every_time,
   predicted_stationary_state
@@ -242,6 +242,7 @@ export FixedDomain,
        kinetic_energy_and_dissipation_below_scale,
        reynolds_box,
        reynolds_taylor,
+       kolmogorov_length,
        max_speed,
        scalar_variance,
        scalar_dissipation,
@@ -300,8 +301,7 @@ export FixedDomain,
        every_time,
        predicted_stationary_state,
        current_time,
-       current_step,
-       flow_parameters
+       current_step
 
 
 

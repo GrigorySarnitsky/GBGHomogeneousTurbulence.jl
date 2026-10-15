@@ -71,15 +71,6 @@ end
   negated = multiply!(deepcopy(seeded), -1.0, seeded)
   @test S != 0
   @test derivative_skewness(negated, d) ≈ -S rtol = 1e-12
-
-  # the run's summary of the same state, on a run that adopts it
-  sim = with_logger(NullLogger()) do
-    Simulation(d; viscosity = ν, velocity_forcing = NoForcing(), state = ResolvedFields(analytic_velocity(d), nothing))
-  end
-  fp = flow_parameters(sim)
-  @test fp.dissipation ≈ ν * squares / 2 rtol = 1e-12
-  @test fp.rms_velocity ≈ sqrt(2 * (squares / 4) / 3) rtol = 1e-12
-  @test fp.viscosity == ν
 end
 
 

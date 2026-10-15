@@ -38,7 +38,6 @@ The run layer:
 - [`current_time`](@ref), [`current_step`](@ref) — the elapsed time and step count;
   [`every_steps`](@ref), [`every_time`](@ref) — the cadence predicates a callback acts
   periodically on.
-- [`flow_parameters`](@ref) — the run's measured flow state as a `Phenomenology` `FlowParameters`.
 - [`write_simulation`](@ref) / [`read_simulation`](@ref) — checkpoint and restore: the restartable
   run as one self-describing HDF5 group (available once `HDF5` is loaded).
 
@@ -60,7 +59,7 @@ using ..Cache: ObservablesCache, check_deposits,
                velocity_physical, max_speed, velocity_at_particles
 using ..Observables: kinetic_energy, dissipation, kinetic_energy_and_dissipation, scalar_variance,
                      scalar_dissipation, energy_spectrum, integral_scale, derivative_skewness,
-                     reynolds_box, reynolds_taylor
+                     reynolds_box, reynolds_taylor, kolmogorov_length
 using ..Forcing: AbstractForcing, DeferredForcing, NoForcing, ConstantPower, VarianceRescaling,
                  VarianceController, StochasticOU, StochasticOUState, initial_forcing_state,
                  kinetic_energy_in_box_units, band_energy_fraction, _uncovered_reason, _stated_state,
@@ -72,10 +71,9 @@ import ..Propagator: deposit!
 using ..Particles: Tracers, AbstractParticleIntegrator, Heun, advect!,
                    restart!, history_depth, ParticleTraversal
 import ..Particles: rebuild_traversal!
-using ..Phenomenology: FlowParameters, taylor_reynolds, kolmogorov_length
 
 export Simulation, advance!, run!, warmup!, StationarityCriterion,
-       current_time, current_step, flow_parameters, every_steps, every_time,
+       current_time, current_step, every_steps, every_time,
        predicted_stationary_state
 
 
@@ -282,9 +280,8 @@ piece above it, seeds a divergence-free velocity (and, given a `scalar`, a mean-
 
 Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref). Read its measured state by
 applying the observables to `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or
-through the cache's deposited observables (`velocity_physical(sim.cache)`); summarize it with
-[`flow_parameters`](@ref), and track its progress with [`current_time`](@ref) /
-[`current_step`](@ref).
+through the cache's deposited observables (`velocity_physical(sim.cache)`), and track its progress
+with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
@@ -802,7 +799,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
               box_time = cbrt(side_length^2 / prediction.dissipation))
     if isnothing(viscosity)
       # ν is SET here from the predicted ε. Which member of (k, ε) is guaranteed depends on what the
-      # forcing holds, so the line says so. Nothing here is a measurement — `flow_parameters` measures.
+      # forcing holds, so the line says so. Nothing here is a measurement — the observables measure.
       resolution = prediction.κ_max_η
       held = _held_quantity(velocity_spec)
       guarantee = held === :dissipation ?
@@ -869,10 +866,7 @@ directly, `κ_max_η` derives it from the grid. Pass one, not both."))
   if carries_scalar
     # The predicted stationary ε where there is one; the seeded field's own ε where nothing is predicted.
     ε_check = ε !== nothing ? ε : _seeded_dissipation(state, domain, ν)
-    η = kolmogorov_length(FlowParameters(; viscosity = ν, dissipation = ε_check,
-                                         rms_velocity = sqrt(2 * k_design / 3),
-                                         integral_scale = inv(envelope_wavenumber), schmidt))
-    κ_max_η = max_resolved_wavenumber(domain) * η
+    κ_max_η = max_resolved_wavenumber(domain) * kolmogorov_length(ε_check, ν)
     κ_max_η_B = κ_max_η / sqrt(schmidt)
     if κ_max_η_B < 1.5
       # The velocity clause must agree with the number it quotes: claim resolution only when the
@@ -981,31 +975,6 @@ end
 
 
 """
-    flow_parameters(sim)
-
-The measured flow state of `sim` as a [`FlowParameters`](@ref) — the bridge that lets any
-[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) reference law be evaluated at the run's
-measured state. The viscosity ``\\nu`` and the
-Schmidt number are read from the run's
-[`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions); the dissipation ``\\varepsilon``, the r.m.s. velocity
-``u' = \\sqrt{2k/3}`` (from the kinetic energy ``k``), the longitudinal integral scale ``L_{11}``, and —
-when the run carries a scalar — the scalar dissipation ``\\varepsilon_\\varphi`` are measured from the
-current state (the scalar dissipation is left `NaN` only for a scalar-free run, where the scalar reference
-laws do not apply).
-"""
-function flow_parameters(sim::Simulation)
-  k = kinetic_energy(sim.state.velocity_spectral)
-  ε = dissipation(sim.state.velocity_spectral, sim.domain, sim.generator.conditions.viscosity)
-  εφ = sim.state.scalar_spectral === nothing ? NaN :
-    scalar_dissipation(sim.state.scalar_spectral, sim.domain, scalar_diffusivity(sim.generator.conditions))
-  FlowParameters(; viscosity = sim.generator.conditions.viscosity, dissipation = ε,
-                 rms_velocity = sqrt(2k / 3),
-                 integral_scale = integral_scale(sim.state.velocity_spectral, sim.domain),
-                 schmidt = sim.generator.conditions.schmidt, scalar_dissipation = εφ)
-end
-
-
-"""
     current_time(sim)
 
 The elapsed simulation time of `sim`.
@@ -1033,7 +1002,7 @@ current_step(sim::Simulation) = sim.clock.step
 # stored in, the schemes, the step settings, the clock with its values — each part through its own
 # display; then what a `run!` callback may read WITHOUT computation: the state's representations of
 # record, the cache's deposited reads (served as the closing deposit left them, never recomputed),
-# and the tracer positions. Nothing that would compute (an observable, `flow_parameters`) is listed,
+# and the tracer positions. Nothing that would compute (an observable) is listed,
 # and a run without a scalar or without particles shows no row about them. Names only: nothing here
 # touches a device array, and nothing reads a cache slot (a checked read could throw on a stale slot;
 # the display must never).

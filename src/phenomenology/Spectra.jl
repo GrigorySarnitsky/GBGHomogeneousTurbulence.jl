@@ -307,7 +307,7 @@ published [`provenance`](@ref); an ad-hoc mix evaluates like any other, but it i
 model, so `provenance` throws for it rather than inventing a source. Evaluated by
 [`spectrum`](@ref)`(model, κ, fp)`, which reads ``\\varepsilon`` and the roll-off's own length ``\\ell``
 (see [`large_scale_length`](@ref) — ``L_{11}`` for most forms, ``k^{3/2}/\\varepsilon`` for Pope's) from
-`fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref).
+`fp` and forms ``\\eta`` with [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length).
 
 This is the standard generic form for a model spectrum (Sagaut & Cambon 2018, *Homogeneous
 Turbulence Dynamics*, 2nd ed., Springer, [doi:10.1007/978-3-319-73162-9](https://doi.org/10.1007/978-3-319-73162-9);

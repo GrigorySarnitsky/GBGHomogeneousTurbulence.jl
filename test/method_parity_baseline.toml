@@ -126,12 +126,6 @@ count = 1
 module = "Generator"
 
 [[generic]]
-set = "SimulationRun"
-name = "flow_parameters"
-count = 1
-module = "SimulationRun"
-
-[[generic]]
 set = "Particles"
 name = "history_depth"
 count = 2
@@ -146,6 +140,12 @@ module = "Forcing"
 [[generic]]
 set = "Observables"
 name = "integral_scale"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "kolmogorov_length"
 count = 1
 module = "Observables"
 
@@ -487,11 +487,11 @@ module = "SimulationRun"
 
 [module]
 SimulationDomain = 25
-Observables = 15
+Observables = 16  # +1 (2026-10-15): `kolmogorov_length(ε, ν)`, the run layer's η no longer borrowed from Phenomenology
 State = 6
 Cache = 23
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)
 Generator = 25
 Propagator = 22
 Particles = 23  # +2 (2026-10-14): `_order`, the two methods unwrapping a `ParticleTraversal` for the gathers (moved from SimulationRun)
-SimulationRun = 48  # +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type
+SimulationRun = 47  # −1 (2026-10-15): `flow_parameters` left the run layer, which no longer reaches the Phenomenology leaf (decision 112); +1 (2026-10-14): `_turnover_time`, the flow's 2k/(3ε) a controller takes; +3 (2026-10-14): `ParticleTracking`'s two constructors and `_check_traversal_mode`; +1 (2026-10-14): `PassiveScalar`'s keyword constructor; +2 (2026-10-14): `_seeded`, the two methods filling a deferred `StochasticOU` seed from the run's rng; −2 (2026-10-14): `_traversal_order` moved to Particles as `_order`; +1 (2026-10-12): `_predicted_stationary_state`, the Float64 prediction the public one converts to the domain's element type

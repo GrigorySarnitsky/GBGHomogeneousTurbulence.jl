@@ -88,7 +88,12 @@ dimensionless-constant fits), each an author-year parametrization of one abstrac
 — is a dependency-light, **extraction-bound** leaf (scaffolded, with reference laws and oracle tests in place): it takes **no** `GBGPeriodicFields` /
 `GBGStreamingStatistics` / dynamics dependency, is **not** re-exported by the umbrella, and is designed to
 be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite. Do not add such dependencies to it.
-See `docs/ARCHITECTURE.md` §4.7 and decision 18.
+**The boundary holds in the other direction too** (the owner, 2026-10-15, decision 112): no module of the
+dynamics side binds a name the leaf defines — a quantity the run layer needs (``\eta``,
+``\mathrm{Re}_\lambda``) is an `Observables` function of measured scalars, never borrowed from the leaf,
+and the bridge from a run's measured state to the leaf's `FlowParameters` record is test code. The
+check is the boundary testset in `test/phenomenology.jl`, which reads every binding of every owned
+module and fails on one that resolves into the leaf. See `docs/ARCHITECTURE.md` §4.7 and decision 18.
 
 ## Core invariants — do not violate
 

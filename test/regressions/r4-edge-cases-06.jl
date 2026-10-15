@@ -22,7 +22,6 @@
 
 using Test, Random, Logging
 using GBGHomogeneousTurbulence
-using GBGHomogeneousTurbulence.Phenomenology: kolmogorov_length
 const κ_max = GBGHomogeneousTurbulence.SimulationDomain.max_resolved_wavenumber
 
 
@@ -32,7 +31,8 @@ function grid_mode_run(forcing)
                    rng = MersenneTwister(4242))
   ν = sim.generator.conditions.viscosity
   warmup!(sim)
-  return ν, κ_max(sim.domain) * kolmogorov_length(flow_parameters(sim))
+  ε = dissipation(sim.state.velocity_spectral, sim.domain, ν)
+  return ν, κ_max(sim.domain) * kolmogorov_length(ε, ν)
 end
 
 

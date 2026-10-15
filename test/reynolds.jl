@@ -1,6 +1,6 @@
-# reynolds_box and reynolds_taylor — plain functions of three measured scalars. Each is checked against
-# its definition written out independently, against the identities tying them to the kinetic energy in
-# box units and to the Kolmogorov length, for element type, and for its refusals.
+# reynolds_box, reynolds_taylor and kolmogorov_length — plain functions of measured scalars. Each is
+# checked against its definition written out independently, against the identities tying them to the
+# kinetic energy in box units and to the Kolmogorov length, for element type, and for its refusals.
 using Test
 using GBGHomogeneousTurbulence
 
@@ -37,4 +37,25 @@ using GBGHomogeneousTurbulence
   @test_throws ArgumentError reynolds_taylor(-k, ε, ν)
   @test_throws ArgumentError reynolds_taylor(k, ε, -ν)
   @test_throws ArgumentError reynolds_taylor(NaN, ε, ν)
+end
+
+
+@testset "the Kolmogorov length" begin
+  ε, ν, L = 0.37, 0.011, 2π
+  # the definition, written out
+  @test kolmogorov_length(ε, ν) ≈ (ν^3 / ε)^(1 / 4) rtol = 1e-14
+  # the resolution a run states through it: Re_box = (L/η)^{4/3}, so η = L / Re_box^{3/4}
+  @test kolmogorov_length(ε, ν) ≈ L / reynolds_box(L, ε, ν)^(3 / 4) rtol = 1e-13
+
+  # the arguments' own floating-point type; integers promote to Float64
+  @test kolmogorov_length(0.37f0, 0.011f0) isa Float32
+  @test kolmogorov_length(1, 1) === 1.0
+
+  # refusals, by name
+  @test_throws ArgumentError kolmogorov_length(0, ν)
+  @test_throws ArgumentError kolmogorov_length(-ε, ν)
+  @test_throws ArgumentError kolmogorov_length(ε, 0)
+  @test_throws ArgumentError kolmogorov_length(ε, -ν)
+  @test_throws ArgumentError kolmogorov_length(Inf, ν)
+  @test_throws ArgumentError kolmogorov_length(ε, NaN)
 end

@@ -26,10 +26,10 @@ The measured functions of the flow state:
   lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
   length scale derived from it.
-- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref) — the box and Taylor-microscale Reynolds numbers,
-  from measured scalars rather than a field.
+- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref), [`kolmogorov_length`](@ref) — the Reynolds
+  numbers and Kolmogorov length from measured scalars, not a field.
 
-All but the two Reynolds numbers are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
+All but those three are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
 the spectral density sampled on the wavenumber shells, and the vorticity recovery alone produces a
 field. Each returns
 the field's own real element type, not a fixed `Float64`, so a `Float32` run measures in
@@ -59,7 +59,7 @@ using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
        kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
-       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor
+       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor, kolmogorov_length
 
 
 """
@@ -600,6 +600,27 @@ function reynolds_taylor(kinetic_energy::Real, dissipation::Real, viscosity::Rea
   (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
   (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
   return sqrt(oftype(ε, 20) / 3) * k / sqrt(ε * ν)
+end
+
+
+"""
+    kolmogorov_length(dissipation, viscosity)
+
+The function computes the Kolmogorov length ``\\eta = (\\nu^3/\\varepsilon)^{1/4}`` from the dissipation rate
+`dissipation` (``\\varepsilon``, such as a run's measured time mean or the stationary value it was set up
+for) and the kinematic viscosity `viscosity` (``\\nu``): the scale at which viscosity terminates the
+cascade. A run states its resolution through it, as the product ``\\kappa_{\\max}\\eta`` of the
+resolved-band edge ``\\kappa_{\\max}`` and this length. The arguments run from the largest scale to the
+smallest.
+
+Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
+`dissipation` or `viscosity` throws an `ArgumentError`.
+"""
+function kolmogorov_length(dissipation::Real, viscosity::Real)
+  ε, ν = promote(float(dissipation), float(viscosity))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return sqrt(sqrt(ν^3 / ε))                 # the fourth root, in the arguments' own type
 end
 
 

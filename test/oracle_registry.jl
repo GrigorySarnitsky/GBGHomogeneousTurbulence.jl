@@ -14,7 +14,7 @@
 # The classification is the moment to notice an operation with no independent oracle. Declaring the
 # registry found the core observables checked only against other package operations, against a trivial zero, or not at all —
 # `kinetic_energy`, `dissipation`, `energy_spectrum`, `integral_scale`, `max_speed`,
-# `derivative_skewness`, `flow_parameters`, `max_resolved_wavenumber`, the two integrating factors and
+# `derivative_skewness`, `max_resolved_wavenumber`, the two integrating factors and
 # `recommended_cfl` — and `observables_analytic.jl` supplies their closed forms.
 # `Phenomenology` is outside the surface until it is extracted (the owner, 2026-09-29).
 using Test
@@ -40,7 +40,7 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :kinetic_energy_and_dissipation_below_scale => (:independent, "below_scale.jl — the spectral sums as host loops, and the box-mean definition on an 8× finer grid"),
   :reynolds_box          => (:independent, "reynolds.jl — through the Kolmogorov velocity of a box-sized eddy, and (L/η)^{4/3}"),
   :reynolds_taylor       => (:independent, "reynolds.jl — u′λ/ν with u′ and λ written out"),
-  :flow_parameters       => (:analytic, "observables_analytic.jl — ε and u′ = √(2k/3) of the single-shell field, on a run that adopts it"),
+  :kolmogorov_length     => (:independent, "reynolds.jl — (ν³/ε)^{1/4} written out, and Re_box = (L/η)^{4/3} through it"),
 
   # ---- the domain and the step ----
   :max_resolved_wavenumber => (:analytic, "observables_analytic.jl — f·(N/2)·2π/L with f = 2/3, 4/5, 2√2/3"),

@@ -22,19 +22,6 @@ end
 end
 
 
-@testset "flow_parameters — the measured-state bridge" begin
-  fp = flow_parameters(SIM)
-  @test fp isa FlowParameters
-  @test fp.viscosity == 0.02
-  ω̂ = new_vector_field_spectral(SIM.domain)
-  curl!(ω̂, SIM.state.velocity_spectral, SIM.domain.multipliers)
-  @test fp.dissipation ≈ dissipation(ω̂, SIM.generator.conditions.viscosity)
-  @test fp.rms_velocity ≈ sqrt(2 * kinetic_energy(SIM.state.velocity_spectral) / 3)
-  @test fp.integral_scale ≈ integral_scale(SIM.state.velocity_spectral, SIM.domain)
-  @test taylor_reynolds(fp) > 0
-end
-
-
 @testset "dissipation — the vorticity and Dirichlet routes, and the condition between them" begin
   # ε = ν⟨|ω|²⟩ from a formed curl versus ν⟨û,|κ|²û⟩ straight from the velocity. The two agree
   # because |κ×û|² = |κ|²|û|² − |κ·û|² and the projected dynamics keeps κ·û = 0 — so the second
@@ -57,14 +44,25 @@ end
 
 # Comparing a measured spectrum against a model is a TEST activity, not a package capability: it
 # answers "does this run reproduce the literature", which is what a validation suite asks and a solver
-# never does. The comparison lives here rather than in `src/` for that reason (decision 49).
+# never does. The comparison lives here rather than in `src/` for that reason (decision 49), and so
+# does the bridge from a run's measured state to the leaf's `FlowParameters` record: the package's
+# dynamics side reaches nothing in `Phenomenology` (decision 112).
+function measured_state(sim)
+  ν = sim.generator.conditions.viscosity
+  k = kinetic_energy(sim.state.velocity_spectral)
+  FlowParameters(; viscosity = ν, dissipation = dissipation(sim.state.velocity_spectral, sim.domain, ν),
+                 rms_velocity = sqrt(2k / 3),
+                 integral_scale = integral_scale(sim.state.velocity_spectral, sim.domain),
+                 schmidt = sim.generator.conditions.schmidt)
+end
+
 #
 # The one subtlety it encodes: the measured `energy_spectrum` is a per-shell energy (k = Σ_κ E_n)
 # while a `Phenomenology` model is a spectral density (k = ∫ E(κ) dκ), so the density must be
 # multiplied by the shell width Δκ = 2π/L before the two are comparable — at any box side L, not only
 # the default L = 2π where Δκ = 1.
 function compare_to_model(sim, model)
-  fp = flow_parameters(sim)
+  fp = measured_state(sim)
   # `energy_spectrum` returns host `Vector`s whatever backend the field lives on — the shell
   # accumulators are O(N) and the reduction brings them back — so this comparison, which walks the
   # shells one at a time, needs no transfer of its own and never scalar-indexes a device array.
@@ -92,7 +90,7 @@ end
                    velocity_forcing = ConstantPower(injection_rate = 0.1))
   advance!(sim)
   v = compare_to_model(sim, Pope2000())
-  fp = flow_parameters(sim)
+  fp = measured_state(sim)
   Δκ = 2π / sim.domain.grid.domain_size[1]
   @test Δκ ≈ 0.5                                        # not 1: the factor is live here
   i = findfirst(>(0), v.wavenumbers)
@@ -105,7 +103,7 @@ end
   @test length(v.wavenumbers) == length(v.measured) == length(v.predicted)
   @test isfinite(v.relative_error) && v.relative_error ≥ 0
   # the prediction is the model density × the shell width Δκ = 2π/L (a per-shell energy, matching `measured`)
-  fp = flow_parameters(SIM)
+  fp = measured_state(SIM)
   Δκ = 2π / SIM.domain.grid.domain_size[1]
   i = findfirst(>(0), v.wavenumbers)
   @test v.predicted[i] ≈ spectrum(Pope2000(), v.wavenumbers[i], fp) * Δκ

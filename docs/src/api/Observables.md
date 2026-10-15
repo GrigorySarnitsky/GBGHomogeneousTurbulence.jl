@@ -41,14 +41,16 @@ what a box of that side measures once its own mean is removed, averaged over eve
 kinetic_energy_and_dissipation_below_scale
 ```
 
-## Reynolds numbers
+## Reynolds numbers and the Kolmogorov length
 
-The box and Taylor-microscale Reynolds numbers are computed from measured scalars (a run's time-mean
-``\varepsilon`` and ``k``, its ``\nu`` and box side) rather than from a field.
+The box and Taylor-microscale Reynolds numbers and the Kolmogorov length are computed from measured
+scalars (a run's time-mean ``\varepsilon`` and ``k``, its ``\nu`` and box side) rather than from a
+field.
 
 ```@docs
 reynolds_box
 reynolds_taylor
+GBGHomogeneousTurbulence.Observables.kolmogorov_length
 ```
 
 ## Derivative skewness

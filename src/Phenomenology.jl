@@ -18,7 +18,7 @@ and never assumed by the dynamics.
 
 The module's contents:
 - [`FlowParameters`](@ref) — the flow-state bundle a law evaluates against, with the
-  derived scales [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
+  derived scales [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length), [`kolmogorov_time`](@ref), [`taylor_microscale`](@ref),
   [`taylor_reynolds`](@ref), and [`scalar_diffusivity`](@ref) as helpers.
 - [`provenance`](@ref) — a law's citation and validity range (a [`Reference`](@ref)); [`fit`](@ref)
   is the (future) seam for fitting a parametrization to measured data.

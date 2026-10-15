@@ -642,9 +642,8 @@ quantities a law reads (``\varepsilon``, ``\nu``, ``L_{11}``, ``u'``, ``\mathrm{
 with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
 helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
-The laws are **consumed to build runs**, not only compared against: an initial-condition or forcing
-spectrum drawn from `Spectra`, and the reference curves the validation harness reads, all from one library.
-And the loop closes: we measure (with this package and SS), `fit` a parametrization to that measurement,
+The laws are **compared against, never consumed by the solver** (decision 112): the validation suite
+reads them, and the dynamics binds nothing the leaf defines. And the loop closes: we measure (with this package and SS), `fit` a parametrization to that measurement,
 and the new fit lands beside the literature, to be validated against the next run.
 
 **Formula verification.** A transcribed law is checked not against a reference implementation — none is
@@ -659,11 +658,11 @@ catches a wrong exponent, coefficient, or sign without trusting a second source.
 path that extracted `GBGStreamingStatistics`. The requirement constrains the design. It is a
 **dependency-light leaf**, depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no field
 math) *nor* `GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor* this
-package's dynamics — first in the include order, importing nothing turbulence-dynamical. And it is a
+package's dynamics — first in the include order, importing nothing turbulence-dynamical, and imported
+by nothing on the dynamics side. And it is a
 **self-contained namespace**: the umbrella does *not* re-export it (`using GBGHomogeneousTurbulence` brings
 the DNS API only; the laws are reached opt-in through `Phenomenology`), and its notation and API pages form
-their own group, separable from the DNS surface. Extract when a second consumer appears; until then the
-seam is real but uncrossed (decision 18).
+their own group, separable from the DNS surface. Extract when a second consumer appears (decision 18).
 
 ### 4.9 Layout summary
 
@@ -3261,6 +3260,27 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `envelope_wavenumber = 2.0` has one meaning again and shows its default, and no either-or with
     `state` remains to be detected. The `Reference` stays off the `ModelSpectrum` struct on its own
     grounds, a property of the parametrization rather than of an instance.
+112. **(2026-10-15, user-directed) The dynamics side binds nothing from the `Phenomenology` leaf;
+    the Kolmogorov length is an observable of measured scalars.** Decision 18 sealed the leaf in one
+    direction — it takes no field-library or dynamics dependency — and decision 19 then made the run
+    layer its first consumer: `flow_parameters(sim)` packed the measured state into the leaf's
+    `FlowParameters` record, and the scalar-resolution check borrowed the leaf's
+    `kolmogorov_length(fp)`, building a record whose unread fields it filled with stand-ins
+    (an "integral scale" of `1/envelope_wavenumber`, a seed parameter where a flow quantity belongs). The owner ruled the boundary two-sided: nothing in
+    the package relies on the leaf, and `FlowParameters` is a record of a real flow state that never
+    carries fake data.
+
+    So ``\eta`` becomes `kolmogorov_length(ε, ν)` in `Observables`, positional and large scale
+    first beside `reynolds_taylor(k, ε, ν)` (decision 104's convention), and the run layer's three
+    imports from the leaf go: `kolmogorov_length` to the observable, `taylor_reynolds` dead since
+    the constructor took `reynolds_taylor`, and `FlowParameters` with the bridge itself, which moves
+    to the validation suite as the test helper `measured_state` — comparing a run to a reference law
+    was already a test activity (decision 49), and so is building the law's argument from the run.
+
+    The leaf keeps its own ``\eta`` spelling, as an extraction-bound leaf must. The check is the
+    boundary testset in `test/phenomenology.jl`: every binding of every owned module is read where
+    it resolves, and one resolving into the leaf fails the suite. Decision 19's bridge is thereby
+    superseded; its measured spectrum and integral scale stay in `Observables`.
 
 ## References
 

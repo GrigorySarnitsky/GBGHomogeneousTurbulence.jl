@@ -1,11 +1,43 @@
 using Test
 using GBGHomogeneousTurbulence
+using GBGPeriodicFields: GBGPeriodicFields
 using GBGHomogeneousTurbulence.Phenomenology
+using GBGHomogeneousTurbulence.Phenomenology: kolmogorov_length   # the leaf's, not the Observables export of the same name
 using GBGHomogeneousTurbulence.Phenomenology.Spectra
 using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions
 using GBGHomogeneousTurbulence.Phenomenology.Scalings
 
 const FP = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0, integral_scale = 1.0)
+
+
+# The leaf's boundary, in both directions (decisions 18 and 112): the leaf takes no field-library
+# or dynamics dependency, and no module of the dynamics side binds a name the leaf defines. A
+# binding is read where it resolves, so a `using ..Phenomenology: name` anywhere in an owned module
+# fails here, whichever name it brings in.
+const HT = GBGHomogeneousTurbulence
+const DYNAMICS_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
+                          HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+in_module(m, root) = m === root || (parentmodule(m) !== m && in_module(parentmodule(m), root))
+leaf_modules(root) = [m for m in (root, Phenomenology.Spectra, Phenomenology.StructureFunctions,
+                                  Phenomenology.Scalings)]
+
+@testset "the leaf's boundary: nothing crosses it in either direction" begin
+  # Into the leaf: no binding from the field library, the statistics library or the dynamics side.
+  for M in leaf_modules(Phenomenology), n in names(M; all = true, imported = true)
+    isdefined(M, n) || continue
+    owner = Base.binding_module(M, n)
+    @test !(in_module(owner, GBGPeriodicFields) || any(D -> in_module(owner, D), DYNAMICS_MODULES))
+  end
+  # Out of the leaf: no dynamics module binds a leaf name, under any spelling.
+  crossings = Pair{Module, Symbol}[]
+  for M in DYNAMICS_MODULES, n in names(M; all = true, imported = true)
+    isdefined(M, n) || continue
+    in_module(Base.binding_module(M, n), Phenomenology) && push!(crossings, M => n)
+  end
+  @test isempty(crossings)
+  # The probe sees through an import: a name the run layer takes from `Generator` resolves there.
+  @test Base.binding_module(HT.SimulationRun, :FlowConditions) === HT.Generator
+end
 
 
 @testset "FlowParameters — derived scales" begin

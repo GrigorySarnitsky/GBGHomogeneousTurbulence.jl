@@ -63,15 +63,6 @@ every_steps
 every_time
 ```
 
-## Flow parameters
-
-Bridge the run's measured state to a [`Phenomenology`](../phenomenology.md) `FlowParameters`, so any
-reference law can be evaluated at the run's measured state.
-
-```@docs
-flow_parameters
-```
-
 ## Persistence
 
 These functions checkpoint and restore the restartable run as one self-describing group, available once `HDF5` is loaded.

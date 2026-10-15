@@ -1,18 +1,16 @@
-# Architecture witness (diff check, not a failing test): the derived-viscosity Simulation constructor's
-# inline `reλ` at src/SimulationRun.jl:284 is the SAME formula as Phenomenology.taylor_reynolds,
-# spelled a second time. This script demonstrates the two spellings agree numerically today —
-# i.e. the finding is duplication of a definition, not a present numeric divergence.
+# Architecture witness (diff check, not a failing test): the derived-viscosity Simulation constructor
+# once spelled Re_λ inline, a second copy of the formula the package already owned. The constructor
+# now calls `reynolds_taylor`; this script keeps the inline spelling as the independent reference and
+# demonstrates the owned function reproduces it, so a drift in the owned formula is caught here.
 using Test
-using GBGHomogeneousTurbulence.Phenomenology: FlowParameters, taylor_reynolds
+using GBGHomogeneousTurbulence
 
-inline_reλ(k, ε, ν) = (2 * k / 3) * sqrt(15 / (ε * ν))          # copy of SimulationRun.jl:284
+inline_reλ(k, ε, ν) = (2 * k / 3) * sqrt(15 / (ε * ν))          # the constructor's former inline copy
 
-@testset "the ν derivation's inline Re_λ duplicates Phenomenology.taylor_reynolds" begin
+@testset "`reynolds_taylor` reproduces the constructor's former inline Re_λ" begin
   for (k, ε, ν) in ((1.5, 1.0, 1e-3), (0.75, 0.3, 5e-4), (3.0, 2.2, 2e-2))
-    fp = FlowParameters(; viscosity = ν, dissipation = ε, rms_velocity = sqrt(2k / 3),
-                        integral_scale = 0.5)
-    @test taylor_reynolds(fp) ≈ inline_reλ(k, ε, ν)
-    println("k=$k ε=$ε ν=$ν :  taylor_reynolds=", taylor_reynolds(fp),
+    @test reynolds_taylor(k, ε, ν) ≈ inline_reλ(k, ε, ν)
+    println("k=$k ε=$ε ν=$ν :  reynolds_taylor=", reynolds_taylor(k, ε, ν),
             "   inline=", inline_reλ(k, ε, ν))
   end
 end

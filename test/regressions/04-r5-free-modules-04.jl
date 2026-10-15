@@ -12,8 +12,8 @@
 # so ∫₀^∞ R₁₁ dr diverges and L₁₁ → ∞. The returned 0.0 is the same silent-degenerate-value failure
 # the guard exists to prevent (its own comment: "0/0 would hand back a silent NaN that then
 # propagates into every derived quantity — a Reynolds number, a turnover time"), reached through the
-# other summand: `flow_parameters` reports integral_scale = 0.0, and a `Phenomenology` law
-# normalised on L₁₁ then evaluates at κL = 0.
+# other summand: a reported L₁₁ = 0.0, and a `Phenomenology` law normalised on L₁₁ then evaluates
+# at κL = 0.
 #
 # The correct behaviour is fix-agnostic and is what is asserted below: L₁₁ must never be handed back
 # as zero. Excluding κ = 0 from BOTH sums satisfies every assertion here — the mean-flow-only field

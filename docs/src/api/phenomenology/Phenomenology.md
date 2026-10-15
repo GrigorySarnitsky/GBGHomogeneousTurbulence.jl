@@ -16,7 +16,7 @@ FlowParameters
 The derived scales, computed from the bundle.
 
 ```@docs
-kolmogorov_length
+GBGHomogeneousTurbulence.Phenomenology.kolmogorov_length
 kolmogorov_time
 taylor_microscale
 taylor_reynolds
