@@ -92,17 +92,6 @@ equations the diffusive (stiff) term is integrated exactly through an integratin
 nonlinear term explicitly by a Runge–Kutta stage combination, and the quadratic product is
 dealiased by the default ``2/3`` rule (other strategies are available).
 
-!!! note "Work in progress"
-    The package is being built one feature at a time, each end to end. The coupled velocity + passive-scalar solver is in
-    place, advanced by the integrating-factor schemes ([`IFLowStorageRK3`](@ref),
-    [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref) and [`IFHeun`](@ref)), with the forcing menu
-    `NoForcing`, `Linear`, `ConstantPower` (the velocity default),
-    `VarianceController`, `VarianceRescaling`, and `StochasticOU`, and Lagrangian particle
-    tracking ([`Tracers`](@ref)). Accumulating
-    statistics over the fields and the sampled trajectories is the caller's own analysis:
-    `GBGPeriodicFields` supplies the field reductions and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the online
-    estimators.
-
 ## Components
 
 Listed in build order — each module uses the ones above it. The
