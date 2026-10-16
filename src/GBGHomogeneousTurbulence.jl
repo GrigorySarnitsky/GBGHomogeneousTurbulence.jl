@@ -11,7 +11,7 @@
 #
 # Module layout (each concern its own file). Physics concerns take their names from the Mori–Zwanzig
 # lens — the four roles State / Generator / Observables / Propagator; the System's forcing, the frame,
-# the instruments, the run layer, and the reference laws are named by their job.
+# the instruments and the run layer are named by their job.
 #   SimulationDomain — the frame: the `FixedDomain` box (transform plans, multipliers, dealias kernel)
 #   Observables      — the measured functions of state (energy, dissipation, skewness, …), including
 #                      the field-valued vorticity recovery. Ahead of `State` because the seeders
@@ -57,8 +57,6 @@ trajectories. It has these submodules:
 - [`SimulationRun`](@ref GBGHomogeneousTurbulence.SimulationRun) — the run layer, checkpointing
   ([`write_simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.write_simulation)) once `HDF5` is loaded.
 
-- [`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) — reference turbulence laws, not re-exported.
-
 Statistics over the flow and its samples are the caller's analysis:
 [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) supplies the field
 reductions, [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/)
@@ -70,11 +68,6 @@ module GBGHomogeneousTurbulence
 
 using GBGPeriodicFields
 
-
-# Phenomenology leads as the dependency-light, extraction-bound leaf (ARCHITECTURE §4.8): it is
-# deliberately NOT re-exported below — reach the reference laws opt-in through the submodule namespace,
-# e.g. `using GBGHomogeneousTurbulence.Phenomenology.Spectra`.
-include("Phenomenology.jl")
 
 include("SimulationDomain.jl")
 include("Observables.jl")

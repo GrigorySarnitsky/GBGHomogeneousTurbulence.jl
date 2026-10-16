@@ -80,20 +80,18 @@ functions of state); **realization / infrastructure** concerns are named by thei
 - `SimulationRun` — the ergonomic run layer (`Simulation` + `run!` / `warmup!` / `advance!`).
 
 Include order: `SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator →
-Particles → SimulationRun` (with `Phenomenology`, the extraction-bound leaf, included first). Cross-module access
-only through explicit `using ..Module: name` — never a bare `using`.
+Particles → SimulationRun`. Cross-module access only through explicit `using ..Module: name` — never a
+bare `using`.
 
-A **`Phenomenology`** submodule — the reference turbulence laws (model spectra, structure-function laws,
-dimensionless-constant fits), each an author-year parametrization of one abstract law family per quantity
-— is a dependency-light, **extraction-bound** leaf (scaffolded, with reference laws and oracle tests in place): it takes **no** `GBGPeriodicFields` /
-`GBGStreamingStatistics` / dynamics dependency, is **not** re-exported by the umbrella, and is designed to
-be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite. Do not add such dependencies to it.
-**The boundary holds in the other direction too** (the owner, 2026-10-15, decision 112): no module of the
-dynamics side binds a name the leaf defines — a quantity the run layer needs (``\eta``,
-``\mathrm{Re}_\lambda``) is an `Observables` function of measured scalars, never borrowed from the leaf,
-and the bridge from a run's measured state to the leaf's `FlowParameters` record is test code. The
-check is the boundary testset in `test/phenomenology.jl`, which reads every binding of every owned
-module and fails on one that resolves into the leaf. See `docs/ARCHITECTURE.md` §4.7 and decision 18.
+**The reference-law module `Phenomenology` is parked** (the owner, 2026-10-16, decision 113). Its
+source, oracle tests and pages live whole under `parked/Phenomenology/`, in the layout of the standalone
+`GBGTurbulencePhenomenology` it becomes when extracted; its tests run on demand with
+`julia --project parked/Phenomenology/test/runtests.jl`. Nothing in the package includes it, builds it,
+or names it on a user-facing surface: a quantity the run layer needs (``\eta``, ``\mathrm{Re}_\lambda``)
+is an `Observables` function of measured scalars (decision 112), and a model spectrum is "a model
+spectrum from the literature" where a docstring needs the idea. The guard is `test/parked_modules.jl`:
+the umbrella defines no `Phenomenology`, and the word appears in no file under `src/`, `docs/src/` or
+`README.md`. `docs/ARCHITECTURE.md` §4.8 keeps the design it was built to.
 
 ## Core invariants — do not violate
 

@@ -98,8 +98,7 @@ dealiased by the default ``2/3`` rule (other strategies are available).
     [`IFLowStorageRK4`](@ref), [`IFSSPRK3`](@ref) and [`IFHeun`](@ref)), with the forcing menu
     `NoForcing`, `Linear`, `ConstantPower` (the velocity default),
     `VarianceController`, `VarianceRescaling`, and `StochasticOU`, and Lagrangian particle
-    tracking ([`Tracers`](@ref)). The reference turbulence laws ([`Phenomenology`](phenomenology.md))
-    provide usable model spectra, structure-function laws, and scaling constants. Accumulating
+    tracking ([`Tracers`](@ref)). Accumulating
     statistics over the fields and the sampled trajectories is the caller's own analysis:
     `GBGPeriodicFields` supplies the field reductions and [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl/) the online
     estimators.
@@ -138,7 +137,3 @@ Listed in build order — each module uses the ones above it. The
 - [`SimulationRun`](api/SimulationRun.md): the ergonomic run layer — `Simulation`, and the
   Courant–Friedrichs–Lewy (CFL) adaptive loop (`advance!` / `run!` / `warmup!`) that drives it. Read the state through `sim.state`, the deposited observables through
   `sim.cache`.
-- [`Phenomenology`](phenomenology.md): the reference turbulence laws — model spectra, structure-function
-  laws, and scaling constants — to validate a run against. It is a separate, opt-in group, not re-exported by
-  the top-level module (load it with `using GBGHomogeneousTurbulence.Phenomenology`) and designed to
-  become a standalone package. Depending on no other module here, it is built *first*; it is listed last here because a user's workflow reaches it last — validating against the laws comes after running.

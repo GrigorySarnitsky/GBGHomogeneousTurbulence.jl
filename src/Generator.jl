@@ -58,8 +58,8 @@ scalar diffusivity is ``\\varkappa = \\nu/\\mathrm{Sc}``), and the velocity and 
 (`velocity_forcing`, `scalar_forcing`, both
 [`AbstractForcing`](@ref GBGHomogeneousTurbulence.Forcing.AbstractForcing)).
 
-Not to be confused with `Phenomenology`'s `FlowParameters`, which shares two field names: this type
-holds what a run is **configured with**, that one holds what a run has been **measured to have**.
+These are what a run is configured with; what the flow turns out to have is measured by
+[`Observables`](@ref GBGHomogeneousTurbulence.Observables).
 
 A scheme reads the conditions through the [`ResolvedGenerator`](@ref) it is handed;
 [`step!`](@ref GBGHomogeneousTurbulence.Propagator.step!) never holds them itself.

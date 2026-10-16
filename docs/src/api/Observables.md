@@ -50,7 +50,7 @@ field.
 ```@docs
 reynolds_box
 reynolds_taylor
-GBGHomogeneousTurbulence.Observables.kolmogorov_length
+kolmogorov_length
 ```
 
 ## Derivative skewness
@@ -82,8 +82,7 @@ vorticity_physical!
 
 ## Spectrum and length scale
 
-The measured energy spectrum and the integral scale are the measured counterparts of a
-[`Phenomenology`](../phenomenology.md) model spectrum, for validation.
+The energy spectrum as a density per unit wavenumber, and the integral length scale read from it.
 
 ```@docs
 energy_spectrum

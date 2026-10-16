@@ -32,12 +32,6 @@ using GBGCodingTools
 using GBGHomogeneousTurbulence
 const ROOT = normpath(joinpath(@__DIR__, ".."))
 const TOOLING = GBGCodingTools.Render.pages(GBGCodingTools.ConfigIO.read_config(ROOT), ROOT)
-# Phenomenology is deliberately not re-exported by the umbrella (ARCHITECTURE §4.7); bring its
-# submodule names into scope here so the docs pages can reference them by bare name, as the DNS API is.
-using GBGHomogeneousTurbulence.Phenomenology
-using GBGHomogeneousTurbulence.Phenomenology.Spectra
-using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions
-using GBGHomogeneousTurbulence.Phenomenology.Scalings
 
 # Make `using GBGHomogeneousTurbulence` available to any `jldoctest` examples (recursive covers the
 # submodules). Doctests are off for now (no runnable examples yet); flip `doctest = true` once added.
@@ -69,10 +63,6 @@ GBGCodingTools.makedocs(ROOT;
     GBGHomogeneousTurbulence.Propagator,
     GBGHomogeneousTurbulence.Particles,
     GBGHomogeneousTurbulence.SimulationRun,
-    GBGHomogeneousTurbulence.Phenomenology,
-    GBGHomogeneousTurbulence.Phenomenology.Spectra,
-    GBGHomogeneousTurbulence.Phenomenology.StructureFunctions,
-    GBGHomogeneousTurbulence.Phenomenology.Scalings,
   ],
   format = Documenter.HTML(
     canonical     = "https://grigorysarnitsky.github.io/GBGHomogeneousTurbulence.jl/stable",
@@ -102,13 +92,6 @@ GBGCodingTools.makedocs(ROOT;
       "Generator"              => "api/Generator.md",
       "Propagator"             => "api/Propagator.md",
       "Particles"              => "api/Particles.md",
-    ],
-    "Phenomenology" => Any[
-      "Overview"           => "phenomenology.md",
-      "Reference laws"     => "api/phenomenology/Phenomenology.md",
-      "Spectra"            => "api/phenomenology/Spectra.md",
-      "StructureFunctions" => "api/phenomenology/StructureFunctions.md",
-      "Scalings"           => "api/phenomenology/Scalings.md",
     ],
     "Validation" => "validation.md",
     "Design & Internals" => Any[

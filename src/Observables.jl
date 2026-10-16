@@ -442,10 +442,9 @@ end
 The measured kinetic-energy **spectral density** ``E(\\kappa)`` of the velocity field `û` (in
 spectral representation): ``E(\\kappa)\\,\\mathrm{d}\\kappa`` is the turbulent kinetic energy
 carried by wavenumber magnitudes in ``[\\kappa, \\kappa + \\mathrm{d}\\kappa]``, so
-``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa`` — the object the reference laws are stated
-about, directly comparable to a
-[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum with no conversion. The
-`domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers and the shell width.
+``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``. A model spectrum from the literature
+predicts the same density, so the two compare value for value. The `domain` (a
+[`FixedDomain`](@ref)) supplies the wavenumber multipliers and the shell width.
 
 Returns a named tuple `(; wavenumbers, energy)`: the shell-center wavenumber magnitudes ``\\kappa``
 and the density estimate at each (positional destructuring `κ, E = energy_spectrum(û, domain)` also
@@ -462,7 +461,7 @@ function energy_spectrum(û, domain::FixedDomain)
   shells, spec = radial_spectrum(û, domain.multipliers)
   # The DENSITY, not the bin sum: each shell's energy over the shell width Δκ = 2π/L, so the return
   # is the object the theory states laws about (E(κ) = C_K ε^{2/3} κ^{-5/3} is a density) and is
-  # directly comparable to a Phenomenology model. On the default 2π box Δκ = 1 and the two
+  # directly comparable to a model spectrum. On the default 2π box Δκ = 1 and the two
   # conventions coincide numerically — which is exactly how the bin-sum convention survived as long
   # as it did (owner-directed cutover, 2026-08-23).
   # In the spectrum's own element type: a bare `2π` is a Float64 and would promote a Float32 run —
@@ -483,9 +482,9 @@ spectral density (from [`energy_spectrum`](@ref)),
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
 ```
 
-The integral scale ``L_{11}`` is the large-eddy scale — the one flow parameter a
-[`Phenomenology`](@ref GBGHomogeneousTurbulence.Phenomenology) model spectrum needs that the small
-scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber multipliers.
+The integral scale ``L_{11}`` is the large-eddy scale: the one flow parameter a model spectrum
+needs that the small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the
+wavenumber multipliers.
 
 The integrals above are the idealized continuous definition, written with the spectral density
 ``E(\\kappa)`` that `energy_spectrum` measures; they are evaluated as quadrature sums over

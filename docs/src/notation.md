@@ -74,10 +74,9 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGHomogeneousTurbulence.Observables.dissipation) |
-| ``E_\varphi(\kappa)`` | the scalar-variance spectral density, integrating to ``\langle\varphi^{2}\rangle`` — with **no** ``\tfrac{1}{2}``, unlike ``E(\kappa)`` | [`spectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.spectrum) on a [`ScalarSpectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.ScalarSpectrum) |
-| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the one form both the measured spectrum and the `Phenomenology` models use | [`spectrum`](@ref GBGHomogeneousTurbulence.Phenomenology.spectrum) |
+| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the form the reference laws are stated in, and the one the measured spectrum below estimates | — |
 | ``E(\kappa_n)`` | the **measured** spectral density at shell ``n``, centred on the wavenumber magnitude ``\kappa_n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGHomogeneousTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
-| ``l`` | a box side: the cube whose own mean is removed in ``k(l)`` and ``\varepsilon(l)``, from the grid spacing up to the domain side ``L``; distinct from ``\ell``, the large-scale length | [`kinetic_energy_and_dissipation_below_scale`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation_below_scale) (its `scales`) |
+| ``l`` | a box side: the cube whose own mean is removed in ``k(l)`` and ``\varepsilon(l)``, from the grid spacing up to the domain side ``L`` | [`kinetic_energy_and_dissipation_below_scale`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation_below_scale) (its `scales`) |
 | ``W_l(\boldsymbol{\kappa})`` | the transfer function of the box mean of side ``l``, ``\prod_a \operatorname{sinc}(\kappa_a l/2)`` — a function of the wavenumber *vector*, not radial | `tophat_window` (`GBGPeriodicFields`) |
 | ``k(l)``, ``\varepsilon(l)`` | the kinetic energy and the dissipation held in scales below ``l``: what a box of side ``l`` measures once its own mean velocity (for ``k``) or vorticity (for ``\varepsilon``) is removed, averaged over its positions; ``k(L) = k``, ``\varepsilon(L) = \varepsilon`` | [`kinetic_energy_and_dissipation_below_scale`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation_below_scale) |
 | ``\langle\varphi^2\rangle`` | scalar variance | [`scalar_variance`](@ref GBGHomogeneousTurbulence.Observables.scalar_variance) |
@@ -86,22 +85,21 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 
 ## Derived scales
 
-These scales are computed from measured scalars; the rows pointing into `Phenomenology` are that leaf's own helpers.
+These scales are computed from measured scalars. A row whose Code column is a dash is a quantity the
+pages use in prose, with no function of its own.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | — |
-| ``\ell`` | the length a large-scale roll-off is evaluated against (``L_{11}``, or Pope's ``\ell_0 = k^{3/2}/\varepsilon``) — never the box side ``L`` | [`large_scale_length`](@ref GBGHomogeneousTurbulence.Phenomenology.Spectra.large_scale_length) |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_length) |
-| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Phenomenology.kolmogorov_time) |
 | ``\tilde{k}`` | the kinetic energy in box units, ``k/(\varepsilon L)^{2/3}``: its ``3/2`` power is the large-eddy length ``k^{3/2}/\varepsilon`` as a fraction of the box side ``L``. A run predicts its stationary state with it, from provisional values per forcing band (the shells a forcing acts on) | [`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units) |
 | ``\mathrm{Re}_{\mathrm{box}}`` | the box Reynolds number ``\varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``. A run whose ``\nu`` is set by ``\kappa_{\max}\eta``, with ``\kappa_{\max}`` the resolved-band edge of *Numerics* below, has ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}`` | [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) |
 | ``G`` | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)'s dimensionless gain | — |
 | ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the unit `warmup!` measures progress in (warm-up budgets and stationarity windows accumulate ``\Delta t \varepsilon/k``). Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the argument of the integrating-factor functions | [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) |
 | ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = \tfrac{2}{3}\tau``, a different quantity from ``\tau`` despite the shared name in the literature | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) |
 | ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu = \sqrt{20/3} k/\sqrt{\varepsilon\nu}``, measured from the flow state | [`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor) |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | [`taylor_microscale`](@ref GBGHomogeneousTurbulence.Phenomenology.taylor_microscale) |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | — |
 
 ## Numerics
 

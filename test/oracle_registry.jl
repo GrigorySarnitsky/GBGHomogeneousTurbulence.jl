@@ -16,7 +16,8 @@
 # `kinetic_energy`, `dissipation`, `energy_spectrum`, `integral_scale`, `max_speed`,
 # `derivative_skewness`, `max_resolved_wavenumber`, the two integrating factors and
 # `recommended_cfl` — and `observables_analytic.jl` supplies their closed forms.
-# `Phenomenology` is outside the surface until it is extracted (the owner, 2026-09-29).
+# The reference-law module parked under `parked/Phenomenology/` is not loaded, so not on the surface
+# (decision 113).
 using Test
 using GBGHomogeneousTurbulence
 import GBGCodingTools

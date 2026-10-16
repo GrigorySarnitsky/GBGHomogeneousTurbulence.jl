@@ -8,8 +8,8 @@
 # method, not from a namespace. It also asserts that `detect_ambiguities` over the package is empty.
 #
 # A moved number is refrozen deliberately, in the same commit, with the reason written beside it in the
-# baseline. The owned modules are listed here; `Phenomenology` is outside the surface until it is
-# extracted (the owner, 2026-09-29).
+# baseline. The owned modules are listed here. The reference-law module parked under
+# `parked/Phenomenology/` is not loaded and so not on the surface (decision 113).
 using Test
 using TOML
 using GBGHomogeneousTurbulence

@@ -8,8 +8,9 @@
 # - [module]: the derived one, every method each module owns over the package's whole function surface,
 #   internals included, so adding a method anywhere moves a number.
 # A moved number is refrozen deliberately, in the same commit, with the reason written beside it.
-# Frozen 2026-09-30 at the declaration. Phenomenology is outside the surface until it is extracted
-# (the owner, 2026-09-29), and the HDF5 extension's methods live in their own module and are not counted.
+# Frozen 2026-09-30 at the declaration. The reference-law module was outside the surface from the start
+# (the owner, 2026-09-29) and is parked, unloaded, since 2026-10-16 (decision 113); the HDF5 extension's
+# methods live in their own module and are not counted.
 
 [[generic]]
 set = "Forcing"

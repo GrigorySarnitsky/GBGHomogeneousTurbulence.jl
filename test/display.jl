@@ -9,10 +9,7 @@
 
 using GBGHomogeneousTurbulence
 using GBGHomogeneousTurbulence: SimulationDomain, State, Observables, Cache, Forcing, Generator,
-                              Propagator, Particles, SimulationRun, Phenomenology
-using GBGHomogeneousTurbulence.Phenomenology: Spectra, StructureFunctions, Scalings, FlowParameters, Reference
-using GBGHomogeneousTurbulence.Phenomenology.Spectra: Pope2000
-using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions: Kolmogorov1941
+                              Propagator, Particles, SimulationRun
 using GBGHomogeneousTurbulence.Particles: advect!, unwrapped_positions
 using GBGPeriodicFields: field_data, point_positions, npoints, LalescuSpline
 using Random
@@ -20,27 +17,19 @@ using Test
 
 
 const MODULES = Set(Any[GBGHomogeneousTurbulence, SimulationDomain, State, Observables, Cache, Forcing,
-                        Generator, Propagator, Particles, SimulationRun, Phenomenology, Spectra,
-                        StructureFunctions, Scalings])
+                        Generator, Propagator, Particles, SimulationRun])
 
 # Types that deliberately carry no display, each with the reason. Every one is a flat record of
-# numbers (or strings) whose default display — its positional constructor call, module-qualified
-# when the name is not in scope — is already the whole description, short, and round-tripping
-# either way (asserted below, so an exemption that stops holding fails); a method would only add a
-# second spelling. A record NESTING another package type is not exempt: the default qualifies every
-# nested name, which ran a `Pope2000` to 157 characters (the model-spectrum family has displays for
-# that reason). The two run-layer records are private besides.
+# numbers whose default display — its positional constructor call, module-qualified when the name
+# is not in scope — is already the whole description, short, and round-tripping either way
+# (asserted below, so an exemption that stops holding fails); a method would only add a second
+# spelling. A record NESTING another package type is not exempt: the default qualifies every nested
+# name, which once ran a model-spectrum preset to 157 characters. Both records are private besides.
 const RECORD_REASON = "a flat record: the default positional-constructor display is complete, " *
                       "short, and round-trips (asserted in the round-trip testset)"
 const NO_DISPLAY = Dict(
   :Clock                  => RECORD_REASON * "; private to the run layer",
   :EveryTime              => RECORD_REASON * "; private to the run layer",
-  :Reference              => RECORD_REASON,
-  :Sreenivasan1995        => RECORD_REASON,
-  :Sreenivasan1998        => RECORD_REASON,
-  :ObukhovCorrsin1949     => RECORD_REASON,
-  :Kolmogorov1941         => RECORD_REASON,
-  :Kolmogorov1962         => RECORD_REASON,
 )
 
 
@@ -76,7 +65,9 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
 
   @testset "every package struct type displays, or is exempt with a reason" begin
     types = package_struct_types()
-    @test length(types) ≥ 30  # a parser that stops matching must fail, not report a clean sweep
+    # A parser that stops matching must fail, not report a clean sweep. The floor was 30 with the
+    # reference-law module's thirteen types counted; it is 25 since that module was parked (decision 113).
+    @test length(types) ≥ 25
 
     for (name, type) in sort!(collect(types); by = first)
       if haskey(NO_DISPLAY, name)
@@ -126,7 +117,6 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
       initial_forcing_state(StochasticOU(domain; forcing_variance = 1.0, correlation_time = 0.5),
                             new_vector_field_spectral(domain), domain),
       StationarityCriterion().monitor,
-      FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1),
     ]
     compounds = Any[sim.generator.conditions, sim.generator, StationarityCriterion()]
     for sample in leaves
@@ -259,19 +249,11 @@ repl(x) = sprint(show, MIME"text/plain"(), x)
     # A record's display is its constructor call: what it prints rebuilds it. This is also the
     # property every `NO_DISPLAY` exemption rests on, so the exempt records are here too.
     for record in (HouLi(), HouLi(order = 24, strength = 30.0, materialized = true), AdamsBashforth(order = 3),
-                   FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1),
-                   FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1,
-                                  schmidt = 0.7, scalar_dissipation = 0.05),
-                   Reference("Someone (2000)", (10.0, 100.0)), Kolmogorov1941(2.1), Pope2000(C_K = 1.6),
                    SimulationRun.Clock(1.5, 3), SimulationRun.EveryTime(0.5, 1.0))
       rebuilt = eval(Meta.parse(repr(record)))
       @test typeof(rebuilt) === typeof(record)
       @test all(isequal(getfield(rebuilt, f), getfield(record, f)) for f in fieldnames(typeof(record)))
     end
-    # The unset scalar dissipation is the keyword's default, so leaving it out round-trips to NaN.
-    fp = FlowParameters(viscosity = 0.01, dissipation = 0.1, rms_velocity = 1, integral_scale = 1)
-    @test !occursin("scalar_dissipation", repr(fp))
-    @test isnan(eval(Meta.parse(repr(fp))).scalar_dissipation)
   end
 
   @testset "the REPL form carries what the compact one abbreviates" begin

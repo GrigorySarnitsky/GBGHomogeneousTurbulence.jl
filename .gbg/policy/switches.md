@@ -5,10 +5,7 @@ Each entry names a rule this package does not hold itself to, and why. A rule li
 here is read as the entry states it.
 
 - `RULE.GIT.TRACKED` — the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08) (`validation/**`)
-
-Excluded from every rule: no rule reads these files, and no reader is given them.
-
-- `src/Phenomenology.jl`, `src/phenomenology/**`, `docs/src/phenomenology.md`, `docs/src/api/phenomenology/**`, `test/phenomenology.jl` — the Phenomenology module is not held to the rulebook until it is extracted into its own package (the owner, 2026-09-29)
+- `RULE.GIT.TRACKED` — the parked reference-law module Phenomenology — its source, tests and pages kept whole, loaded and built by nothing, in the layout of the standalone package it becomes when extracted (the owner, 2026-10-16, decision 113) (`parked/**`)
 
 Rules this package adds for itself, which are nobody else's:
 

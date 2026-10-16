@@ -1,42 +1,28 @@
+# The oracle tests of the parked reference-law module. Run through `runtests.jl` beside this file,
+# which includes the module's source first and evaluates this file in a child module of it.
 using Test
-using GBGHomogeneousTurbulence
-using GBGPeriodicFields: GBGPeriodicFields
-using GBGHomogeneousTurbulence.Phenomenology
-using GBGHomogeneousTurbulence.Phenomenology: kolmogorov_length   # the leaf's, not the Observables export of the same name
-using GBGHomogeneousTurbulence.Phenomenology.Spectra
-using GBGHomogeneousTurbulence.Phenomenology.StructureFunctions
-using GBGHomogeneousTurbulence.Phenomenology.Scalings
+using ..Phenomenology
+using ..Phenomenology.Spectra
+using ..Phenomenology.StructureFunctions
+using ..Phenomenology.Scalings
 
 const FP = FlowParameters(viscosity = 1e-3, dissipation = 0.1, rms_velocity = 1.0, integral_scale = 1.0)
 
 
-# The leaf's boundary, in both directions (decisions 18 and 112): the leaf takes no field-library
-# or dynamics dependency, and no module of the dynamics side binds a name the leaf defines. A
-# binding is read where it resolves, so a `using ..Phenomenology: name` anywhere in an owned module
-# fails here, whichever name it brings in.
-const HT = GBGHomogeneousTurbulence
-const DYNAMICS_MODULES = [HT.SimulationDomain, HT.Observables, HT.State, HT.Cache, HT.Forcing,
-                          HT.Generator, HT.Propagator, HT.Particles, HT.SimulationRun]
+# The leaf's boundary (decision 18): it takes no field-library, statistics or dynamics dependency, so
+# every binding of every leaf module resolves inside the leaf or in Base. (The other direction — that
+# the package binds nothing the leaf defines — is vacuous since the package stopped loading it, and
+# the package's own `test/parked_modules.jl` guards that.)
 in_module(m, root) = m === root || (parentmodule(m) !== m && in_module(parentmodule(m), root))
-leaf_modules(root) = [m for m in (root, Phenomenology.Spectra, Phenomenology.StructureFunctions,
-                                  Phenomenology.Scalings)]
+const LEAF_MODULES = [Phenomenology, Phenomenology.Spectra, Phenomenology.StructureFunctions,
+                      Phenomenology.Scalings]
 
-@testset "the leaf's boundary: nothing crosses it in either direction" begin
-  # Into the leaf: no binding from the field library, the statistics library or the dynamics side.
-  for M in leaf_modules(Phenomenology), n in names(M; all = true, imported = true)
+@testset "the leaf's boundary: it depends on nothing but Base" begin
+  for M in LEAF_MODULES, n in names(M; all = true, imported = true)
     isdefined(M, n) || continue
     owner = Base.binding_module(M, n)
-    @test !(in_module(owner, GBGPeriodicFields) || any(D -> in_module(owner, D), DYNAMICS_MODULES))
+    @test in_module(owner, Phenomenology) || in_module(owner, Base) || in_module(owner, Core)
   end
-  # Out of the leaf: no dynamics module binds a leaf name, under any spelling.
-  crossings = Pair{Module, Symbol}[]
-  for M in DYNAMICS_MODULES, n in names(M; all = true, imported = true)
-    isdefined(M, n) || continue
-    in_module(Base.binding_module(M, n), Phenomenology) && push!(crossings, M => n)
-  end
-  @test isempty(crossings)
-  # The probe sees through an import: a name the run layer takes from `Generator` resolves there.
-  @test Base.binding_module(HT.SimulationRun, :FlowConditions) === HT.Generator
 end
 
 
@@ -203,15 +189,6 @@ end
   @test provenance(sl).valid_Reλ == (200.0, Inf)
 end
 
-
-@testset "Phenomenology is not re-exported by the umbrella" begin
-  # the laws must NOT leak into `using GBGHomogeneousTurbulence`
-  @test !isdefined(GBGHomogeneousTurbulence, :Pope2000)
-  @test !isdefined(GBGHomogeneousTurbulence, :FlowParameters)
-  # but the submodule namespace IS reachable, and resolves to the same binding
-  @test isdefined(GBGHomogeneousTurbulence, :Phenomenology)
-  @test GBGHomogeneousTurbulence.Phenomenology.Spectra.Pope2000 === Pope2000
-end
 
 # The Pope model spectrum is normalized: c_L = 6.78 is exactly the coefficient making ∫E dκ = k, and
 # it is calibrated against L₀ = k^{3/2}/ε — NOT the longitudinal L₁₁ the composition used to pass it.

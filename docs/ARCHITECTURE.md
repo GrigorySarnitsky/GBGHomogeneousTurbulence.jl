@@ -257,8 +257,8 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   composes the `ResolvedFields` and its `ObservablesCache`, and the time loop advances the state in
   place — each iteration a `step!` closed by the closing `deposit!`. Every concrete type of the
   package — the frame, the state, the cache, the forcings, the generator and its scratch, the
-  register sets, the tracers and their scheme, the run, the stationarity records, the
-  `Phenomenology` parameter records — carries a display in the field library's convention: one
+  register sets, the tracers and their scheme, the run, the stationarity records — carries a
+  display in the field library's convention: one
   self-delimiting line carrying what the package refuses on, a REPL form where that line
   abbreviates, nothing reading an element (decision 87; the derived gate is `test/display.jl`).
 
@@ -374,8 +374,8 @@ states the physical quantity first, then the reduction that computes it:
   `GBGPeriodicFields`' top-hat window (decision 96).
 
 These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
-and the stationarity signals `warmup!` watches. They are also the *measured* half of the validation
-harness whose *predicted* half is `Phenomenology` (§4.8).
+and the stationarity signals `warmup!` watches. They are also the *measured* half of a comparison
+against the reference laws (§4.8).
 
 ### 4.4 `Forcing` — the source
 
@@ -586,6 +586,12 @@ The layer wires §4.1–§4.6 together and holds no physics or numerics of its o
 
 ### 4.8 `Phenomenology` — the reference laws (extraction-bound)
 
+**Parked since 2026-10-16 (decision 113).** The module lives whole under `parked/Phenomenology/` —
+source, oracle tests and pages, in the layout of the standalone package it becomes when extracted —
+and nothing in the package includes, builds or tests it; its tests run on demand with
+`julia --project parked/Phenomenology/test/runtests.jl`. What follows is the design it was built to,
+kept as the design of that future package.
+
 `Phenomenology` is the library of **reference turbulence phenomenology**: the fitted scalings, model
 spectra, structure-function laws, and dimensionless constants that theory and experiment have established.
 It is the **symmetric counterpart to `Observables`** — those are the *measured* functions of the DNS
@@ -613,10 +619,7 @@ needs a law's validity range to be fair, and it is the single source of the cita
 **Naming is a three-level handle**, because one author publishes many models across years and quantities:
 the **quantity is the submodule** (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the **paper is the
 author-year handle** (`Pope2000`, first author's surname, the full list in `provenance`), and a **same
-author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The validating case
-would be Kolmogorov 1941 across two submodules — `StructureFunctions.Kolmogorov1941` (the 2/3 and 4/5
-laws) and a spectrum counterpart `Spectra.Kolmogorov1941`, were one added — separated by the submodule
-alone. The full
+author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The full
 handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction — and
 where a preset's value is *not* read off its name's paper (`Sreenivasan1995`'s as-quoted value), the
 docstring says so at the value.
@@ -642,9 +645,10 @@ quantities a law reads (``\varepsilon``, ``\nu``, ``L_{11}``, ``u'``, ``\mathrm{
 with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
 helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
-The laws are **compared against, never consumed by the solver** (decision 112): the validation suite
-reads them, and the dynamics binds nothing the leaf defines. And the loop closes: we measure (with this package and SS), `fit` a parametrization to that measurement,
-and the new fit lands beside the literature, to be validated against the next run.
+The laws are **compared against, never consumed by the solver** (decision 112): the comparison is the
+module's own test, and the dynamics binds nothing the module defines. And the loop closes: we measure
+(with this package and SS), `fit` a parametrization to that measurement, and the new fit lands beside
+the literature, to be validated against the next run.
 
 **Formula verification.** A transcribed law is checked not against a reference implementation — none is
 authoritative, and cross-checking against another code merely moves the trust — but against the physical
@@ -653,23 +657,20 @@ relations it *must* satisfy: the asymptotic slopes (the ``\kappa^{-5/3}`` inerti
 and the roll-off limits ``f_L, f_\eta \to 1``. This self-consistency battery lives in the test suite and
 catches a wrong exponent, coefficient, or sign without trusting a second source.
 
-**Extraction requirement (recorded).** `Phenomenology` is built inside this package for now but is
-**designed to be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite** — the demand-driven
-path that extracted `GBGStreamingStatistics`. The requirement constrains the design. It is a
-**dependency-light leaf**, depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no field
-math) *nor* `GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor* this
-package's dynamics — first in the include order, importing nothing turbulence-dynamical, and imported
-by nothing on the dynamics side. And it is a
-**self-contained namespace**: the umbrella does *not* re-export it (`using GBGHomogeneousTurbulence` brings
-the DNS API only; the laws are reached opt-in through `Phenomenology`), and its notation and API pages form
-their own group, separable from the DNS surface. Extract when a second consumer appears (decision 18).
+**Extraction requirement (recorded).** `Phenomenology` is **designed to be cut into a standalone
+`GBGTurbulencePhenomenology` with no rewrite** — the demand-driven path that extracted
+`GBGStreamingStatistics`. The requirement constrains the design. It is a **dependency-light leaf**,
+depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no field math) *nor*
+`GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor* this package's
+dynamics, and its pages form their own group, separable from the DNS surface. Extract when a consumer
+appears (decision 18).
 
 ### 4.9 Layout summary
 
 `SimulationDomain → Observables → State → Cache → Forcing → Generator → Propagator → Particles →
 SimulationRun`.
-Cross-module access is through explicit `using ..Module: name` lists; `Phenomenology` (§4.8) leads this
-order as the dependency-light leaf the initial-condition and validation consumers read.
+Cross-module access is through explicit `using ..Module: name` lists. The reference-law module
+`Phenomenology` (§4.8) is parked outside the package and outside this order.
 Statistics live consumer-side of this package too: the sampling in `Particles` and the observables in
 `Observables` produce the *samples*, and a statistics bridge that streams them to `GBGStreamingStatistics`
 is deferred (§7).
@@ -3281,6 +3282,30 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     boundary testset in `test/phenomenology.jl`: every binding of every owned module is read where
     it resolves, and one resolving into the leaf fails the suite. Decision 19's bridge is thereby
     superseded; its measured spectrum and integral scale stay in `Observables`.
+113. **(2026-10-16, user-directed) The `Phenomenology` leaf is parked: moved out of the package,
+    loaded by nothing, named on no user-facing surface.** Decision 112 left the leaf with no consumer
+    inside the package, and the owner asked that nothing in the package rely on it and that the
+    documentation a user reads stop mentioning it, with the code kept in git. The module, its oracle
+    tests and its five pages moved whole to `parked/Phenomenology/`, the layout of the standalone
+    package it becomes when extracted. There no rule's file set reaches them, and `RULE.GIT.TRACKED`
+    is told why they are tracked; the old exclusion of the leaf from the rulebook went with them.
+
+    The umbrella no longer includes the module and `docs/make.jl` no longer builds it. The validation
+    suite's model-spectrum comparison, with the `measured_state` bridge, went to the parked module's
+    own tests, since both test the module's reading of a run rather than the solver. The one piece of
+    solver coverage they carried incidentally — the shell-width factor of `energy_spectrum` on a box
+    other than ``2\pi``, where ``\Delta\kappa \ne 1`` — is now a Parseval check in `test/validation.jl`.
+
+    The public surfaces that pointed at the leaf now say what they mean without it: `energy_spectrum`
+    and `integral_scale` speak of a model spectrum from the literature, `FlowConditions` says what it
+    holds instead of contrasting itself with `FlowParameters`, and the glossary keeps the symbols its
+    live pages use (``E(\kappa)``, ``\lambda``) and drops the three only the leaf used
+    (``E_\varphi(\kappa)``, ``\ell``, ``\tau_\eta``).
+
+    The guard is `test/parked_modules.jl`: the umbrella defines no `Phenomenology`, and the word
+    appears in no file under `src/`, `docs/src/` or `README.md`, so the sweep is measured rather than
+    remembered. Decision 112's boundary testset went with the leaf; this document and `CLAUDE.md`
+    keep the name as the record of the design.
 
 ## References
 

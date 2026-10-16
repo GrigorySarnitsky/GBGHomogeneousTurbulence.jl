@@ -23,7 +23,7 @@ module ScalarTests;        include("scalar.jl");         end
 module ForcingTests;       include("forcing.jl");        end
 module ParticlesTests;     include("particles.jl");      end
 module SimulationRunTests; include("simulation_run.jl"); end
-module PhenomenologyTests;  include("phenomenology.jl");  end
+module ParkedModulesTests;  include("parked_modules.jl"); end
 module ValidationTests;     include("validation.jl");     end
 module BelowScaleTests;     include("below_scale.jl");    end
 module ReynoldsTests;       include("reynolds.jl");       end

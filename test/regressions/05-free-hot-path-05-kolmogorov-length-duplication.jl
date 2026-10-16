@@ -1,11 +1,10 @@
 # Architecture witness (diff check, not a failing test) — the sibling of `architecture-01.jl`.
 #
-# The relation η = (ν³/ε)^(1/4) is spelled in two places inside this package's own surface, and a
-# third in the extraction-bound `Phenomenology` leaf, which spells its own formulas by design:
+# The relation η = (ν³/ε)^(1/4) is spelled in two places inside this package's own surface (the
+# parked reference-law module under `parked/Phenomenology/` spells its own copy, by design):
 #
 #   src/Observables.jl       kolmogorov_length(ε, ν)                     # the package's one home
 #   src/SimulationRun.jl     the derived-ν solve, the relation inverted  # no inverse exists to call
-#   src/Phenomenology.jl     kolmogorov_length(fp)                        # the leaf's own copy
 #
 # The ONLY test that pins the derived-ν calibration once re-derived η from a bare literal instead of
 # calling the package's own function, so it was not independent of what it guards. This script

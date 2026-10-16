@@ -11,6 +11,8 @@ Config(
     switches = [
         Switch(target = Symbol("RULE.GIT.TRACKED"), files = ["validation/**"],
                reason = "the TurTLE reproduction scripts the Validation page points at, so a reader of the published comparison can rerun it from the repository (the owner, 2026-10-05 and 2026-10-08)"),
+        Switch(target = Symbol("RULE.GIT.TRACKED"), files = ["parked/**"],
+               reason = "the parked reference-law module Phenomenology — its source, tests and pages kept whole, loaded and built by nothing, in the layout of the standalone package it becomes when extracted (the owner, 2026-10-16, decision 113)"),
     ],
     generated = ["docs/src/architecture.md", "docs/src/decisions.md", "docs/src/gbg.md"],
     disciplines = [:turbulence_theory, :spectral_numerics, :software_architecture],
@@ -21,10 +23,5 @@ Config(
                     pattern = r"\\{1,2}boldsymbol\{u\}\s*\\{1,2}times\s*\\{1,2}boldsymbol\{\\{1,2}omega\}|\bu\s*×\s*ω|cross!\(\s*ω\s*,\s*u\s*,\s*ω\s*\)",
                     trigger = r"\b[Ll]amb(?![A-Za-z])", window = 3, escape = r"negat",
                     skip = ["## 11." => "## References"]),
-    ],
-    exclusions = [
-        Exclusion(files = ["src/Phenomenology.jl", "src/phenomenology/**", "docs/src/phenomenology.md",
-                           "docs/src/api/phenomenology/**", "test/phenomenology.jl"],
-                  reason = "the Phenomenology module is not held to the rulebook until it is extracted into its own package (the owner, 2026-09-29)"),
     ],
 )
