@@ -34,6 +34,7 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :kinetic_energy_and_dissipation => (:analytic, "observables_analytic.jl — the same k and ε, as one pair"),
   :scalar_variance       => (:analytic, "observables_analytic.jl — ⟨φ²⟩ = D²/2 on φ = D sin x"),
   :scalar_dissipation    => (:analytic, "observables_analytic.jl — ε_φ = ϰD²; and scalar.jl, 2ϰ⟨|∇φ|²⟩ from an explicit physical gradient"),
+  :scalar_variance_and_dissipation => (:analytic, "observables_analytic.jl — the same ⟨φ²⟩ and ε_φ, as one pair"),
   :energy_spectrum       => (:analytic, "observables_analytic.jl — all of k in shell 1, nothing elsewhere"),
   :integral_scale        => (:analytic, "observables_analytic.jl — L₁₁ = 3π/4 for a single shell"),
   :max_speed             => (:analytic, "observables_analytic.jl — √(A² + B² + C²), sampled where every sine is ±1"),

@@ -194,7 +194,7 @@ unit,words,longest_paragraph,admonitions
 "Generator.md § Flow conditions",19,19,0
 "Generator.md § The generator as one value",30,30,0
 "Generator.md § The generator protocol",30,30,0
-"Observables.jl :: Observables",343,155,0
+"Observables.jl :: Observables",345,157,0
 "Observables.jl :: derivative_skewness(û, domain)",410,94,1
 "Observables.jl :: dissipation(ω, viscosity)",276,73,1
 "Observables.jl :: energy_spectrum(û, domain)",171,59,0

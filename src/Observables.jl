@@ -12,7 +12,8 @@ The measured functions of the flow state:
 - [`kinetic_energy`](@ref), [`scalar_variance`](@ref) — the turbulent kinetic energy and the scalar
   variance.
 - [`dissipation`](@ref), [`scalar_dissipation`](@ref) — their dissipation rates.
-- [`kinetic_energy_and_dissipation`](@ref) — ``(k, \\varepsilon)`` in one fused traversal.
+- [`kinetic_energy_and_dissipation`](@ref), [`scalar_variance_and_dissipation`](@ref) — each pair
+  in one fused traversal.
 - [`kinetic_energy_and_dissipation_below_scale`](@ref) — the kinetic energy and dissipation held in
   scales below each box side ``l`` the grid offers.
 - [`derivative_skewness`](@ref) — the velocity-derivative skewness, the classical marker of a
@@ -59,7 +60,7 @@ using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
        kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
-       scalar_variance, scalar_dissipation, derivative_skewness,
+       scalar_variance, scalar_dissipation, scalar_variance_and_dissipation, derivative_skewness,
        energy_spectrum, integral_scale, reynolds_box, reynolds_taylor, taylor_microscale,
        kolmogorov_length, kolmogorov_time, kolmogorov_velocity
 
@@ -358,6 +359,35 @@ recovered or cached, so there is no field-argument twin.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =
   (v = weighted_inner(φ̂, domain.squared_wavenumber_kernel); 2 * oftype(v, diffusivity) * v)
+
+
+"""
+    scalar_variance_and_dissipation(φ̂, domain, diffusivity)
+
+Measure the scalar variance ``\\langle\\varphi^{2}\\rangle`` and the scalar dissipation rate
+``\\varepsilon_\\varphi`` together, from one fused traversal of the scalar in spectral
+representation: the scalar twin of [`kinetic_energy_and_dissipation`](@ref).
+
+The two values are [`scalar_variance(φ̂)`](@ref GBGHomogeneousTurbulence.Observables.scalar_variance)
+and [`scalar_dissipation(φ̂, domain, diffusivity)`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation),
+each formula at its own home. The dissipation is bitwise identical to its single call, and the
+variance equal to within summation-order roundoff, a few ulp. The pair costs one read of the
+coefficients and one blocking device-to-host readback instead of two. Their ratio
+``\\langle\\varphi^{2}\\rangle/\\varepsilon_\\varphi`` is the scalar's own decay time, which set
+against the eddy-turnover time ``k/\\varepsilon`` gives the mechanical-to-scalar time-scale ratio.
+
+# Arguments
+- `φ̂` — the scalar field in spectral representation.
+- `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) supplying the
+  squared-wavenumber weights.
+- `diffusivity` — the scalar diffusivity ``\\varkappa = \\nu/\\mathrm{Sc}`` scaling the dissipation.
+
+Returns a named tuple `(scalar_variance, scalar_dissipation)`, each in the field's own real element type.
+"""
+function scalar_variance_and_dissipation(φ̂, domain::FixedDomain, diffusivity::Real)
+  whole, dirichlet = weighted_inner(φ̂, (domain.unit_kernel, domain.squared_wavenumber_kernel))
+  return (scalar_variance = whole, scalar_dissipation = 2 * oftype(dirichlet, diffusivity) * dirichlet)
+end
 
 
 # The exact isotropy constant relating the coordinate-free strain skewness to the classical longitudinal

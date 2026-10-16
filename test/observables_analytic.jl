@@ -52,6 +52,13 @@ end
   @test pair.dissipation ≈ ν * squares / 2 rtol = 1e-13
   @test scalar_variance(φ̂) ≈ D^2 / 2 rtol = 1e-13
   @test scalar_dissipation(φ̂, d, ϰ) ≈ ϰ * D^2 rtol = 1e-13
+  scalar_pair = scalar_variance_and_dissipation(φ̂, d, ϰ)
+  @test scalar_pair.scalar_variance ≈ D^2 / 2 rtol = 1e-13
+  @test scalar_pair.scalar_dissipation ≈ ϰ * D^2 rtol = 1e-13
+  # the fused pair against its two single calls: the dissipation bitwise, the variance to roundoff
+  @test scalar_pair.scalar_dissipation == scalar_dissipation(φ̂, d, ϰ)
+  @test scalar_pair.scalar_variance ≈ scalar_variance(φ̂) rtol = 1e-14
+  @test scalar_variance_and_dissipation(φ̂, d, 1.0f0).scalar_dissipation isa Float64
 
   κ, E = energy_spectrum(û, d)
   @test κ[2] == 1.0

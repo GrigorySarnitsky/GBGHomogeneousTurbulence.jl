@@ -367,6 +367,12 @@ count = 1
 module = "Observables"
 
 [[generic]]
+set = "Observables"
+name = "scalar_variance_and_dissipation"
+count = 1
+module = "Observables"
+
+[[generic]]
 set = "Generator"
 name = "scalar_integrating_factor"
 count = 1
@@ -506,7 +512,7 @@ module = "SimulationRun"
 
 [module]
 SimulationDomain = 25
-Observables = 20  # +4 (2026-10-16): `integral_scale(spectrum)`, `taylor_microscale`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
+Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_scale(spectrum)`, `taylor_microscale`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
 State = 6
 Cache = 23
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)

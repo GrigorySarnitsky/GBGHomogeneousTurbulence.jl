@@ -82,6 +82,7 @@ const ROWS = Dict{Symbol, Function}(
     c -> (() -> kinetic_energy_and_dissipation_below_scale(c.û, c.domain, 0.05), (c.sim,)),
   :scalar_variance => c -> (() -> scalar_variance(c.φ̂), (c.sim,)),
   :scalar_dissipation => c -> (() -> scalar_dissipation(c.φ̂, c.domain, 0.05), (c.sim,)),
+  :scalar_variance_and_dissipation => c -> (() -> scalar_variance_and_dissipation(c.φ̂, c.domain, 0.05), (c.sim,)),
   :energy_spectrum => c -> (() -> energy_spectrum(c.û, c.domain), (c.sim,)),
   :integral_scale => c -> (() -> integral_scale(c.û, c.domain), (c.sim,)),
   :derivative_skewness => c -> (() -> derivative_skewness(c.û, c.domain), (c.sim,)),
@@ -265,7 +266,7 @@ below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
     # The skewness stays the largest temporary an observable takes — the run-phase peak an opted-in
     # warm-up pays (the stationarity gate is off by default).
     observables = (:kinetic_energy, :dissipation, :kinetic_energy_and_dissipation, :energy_spectrum,
-                   :integral_scale, :scalar_variance, :scalar_dissipation,
+                   :integral_scale, :scalar_variance, :scalar_dissipation, :scalar_variance_and_dissipation,
                    :kinetic_energy_and_dissipation_below_scale, :max_speed, :derivative_skewness)
     @test argmax(n -> units[n][end], observables) === :derivative_skewness
   end
