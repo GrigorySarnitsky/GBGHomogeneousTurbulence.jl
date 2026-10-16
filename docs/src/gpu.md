@@ -1,7 +1,7 @@
 # Memory footprint on a GPU
 
-A run goes on a GPU through the `array_family` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with `CUDA` added to your
-environment, or `ROCArray` for an AMD card, with `AMDGPU`. Its `element_type` keyword sets the precision. This
+A run goes on a GPU through the `array_family` keyword of [`Simulation`](@ref): `CuArray` for an NVIDIA card, with [`CUDA`](https://cuda.juliagpu.org/stable/) added to your
+environment, or `ROCArray` for an AMD card, with [`AMDGPU`](https://amdgpu.juliagpu.org/stable/). Its `element_type` keyword sets the precision. This
 page answers the question a GPU run meets first, whether a grid fits on the card; it also describes how
 CUDA's unified memory lets a run outgrow the card. Everything else about driving a device, from writing
 efficient device code to the vendors' pitfalls, is on the field library [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)'s
