@@ -42,6 +42,9 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :reynolds_box          => (:independent, "reynolds.jl — through the Kolmogorov velocity of a box-sized eddy, and (L/η)^{4/3}"),
   :reynolds_taylor       => (:independent, "reynolds.jl — u′λ/ν with u′ and λ written out"),
   :kolmogorov_length     => (:independent, "reynolds.jl — (ν³/ε)^{1/4} written out, and Re_box = (L/η)^{4/3} through it"),
+  :taylor_microscale     => (:independent, "reynolds.jl — √(15νu′²/ε) written out, and Re_λ = u′λ/ν through it"),
+  :kolmogorov_time       => (:independent, "reynolds.jl — (ν/ε)^{1/2} written out, and η = u_η τ_η"),
+  :kolmogorov_velocity   => (:independent, "reynolds.jl — (εν)^{1/4} written out, and u_η η/ν = 1"),
 
   # ---- the domain and the step ----
   :max_resolved_wavenumber => (:analytic, "observables_analytic.jl — f·(N/2)·2π/L with f = 2/3, 4/5, 2√2/3"),

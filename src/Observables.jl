@@ -25,11 +25,12 @@ The measured functions of the flow state:
   (its cached read, [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical),
   lives in `Cache`).
 - [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
-  length scale derived from it.
-- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref), [`kolmogorov_length`](@ref) — the Reynolds
-  numbers and Kolmogorov length from measured scalars, not a field.
+  length scale read from it, by measuring the spectrum or from one already measured.
+- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref), [`taylor_microscale`](@ref),
+  [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`kolmogorov_velocity`](@ref) — the
+  Reynolds numbers and the Taylor and Kolmogorov scales from measured scalars, not a field.
 
-All but those three are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
+All but those six are functions of the state: most reduce a field to a scalar, the energy spectrum reduces to
 the spectral density sampled on the wavenumber shells, and the vorticity recovery alone produces a
 field. Each returns
 the field's own real element type, not a fixed `Float64`, so a `Float32` run measures in
@@ -59,7 +60,8 @@ using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
        kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, derivative_skewness,
-       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor, kolmogorov_length
+       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor, taylor_microscale,
+       kolmogorov_length, kolmogorov_time, kolmogorov_velocity
 
 
 """
@@ -474,27 +476,31 @@ end
 
 """
     integral_scale(û, domain)
+    integral_scale(spectrum)
 
-The longitudinal integral length scale of the velocity field `û`, measured from its
-spectral density (from [`energy_spectrum`](@ref)),
+The longitudinal integral length scale of the velocity field `û`, read from its spectral density
+``E(\\kappa)``,
 
 ```math
 L_{11} = \\frac{3\\pi}{4} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\kappa}{\\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa}.
 ```
 
 The integral scale ``L_{11}`` is the large-eddy scale: the one flow parameter a model spectrum
-needs that the small scales do not fix. The `domain` (a [`FixedDomain`](@ref)) supplies the
-wavenumber multipliers.
+needs that the small scales do not fix.
 
-The integrals above are the idealized continuous definition, written with the spectral density
-``E(\\kappa)`` that `energy_spectrum` measures; they are evaluated as quadrature sums over
-the shells, the common shell width canceling in the ratio.
+The first form measures the spectrum with [`energy_spectrum`](@ref), one traversal of the field,
+and hands it to the second; the `domain` (a [`FixedDomain`](@ref)) supplies the wavenumber
+multipliers. The second form takes a `spectrum` already measured, the named tuple
+`energy_spectrum` returns, so a caller who wants both the spectrum and the scale traverses the
+field once.
 
-The cancellation is exact; what is approximate is the *shell* itself: ``E_n`` is the exact sum over
-a shell's lattice modes, and identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint
-quadrature whose error is largest at the low shells, where the mode count departs most from the
-continuum ``4\\pi\\kappa^2``. Those are also the shells this ratio weights most, so read ``L_{11}``
-as resolution-limited at coarse grids.
+The integrals above are the idealized continuous definition; they are evaluated as quadrature sums
+over the shells, the common shell width canceling in the ratio. The cancellation is exact; what is
+approximate is the *shell* itself: ``E_n`` is the exact sum over a shell's lattice modes, and
+identifying it with ``E(\\kappa_n)\\Delta\\kappa`` is a midpoint quadrature whose error is largest
+at the low shells, where the mode count departs most from the continuum ``4\\pi\\kappa^2``. Those
+are also the shells this ratio weights most, so read ``L_{11}`` as resolution-limited at coarse
+grids.
 
 For reference, two related scales follow from the same spectrum. The **transverse** integral scale
 is ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full
@@ -510,12 +516,17 @@ L_E &= \\frac{\\pi}{2} \\frac{\\int_0^\\infty E(\\kappa)/\\kappa\\,\\mathrm{d}\\
 ```
 
 the isotropic average of the one longitudinal and two transverse contributions.
+
+Returns a number in the spectrum's element type. A spectrum with no energy outside the
+``\\kappa = 0`` shell has no integral scale and throws an `ArgumentError`.
 """
-function integral_scale(û, domain::FixedDomain)
-  κ, E = energy_spectrum(û, domain)
-  # Both sums run where the spectrum lives — no host transfer and no scalar indexing, so the
-  # diagnostic works unchanged on a device backend. The κ = 0 shell is excluded from the numerator
-  # by the branch rather than by skipping an index, which a fused broadcast cannot do.
+integral_scale(û, domain::FixedDomain) = integral_scale(energy_spectrum(û, domain))
+
+function integral_scale(spectrum::NamedTuple{(:wavenumbers, :energy)})
+  κ, E = spectrum
+  # Both sums run where the spectrum lives — no scalar indexing, so a spectrum left on a device
+  # works unchanged. The κ = 0 shell is excluded from the numerator by the branch rather than by
+  # skipping an index, which a fused broadcast cannot do.
   # Excluding the κ = 0 shell, as the numerator does. Testing `sum(E)` instead let a field whose
   # energy is entirely in the mean flow pass the emptiness guard and return a meaningless zero.
   total = sum(broadcast((k, e) -> k > 0 ? e : zero(e), κ, E))
@@ -603,6 +614,41 @@ end
 
 
 """
+    taylor_microscale(kinetic_energy, dissipation, viscosity)
+
+The function computes the Taylor microscale ``\\lambda = \\sqrt{15\\nu u'^{2}/\\varepsilon}`` from
+three scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one component, which gives
+
+```math
+\\lambda = \\sqrt{\\frac{10\\nu k}{\\varepsilon}}.
+```
+
+It is the length the velocity-derivative variance sets,
+``\\langle(\\partial_{x_1} u_1)^{2}\\rangle = u'^{2}/\\lambda^{2}``, between the integral scale and
+the Kolmogorov length, and the length in the Taylor-microscale Reynolds number
+``\\mathrm{Re}_\\lambda = u'\\lambda/\\nu`` of [`reynolds_taylor`](@ref).
+
+# Arguments
+- `kinetic_energy` — the turbulent kinetic energy ``k``.
+- `dissipation` — the dissipation rate ``\\varepsilon``.
+- `viscosity` — the kinematic viscosity ``\\nu``.
+
+The arguments run from the largest scale to the smallest.
+
+Returns a number in the floating-point type the arguments promote to. A negative or non-finite
+`kinetic_energy`, or a non-positive or non-finite `dissipation` or `viscosity`, throws an
+`ArgumentError`.
+"""
+function taylor_microscale(kinetic_energy::Real, dissipation::Real, viscosity::Real)
+  k, ε, ν = promote(float(kinetic_energy), float(dissipation), float(viscosity))
+  (isfinite(k) && k >= 0) || throw(ArgumentError("`kinetic_energy` must be finite and non-negative, got $kinetic_energy"))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return sqrt(oftype(ε, 10) * ν * k / ε)
+end
+
+
+"""
     kolmogorov_length(dissipation, viscosity)
 
 The function computes the Kolmogorov length ``\\eta = (\\nu^3/\\varepsilon)^{1/4}`` from the dissipation rate
@@ -620,6 +666,47 @@ function kolmogorov_length(dissipation::Real, viscosity::Real)
   (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
   (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
   return sqrt(sqrt(ν^3 / ε))                 # the fourth root, in the arguments' own type
+end
+
+
+"""
+    kolmogorov_time(dissipation, viscosity)
+
+The function computes the Kolmogorov time ``\\tau_\\eta = (\\nu/\\varepsilon)^{1/2}`` from the
+dissipation rate `dissipation` (``\\varepsilon``) and the kinematic viscosity `viscosity` (``\\nu``):
+the turnover time of an eddy of the Kolmogorov length ``\\eta`` ([`kolmogorov_length`](@ref)), and
+the inverse root-mean-square strain rate, ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = 1/(2\\tau_\\eta^{2})``.
+The arguments run from the largest scale to the smallest.
+
+Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
+`dissipation` or `viscosity` throws an `ArgumentError`.
+"""
+function kolmogorov_time(dissipation::Real, viscosity::Real)
+  ε, ν = promote(float(dissipation), float(viscosity))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return sqrt(ν / ε)
+end
+
+
+"""
+    kolmogorov_velocity(dissipation, viscosity)
+
+The function computes the Kolmogorov velocity ``u_\\eta = (\\varepsilon\\nu)^{1/4}`` from the
+dissipation rate `dissipation` (``\\varepsilon``) and the kinematic viscosity `viscosity` (``\\nu``):
+the velocity of an eddy of the Kolmogorov length ``\\eta`` ([`kolmogorov_length`](@ref)), whose
+Reynolds number ``u_\\eta\\eta/\\nu`` is one, so that ``\\eta = u_\\eta\\tau_\\eta`` with
+``\\tau_\\eta`` the Kolmogorov time ([`kolmogorov_time`](@ref)). The arguments run from the largest
+scale to the smallest.
+
+Returns a number in the floating-point type the arguments promote to. A non-positive or non-finite
+`dissipation` or `viscosity` throws an `ArgumentError`.
+"""
+function kolmogorov_velocity(dissipation::Real, viscosity::Real)
+  ε, ν = promote(float(dissipation), float(viscosity))
+  (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))
+  (isfinite(ν) && ν > 0) || throw(ArgumentError("`viscosity` must be finite and positive, got $viscosity"))
+  return sqrt(sqrt(ε * ν))                   # the fourth root, in the arguments' own type
 end
 
 

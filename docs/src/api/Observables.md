@@ -41,16 +41,19 @@ what a box of that side measures once its own mean is removed, averaged over eve
 kinetic_energy_and_dissipation_below_scale
 ```
 
-## Reynolds numbers and the Kolmogorov length
+## Reynolds numbers and the Taylor and Kolmogorov scales
 
-The box and Taylor-microscale Reynolds numbers and the Kolmogorov length are computed from measured
-scalars (a run's time-mean ``\varepsilon`` and ``k``, its ``\nu`` and box side) rather than from a
-field.
+The box and Taylor-microscale Reynolds numbers, the Taylor microscale and the three Kolmogorov scales
+are computed from measured scalars (a run's time-mean ``\varepsilon`` and ``k``, its ``\nu`` and box
+side) rather than from a field. The arguments run from the largest scale to the smallest.
 
 ```@docs
 reynolds_box
 reynolds_taylor
+taylor_microscale
 kolmogorov_length
+kolmogorov_time
+kolmogorov_velocity
 ```
 
 ## Derivative skewness

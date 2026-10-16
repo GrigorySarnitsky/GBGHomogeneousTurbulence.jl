@@ -141,12 +141,30 @@ module = "Forcing"
 [[generic]]
 set = "Observables"
 name = "integral_scale"
-count = 1
+count = 2  # +1 (2026-10-16): the method taking a measured spectrum (decision 114)
 module = "Observables"
 
 [[generic]]
 set = "Observables"
 name = "kolmogorov_length"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "kolmogorov_time"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "kolmogorov_velocity"
+count = 1
+module = "Observables"
+
+[[generic]]
+set = "Observables"
+name = "taylor_microscale"
 count = 1
 module = "Observables"
 
@@ -488,7 +506,7 @@ module = "SimulationRun"
 
 [module]
 SimulationDomain = 25
-Observables = 16  # +1 (2026-10-15): `kolmogorov_length(ε, ν)`, the run layer's η no longer borrowed from Phenomenology
+Observables = 20  # +4 (2026-10-16): `integral_scale(spectrum)`, `taylor_microscale`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
 State = 6
 Cache = 23
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)

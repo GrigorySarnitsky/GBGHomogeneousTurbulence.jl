@@ -194,11 +194,11 @@ unit,words,longest_paragraph,admonitions
 "Generator.md § Flow conditions",19,19,0
 "Generator.md § The generator as one value",30,30,0
 "Generator.md § The generator protocol",30,30,0
-"Observables.jl :: Observables",330,140,0
+"Observables.jl :: Observables",343,155,0
 "Observables.jl :: derivative_skewness(û, domain)",410,94,1
 "Observables.jl :: dissipation(ω, viscosity)",276,73,1
 "Observables.jl :: energy_spectrum(û, domain)",171,59,0
-"Observables.jl :: integral_scale(û, domain)",202,65,0
+"Observables.jl :: integral_scale(û, domain)",263,90,0
 "Observables.jl :: kinetic_energy(u)",155,67,0
 "Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,99,0
 "Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",395,73,1
@@ -318,7 +318,7 @@ unit,words,longest_paragraph,admonitions
 "index.md § Quick start",21,21,0
 "index.md § What it solves",197,95,1
 "notation.md § Conventions",317,317,0
-"notation.md § Derived scales",301,282,0
+"notation.md § Derived scales",307,278,0
 "notation.md § Diagnostics",279,279,0
 "notation.md § Forcing",169,169,0
 "notation.md § Notation",95,73,0

@@ -3307,6 +3307,22 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     remembered. Decision 112's boundary testset went with the leaf; this document and `CLAUDE.md`
     keep the name as the record of the design.
 
+114. **(2026-10-16, user-directed) `integral_scale` takes a measured spectrum, and the Taylor and
+    Kolmogorov scales are `Observables` functions of measured scalars.** The field method of
+    `integral_scale` measured the spectrum itself, so a caller who wanted the spectrum and the scale
+    traversed the field twice. The generic now has a second method taking the named tuple
+    `energy_spectrum` returns, and the field method measures and delegates: decision 46's shape, with
+    the measured value passed rather than cached, because a spectrum is an occasional diagnostic and
+    a per-step deposit would cost a resident slot and a traversal every iteration.
+
+    Beside `kolmogorov_length` stand `kolmogorov_time`, ``(\nu/\varepsilon)^{1/2}``, and
+    `kolmogorov_velocity`, ``(\varepsilon\nu)^{1/4}``; beside `reynolds_taylor` the length it is built
+    on, `taylor_microscale`, ``\sqrt{10\nu k/\varepsilon}``. All are positional, largest scale first
+    (decision 104). None is derived from the spectrum: of the binned spectrum's moments only the zeroth
+    is exact, and ``\varepsilon`` read as ``2\nu\sum_n \kappa_n^2 E_n`` measured 6–14% low on
+    ``32^3`` to ``128^3`` fields, so the fused `weighted_inner` reductions stay the home of every
+    scalar, and ``L_{11}`` alone comes from the spectrum, with its quadrature caveat stated.
+
 ## References
 
 Works are cited author–year above and given in full here, each with its DOI where the work has one. Four do not,

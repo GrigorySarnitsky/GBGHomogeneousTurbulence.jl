@@ -89,6 +89,9 @@ const ROWS = Dict{Symbol, Function}(
   :reynolds_box => c -> (() -> reynolds_box(2π, 0.1, 0.01), ()),
   :reynolds_taylor => c -> (() -> reynolds_taylor(1.5, 0.1, 0.01), ()),
   :kolmogorov_length => c -> (() -> kolmogorov_length(0.1, 0.01), ()),
+  :taylor_microscale => c -> (() -> taylor_microscale(1.5, 0.1, 0.01), ()),
+  :kolmogorov_time => c -> (() -> kolmogorov_time(0.1, 0.01), ()),
+  :kolmogorov_velocity => c -> (() -> kolmogorov_velocity(0.1, 0.01), ()),
   :kinetic_energy_in_box_units => c -> (() -> kinetic_energy_in_box_units(ConstantPower(); reynolds_box = 1000.0), ()),
   :band_energy_fraction => c -> (() -> band_energy_fraction(ConstantPower(); reynolds_box = 1000.0), ()),
   :predicted_stationary_state =>

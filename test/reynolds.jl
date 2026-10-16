@@ -1,6 +1,7 @@
-# reynolds_box, reynolds_taylor and kolmogorov_length — plain functions of measured scalars. Each is
-# checked against its definition written out independently, against the identities tying them to the
-# kinetic energy in box units and to the Kolmogorov length, for element type, and for its refusals.
+# reynolds_box, reynolds_taylor, taylor_microscale and the three Kolmogorov scales — plain functions of
+# measured scalars. Each is checked against its definition written out independently, against the
+# identities tying them to each other (Re_λ = u′λ/ν, η = u_η τ_η, Re_box = (L/η)^{4/3}), for element
+# type, and for its refusals.
 using Test
 using GBGHomogeneousTurbulence
 
@@ -58,4 +59,59 @@ end
   @test_throws ArgumentError kolmogorov_length(ε, -ν)
   @test_throws ArgumentError kolmogorov_length(Inf, ν)
   @test_throws ArgumentError kolmogorov_length(ε, NaN)
+end
+
+
+@testset "the Taylor microscale" begin
+  ε, k, ν = 0.37, 1.5, 0.011
+  u′ = sqrt(2k / 3)
+  # the definition, written out
+  @test taylor_microscale(k, ε, ν) ≈ sqrt(15ν * u′^2 / ε) rtol = 1e-14
+  # the Reynolds number it is built into: Re_λ = u′λ/ν
+  @test u′ * taylor_microscale(k, ε, ν) / ν ≈ reynolds_taylor(k, ε, ν) rtol = 1e-13
+  # a flow with no energy has no Taylor microscale to speak of, and the formula says zero
+  @test taylor_microscale(0, ε, ν) == 0
+
+  # the arguments' own floating-point type; integers promote to Float64
+  @test taylor_microscale(1.5f0, 0.37f0, 0.011f0) isa Float32
+  @test taylor_microscale(1, 1, 1) === sqrt(10.0)
+
+  # refusals, by name
+  @test_throws ArgumentError taylor_microscale(-k, ε, ν)
+  @test_throws ArgumentError taylor_microscale(NaN, ε, ν)
+  @test_throws ArgumentError taylor_microscale(k, 0, ν)
+  @test_throws ArgumentError taylor_microscale(k, -ε, ν)
+  @test_throws ArgumentError taylor_microscale(k, Inf, ν)
+  @test_throws ArgumentError taylor_microscale(k, ε, 0)
+  @test_throws ArgumentError taylor_microscale(k, ε, -ν)
+  @test_throws ArgumentError taylor_microscale(k, ε, NaN)
+end
+
+
+@testset "the Kolmogorov time and velocity" begin
+  ε, ν = 0.37, 0.011
+  # the definitions, written out
+  @test kolmogorov_time(ε, ν) ≈ sqrt(ν / ε) rtol = 1e-14
+  @test kolmogorov_velocity(ε, ν) ≈ (ε * ν)^(1 / 4) rtol = 1e-14
+  # the three Kolmogorov scales are one set: η = u_η τ_η, and the eddy of size η has Reynolds number one
+  @test kolmogorov_velocity(ε, ν) * kolmogorov_time(ε, ν) ≈ kolmogorov_length(ε, ν) rtol = 1e-13
+  @test kolmogorov_velocity(ε, ν) * kolmogorov_length(ε, ν) / ν ≈ 1 rtol = 1e-13
+  # the strain rate the time scale inverts: ⟨S:S⟩ = ε/(2ν) = 1/(2τ_η²)
+  @test 1 / (2 * kolmogorov_time(ε, ν)^2) ≈ ε / (2ν) rtol = 1e-13
+
+  # the arguments' own floating-point type; integers promote to Float64
+  @test kolmogorov_time(0.37f0, 0.011f0) isa Float32
+  @test kolmogorov_velocity(0.37f0, 0.011f0) isa Float32
+  @test kolmogorov_time(1, 1) === 1.0
+  @test kolmogorov_velocity(1, 1) === 1.0
+
+  # refusals, by name — the same inputs `kolmogorov_length` refuses, the three scales being one set
+  for f in (kolmogorov_time, kolmogorov_velocity)
+    @test_throws ArgumentError f(0, ν)
+    @test_throws ArgumentError f(-ε, ν)
+    @test_throws ArgumentError f(Inf, ν)
+    @test_throws ArgumentError f(ε, 0)
+    @test_throws ArgumentError f(ε, -ν)
+    @test_throws ArgumentError f(ε, NaN)
+  end
 end

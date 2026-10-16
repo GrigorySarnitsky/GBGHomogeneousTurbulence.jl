@@ -93,13 +93,15 @@ pages use in prose, with no function of its own.
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | — |
 | ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_length) |
+| ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}``, the turnover time of an eddy of size ``\eta`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_time) |
+| ``u_\eta`` | Kolmogorov velocity, ``(\varepsilon\nu)^{1/4}``, so that ``\eta = u_\eta\tau_\eta`` | [`kolmogorov_velocity`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_velocity) |
 | ``\tilde{k}`` | the kinetic energy in box units, ``k/(\varepsilon L)^{2/3}``: its ``3/2`` power is the large-eddy length ``k^{3/2}/\varepsilon`` as a fraction of the box side ``L``. A run predicts its stationary state with it, from provisional values per forcing band (the shells a forcing acts on) | [`kinetic_energy_in_box_units`](@ref GBGHomogeneousTurbulence.Forcing.kinetic_energy_in_box_units) |
 | ``\mathrm{Re}_{\mathrm{box}}`` | the box Reynolds number ``\varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``. A run whose ``\nu`` is set by ``\kappa_{\max}\eta``, with ``\kappa_{\max}`` the resolved-band edge of *Numerics* below, has ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}`` | [`reynolds_box`](@ref GBGHomogeneousTurbulence.Observables.reynolds_box) |
 | ``G`` | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController)'s dimensionless gain | — |
 | ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the unit `warmup!` measures progress in (warm-up budgets and stationarity windows accumulate ``\Delta t \varepsilon/k``). Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the argument of the integrating-factor functions | [`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!) |
 | ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = \tfrac{2}{3}\tau``, a different quantity from ``\tau`` despite the shared name in the literature | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) |
 | ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu = \sqrt{20/3} k/\sqrt{\varepsilon\nu}``, measured from the flow state | [`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor) |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon}`` | — |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon} = \sqrt{10\nu k/\varepsilon}`` | [`taylor_microscale`](@ref GBGHomogeneousTurbulence.Observables.taylor_microscale) |
 
 ## Numerics
 
