@@ -37,11 +37,6 @@ field. Each returns
 the field's own real element type, not a fixed `Float64`, so a `Float32` run measures in
 `Float32`.
 
-Three observables gate the warm-up
-([`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)), which advances until the
-dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
-the scalar is forced — the scalar variance settles.
-
 None dealiases first: the quadratic reductions are exactly alias-free when the dealiasing leaves
 the Nyquist modes empty (see `kinetic_energy` for the condition;
 [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) meets it only to machine precision),
