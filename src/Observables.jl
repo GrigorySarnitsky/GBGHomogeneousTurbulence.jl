@@ -91,10 +91,7 @@ kinetic_energy(u) = inner(u, u) / 2
 The mean kinetic-energy dissipation rate of a homogeneous flow — a single number, not a field:
 
 ```math
-\\begin{aligned}
-\\varepsilon &= \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle \\\\
-              &= 2\\nu\\langle S_{ij}S_{ij}\\rangle,
-\\end{aligned}
+\\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
 ```
 
 the two forms equal for a homogeneous, divergence-free flow (periodicity alone removes the
