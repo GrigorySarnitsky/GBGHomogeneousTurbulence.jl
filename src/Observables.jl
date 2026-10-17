@@ -155,9 +155,7 @@ viscosity)`](@ref GBGHomogeneousTurbulence.Observables.dissipation) — each for
 call, the kinetic energy equal to within summation-order roundoff (a few ulp: the single reduces
 on a threaded tree, the fused pass serially) — but the pair costs one read of the coefficients and
 one blocking device-to-host readback instead of two. Reach for it wherever both are
-wanted at every iteration; the standing case is the eddy-turnover clock ``\\Delta t \\varepsilon/k`` (``\\Delta t`` the timestep)
-of a spin-up or budget loop, which is how
-[`StationarityCriterion`](@ref GBGHomogeneousTurbulence.SimulationRun.StationarityCriterion) measures it.
+wanted at the same state, as for the eddy-turnover time ``k/\\varepsilon``.
 
 # Arguments
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the

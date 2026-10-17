@@ -26,9 +26,9 @@ scalar_dissipation
 
 ## The fused energy–dissipation pairs
 
-One traversal measures both quadratic reductions of a field. The velocity's pair clocks a run in
-eddy turnovers ``k/\varepsilon``; the scalar's gives its decay time
-``\langle\varphi^{2}\rangle/\varepsilon_\varphi``.
+One traversal measures both quadratic reductions of a field. The velocity's pair gives the
+eddy-turnover time ``k/\varepsilon``, the time scale of the energy-containing eddies; the scalar's
+gives its decay time ``\langle\varphi^{2}\rangle/\varepsilon_\varphi``.
 
 ```@docs
 kinetic_energy_and_dissipation
