@@ -40,10 +40,7 @@ the field's own real element type, not a fixed `Float64`, so a `Float32` run mea
 Three observables gate the warm-up
 ([`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
-the scalar is forced — the scalar variance settles. The kinetic energy is not among them, since
-a forcing holding it fixed leaves it flat and
-[`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)'s fixed injection makes it ring; it is
-measured (the eddy-turnover clock counts in units of ``k/\\varepsilon``) but never gated on.
+the scalar is forced — the scalar variance settles.
 
 None dealiases first: the quadratic reductions are exactly alias-free when the dealiasing leaves
 the Nyquist modes empty (see `kinetic_energy` for the condition;

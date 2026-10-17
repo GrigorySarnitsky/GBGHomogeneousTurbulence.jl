@@ -66,7 +66,7 @@ sim = Simulation(grid_points_per_axis = 128, viscosity = 1e-2;
                  scalar = PassiveScalar(schmidt = 1.0))
 
 # Spin past the transient: advance until the running dissipation ε(t) stops drifting
-# (k(t) is deliberately not used — a fixed-injection forcing like this makes it ring).
+# (k(t) is deliberately not used — under a fixed-injection forcing like this it overshoots, then wanders).
 warmup!(sim)
 
 # Observe and advance. The callback fires after every iteration (and once at the
@@ -1017,7 +1017,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 13. **(2026-07) `warmup!` detects stationarity on the dissipation ``\varepsilon`` and the
     velocity-derivative skewness, not the kinetic energy.** ``\varepsilon(t)`` (the small scales, which
     settle last) must stop drifting over a trailing window; ``k(t)`` is avoided because a constant-energy
-    forcing clamps it and a fixed-injection forcing makes it ring. The skewness ``S(t)``
+    forcing clamps it and a fixed-injection forcing leaves it wandering. The skewness ``S(t)``
     (`derivative_skewness`) must also have plateaued with ``\lvert S\rvert`` above a floor — the
     "real turbulence yet" gate, whose default floor is a permissive one: raise it to ``0.4`` when the
     run must be strict, against the ``\lvert S\rvert \approx 0.5`` of a developed cascade (``S`` runs from ``0`` toward ``\approx -0.5``). When the scalar is

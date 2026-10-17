@@ -1390,8 +1390,8 @@ end
 
 # Stationarity detector. Warm-up completes when the running dissipation ``ε(t)`` — and, for a forced
 # scalar, the scalar variance ``⟨φ²⟩(t)`` — stop drifting. ε (equivalently enstrophy) is used rather
-# than the kinetic energy ``k(t)``, which is clamped flat by constant-energy forcing and rings under
-# fixed-injection forcing; the small scales settle last, so a flat ε is the strict indicator. Flatness
+# than the kinetic energy ``k(t)``, which is clamped flat by constant-energy forcing and under
+# fixed-injection forcing overshoots, then wanders slowly about its mean; the small scales settle last, so a flat ε is the strict indicator. Flatness
 # is a two-half-window mean comparison over a trailing window in eddy-turnover units. The strict gate
 # is the velocity-derivative skewness S(t) (≈0 for a random-phase field, →−0.5 for a developed
 # cascade): a flat S with |S| ≥ skewness_floor marks real turbulence. The transform-heavy skewness is
@@ -1493,9 +1493,9 @@ At each iteration it measures the dissipation ``\\varepsilon`` and the kinetic e
 the eddy-turnover clock ``\\Delta t \\varepsilon/k`` over the timestep ``\\Delta t``, and tests ``\\varepsilon`` for flatness over a
 trailing window; it stops the run when every gate holds, or gives up with a warning at
 `max_turnovers`. The gate reads ``\\varepsilon`` alone: the small scales settle last, so a flat
-``\\varepsilon`` is the strict indicator — where ``k`` is whatever the forcing shapes: clamped by a
-rescale, driven toward its target by a controller, ringing under fixed injection — so its
-flatness would certify the forcing, not the flow.
+``\\varepsilon`` is the strict indicator. A rescale or a controller holds ``k``, whose flatness would
+then certify the forcing; under fixed injection ``k`` overshoots, then wanders slowly, and a drift
+test passes only by chance.
 
 # Arguments
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
