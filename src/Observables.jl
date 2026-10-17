@@ -181,28 +181,34 @@ The kinetic energy and the dissipation rate held in scales below a box side ``l`
 
 Cut from the flow a cubic box of side ``l``, remove the box's own mean velocity, and take the kinetic
 energy of what is left; averaged over every position of the box, that is ``k(l)``. The dissipation
-``\\varepsilon(l)`` removes the box's mean vorticity instead, since removing the mean velocity leaves
-every gradient unchanged.
+``\\varepsilon(l)`` removes the box's mean strain rate instead, since removing the mean velocity leaves
+every gradient unchanged: what is left is the dissipation inside the box once its mean uniform
+deformation is taken out.
 
 With ``C_l(\\boldsymbol{x}) = \\boldsymbol{x} + [-l/2, l/2]^{3}`` the cube of side ``l`` centred at
 ``\\boldsymbol{x}``, the box mean of the velocity is the field
 ``\\langle\\boldsymbol{u}\\rangle_l(\\boldsymbol{x}) = l^{-3}\\int_{C_l(\\boldsymbol{x})} \\boldsymbol{u}(\\boldsymbol{y})\\,\\mathrm{d}^{3}y``,
-and ``\\langle\\boldsymbol{\\omega}\\rangle_l`` that of the vorticity likewise. Then
+and ``\\langle S_{ij}\\rangle_l`` and ``\\langle\\boldsymbol{\\omega}\\rangle_l`` those of the strain-rate tensor
+``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)`` and of the vorticity likewise. Then
 
 ```math
 \\begin{aligned}
 k(l) &= \\frac{1}{L^{3}} \\int_{\\Omega} \\biggl[\\frac{1}{l^{3}} \\int_{C_l(\\boldsymbol{x})}
   \\tfrac{1}{2}\\bigl\\lvert\\boldsymbol{u}(\\boldsymbol{y}) - \\langle\\boldsymbol{u}\\rangle_l(\\boldsymbol{x})\\bigr\\rvert^{2}\\,\\mathrm{d}^{3}y\\biggr]\\,\\mathrm{d}^{3}x, \\\\
 \\varepsilon(l) &= \\frac{1}{L^{3}} \\int_{\\Omega} \\biggl[\\frac{1}{l^{3}} \\int_{C_l(\\boldsymbol{x})}
+  2\\nu\\bigl(S_{ij}(\\boldsymbol{y}) - \\langle S_{ij}\\rangle_l(\\boldsymbol{x})\\bigr)^{2}\\,\\mathrm{d}^{3}y\\biggr]\\,\\mathrm{d}^{3}x \\\\
+  &= \\frac{1}{L^{3}} \\int_{\\Omega} \\biggl[\\frac{1}{l^{3}} \\int_{C_l(\\boldsymbol{x})}
   \\nu\\bigl\\lvert\\boldsymbol{\\omega}(\\boldsymbol{y}) - \\langle\\boldsymbol{\\omega}\\rangle_l(\\boldsymbol{x})\\bigr\\rvert^{2}\\,\\mathrm{d}^{3}y\\biggr]\\,\\mathrm{d}^{3}x,
 \\end{aligned}
 ```
 
-over the periodic box ``\\Omega = [0, L)^{3}``. Within one cube the mean square about the mean is
+over the periodic box ``\\Omega = [0, L)^{3}``, summed over ``i`` and ``j``. The strain form is the
+dissipation itself; the vorticity form equals it for a divergence-free velocity, as in
+`dissipation`, because the box mean of such a velocity is divergence-free too. Within one cube the mean square about the mean is
 the mean square less the square of the mean, and periodicity makes the position average of a cube
 average the whole-box average ``\\langle\\cdot\\rangle``; so
 ``k(l) = k - \\tfrac{1}{2}\\langle\\lvert\\langle\\boldsymbol{u}\\rangle_l\\rvert^{2}\\rangle`` and
-``\\varepsilon(l) = \\varepsilon - \\nu\\langle\\lvert\\langle\\boldsymbol{\\omega}\\rangle_l\\rvert^{2}\\rangle``.
+``\\varepsilon(l) = \\varepsilon - 2\\nu\\langle\\langle S_{ij}\\rangle_l\\langle S_{ij}\\rangle_l\\rangle = \\varepsilon - \\nu\\langle\\lvert\\langle\\boldsymbol{\\omega}\\rangle_l\\rvert^{2}\\rangle``.
 From the coefficients these are
 
 ```math

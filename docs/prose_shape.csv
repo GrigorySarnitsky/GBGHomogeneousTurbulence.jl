@@ -116,7 +116,7 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § 4. Modules",94,94,0
 "ARCHITECTURE.md § 4.1 `State` and `SimulationDomain` — the field and the frame",804,337,0
 "ARCHITECTURE.md § 4.2 `Generator` — the evolution, split reversible and irreve",800,349,0
-"ARCHITECTURE.md § 4.3 `Observables` — the measured functions of the state",231,169,0
+"ARCHITECTURE.md § 4.3 `Observables` — the measured functions of the state",231,171,0
 "ARCHITECTURE.md § 4.4 `Forcing` — the source",716,391,0
 "ARCHITECTURE.md § 4.5 `Propagator` — the map that advances the state in time",476,445,0
 "ARCHITECTURE.md § 4.6 `Particles` — Lagrangian instruments",528,217,0
@@ -201,7 +201,7 @@ unit,words,longest_paragraph,admonitions
 "Observables.jl :: integral_scale(û, domain)",263,90,0
 "Observables.jl :: kinetic_energy(u)",155,67,0
 "Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,99,0
-"Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",448,73,1
+"Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",509,82,1
 "Observables.jl :: max_speed(u)",316,143,2
 "Observables.jl :: reynolds_box(side_length, dissipation, viscosity)",162,62,0
 "Observables.jl :: reynolds_taylor(kinetic_energy, dissipation, viscosity)",126,41,0

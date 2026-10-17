@@ -368,7 +368,7 @@ states the physical quantity first, then the reduction that computes it:
   derived from it;
 - `kinetic_energy_and_dissipation_below_scale`, the kinetic energy ``k(l)`` and dissipation
   ``\varepsilon(l)`` held in scales below each box side ``l`` the grid offers — what a box of side ``l``
-  measures once its own mean velocity (or vorticity) is removed, averaged over its positions — as the
+  measures once its own mean velocity (or mean strain rate) is removed, averaged over its positions — as the
   weighted reductions ``\tfrac{1}{2}\sum(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2`` and
   ``\nu\sum\lvert\boldsymbol{\kappa}\rvert^2(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2`` over
   `GBGPeriodicFields`' top-hat window (decision 96).
