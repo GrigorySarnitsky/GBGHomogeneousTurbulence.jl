@@ -86,23 +86,23 @@ end
 
 The preallocated per-step scratch the scheme writes into, sized so a step allocates no field-sized
 memory. Built per scheme by [`allocate_buffers(scheme, domain; scalar)`](@ref GBGHomogeneousTurbulence.Propagator.allocate_buffers), which allocates
-**exactly** that scheme's working set: an array another scheme would use is left `nothing`, never
+exactly that scheme's working set: an array another scheme would use is left `nothing`, never
 allocated.
 
-Each such array is a **register**: storage a scheme computes one stage into and overwrites at the
+Each such array is a *register*: storage a scheme computes one stage into and overwrites at the
 next, holding nothing a caller should read between steps. The observables cache's slots serve the
 same purpose mid-iteration — the step computes its stage recoveries into them — which is why a cached
 field is meaningful only between iterations.
 
-There are deliberately **no physical-representation registers** here: the substage velocity,
+There are deliberately no physical-representation registers here: the substage velocity,
 vorticity, and scalar recoveries write into the run's
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) slots, taken as scratch
 mid-iteration and re-deposited at the iteration's end by [`deposit!`](@ref) — a slot IS its producer's register.
-Likewise there is **no integrating-factor register**: the exact linear subflow is applied by the
+Likewise there is no integrating-factor register: the exact linear subflow is applied by the
 backend's fused exponential convolution
 ([`exponential_convolve!`](@extref GBGPeriodicFields GBGPeriodicFields.Convolution.exponential_convolve!)),
 evaluated per mode from the factor's parameters, so no
-kernel field is ever built or stored. The right-hand-side **assembly** scratch (the quadratic
+kernel field is ever built or stored. The right-hand-side assembly scratch (the quadratic
 products, the phase-shift buffers, any steady forcing rate) lives with the generator, on the
 [`ResolvedGenerator`](@ref GBGHomogeneousTurbulence.Generator.ResolvedGenerator) — the buffers here
 are
@@ -154,7 +154,7 @@ end
     allocate_buffers(scheme, tracers, cache) -> ParticleIntegratorBuffers
 
 Allocate the per-step registers a scheme needs, dispatching on the concrete scheme so it allocates
-**exactly** its working set — never a register another scheme would use. A scheme with no method
+exactly its working set — never a register another scheme would use. A scheme with no method
 here is a hard error; there is no over-allocating fallback. The constructor of
 a [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) calls this for you.
 
@@ -270,7 +270,7 @@ right-hand-side assembly and its dealiasing pass write through: the 2N count mea
 not the solver it is embedded in.
 
 # References
-- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* **35**, 48–56.
+- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* 35, 48–56.
 """
 struct IFLowStorageRK3 <: AbstractIntegrator end
 
@@ -563,7 +563,7 @@ Integrating-factor strong-stability-preserving third-order Runge–Kutta of Shu 
 TurTLE, the reference pseudospectral solver, so a code-to-code comparison against it shares the time
 discretization. Choose it for that comparison; for everything else it and [`IFLowStorageRK3`](@ref)
 are interchangeable — same order, same three right-hand-side evaluations, same two registers per
-field, and the **same linear stability** (every three-stage third-order explicit Runge–Kutta has
+field, and the same linear stability (every three-stage third-order explicit Runge–Kutta has
 stability function ``R(z) = 1 + z + z^2/2 + z^3/6``, imaginary-axis limit ``\\sqrt{3}``), differing
 only in the nonlinear error constants.
 
@@ -603,7 +603,7 @@ no accumulator is transported by the integrating factor).
     forward and carry no such term.
 
 # References
-- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471.
+- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* 77, 439–471.
 """
 struct IFSSPRK3 <: AbstractIntegrator end
 
@@ -792,18 +792,18 @@ closes as `step!` then `deposit!`, then
 - `sim` — `sim` form: the [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) to
   unpack.
 
-The **field form** deposits the field-derived slots — the velocity, vorticity and, when the run
+The field form deposits the field-derived slots — the velocity, vorticity and, when the run
 carries one, scalar recoveries in physical representation, then the maximum-speed reduction over
 the just-deposited velocity — from the state the step has just produced. Every recovery
 is work the next iteration's first stage would have done anyway, so closing the iteration costs no
 extra transforms — one extra pass only, the maximum-speed reduction, which runs every iteration
 even under a hand-fixed ``\\Delta t`` that never reads it.
 
-The **particle form** deposits the one trajectory-bound slot: it interpolates `u` at the tracer
-set's current positions and stamps the slot against **both** counters — the
-fields epoch (its count of state changes) of the interpolated velocity and the particles epoch
-(of position changes) of the positions, since the
-velocity at the particles is a function of the two together. It therefore runs **after** the tracer
+The particle form deposits the one trajectory-bound slot: it interpolates `u` at the tracer
+set's current positions and stamps the slot against both counters — the
+fields epoch, the version of the state the velocity was interpolated from, and the particles epoch,
+the version of the positions — since the
+velocity at the particles is a function of the two together. It therefore runs after the tracer
 push, which itself consumed the field form's deposit.
 
 The deposited values serve twice: they are
@@ -818,7 +818,7 @@ deposits so the first iteration finds the initial state's observables, and a han
 each form itself after the advance it closes. After mutating the state or the positions from
 outside the iteration, announce it — [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!) /
 [`particles_modified!`](@ref GBGHomogeneousTurbulence.Cache.particles_modified!) — and re-deposit
-with the **`sim` form**, which performs every deposit the run's configuration carries.
+with the `sim` form, which performs every deposit the run's configuration carries.
 
 Returns `cache` (or `sim`).
 """
@@ -874,7 +874,7 @@ wavenumber the dealiasing keeps — a rate. Stability needs that rate times the
 step, which once ``\\Delta t`` is substituted is ``C_{\\mathrm{CFL}} \\kappa_{\\max}^{\\mathrm{ret}}\\Delta x``, to
 stay inside the scheme's imaginary-axis stability limit ``y_{\\mathrm{s}}``, a pure number.
 
-Two loosenesses sit in that estimate and they pull in **opposite** directions. The speed in the
+Two loosenesses sit in that estimate and they pull in opposite directions. The speed in the
 denominator is [`max_speed`](@ref GBGHomogeneousTurbulence.Observables.max_speed), a maximum over grid
 points, so the continuum supremum between them can be larger — making the computed step too long.
 Against it, the eigenvalue bound over-estimates the true spectral radius, since not every mode

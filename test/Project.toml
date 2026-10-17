@@ -11,7 +11,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
 GBGPeriodicFields = {rev = "e57f78aac4ce61cae7b0e38d38ac0ff2b31eac67", url = "https://github.com/GrigorySarnitsky/GBGPeriodicFields.jl"}
-GBGCodingTools = {rev = "v2.0.0-rc.76", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
+GBGCodingTools = {rev = "v2.0.0-rc.79", url = "https://github.com/GrigorySarnitsky/GBGCodingTools.jl.git"}
 
 [compat]
 GBGCodingTools = "=2.0.0"

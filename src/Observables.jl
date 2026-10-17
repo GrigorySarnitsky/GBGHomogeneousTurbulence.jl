@@ -40,7 +40,7 @@ the field's own real element type, not a fixed `Float64`, so a `Float32` run mea
 Three observables gate the warm-up
 ([`warmup!`](@ref GBGHomogeneousTurbulence.SimulationRun.warmup!)), which advances until the
 dissipation ``\\varepsilon`` stops drifting, the derivative skewness reaches its plateau, and — when
-the scalar is forced — the scalar variance settles. The kinetic energy is **not** among them, since
+the scalar is forced — the scalar variance settles. The kinetic energy is not among them, since
 a forcing holding it fixed leaves it flat and
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower)'s fixed injection makes it ring; it is
 measured (the eddy-turnover clock counts in units of ``k/\\varepsilon``) but never gated on.
@@ -135,7 +135,7 @@ inner product against the `domain.squared_wavenumber_kernel` multiplier: from
 \\end{aligned}
 ```
 
-the mean-square vorticity of a divergence-free velocity is its **Dirichlet energy** — the mean square
+the mean-square vorticity of a divergence-free velocity is its *Dirichlet energy* — the mean square
 of its gradient, ``H^1`` in the Sobolev naming —
 ``\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = \\langle\\hat{\\boldsymbol{u}},\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat{\\boldsymbol{u}}\\rangle``.
 
@@ -429,7 +429,7 @@ reduction, storing no determinant field, and a field with no strain returns zero
 The denominator needs no physical field: for a solenoidal field
 ``\\langle\\boldsymbol{S}:\\boldsymbol{S}\\rangle = \\tfrac{1}{2}\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle``, the Dirichlet energy, reduced from `û`.
 
-Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a **cubic** invariant, its grid mean carries a small
+Because ``\\langle\\det\\boldsymbol{S}\\rangle`` is a cubic invariant, its grid mean carries a small
 residual aliasing on a ``2/3``-truncated field — negligible for a well-resolved run, but, unlike the
 quadratic reductions, not exactly alias-free. That account covers the sharp truncations: the wider
 [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) ball carries the same kind of residual over its larger retained band, and [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi)'s
@@ -450,7 +450,7 @@ gate of the warm-up detector.
     run near its memory ceiling should size for the diagnostic rather than for the steady state.
 
 # References
-- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317). *J. Fluid Mech.* **1**(5), 497–504.
+- Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317). *J. Fluid Mech.* 1(5), 497–504.
 """
 function derivative_skewness(û, domain::FixedDomain)
   strain = symmetric_gradient(û, domain.multipliers)                   # Ŝ = sym∇u (fused; skips the full ∇u)
@@ -471,7 +471,7 @@ end
 """
     energy_spectrum(û, domain)
 
-The measured kinetic-energy **spectral density** ``E(\\kappa)`` of the velocity field `û` (in
+The measured kinetic-energy spectral density ``E(\\kappa)`` of the velocity field `û` (in
 spectral representation): ``E(\\kappa)\\,\\mathrm{d}\\kappa`` is the turbulent kinetic energy
 carried by wavenumber magnitudes in ``[\\kappa, \\kappa + \\mathrm{d}\\kappa]``, so
 ``k = \\int_0^\\infty E(\\kappa)\\,\\mathrm{d}\\kappa``. A model spectrum from the literature
@@ -532,9 +532,9 @@ at the low shells, where the mode count departs most from the continuum ``4\\pi\
 are also the shells this ratio weights most, so read ``L_{11}`` as resolution-limited at coarse
 grids.
 
-For reference, two related scales follow from the same spectrum. The **transverse** integral scale
-is ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the **full
-trace** velocity correlation
+For reference, two related scales follow from the same spectrum. The transverse integral scale
+is ``L_{22} = L_{11}/2`` (the incompressible-isotropic relation). The scale defined from the full
+trace velocity correlation
 ``R_{ii}(r) = \\langle\\boldsymbol{u}(\\boldsymbol{x})\\cdot\\boldsymbol{u}(\\boldsymbol{x}+r\\boldsymbol{e})\\rangle``
 (``\\boldsymbol{e}`` a unit vector) — with no directional projection — is
 

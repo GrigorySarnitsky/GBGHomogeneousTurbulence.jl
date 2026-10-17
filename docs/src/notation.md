@@ -21,12 +21,12 @@ a direct dependency.
 | Box units | ``\tilde{q}`` | A quantity ``q`` divided by its unit built from the box side ``L`` and the dissipation rate ``\varepsilon``: length ``L``, time ``(L^{2}/\varepsilon)^{1/3}``, velocity ``(\varepsilon L)^{1/3}``. So ``\tilde{k} = k/(\varepsilon L)^{2/3}`` and ``\tilde{\nu} = \nu/(\varepsilon^{1/3}L^{4/3})``. The tilde means this and nothing else; an average is never a tilde (see the box mean below). |
 | Box mean | ``\langle \cdot \rangle_l`` | The average over a cube of side ``l`` centred at each point, so ``\langle\boldsymbol{u}\rangle_l`` is a field; the unindexed ``\langle\cdot\rangle`` is the average over the whole box. Averages and filters are always brackets with an index, never an overbar or a tilde. |
 | Spectral representation | ``\hat f`` | The field ``f`` in spectral (Fourier) representation, [`to_spectral`](@extref GBGPeriodicFields GBGPeriodicFields.Fields.to_spectral). A field is one physical object; physical and spectral are two representations of it. |
-| Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: **bold** ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*.  |
+| Wavenumber clash | ``\boldsymbol{\kappa}`` / ``\kappa`` / ``k`` | Kept distinct: bold ``\boldsymbol{\kappa}`` is the wavenumber *vector*, ``\kappa = \lvert\boldsymbol{\kappa}\rvert`` its *magnitude* (the spectrum coordinate), and italic scalar ``k`` is the *turbulent kinetic energy*.  |
 
 ## Physical variables
 
 
-The **Code** column gives the name each symbol carries in the package.
+The Code column gives the name each symbol carries in the package.
 
 | Symbol | Meaning | Code |
 |:---|:---|:---|
@@ -74,8 +74,8 @@ magnitude ``\kappa`` and the turbulent kinetic energy ``k``.)*
 |:---|:---|:---|
 | ``k`` | turbulent kinetic energy ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` | [`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy) |
 | ``\varepsilon`` | mean dissipation rate ``\nu\langle\lvert\boldsymbol{\omega}\rvert^2\rangle`` | [`dissipation`](@ref GBGHomogeneousTurbulence.Observables.dissipation) |
-| ``E(\kappa)`` | the energy spectrum as a **density** per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the form the reference laws are stated in, and the one the measured spectrum below estimates | — |
-| ``E(\kappa_n)`` | the **measured** spectral density at shell ``n``, centred on the wavenumber magnitude ``\kappa_n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGHomogeneousTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
+| ``E(\kappa)`` | the energy spectrum as a *density* per unit wavenumber: ``k = \int_0^\infty E(\kappa)\,\mathrm{d}\kappa`` (dimensions ``L^3T^{-2}``) — the form the reference laws are stated in, and the one the measured spectrum below estimates | — |
+| ``E(\kappa_n)`` | the measured spectral density at shell ``n``, centred on the wavenumber magnitude ``\kappa_n``: the shell's energy over the shell width ``\Delta\kappa = 2\pi/L``, so ``k = \sum_n E(\kappa_n) \Delta\kappa`` — the same kind of object as a model ``E(\kappa)``, directly comparable | [`energy_spectrum`](@ref GBGHomogeneousTurbulence.Observables.energy_spectrum) (the `GBGPeriodicFields` radial spectrum, halved, over ``\Delta\kappa``) |
 | ``l`` | a box side: the cube whose own mean is removed in ``k(l)`` and ``\varepsilon(l)``, from the grid spacing up to the domain side ``L`` | [`kinetic_energy_and_dissipation_below_scale`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation_below_scale) (its `scales`) |
 | ``W_l(\boldsymbol{\kappa})`` | the transfer function of the box mean of side ``l``, ``\prod_a \operatorname{sinc}(\kappa_a l/2)`` — a function of the wavenumber *vector*, not radial | `tophat_window` (`GBGPeriodicFields`) |
 | ``k(l)``, ``\varepsilon(l)`` | the kinetic energy and the dissipation held in scales below ``l``: what a box of side ``l`` measures once its own mean velocity (for ``k``) or vorticity (for ``\varepsilon``) is removed, averaged over its positions; ``k(L) = k``, ``\varepsilon(L) = \varepsilon`` | [`kinetic_energy_and_dissipation_below_scale`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation_below_scale) |
@@ -132,7 +132,7 @@ pages use in prose, with no function of its own.
 ## Vocabulary
 
 The page above fixes one symbol per physical concept. This section does the same for the package's
-**operational** words — the ones that name how a run is organized rather than what it computes. Each
+operational words — the ones that name how a run is organized rather than what it computes. Each
 is used throughout the docstrings, and each means exactly this and nothing looser.
 
 | Term | Meaning |
@@ -144,7 +144,7 @@ is used throughout the docstrings, and each means exactly this and nothing loose
 | **register** | storage a component computes one value into and overwrites at the next use, holding nothing a reader should trust in between. A cache slot doubles as its producer's register mid-iteration, which is why a cached field is meaningful only between iterations. |
 | **scratch** | working storage a component owns for its intermediate results — a register, or a named bundle of them (the generator's assembly scratch, a scheme's [`IntegratorBuffers`](@ref GBGHomogeneousTurbulence.Propagator.IntegratorBuffers)). |
 | **push** | one advance of the tracer positions — the particle half of an iteration, performed by [`advect!`](@ref GBGHomogeneousTurbulence.Particles.advect!). |
-| **front door** | the former name for what current docs call the **domain-building** [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor: the form that builds every component from a few keywords, as against handing it a pre-built domain. In a wider sense it also names `SimulationRun`, the layer a user enters the package through. |
+| **front door** | the former name for what current docs call the domain-building [`Simulation`](@ref GBGHomogeneousTurbulence.SimulationRun.Simulation) constructor: the form that builds every component from a few keywords, as against handing it a pre-built domain. In a wider sense it also names `SimulationRun`, the layer a user enters the package through. |
 | **observation** | the callback a run is driven by: it reads the run once at the start and once after every iteration — ``n+1`` readings over a run of ``n`` iterations — and its return decides whether to continue. By extension the *occasion* — "computed at an observation" means computed in that callback, between iterations, from what the run already holds. |
 | **holder** | in the test suite's audit of costs against their lower bounds: the named owner of a gap between an achieved cost and its floor — every residual distance must carry one, and closing the gap retires it in the same commit. |
 | **ledger** | a frozen table of measured costs (memory, transforms, passes, synchronizations) the test suite holds the code to; a deliberate change re-freezes it consciously, citing its decision. |

@@ -44,7 +44,7 @@ The lifecycle, four hook methods a strategy may act on, each defaulting to doing
 - [`add_forcing_source!`](@ref) — add a source term at each stage.
 - [`project_forcing!`](@ref) — project or rescale the field after the step.
 
-The strategies; each but `NoForcing` acts on a **band**, an annulus of integer Fourier shells:
+The strategies; each but `NoForcing` acts on a *band*, an annulus of integer Fourier shells:
 
 - [`NoForcing`](@ref) — leave the field undriven.
 - [`Linear`](@ref) — a fixed linear rate on the band.
@@ -69,8 +69,8 @@ Construction and persistence:
 - [`write_forcing`](@ref) / [`read_forcing`](@ref) — a strategy's HDF5 persistence: its defining
   parameters as one self-describing group (available once `HDF5` is loaded).
 
-Which keywords carry defaults follows one test: **does the value come from the method, or from this
-run?** A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
+Which keywords carry defaults follows one test: does the value come from the method, or from this
+run? A canonical band (`lowest_shell = 1`, `highest_shell = 2`) is the method's and defaults; what
 a run holds fixed, or drives at — `target`, `rate`, `injection_rate`, `over`, `forcing_variance`,
 the correlation time — has no canonical value and is required. A `seed` is neither: any value gives an
 equally valid realization, so one omitted is drawn — from the run's `rng` when a `Simulation`
@@ -85,7 +85,7 @@ mask holds those modes empty — so construction warns about it; the additive `S
 inject there instead, and refuses such a band. `highest_shell = Inf` asks for that reach on purpose —
 every retained mode but the mean, on any grid — so it draws no warning; `StochasticOU` refuses it too.
 
-The two fields are forced **independently**:
+The two fields are forced independently:
 [`FlowConditions`](@ref GBGHomogeneousTurbulence.Generator.FlowConditions) — the `Generator`
 parameter record bundling the viscosity, the Schmidt number, and the two forcings — takes a
 separate `velocity_forcing` and `scalar_forcing`, so a run can force one, both, or neither.
@@ -140,10 +140,10 @@ generator calls the first once, when it is built, and a step calls the other thr
 - [`add_forcing_source!`](@ref) — at every stage: add a source term to the right-hand side.
 - [`project_forcing!`](@ref) — once, after the completed step: project or rescale the advanced field.
 
-The rate and the source are two channels of **one** forcing term: the steady part folded exactly into
+The rate and the source are two channels of one forcing term: the steady part folded exactly into
 the integrating factor, the remainder added at the stages. A single strategy may use both.
 
-Which channel a rate may take is decided by steadiness in time, **not** by linearity in the field. The
+Which channel a rate may take is decided by steadiness in time, not by linearity in the field. The
 integrating factor holds a rate fixed for the whole step, so a rate re-solved from the state must go
 through `add_forcing_source!` instead; freezing it in the integrating factor would drop the scheme to
 first order.
@@ -380,7 +380,7 @@ transfer, and [`Linear`](@ref), which takes the rate route instead, makes none e
 
 !!! warning "The source is accumulated, never assigned"
     Every stage adds into an `N̂` the generator has already filled with the nonlinear term, so an
-    implementation must **add** its contribution and must not overwrite the buffer.
+    implementation must add its contribution and must not overwrite the buffer.
 """
 add_forcing_source!(::AbstractForcing, forcing_state, N̂, field, domain::FixedDomain,
                     diffusivity::Real) = N̂
@@ -483,9 +483,9 @@ this one is applied after the step and costs it (see the caveat below). It is ke
 method a reader may need to reproduce, and because holding a band's value *exactly* is occasionally
 what is wanted.
 
-Which observable is held follows from the field, chosen to agree with the diagnostics: the **kinetic
-energy** ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
-([`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy)), the **scalar variance**
+Which observable is held follows from the field, chosen to agree with the diagnostics: the kinetic
+energy ``\\tfrac{1}{2}\\langle\\lvert\\boldsymbol{u}\\rvert^{2}\\rangle`` for the velocity
+([`kinetic_energy`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy)), the scalar variance
 ``\\langle\\varphi^{2}\\rangle`` for the scalar
 ([`scalar_variance`](@ref GBGHomogeneousTurbulence.Observables.scalar_variance)) — each the field's
 ``L^{2}`` observable, the ``\\tfrac{1}{2}`` belonging to the kinetic energy's definition rather than
@@ -526,8 +526,8 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     the rescale is applied *after* the step, which is Lie–Trotter operator splitting — the step's
     map and the rescale's map composed one after the other, a composition whose error is
     ``O(\\Delta t)`` regardless of how accurate either map is alone — so it
-    is first-order however good the scheme is. Measured on the third-order [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3): **1.02**
-    here, against **3.01** for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
+    is first-order however good the scheme is. Measured on the third-order [`IFLowStorageRK3`](@ref GBGHomogeneousTurbulence.Propagator.IFLowStorageRK3): 1.02
+    here, against 3.01 for `Linear`, `ConstantPower`, `VarianceController` and an unforced run.
     (A stochastic forcing is outside that comparison — it has no classical order to lose.)
     Molecular dynamics reached the same
     conclusion about the same manoeuvre — per-step rescaling is the deterministic (Berendsen) limit
@@ -536,14 +536,14 @@ transfer: the band and whole-field observables ride a single fused traversal, in
     than project after the fact.
 
     Two configurations also behave sharply. Under `:total`, if the out-of-band value alone exceeds
-    `target`, the band is **zeroed** — the closest reachable state, and the most violent intervention
-    the rescale can make. At the other end an empty band is **left alone** rather than divided by ~0,
+    `target`, the band is zeroed — the closest reachable state, and the most violent intervention
+    the rescale can make. At the other end an empty band is left alone rather than divided by ~0,
     so it stays empty instead of being driven to `target`. Seed content in the band if a run depends
     on the clamp taking hold.
 
 # References
-- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6**(4), 1612–1614.
-- Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420). *J. Chem. Phys.* **126**, 014101.
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* 6(4), 1612–1614.
+- Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420). *J. Chem. Phys.* 126, 014101.
 
 # Fields
 - `band` — the band-pass kernel selecting the rescaled shells.
@@ -676,10 +676,10 @@ the rate ``\\varepsilon`` for the velocity (measured by
 [`dissipation`](@ref GBGHomogeneousTurbulence.Observables.dissipation)) and
 ``\\varepsilon_\\varphi`` for the scalar (by
 [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation)). The keyword
-names the kind of quantity it is — a **rate**, where `VarianceRescaling`'s `target` is an
-**amplitude**.
+names the kind of quantity it is — a *rate*, where `VarianceRescaling`'s `target` is an
+*amplitude*.
 
-Since that amplitude is re-solved from the state, it enters the right-hand side at **every stage**
+Since that amplitude is re-solved from the state, it enters the right-hand side at every stage
 rather than the integrating factor, where freezing it would cost the scheme its order. Like
 [`Linear`](@ref) it is a per-mode multiple of the field, so it preserves a solenoidal velocity.
 
@@ -742,17 +742,17 @@ A(\\boldsymbol{\\kappa}, t) = \\frac{\\varepsilon(t) - G[k(t) - k_\\infty]/t_\\e
 
 with ``k_\\infty`` the `target`, ``G`` the `gain` and ``t_\\ell`` the `turnover_time`, so that
 ``\\mathrm{d}k/\\mathrm{d}t = -G(k - k_\\infty)/t_\\ell`` exactly: the variance relaxes
-exponentially to a **stable attractor** with settling time ``t_\\ell/G``.
+exponentially to a stable attractor with settling time ``t_\\ell/G``.
 
-The limit `gain = 0` is the bare **marginal law**, and it is allowed: exact reinjection of the
+The limit `gain = 0` is the bare *marginal law*, and it is allowed: exact reinjection of the
 instantaneous ``\\varepsilon`` makes ``\\mathrm{d}k/\\mathrm{d}t = 0``, so ``k`` is *conserved at
-its initial value* and `target` never enters the rate. Every level is then a **neutral** equilibrium
+its initial value* and `target` never enters the rate. Every level is then a neutral equilibrium
 — the reinjection cancels the cascade's own restoring response, which [`ConstantPower`](@ref)'s
 fixed injection retains — so discrete integration bias accumulates uncorrected (about 1% of ``k``
 per 1000 steps, measured at ``24^3`` in `Float64`; a `Float32` run's roundoff bias is larger and
 unmeasured), and nothing ever restores it.
 
-The two variances there are **not interchangeable**: ``k`` is the whole field's, the one held;
+The two variances there are not interchangeable: ``k`` is the whole field's, the one held;
 ``k_{\\mathrm{band}}`` the forced band's, dividing out because the forcing injects only there. An empty band is
 left alone rather than divided by ``\\sim 0`` (the floor `ConstantPower` documents), so seed content
 in the band if the run depends on the controller taking hold.
@@ -780,7 +780,7 @@ in the band if the run depends on the controller taking hold.
   positive gain is refused there — a scalar variance is not an energy, and the derived settling
   time would depend on the scalar's amplitude unit, breaking the scalar equation's exact
   linearity in ``\\varphi`` (at `gain = 0` the settling time never enters the dynamics and the
-  marginal law stays legal). Driving the scalar, pass the **flow's** turnover time
+  marginal law stays legal). Driving the scalar, pass the *flow's* turnover time
   ``2k/(3\\varepsilon)`` explicitly.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``.
   `highest_shell = Inf` forces every retained mode but the mean, on any grid: the band-free linear
@@ -788,8 +788,8 @@ in the band if the run depends on the controller taking hold.
   461–473) that physical-space codes apply, where
   ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
 
-The molecular-dynamics thermostats map the design space exactly, and **this controller is the
-Berendsen-weak-coupling analogue** — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
+The molecular-dynamics thermostats map the design space exactly, and this controller is the
+Berendsen-weak-coupling analogue — gain-limited relaxation toward a target (Berendsen et al. 1984), carrying that class's known caveat: the
 held quantity's own fluctuations are distorted by the coupling. Per-step rescaling is the naive
 thermostat, whose limit here is `VarianceRescaling`; the contrasting extended-variable class
 that restores canonical fluctuations is Nosé–Hoover
@@ -801,10 +801,10 @@ does not take.
     disturbance. The two are kept separate because that is how the source states them.
 
 # References
-- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
-- Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984). [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
-- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* **81**(1), 511–519.
-- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* **31**(3), 1695–1697.
+- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* 28, 035114.
+- Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984). [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* 81, 3684–3690.
+- Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* 81(1), 511–519.
+- Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* 31(3), 1695–1697.
 
 # Fields
 - `band` — the band-pass kernel, evaluated per mode where used; the controller convolves against it and stores nothing.
@@ -1136,7 +1136,7 @@ held at a value.
 
 Its strength is `forcing_variance`, the stationary mean square
 ``\\sigma^{2} = \\langle\\lvert\\boldsymbol{f}\\rvert^{2}\\rangle`` of the term added: an acceleration
-when it drives the velocity, a rate of change of ``\\varphi`` when it drives the scalar. It is **not**
+when it drives the velocity, a rate of change of ``\\varphi`` when it drives the scalar. It is not
 the variance of the field itself, which is what `VarianceController` holds.
 
 The forcing lives on the band's Fourier modes — the integer shells `lowest_shell` to `highest_shell` in
@@ -1209,7 +1209,7 @@ builds it for you.
     an `ArgumentError` for a band reaching past the cutoff, where the other strategies only warn.
 
 # References
-- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278.
+- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* 16, 257–278.
 
 # Fields
 - `forcing_variance`, `correlation_time`, `seed`, `lowest_shell`, `highest_shell` — the parameters above.

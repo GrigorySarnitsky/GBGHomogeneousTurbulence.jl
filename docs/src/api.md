@@ -2,8 +2,8 @@
 
 The package is an umbrella module (`GBGHomogeneousTurbulence`) assembled from submodules, which
 build on one another in the order `SimulationDomain` → `Observables` → `State` → `Cache` → `Forcing` →
-`Generator` → `Propagator` → `Particles` → `SimulationRun`. **The pages below are ordered for reading,
-not by that dependency**: `SimulationRun` comes first because a run is what a user builds first, and
+`Generator` → `Propagator` → `Particles` → `SimulationRun`. The pages below follow reading order instead:
+`SimulationRun` comes first because a run is what a user builds first, and
 the pieces it composes follow. The umbrella re-exports the public surface of every submodule, so
 `using GBGHomogeneousTurbulence` brings the whole of it into scope.
 

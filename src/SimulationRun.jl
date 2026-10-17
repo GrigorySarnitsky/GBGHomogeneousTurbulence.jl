@@ -92,12 +92,12 @@ with `scalar = nothing` carries none, and no scalar setting can be given to it.
 
 # Arguments
 - `schmidt = 1.0` — the Schmidt number ``\\mathrm{Sc}`` (scalar diffusivity
-  ``\\varkappa = \\nu/\\mathrm{Sc}``). **The run's resolution criterion covers the velocity, not the
-  scalar**, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
+  ``\\varkappa = \\nu/\\mathrm{Sc}``). The run's resolution criterion covers the velocity, not the
+  scalar, whose cutoff at ``\\mathrm{Sc} > 1`` is the finer Batchelor scale
   ``\\eta_B = \\eta/\\sqrt{\\mathrm{Sc}}`` — under-resolved by ``\\sqrt{\\mathrm{Sc}}`` on the same
   grid, with [`scalar_dissipation`](@ref GBGHomogeneousTurbulence.Observables.scalar_dissipation)
   then measuring a truncated field. The package targets ``\\mathrm{Sc} = O(1)``, with no
-  Batchelor-range machinery. `Simulation` **warns** when the run's ``\\kappa_{\\max}\\eta_B`` falls
+  Batchelor-range machinery. `Simulation` warns when the run's ``\\kappa_{\\max}\\eta_B`` falls
   below the ``1.5`` well-resolved floor — in either viscosity mode, since the check reads the
   resolved ``\\nu`` however it was obtained — a warning, not an error, so a deliberately
   under-resolved scalar stays reachable but not silent; the remedy is `κ_max_η` raised by
@@ -163,7 +163,7 @@ tracking setting can be given to it.
 # Arguments
 - `number_of_particles` — how many tracers to seed.
 
-- `interpolation_scheme = CatmullRom` — the **spatial** scheme that evaluates a field at the
+- `interpolation_scheme = CatmullRom` — the spatial scheme that evaluates a field at the
   tracer positions, a [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)
   scheme; forwarded to `Tracers`, whose docstring compares the schemes.
 
@@ -179,7 +179,7 @@ tracking setting can be given to it.
 
 - `particle_integration_scheme = Heun()` — the scheme that advances the trajectories in time, an
   [`AbstractParticleIntegrator`](@ref GBGHomogeneousTurbulence.Particles.AbstractParticleIntegrator);
-  its **registers** — the per-step scratch that scheme needs, meaningless to read between calls —
+  its *registers* — the per-step scratch that scheme needs, meaningless to read between calls —
   are allocated for you. Pass
   [`AdamsBashforth()`](@ref GBGHomogeneousTurbulence.Particles.AdamsBashforth) when trajectory
   accuracy in time limits a measurement: it costs one stored array per extra order and saves an
@@ -273,10 +273,10 @@ assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@
 clock.
 
 The two forms differ only in where the `FixedDomain` comes from. The first is
-**domain-building**: from `grid_points_per_axis` and `side_length` it builds the domain and every
+*domain-building*: from `grid_points_per_axis` and `side_length` it builds the domain and every
 piece above it, seeds a divergence-free velocity (and, given a `scalar`, a mean-zero scalar
 ``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
-**domain-taking**: the same assembly on a `FixedDomain` you built yourself.
+*domain-taking*: the same assembly on a `FixedDomain` you built yourself.
 
 Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref). Read its measured state by
 applying the observables to `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or
@@ -285,10 +285,10 @@ with [`current_time`](@ref) / [`current_step`](@ref).
 
 # Setting the Reynolds number
 
-By default the run is **forced and stationary**, set up for the stationary state it is predicted to
+By default the run is forced and stationary, set up for the stationary state it is predicted to
 settle in: the kinetic energy ``k`` and the dissipation rate ``\\varepsilon``.
 
-State that state **once** — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
+State that state once — by `kinetic_energy`, by `dissipation`, or by the target of a velocity
 forcing that holds one of the two — and the other member is predicted; stating it twice is an
 `ArgumentError`, and stating nothing means ``k = 1.5``. The prediction is
 [`predicted_stationary_state`](@ref)'s. It goes through the kinetic energy in box units (lengths
@@ -303,7 +303,7 @@ A velocity forcing whose strength is left out takes it from that state (see
 [`ConstantPower`](@ref GBGHomogeneousTurbulence.Forcing.ConstantPower) with its injection rate filled
 so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather than supplied:
 
-  * When no `viscosity` is passed, the viscosity is **derived**: ``\\nu`` is set so that
+  * When no `viscosity` is passed, the viscosity is derived: ``\\nu`` is set so that
     ``\\kappa_{\\max}\\eta`` equals `κ_max_η`, the highest Reynolds number the grid resolves, with
     ``\\kappa_{\\max}`` the [`max_resolved_wavenumber`](@ref) and ``\\eta = (\\nu^{3}/\\varepsilon)^{1/4}`` the
     Kolmogorov length.
@@ -316,7 +316,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     the forcing guarantees.
 
     !!! note "The criterion measures the resolved band, strategy by strategy"
-        ``\\kappa_{\\max}`` here is each strategy's **resolved** cutoff — for
+        ``\\kappa_{\\max}`` here is each strategy's resolved cutoff — for
         [`HouLi`](@ref GBGHomogeneousTurbulence.SimulationDomain.HouLi) that is
         ``\\tfrac{4}{5}\\kappa_{\\mathrm{Ny}}``, with ``\\kappa_{\\mathrm{Ny}} = N\\pi/L`` the Nyquist
         wavenumber, where its per-step damping overtakes viscosity,
@@ -338,7 +338,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
     refused with an `ArgumentError`: an unforced run (`velocity_forcing = NoForcing()`), and a band
     that does not start at shell 1 or ends at shell 1.
 
-  * When `viscosity` is **supplied**, it is used directly; the two are alternatives, and
+  * When `viscosity` is supplied, it is used directly; the two are alternatives, and
     passing both raises an `ArgumentError`. A covered forcing's state is still predicted, at the
     ``\\mathrm{Re}_{\\mathrm{box}} = \\varepsilon^{1/3}L^{4/3}/\\nu`` the given ``\\nu`` gives. For a run the prediction
     does not cover, nothing is predicted: the velocity is seeded at the stated ``k``, and an unforced
@@ -346,13 +346,13 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
 
 # Arguments
 
-All keyword except `domain`. The keywords split as the two forms do: the **domain group** is
+All keyword except `domain`. The keywords split as the two forms do: the *domain group* is
 consumed by the domain-building form, and the domain-taking form replaces the whole group with its
-one positional argument; the **run group** is accepted by both.
+one positional argument; the *run group* is accepted by both.
 
 The domain group:
 
-- `domain` — a pre-built `FixedDomain`: the **positional** argument of the domain-taking form,
+- `domain` — a pre-built `FixedDomain`: the positional argument of the domain-taking form,
   standing in for every other keyword of this group.
 - `grid_points_per_axis` — the number of grid points ``N`` along each side; required.
 - `side_length = 2π` — the box side ``L``.
@@ -390,7 +390,7 @@ The run group, `kwargs...` in both signatures
   beside it is refused; under a derived ``\\nu``, a forcing that holds neither quantity draws the
   warning above.
 - `envelope_wavenumber = 2.0` — the large-scale envelope wavenumber ``\\kappa_p`` of the random
-  seed, for the **velocity and the scalar alike** (each shell-summed spectrum peaks at
+  seed, for the velocity and the scalar alike (each shell-summed spectrum peaks at
   ``\\kappa_p/\\sqrt{2}``). Keep ``\\kappa_p`` well below the dealias cutoff: a value near or above
   it concentrates the seed, before its energy rescale, in shells the dealiasing holds empty, and the
   seeders warn when the envelope's peak reaches the cutoff. The seed's shape is deliberately the
@@ -405,7 +405,7 @@ The run group, `kwargs...` in both signatures
   the advective rule ``\\Delta t = C\\Delta x / u_{\\max}`` (``C`` the `cfl` coefficient, ``u_{\\max}``
   the largest velocity-component magnitude in the box), the longest mode's diffusive-decay
   time ``1/(D\\kappa_{\\min}^{2})`` — with ``\\kappa_{\\min} = 2\\pi/L`` the box's fundamental
-  wavenumber and ``D`` the **larger** of the run's diffusivities (``\\nu``,
+  wavenumber and ``D`` the larger of the run's diffusivities (``\\nu``,
   and ``\\varkappa = \\nu/\\mathrm{Sc}`` when a scalar rides), since the faster-diffusing field
   decays first — and this. The advective
   rule alone diverges as a decaying flow approaches rest — past some step the integrating factor
@@ -418,7 +418,7 @@ The run group, `kwargs...` in both signatures
   mode; `nothing` carries none, and no tracking setting can then be given.
 - `rng` — the random stream for the initial condition, the tracer seeding, and the seed of a
   `StochasticOU` forcing named without one (defaults to `Random.default_rng()`).
-- `state = nothing` — an existing `ResolvedFields` to **adopt** as the run's state in place of the
+- `state = nothing` — an existing `ResolvedFields` to adopt as the run's state in place of the
   random seed, which is how a run continues from a stored or externally imported field. Its arrays
   become the run's own and are not copied, so two runs must not adopt one state object. Three rules
   apply to it:
@@ -986,8 +986,8 @@ current_time(sim::Simulation) = sim.clock.time
 
 The number of steps `sim` has taken — how far the run has gone.
 
-Distinct from the observables cache's **epoch**, which counts *changes to the state* rather than
-advances of the run: a completed step advances the epoch, but so does any state change announced
+Distinct from the observables cache's *epoch*, the version number of the state: a completed step
+raises it by one, and so does any state change announced
 with [`fields_modified!`](@ref GBGHomogeneousTurbulence.Cache.fields_modified!). The constructor's
 deposit of the seeded fields already leaves their epoch at 1, so after two steps
 and one announced change the clock reads
@@ -1290,7 +1290,7 @@ it lies on ``0`` — so the firing instants land within one step past the multip
 them. A step that jumps over two multiples fires once, not twice, and the next firing is at the next
 multiple ahead.
 
-The predicate carries its own record of the next multiple to fire on, so it serves **one** run: make
+The predicate carries its own record of the next multiple to fire on, so it serves one run: make
 a fresh one per run. For a cadence in steps use [`every_steps`](@ref). The example passes the
 callback as a
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
@@ -1333,7 +1333,7 @@ Observe and advance `sim` until the observation stops it. The second form passes
 [`do` block](https://docs.julialang.org/en/v1/manual/functions/#Do-Block-Syntax-for-Function-Arguments).
 
 After every iteration — and once at the seeded initial state, before any advance — the `callback`
-**observes** the run as `callback(sim)`: it reads the state and the cached observables, records
+observes the run as `callback(sim)`: it reads the state and the cached observables, records
 what it wants, and returns `true` to continue or `false` to stop. Any other return throws an
 `ArgumentError`.
 
@@ -1485,7 +1485,7 @@ _scalar_forced(sim::Simulation) = sim.state.scalar_spectral !== nothing && !(sim
 The packaged spin-up observation for [`run!`](@ref): a callback that watches the run settle into
 statistical stationarity and stops it there — `run!(StationarityCriterion(), sim)` is the detecting
 spin-up, and [`warmup!`](@ref) is the one-line shorthand for exactly that call. Use it before measurement on any freshly
-seeded **forced** run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
+seeded forced run. A freely decaying run (`NoForcing()`) has no stationary state to detect — its
 ``\\varepsilon`` never plateaus — so the criterion can only run to `max_turnovers` and warn; give a
 decaying run a fixed-length loop instead, which is a three-line callback (see `run!`).
 
@@ -1501,11 +1501,11 @@ flatness would certify the forcing, not the flow.
 - `gate_scalar` — when the run's scalar is forced, also require the scalar variance
   ``\\langle\\varphi^2\\rangle`` to be flat (the scalar settles after the velocity; an unforced
   scalar has no stationary state and is never gated).
-- `gate_skewness` — also require the velocity-derivative skewness ``S`` to have plateaued **and** reached
+- `gate_skewness` — also require the velocity-derivative skewness ``S`` to have plateaued and reached
   ``\\lvert S\\rvert \\ge \\texttt{skewness\\_floor}`` — the "real turbulence yet" signal, exactly as
   strict as its floor (see `skewness_floor` below): a
   random-phase field starts at ``S \\approx 0`` and only a developed cascade reaches
-  ``S \\approx -0.5``. It is **off by default**, and turning it on is the stricter spin-up: the
+  ``S \\approx -0.5``. It is off by default, and turning it on is the stricter spin-up: the
   ``\\varepsilon`` gate alone can be satisfied by a field whose cascade is not yet developed, so a
   run whose measurement depends on the small scales should set it. The cost is why it is not the
   default — the skewness is the only observation here that transforms a rank-2 field, nine
@@ -1518,7 +1518,7 @@ flatness would certify the forcing, not the flow.
   times (past the start-up overshoot); flatness is a two-half-window mean comparison over the
   trailing `window_turnovers`, relative drift below `tolerance`.
 - `skewness_floor` — the minimum ``\\lvert S\\rvert`` for a plateau to count as developed turbulence.
-  The default `0.1` is a **floor against a random-phase field**, which starts at ``S \\approx 0``; it
+  The default `0.1` is a floor against a random-phase field, which starts at ``S \\approx 0``; it
   is a fifth of the ``\\lvert S\\rvert \\approx 0.5`` of a developed cascade, so clearing it means
   "no longer Gaussian", not "fully developed". Raise it toward `0.4` when the run's statistics
   depend on the cascade being mature.

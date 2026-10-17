@@ -18,26 +18,26 @@ reference for turbulence notation (§References).
 
 ## 1. Identity
 
-> `GBGHomogeneousTurbulence` **is** a small, focused pseudospectral direct numerical simulation (DNS) of
+> `GBGHomogeneousTurbulence` is a small, focused pseudospectral direct numerical simulation (DNS) of
 > homogeneous isotropic turbulence: one incompressible velocity field ``\boldsymbol{u}`` and one passive
 > scalar ``\varphi`` on a triple-periodic box, advanced by interchangeable integrating-factor
-> time-stepping, with Lagrangian particle probes and field sampling along their trajectories. It is a **library
-> of composable pieces with a thin ergonomic run layer on top**, built as a *consumer* of
+> time-stepping, with Lagrangian particle probes and field sampling along their trajectories. It is a library
+> of composable pieces with a thin ergonomic run layer on top, built as a *consumer* of
 > [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl) (the field and spectral
 > machinery) and
 > [`GBGStreamingStatistics`](https://grigorysarnitsky.github.io/GBGStreamingStatistics.jl) (the
 > statistics — the division is settled and the bridge to it is deferred, §4.9).
 >
-> It **is not** a general PDE or CFD framework, and not multi-physics: the physics is a **thin, fixed
-> core** — Navier–Stokes plus one passive scalar, no chemistry, phases, or processes. It is **not
-> dimensional** — control is by Reynolds and Schmidt number, never units. It is **not** a field library
+> It is not a general PDE or CFD framework, and not multi-physics: the physics is a thin, fixed
+> core — Navier–Stokes plus one passive scalar, no chemistry, phases, or processes. It is not
+> dimensional — control is by Reynolds and Schmidt number, never units. It is not a field library
 > (that is `GBGPeriodicFields`) or a statistics library (that is `GBGStreamingStatistics`), and it builds
-> **no** speculative extension points — no generality ahead of a concrete need (§9).
+> no speculative extension points — no generality ahead of a concrete need (§9).
 
 The package inverts the richness of its sibling consumer
 [`GBGCloudPhysics`](https://grigorysarnitsky.github.io/GBGCloudPhysics.jl): where Cloud carries a rich
-constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carries a **thin fixed physics
-over rich, interchangeable numerics and statistics**. That inversion is the single fact that explains most
+constitutive physics over a thin numerical core, `GBGHomogeneousTurbulence` carries a thin fixed physics
+over rich, interchangeable numerics and statistics. That inversion is the single fact that explains most
 of what follows.
 
 **The first scientific goal** is to measure the kinetic energy in box units (built from the box side ``L`` and the dissipation rate ``\varepsilon``)
@@ -53,7 +53,7 @@ for 1–4, 0.47 for every mode), flat in the Reynolds number.
 ## 2. Running a simulation
 
 The primary measure of this library's quality is how easily one sets up and runs a case — including
-**warm-up** to a statistically stationary state before any measurement. The headline interface is
+warm-up to a statistically stationary state before any measurement. The headline interface is
 therefore a thin run layer that assembles the machinery with sensible defaults and owns the time loop:
 
 ```julia
@@ -83,7 +83,7 @@ end
 The run layer holds the pieces of §4 in one `Simulation` value. Each iteration it chooses a stable
 timestep from the advective-CFL condition over the cached maximum speed (§4.5) and serves the
 deposited observables from the deposit-driven `ObservablesCache` (§4.1). It runs the
-**observation-first loop**: after every iteration, and once at the seeded ``t_0`` — ``n``
+*observation-first loop*: after every iteration, and once at the seeded ``t_0`` — ``n``
 iterations, ``n+1`` observations — the callback reads the run and decides whether it continues
 (§11 decision 43).
 Spin-up is the packaged `StationarityCriterion` observation, `warmup!` its one-line sugar: it
@@ -107,28 +107,28 @@ never a wall in front of it.
 
 ## 3. The organizing frame
 
-A run is fixed by two independent things: **what** continuous problem you pose, and **how** you realize it
+A run is fixed by two independent things: what continuous problem you pose, and how you realize it
 numerically. Beneath both lies a single organizing idea.
 
 ### The foundation — one dynamics under a ladder of projections
 
 **The architecture is founded on the Mori–Zwanzig decomposition.** One dynamics, seen under a ladder of
-projections, resolves into the four roles every rung shares — **State**, **Generator**, **Observables**,
-**Propagator** — and the modules *are* those roles. The decomposition can bear this weight because it is
+projections, resolves into the four roles every rung shares — State, Generator, Observables,
+Propagator — and the modules *are* those roles. The decomposition can bear this weight because it is
 *exact*: projecting the full dynamics onto a coarser description is not an approximation but an identity,
 one that leaves behind an exact memory and an exact noise. What is *investigated, never assumed* is the
-**closure** — the model of that memory. So founding the architecture on Mori–Zwanzig and refusing to
+*closure* — the model of that memory. So founding the architecture on Mori–Zwanzig and refusing to
 assume the physics are one commitment, not two: the framework is exact, and the approximation it demands
 is precisely the research question.
 
 The four roles are level-agnostic — a DNS, a large-eddy model, and a moment closure all carry them,
 differing only in *which* state each holds and *how much* memory its generator must model:
 
-- the **State** — the field the dynamics acts on (§4.1);
-- the **Generator** — the right-hand side that evolves it, itself split into a reversible and an
+- the *State* — the field the dynamics acts on (§4.1);
+- the *Generator* — the right-hand side that evolves it, itself split into a reversible and an
   irreversible part (§4.2);
-- the **Observables** — the measured functions of the state (§4.3);
-- the **Propagator** — the map that advances the state through time, realized by a choice of
+- the *Observables* — the measured functions of the state (§4.3);
+- the *Propagator* — the map that advances the state through time, realized by a choice of
   integrating-factor scheme (§4.5).
 
 Today only the finest rung, DNS, is built. The roles are named and carved so the coarser rungs slot in
@@ -136,22 +136,22 @@ without re-carving (§7), but no generality is built ahead of them.
 
 ### Specification and realization
 
-On this foundation, a run is fixed by a **specification** — the continuous problem — and a
-**realization** — the numerics. The specification has two parts:
+On this foundation, a run is fixed by a *specification* — the continuous problem — and a
+*realization* — the numerics. The specification has two parts:
 
-- The **System**: the flow scenario — forced homogeneous isotropic turbulence, freely decaying
+- The *System*: the flow scenario — forced homogeneous isotropic turbulence, freely decaying
   turbulence, and — each deferred, §7 — uniform-mean-gradient scalar mixing (its source term is not
   yet built) and homogeneous shear (its frame is not). A System
   is a choice of forcing, initial condition, and the dimensionless parameters ``\mathrm{Re}`` and
   ``\mathrm{Sc}``.
-- The **Model**: the level of description — a *rung on the ladder of projections*. DNS resolves every
+- The *Model*: the level of description — a *rung on the ladder of projections*. DNS resolves every
   active scale; a large-eddy Model resolves the large scales and models the rest; a
   filtered-density-function or moment Model carries statistics rather than fields. Descending the ladder
   applies a coarser projection, and the memory it leaves is what the Model's closure must supply.
 
-The realization is the **Method** — the numerics — in two layers the package keeps distinct:
+The realization is the *Method* — the numerics — in two layers the package keeps distinct:
 
-- A **Model-fibered family** — the choices that only make sense *for a given Model*: the time-stepping
+- A *Model-fibered family* — the choices that only make sense *for a given Model*: the time-stepping
   scheme and its dealiasing for a field Model (§4.5), or the particle pushers and mixing model a
   statistical Model would need. The Model sets these.
 - **Model-agnostic axes** — precision, memory footprint, and compute backend (§6) — which cut across
@@ -187,8 +187,8 @@ practices the comparison internally).
 Each concern is its own module, included in dependency order by the umbrella
 `src/GBGHomogeneousTurbulence.jl`. The four Mori–Zwanzig roles carry their role names — `State`, `Generator`,
 `Observables`, `Propagator`; the System's forcing, the discretized frame, the Lagrangian instruments, the
-run layer, and the reference laws are named by their job. The rule is that **a role recurring at every
-rung of the ladder wears its role name, while a concrete mechanism wears its job** — so the load-bearing
+run layer, and the reference laws are named by their job. The rule is that a role recurring at every
+rung of the ladder wears its role name, while a concrete mechanism wears its job — so the load-bearing
 structure is legible at a glance, and no piece of plain machinery is dressed in theory it does not carry.
 
 ### 4.1 `State` and `SimulationDomain` — the field and the frame it lives on
@@ -196,7 +196,7 @@ structure is legible at a glance, and no piece of plain machinery is dressed in 
 Two modules separate *what evolves* from the *frame it evolves on*.
 
 - **`SimulationDomain`** provides the discretized periodic box the run lives on — the reusable,
-  read-only frame. Its concrete type is the **`FixedDomain`**, the fixed, unsheared cube. It bundles the
+  read-only frame. Its concrete type is the `FixedDomain`, the fixed, unsheared cube. It bundles the
   grid, the real–Fourier layout, and the real-to-complex transform plans — one rank-blind pair
   shared by every field, the velocity, the scalar, and the rank-2 strain tensor of the skewness
   diagnostic alike (decision 81), planned under the caller's `fft_flags` / `fft_timelimit` request,
@@ -209,12 +209,12 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   (decision 63); and the dealias
   kernel of the run's chosen strategy (the sharp ``2/3`` rule by default), likewise a compressed
   symbol. The name marks what can vary: a `FixedDomain` has time-independent,
-  separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). **Precision and backend enter here and flow everywhere
-  from here**: `element_type` fixes the real element type
+  separable wavenumbers, unlike the deferred sheared frame (`ShearedDomain`, §7). Precision and backend enter here and flow everywhere
+  from here: `element_type` fixes the real element type
   ([`Float32`](@extref Julia Core.Float32) or `Float64`)
   and `array_family` its arrays ([`Array`](@extref Julia Core.Array), `CuArray`, `ROCArray`), and every buffer is allocated `similar`
   to this frame, so a run is CPU/GPU-agnostic and single- or double-precision by construction.
-- **`State`** owns the DNS realization of the Mori–Zwanzig State role. **`ResolvedFields`** is the
+- **`State`** owns the DNS realization of the Mori–Zwanzig State role. `ResolvedFields` is the
   record of the evolving fields in spectral representation — the velocity ``\hat{\boldsymbol{u}}`` and, when the run carries
   one, the scalar ``\hat\varphi`` — together with the `modeled` slot holding any forcing's evolving state
   (§8), and the *single source of truth*: the physical velocity, vorticity, and
@@ -223,13 +223,13 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   ``(\hat{\boldsymbol{u}}, \hat\varphi)`` — the reification the Mori–Zwanzig lens demands, kept a bare
   carrier so the operations acting on it, not the record itself, carry the design (§11 decision 26).
 
-  The **chart map** — the recovery of the physical representations — is not a package verb. The
+  The *chart map* — the recovery of the physical representations — is not a package verb. The
   velocity and scalar are recovered by the source-preserving four-argument form of
   `GBGPeriodicFields`' `to_physical!`, whose extra argument is a scratch field the transform consumes
   in the state's place, at the sites that consume them; the derived vorticity comes from
   `Observables.vorticity_physical!` (decision 47).
 
-  The recovered values land in the **`ObservablesCache`** — its own module, `Cache`, included after
+  The recovered values land in the `ObservablesCache` — its own module, `Cache`, included after
   `Observables`. That is the storage each iteration fills at its end with its observables: the
   physical velocity, vorticity and scalar, the maximum speed, and, when tracers ride the run, the
   velocity at the particles ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` (tracer positions ``\boldsymbol{X}``, current time ``t_n``). It fills them under the
@@ -250,7 +250,7 @@ Two modules separate *what evolves* from the *frame it evolves on*.
   decision 30). The `State` module's initial conditions seed the state:
   `random_solenoidal_velocity_spectral!` fills a divergence-free velocity with a large-scale spectral envelope,
   rescaled to a target ``k``, and `random_scalar_spectral!` fills a mean-zero scalar to a target variance. The
-  per-step scratch is **not** state: the scheme's registers live with the scheme (`IntegratorBuffers`
+  per-step scratch is not state: the scheme's registers live with the scheme (`IntegratorBuffers`
   in `Propagator`, §4.5) and the assembly scratch with the generator (`ResolvedGenerator`, §4.2).
   Each is preallocated, so a step allocates no field-sized memory (§9, invariant 4), and sized to
   the run — no scalar buffers when the run carries no scalar; GPU memory is tight. A `Simulation`
@@ -270,9 +270,9 @@ inputs are bundled in `FlowConditions` — the viscosity ``\nu`` (``\mathrm{Re} 
 ``\mathrm{Sc}`` (scalar diffusivity ``\varkappa = \nu/\mathrm{Sc}``), and the two forcings; ``\nu`` and
 ``\mathrm{Sc}`` set the diffusion, the forcings the source, and folding this bundle into `Generator` is what
 adds the `Generator → Forcing` dependency. It carries a
-**metriplectic seam** — a reversible part that conserves energy and an irreversible part that dissipates
+*metriplectic seam* — a reversible part that conserves energy and an irreversible part that dissipates
 it (§8) — and the numerical split is built to honor it. The incompressible momentum equation is
-advanced in **rotational (Lamb-vector) form**: writing the convective term through the identity
+advanced in rotational (Lamb-vector) form: writing the convective term through the identity
 ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) + \boldsymbol{\omega}\times\boldsymbol{u}``
 (with vorticity ``\boldsymbol{\omega} = \nabla\times\boldsymbol{u}`` and the Lamb vector
 ``\boldsymbol{\omega}\times\boldsymbol{u}``, the literature's sign, decision 93) and letting the Leray–Helmholtz
@@ -301,7 +301,7 @@ Its three terms are the seam made explicit, and the time-stepping treats each ac
   — the exact propagator of the linear part over an interval ``\delta t`` (a Runge–Kutta stage substep, the fraction
   ``d_i\Delta t`` of the step, or the whole step ``\Delta t``), with diffusivity ``D = \nu`` for the velocity and
   ``D = \varkappa = \nu/\mathrm{Sc}`` for the scalar, and ``A(\boldsymbol{\kappa})`` an optional linear
-  forcing rate (the source, below). ``\mathcal{E}`` is **never materialized** (decision 39): the factor
+  forcing rate (the source, below). ``\mathcal{E}`` is never materialized (decision 39): the factor
   pair `velocity_integrating_factor` / `scalar_integrating_factor` supplies its *parameters* — the coefficient on
   ``\lvert\boldsymbol{\kappa}\rvert^2`` and any steady forcing rate, fixed when the generator is built — and the backend's
   fused exponential convolution evaluates ``\mathcal{E}`` per mode as it applies it, advancing the
@@ -321,13 +321,13 @@ physical ``\varphi`` from ``\hat\varphi`` at each stage, and `scalar_rhs!` assem
 ``\nabla\cdot\boldsymbol{u} = 0``); the conservative form conserves the scalar mean exactly under the
 ``2/3`` rule.
 
-The metriplectic reading is a **lens, not a literal thermodynamics**: incompressible isothermal flow
+The metriplectic reading is a lens, not a literal thermodynamics: incompressible isothermal flow
 carries no genuine entropy — the dissipated kinetic energy simply leaves the model as untracked heat — so
 the load-bearing content is the reversible/irreversible split of the right-hand side and the constraint it
 puts on any closure: net dissipation lives in the diffusion term alone, so a subgrid model may only
 *remove* energy through that half (§8).
 
-The generator is **reified**: **`ResolvedGenerator`** bundles the `FlowConditions` with the assembly
+The generator is reified: `ResolvedGenerator` bundles the `FlowConditions` with the assembly
 scratch its evaluations write through (the quadratic products' spectral image, the `PhaseShift`
 displaced-evaluation buffers, any steady forcing rate — in physical representation each
 quadratic product forms in place over an operand's own register, §11 decision 41), behind a six-verb
@@ -364,7 +364,7 @@ states the physical quantity first, then the reduction that computes it:
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
 - ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum
-  over the shell width — the **density**, the same object a model law gives — and `integral_scale`
+  over the shell width — the *density*, the same object a model law gives — and `integral_scale`
   derived from it;
 - `kinetic_energy_and_dissipation_below_scale`, the kinetic energy ``k(l)`` and dissipation
   ``\varepsilon(l)`` held in scales below each box side ``l`` the grid offers — what a box of side ``l``
@@ -373,7 +373,7 @@ states the physical quantity first, then the reduction that computes it:
   ``\nu\sum\lvert\boldsymbol{\kappa}\rvert^2(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2`` over
   `GBGPeriodicFields`' top-hat window (decision 96).
 
-These are not incidental: they are the **fitness functionals** the comparison machine of §3 evaluates,
+These are not incidental: they are the *fitness functionals* the comparison machine of §3 evaluates,
 and the stationarity signals `warmup!` watches. They are also the *measured* half of a comparison
 against the reference laws (§4.8).
 
@@ -401,7 +401,7 @@ scratch: it lives in the `modeled` slot of `ResolvedFields`, so that one record 
 evolving state of the run (§8's open-systems reading; §11 decisions 23 and 90).
 
 Which hook a strategy uses is not an implementation detail: it decides whether the strategy preserves
-the scheme's order in time. A rate folded into ``\mathcal{E}`` is integrated **exactly**, but only a
+the scheme's order in time. A rate folded into ``\mathcal{E}`` is integrated exactly, but only a
 *steady* rate can be — freezing a state-dependent one at the step's start is the left-endpoint
 rectangle rule on ``\int A\,\mathrm dt``, which is first-order however good the scheme is, and a
 post-step projection is Lie–Trotter splitting, first-order by construction. So a state-dependent
@@ -414,15 +414,15 @@ free. `ConstantPower` (holding the injection rate) and `VarianceController` (hol
 ``L^2`` observable: the kinetic energy for the velocity, the scalar variance for the scalar; the
 constant-``k`` controller of Bassenne et al. 2016, Eq. 20) both carry state-dependent rates and enter
 through the source at every stage; the controller's proportional restoring term makes its target a
-stable attractor rather than a clamp. `ConstantPower` is the **default velocity forcing**, chosen
+stable attractor rather than a clamp. `ConstantPower` is the default velocity forcing, chosen
 because it has no gain or settling time to choose (decision 95).
 `VarianceRescaling` (rescaling a band to hold the same observable — `over = :band | :total`) is the
 one post-step projection, kept as the reference implementation of a published method (Sullivan,
 Mahalingam & Kerr 1994) with its first-order caveat and its Berendsen-class caveat (Bussi, Donadio &
 Parrinello 2007) documented rather than hidden. `StochasticOU` (Eswaran & Pope 1988) is the one
 strategy independent of the flow it drives: an exact Ornstein–Uhlenbeck process on the band's conjugate
-mode pairs, drawn on the host, advanced on the run's backend and added at every stage, holding nothing field-sized. **One
-implementation serves both** the velocity (a vector field) and the scalar (a scalar field), because
+mode pairs, drawn on the host, advanced on the run's backend and added at every stage, holding nothing field-sized. One
+implementation serves both the velocity (a vector field) and the scalar (a scalar field), because
 these methods are written through tensor-order-generic field operators; the only field-specific step a
 forcing can need is the solenoidal projection of the velocity, which the field-proportional strategies
 never need (each preserves a divergence-free velocity by construction) and `StochasticOU` applies per
@@ -443,13 +443,13 @@ too. A scalar forcing states its target, since no scalar state is modelled.
 on the generator's reversible/irreversible seam. Its numerical schemes are the Model-fibered part of the
 Method (§3).
 
-- **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by **`step!`**, which
-  advances the velocity ``\hat{\boldsymbol{u}}`` and scalar ``\hat\varphi``, both in spectral representation, **together** through
+- **`AbstractIntegrator`** is the family of integrating-factor schemes dispatched by `step!`, which
+  advances the velocity ``\hat{\boldsymbol{u}}`` and scalar ``\hat\varphi``, both in spectral representation, together through
   the same Runge–Kutta stages. Coupled stepping is deliberate: the scalar is passive, so time-accuracy
   needs both nonlinear terms evaluated at each stage's state; advancing the velocity fully and the scalar
   afterward would drop the substage velocities and degrade the coupling to first order.
 - **`IFLowStorageRK3`** (the Williamson 1980 2N-storage / RKW3 workhorse) is third-order and imaginary-axis stable;
-  **`IFHeun`** (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
+  `IFHeun` (Heun) is a two-stage option, cheaper in transforms (two nonlinear evaluations against
   three) but *dearer* in memory and imaginary-axis unstable, leaning on viscous damping. The memory
   comparison counts the solver's scratch registers per field: `IFHeun` carries three (a predictor
   plus two stage registers that double as its assemblies) against `IFLowStorageRK3`'s two (an
@@ -457,9 +457,9 @@ Method (§3).
   state's array plus the accumulator, the assembly excluded as the solver's, not the scheme's (the
   `IFLowStorageRK3` docstring keeps that ledger); the two bookkeepings agree on the point that
   matters, one register in `IFHeun`'s disfavor. Two more schemes share `IFLowStorageRK3`'s two
-  registers: **`IFLowStorageRK4`** (Carpenter & Kennedy 1994) is fourth-order in five stages of the
+  registers: `IFLowStorageRK4` (Carpenter & Kennedy 1994) is fourth-order in five stages of the
   same 2N-storage form, its ``1.93\times`` wider imaginary-axis stability limit buying fewer transforms per
-  unit time on a stability-limited run (decision 85); **`IFSSPRK3`** is the Shu–Osher third-order
+  unit time on a stability-limited run (decision 85); `IFSSPRK3` is the Shu–Osher third-order
   SSP scheme in TurTLE's stage arrangement, kept for code-to-code validation against that
   reference (decision 80). The [`recommended_cfl`](@ref) helper gives each scheme its conservative advective-CFL ceiling
   ``C_{\mathrm{CFL}}`` (for
@@ -482,19 +482,19 @@ Method (§3).
 
 ### 4.6 `Particles` — Lagrangian instruments
 
-Particles are **instruments** — probes of the turbulence — not a second physics. A particle is a
+Particles are *instruments* — probes of the turbulence — not a second physics. A particle is a
 state-carrying trajectory object: today a tracer (position ``\boldsymbol{X}``); the deferred ladder is
 inertial (``\boldsymbol{X}, \boldsymbol{v}``) and oriented (``\boldsymbol{X}, \boldsymbol{v}, \boldsymbol{L}``)
-probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory **state** only,
+probes (§7). `Tracers` holds positions and a chosen interpolation scheme — trajectory state only,
 with the particle integration scheme's registers held apart in a `ParticleIntegratorBuffers` allocated per
 scheme, exactly as `ResolvedFields` is held apart from `IntegratorBuffers` on the field side
 (decision 50). The default scheme, `Heun`, is Heun-in-time on
-the velocity at the iteration's two endpoints. The first, ``\boldsymbol{v}_1``, is the **trajectory
-sample** ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
+the velocity at the iteration's two endpoints. The first, ``\boldsymbol{v}_1``, is the *trajectory
+sample* ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` recorded by the previous closing deposit — the genuine
 Lagrangian velocity, held in the observables cache's own `velocity_at_particles` slot and dated
 against BOTH epochs, since it is a function of the state and the positions together (read through
 `velocity_at_particles`, §11 decisions 42 and 67). The second, ``\boldsymbol{v}_2``, interpolates the just-deposited
-``\boldsymbol{u}(t_{n+1})`` at the Heun **predictor** positions, which no tracer ever occupies:
+``\boldsymbol{u}(t_{n+1})`` at the Heun predictor positions, which no tracer ever occupies:
 `ParticleIntegratorBuffers.velocity_predictor` is a stage register of the scheme. After the push, the particle form of
 `deposit!` interpolates the new sample at the new positions from the same deposited field and
 stamps it at the current epochs — one closing act per dynamical factor, `step!` then `deposit!`,
@@ -505,12 +505,12 @@ The sample deposit is what keeps an instrument of ``M`` tracers at ``M``-point c
 at the particles stores ``M\times3`` values where retaining the endpoint field would cost an
 ``N^{3}\times3`` resident buffer and copy (``N`` grid points per axis). Tracked and untracked runs therefore have identical
 field-scale residency and per-step traffic — the zero both audits assert. (One tempting reuse is
-recorded as **forbidden**: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
+recorded as forbidden: ``\boldsymbol{v}_2 \approx \boldsymbol{u}(t_{n+1},\boldsymbol{X}^*)``
 differs from the next sample only at ``\mathcal{O}(\Delta t^{2})``, so reusing it as the next
 ``\boldsymbol{v}_1`` looks like a free interpolation saved — but it corrupts the recorded observable
 the Lagrangian statistics accumulate. Never approximate the thing you measure.)
 
-Their **numerics are first-class**, on the same footing as the field schemes — and pluggable in the
+Their numerics are first-class, on the same footing as the field schemes — and pluggable in the
 same way: `AbstractParticleIntegrator` is the family, `allocate_buffers(scheme, tracers, cache)` builds its
 registers. Two axes matter: the particle integration scheme — the default second-order `Heun`, and the
 variable-step `AdamsBashforth` (order 4 by default, its sample history held in the observables cache
@@ -524,8 +524,8 @@ value-preserving accelerator (the interpolated values are bit-identical with or 
 `traversal_mode` of its `ParticleTracking` choosing a manual cadence instead (decision 86).
 When the inertial and oriented probes arrive, the integrating-factor split carries over for the
 *translational* stiff drag (field viscosity and a particle's linear or matrix drag are the same
-linear-exact move), while **orientation dynamics on the rotation group is a distinct geometric
-scheme** — the reversible generator of §8 again — so the split does not naively unify all of it.
+linear-exact move), while orientation dynamics on the rotation group is a distinct geometric
+scheme — the reversible generator of §8 again — so the split does not naively unify all of it.
 
 ### 4.7 `SimulationRun` — the front door
 
@@ -555,12 +555,12 @@ Over it:
 - **`advance!(sim)`** owns one iteration: ``\Delta t`` from the scheme's CFL over the cached
   maximum speed (scalar arithmetic — the previous closing deposit measured it), `step!`, the closing `deposit!`,
   the tracer advance on the sample and the deposited endpoint field, the new sample, and the
-  deposit-completeness check. **`run!(callback, sim)`** is the observation-first loop over it: the callback
+  deposit-completeness check. `run!(callback, sim)` is the observation-first loop over it: the callback
   observes the run after every iteration (and once at the seeded ``t_0``) and its `Bool` return decides continuation —
   stopping is the caller's decision on observables, never a run option (§11 decision 43).
-- **`StationarityCriterion`** is the packaged spin-up observation, and **`warmup!(sim; ...)`** its
+- **`StationarityCriterion`** is the packaged spin-up observation, and `warmup!(sim; ...)` its
   one-line sugar: stationarity detection on the running dissipation ``\varepsilon(t)`` — a
-  trailing-window flatness test that **gates** on ``\varepsilon`` rather than on the clampable
+  trailing-window flatness test that gates on ``\varepsilon`` rather than on the clampable
   ``k(t)``, though ``k`` is still measured, to normalize the eddy-turnover clock
   ``\Delta t \varepsilon/k``. The velocity-derivative skewness ``S(t)`` is an opt-in second gate
   (`gate_skewness = true`; off by default since decision 78, its rank-2 transforms being a per-call
@@ -578,7 +578,7 @@ Over it:
   the reader rebuilds through the constructor and replays the seeding deposits — and the methods
   live in the `GBGHomogeneousTurbulenceHDF5Ext` weak-dependency extension, so the surface exists
   only when `HDF5` is loaded.
-- **`current_time(sim)`** and **`current_step(sim)`** report the run's time and step count, and the observables applied to
+- **`current_time(sim)`** and `current_step(sim)` report the run's time and step count, and the observables applied to
   `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`, `dissipation` on the recovered vorticity) are
   the current-state diagnostics, for a callback to read.
 
@@ -592,9 +592,9 @@ and nothing in the package includes, builds or tests it; its tests run on demand
 `julia --project parked/Phenomenology/test/runtests.jl`. What follows is the design it was built to,
 kept as the design of that future package.
 
-`Phenomenology` is the library of **reference turbulence phenomenology**: the fitted scalings, model
+`Phenomenology` is the library of reference turbulence phenomenology: the fitted scalings, model
 spectra, structure-function laws, and dimensionless constants that theory and experiment have established.
-It is the **symmetric counterpart to `Observables`** — those are the *measured* functions of the DNS
+It is the symmetric counterpart to `Observables` — those are the *measured* functions of the DNS
 state; these are the *predicted* values of the same functions. The DNS measures, the laws predict, and the
 comparison machine of §3 sets them side by side. Two properties follow, both instances of the charter
 *investigate the physics, do not assume it*:
@@ -606,7 +606,7 @@ comparison machine of §3 sets them side by side. Two properties follow, both in
   subtypes of one law family, discovered and validated alike, never baked in as truth.
 
 **The abstraction is the strategy pattern** already used for `AbstractForcing` / `AbstractIntegrator` /
-`DealiasingStrategy`: **a law family is an abstract type, each parametrization a named preset** — usually a
+`DealiasingStrategy`: a law family is an abstract type, each parametrization a named preset — usually a
 concrete subtype carrying its fitted coefficients and provenance, or (for the composed velocity spectra)
 an alias naming the `ModelSpectrum` specialization that carries its two roll-off factors, so `isa`
 holds on the preset name either way (decision 55) — implementing one small interface: evaluate the law at its
@@ -617,9 +617,9 @@ choosing the preset (`Pope2000` versus `VonKarman1948`) and optionally overridin
 needs a law's validity range to be fair, and it is the single source of the citation.
 
 **Naming is a three-level handle**, because one author publishes many models across years and quantities:
-the **quantity is the submodule** (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the **paper is the
-author-year handle** (`Pope2000`, first author's surname, the full list in `provenance`), and a **same
-author-year-quantity collision takes a trailing letter** (`Pope2014a`, `Pope2014b`). The full
+the quantity is the submodule (`Spectra.Pope…` versus `StructureFunctions.Pope…`), the paper is the
+author-year handle (`Pope2000`, first author's surname, the full list in `provenance`), and a same
+author-year-quantity collision takes a trailing letter (`Pope2014a`, `Pope2014b`). The full
 handle `Phenomenology.Spectra.Pope2000` reads like a citation and is unique by construction — and
 where a preset's value is *not* read off its name's paper (`Sreenivasan1995`'s as-quoted value), the
 docstring says so at the value.
@@ -627,7 +627,7 @@ docstring says so at the value.
 **Submodules are cut by representation, so they stay few** while the models multiply as subtypes:
 
 - **`Spectra`** — functions of ``\kappa`` (velocity ``E(\kappa)``, scalar ``E_\varphi(\kappa)``),
-  **composed**: an inertial core ``C_K \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
+  composed: an inertial core ``C_K \varepsilon^{2/3}\kappa^{-5/3}`` times a swappable large-scale
   factor ``f_L(\kappa \ell)`` — each form evaluated at the length its own coefficient was fitted against — and dissipation-range factor ``f_\eta(\kappa\eta)``, a named preset fixing a
   published triple.
 - **`StructureFunctions`** — functions of ``r`` (the ``D_{L\dots}(r)`` laws and, sharing the
@@ -645,7 +645,7 @@ quantities a law reads (``\varepsilon``, ``\nu``, ``L_{11}``, ``u'``, ``\mathrm{
 with the derived scales (``\eta``, ``\tau_\eta``, ``\lambda``, ``\mathrm{Re}_\lambda``, ``\varkappa``) as
 helpers — the analogue of the `FlowConditions` and `FixedDomain` bundles.
 
-The laws are **compared against, never consumed by the solver** (decision 112): the comparison is the
+The laws are compared against, never consumed by the solver (decision 112): the comparison is the
 module's own test, and the dynamics binds nothing the module defines. And the loop closes: we measure
 (with this package and SS), `fit` a parametrization to that measurement, and the new fit lands beside
 the literature, to be validated against the next run.
@@ -657,9 +657,9 @@ relations it *must* satisfy: the asymptotic slopes (the ``\kappa^{-5/3}`` inerti
 and the roll-off limits ``f_L, f_\eta \to 1``. This self-consistency battery lives in the test suite and
 catches a wrong exponent, coefficient, or sign without trusting a second source.
 
-**Extraction requirement (recorded).** `Phenomenology` is **designed to be cut into a standalone
-`GBGTurbulencePhenomenology` with no rewrite** — the demand-driven path that extracted
-`GBGStreamingStatistics`. The requirement constrains the design. It is a **dependency-light leaf**,
+**Extraction requirement (recorded).** `Phenomenology` is designed to be cut into a standalone
+`GBGTurbulencePhenomenology` with no rewrite — the demand-driven path that extracted
+`GBGStreamingStatistics`. The requirement constrains the design. It is a dependency-light leaf,
 depending on *neither* `GBGPeriodicFields` (a law is a scalar function, no field math) *nor*
 `GBGStreamingStatistics` (it provides reference values, computes no statistics) *nor* this package's
 dynamics, and its pages form their own group, separable from the DNS surface. Extract when a consumer
@@ -680,7 +680,7 @@ is deferred (§7).
 ## 5. The consumer boundary — what belongs here, and what does not
 
 `GBGHomogeneousTurbulence` owns the turbulence-specific glue and delegates everything domain-neutral. The
-dividing line is **domain-neutrality**, not "thinness":
+dividing line is domain-neutrality, not "thinness":
 
 - **To `GBGPeriodicFields`** — every field operation: the transforms, `curl!` / `cross!` / `divergence!`,
   the Leray–Helmholtz projection `helmholtz_projection!` (``\mathbb{P}``), `convolve!` and the dealias/band kernels,
@@ -703,7 +703,7 @@ Two standing rules follow:
 
 ## 6. Precision and footprint as studied axes
 
-Precision and the memory-footprint/accuracy trade-off are **objects of study**, not fixed defaults — the
+Precision and the memory-footprint/accuracy trade-off are objects of study, not fixed defaults — the
 numerical counterpart of the charter that the tool investigates the physics rather than assuming it (§8).
 
 - **Both precisions are supported equally, and no kernel privileges either.** (The `Simulation`
@@ -714,7 +714,7 @@ numerical counterpart of the charter that the tool investigates the physics rath
   question, settled by test rather than by a house default. The element type
   ``T`` flows from the frame (§4.1): no kernel silently fixes the arithmetic. (The `FlowConditions` scalar
   parameters are stored `Float64` and converted to ``T`` at use — a scalar convenience, not a field
-  commitment.) Field reductions do **not** break this: every observable returns the field's own element
+  commitment.) Field reductions do not break this: every observable returns the field's own element
   type, so a `Float32` run measures in `Float32` — the `Observables` module docstring states it and
   `test/validation.jl` pins it over every exported observable. Accuracy is bought there by
   *summation order*, not by a wider accumulator: the backend's reductions sum pairwise, whose error grows as
@@ -739,7 +739,7 @@ working point on a studied axis, not a universal law.
 
 ## 7. Deliberately deferred
 
-These are **named so they are not precluded, and deliberately left un-abstracted**: no extension point or
+These are named so they are not precluded, and deliberately left un-abstracted: no extension point or
 generalization is built for them until a second concrete case forces the abstraction. None is a gap.
 
 - **The uniform-mean-gradient scalar source** — the standard scalar-injection route
@@ -766,7 +766,7 @@ generalization is built for them until a second concrete case forces the abstrac
   rung forces it. Each is discriminated from DNS by statistical commutation; the canonical acceptance test
   is the relaxation of a two-mode scalar distribution (a micromixing benchmark). The natural first
   *spectral* rung is a Chollet–Lesieur eddy viscosity ``\nu_e(\kappa \mid \kappa_c)`` at the truncation
-  wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a **per-mode linear rate**, a
+  wavenumber ``\kappa_c`` (Chollet & Lesieur 1981) — architecturally a per-mode linear rate, a
   negative linear-forcing citizen folded into the integrating factor as the steady rate of a `Linear` forcing
   is, with the plateau–cusp profile resident and only its ``\sqrt{E(\kappa_c)/\kappa_c}`` scale updated
   per step from one shell reduction. The Hou–Li filter at ``\nu = 0`` is its crude implicit sibling
@@ -776,13 +776,13 @@ generalization is built for them until a second concrete case forces the abstrac
 - **Alternative dealiasing and nonlinear forms (partly built).** `DealiasingStrategy` now *owns the
   dealiased nonlinear assembly* — ``\hat{\boldsymbol{u}}`` (and ``\hat\varphi``) in, the dealiased term
   out — so a strategy may restructure *how* the product is computed, not merely filter its output. The
-  sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; **`PhaseShift`**
+  sharp ``2/3`` rule and the smooth Hou–Li filter kernel-multiply the single realization; `PhaseShift`
   (decision 27) averages a half-cell-displaced evaluation to cancel aliasing and truncates spherically to
   ``\tfrac{\sqrt{2}}{3}N\cdot\tfrac{2\pi}{L}``, at ``2\times`` the transforms. Still deferred siblings of the same assembly:
-  ``3/2`` zero-padding, and the **skew-symmetric** momentum form (which reorganizes the quadratic product
+  ``3/2`` zero-padding, and the skew-symmetric momentum form (which reorganizes the quadratic product
   to conserve energy in the discrete equations). The assembly touches only the `Generator` and its
   scratch, never the State (§4.1); the rotational form + spherical ``2/3`` stays the lean default.
-- **A temporal-accuracy step control.** The step is set today by the advective **CFL** — a
+- **A temporal-accuracy step control.** The step is set today by the advective CFL — a
   stability-calibrated, conservative ceiling with a manual `cfl` override — and nothing adapts it to a
   target *temporal* accuracy. An embedded-error or PI step controller, distinct in purpose from the
   stability CFL, would make temporal accuracy a studied fitness axis beside precision and footprint (§5).
@@ -818,7 +818,7 @@ with it — an arrangement it shared is neither evidence for nor against the arr
 stand on the reasoning in this document (the same rule §11 applies to a recorded decision: legacy is
 not evidence of correctness). Where it is consulted, the product is a diagnosis, not a pattern.
 
-The package makes real theory legible. One framework — **Mori–Zwanzig — is its foundation** (§3); the rest
+The package makes real theory legible. One framework — Mori–Zwanzig — is its foundation (§3); the rest
 are lenses read through it. Nothing in the *numerics* is load-bearing on the subordinate lenses — the
 arithmetic would be identical had they never been named — but the *architecture* is founded on the
 Mori–Zwanzig decomposition, which is exact and so can carry that weight. The lenses organize
@@ -826,28 +826,28 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
 
 - **Mori–Zwanzig — the foundation, elaborated.** §3 states the decomposition; here is its machinery. A
   projection ``\mathcal{P}`` splits the full state into a resolved part and the rest, and applying it to the
-  exact dynamics gives the resolved variables a **generalized Langevin equation** (Mori 1965;
+  exact dynamics gives the resolved variables a *generalized Langevin equation* (Mori 1965;
   Zwanzig 1973): a streaming term (the
-  projected drift), a **memory integral** over a kernel ``K(t-s)`` carrying the history the projection
-  discarded, and a **colored-noise** term living in the unresolved subspace. A Model is a choice of
+  projected drift), a *memory integral* over a kernel ``K(t-s)`` carrying the history the projection
+  discarded, and a *colored-noise* term living in the unresolved subspace. A Model is a choice of
   ``\mathcal{P}`` and a closure that approximates that kernel and that noise; DNS is the identity
   projection, for which both vanish, so it needs no closure. The memory kernel ``K`` is the precise content
   of the tendency a coarse state cannot supply on its own (§3), and modeling it is the closure problem the
   tool exists to test.
 - **Open systems / non-equilibrium — a reading of the projection.** The Mori–Zwanzig cut *is* the
-  open-system system/environment split: the **resolved** variables are the system, the projected-out
+  open-system system/environment split: the resolved variables are the system, the projected-out
   variables the environment, which survives only as the memory + noise above. A driven-dissipative flow is
   an open system in a non-equilibrium steady state — energy injected by the forcing (an energy *reservoir*,
   the source of §4.2), dissipated to the unmodeled viscous *bath* (the sink), balanced at stationarity. The
   lens carries its own caveat: whatever a model *retains* of the environment — a stochastic forcing's
   internal state, a closure's subgrid degrees of freedom — is not the environment but the finite
-  **Markovian surrogate** kept on the system's own side, a *modeled* degree of freedom; so it homes as
+  *Markovian surrogate* kept on the system's own side, a *modeled* degree of freedom; so it homes as
   the `modeled` slot on the one `State`, never a separate "environment state" — built for the
   stochastic forcing's process (§11 decision 90).
 - **The commuting square — the modeling ideal.** With ``\Pi`` a coarse-graining and ``S`` a flow map, one
   would like ``\Pi\circ S_{\mathrm{fine}} = S_{\mathrm{coarse}}\circ\Pi``. It cannot hold pathwise: the coarse
   state does not determine its own tendency (that is the memory and noise made concrete), and turbulence is
-  chaotic. The achievable ideal — the design target of any Model — is **statistical** commutation,
+  chaotic. The achievable ideal — the design target of any Model — is statistical commutation,
   agreement of the distributions and fluxes on the attractor, exactly what the DNS-versus-LES comparison of
   §3 measures.
 - **Geometric mechanics (metriplectic / GENERIC) — the reversible/irreversible split.** The
@@ -862,16 +862,16 @@ Mori–Zwanzig decomposition, which is exact and so can carry that weight. The l
   what would make closure constants transferable, but it is approximate (intermittency), it fails for
   scalar small scales (persistent gradient anisotropy), and the unclosed terms are *conditional* quantities
   that re-import the large scales. So the tool is built to *test* how universal a closure is, per regime,
-  not to assume it. This is the general charter: **the architecture investigates the physics; it must not
-  assume it** — the same discipline as the model-free statistics it consumes.
+  not to assume it. This is the general charter: the architecture investigates the physics; it must not
+  assume it — the same discipline as the model-free statistics it consumes.
 - **The skew-product tower — what a `Simulation` is.** The composite system factors as a tower
   ``t \to`` forcing noise ``\to`` fields ``\to`` particles: the generator is block lower-triangular
   (each row reads only itself and the rows above — the fields never read the tracer positions, the
   clock reads nothing), so the flow is a skew product and `advance!` is its Gauss–Seidel sweep in
   topological order (step the fields, refresh the observation, push the tracers, tick the clock).
   Triangularity is what licenses the composed propagator: splitting error cannot propagate *up* the
-  triangle. It also gives every state slot a litmus. **The restart record holds exactly what the
-  flow map needs** — ``\hat{\boldsymbol{u}}``, ``\hat\varphi``, the tracer positions, and a
+  triangle. It also gives every state slot a litmus. The restart record holds exactly what the
+  flow map needs — ``\hat{\boldsymbol{u}}``, ``\hat\varphi``, the tracer positions, and a
   stochastic forcing's internal state (the extended-phase-space discipline of molecular dynamics'
   thermostats). The observables cache holds spent compute, reconstructable from the record —
   delete it and the trajectory is unchanged. The clock and what a run records are the
@@ -895,11 +895,11 @@ one usually encodes a decision.
 3. **No privileged precision or backend.** ``T`` and the array type flow from the frame; both precisions
    and CPU/GPU are first-class (§6).
 4. **Allocation-free stepping over a compile-time state — with an audited footprint.** A time step allocates no field-sized memory over
-   the preallocated `IntegratorBuffers` — load-bearing for GPU hot loops. The evolving state is a **compile-time
-   product of concretely-typed buffers** (a parametrized record the compiler specializes), never a
+   the preallocated `IntegratorBuffers` — load-bearing for GPU hot loops. The evolving state is a compile-time
+   product of concretely-typed buffers (a parametrized record the compiler specializes), never a
    runtime-heterogeneous container — the discipline that keeps the step type-stable and device-generic, and
    that lets the state grow (a scalar today, a coarser Model's extra fields tomorrow) to more slots at no
-   runtime cost. **Each scheme allocates exactly its working set:** `allocate_buffers` dispatches on the
+   runtime cost. Each scheme allocates exactly its working set: `allocate_buffers` dispatches on the
    concrete scheme and builds only the registers that scheme writes — there is no over-allocating
    `::AbstractIntegrator` fallback, so a scheme with no method is a hard error, never a silent superset
    (an `IFLowStorageRK3` run carries neither of the two registers `IFHeun` adds — its corrector stage
@@ -912,7 +912,7 @@ one usually encodes a decision.
 7. **A library, not a framework.** The run layer is a convenience over exposed pieces (§2, §4.7), never a
    mandatory shell.
 8. **The scalar is denoted ``\varphi``**, never ``\theta`` — in code, mathematics, and prose.
-   And it is an **``\mathrm{Sc} = O(1)`` scalar**: no Batchelor-range machinery exists, the derived
+   And it is an ``\mathrm{Sc} = O(1)`` scalar: no Batchelor-range machinery exists, the derived
    viscosity resolves the velocity's cutoff rather than ``\eta_B = \eta/\sqrt{\mathrm{Sc}}``, and the
    constructor warns — never refuses — when the scalar is clearly under-resolved. High-Schmidt
    support is a deliberate absence, not an oversight.
@@ -929,7 +929,7 @@ one usually encodes a decision.
   siblings' physical-form-first / estimand-first rules.
 - **Coordinate-free where a coordinate-free form exists.** Homogeneous isotropic turbulence is
   statistically isotropic — no preferred direction — so a diagnostic or computation that picks a coordinate
-  axis imports a spurious direction-dependence; state the **rotation-invariant** form, not an axis
+  axis imports a spurious direction-dependence; state the rotation-invariant form, not an axis
   projection. The reference is `derivative_skewness`: the normalized third invariant of the strain rate
   ``\boldsymbol{S}``, not the axis-picking longitudinal velocity-derivative skewness (decision 17).
 - **Two-tier docs.** `CLAUDE.md` is the terse working map and defers here; this document carries the
@@ -951,7 +951,7 @@ one usually encodes a decision.
   nontrivial claims are *dynamical* — the exactness of ``\mathcal{E}``, the order of the scheme,
   imaginary-axis stability, mean conservation — and are pinned by numerical oracle tests (a Taylor–Green
   order study, unforced energy decay, exact diffusion). This is why the package follows the
-  `GBGCloudPhysics` consumer pattern with **no `FORMALIZATION.md`**; a typed-statement ledger is a
+  `GBGCloudPhysics` consumer pattern with no `FORMALIZATION.md`; a typed-statement ledger is a
   backend's need. The design's *structure* — the module carving and role wiring — was checked at design
   time against a relational-logic model (decisions 21–22), which carries no dynamics and so complemented
   the oracle rather than becoming the ledger. Revisit only if a built Model
@@ -1038,7 +1038,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     option rather than a fixed default.
 16. **(2026-07) Modules named from the Mori–Zwanzig lens; `Equations` split into `Dynamics` +
     `Observables`; `Driver` → `SimulationRun`.** Since MZ is the central lens (§8), the physics concerns
-    take their names from it — the **dynamics** (the generator/RHS) and its **observables** (the measured
+    take their names from it — the *dynamics* (the generator/RHS) and its *observables* (the measured
     functions of state) — rather than from production-DNS convention (`rhs`/`stats`) or generic software
     terms. `Equations` conflated the two and under-described; splitting it makes each concern its own
     module and its own name. Realization and infrastructure concerns keep job-names (`TimeIntegration`,
@@ -1061,8 +1061,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     type, each parametrization an author-year preset (`Spectra.Pope2000`), disambiguated on three axes
     (quantity → submodule, paper → author-year, same-year collision → a trailing letter). It is the
     predicted counterpart to `Observables` — a provider the validation layer reads, not a comparer — and
-    holds our own fits beside the literature on equal footing. **Built inside this package but designed to
-    be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite** (the `GBGStreamingStatistics`
+    holds our own fits beside the literature on equal footing. Built inside this package but designed to
+    be cut into a standalone `GBGTurbulencePhenomenology` with no rewrite (the `GBGStreamingStatistics`
     precedent): a dependency-light leaf — no `GBGPeriodicFields`, `GBGStreamingStatistics`, or dynamics
     dependency — that the umbrella does *not* re-export, with its own doc and API group. Extract when a
     second consumer appears.
@@ -1077,7 +1077,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the density ``E(\kappa)``, and ``E_n \approx E(\kappa_n) \Delta\kappa``, ``\kappa_n`` the shell's wavenumber, with
     ``\Delta\kappa = 2\pi/L``. The factor is invisible on the default ``L = 2\pi`` box, where it is
     ``1``, and silently wrong on any other. *(Superseded 2026-08-23, owner-directed:
-    `energy_spectrum` now returns the **density** — the shell energy over ``\Delta\kappa`` — so the
+    `energy_spectrum` now returns the density — the shell energy over ``\Delta\kappa`` — so the
     conversion seam this entry documents is gone; measured and modeled spectra are the same kind of
     object and compare directly. The bin-sum convention had survived precisely because the factor
     is 1 on the default box.)* This realizes the
@@ -1090,32 +1090,32 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     (``k/(L\varepsilon)^{2/3} \approx 0.9``, a box-normalized group — distinct from the classical dissipation anomaly ``C_\varepsilon = \varepsilon L_{11}/u'^3`` on the integral scale, related only on a common length by ``G = \tfrac{3}{2} C_\varepsilon^{-2/3}`` — calibrated to
     JHTDB), then sets ``\nu`` so the resolution criterion ``\kappa_{\max}\eta`` (largest resolved wavenumber times Kolmogorov length) equals the `κ_max_η`
     option (default `2`) — the highest Reynolds number consistent with that resolution criterion. This is the
-    **construction** half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
+    construction half of the consume-and-fit loop (§4.7): laws are read to *build* runs, not only to
     validate them.
     The run is forced-and-stationary by default (a `VarianceRescaling` holds the total energy at the value
     given by the `kinetic_energy` keyword,
     default `1.5`, i.e. ``u'=1``); an explicit `viscosity` opts back into direct control. *(Superseded
     in the holder, not in the substance: decision 58 made `VarianceController` the default. The
     calibration constraint — the run must really hold ``k`` at the assumed value — is unchanged, and
-    the controller holds it to a tolerance rather than exactly.)* It does **not**
+    the controller holds it to a tolerance rather than exactly.)* It does not
     breach the extraction boundary — `Li2008` stays a pure scalar law with no `GBGPeriodicFields` /
     `GBGStreamingStatistics` / dynamics dependency; only the run layer (never `Phenomenology`) knows both
     sides. The accuracy target is ``\kappa_{\max}\eta`` (spectral content at the highest *evolved*
     wavenumber), not ``\eta/\Delta x`` (geometric): the former is dealiasing-aware through
     ``\kappa_{\max} = f \tfrac{N}{2}\tfrac{2\pi}{L}`` (then `max_wavenumber`), which is correct because
     accuracy itself depends on the dealiasing. *(Refined by decision 82: the criterion's
-    ``\kappa_{\max}`` is now the **resolved** cutoff `max_resolved_wavenumber` — under `HouLi` the
+    ``\kappa_{\max}`` is now the resolved cutoff `max_resolved_wavenumber` — under `HouLi` the
     ``4/5``-of-Nyquist crossover, not the retained Nyquist this entry's ``f`` implied.)*
 21. **(2026-07) The physics-first carving is checked against a formal structural model
     (in Alloy, kept outside the repository).** The module carving and the Mori–Zwanzig role wiring were re-examined
     against an explicit relational-logic model under an adversarial multi-lens
     review — a design-time artifact, deliberately not a shipped ledger — to counter a pull toward
-    software-shaped, object-first structure. The model carries only **structure**: the dependency graph
+    software-shaped, object-first structure. The model carries only structure: the dependency graph
     (checked against the actual `using` edges), the state as one product of typed slots on a single module,
     the Model ladder as a coarsening poset with an explicit fine→coarse projection, the
     reversible/irreversible/source split of the generator wired to the observables that measure it, closure
     required exactly where a rung is a proper projection, and the passive tracer kept distinct from an
-    inertial (slipping) phase. It carries **no dynamics** — the nonlinear operator, the exact rates, the
+    inertial (slipping) phase. It carries no dynamics — the nonlinear operator, the exact rates, the
     memory integral, the symplectic bracket stay with the numerical oracle (§10, decision 12) — so it is not
     a `FORMALIZATION.md` by another route. Four adversarial passes converged: the structural claims are
     mutually consistent and every self-check is non-vacuous (perturb its premise and the check fails). The
@@ -1124,17 +1124,17 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     populated* while DNS is the only built rung (not a speculative extension point, invariant 9) — and the
     state-realization discipline now folded into invariant 4.
 22. **(2026-07) Mori–Zwanzig raised to foundation; the physics-first renames; this document rewritten.**
-    Following the structural verification (decision 21), Mori–Zwanzig is made the **foundation** of the
+    Following the structural verification (decision 21), Mori–Zwanzig is made the foundation of the
     architecture, not merely the central lens — *reversing decision 8*. The reversal is safe because the
     decomposition is *exact* (a projection is an identity, not an approximation); what stays *investigated,
     never assumed* is the closure that models the memory it leaves, so the foundation and the "investigate,
-    don't assume" charter (invariant 6) are one commitment. It founds the **architecture** — the carving
+    don't assume" charter (invariant 6) are one commitment. It founds the architecture — the carving
     and the names — not the numerics, which are Navier–Stokes solved pseudospectrally regardless. The four
     roles take their role names: `Dynamics → Generator`, `TimeIntegration → Propagator`, and
     `SimulationState` split into `SimulationDomain` (the frame) and `State` (the field), *completing and
     partly revising decision 16*. Decision 16's "realization keeps job-names" is re-cut on the sharper line
-    it was reaching for — **a level-agnostic Mori–Zwanzig role wears its role name, a concrete mechanism
-    wears its job** — under which the propagator is a role present at every rung, not mere realization, so
+    it was reaching for — a level-agnostic Mori–Zwanzig role wears its role name, a concrete mechanism
+    wears its job — under which the propagator is a role present at every rung, not mere realization, so
     `Propagator` is correct while its schemes (`IFLowStorageRK3`) keep their descriptive names.
     `ARCHITECTURE.md` was rewritten whole (except this append-only log) to read holistically from the
     foundation down.
@@ -1142,17 +1142,17 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     forcing-protocol renames, and an open-systems sub-lens.** A close read of the rewrite settled three
     changes. (a) The parameter bundle `Physics` — the viscosity, the Schmidt number, and the two forcings,
     the physical *conditions* that tune the generator, misfiled under the `Propagator` stepper — is renamed
-    **`FlowConditions`** and folded into **`Generator`**, the right-hand side it parametrizes; this adds the
+    `FlowConditions` and folded into `Generator`, the right-hand side it parametrizes; this adds the
     honest `Generator → Forcing` dependency (the RHS includes the forcing source). A six-perspective naming
     panel chose `FlowConditions` over `System` (the bundle is a proper *subset* of the §3 System axis — it
     lacks the initial condition and the domain — so a type named for the axis while holding less is ambiguous
     and imprecise) and over `GeneratorParameters` (relational, and imprecise once a coarser rung's generator
     gains closure coefficients). (b) The `AbstractForcing` protocol methods are made grammatically uniform,
     verb-first: `set_forcing_rate!`, `add_forcing_source!`, `prepare_forcing!`, `project_forcing!`. (c) The
-    open-systems / non-equilibrium reading is recorded as a **sub-lens under Mori–Zwanzig** (§8), not new
+    open-systems / non-equilibrium reading is recorded as a sub-lens under Mori–Zwanzig (§8), not new
     state types: a six-tradition panel (unanimous) confirmed the system/environment split *is* the
     Mori–Zwanzig resolved/modeled cut, but that whatever a model retains of the environment is a finite
-    **Markovian surrogate on the system's own side** — a `modeled` slot on the one `State`, never a separate
+    Markovian surrogate on the system's own side — a `modeled` slot on the one `State`, never a separate
     'environment state' — so a stateful forcing's internal state homes there when `StochasticOU` is
     de-archived, and no type is minted now (invariant 9).
 24. **(2026-07) The domain module is `SimulationDomain`, its concrete type `FixedDomain`.** Decision 22
@@ -1162,46 +1162,46 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     call stops resolving (verified empirically). The module keeps the user-facing concern name
     `SimulationDomain` (the discretized box a run lives on); its type takes a name for *what it is among the
     alternatives*. Weighed against `SimpleDomain` (relational and vague — simple next to what?) and
-    `PeriodicCube` (a property the deferred sheared frame *also* has), the choice is **`FixedDomain`**: the
+    `PeriodicCube` (a property the deferred sheared frame *also* has), the choice is `FixedDomain`: the
     fixed, unsheared, orthogonal cube with time-independent, separable wavenumbers. It names the very axis
-    the deferred **`ShearedDomain`** (the Rogallo moving frame, §7) varies — fixed versus sheared, separable
+    the deferred `ShearedDomain` (the Rogallo moving frame, §7) varies — fixed versus sheared, separable
     versus time-dependent — so the two type names read as one family. `FlowConditions` needs no such care: a
     type, not a module, it cannot collide.
 25. **(2026-07) Design-review batch: the recovery split, `ForcingSpec` → `DeferredForcing`, a scalar
     spectrum IC, and precision-aware Hou–Li damping.** Four refinements settled on a reading of the API.
-    (a) The fused `velocity_vorticity!` is split into the sibling recoveries **`velocity_to_physical!`**
-    and **`vorticity_to_physical!`**: its two halves share no intermediate — curl-then-transform for the
+    (a) The fused `velocity_vorticity!` is split into the sibling recoveries `velocity_to_physical!`
+    and `vorticity_to_physical!`: its two halves share no intermediate — curl-then-transform for the
     vorticity, copy-then-transform for the velocity, over separate buffers — so the split carries no
     compute or memory penalty and reads as one convention with `scalar_to_physical!` (`X_to_physical!`
-    produces the physical `X`, its source shown in the signature). (b) **`ForcingSpec` is renamed
-    `DeferredForcing`**, naming the object by its meaning — a forcing specified before the domain exists
+    produces the physical `X`, its source shown in the signature). (b) `ForcingSpec` is renamed
+    `DeferredForcing`, naming the object by its meaning — a forcing specified before the domain exists
     and materialized once it does — rather than the `spec` abbreviation (superseding the name minted in
-    decision 14). (c) **`random_scalar_spectral!` gains a `spectrum` keyword** mirroring
+    decision 14). (c) `random_scalar_spectral!` gains a `spectrum` keyword mirroring
     `random_solenoidal_velocity_spectral!`, seeding the scalar from a target radial scalar-variance spectrum (an
     Obukhov–Corrsin form from `Phenomenology`) for spectrum-matched initial conditions and faster
-    warm-up. (d) **`HouLi`'s `strength` defaults to `nothing`, meaning auto**: resolved at kernel-build
+    warm-up. (d) `HouLi`'s `strength` defaults to `nothing`, meaning auto: resolved at kernel-build
     time to ``-\log`` of the element type's machine epsilon (``\approx 36`` for `Float64`,
     ``\approx 16`` for `Float32`), so the Nyquist mode always damps to that precision's epsilon —
     precision as a studied axis (invariant 4); an explicit `strength` overrides.
 26. **(2026-07) The state reified as `ResolvedFields`; the per-step scratch relocated to `Propagator`.**
     The DNS state — the evolving velocity ``\hat{\boldsymbol{u}}`` and optional scalar
-    ``\hat\varphi`` — is made first-class as **`ResolvedFields`** (module `State`), completing the
+    ``\hat\varphi`` — is made first-class as `ResolvedFields` (module `State`), completing the
     Mori–Zwanzig triad whose State leg had been missing: the fields were scattered across the `Simulation`
     value while the diagnostics read the physical *scratch* as if it were state (`kinetic_energy(sim)` read
-    `buffers.velocity`). It is a **bare, inert record with every operation external** — the panel's ruling,
+    `buffers.velocity`). It is a bare, inert record with every operation external — the panel's ruling,
     which adopts the category lens's guardrail (arrows primary, no methods on the carrier) and rejects its
-    dissolution. **`ResolvedFields` holds only the spectral truth** (``\hat{\boldsymbol{u}}``,
+    dissolution. `ResolvedFields` holds only the spectral truth (``\hat{\boldsymbol{u}}``,
     ``\hat\varphi``); the physical velocity, vorticity, and scalar are a Method-side derived view, never
     stored, so the state cannot go stale — and because the physical chart is rung-specific (EDQNM has no
     phases to invert), keeping it out of the state keeps the record fit to lift, unchanged, to one slot of
-    the future product-of-slots `State` (§7, abstraction-ready, not built). The observables become **thin
-    functions of the natural representation** with no `State` dependency:
+    the future product-of-slots `State` (§7, abstraction-ready, not built). The observables become thin
+    functions of the natural representation with no `State` dependency:
     `kinetic_energy`/`scalar_variance`/`derivative_skewness`/`energy_spectrum` are Parseval reductions of
     ``\hat{\boldsymbol{u}}``/``\hat\varphi``, `dissipation` curls into scratch and reduces, and the run layer
     prepares what each needs — the mirror of the generator, both now thin externals over bare fields.
     Consequently the monolithic `FieldBuffers` is dissolved: the generator's operators take their
-    **individual scratch fields** (naming no bundle), so the scratch is free to live with the scheme
-    that owns it as **`IntegratorBuffers`** (module `Propagator`), built by `allocate_buffers` dispatching
+    individual scratch fields (naming no bundle), so the scratch is free to live with the scheme
+    that owns it as `IntegratorBuffers` (module `Propagator`), built by `allocate_buffers` dispatching
     on the concrete scheme; `ScalarBuffers` stays a nested optional sub-bundle. The name `ResolvedFields`
     (over `ResolvedState` / `DNSState` / `FieldState`) follows the `FixedDomain` axis-lesson taken to the
     slot level: the module `State` carries the level-agnostic role, so the concrete slot is named for its
@@ -1237,7 +1237,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
       laundered smell — an IC seeder that defaulted `kinetic_energy = 0.5` while the front door supplied
       `1.5`, once documented "by design" rather than fixed.)
     - **`scalar_type` → `element_type`** (the keyword names the array element type, not the passive
-      scalar's type); **`Tracers(domain; positions)`**, so backend and precision flow from the domain
+      scalar's type); `Tracers(domain; positions)`, so backend and precision flow from the domain
       (all-keyword past `domain` since decision 52).
     - **`step!` advances the `State`** (`ResolvedFields`), not loose ``\hat{\boldsymbol{u}}`` / ``\hat\varphi``.
     - **Observables are functions of the state, not the `Simulation`.** No `f(sim)` form: an observable
@@ -1251,26 +1251,26 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``\hat{\boldsymbol{u}}`` *before* assembling the scalar's advection. A mask strategy never reads
     ``\hat{\boldsymbol{u}}`` there, but `PhaseShift`'s displaced evaluation does (decision 27) — so the
     displaced flux paired the *next* stage's velocity with *this* stage's scalar, breaking the odd-axis
-    alias cancellation at ``\mathcal{O}(\Delta t)`` and degrading the scalar from third to **first** order
+    alias cancellation at ``\mathcal{O}(\Delta t)`` and degrading the scalar from third to first order
     (measured self-convergence ratios 2.02 against 7.97 for the velocity; `IFRK2`'s call sites were
     consistent, and the term-level padding oracle cannot see a call-site mismatch — it checks the
     assembly with matched inputs). The comment that had licensed the old order ("`u` and `φ̂` are
     untouched above") was written before `PhaseShift` made the assembly read ``\hat{\boldsymbol{u}}``
     — an invalidated premise, not a wrong derivation. Both right-hand sides are now evaluated at the
     stage state before either field is updated (bit-identical for the mask strategies), and the suite
-    carries the **dealiasing × scheme convergence matrix**: both fields must converge at scheme order
+    carries the dealiasing × scheme convergence matrix: both fields must converge at scheme order
     under every strategy. The bug is the motivating instance for decision 31's seam — a stage that
     reads a mid-update intermediate is a malformed factorization, which a reified right-hand side makes
     unrepresentable.
 30. **(2026-07) The observation layer: `ObservablesCache` — epoch-dated, memoized charts over the state; the
-    recoveries move to `State`.** The physical recoveries are the **chart map** of the state — they
+    recoveries move to `State`.** The physical recoveries are the chart map of the state — they
     read only ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and the frame — so they home in `State`
     (`Generator` imports them for its displaced evaluations; the new `Generator → State` edge respects
     the include order). `ObservablesCache` memoizes their values: preallocated slots (`:velocity`,
-    `:vorticity`), each carrying the **fields epoch** it was computed at; an accessor
+    `:vorticity`), each carrying the fields epoch it was computed at; an accessor
     (`physical_velocity`, `physical_vorticity`) returns the stored field when current and recomputes it
     first otherwise — the deposit-or-recompute contract — and `step!` advances the epoch as it
-    completes. An out-of-band mutation is declared through **`fields_modified!`** — named for
+    completes. An out-of-band mutation is declared through `fields_modified!` — named for
     *what was changed*, the resolved fields, which is the plain reading and the one the code follows.
     *(Two corrections to this entry's original text, both recorded rather than made silently. The verb
     was named `resolved_fields_modified!` when the decision was taken; decision 24 shortened it, and
@@ -1281,14 +1281,14 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     saying plainly what a caller did, not by describing a downstream consequence the caller would
     have to reason about.)* the sanctioned mutators call it themselves, and the seeders' docstrings direct hand-run
     loops to it. This kills the `step!` silent-precondition footgun — there is no caller prefill left
-    to forget. **Epoch granularity is deliberately coarse**: one counter per dynamical factor of the
+    to forget. Epoch granularity is deliberately coarse: one counter per dynamical factor of the
     tower (fields, particles), no finer — every production memoization precedent surveyed (LAMMPS
     computes' timestep tags, OpenFOAM's registry event numbers, Fluidsim's iteration counters) uses a
     single counter, within-step consistency is the seam's job (decision 31), and an over-fine epoch
-    system is itself a silent-staleness surface. Observables are **opt-in** (an undeclared one errors —
+    system is itself a silent-staleness surface. Observables are opt-in (an undeclared one errors —
     resident GPU memory is a choice), and the cache's shared spectral scratch replaces two
     `IntegratorBuffers` slots — net one resident spectral vector *fewer* than before the layer.
-    Naming: **`ObservablesCache`** was fixed by a six-lens panel (5–1 over `DerivedQuantities`, upheld by
+    Naming: `ObservablesCache` was fixed by a six-lens panel (5–1 over `DerivedQuantities`, upheld by
     an adversarial pass) with a license clause the docstring carries — each slot holds *a derived
     field's values*, on the grid lattice or at the tracer positions; particle content never enters —
     a recorded rename trigger (the first particle-*sourced* slot, e.g. a number density, reopens the
@@ -1309,7 +1309,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     with a *diagonal, exact* linear operator, the exponential-scheme family's special case), and
     `finalize!` (close the step — the post-step forcing projections). The rhs/factor pairs are the
     required core; `prepare!`/`finalize!` default to no-ops (a two-tier required/optional protocol).
-    **`finalize!` on the generator is a recorded deviation** from the solver-library precedent (the
+    `finalize!` on the generator is a recorded deviation from the solver-library precedent (the
     SciML/PETSc/SUNDIALS right-hand-side objects are pure evaluators, with post-step action in
     callback layers), adopted because the projection is part of the *step's* contract, not of
     observation: the observables, the diagnostics, and the tracer advance must see the forced end-of-step
@@ -1324,7 +1324,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `FilteredGenerator` (carrying its closure) the eventual LES sibling — and the run layer's
     `_resolve_forcing` was renamed `_materialize_forcing`, reserving *resolved* for that axis against
     `DeferredForcing`'s materialization vocabulary. Every migration stage was verified
-    **bit-identical** on fixed-seed trajectories (all three dealiasing strategies and the
+    bit-identical on fixed-seed trajectories (all three dealiasing strategies and the
     `StochasticOU`-forced case) against the pre-migration code.
 32. **(2026-07) Forcing hooks own their scratch; the lifecycle order is contract.** The four-hook
     interface no longer receives the scheme's buffer bundle ("for interface uniformity" — the
@@ -1346,15 +1346,15 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     rescaling the recorded upgrade path when faithful fluctuations of the held quantity matter.
 33. **(2026-07) The memory audit: a frozen buffer ledger and a liveness lower bound, in the standard
     suite.** "Minimal footprint" becomes a checked property instead of an aspiration
-    (`test/memory_audit.jl`, run by `Pkg.test()`). Two instruments. (a) **The ledger**: a reflective
+    (`test/memory_audit.jl`, run by `Pkg.test()`). Two instruments. (a) The ledger: a reflective
     walk over every resident field-sized buffer a run owns (state, observables cache, generator,
     scheme registers, forcing-owned state and kernels, the tracer buffers), counted per shape
-    class over the full **five-axis** combination space — scheme × dealiasing × scalar ×
-    (velocity forcing × scalar forcing) × tracers. The frozen spec is **compositional**: twelve
+    class over the full five-axis combination space — scheme × dealiasing × scalar ×
+    (velocity forcing × scalar forcing) × tracers. The frozen spec is compositional: twelve
     unforced, tracer-free base cells plus a per-forcing delta table and a tracer delta, and an
     exhaustive sweep over the whole product (~360 combinations) asserts measured = base + deltas,
     cell by cell — a cross-term (a buffer whose existence depends on two axes at once) fails the
-    sweep and must be recorded. The observables cache's **charts axis** (resident charts are
+    sweep and must be recorded. The observables cache's charts axis (resident charts are
     opt-in) is audited at the API level with its own delta; for any *stepping* run it is pinned by
     the physics — the rotational generator's declared working set requires both charts — and becomes
     a live run axis when per-component chart declarations or further charts land. Adding or removing
@@ -1363,39 +1363,39 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `AdamsBashforth` joined, its registers audited the same way)*, entering as on/off with the
     per-tracer ``(M, 3)`` arrays audited in their own units; precision, backend, and the
     interpolation scheme change bytes, never counts, so they are outside a count ledger. Two scope
-    boundaries are deliberate: the ledger audits the **resident** working set — construction-time
+    boundaries are deliberate: the ledger audits the resident working set — construction-time
     seeding transients and the recorded per-call diagnostic allocations (invariant 4's exception,
     e.g. the derivative-skewness tensors) are *peak*-memory events a separate instrument would
-    cover — and the **frame** (the domain's plans, multipliers, kernels) is excluded as shared,
+    cover — and the frame (the domain's plans, multipliers, kernels) is excluded as shared,
     combination-independent infrastructure, a constant offset rather than an axis. *(That second
     boundary was withdrawn by decision 36: constant in the combination space is not the same as
-    small, and the frame now carries a ledger of its own.)* (c) **The episode
-    ledger** closes the resident-vs-peak gap: the hot loop is allocation-free (the step guards), so
+    small, and the frame now carries a ledger of its own.)* (c) The episode
+    ledger closes the resident-vs-peak gap: the hot loop is allocation-free (the step guards), so
     the stepping-phase peak *is* the resident ledger; outside it the transient episodes are few,
     sequential, and frozen in units of ``N^3`` reals with mechanical `@allocated` drift guards —
     seeding ``\approx 10.3`` (construction only; includes a ``3.2``-unit transient from the *aliased*
     Leray projection, raised to `GBGPeriodicFields`), the energy spectrum ``\approx 1.6`` (the
-    backend's radial-spectrum staging), and the **velocity-derivative skewness ``\approx 19.6`` — the
+    backend's radial-spectrum staging), and the velocity-derivative skewness ``\approx 19.6`` — the
     dominant episode, about half again the default resident set, and on by default in `warmup!`'s
-    skewness gate**: the binding device peak of a default warm-up at the largest fitting ``N``.
+    skewness gate: the binding device peak of a default warm-up at the largest fitting ``N``.
     This prices invariant 4's per-call-diagnostic trade (resident traded into episodic peak) and
     names its reduction paths: symmetric six-component tensor storage at the backend (the tensors are
     stored with all nine components today), or gating the skewness off when memory binds. The
     archived `StochasticOU`'s prepare phase also projects its noise aliased — an OU-forced step is
     not allocation-free today (``\approx 3`` units per step), recorded on its de-archival gate. The
     allocator-level high-water mark (GC and pool timing) remains an empirical measurement on the
-    benchmark hosts, a fitness number rather than a test invariant. (b) **The
-    liveness audit**: each `step!` body is a straight-line program, so its op list (reads and writes
+    benchmark hosts, a fitness number rather than a test invariant. (b) The
+    liveness audit: each `step!` body is a straight-line program, so its op list (reads and writes
     per primitive field operation) gives every value a live range, and the peak number of
     simultaneously live values per shape class is the *lower bound* on the buffers the implemented
     operation order needs — the classical register-allocation argument. The audit asserts achieved ≥
-    bound and that **every nonzero gap carries a named holder**; an unclaimed gap fails the test.
+    bound and that every nonzero gap carries a named holder; an unclaimed gap fails the test.
     Current verdicts: the physical-vector count sits *exactly at its bound* under the chart contract
     (the charts are contract-live across the step; the epoch-at-start chart-reuse that would release
     two registers during the stages is the recorded candidate); one spectral-vector gap is held by
-    the State/Generator **ownership boundary** (the cache's recovery scratch and the generator's
+    the State/Generator ownership boundary (the cache's recovery scratch and the generator's
     product registers could alias in the implemented schedule but live on opposite sides of a
-    deliberately kept seam); the spectral-scalar gaps are held by the **shared factor register**
+    deliberately kept seam); the spectral-scalar gaps are held by the shared factor register
     (deletable by a fused exponential-multiply convolution — raised to `GBGPeriodicFields` as a
     request, with an in-place transform mode for disposable sources as the second request, which
     would halve the archived `StochasticOU`'s noise scratch on de-archival) and by the scalar's
@@ -1410,30 +1410,30 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     straight-line op lists — extracted to `test/audit_ops.jl` as the single source of truth both
     audits project, and upgraded to pass-exact fidelity to `step!` (stage 1 *seeds* the low-storage
     accumulator, the last stage skips its rotation) — priced in the two compute currencies of a
-    pseudospectral step on a GPU. (a) **The transform ledger**: scalar-equivalent FFT counts (c2r,
+    pseudospectral step on a GPU. (a) The transform ledger: scalar-equivalent FFT counts (c2r,
     r2c) per step, frozen per scheme × dealiasing × scalar cell with the chart recomputes amortized
     in (each chart is recovered once per fields epoch, wherever first read — which is also why the
-    **tracer transform delta is zero**: the Heun endpoints ride the epoch cache, the observation
+    tracer transform delta is zero: the Heun endpoints ride the epoch cache, the observation
     layer's compute dividend). Transforms carry the flops — ``\tfrac{5}{2} N^3\log_2 N^3`` per scalar
     transform against O(1–20) flops per point for every pointwise kernel, far under the roofline
-    machine balance — so **flops are derived from the count, never an independent frozen axis**.
+    machine balance — so flops are derived from the count, never an independent frozen axis.
     The counts are per-evaluation × evaluations (asserted structurally), the mask evaluation is
     ``(6, 3)`` for the velocity and ``(1, 3)`` for the scalar, and `PhaseShift` doubles the velocity
     transforms exactly — the dealiasing axis's memory↔compute trade now priced on both sides.
-    Verdicts: every cell sits **at its lower bound** (each physical component field consumed costs
+    Verdicts: every cell sits at its lower bound (each physical component field consumed costs
     one c2r, each spectral product component one r2c, for the algorithms as chosen) except
     `PhaseShift` × scalar, where `scalar_rhs!` re-shifts and re-recovers the displaced velocity that
     `velocity_rhs!` left fresh at the same stage state — 3 c2r per evaluation, held by the named
-    **shifted-velocity reuse** gap (the fix is a same-stage freshness contract on the generator's
-    displaced scratch across two protocol verbs — a seam question, recorded, not chased). (b) **The
-    pass ledger**: full-field memory passes per shape class for everything between transforms —
-    pointwise kernels are bandwidth-bound, so what fusion buys is passes, and the **fusion bound**
+    shifted-velocity reuse gap (the fix is a same-stage freshness contract on the generator's
+    displaced scratch across two protocol verbs — a seam question, recorded, not chased). (b) The
+    pass ledger: full-field memory passes per shape class for everything between transforms —
+    pointwise kernels are bandwidth-bound, so what fusion buys is passes, and the fusion bound
     is the liveness argument transplanted to traffic: per between-barriers segment, a perfectly
     fused kernel reads each live-in once, writes each live-out once, reads each field-scale
     configuration array once, and a pure intermediate costs nothing. Verdicts: the physical-side
     and configuration classes sit *at* the fused ideal in every cell; every gap lives in the two
-    spectral classes and is held by **PF kernel granularity** (the numpy model's op-per-kernel
-    boundaries) plus the **factor materialization** the open `GBGPeriodicFields`
+    spectral classes and is held by PF kernel granularity (the numpy model's op-per-kernel
+    boundaries) plus the factor materialization the open `GBGPeriodicFields`
     fused-exponential request would delete. Forcing enters as frozen per-hook deltas (only the
     stochastic forcing transforms — its noise pipeline; the OU-velocity column is cross-checked
     against its op list). Both ledgers are static projections; their currency is anchored by the
@@ -1444,23 +1444,23 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 35. **(2026-07) A recorded cost is not a minimal one: every audited cell is held against a physical
     floor, and the residual distance must be claimed.** Decisions 33 and 34 built ledgers that
     *record* what a run costs and fail when the number drifts. That certifies stability, not
-    minimality: a frozen cell measures what **is**, never what **should be**, and a cost with no
+    minimality: a frozen cell measures what *is*, never what *should be*, and a cost with no
     lower bound held against it is unexamined rather than optimal. The correction is to give every
-    cell a **floor** — the cost the quantity cannot go below on physical grounds — and to require
-    that `achieved − floor > 0` carry a **named holder**, split into `FIX`-then-retire (a local win,
+    cell a *floor* — the cost the quantity cannot go below on physical grounds — and to require
+    that `achieved − floor > 0` carry a named holder, split into `FIX`-then-retire (a local win,
     removed when taken) and `PF-RAISE` (a recorded backend request). An unclaimed gap fails the
     suite. This inverts enforcement from *did the number change* to *is there residual distance to
     the floor, and is it accounted for*, and it subsumes a third axis the two ledgers could not see:
-    **form** — not how well a fixed expression is scheduled, but which of the mathematically
+    form — not how well a fixed expression is scheduled, but which of the mathematically
     equivalent expressions is evaluated at all (Parseval for a quadratic reduction, the Dirichlet
     form for a gradient energy, the solenoidal identity for enstrophy, a spectrum that already
     integrates to the energy). Cubic and nonlinear invariants are floors, not gaps: the Lamb vector,
     the scalar flux, and ``\det\boldsymbol{S}`` have no quadratic shortcut.
 
-    Two structural consequences beyond the ledgers. The op model must extend **past `step!`** to
+    Two structural consequences beyond the ledgers. The op model must extend past `step!` to
     every surface a run touches — the initial-condition seeders, the observables, the run-loop
     accounting, the tracer advance, the forcing hooks — since a cost outside the stepped region is
-    invisible, not absent. And an **eighth axis** joins the seven: **host–device synchronization**.
+    invisible, not absent. And an eighth axis joins the seven: host–device synchronization.
     On GPU-primary code every reduction that returns a Julia scalar is a blocking device-to-host
     transfer that drains the pipeline, and no footprint or traffic count can see a barrier; the
     floor is one such readback per step under an adaptive CFL (only the speed bound gates the next
@@ -1469,9 +1469,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     property of the schedule and belongs with the other ledgers.
 
     The instrument is `test/optimality_audit.jl`, projecting the same op model the two ledgers do.
-    It carries the **holder register** — every named holder, its cause, and its disposition — and
-    enforces the discipline in both directions: an unclaimed gap fails, and so does a **stale
-    holder**, one whose gap has been closed everywhere, so retiring it is part of taking the win. It
+    It carries the *holder register* — every named holder, its cause, and its disposition — and
+    enforces the discipline in both directions: an unclaimed gap fails, and so does a stale
+    holder, one whose gap has been closed everywhere, so retiring it is part of taking the win. It
     also splits the pass gap into its two tiers, which have different owners: *achieved − bound* is
     unused fusion (kernel granularity), while *bound − floor* is the traffic that exists only
     because the per-mode symbols are materialized as ``N^{3}`` arrays. The split is diagnostic — the
@@ -1480,31 +1480,31 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``\lvert\boldsymbol{\kappa}\rvert^{2}`` swept once per integrating-factor build), so a lazy
     per-mode symbol apply would delete that class outright and do nothing for the other.
 
-    On the synchronization axis the default configuration issued **three** blocking readbacks per
-    step against a floor of **one** — the CFL speed bound plus `VarianceRescaling`'s two observables.
+    On the synchronization axis the default configuration issued three blocking readbacks per
+    step against a floor of one — the CFL speed bound plus `VarianceRescaling`'s two observables.
     Only the timestep's is irreducible; a forcing's scalar is consumed by the very next kernel and
     visits the host only because it is written as a Julia number. *(Superseded by decision 58, which
-    made `VarianceController` the default and the count **ten** — the speed bound plus three
+    made `VarianceController` the default and the count ten — the speed bound plus three
     reductions at each of three stages. That decision bought temporal order at this axis's expense;
     the gap is held, not accepted — the three per-stage reductions differ only in their weight, and
     one fused multi-weight reduction collapses them.)*
 
     First fruits, each verified and each retiring its holder rather than recording it: the tracer
-    push no longer retains a start-of-step velocity **field** (§4.6) — an ``N^{3}\times3`` resident
+    push no longer retains a start-of-step velocity field (§4.6) — an ``N^{3}\times3`` resident
     buffer and per-step copy serving an ``M\times3`` interpolation, which the ledgers had faithfully
     recorded as a tracer delta and never challenged, in plain conflict with invariant 4's *footprint
     over compute*; the run layer measures ``\varepsilon`` through the Dirichlet form rather than
     building a vorticity to square away; and `IFRK2` builds each integrating factor once per step
-    instead of twice. Where a residual is deliberately **not** taken it is named and its premise
+    instead of twice. Where a residual is deliberately not taken it is named and its premise
     tested, not asserted — the coincident integrating factors at ``\mathrm{Sc} = 1`` are left
     unexploited because the guard would make the hot loop's schedule depend on a runtime value, and
     because the sound condition is *equal diffusivities and both linear rates unarmed*, never
     ``\mathrm{Sc} = 1`` alone.
 
 36. **(2026-07) The frame is ledgered too, and the two ledgers must jointly account for every
-    field-scale array.** Decision 33's ledger walked what a run **evolves** — the state, the
+    field-scale array.** Decision 33's ledger walked what a run evolves — the state, the
     observables cache, the generator's assembly scratch, the scheme registers, the tracers. It
-    never walked the `FixedDomain`, the read-only **frame** the run lives on, so that storage was
+    never walked the `FixedDomain`, the read-only frame the run lives on, so that storage was
     outside every instrument: the audit claimed to bound residency while measuring only part of it.
     The frame is not small. It holds three field-scale arrays — ``\lvert\boldsymbol{\kappa}\rvert^{2}``
     as a real array, the same ``\lvert\boldsymbol{\kappa}\rvert^{2}`` again as the `weighted_inner`
@@ -1518,16 +1518,16 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     carries, the instrument could see 44 %. It would have confirmed the smaller half of the win and
     been structurally blind to the larger.
 
-    The two ledgers are kept **apart** because they answer different questions — the working set is
+    The two ledgers are kept apart because they answer different questions — the working set is
     what the schedule needs live, the frame is what the discretization costs to have precomputed —
-    and are joined by a **completeness invariant**: their sum must account for every field-scale
+    and are joined by a *completeness invariant*: their sum must account for every field-scale
     array reachable from a live `Simulation`, cell by cell. That invariant, not the frame table, is
     what keeps the hole shut, since it fails on new residency wherever it hangs. One exclusion is
-    **named** rather than left absent: a backend FFT plan's work area is owned by the vendor library,
+    named rather than left absent: a backend FFT plan's work area is owned by the vendor library,
     reachable from no Julia field, and observable only by a device query, so it stays a benchmark-side
     empiric.
 
-    The frame's floor is **zero** field-scale arrays — every entry is a closed-form function of the
+    The frame's floor is zero field-scale arrays — every entry is a closed-form function of the
     ``O(N)`` per-axis multipliers — and here the floor is *demonstrated* rather than argued: the
     audit reconstructs ``\lvert\boldsymbol{\kappa}\rvert^{2}`` as the outer sum of three axis
     vectors, checks the Dirichlet weight against it exactly, and checks that each strategy's kernel
@@ -1536,10 +1536,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     reconstructions and move the floor.
 
     Two findings the ledger surfaced the first time it ran, both claimed by the existing symbol
-    holder and retiring with it: ``\lvert\boldsymbol{\kappa}\rvert^{2}`` is resident **twice** in two
+    holder and retiring with it: ``\lvert\boldsymbol{\kappa}\rvert^{2}`` is resident twice in two
     element types, because `weighted_inner` takes a spectral-scalar-typed weight while the envelope
     and integrating-factor broadcasts want the real array; and both spectral-scalar frame entries are
-    real-valued symbols held in **complex** containers, at twice their information content. The audit
+    real-valued symbols held in complex containers, at twice their information content. The audit
     op model's fifth shape class was renamed in the same step — a class holding
     ``\lvert\boldsymbol{\kappa}\rvert^{2}`` and the dealias mask cannot be called `rate` for one of
     its occupants, and the frame table would have reported a nonzero rate cell for a domain that
@@ -1549,32 +1549,32 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     liveness projection of decision 33 extends some values' live range across the whole step, and it
     did so for two different reasons under one name. The evolving state
     (``\hat{\boldsymbol{u}}``, ``\hat\varphi``, a stochastic forcing's internal state) is live because
-    the **dynamics** says so — every stage reads and writes it, and no schedule exists in which it is
+    the dynamics says so — every stage reads and writes it, and no schedule exists in which it is
     not live — so extending it is a statement of fact and belongs in a lower bound. The observation
-    cache's charts are live because a **design choice** says so: the epoch-at-end contract requires
+    cache's charts are live because a design choice says so: the epoch-at-end contract requires
     them to survive the step, and a different design does not. Extending *those* and then reporting
     the result as the bound made the physical-vector cell a tautology — the ledger carries exactly
     those observables, so `achieved == bound` held by construction, and the suite positively asserted the
     equality.
 
-    Measured on the same operation lists: the honest liveness floor is **three** physical vectors —
-    the two substage recoveries plus the product register — against a ledger of **five**. The audit
-    reported a gap of zero where there are **two physical vectors, 768 MiB at ``256^{3}`` in double
-    precision**, the largest single residency item the optimality campaign has surfaced. The holder
+    Measured on the same operation lists: the honest liveness floor is three physical vectors —
+    the two substage recoveries plus the product register — against a ledger of five. The audit
+    reported a gap of zero where there are two physical vectors, 768 MiB at ``256^{3}`` in double
+    precision, the largest single residency item the optimality campaign has surfaced. The holder
     that should have claimed it, `CHART CONTRACT`, had been *written down* in the register's own
     comment from the start and never bound to a cell, because the assumption was consumed by the
     bound instead.
 
     This is decision 35's failure mode occurring inside the instrument decision 35 depends on.
     Decision 35 corrected *a recorded cost is not a minimal one*; the residue it left is sharper — a
-    **bound built out of the very thing it should test** is worse than a loose bound, because a loose
+    bound built out of the very thing it should test is worse than a loose bound, because a loose
     bound at least fails honestly. The correction splits the set in two, admits only the dynamics half
     to the projection, and makes the chart contract a holder with a `FIX` disposition, so the gap is
     claimed and retires when the closing-refresh design closes it.
 
-    Two details keep the fix honest. The traffic model of decision 34 keeps the **union**, because a
+    Two details keep the fix honest. The traffic model of decision 34 keeps the union, because a
     value that outlives a fusion segment must reach memory whatever the reason it survives — so the
-    compute ledger is untouched. And a guard test now asserts the assumption is **load-bearing**:
+    compute ledger is untouched. And a guard test now asserts the assumption is load-bearing:
     adding the chart extension back must raise the count, and raise it exactly onto the ledger, so
     re-merging the two sets fails the suite rather than silently re-certifying the tautology. The
     same test pins that the split is confined to its class — excluding the charts changes neither
@@ -1587,7 +1587,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     is gone (its consumers — the initial-condition envelopes, now composed radial kernels folded with
     the truncation; the integrating-factor builds, a transitional lazy broadcast; the backend/eltype
     template, now the multipliers' axis arrays), and the phase-shift translation kernels are per-axis
-    `SeparableKernel`s. Decision 36's frame floor of zero is thereby **achieved** — 322.5 MiB retired
+    `SeparableKernel`s. Decision 36's frame floor of zero is thereby achieved — 322.5 MiB retired
     at ``256^3``/`Float64`, ``\lvert\boldsymbol{\kappa}\rvert^{2}`` no longer resident twice — and the optimality audit's
     reconstruction demonstration inverted into a correctness pin: the lazy symbols, materialized on
     demand, must equal the explicit axis-vector reconstruction. Knock-on residency wins recorded in
@@ -1610,7 +1610,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     mode from the ``O(N)`` wavenumber arrays. Three consequences, each landed in the same re-freeze:
     (1) the `IntegratorBuffers.integrating_factor` register and every per-stage factor build are gone —
     the stage update ``\hat{\boldsymbol{u}} \leftarrow \mathcal{E}(\hat{\boldsymbol{u}} + B_i \boldsymbol{h})`` is
-    the backend's **two-operand** exponential form, one pass where combine-build-rotate were three, and
+    the backend's two-operand exponential form, one pass where combine-build-rotate were three, and
     a velocity-only working set now holds *nothing scalar-shaped at all*; (2) an armed linear forcing
     rate became a scalar field in spectral representation holding real values (the fused exponential's
     per-mode offset), read once per application instead of once per build; (3) the de-alias/truncation
@@ -1618,7 +1618,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     kernel-composed ``\mathbb{P}`` and ``\nabla\cdot`` arities, the latter absorbing the ``-\nabla\cdot``
     sign in ``\alpha``), and the phase-shift chain's final convolve applies shift-back, average, and truncation in one
     convolve through a `back ∘ truncation` kernel composed once at construction. Three audit holders
-    retired in the same commit, each because its gap **closed**: `SHARED FACTOR` (the register it
+    retired in the same commit, each because its gap closed: `SHARED FACTOR` (the register it
     priced no longer exists), `MATERIALIZED_SYMBOLS` (both its residency and traffic claims delivered —
     the pass ledger's fused bound now *equals* the physical floor, asserted as an equality), and the
     `COINCIDENT INTEGRATING FACTORS` residual (nothing is built for the ``\mathrm{Sc} = 1`` coincidence
@@ -1631,34 +1631,34 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 40. **(2026-08) The observables cache is deposit-driven, and a slot is its producer's register.** The
     cache moves to its own module (`Cache`, between `State` and `Forcing`) and is rebuilt to the
     design of `docs/src/observables_cache.md`: the schedule is fixed at construction and identical on
-    every iteration; **everything is deposited at the end of the iteration** (`deposit!` — the next
+    every iteration; everything is deposited at the end of the iteration (`deposit!` — the next
     iteration's first-stage recoveries relocated, plus the maximum-speed reduction the next timestep
-    choice reads); a read serves the current-epoch value or **throws** — there is no path, internal or on
+    choice reads); a read serves the current-epoch value or throws — there is no path, internal or on
     request, by which reading causes a computation (the recompute-on-staleness accessors of
     decision 30 are retired; `fields_modified!` now opens an interval in which reads throw,
-    closed by an explicit `deposit!`). Contents are **automatic** — the constructor derives them from
+    closed by an explicit `deposit!`). Contents are automatic — the constructor derives them from
     the configuration (the `observables` declaration keyword is gone); the three-valued slot epoch
     (deposited value / producer's scratch / never deposited) polices the mid-iteration window, and
     the deposit-completeness check refuses to close an iteration with an undeposited slot. The
-    storage consequence is the **slot=register merge**: the step's substage recovery registers ARE
+    storage consequence is the *slot=register merge*: the step's substage recovery registers ARE
     the cache's chart arrays (taken at stage 2, re-deposited at the iteration's end), which deletes
     `IntegratorBuffers`' two physical vectors — precisely the honest gap decision 37 uncovered,
     768 MiB at ``256^3``/Float64 — along with the cache's spectral scratch and the scalar's copy
     register (the closing and substage recoveries write through a stage register that is dead at that
-    point of the schedule). Every unforced ledger cell now sits **at** its liveness bound in every
+    point of the schedule). Every unforced ledger cell now sits at its liveness bound in every
     class, so three holders retire in this commit (`CHART CONTRACT` — by exactly the closing
     refresh its text prescribed — `OWNERSHIP`, and `SCALAR REGISTERS`), and `DYNAMICS_LIVE` absorbs
     the charts as facts of the deposit-persistence contract (the `charts_live` choice parameter is
     gone; the falsifiability guard now pins the closing-deposit structure instead). The audited op model
-    widens from the step to the **iteration** (step + closing deposit), which surfaces the once-per-iteration
+    widens from the step to the iteration (step + closing deposit), which surfaces the once-per-iteration
     maximum-speed readback in the pass and synchronization ledgers (+1 physical-vector pass in every
     cell; a hand-fixed-``\Delta t`` iteration still pays it — held by the new `UNIFORM DEPOSIT
     SCHEDULE` design holder, the price of a schedule that never varies with how the run is driven).
     Read that against decision 35's synchronization floor — one readback per step under an adaptive
     CFL, none under a fixed step — and note the two are speaking about different things: 35 states
-    the **floor**, this states what is **achieved**, and on the fixed-step axis they deliberately
+    the floor, this states what is achieved, and on the fixed-step axis they deliberately
     differ. That gap is exactly what a named holder is for;
-    transforms froze **identical** in every cell. Public-surface consequences: the accessors are the
+    transforms froze identical in every cell. Public-surface consequences: the accessors are the
     noun-first checked reads `velocity_physical` / `vorticity_physical` / `scalar_physical` and the
     cached `max_speed` (one generic with the `Observables` reduction), `physical_velocity` /
     `physical_vorticity` / `spectral_scratch` are gone, and the allocator family was renamed so the
@@ -1675,11 +1675,11 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the flux ``\boldsymbol{u}\varphi`` lands in the velocity's through the backend's pointwise
     `multiply!` — which also replaces the raw broadcast `_scalar_flux!` had carried, a
     reimplementation of a shipped PF operation (invariant 2). The displaced PhaseShift evaluations
-    reuse their own shifted registers the same way. The verb `velocity_rhs!` therefore **consumes** its `ω`
+    reuse their own shifted registers the same way. The verb `velocity_rhs!` therefore consumes its `ω`
     argument and `scalar_rhs!` its `u` (documented in both docstrings; `step!` takes the
     corresponding cache slots before the stage-1 assembly), and `ResolvedGenerator` keeps only the
-    spectral product image: one physical vector retired from **every** configuration — 384 MiB at
-    ``256^3``/Float64 — bringing the physical-vector floor to **two** registers (the chart slots,
+    spectral product image: one physical vector retired from every configuration — 384 MiB at
+    ``256^3``/Float64 — bringing the physical-vector floor to two registers (the chart slots,
     now serving as recovery registers *and* product targets), with the archived OU's physical
     ownership gap closing as a side effect (no product register remains for its noise to alias).
     This is the reuse §2.3 of the design page recorded as blocked before the backend's alias-safe
@@ -1690,13 +1690,13 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     names — is superseded by decision 67: the cache allocates and owns the slot. The sample's slot
     status, its two epochs, the iteration-end schedule, the unserved predictor register, and the
     forbidden reuse all stand.]* `Tracers.velocity1` / `velocity2` were categorically different objects
-    wearing sequence numbers: the first is the **trajectory sample**
+    wearing sequence numbers: the first is the trajectory sample
     ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` — a genuine Lagrangian observable between iterations —
     the second the velocity at the Heun *predictor* position, which no tracer ever occupies: a stage
     register, substage on the position argument alone. They are renamed `particle_velocities` /
     `velocity_predictor`, and the sample becomes the observables cache's first trajectory-bound
     slot — the class decision 30 reserved and never used — wired to the tracer set's own point-value
-    storage (the slot IS the register, as everywhere else) and dated against **both** epochs,
+    storage (the slot IS the register, as everywhere else) and dated against both epochs,
     since the sample is a function of the state and the positions together. The push's schedule
     moves fully onto the iteration ends: `advance!` checks the sample at the start (the previous
     closing deposit recorded ``\boldsymbol{v}_1``), pushes after the closing field deposits
@@ -1704,7 +1704,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the new sample at the new positions — so `advect!`'s prose-only staleness contract is retired in
     favor of the slot epoch, and the sample is read through the checked `particle_velocities`
     (`tracer_velocities` is gone; `tracer_positions` is renamed `particle_positions`, the
-    user-settled accessor prefix). The register `velocity_predictor` is deliberately **not served** as an
+    user-settled accessor prefix). The register `velocity_predictor` is deliberately not served as an
     observable — an off-trajectory value must not be offered as a plausible-looking Lagrangian
     velocity, though it remains an ordinary reachable field of its buffers type — and the
     tempting ``\boldsymbol{v}_2``-as-next-``\boldsymbol{v}_1`` reuse is recorded as forbidden (it
@@ -1725,8 +1725,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     gates, the give-up cap) as a callable carrying its own observation state — with `warmup!` kept
     as its one-line sugar. The uniform read surface completes the redesign: `velocity_spectral` /
     `scalar_spectral` read the state itself, the cache accessors the deposited observables, and
-    `particle_positions` the probes' state — a **function names what the run holds, wherever it
-    lives** (reading needs no knowledge of the state/cache split), while writing stays on the dot
+    `particle_positions` the probes' state — a function names what the run holds, wherever it
+    lives (reading needs no knowledge of the state/cache split), while writing stays on the dot
     path, where the danger demands the knowledge. An accessor exists exactly for what the run holds:
     `vorticity_spectral(sim)` deliberately does not exist (``\hat{\boldsymbol{\omega}}`` is
     materialized nowhere), and a `MethodError` is the honest answer.
@@ -1735,7 +1735,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     The cache design's full relocation — assembling the dealiased
     ``\mathbb{P}(\boldsymbol{u}\times\boldsymbol{\omega})`` and
     ``-\nabla\cdot(\boldsymbol{u}\varphi)`` at the iteration's end, so the next first stage reads them — was
-    written in the third-array world and is **incompatible with decision 41**: the products now form
+    written in the third-array world and is incompatible with decision 41: the products now form
     in place over the velocity and vorticity slots, so an end-of-iteration assembly would destroy the deposited
     charts the observation exists to serve, and keeping both would re-add the product array
     (one physical vector, 384 MiB at ``256^3``/Float64). Minimal footprint trumps compute
@@ -1758,7 +1758,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `u_shifted`'s last consumer), and `prepare!` opens every step with the mark cleared. The
     contract is opportunistic, not load-bearing for correctness: a bare `scalar_rhs!` with no
     preceding velocity evaluation finds the mark cleared and rebuilds the displaced velocity
-    itself, value-identically. The transform ledger now sits **at its lower bound in every cell**
+    itself, value-identically. The transform ledger now sits at its lower bound in every cell
     — `TRANSFORM_GAP_HOLDERS` is empty, `PhaseShift` is exactly ``2\times`` its mask cell for
     velocity and scalar alike (RK3 ``51 \to 42`` c2r, RK2 ``34 \to 28``), and the `PhaseShift`
     scalar pass cells drop the deleted shift and recovery passes with it. This completes the
@@ -1768,8 +1768,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     generics the cached reads extend.** The include order becomes `State → Observables → Cache` *(misrecorded here: the order has been
     `Observables → State` since the module split — the entry's substance, `Observables` before
     `Cache`, is unaffected)*, and
-    an observable with both a measurement and a cached value is **one generic with two method
-    families** — the field-argument reduction computes ("measure now"), the `ObservablesCache`
+    an observable with both a measurement and a cached value is one generic with two method
+    families — the field-argument reduction computes ("measure now"), the `ObservablesCache`
     method serves the deposited value or throws — with the bare binding and the docstring homed in
     `Observables` and `Cache` extending it (`max_speed` today; the pattern is the rule for any
     future cached observable). Dispatch by argument type is the mode selector: a considered
@@ -1778,7 +1778,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     state stores no observables. Two contracts survive unchanged: reads never compute (decision 40's
     no-recompute contract), and ``\varepsilon``, ``k``, ``E(\kappa)`` still never become resident
     slots. The recorded homing rationale is also corrected here: the placement criterion for what
-    lives upstream of `Generator` is **consumption inside `step!`** (the assembly's per-stage
+    lives upstream of `Generator` is consumption inside `step!` (the assembly's per-stage
     inputs), *not* a "measurement never feeds the dynamics" principle — that principle is false in
     mechanics (the Hamiltonian, an observable, generates the flow) and false in this package
     (`max_speed` sets the adaptive ``\Delta t``; `VarianceRescaling` holds a measured band energy);
@@ -1799,9 +1799,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     decision 30's "chart map homed in `State`" — the chart map is PF's operation; `State` keeps only
     the state and its seeders. What remains a package verb is the one recovery that is *not* a bare chart map (its slot is still a
     chart — a physical-representation view — but its recovery computes an observable, the curl):
-    **`vorticity_physical!`** — curl in scratch, then transform; no preservation copy, since the curl
+    `vorticity_physical!` — curl in scratch, then transform; no preservation copy, since the curl
     only reads its source — homed in `Observables` as the field-valued observable whose cached read
-    is `Cache.vorticity_physical` — an f/`f!` **pair**, not decision 46's single dispatched generic, and
+    is `Cache.vorticity_physical` — an f/`f!` pair, not decision 46's single dispatched generic, and
     the difference is structural rather than a drift: `max_speed` is a pure reduction, so one name can
     dispatch on whether it is handed a field or the cache, while a recovery *writes a field* and a
     checked read *returns one*, which no single name can carry. Decision 46's one-generic rule
@@ -1818,12 +1818,12 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     "boundary" for the instant between iterations.** Two informal house terms are retired from
     every surface, prose and code alike, after the user's documentation read-through flagged both
     as unclear ("tail" is not a standard term for the end of a loop body; "boundary" invites the
-    spatial reading — on a triple-periodic box, of all packages). The **closing deposit** is the
+    spatial reading — on a triple-periodic box, of all packages). The closing deposit is the
     `deposit!` that ends an iteration ("tail deposit", "the tail", "at its tail" before); the
     instant between iterations is named plainly — *between iterations*, *the iteration's end*,
-    *the instant* ``t_n`` — and the cache values carry the adjective **deposited** (the deposited
+    *the instant* ``t_n`` — and the cache values carry the adjective deposited (the deposited
     velocity, the deposited observables) where "boundary velocity/observables" stood.
-    The `check_boundary` verb is renamed **`check_deposits`** (the deposit-completeness check), and the op
+    The `check_boundary` verb is renamed `check_deposits` (the deposit-completeness check), and the op
     model's `_tail_deposit`/`tail` become `_closing_deposit`/`closing`. Untouched, being different
     senses of the same words: the spatial box boundary, an ownership or kernel-granularity
     boundary, a spectrum's ``\kappa^{2}`` tail, and the phase-shift chain's final convolve
@@ -1857,7 +1857,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `ParticleIntegratorBuffers` — one generic across both sides, because it is one concept. The axis
     is recorded as planned in §7, and the scratch genuinely varies along it: a higher-order
     Runge–Kutta scheme wants several stage velocities, a multistep scheme wants a velocity *history*
-    and no predictor at all, and an inertial particle wants ``\boldsymbol{v}`` as **state** rather
+    and no predictor at all, and an inertial particle wants ``\boldsymbol{v}`` as state rather
     than scratch. The split also disentangles `particle_velocities`'s two roles — the measured
     Lagrangian observable, and "the first half of the next push" — so a history-based scheme would
     not disturb the observable. Storage is unchanged, only reassigned: the memory audit now pins two
@@ -1866,7 +1866,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 51. **(2026-08, user-directed) *Particle* is the category, *tracer* the kind.** The public surface
     used three nouns for one set of objects — `particle_positions` beside `number_of_tracers` in a
     single export line, plus `particle_velocities` — with no convention stated anywhere. The rule is
-    now: **name by what the operation is true of.** Anything true of the whole deferred ladder of §7
+    now: name by what the operation is true of. Anything true of the whole deferred ladder of §7
     takes *particle* — the positions, the count, the cache slot, interpolation at positions;
     only what is specific to the massless, internal-degree-of-freedom-free kind takes *tracer* — the
     `Tracers` type and its construction. Hence `number_of_tracers` becomes `number_of_particles` (a
@@ -1899,8 +1899,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `*_stamp` fields become `*_epoch`, and the verb goes with the noun — a deposit *fills a slot and
     sets its epoch* rather than "stamping" it.
 
-    The merge creates one hazard, so the `Cache` docstring now states it outright: **an epoch counts
-    changes to the state, not advances of the run.** A completed `step!` advances the fields epoch,
+    The merge creates one hazard, so the `Cache` docstring now states it outright: an epoch counts
+    changes to the state, not advances of the run. A completed `step!` advances the fields epoch,
     but so does any announced out-of-band mutation, so the two counts diverge: the constructor's
     seeding deposit leaves the fields epoch at 1, so after two steps and one announced mutation the
     clock reads step 2 and the fields epoch reads 4 — measured, not assumed. The epoch answers "is this value still the right one?"; `current_step` answers "how
@@ -1919,14 +1919,14 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     demanded all along: *what does your run hold fixed?* is not a property of the method.
 
     The reason it matters more than an ergonomic slip: a deterministic clamp destroys the physical
-    fluctuation of whatever it holds, so `over` decides **which quantity the run may no longer
-    measure**. Under `:total` the kinetic energy is an artifact of the forcing and the band is free;
+    fluctuation of whatever it holds, so `over` decides which quantity the run may no longer
+    measure. Under `:total` the kinetic energy is an artifact of the forcing and the band is free;
     under `:band` the band is the artifact and ``k`` is a measurable of the flow. A default silently
     made that choice for a user who might be measuring exactly the clamped quantity.
 
     The two surfaces had also disagreed — the constructor defaulted to `:band`, the `Simulation` front
-    door overrode to `:total` — and investigating why settled the design. The override is **load
-    bearing**: in grid mode the front door chooses ``\nu`` from the *assumed* kinetic energy through
+    door overrode to `:total` — and investigating why settled the design. The override is load
+    bearing: in grid mode the front door chooses ``\nu`` from the *assumed* kinetic energy through
     the box-normalized dissipation law, so the resolution criterion ``\kappa_{\max}\eta`` is
     self-consistent only if the run really holds ``k`` at that value, which is precisely what
     `:total` guarantees and `:band` does not. A hand-built forcing that nothing downstream calibrates
@@ -1981,7 +1981,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     only available improvement was to move the warning from the prose into the signature, where a
     caller meets it.
 
-    Which operand is consumed follows the **physics** rather than the argument position (the Lamb
+    Which operand is consumed follows the physics rather than the argument position (the Lamb
     vector forms over the vorticity, the scalar flux over the velocity), which is why naming beats
     any positional convention here: there is no position rule to state, and a reader who looked for
     one would find a coincidence — both sit fifth — that does not generalize.
@@ -1994,10 +1994,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     no extra field evaluation and no extra interpolation, where `EndpointHeun` pays one interpolation
     per step. Same reasoning as TurTLE's tracers (Adams–Bashforth, orders 1–5, default 4).
 
-    Two departures, both forced here. **Steps are not uniform** — the advective-CFL loop changes
+    Two departures, both forced here. Steps are not uniform — the advective-CFL loop changes
     ``\Delta t`` every iteration, so the weights are recomputed per step as the integral of the
     Lagrange polynomial through the stored sample times, verified to reduce to the classical
-    constants at uniform step. **The startup bounds the order** — TurTLE ramps AB1→AB4, but AB1 is
+    constants at uniform step. The startup bounds the order — TurTLE ramps AB1→AB4, but AB1 is
     Euler and measurement gave ``\approx 2.0`` for the ramp against ``\approx 3.0`` for an
     `EndpointHeun` bootstrap, so the bootstrap shipped. Fourth order over a fixed window would need a
     start of matching order, unavailable because it wants the velocity between step endpoints.
@@ -2006,7 +2006,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     past the interpolation's *smoothness* buys nothing." That misattributes the mechanism. The
     interpolant perturbs the field by a ``\Delta t``-independent ``\epsilon``, so Grönwall gives a
     trajectory-error floor no timestep can cross — and the floor is set by the interpolant's
-    **reproduction degree**, not its smoothness. Measured on a frozen ABC flow at ``64^3``, ``T = 1``:
+    reproduction degree, not its smoothness. Measured on a frozen ABC flow at ``64^3``, ``T = 1``:
     `CatmullRom` (``C^1``, degree 2) floors at ``1.2\times10^{-5}``; `LalescuSpline(3, 1)` (same
     ``C^1``, degree 3) at ``2.6\times10^{-7}``; `LagrangeSpline(3)` (``C^0``, degree 7) at
     ``1.2\times10^{-11}``. At fixed degree 7, ``C^0`` and ``C^3`` gave identical time convergence, so
@@ -2015,7 +2015,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 58. **(2026-08, user-directed) A state-dependent forcing rate belongs in the source, not in the
     integrating factor: `VarianceController` is the new default, and `VarianceRescaling` is kept as a
     documented first-order reference.** The audit that followed the bug hunt found the default
-    `Simulation` integrating at **first order** on a third-order scheme, and the cause was routing
+    `Simulation` integrating at first order on a third-order scheme, and the cause was routing
     rather than any error in the schemes or the forcing protocol. Both are worth separating, because
     only one of them was a defect.
 
@@ -2042,8 +2042,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     variance ``k`` in the restoring term, the forced band's ``k_f`` normalizing, and the two are not
     interchangeable (see the postscript). Its marginal term
     ``\varepsilon/2k_f`` reinjects exactly what dissipation removes, and its proportional term gives
-    ``\mathrm dk/\mathrm dt = -G(k - k_\infty)/t_\ell`` — exponential relaxation to a **stable
-    attractor**. That is the structural difference from the rescale, not a numerical refinement: the
+    ``\mathrm dk/\mathrm dt = -G(k - k_\infty)/t_\ell`` — exponential relaxation to a stable
+    attractor. That is the structural difference from the rescale, not a numerical refinement: the
     clamp *imposes* the target and destroys the fluctuation of the quantity it holds, while the
     controller *restores* toward it and leaves the fluctuation to the flow. Molecular dynamics settled
     the same question the same way — naive velocity rescaling versus a thermostat that extends the
@@ -2078,7 +2078,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     dissipation identically, so ``\mathrm dk/\mathrm dt = 0`` and ``k`` is *conserved at its initial
     value* (`target` never enters the rate). The subtlety is stability, not conservation: the exact
     reinjection cancels the cascade's own restoring response — the physical feedback `ConstantPower`'s
-    *fixed* injection retains — so every level is a **neutral** equilibrium, and discrete integration
+    *fixed* injection retains — so every level is a neutral equilibrium, and discrete integration
     bias accumulates uncorrected (measured: ``k`` drifting monotonically ~1% per 1000 steps at
     ``24^3``, against a G = 1 controller holding 1.498 flat). The guard is now finite-and-non-negative;
     a negative gain stays refused (anti-restoring). The witness is the discriminating experiment, not
@@ -2094,7 +2094,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     at ``\kappa = 0`` was integrated with no restoring term and, the flow being chaotic, grew at the
     Lyapunov rate: measured 3% of ``u'`` after 3000 Float32 steps, a phantom uniform wind under every
     Lagrangian statistic. The pin is an O(1) masked write in `velocity_rhs!` / `scalar_rhs!`, placed
-    **between** the nonlinear assembly and the forcing source: the exact law covers the advective
+    between the nonlinear assembly and the forcing source: the exact law covers the advective
     term alone, so a forcing that deliberately drives a mean stays expressible. The zeroing is
     physics (a conservation law), not field machinery, which is why it lives here and is not a
     `GBGPeriodicFields` raise — defining ``\mathbb P(0) = 0`` at the backend would encode momentum
@@ -2153,7 +2153,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
       and the new public observable `kinetic_energy_and_dissipation` — the eddy-turnover clock's
       ``(k, \varepsilon)`` pair, used by `StationarityCriterion` every iteration. The `FixedDomain`
       gained `unit_kernel` (the constant-``1`` weight in the same lazy form, so a plain variance can
-      join a fused traversal). The synchronization ledger re-froze: the default row fell **10 → 4**
+      join a fused traversal). The synchronization ledger re-froze: the default row fell 10 → 4
       crossings (one fused reduction per stage plus the ``\Delta t`` choice), the
       `VarianceRescaling` and warm-up rows each by their fused share; the compute ledger's
       controller delta fell 6 → 4 passes per evaluation. `UNFUSED QUADRATIC REDUCTIONS` was
@@ -2175,18 +2175,18 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 
     - **Base-space motion** (`displace!` — "the exp map of the flat torus" — and `wrap!`). Every
       trajectory update now crosses the package boundary as a *named PF operation*: the Heun push
-      is two fused displacements (predictor and corrector), the Adams–Bashforth push is **one**
+      is two fused displacements (predictor and corrector), the Adams–Bashforth push is one
       fused ``K``-term displacement where a loop once made ``K`` broadcast passes over the
       positions, and the periodic wrap rides the same traversal via the `grid` form. IT's
       `advect!` bodies contain no `point_values` unwraps and no raw-array arithmetic on positions.
-      `_wrap!` is **deleted**: its hard-won contract — the excluded-endpoint fold (floating-point
+      `_wrap!` is deleted: its hard-won contract — the excluded-endpoint fold (floating-point
       ``\operatorname{mod}`` can return exactly ``L``) and non-finite transparency (an order test
       would launder a diverged trajectory into a tidy in-box position) — was adopted verbatim into
       PF's `wrap!`, and IT's witness now pins that contract at the boundary `advect!` actually
       calls, so a PF regression on either half fails here too.
     - **Allocation from context** (the six field constructors accept a storage *family* —
       `Array` / `CuArray` / `ROCArray` — and produce the storage themselves, element type from the
-      grid). `_reference`/`_blank` are **deleted**: the frame no longer borrows a multipliers axis
+      grid). `_reference`/`_blank` are deleted: the frame no longer borrows a multipliers axis
       vector as a backend-and-element-type witness for raw `Base.similar`. `FixedDomain` now
       stores the constructor's own `storage_family` (a type, zero array bytes — the frame ledger
       is untouched), the six `new_<Type>` allocators are thin wrappers over the family
@@ -2198,13 +2198,13 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     for the dispersion diagnostics. The accuracy analysis fixes which is which, not a flag: the
     absolute floating-point resolution at a coordinate grows with the coordinate, so an unwrapped
     position that winds ``n`` boxes is known ever more coarsely — feeding it back into
-    interpolation would degrade the dynamics, `Float32` fastest. The dynamics therefore **always**
+    interpolation would degrade the dynamics, `Float32` fastest. The dynamics therefore always
     advance wrapped. The unwrapped record only ever feeds *differences*
     ``\boldsymbol{X}(t) - \boldsymbol{X}(0)`` — mean-square displacement, dispersion — whose
     relative accuracy the coordinate growth does not touch, so it needs no wrap and must not have
     one. Implementation: `Tracers(…; unwrapped = true)` (forwarded by `Simulation`) carries a
     fourth state field, a `PointSet` starting equal to the seeded positions; every push applies
-    the **same displacement terms** to both records — the wrapped positions through `displace!`'s
+    the same displacement terms to both records — the wrapped positions through `displace!`'s
     grid form, the record through the grid-free universal-cover lift (the two cannot disagree on a
     step, only on the winding the wrap discards). Read through `unwrapped_positions`; an untracked
     set throws. An announced `particles_modified!` on a run restarts the record at the new positions — winding
@@ -2217,10 +2217,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `point_coordinates` extracting the matrix view, the `positions`/`position_points` pair in
     `Tracers` had lost its reason (the raw field existed for the axpy-and-wrap arithmetic decision
     64 deleted, and the new unwrapped record already used the single-`PointSet` pattern). `Tracers`
-    now carries **one** position storage — `position_points::PointSet` — and one type parameter
+    now carries one position storage — `position_points::PointSet` — and one type parameter
     fewer; `particle_positions` serves the `(M, 3)` view through `point_coordinates`, the count
     comes from `npoints`, and the point-value allocators are thin wrappers over
-    `similar_pointvalues`. The constructor's `positions` keyword takes a **`PointSet`**, and a raw
+    `similar_pointvalues`. The constructor's `positions` keyword takes a `PointSet`, and a raw
     array is refused with the rule stated in the error: raw arrays cross the boundary only through
     the `GBGPeriodicFields` point types, and a caller who needs the bare array back extracts it
     with that package's accessors. (A malformed shape is refused one layer down, by `PointSet`'s
@@ -2230,7 +2230,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     `velocity_at_particles`.** Decision 42 made the trajectory sample a cache slot but wired the
     slot to the tracer set's own point-value storage — one array under two names. That aliasing was
     the last seam in the observable/state split: the sample
-    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is an observable of the **flow** — a tracer has no
+    ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))`` is an observable of the flow — a tracer has no
     velocity of its own — so `Tracers` now carries positions and the interpolation scheme only,
     and the `ObservablesCache` allocates the slot itself (a `number_of_particles` keyword sizes an
     ``M \times 3`` array of point values on the domain's backend, plus the multistep history)
@@ -2239,7 +2239,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     writes into the cache it is handed; `allocate_buffers(scheme, tracers, cache)` takes the cache
     whose slot and history the scheme's registers ride; the checked read is unchanged in contract.
     The name changed with the ownership, on the user's ruling: *particle velocities* would name
-    particle **state** — the inertial ladder's own ``\boldsymbol{v}`` — while this slot holds the
+    particle state — the inertial ladder's own ``\boldsymbol{v}`` — while this slot holds the
     flow's velocity sampled at the particle positions. The old names `particle_velocities` /
     `record_particle_velocities!` became `velocity_at_particles` / `record_velocity_at_particles!`
     (the `at_particles` morpheme from `interpolate_at_particles!`), and prose everywhere says "the
@@ -2252,7 +2252,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     time-integration members asymmetrically: `integration_scheme` claimed the unqualified word for
     the fields, and `trajectory_scheme` named the particles' scheme by the object it produces
     rather than the thing it advances. The user weighed the frame vocabulary (Eulerian /
-    Lagrangian) and chose the system vocabulary: the run advances **fields** and **particles** —
+    Lagrangian) and chose the system vocabulary: the run advances fields and particles —
     decision 51's umbrella word — so the keywords are `field_integration_scheme` /
     `particle_integration_scheme` / `interpolation_scheme`, and the two renamed keywords' morphemes
     now align with their supertypes (`AbstractIntegrator` / `AbstractParticleIntegrator`). Prose
@@ -2283,7 +2283,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``\mathcal{O}(\texttt{order})`` host vectors for the variable-step weight solve. The register
     sets now nest — a multistep scheme uses the predictor registers for its `Heun` starting steps
     only, and adds the two host vectors (empty for a one-step scheme) — so one type serves every
-    scheme with **zero** dead device storage for either, which is tighter than the field side's
+    scheme with zero dead device storage for either, which is tighter than the field side's
     `IntegratorBuffers` manages with its `nothing` slots. This mirrors the field side's one-type
     pattern: `advect!` and `restart!` keep dispatching on the scheme, exactly as `step!` does, and
     `allocate_buffers(scheme, tracers, cache)` is the one particle form (the two-argument form died
@@ -2302,7 +2302,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     argument for the *writer stamping in the same call*, not for the caller sequencing two calls.
     `deposit!` is now one generic with three methods: the field form (after `step!`), the particle
     form `deposit!(cache, tracers, u)` — added by `Particles` exactly as it extends
-    `allocate_buffers`, interpolating and stamping **both** epochs in one act (the stamping half
+    `allocate_buffers`, interpolating and stamping both epochs in one act (the stamping half
     lives on in `Cache` as the private `deposit_velocity_at_particles!`, beside its field-slot
     siblings) — and the `sim` form, which performs every deposit the configuration carries. The
     dependency chain still forces two deposit *moments* per iteration — the push consumes the field
@@ -2324,7 +2324,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     principle, under which an accessor earns its place only by enforcing a contract. Both are
     deleted; a caller reads `tracers.positions` and applies the field library's own accessors.
     `unwrapped_positions` stays as the one guarded read — the opt-in slot with the named
-    `ArgumentError` — and now returns the **`PointSet`**, keeping the PF-typed boundary on output
+    `ArgumentError` — and now returns the `PointSet`, keeping the PF-typed boundary on output
     exactly as decision 66 fixed it on input; the raw view is one `point_coordinates` away. The
     fields shed the `_points` suffix, a fossil of the pre-66 dual-field era in which
     `position_points` disambiguated the `PointSet` wrapper from its raw `positions` sibling: with
@@ -2335,8 +2335,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     *grid* / *explicit*.** The old pair failed the dichotomy test the user applied: *grid* and
     *explicit* are not opposing terms, so the two labels never said they exhaust the choice — and
     "(no `viscosity`)" under-specified the trigger, which is the keyword *not being passed
-    explicitly*. The new pair is exhaustive by construction — ``\nu`` is either **supplied**
-    (`viscosity = …`, used directly) or, absent, **derived** (from the grid, as the highest
+    explicitly*. The new pair is exhaustive by construction — ``\nu`` is either supplied
+    (`viscosity = …`, used directly) or, absent, derived (from the grid, as the highest
     Reynolds number consistent with `κ_max_η`; decision 20's solve, now called *the viscosity
     derivation* everywhere it is named). Swept across the `Simulation` docstring (bullets,
     examples, keyword entries), the five `@warn` prefixes (`"Simulation (derived viscosity): …"`),
@@ -2350,8 +2350,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     "Front door" as the name of the no-`domain` form said nothing about what distinguishes it (it
     builds the `FixedDomain` for you), so the form dichotomy is now mechanism-named and exhaustive:
     the domain is either built from keywords or taken pre-built. The `# Arguments` section splits
-    into the **domain group** (consumed by the domain-building form; the domain-taking form
-    replaces the whole group with its one positional argument) and the **run group** (accepted by
+    into the *domain group* (consumed by the domain-building form; the domain-taking form
+    replaces the whole group with its one positional argument) and the *run group* (accepted by
     both), retiring the per-bullet *(front door only)* markers the grouping now carries
     structurally. *Front door* survives in its sanctioned entry-point sense (§4.7's heading, the
     decision log) and the glossary row now marks it historical, resolving to *domain-building*.
@@ -2371,13 +2371,13 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     chart, the current velocity sample, kernels, plans, and all scratch — the reader rebuilds the
     `Simulation` through its own constructor and replays the seeding deposits over the loaded
     state. Stored because irreplaceable: the spectral state, the positions and the opt-in
-    unwrapped record, the clock, and the **Lagrangian sample history** (ring, step sizes, fill
+    unwrapped record, the clock, and the Lagrangian sample history (ring, step sizes, fill
     count), restored fill-aware after the epoch announcements — the order is load-bearing, since
     `particles_modified!` discards the history and restarts the unwrapped record, so both are
     written after it. Ruled non-persistent: a stochastic forcing's evolving force and stream — a
     reloaded `StochasticOU` resumes on a fresh stream (parameters only), so continuation is exact
-    (bitwise, pinned by test) for deterministic forcings. The forcing structs now **store their
-    shell bounds** — the parameters their band kernels are derived from, previously dropped at
+    (bitwise, pinned by test) for deterministic forcings. The forcing structs now store their
+    shell bounds — the parameters their band kernels are derived from, previously dropped at
     construction — the "an object is its parameters" lesson applied one layer up.
 
 76. **(2026-08, user-directed) The push announces itself: `advect!` advances the particles
@@ -2416,7 +2416,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``2 \times`` (velocity 3 + scalar 1 + tensor 9) spectral fields — measured to within 0.05% on
     five configurations across two grids, two dealiasing strategies, two precisions and two vendor
     libraries. The rank-2 family is 9 of those 13 components, and its only consumer is
-    `derivative_skewness`: **3.81 GiB at ``384^3`` / `Float32`** held for the life of a run to serve
+    `derivative_skewness`: 3.81 GiB at ``384^3`` / `Float32` held for the life of a run to serve
     one occasional diagnostic. `FixedDomain` now stores a memo cell and `tensor_plans` builds on the
     first rank-2 transform. The velocity and scalar plans stay eager — the time loop transforms both
     every step, so there is nothing to defer.
@@ -2443,7 +2443,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     correctly. The owner was simply never instantiated on the backend where it holds anything.
 
     The device leg now runs the frame ledger and the completeness invariant whenever a functional
-    CUDA or AMDGPU backend is present, and **records a visibly unfulfilled test when it is not** —
+    CUDA or AMDGPU backend is present, and records a visibly unfulfilled test when it is not —
     a conditional that passed quietly on a CPU-only runner would rebuild the same blindness in a
     new form. The register is bidirectional as everywhere else in that file: when the backend stops
     allocating eagerly, `DEVICE_FRAME` must fall in the same commit.
@@ -2494,9 +2494,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     day, and the bump landed only when the witness read zero.
 82. **(2026-08, user-directed) Retained vs resolved: two named band edges, and the resolution
     criterion measures the resolved one.** A dealiasing strategy fixes two distinct wavenumbers that
-    decision 20's single `max_wavenumber` conflated: the **retained** cutoff (the highest mode kept
+    decision 20's single `max_wavenumber` conflated: the *retained* cutoff (the highest mode kept
     energetic — what the advective-CFL, the random-seed spectrum, and the empty-shell warnings must
-    see) and the **resolved** cutoff (the highest mode whose dynamics is genuine Navier–Stokes —
+    see) and the *resolved* cutoff (the highest mode whose dynamics is genuine Navier–Stokes —
     what the resolution criterion ``\kappa_{\max}\eta`` and the viscosity solve must see). For the
     sharp-cutoff strategies the two coincide; under `HouLi` they diverge, because the per-step filter is an
     extra damping rate ``\mathrm{strength} (\kappa/\kappa_{\mathrm{Ny}})^{36}/\Delta t`` that
@@ -2582,7 +2582,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     callback.** PF's `point_traversal_order` sorts the tracers into a tile-major visiting order so
     the interpolation gathers read the field with memory locality: the gather at ``256^3`` /
     ``10^6`` tracers fell from ``7.7`` to ``1.9`` ms on the device, while the result is
-    **bit-identical** to the unordered gather (PF visits the same points with the same stencil;
+    bit-identical to the unordered gather (PF visits the same points with the same stencil;
     only the order changes). Three placements were weighed. The order is not trajectory *state*
     (`Tracers`), because it carries no physics and nothing of it is persisted — a checkpoint
     restores the tracers and the run rebuilds the order from their positions. It is not a
@@ -2591,7 +2591,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     same-length order, so the predictor points inherit the tracers' order without a second one.
     It is not a cache slot, because it is never *read* as an observable. Hence a fourth owner,
     `ParticleTraversal` (the order plus PF's rebuild scratch plus the automatic flag), held in
-    `Simulation.particle_traversal`. **Cadence:** the order decays as the tracers move — measured
+    `Simulation.particle_traversal`.
+
+    **Cadence:** the order decays as the tracers move — measured
     good for ``60``–``175`` steps — and a rebuild costs ``\approx 0.27`` ms on the device against
     a break-even of two to six steps, so the every-iteration rebuild sits within ``0.3\%`` of the
     optimum, and that is the default (`ordered_interpolation = nothing` resolves to `true`
@@ -2601,12 +2603,16 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     allocates nothing, and naming the setting on a tracer-free run is refused (the by-name
     guard of decision 83, extended to one more setting). The verbs a caller drives directly take the same order
     through `traversal = nothing` (`advect!`, `deposit!`, `interpolate_at_particles!`), so the
-    run layer and a hand-driven loop cannot diverge. **Cadence predicates:** the manual mode
+    run layer and a hand-driven loop cannot diverge.
+
+    **Cadence predicates:** the manual mode
     needs a clean way to say *every* ``n`` *steps* or *every* ``\Delta T`` in a `run!` callback,
     and the `Clock` holds only `time` and `step`, so `every_steps(n)` is a pure closure on the
     step count and `every_time(period)` a stateful predicate (a mutable `next` threshold — one
     firing per crossed multiple, a step jumping several multiples fires once); both fire at the
-    seeded state, matching `run!`'s step-0 callback. **Ledgers:** the traversal is ``O(M)`` plus
+    seeded state, matching `run!`'s step-0 callback.
+
+    **Ledgers:** the traversal is ``O(M)`` plus
     ``O(\text{tiles})`` — three vectors of the tracer count and two of the tile count — so the
     tracer delta of the memory audit stays at zero; a new M-scale testset pins the exact
     multiset and that no other owner shares the arrays. The step's allocation is a constant
@@ -2624,7 +2630,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     bites harder is what an exception carries once it interpolates such an object. PF closed the same hole on its side
     the same day (decision 82 there), and its rules bind here unchanged, so that a nested PF
     object — a field, a point set, a kernel, an interpolation scheme — prints through its own
-    `show` and the two packages spell one fact one way. **Two forms:** the two-argument `show` is
+    `show` and the two packages spell one fact one way.
+
+    **Two forms:** the two-argument `show` is
     one self-delimiting line, `Type(body)`, for a container, a `$(...)` and an error message;
     the three-argument `MIME"text/plain"` form is the REPL's and exists only where the line
     abbreviates something — the cache's per-slot standing, read off the epochs exactly as the
@@ -2635,14 +2643,16 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     computing — the state, the cache's deposited reads, the tracer positions — with no row for a
     scalar or particles a run does not carry and no observable that would compute *(amended
     2026-09-05 from "one row per constructor keyword", owner-directed: a display that offered
-    `flow_parameters(sim)` beside the cache reads blurred what is served from what is measured)*. **The body carries what the package
-    REFUSES on**, asserted over the refused pairs: a state on another grid, element type, or
+    `flow_parameters(sim)` beside the cache reads blurred what is served from what is measured)*. The body carries what the package
+    refuses on, asserted over the refused pairs: a state on another grid, element type, or
     storage family, or a box differing in the ninth decimal (`Simulation(domain; state)`); a
     scalar state against a cache or buffers without a scalar (the closing `deposit!`); a
     generator without the displaced-scalar scratch under `PhaseShift` (`scalar_rhs!`); a
     particle scheme against buffers of another order or a cache of another history depth
     (`allocate_buffers`, `advect!`); a tracer set without the unwrapped record
-    (`unwrapped_positions`). **One vocabulary for an optional part:** present, it prints through
+    (`unwrapped_positions`).
+
+    **One vocabulary for an optional part:** present, it prints through
     its own display under its field name (`scalar_physical …`, `phase_shift …`,
     `unwrapped_positions …`); absent, it prints as `no scalar`, `no particles`, `no phase-shift
     scratch`, `no unwrapped positions` — a review of the first draft found the one fact "holds a
@@ -2654,10 +2664,10 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     reserved for a display that IS a constructor call and round-trips through the parser —
     `HouLi(order = 24)`, `AdamsBashforth(order = 3)`, `FlowParameters(viscosity = …)`, the
     `Phenomenology` presets `Pope2000(C_K = 1.6)` — printing only what departs from the defaults.
-    **Nothing reads an element**, measured on a ``32^3`` run with ``2\times 10^4`` tracers
+    Nothing reads an element, measured on a ``32^3`` run with ``2\times 10^4`` tracers
     against a floor of half a scalar field: the tracer count is chosen so the particle arrays sit
     above the floor too, since a display copying a dozen tracers' positions would allocate a few
-    hundred bytes and pass a field-scale floor. **The gate is derived** in the field library's
+    hundred bytes and pass a field-scale floor. The gate is derived in the field library's
     shape: every concrete struct type of the fourteen modules must carry a package-owned `show` or
     a cited exemption, checked both ways so a stale exemption fails. An empty *parametric* struct
     is enumerated — its content lives in the type parameter (`AdamsBashforth{K}`), so the default
@@ -2686,7 +2696,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the spectral kinetic energy held its target while ``\varepsilon``, the maximum speed and the
     physical field's own ``\tfrac{1}{2}\langle\lvert\boldsymbol{u}\rvert^2\rangle`` collapsed,
     the dead state's ``\varepsilon = 0.027`` being exactly ``2\nu\kappa^2 k`` at ``\kappa = 1`` — all of
-    ``k`` sitting in the forced shells in a form the physical field cannot see. **Mechanism.** The
+    ``k`` sitting in the forced shells in a form the physical field cannot see.
+
+    **Mechanism.** The
     real-to-complex layout stores both members of a conjugate pair on the folded axis's zero plane
     (and its Nyquist plane for an even axis). Their anti-Hermitian combination is invisible to the
     inverse real transform, so the nonlinear term — formed from the physical fields — neither sees
@@ -2700,7 +2712,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     cuFFT and rocFFT at round-off everywhere — so the death time is seed-independent: six seeds at
     ``t = 66``–``71``, RK3 and RK4, `TwoThirds` and `PhaseShift` alike, `Float64` at ``t = 142``
     (a floor ``10^{-9}`` smaller, ``\ln 10^9/0.26 \approx 80`` time units later, as the rate
-    predicts). `reality_residual` traces it from ``4\times10^{-2}`` at ``t = 0`` to
+    predicts); `reality_residual` traces it from ``4\times10^{-2}`` at ``t = 0`` to
     ``1.3\times10^{6}`` at saturation. `StochasticOU` (additive) and decaying runs are unaffected —
     and a ``32^3`` CPU run is unaffected by luck, FFTW being exact there, which is why the suite had
     never seen it. Two consequences were the worst of it: every Parseval diagnostic (``k``,
@@ -2711,7 +2723,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     forcing); Dedalus's `enforce_real_cadence` (a grid round trip every 100 steps, "decrease under
     strong linear instabilities"); FFTW++'s `HermitianSymmetrizeX` (never evolve the redundant
     half); and Wang & Rosa (2009), *A spurious evolution of turbulence originated from round-off
-    error in pseudo-spectral simulation*, Computers & Fluids **38**, 1943–1949 — the same shape on
+    error in pseudo-spectral simulation*, Computers & Fluids 38, 1943–1949 — the same shape on
     the divergence-free constraint, round-off amplified over ``\approx 50`` turnovers, re-projection
     per step as the remedy, which is decision 61 here. GHOST is immune by an additive forcing and
     pair-aware operations; hit3d and Fluidsim carry the same multiplicative forcing unprotected and
@@ -2737,7 +2749,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     scheme's op list (a real in-place read and write of the state, which the liveness model sees,
     and a renamed op fails the price table) and priced below the ledger's resolution, as the O(1)
     mean-mode pin and the tracers' ``M \times 3`` reads are. Its pass count is pinned at the ideal
-    in the field library's pass audit. No memory. **Witness** (`test/regressions/r7-reality-projection-forced-run.jl`):
+    in the field library's pass audit. No memory.
+
+    **Witness** (`test/regressions/r7-reality-projection-forced-run.jl`):
     a planted ``2\times10^{-6}`` anti-Hermitian perturbation on the pair ``(0,\pm1,0)`` — planted,
     because a witness waiting for the library's own seed passes vacuously wherever FFTW is exact —
     is removed exactly by the next step, velocity and scalar; under the controller the residual is
@@ -2748,19 +2762,24 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 89. **(2026-09-17, user-directed) CUDA unified memory is inherited, not implemented; what a run needs
     on a card is a page, and the suite holds that page to the code.** The field library made CUDA.jl's
     `default_memory = "unified"` preference a supported configuration (its decision 84), prompted by
-    this package at ``768^3`` `Float64` on a 96 GiB GH200. **Inheritance.** The package allocates only
+    this package at ``768^3`` `Float64` on a 96 GiB GH200.
+
+    **Inheritance.** The package allocates only
     through `array_type{S}(undef, dims...)` in the domain's allocators and `similar` in the particle
     code, and names no memory kind, so every array a run holds follows the preference with no code
     change. Checked on the RTX 5070 Ti in two environments differing only in the preference: 29 of 29
     arrays unified for a bare run, 36 of 36 with the scalar, 45 of 45 with the scalar and ``10^4``
     tracers, 45 of 45 for a run restored by `read_simulation` — and none in the device-memory control.
+
     **Placement.** A page (`docs/src/gpu.md`), linked from the landing page and from the `array_type`
     bullets of `FixedDomain` and `Simulation`. The mechanism — the call, the two entries it writes, the
     `[CUDACore]` spelling that leaves it silently off — stays on the field library's page and is linked,
     never restated: belongs-in-PF holds for documentation too. What is this package's own is the
     storage a run holds, that the preference reaches all of it, and the caveats. A docstring was
     rejected as the table's home (it depends on four settings, none of them `array_type`), and so was
-    this log, which cannot correct a number in place. **The table is derived, not typed.** Storage is a
+    this log, which cannot correct a number in place.
+
+    **The table is derived, not typed.** Storage is a
     cubic polynomial in ``N`` for even ``N``, so `test/gpu_memory_page.jl` reads the table out of the page, fits each
     row exactly at four sizes, requires a fifth to match byte for byte, and compares the leading
     coefficient and the ``512^3``/``768^3``/``1024^3`` values; it classifies every exported integrator,
@@ -2771,7 +2790,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     decision: ``768^3`` `Float64` holds 91.3 GiB under `PhaseShift` without the scalar (hence "short by
     a few GiB" with the workspace and context on 96 GiB) and 114.9 GiB with it. The memory audit is
     unaffected: its ledgers are static and never read `CUDA.used_memory`, which does not count unified
-    allocations. **Open, stated on the page rather than assumed away:** the package has no GPU test
+    allocations.
+
+    **Open, stated on the page rather than assumed away:** the package has no GPU test
     lane of its own; unified arrays ignore `allowscalar(false)`, so a unified run cannot catch a stray
     scalar index; and the cost of a time step in unified memory is unmeasured everywhere, GH200
     included — no GH200 figure is written until one is measured on this package's step.
@@ -2794,8 +2815,8 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     invariant 2. The defence of it rested on the code already being written and measured, which is the
     circular justification this file's own self-guards name. The request was withdrawn mid-ruling.
 
-    **What ships.** The process is an ordinary field in spectral representation on a **companion grid
-    over the same box** — the smallest even grid whose modes cover the band, ``6^3`` for the default
+    **What ships.** The process is an ordinary field in spectral representation on a companion grid
+    over the same box — the smallest even grid whose modes cover the band, ``6^3`` for the default
     shells 1–2. Two grids over one box resolve the same physical wavenumbers where they overlap, so the
     companion's modes are exactly a subset of the run's. Each step: a host Gaussian draw into a
     companion physical field (the stream stays the seed's, and the draw is real, so its spectrum
@@ -2807,7 +2828,7 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     2026-09-17/18), which writes only the shared modes, carries physical amplitudes across the
     resolution ratio, and never traverses the run's own field.
 
-    The increment's scale is the **expected** variance of the masked, projected draw —
+    The increment's scale is the expected variance of the masked, projected draw —
     ``2M/N_c^{3}`` per unit variance for the velocity, ``M/N_c^{3}`` for the scalar, with ``M`` the
     band's lattice modes counted once at construction. The archived form divided by each draw's
     *realized* norm, which fixes every increment's size — not the independent Gaussian modes the method
@@ -2858,11 +2879,14 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     (it had three per step), no passes at field scale, and the last memory-gap holder (OWNERSHIP, OU
     noise ↔ product) retired with the noise. The synchronization row falls from four crossings per step
     to two — one of which is the adaptive timestep's, the other the scalar run's NaN guard.
+
     **Not done:** no code-to-code comparison exists — TurTLE has no Ornstein–Uhlenbeck forcing — so the
     process rests on the statistical tests above.
 
 91. **(2026-09-18, user-directed) The package is `GBGHomogeneousTurbulence`.** Renamed before the
-    first release, when a rename is still cheap. **Why the old name was wrong.** A triple-periodic
+    first release, when a rename is still cheap.
+
+    **Why the old name was wrong.** A triple-periodic
     pseudospectral box enforces *homogeneity*; isotropy is only what the default forcing and initial
     condition choose — nothing in the domain, the generator, the propagator or the transforms knows
     about it. Naming the package for a property of its default configuration rather than for its
@@ -2872,16 +2896,22 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     the scope plainly: chapter 4 is homogeneous isotropic turbulence, chapters 7–12 are rotation,
     strain, shear, buoyancy, coupled cases and MHD — every one homogeneous, every one reachable from
     this machinery with extra generator terms or a moving frame. The old name covered one chapter of
-    the fourteen. **The boundary, stated rather than implied.** Their chapters 13–14 are compressible
-    homogeneous turbulence, which this package does **not** reach: the incompressible Leray
+    the fourteen.
+
+    **The boundary, stated rather than implied.** Their chapters 13–14 are compressible
+    homogeneous turbulence, which this package does not reach: the incompressible Leray
     projection is structural here, not a setting. Compressible homogeneous turbulence is out of
-    scope, as §3 records for the Model. **Mechanics.** Repository `GBGHomogeneousTurbulence.jl`,
+    scope, as §3 records for the Model.
+
+    **Mechanics.** Repository `GBGHomogeneousTurbulence.jl`,
     module and extension renamed, every current-state surface swept by hand — the sibling-link
     tooling cannot catch a rename, since a table keyed on a package's spelling goes quiet rather than
     failing. Two things deliberately keep the old spelling: this log, which records what the package
     was called when each decision was made, and the `type` attributes of checkpoints written before
     today — a stored tag is normalized to the current spelling on read, so those files still load and
-    nothing rewrites them. **Fleet.** The three sibling sessions were told before the rename, since a
+    nothing rewrites them.
+
+    **Fleet.** The three sibling sessions were told before the rename, since a
     Dropbox working copy and their `inspiration/` clones point at the old path; two of them held
     tables keyed on the old name that would degrade to silence rather than fail. *(Corrected the same
     day: this entry first said both had fixed the class. One of those fixes was made without its
@@ -2890,7 +2920,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     redirects a renamed repository URL but not its Pages URL, so a stale link in a sibling's table
     breaks outright.)*
 92. **(2026-09-24, user-directed) `highest_shell = Inf` is the band-free form of every
-    field-multiplying forcing.** It forces every retained mode but the mean, on any grid. **Why.**
+    field-multiplying forcing.** It forces every retained mode but the mean, on any grid.
+
+    **Why.**
     The linear forcing a physical-space code applies acts on the whole field, and the only way to ask
     for it before was `highest_shell = N`, a number the user had to restate for every grid. With the
     band set to the whole field, `Linear` is Lundgren's forcing itself, `VarianceController` is
@@ -2899,22 +2931,25 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     rescale ``\boldsymbol{u} \leftarrow \boldsymbol{u}\sqrt{\texttt{target}/k}`` — verified mode
     by mode to round-off, and identical under `over = :band` and `:total`, which then coincide
     (`over` stays required, one rule rather than a special case, and the docstring says they agree).
+
     **What is stored is `Inf`, not the shell it resolves to.** A strategy's shell bounds are what
     rebuild its band and what it displays, and `Inf` rebuilds the right band on any grid, where the
     resolved shell would read back as "every mode" only on the grid it came from. PF's
     `spectral_band` requires finite edges, so IT resolves `Inf` at construction to the stored grid's
     corner, ``\lceil\sqrt{3}N/2\rceil`` shells — past every mode the grid holds, retained or not,
     whatever the dealiasing mask's shape. That is the physics-side reading of an unbounded request
-    mapped onto a finite-edge operation, not field machinery, so it is not a PF raise. **`Inf` is the
-    only non-integer.** A lattice ``\lvert\boldsymbol{\kappa}\rvert^2/\kappa_0^2`` is always an
+    mapped onto a finite-edge operation, not field machinery, so it is not a PF raise. `Inf` is the
+    only non-integer. A lattice ``\lvert\boldsymbol{\kappa}\rvert^2/\kappa_0^2`` is always an
     integer and an integer shell's edge sits at ``(n + \tfrac{1}{2})^2``, which never is one, so no
     mode lies on an edge for roundoff to decide; `highest_shell = 2.5` would put the edge on
-    ``\lvert\boldsymbol{\kappa}\rvert = 3\kappa_0``. **The mean stays out**, since `lowest_shell`
+    ``\lvert\boldsymbol{\kappa}\rvert = 3\kappa_0``. The mean stays out, since `lowest_shell`
     is still at least 1: the band-free form is ``\boldsymbol{f} = A(\boldsymbol{u} - \langle\boldsymbol{u}\rangle)``,
     not the literal ``\boldsymbol{f} = A\boldsymbol{u}``, which would drive the mean at rate ``A`` with nothing to
     damp it and amplify its round-off exponentially — the class decision 88 closed for the
-    self-conjugate planes. **`StochasticOU` refuses it**, by name: an additive source must stay below
-    the dealias cutoff, and its coarse grid is sized from the top shell. **Rejected:**
+    self-conjugate planes. `StochasticOU` refuses it, by name: an additive source must stay below
+    the dealias cutoff, and its coarse grid is sized from the top shell.
+
+    **Rejected:**
     `highest_shell = nothing` (a physicist can read "no highest shell" as "no band"; `Inf` has one
     reading), a separate band argument such as `shells = 1:2` (Base has no infinite integer range, so
     "all" would need its own sentinel anyway), a named constant (an invented alias for a number
@@ -2923,7 +2958,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     written `[2, 4, Inf]` promotes its integers to `Float64`, and refusing `2.0` broke the natural
     way to vary the band. Only a fractional value such as `2.5` is refused.)*
 93. **(2026-09-24, user-directed) The Lamb vector is ``\boldsymbol{\omega}\times\boldsymbol{u}``, vorticity
-    first — the literature's sign — and the package follows it.** **Why.** A PF reviewer questioned an
+    first — the literature's sign — and the package follows it.**
+
+    **Why.** A PF reviewer questioned an
     example calling ``\boldsymbol{u}\times\boldsymbol{\omega}`` "the Lamb vector", and this package did
     the same on its landing page, in §4.2 and in `velocity_rhs!`. The owner asked for a firm check
     rather than recall, so the definitions were read from primary texts. Lamb (1932), Art. 146, Eq. (5)
@@ -2939,17 +2976,21 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     defines the reversed order, and it contradicts itself: its divergence identities are Hamman et al.'s,
     which hold only for vorticity first, and its page citation to Lamb (1932) lands on the motion of two
     spheres. The reversed usage is a code-side habit of solvers that write the term on the right-hand
-    side, not a definition anyone publishes. **The convention, applied.** The identity is
+    side, not a definition anyone publishes.
+
+    **The convention, applied.** The identity is
     ``(\boldsymbol{u}\cdot\nabla)\boldsymbol{u} = \nabla(\tfrac{1}{2}\lvert\boldsymbol{u}\rvert^2) + \boldsymbol{\omega}\times\boldsymbol{u}``
     and the momentum equation is ``\partial_t\boldsymbol{u} = -\mathbb{P}(\boldsymbol{\omega}\times\boldsymbol{u}) + \nu\nabla^2\boldsymbol{u} + \boldsymbol{f}``
-    on every current-state surface. **The arithmetic did not change.** The solver still forms the
+    on every current-state surface.
+
+    **The arithmetic did not change.** The solver still forms the
     velocity-first product in place over the vorticity's array: reversing a cross product's operands
     negates it, so the minus sign is carried by the operand order and costs no pass, and the run is
     bit-identical. What changed is the name — that product is the *negated* Lamb vector wherever it
     is named — and the internal assembly function, now `_velocity_advective_term!`, which no longer
     claims to form the Lamb vector. The one term the package might have introduced, a Lamb-vector
     symbol, was not: ``\ell`` is `large_scale_length`, and a bold ``\boldsymbol{l}`` beside it invites
-    the confusion the glossary exists to prevent, so the vector is written out. **Enforced**, not only
+    the confusion the glossary exists to prevent, so the vector is written out. Enforced, not only
     stated: `docs/make.jl`'s `lint_lamb_vector_sign()` fails the build on a velocity-first cross product
     — in math, in Unicode or as the `cross!` call — within three lines of the word *Lamb* unless the
     window names it the negation. It fired on six sites of the tree it was written against (the
@@ -2958,7 +2999,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     hand, from a full enumeration of the word's occurrences and of every velocity-first product, and
     the glossary row is the reference. The decision log is exempt as history.
 94. **(2026-09-24, user-directed) The package's first goal is the law ``G(\text{forcing}, \mathrm{Re}_\lambda,
-    \text{band})``, and until it exists the run layer uses ``G = 0.7``.** **Why.** The run layer derives
+    \text{band})``, and until it exists the run layer uses ``G = 0.7``.**
+
+    **Why.** The run layer derives
     ``\nu`` from a requested ``\kappa_{\max}\eta`` through the stationary estimate
     ``\varepsilon = (k/G)^{3/2}/L``, and it used `Li2008`'s ``G = 0.9``, a JHTDB reduction at
     ``\mathrm{Re}_\lambda \approx 433``. The owner's first sweep, 96³ `VarianceRescaling(over = :total)`
@@ -2970,27 +3013,33 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     only scientific: with 0.9 a requested ``\kappa_{\max}\eta = 1.5`` delivered about 1.37 on the
     default band and 1.18 on every mode, and the logged ``\mathrm{Re}_\lambda`` overstated the real one by
     15–40%. An earlier witness had seen the same bias at 32³, where the modelled ``\varepsilon`` fell
-    about 2× short. ``G = 0.7`` is the default band's value at the upper end of the Reynolds numbers
-    reached; it corrects the common case and is **not** a law — the band dependence alone moves ``G`` by
-    a third. **Where the value lives.** `Li2008` keeps 0.9: it is the record of that paper's dataset, and
+    about 2× short. The constant ``G = 0.7`` is the default band's value at the highest Reynolds numbers
+    reached; it corrects the common case and is not a law — the band dependence alone moves ``G`` by
+    a third.
+
+    **Where the value lives.** `Li2008` keeps 0.9: it is the record of that paper's dataset, and
     relabelling a number the package measured as Li et al.'s would misattribute it. The provisional value
     is one constant in `Forcing`'s stationary estimate, which the `VarianceController`'s default clock
     already used and which the run layer now calls too. The two previously held separate copies pinned
-    together by a test; they now share one function, so they cannot disagree. **What comes next** is
+    together by a test; they now share one function, so they cannot disagree. What comes next is
     the owner's: the sweep design (forcing type × band × ``\mathrm{Re}_\lambda``, resolution and
     dealiasing as convergence checks) and, once enough data exist, whether the law enters as an
     empirical fit, a theoretical form, or a ``\nu`` that recalibrates itself from the warm-up's measured
     ``\varepsilon``. *(Amended 2026-09-26, decision 97: `Li2008` was removed, so "Where the value lives"
     now records only the package's provisional constant.)*
 95. **(2026-09-24, user-directed) A run is set up for a stationary state stated once, and the
-    default forcing holds its dissipation rate.** **The state.** A forced run settles at a pair
+    default forcing holds its dissipation rate.**
+
+    **The state.** A forced run settles at a pair
     ``(k, \varepsilon)``. `Simulation` now takes it from exactly one source — `kinetic_energy`,
     `dissipation`, or the target of a velocity forcing that holds one of the two — and predicts the other
     member through ``G``, the only place ``G`` enters a run. Two sources are an `ArgumentError`, because
     the state would be stated twice; none gives ``k = 1.5``. Before, `kinetic_energy` and a forcing's
     target stated the same quantity separately and a mismatch only warned. The derived viscosity is
     solved from the state's ``\varepsilon``, the initial velocity is seeded at its ``k``, and a start
-    from another energy is an adopted `state`. **Filling the forcing.** A deferred velocity forcing
+    from another energy is an adopted `state`.
+
+    **Filling the forcing.** A deferred velocity forcing
     may leave its target out, and the run fills it from the state: `ConstantPower` its injection rate
     from ``\varepsilon``, `VarianceController` and `VarianceRescaling(over = :total)` their target from
     ``k``, `StochasticOU` its variance from ``\varepsilon/T_L``. `DeferredForcing` therefore holds its
@@ -2998,14 +3047,16 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     stay required. `Linear`'s rate would need the band's own energy, a model the ``G`` study must
     supply (the open item for the paper). `VarianceRescaling(over = :band)` holds that energy. A
     scalar forcing's target stays required because the scalar has no modelled state, and the
-    mechanical-to-scalar time scale is a project in itself (owner-ruled). **Why the state, and why
+    mechanical-to-scalar time scale is a project in itself (owner-ruled).
+
+    **Why the state, and why
     ``\varepsilon``.** Resolution is a statement about ``\eta = (\nu^3/\varepsilon)^{1/4}``, so
     given ``\varepsilon`` the viscosity for a requested ``\kappa_{\max}\eta`` is exact, with no ``G``
     between request and outcome; given ``k`` instead, ``G``'s error lands on the resolution.
     Holding ``\varepsilon`` moves that error onto ``k``, which only rescales the velocity unit.
     Measured in the rewritten 32³ witness: `ConstantPower` at two injection rates reached
     ``\kappa_{\max}\eta = 2.016`` against 2, a `VarianceRescaling(over = :total)` holding ``k``
-    reached 1.815. **The default is `ConstantPower()`**, and the owner's reason is not the guarantee
+    reached 1.815. The default is `ConstantPower()`, and the owner's reason is not the guarantee
     but that it has no gain or settling time to choose — fewer parameters to get right. It enters
     every stage like the `VarianceController` it replaces, so default runs keep the scheme's order,
     and ``k`` now fluctuates freely rather than being restored. Tests that seeded one energy beside a
@@ -3018,21 +3069,26 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     \tfrac{1}{2}\sum(1 - W_l^2)\lvert\hat{\boldsymbol{u}}\rvert^2``, the position average of Pope's
     residual kinetic energy of a top-hat filter (2000, Ex. 13.22); the vorticity analogue gives
     ``\varepsilon(l)``, because removing the mean *velocity* leaves every gradient and so a flat
-    ``\varepsilon``. **Settled with the owner:** the cube, on principle (other window shapes may
+    ``\varepsilon``.
+
+    **Settled with the owner:** the cube, on principle (other window shapes may
     become an option later); one function returning `(; scales, kinetic_energy, dissipation)`, named
     after `kinetic_energy_and_dissipation` since it carries both; ``N`` domain-derived sides
     ``l = nL/N``; the glossary symbols ``l`` (free) and ``W_l`` (``G`` already wore two meanings).
-    **The window is PF's** — requested 2026-09-22 with the full rationale and built as `tophat_window`
+    The window is PF's — requested 2026-09-22 with the full rationale and built as `tophat_window`
     (PF decision 87; `assignment_window` is now its square at the grid spacing), so no kernel machinery
     lives here. It is the continuum box mean of the band-limited field, not a mean of grid values.
+
     **The batch width is measured, not assumed:** on the RTX 5070 Ti two sides per traversal were the
     fastest or tied at 128³ and 256³ in both precisions, wider batches slower (the per-mode arithmetic
     of the lazy product kernels, not the saved field read, sets the cost), and 32 weights in one fused
     tuple fail to compile on CUDA (Julia's generic splat past its tuple limit), so ``B = 2``, ROCm still
-    to be measured. **Precision:** each value is a whole-field reduction minus a retained part, so in
+    to be measured.
+
+    **Precision:** each value is a whole-field reduction minus a retained part, so in
     `Float32` the smallest sides of a field with little small-scale energy lose digits — batch widths
     differed by up to ``6\times10^{-4}`` relative there at 256³; the docstring says to measure in
-    `Float64` where those sides matter. **Tested** against two independent oracles: the exact spectral
+    `Float64` where those sides matter. Tested against two independent oracles: the exact spectral
     sums as plain host loops (``10^{-12}``), and the definition itself — boxes cut on an 8× zero-padded
     grid, each mean removed, averaged over positions — elementwise within its own ``1/q^2``
     discretization bound, which the tempting ``(1 - W_l)^2`` form misses by up to 97%. *(Amended
@@ -3041,63 +3097,81 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     decision 88.)* *(Notation updated 2026-09-29: the box mean, written ``\bar{\boldsymbol{u}}_l`` when this
     entry was recorded, is ``\langle\boldsymbol{u}\rangle_l`` by decision 102.)*
 97. **(2026-09-26, user-directed) `Li2008` and `stationary_dissipation` are removed from
-    `Phenomenology.Scalings`.** **Why.** The law gave one number, ``G = 0.9``, the package's own reduction
+    `Phenomenology.Scalings`.**
+
+    **Why.** The law gave one number, ``G = 0.9``, the package's own reduction
     of one JHTDB dataset at ``\mathrm{Re}_\lambda \approx 433``. It is not a published
     ``G(\text{forcing}, \mathrm{Re}_\lambda, \text{band})`` or band energy fraction, and no published
     source provides them (decision 94 makes measuring them the package's first goal). A preset naming a
     paper that does not supply the quantity misattributes it, and the run layer had already stopped
-    using it. `stationary_dissipation` had `Li2008` as its only method, so it goes too. The Li et al.
+    using it. So `stationary_dissipation`, whose only method was `Li2008`, goes too. The Li et al.
     (2008) entry leaves §References, which lists only works a current docstring cites. The provisional
     ``G = 0.7`` stays in `Forcing`'s stationary estimate. Its test now spells out
     ``(k/0.7)^{3/2}/L`` rather than evaluating a law. `Scalings` keeps `Sreenivasan1998` and
     `Sreenivasan1995`.
 98. **(2026-09-27, user-directed) `kinetic_energy_and_dissipation_below_scale` uses PF's
-    `weighted_inner` as documented, with no batching layer of its own.** **Why.** Decision 96 split the
+    `weighted_inner` as documented, with no batching layer of its own.**
+
+    **Why.** Decision 96 split the
     ``2N`` weights into batches of a width measured on one GPU, padded the last batch, and recorded
     the width as a tuning constant. That was a layer built over the backend to fit measurements that
     depend on Julia's compilation path, the backend and the hardware. How many weights one traversal
     answers is PF's concern, and PF now owns it: its tuple form takes any number of weights and groups
     them itself (PF decision 88, fixing the 32-weight compile failure reported from here). The
-    observable now builds every side's two weights and makes one call. **Measured once, to confirm it
+    observable now builds every side's two weights and makes one call.
+
+    **Measured once, to confirm it
     works, not to tune it:** on the RTX 5070 Ti one call at 256³ takes 0.17 s in `Float32` and 0.26 s
     in `Float64`, after a first-call compilation of about 10 s for each grid size, since the weight
     tuple's length is ``2N``.
 99. **(2026-09-28, user-directed) HT's calls into PF, reviewed by PF and corrected.** HT sent PF its
     audit of every place HT reached past PF's API. PF ruled on each and shipped two operations for it
-    (PF decision 90): `mean_free_projection!` and `materialize_kernel!`. **Mean mode.** The velocity's
+    (PF decision 90): `mean_free_projection!` and `materialize_kernel!`.
+
+    **Mean mode.** The velocity's
     advective term had its ``\kappa = 0`` coefficient zeroed by writing raw storage at the index PF
     keeps private. It now uses `mean_free_projection!`, exact and ``O(1)``, in the same place: between
     the assembly and the forcing source, since the Leray projection passes the mean through. The scalar
     path's zeroing is gone. The divergence's mean is exactly zero under all three dealiasing strategies,
-    and a test pins it with `iszero`. **`Linear`'s rate.** `Linear` kept the materialized band as a raw
+    and a test pins it with `iszero`.
+
+    **`Linear`'s rate.** `Linear` kept the materialized band as a raw
     real ``N^{3}`` array (1.69 GiB at 768³ `Float64`) and rewrote the rate from it by a raw broadcast at
     every step. The rate is steady, so the generator now fills it once, when it is built, from the
     steadiness probe's own fill. `Linear` keeps only its lazy band kernel, and the fill is
     `materialize_kernel!(StoredKernel(rate), band)` followed by `multiply!`, allocating nothing. The
-    memory ledger drops the real array and the compute ledger the per-step write. **`max_speed`** keeps
-    the fused `maximum` but maps the squared magnitude and takes one square root. The overflow-safe
+    memory ledger drops the real array and the compute ledger the per-step write. In `max_speed` the fused `maximum`
+    now maps the squared magnitude and takes one square root. The overflow-safe
     fiber `norm` it used costs several times more, and a velocity cannot overflow; the result is
-    identical. **Raw-storage clean-ups.** In-place scalings use `multiply!`, and host-drawn random fields
+    identical.
+
+    **Raw-storage clean-ups.** In-place scalings use `multiply!`, and host-drawn random fields
     reach the run's storage through `adapt!`. The element type is read with `field_scalar_type`, and
-    the CFL grid spacing from the grid. **Kept, on PF's ruling:** `StochasticOU`'s exact lattice mode
+    the CFL grid spacing from the grid.
+
+    **Kept, on PF's ruling:** `StochasticOU`'s exact lattice mode
     count, `_check_reality`'s largest-stored-coefficient scale, and the zero fill in the allocators
     (PF's constructors return uninitialized memory). *(Verified the same day: 24 fixed-``\Delta t`` runs
     covering every changed path — `Linear` on its default band and on every mode, a `Linear`-forced
     scalar, `StochasticOU`, `ConstantPower` with a scalar — under the three dealiasing strategies in
-    both precisions are bitwise identical to the pre-change tree on the CPU. `max_speed` matched at
-    all 3600 sampled steps, because StaticArrays' `norm` returns the plain magnitude whenever it is
+    both precisions are bitwise identical to the pre-change tree on the CPU. All 3600 sampled steps matched in
+    `max_speed`, because StaticArrays' `norm` returns the plain magnitude whenever it is
     finite and nonzero, so adaptive runs are unchanged too.)*
 100. **(2026-09-28, user-directed) HT's remaining raw-storage sites, ruled by PF, and a test that
     keeps the list closed.** PF reviewed three sites the first audit missed and changed two things for
     them (PF decision 91): `adapt!` now refuses every mismatch by name, and fields compare by value
-    with `==`. **Checkpoint loads.** A stored field, which `read_field` returns on the host, is moved into
+    with `==`.
+
+    **Checkpoint loads.** A stored field, which `read_field` returns on the host, is moved into
     the run's field with `adapt!`, and so is `StochasticOU`'s process. HT's own size and element-type
     checks and the raw `copyto!` are gone; HT only puts the checkpoint's context in front of PF's
     message. One behaviour changed, correctly: `adapt!` compares the whole grid, so a checkpoint with
     the same point count but another box side or origin, which the size check let through, is now
-    refused. **The steady-rate probe** keeps its two raw fills: the probe is a fixture, not a physical
+    refused. The steady-rate probe keeps its two raw fills: the probe is a fixture, not a physical
     field, and PF has no operation for writing arbitrary coefficients. It compares the two rates with
-    PF's `==` instead of their raw storage. **The check.** `test/pf_storage_access.jl` lists every
+    PF's `==` instead of their raw storage.
+
+    **The check.** `test/pf_storage_access.jl` lists every
     `field_data` call in `src/` and `ext/` against an allowlist, each entry citing its ruling. A new
     site fails the suite until it is ruled on, and an entry whose site is gone fails until it is
     removed. It is falsified in the same test, against a planted site and a deleted one. It cannot see
@@ -3107,7 +3181,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     units, and a tilde means box units throughout.** Decisions 94 and 95 wrote it ``G = k/(L\varepsilon)^{2/3}``
     and called it the box-normalized dissipation group, a name taken from the `Li2008` law, which
     decision 97 removed. The literature has no name for it. ``G`` also names `VarianceController`'s
-    gain, so the glyph meant two things. **The symbol:** ``\tilde{k} = k/(\varepsilon L)^{2/3}``, with
+    gain, so the glyph meant two things.
+
+    **The symbol:** ``\tilde{k} = k/(\varepsilon L)^{2/3}``, with
     the tilde marking a quantity in box units: the unit system built from the box side ``L`` and
     ``\varepsilon``, as Sagaut & Cambon mark nondimensional variables. The hat is taken by the spectral
     representation, and the asterisk by the complex conjugate. The tilde is free because averages and
@@ -3117,7 +3193,9 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     ``\mathrm{Re}_{\mathrm{box}} = \varepsilon^{1/3}L^{4/3}/\nu = 1/\tilde{\nu}``, written with ``\mathrm{box}`` rather
     than ``L``, because Pope's ``\mathrm{Re}_L`` is ``k^{2}/(\varepsilon\nu)``. The band energy fraction
     is written ``k_f/k``, since ``f`` names the force. *(Superseded the same day by decision 103: the band
-    energy is ``k_{\mathrm{band}}``, the fraction ``k_{\mathrm{band}}/k``.)* **Names, for the model to come:**
+    energy is ``k_{\mathrm{band}}``, the fraction ``k_{\mathrm{band}}/k``.)*
+
+    **Names, for the model to come:**
     `kinetic_energy_in_box_units` and `band_energy_fraction`, with the Reynolds keywords
     `reynolds_box` and `reynolds_taylor` (owner ruling; `Phenomenology` is not a precedent until it is
     extracted). `G` now names the gain alone, and the provisional constant is
@@ -3141,30 +3219,38 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
 104. **(2026-09-29, user-directed) The two Reynolds numbers as plain functions of three scalars.**
     `reynolds_box(side_length, dissipation, viscosity)` gives ``\varepsilon^{1/3}L^{4/3}/\nu`` and
     `reynolds_taylor(kinetic_energy, dissipation, viscosity)` gives ``\sqrt{20/3} k/\sqrt{\varepsilon\nu}``.
+
     **Why scalars, not a run or a field:** the owner's ruling. A study reduces a run to time means first,
     and the Reynolds number belongs to those means, not to an instantaneous state. The functions give
     that study the package's one definition, so no script carries its own copy. They live in
-    `Observables` beside the reductions whose results they take. **Argument order, the owner's rule:**
+    `Observables` beside the reductions whose results they take.
+
+    **Argument order, the owner's rule:**
     large scale first, then small — the energy-containing quantity (``L`` or ``k``), then the cascade
-    rate ``\varepsilon``, then ``\nu``. **Positional, not keywords**, like every other observable. The same names serve as the keywords of
+    rate ``\varepsilon``, then ``\nu``. Positional, not keywords, like every other observable. The same names serve as the keywords of
     the ``\tilde{k}`` model to come, as `kinetic_energy` is both a keyword and an observable.
 105. **(2026-09-29, user-directed) The stationary-state model, and the run predicting from it.**
     `kinetic_energy_in_box_units(forcing; reynolds_box | reynolds_taylor)` and
     `band_energy_fraction(...)`, in `Forcing`, give ``\tilde{k}`` and ``k_{\mathrm{band}}/k`` for a forcing's
     strategy, band and `over`; exactly one Reynolds keyword, and the Taylor form is solved for
-    ``\mathrm{Re}_{\mathrm{box}}`` by bisection. **Placeholders:** ``\tilde{k}`` flat in ``\mathrm{Re}`` (the keyword
+    ``\mathrm{Re}_{\mathrm{box}}`` by bisection.
+
+    **Placeholders:** ``\tilde{k}`` flat in ``\mathrm{Re}`` (the keyword
     is checked and changes nothing until the dependence is measured) and the same for every strategy:
     0.72, 0.56 and 0.47 for shells 1–2, 1–4 and every mode, linear in ``1/h`` between; ``k_{\mathrm{band}}/k``
     the inertial-tail estimate, 1 for every mode. A band from shell 1 ending at shell 2 or above is
-    covered. **The prediction** is one public function, `predicted_stationary_state`, which
+    covered. The prediction is one public function, `predicted_stationary_state`, which
     `Simulation` calls. A derived ν needs no fixed point: ``\kappa_{\max}\eta`` fixes ``\eta``, so
     ``\mathrm{Re}_{\mathrm{box}} = (L/\eta)^{4/3}``, then ``\tilde{k}``, then the unstated member, then
     ``\nu = \varepsilon^{1/3}\eta^{4/3}``. With a given ν and a stated ``k``, ``\varepsilon`` is solved by bisection.
+
     **Fills** (owner's rulings): `Linear`'s rate becomes optional, ``A = \varepsilon/(2k_{\mathrm{band}})``;
     `VarianceRescaling(over = :band)`'s target becomes optional, ``k_{\mathrm{band}}``, its fraction
     taken to be the one `over = :total` holds on the same band (a modelling assumption, testable by one
     run); the controller's omitted settling time is the predicted ``2k/(3\varepsilon)``; the deferred
-    `StochasticOU` states `correlation_time_in_box_units`, converted once to ``T_L``. **Uncovered runs**
+    `StochasticOU` states `correlation_time_in_box_units`, converted once to ``T_L``.
+
+    **Uncovered runs**
     (owner's rulings): a derived ν for an unforced run or an uncovered band is an `ArgumentError`
     (the unforced case was a warning); with a given ν nothing is predicted, the seed takes the stated
     ``k``, an unforced run may state both ``k`` and ``\varepsilon``, a `Phenomenology` initial spectrum
@@ -3335,74 +3421,74 @@ self-contained citation in a `Reference` value, so this list need not duplicate 
 cites.
 
 - Betchov, R. (1956). [*An inequality concerning the production of vorticity in isotropic turbulence*](https://doi.org/10.1017/S0022112056000317).
-  *J. Fluid Mech.* **1**(5), 497–504. *(The isotropy
+  *J. Fluid Mech.* 1(5), 497–504. *(The isotropy
   relations behind the strain-skewness constant, §4.3.)*
-- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* **14**, 2538–2541. *(Phase-shift dealiasing; the
+- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* 14, 2538–2541. *(Phase-shift dealiasing; the
   `PhaseShift` strategy, §7, decision 27.)*
-- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074. *(The ``2/3`` truncation rule.)*
-- Orszag, S. A. & Patterson, G. S. (1972). [*Numerical simulation of three-dimensional homogeneous isotropic turbulence*](https://doi.org/10.1103/PhysRevLett.28.76). *Phys. Rev. Lett.* **28**, 76–79. *(The pseudospectral method.)*
+- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* 28, 1074. *(The ``2/3`` truncation rule.)*
+- Orszag, S. A. & Patterson, G. S. (1972). [*Numerical simulation of three-dimensional homogeneous isotropic turbulence*](https://doi.org/10.1103/PhysRevLett.28.76). *Phys. Rev. Lett.* 28, 76–79. *(The pseudospectral method.)*
 - Rogallo, R. S. (1981). [*Numerical experiments in homogeneous turbulence.*](https://ntrs.nasa.gov/citations/19810022965) NASA TM-81315. *(No DOI;
   a NASA technical memorandum. The sheared-frame scheme, §7; the spherical-truncation dealiasing of
   the `PhaseShift` strategy, decision 27.)*
 - Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014).
-  *J. Comput. Phys.* **226**, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
-- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). [*Effective dissipation and turbulence in spectrally truncated Euler flows*](https://doi.org/10.1103/PhysRevLett.95.264502). *Phys. Rev. Lett.* **95**, 264502. *(Thermalization of the
+  *J. Comput. Phys.* 226, 379–397. *(The smooth spectral filter; the `HouLi` dealiasing strategy.)*
+- Cichowlas, C., Bonaïti, P., Debbasch, F. & Brachet, M. (2005). [*Effective dissipation and turbulence in spectrally truncated Euler flows*](https://doi.org/10.1103/PhysRevLett.95.264502). *Phys. Rev. Lett.* 95, 264502. *(Thermalization of the
   Galerkin-truncated conservative system; the ``\nu = 0`` oracle, §7.)*
-- Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* **38**, 2747–2757. *(The spectral eddy
+- Chollet, J.-P. & Lesieur, M. (1981). [*Parameterization of small scales of three-dimensional isotropic turbulence utilizing spectral closures*](https://doi.org/10.1175/1520-0469%281981%29038%3C2747:POSSOT%3E2.0.CO;2). *J. Atmos. Sci.* 38, 2747–2757. *(The spectral eddy
   viscosity ``\nu_e(\kappa \mid \kappa_c)``; the deferred spectral large-eddy rung, §7.)*
-- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* **16**, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
+- Eswaran, V. & Pope, S. B. (1988). [*An examination of forcing in direct numerical simulations of turbulence*](https://doi.org/10.1016/0045-7930%2888%2990013-8). *Computers & Fluids* 16, 257–278. *(The stochastic Ornstein–Uhlenbeck forcing.)*
 - Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI; a Center for Turbulence Research brief.)*
   *(The linear negative-damping forcing.)*
 - Lambert, C., Reneuve, J. & Augier, P. (2026). [*Aliasing and phase shifting in pseudo-spectral simulations of the incompressible Navier-Stokes equations*](https://doi.org/10.48550/arXiv.2603.08892). arXiv:2603.08892.
-- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* 229(17), 5862–5869.
   *(The interpolation family `LalescuSpline` implements,
   and the source for choosing interpolation order in particle tracking — decision 57's floor.)*
 - Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys.
-  Commun.* **278**, 108406. *(TurTLE; the
+  Commun.* 278, 108406. *(TurTLE; the
   Adams–Bashforth tracer integration `AdamsBashforth` follows, decision 57.)*
-- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* **6**(4), 1612–1614.
+- Sullivan, N. P., Mahalingam, S. & Kerr, R. M. (1994). [*Deterministic forcing of homogeneous, isotropic turbulence*](https://doi.org/10.1063/1.868274). *Phys. Fluids* 6(4), 1612–1614.
   *(`VarianceRescaling`: the per-step rescaling of the low-``\kappa``
   modes to a fixed band energy. Kept as the reference implementation, with its first-order
   operator-splitting caveat documented rather than hidden.)*
 - Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334).
-  *J. Chem. Phys.* **81**(1), 511–519. *(the thermostat analogy
+  *J. Chem. Phys.* 81(1), 511–519. *(the thermostat analogy
   `VarianceController` cites: feedback inside the equations rather than per-step rescaling.)*
 - Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A*
-  **31**(3), 1695–1697. *(the companion half of the
+  31(3), 1695–1697. *(the companion half of the
   Nosé–Hoover move.)*
-- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* **28**, 035114.
+- Bassenne, M., Urzay, J., Park, G. I. & Moin, P. (2016). [*Constant-energetics physical-space forcing methods for improved convergence to homogeneous-isotropic turbulence with application to particle-laden flows*](https://doi.org/10.1063/1.4944629). *Phys. Fluids* 28, 035114.
   *(`VarianceController`: the constant-``k`` controller of their Eq. 20, the marginal law
   ``A = \varepsilon/2k_{\mathrm{band}}`` plus a proportional restoring term measuring the whole-field ``k``, giving exponential relaxation to a stable
   attractor. The smooth, gain-limited replacement for the discontinuous projection above.)*
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984).
-  [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* **81**, 3684–3690.
+  [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* 81, 3684–3690.
   *(The thermostat whose deterministic-rescaling limit
   `VarianceRescaling` is; named there and now cited.)*
 - Bussi, G., Donadio, D. & Parrinello, M. (2007). [*Canonical sampling through velocity rescaling*](https://doi.org/10.1063/1.2408420).
-  *J. Chem. Phys.* **126**, 014101. *(Stochastic velocity rescaling; its deterministic limit is the
+  *J. Chem. Phys.* 126, 014101. *(Stochastic velocity rescaling; its deterministic limit is the
   Berendsen thermostat — no conserved quantity, no well-defined ensemble except in limiting cases —
   the caveat `VarianceRescaling` carries.)*
-- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* **35**, 48–56. *(The
+- Williamson, J. H. (1980). [*Low-storage Runge–Kutta schemes*](https://doi.org/10.1016/0021-9991%2880%2990033-9). *J. Comput. Phys.* 35, 48–56. *(The
   2N low-storage family; the package's third-order coefficients are the low-storage set later adopted for spectral DNS and
   popularly named "RKW3"; it is also attributed to an unpublished 1986 note of Wray's, so this entry
   cites the family rather than a numbered case.)*
 - Carpenter, M. H. & Kennedy, C. A. (1994). [*Fourth-order 2N-storage Runge–Kutta schemes.*](https://ntrs.nasa.gov/citations/19940028444) NASA TM-109112. *(No DOI;
   a NASA technical memorandum. The five-stage, two-register fourth-order scheme `IFLowStorageRK4`
   implements.)*
-- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* **77**, 439–471. *(The SSPRK3 tableau
+- Shu, C.-W. & Osher, S. (1988). [*Efficient implementation of essentially non-oscillatory shock-capturing schemes*](https://doi.org/10.1016/0021-9991%2888%2990177-5). *J. Comput. Phys.* 77, 439–471. *(The SSPRK3 tableau
   `IFSSPRK3` implements, in TurTLE's stage arrangement.)*
 - Pope, S. B. (2000). [*Turbulent Flows.*](https://doi.org/10.1017/CBO9780511840531) Cambridge University Press. *(Notation; the
   filtered-density-function Model and mixing models, §7–§8.)*
-- Mori, H. (1965). [*Transport, collective motion, and Brownian motion*](https://doi.org/10.1143/PTP.33.423). *Prog. Theor. Phys.* **33**,
+- Mori, H. (1965). [*Transport, collective motion, and Brownian motion*](https://doi.org/10.1143/PTP.33.423). *Prog. Theor. Phys.* 33,
   423–455. *(The projection formalism, the foundation of §3 and §8.)*
-- Zwanzig, R. (1973). [*Nonlinear generalized Langevin equations*](https://doi.org/10.1007/BF01008729). *J. Stat. Phys.* **9**, 215–220. *(The projection formalism, with Mori 1965.)*
-- Morrison, P. J. (1986). [*A paradigm for joined Hamiltonian and dissipative systems*](https://doi.org/10.1016/0167-2789%2886%2990209-5). *Physica D* **18**,
+- Zwanzig, R. (1973). [*Nonlinear generalized Langevin equations*](https://doi.org/10.1007/BF01008729). *J. Stat. Phys.* 9, 215–220. *(The projection formalism, with Mori 1965.)*
+- Morrison, P. J. (1986). [*A paradigm for joined Hamiltonian and dissipative systems*](https://doi.org/10.1016/0167-2789%2886%2990209-5). *Physica D* 18,
   410–419. *(The metriplectic bracket formulation; the reversible/irreversible split, §4.2, §8.)*
 - Öttinger, H. C. (2005). [*Beyond Equilibrium Thermodynamics.*](https://doi.org/10.1002/0471727903) Wiley. *(GENERIC; the
   reversible/irreversible split, §8.)*
 - Lamb, H. (1932). [*Hydrodynamics*](https://openlibrary.org/books/OL6287619M/Hydrodynamics), 6th ed. Cambridge University Press. *(No DOI; a 1932 monograph.
   Art. 146, Eq. (5): the rotational form of the equations of motion, decision 93.)*
 - Hamman, C. W., Klewicki, J. C. & Kirby, R. M. (2008). [*On the Lamb vector divergence in Navier–Stokes flows*](https://doi.org/10.1017/S0022112008002760).
-  *J. Fluid Mech.* **610**, 261–284. *(The Lamb vector defined as ω × u, p. 265; decision 93.)*
+  *J. Fluid Mech.* 610, 261–284. *(The Lamb vector defined as ω × u, p. 265; decision 93.)*
 - Sagaut, P. & Cambon, C. (2018). [*Homogeneous Turbulence Dynamics*](https://doi.org/10.1007/978-3-319-73162-9), 2nd ed.
   Springer. *(The package's scope, decision 91; the Lamb vector named ω × u, p. 586, decision 93.)*

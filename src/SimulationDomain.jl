@@ -47,8 +47,8 @@ export FixedDomain,
 How the aliasing of the quadratic nonlinearity is controlled. A [`FixedDomain`](@ref) is built
 with one; it fixes the `domain.dealias` kernel and, through
 [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl), the advective-CFL
-ceiling. They come in two families: a **mask** strategy
-acts on the assembled product alone, while a **shift** strategy also changes how that product is
+ceiling. They come in two families: a *mask* strategy
+acts on the assembled product alone, while a *shift* strategy also changes how that product is
 evaluated. The concrete strategies are [`TwoThirds`](@ref) (the sharp ``2/3`` rule, a mask),
 [`HouLi`](@ref) (the smooth Hou–Li filter, a mask), and [`PhaseShift`](@ref) (the half-cell shift-average, a shift,
 truncated spherically at ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``). The
@@ -68,7 +68,7 @@ points per side of length ``L``, and ``\\kappa_{\\max}`` the dealiased maximum �
 the quadratic nonlinearity exactly, with the narrowest retained band of the three and no taper to evaluate.
 
 # References
-- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* **28**, 1074.
+- Orszag, S. A. (1971). [*On the elimination of aliasing in finite-difference schemes by filtering high-wavenumber components*](https://doi.org/10.1175/1520-0469%281971%29028%3C1074:OTEOAI%3E2.0.CO;2). *J. Atmos. Sci.* 28, 1074.
 """
 struct TwoThirds <: DealiasingStrategy end
 
@@ -102,7 +102,7 @@ CFL step than the ``2/3`` rule — handled automatically by
   once into a stored coefficient array — one resident complex array of spectral-mode size (``\\approx 17`` MB at
   ``128^3`` `Float64`, ``\\approx 135`` MB at ``256^3``) — that each traversal then merely reads. Because
   the coefficients are the same expression evaluated once, the two settings advance a run
-  **bit-identically**.
+  bit-identically.
 
 On the fly, every traversal recomputes the filter's exponential and power per mode;
 `materialized = true` makes that an array read, but the integrating factor's exponential stays
@@ -119,7 +119,7 @@ per mode, so only part of the cost is recovered. Prefer `true` when compute is t
     this strategy whatever the `order` — not the Nyquist (its docstring scopes the convention).
 
 # References
-- Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014). *J. Comput. Phys.* **226**, 379–397.
+- Hou, T. Y. & Li, R. (2007). [*Computing nearly singular solutions using pseudo-spectral methods*](https://doi.org/10.1016/j.jcp.2007.04.014). *J. Comput. Phys.* 226, 379–397.
 
 # Fields
 The plain constructor `HouLi(order, strength, materialized)` takes the three fields directly:
@@ -141,7 +141,7 @@ HouLi(; order::Integer = 36, strength::Union{Real, Nothing} = nothing,
     PhaseShift()
 
 Phase-shift dealiasing, after Patterson & Orszag (1971) with the spherical truncation of
-Rogallo (1981), assembles each quadratic nonlinear term on the grid **and** on a half-cell-displaced
+Rogallo (1981), assembles each quadratic nonlinear term on the grid and on a half-cell-displaced
 grid, averages the two, and truncates spherically at
 ``\\kappa_{\\max} = \\tfrac{\\sqrt{2}}{3}N\\cdot\\tfrac{2\\pi}{L} = \\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}``
 (with ``\\kappa_{\\mathrm{Ny}} = \\tfrac{N}{2}\\cdot\\tfrac{2\\pi}{L}`` the Nyquist wavenumber of ``N`` points
@@ -149,14 +149,14 @@ per side of length ``L``).
 
 The half-cell average cancels the aliasing images that wrap in an odd number of axes — the spurious
 spectral replicas the under-resolved quadratic product folds back into the resolved band — and the
-spherical cutoff removes the surviving two-axis images. It dealiases the quadratic **exactly** while
+spherical cutoff removes the surviving two-axis images. It dealiases the quadratic exactly while
 keeping the resolved band out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}} \\approx 0.94 \\kappa_{\\mathrm{Ny}}`` — a factor ``\\sqrt{2}``
 further than the [`TwoThirds`](@ref) rule's ``\\tfrac{2}{3}\\kappa_{\\mathrm{Ny}}``
 (``\\approx 2.8\\times`` the modes in the retained sphere).
 
 Use it when the recovered bulk of that discarded top third — out to
-``\\approx 0.94\\kappa_{\\mathrm{Ny}}``, never the Nyquist-adjacent remainder — is worth the price: a **second** nonlinear-term transform
+``\\approx 0.94\\kappa_{\\mathrm{Ny}}``, never the Nyquist-adjacent remainder — is worth the price: a second nonlinear-term transform
 per stage (``2\\times`` the transforms) and the displaced-evaluation scratch (a field-scale
 spectral-representation buffer per phase-shifted term). Because it retains energy out to
 ``\\tfrac{2\\sqrt{2}}{3}\\kappa_{\\mathrm{Ny}}`` it takes a proportionally smaller advective-CFL step
@@ -171,7 +171,7 @@ than the ``2/3`` rule — handled automatically by
     Nyquist content to mistranslate.
 
 # References
-- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* **14**, 2538–2541.
+- Patterson, G. S. & Orszag, S. A. (1971). [*Spectral calculations of isotropic turbulence: efficient removal of aliasing interactions*](https://doi.org/10.1063/1.1693365). *Phys. Fluids* 14, 2538–2541.
 - Rogallo, R. S. (1981). [*Numerical experiments in homogeneous turbulence.*](https://ntrs.nasa.gov/citations/19810022965) NASA TM-81315. *(No DOI.)*
 """
 struct PhaseShift <: DealiasingStrategy end
@@ -387,7 +387,7 @@ _real_type(domain::FixedDomain) = eltype(domain.grid.domain_size)
     max_retained_wavenumber(domain)
 
 The highest wavenumber magnitude `domain` (a [`FixedDomain`](@ref)) keeps energetic — the dealiasing
-cutoff, the edge of the **retained** band
+cutoff, the edge of the *retained* band
 
 ```math
 \\kappa_{\\max}^{\\mathrm{ret}} = f_{\\mathrm{ret}} \\frac{N}{2} \\frac{2\\pi}{L},
@@ -396,7 +396,7 @@ cutoff, the edge of the **retained** band
 with ``N`` the grid points per side, ``L`` the box side, ``f_{\\mathrm{ret}}`` the retained-Nyquist
 fraction of the [`DealiasingStrategy`](@ref) (``2/3`` for `TwoThirds`, ``1`` for `HouLi`,
 ``\\tfrac{2\\sqrt{2}}{3}`` for `PhaseShift`). For the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, the cutoff sits strictly
-**below** the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each
+below the grid Nyquist ``\\tfrac{N}{2}\\tfrac{2\\pi}{L}`` — they zero the modes above it each
 step. `HouLi` is the exception its ``f_{\\mathrm{ret}} = 1`` implies: it zeroes nothing, damping
 modes progressively as they approach the Nyquist (to machine epsilon there), so its retained band is
 the whole representable band.
@@ -420,7 +420,7 @@ end
     max_resolved_wavenumber(domain)
 
 The highest wavenumber magnitude whose dynamics `domain` (a [`FixedDomain`](@ref)) resolves as
-genuine Navier–Stokes — the **resolved**-band edge
+genuine Navier–Stokes — the *resolved*-band edge
 
 ```math
 \\kappa_{\\max} = f_{\\mathrm{res}} \\frac{N}{2} \\frac{2\\pi}{L},

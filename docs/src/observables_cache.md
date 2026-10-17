@@ -5,11 +5,11 @@
 ### 1.1 What it is for
 
 A run integrates two fields and no others: the velocity ``\boldsymbol{u}`` and the passive scalar
-``\varphi``. The two of them at one instant of time make up the **state**, held in spectral
+``\varphi``. The two of them at one instant of time make up the *state*, held in spectral
 representation as ``\hat{\boldsymbol{u}}`` and ``\hat\varphi``. A run has the state at discrete times
 ``t_0, t_1, t_2, \ldots, t_n, \ldots``, and between those times the run has no state.
 
-Everything else a run computes is an **observable** — a function of the state at one ``t_n``, and
+Everything else a run computes is an *observable* — a function of the state at one ``t_n``, and
 therefore rebuildable from the state exactly. Some observables are fields in either representation,
 some are values at particle positions, and some are single numbers.
 
@@ -20,28 +20,28 @@ generator, the component assembling the right-hand side, forms the advective ter
 it from ``\hat{\boldsymbol{u}}`` and keep a copy — three recoveries and three resident fields where
 one of each suffices.
 
-The **observables cache** is where a component puts a value another component will read, instead of
-holding it privately. To **cache** an observable is to keep its value at ``t_n`` there until something
-reads it; the storage one cached observable occupies is its **slot**. An external consumer — a
+The *observables cache* is where a component puts a value another component will read, instead of
+holding it privately. To *cache* an observable is to keep its value at ``t_n`` there until something
+reads it; the storage one cached observable occupies is its *slot*. An external consumer — a
 callback, a statistics accumulator — reads through the same door, but the cache exists for the run's
 own components, not for the consumer.
 
-An **iteration** is everything a run does to advance from ``t_n`` to ``t_{n+1}``: the timestep
-choice, the step, the closing **deposits** that write its observables into the cache, and the particle push that ends on them. It strictly
-contains the **step**, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
-divided into the **stages** of the time scheme; the particle push and the deposits sit in the
+An *iteration* is everything a run does to advance from ``t_n`` to ``t_{n+1}``: the timestep
+choice, the step, the closing *deposits* that write its observables into the cache, and the particle push that ends on them. It strictly
+contains the *step*, which advances ``(\hat{\boldsymbol{u}}, \hat\varphi)`` and which is itself
+divided into the *stages* of the time scheme; the particle push and the deposits sit in the
 iteration but outside the step. At each instant ``t_n`` between iterations, before the next one
-begins, sits the **observation**: the caller's callback reads the state and the cache, records what it wants, and
+begins, sits the *observation*: the caller's callback reads the state and the cache, records what it wants, and
 decides whether the run continues. Every rule of the cache architecture below
 follows from one design choice, stated here rather than derived:
 
 > **Caching an observable adds nothing to what an iteration computes, moves, or stores.**
 
-To **compute** is to do arithmetic; to **move** is to carry bytes between memory and the processor;
-to **store** is to keep bytes resident. The first two are the halves of an iteration's cost in time,
+To *compute* is to do arithmetic; to *move* is to carry bytes between memory and the processor;
+to *store* is to keep bytes resident. The first two are the halves of an iteration's cost in time,
 and on the GPU this package targets, the second usually dominates: a pointwise multiplication over a
 grid costs one arithmetic operation per point against twenty-four bytes moved in double precision (twelve in single). Traffic here
-comes in whole-array sweeps, so the unit of movement is one **pass** over the grid — a traversal
+comes in whole-array sweeps, so the unit of movement is one *pass* over the grid — a traversal
 touching every grid point once. Storing is the cost in memory, the axis this package minimizes
 first.
 
@@ -90,7 +90,7 @@ wants one computes it at an observation (§2.4).
 
 One case looks like a counterexample and is worth stating. The constant-energy forcing
 [`VarianceController`](@ref) *does* form the whole-field ``k``, and forms it at every stage, to size its own amplitude. Those values are
-**mid-step** ones — each measured at a Runge–Kutta stage's own state and discarded — not the
+mid-step ones — each measured at a Runge–Kutta stage's own state and discarded — not the
 observable at the iteration's end, which is what a slot must hold, so the case fails the surviving
 test below rather than this one. The other constant-energy forcing, [`VarianceRescaling`](@ref) with `over = :total`, forms the same quantity once
 per step and is the same story, its value taken before the rescale it sizes.
@@ -105,7 +105,7 @@ cache holds.
 
 **Does it survive? The schedule must leave it at the iteration's end, in a *register* the iteration already
 owns.** This is the memory axis: a cached value occupies no array of its own, because its slot *is*
-the register its producer computed it in — a **register** being storage a component computes one
+the register its producer computed it in — a *register* being storage a component computes one
 value into and overwrites at the next use, holding nothing a reader should trust between times. An
 observable is therefore cached exactly
 when the iteration's schedule still holds it whole as the iteration ends, and register reuse is
@@ -124,7 +124,7 @@ internal or on request — by which reading causes a computation.
 
 That is what makes the rules below refusals rather than inconveniences. A cache that quietly rebuilt
 a stale value could never report a scheduling error; it would convert one into a doubled transform
-count that no **ledger** (the test suite's frozen table of measured costs) catches, since a ledger freezes the intended schedule. Because the schedule is
+count that no *ledger* (the test suite's frozen table of measured costs) catches, since a ledger freezes the intended schedule. Because the schedule is
 fixed, an iteration's transform and traffic counts are exact constants of the configuration rather
 than averages over a run, and the frozen ledgers report the true cost.
 
@@ -150,7 +150,7 @@ reaches is observed exactly once: the first because the `Simulation` constructor
 state as it builds the run, the last because the observation that stops the run has already
 read the state and the cache there. A run of ``n`` iterations has ``n+1`` observations. Only the last
 closing deposit has no following iteration to fold into; it serves the final observation instead.
-Relative to a cacheless solver serving only its own dynamics, the run therefore pays **one** extra
+Relative to a cacheless solver serving only its own dynamics, the run therefore pays one extra
 closing deposit per run: the state-only share of one first-stage evaluation, one reduction, and one
 interpolation.
 That is the cache's *added* cost per run. Inside every other closing deposit the recovery is work
@@ -159,10 +159,10 @@ it is the standing per-iteration traffic cost §1.4 prices.
 
 **A slot's epoch says which of three states the slot is in**: holding the observable at a
 named ``t_n``, holding the producer's scratch, or holding nothing yet deposited. (In the code the named time is
-an **epoch** — a counter of state changes, one per dynamical factor: the fields' epoch advances with
-every step or announced mutation, the particles' with every push, and a slot's epoch is current when
-it equals its factor's epoch. An epoch is therefore **not** an iteration number: it counts changes to
-the state rather than advances of the run.) A read is served only in the
+an *epoch*: a version number, one per dynamical factor. The fields' epoch rises by one with every
+completed step or announced mutation, the particles' with every push or announced reposition, and a
+slot's epoch is current when it equals its factor's. An announced mutation raises an epoch without
+an iteration, so the fields' epoch runs ahead of the step count.) A read is served only in the
 first case, and only when the named time is the current one; otherwise it throws. What a stale read
 reports is that the schedule is wrong — the caller asked at a moment the schedule does not fill — and
 the only repair is to fix the schedule.
@@ -244,7 +244,7 @@ computes.
 
 ### 2.1 The equations
 
-The system is incompressible Navier–Stokes in **rotational form** on a triple-periodic box, with a
+The system is incompressible Navier–Stokes in *rotational form* on a triple-periodic box, with a
 passive scalar and tracer particles. The convective term is written through
 
 ```math
@@ -297,14 +297,14 @@ transforms below.
 The state lives in spectral representation, where derivatives are multiplications and the projection
 acts wavenumber by wavenumber. A product of two fields is a convolution there, so a step evaluates
 each quadratic term pseudospectrally, then removes the aliasing that the evaluation introduces,
-according to its **dealiasing rule**. [`TwoThirds`](@ref) and [`HouLi`](@ref) are **mask rules**,
+according to its *dealiasing rule*. [`TwoThirds`](@ref) and [`HouLi`](@ref) are *mask rules*,
 discarding or tapering the aliased wavenumbers in one per-wavenumber multiplication.
 [`PhaseShift`](@ref) evaluates the term a second time on a half-cell-displaced grid and averages,
 cancelling the aliases rather than filtering them, at exactly twice the transforms — for the
 velocity and the scalar alike, since the scalar term reads the displaced velocity its stage's
 velocity term has just built.
 
-Under a mask rule one **evaluation** of the velocity term proceeds as follows: recover
+Under a mask rule one *evaluation* of the velocity term proceeds as follows: recover
 ``\boldsymbol{u}`` (3 inverse transforms); form
 ``\hat{\boldsymbol{\omega}} = \mathrm{i}\boldsymbol{\kappa}\times\hat{\boldsymbol{u}}`` and recover
 ``\boldsymbol{\omega}`` (3 inverse); multiply pointwise — the negated Lamb vector ``\boldsymbol{u}\times\boldsymbol{\omega}`` forming in place over the
@@ -331,15 +331,15 @@ into the velocity's. No third array exists, and the evaluation holds two vector 
 representation at once. The vorticity is deposited at the iteration's end either way, so the reuse changes the
 run's residency, not the cache's contents.
 
-The tracer scheme consumes two velocity samples per push. The first — the **velocity at the
-particles**, ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
+The tracer scheme consumes two velocity samples per push. The first — the *velocity at the
+particles*, ``\boldsymbol{u}(t_n, \boldsymbol{X}(t_n))``, the flow velocity sampled at the tracer positions — is the
 cache's deposit from the previous closing deposit; the
 second is evaluated at ``t_{n+1}``, at a predicted position the particle never
 reaches. Both are ``M\times3`` arrays, for ``M`` tracers, interpolated with the tracer set's scheme — a Catmull–Rom
 spline by default, so the sampled velocity is continuously differentiable along a trajectory.
 
 A multistep particle integration scheme looks further back, and the cache is where that history lives: built
-with `history_depth` above 1 it keeps a bounded ring of **past** velocity samples —
+with `history_depth` above 1 it keeps a bounded ring of past velocity samples —
 `history_depth` minus one further ``M\times3`` arrays beyond the current slot — which `AdamsBashforth`
 integrates over and an out-of-band reposition discards (`particles_modified!`). The history rides
 the same epoch bookkeeping as the current sample; it is the one place the cache holds more than the
@@ -350,7 +350,7 @@ owns the epoch owns the invalidation.
 
 Both states are always present — the fluid's and the probes'. Tracers consume a field and produce
 values at points; they hold no field. The table below lists the observables of this system, one row
-each. Its **Cached** column takes four values: *yes*, the schedule leaves the observable deposited
+each. Its Cached column takes four values: *yes*, the schedule leaves the observable deposited
 between iterations; *depends*, the observable survives in some configurations and not in others; *no*, a
 genuine observable this schedule does not surface — the value at ``t_n`` is well-defined, and an
 observation builds it itself in one act; and *never*, not an observable at all (§1.2's kind test) —

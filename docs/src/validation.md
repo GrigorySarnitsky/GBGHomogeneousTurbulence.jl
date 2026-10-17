@@ -5,19 +5,19 @@
     and all five reference-data files are published as release assets; every number on this page is
     reproducible from them with the scripts in the repository's `validation/` directory.
 
-The package is validated against **TurTLE** — an independent, production pseudo-spectral DNS code
+The package is validated against TurTLE — an independent, production pseudo-spectral DNS code
 (Lalescu et al.,
 [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406),
-*Comput. Phys. Commun.* **278**, 108406, 2022) — run at an identical physics point, with the same
+*Comput. Phys. Commun.* 278, 108406, 2022) — run at an identical physics point, with the same
 time-stepping tableau, an exactly matched dealiasing filter, the same initial state, and the same
 ``10^4`` tracer particles. Under those conditions the two codes solve the same discrete system up
-to one deliberate difference of route: TurTLE's `NSVEparticles` evolves the **vorticity**
+to one deliberate difference of route: TurTLE's `NSVEparticles` evolves the vorticity
 formulation while this package evolves the velocity (rotational) form. The two solutions therefore
 separate not from pure roundoff but from that formulation-level seed (measured ``\sim 10^{-12}``
 after one time unit), growing at the flow's Lyapunov rate — a finite window of exact tracking,
 followed by statistical agreement. Both behaviors are quantified below.
 
-The comparison used TurTLE **8.2.1**, its current release at the time.
+The comparison used TurTLE 8.2.1, its current release at the time.
 
 ## The physics point
 
@@ -35,7 +35,7 @@ Both codes run one forced, stationary case of homogeneous isotropic turbulence:
 | particles | ``10^4`` tracers, fourth-order Adams–Bashforth, cubic-spline interpolation | identical in both codes |
 | window | 18,400 steps = 36.8 time units ≈ 14.9 ``k/\varepsilon`` | from the [frozen handoff state](@ref "The shared initial state, and the import witnesses") |
 
-The viscosity is set by the **resolved** resolution criterion ``\kappa_{\max}\eta = 1.5`` (resolved
+The viscosity is set by the resolved resolution criterion ``\kappa_{\max}\eta = 1.5`` (resolved
 edge times Kolmogorov microscale): under the smooth filter that edge is 0.8 of
 the Nyquist wavenumber, ``\kappa_{\max} = 0.8 \kappa_{\mathrm{Ny}} = 51.2``
 (the per-step filter damping overtakes the viscous rate ``\nu\kappa^{2}`` there), so
@@ -61,7 +61,7 @@ which at ``N = 128`` gives ``s = 63.463`` — the value the run uses with
 
 ## The shared initial state, and the import witnesses
 
-Both codes started the comparison window from **the same TurTLE-generated state**: a 50-turnover
+Both codes started the comparison window from the same TurTLE-generated state: a 50-turnover
 warm-up, then ``10^4`` tracers seeded and advanced 100 steps so the fourth-order Adams–Bashforth
 integrator carried an authentic sample history. The joint state — the vorticity field in spectral
 representation, the tracer positions, and the four-slot history — was frozen as
@@ -76,7 +76,7 @@ Every step of that import is witnessed, not assumed:
 
 | witness | result |
 |:---|:---|
-| state fidelity: ``k`` and ``\varepsilon`` of the imported state vs TurTLE's own ``t_0`` sample | relative difference **0.0** (bit-exact) |
+| state fidelity: ``k`` and ``\varepsilon`` of the imported state vs TurTLE's own ``t_0`` sample | relative difference 0.0 (bit-exact) |
 | curl round trip: ``\nabla\times`` applied to the recovered velocity vs the injected vorticity | ``1.4 \times 10^{-16}`` |
 | interpolation parity: ``\boldsymbol{u}(t_0, \boldsymbol{X}_0)``, the velocity at the tracers' handoff positions, sampled by this package's Catmull–Rom vs TurTLE's stored I4O3-kernel sample | ``1.6 \times 10^{-14}`` over all ``10^4`` tracers |
 | Adams–Bashforth history slot order | pinned bitwise against TurTLE's stored per-step samples |
@@ -125,7 +125,7 @@ The estimator is the single-origin ensemble form,
 ```
 
 the dot product averaged over the ``10^4`` tracers with ``\boldsymbol{u}(0)`` frozen at the
-handoff instant. This package computes it **online in the callback passed to [`run!`](@ref)** (the
+handoff instant. This package computes it online in the callback passed to [`run!`](@ref) (the
 initial sample is stored once; each instant contributes one scalar); TurTLE's curve is computed
 from its stored trajectory samples with the identical formula. Because both codes share
 ``\boldsymbol{u}(0)`` and the particles, the curves are comparable realization to realization:
@@ -144,9 +144,9 @@ itself is statistical noise of that size.
 
 ### Robustness across forcings: the Linear (Lundgren) pair
 
-The whole comparison was repeated with a different forcing law — the band-limited **linear
-(Lundgren-type) forcing** ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
-**fixed** coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``, the target
+The whole comparison was repeated with a different forcing law — the band-limited linear
+(Lundgren-type) forcing ``\boldsymbol{f} = A \boldsymbol{u}`` on the same shells, with the
+fixed coefficient ``A = 0.42386263 = \varepsilon_{\mathrm{target}}/(2k_{\mathrm{band}}(t_0))``, the target
 injection rate over twice the handoff band energy (this package's `Linear(rate = A)` ⇔ TurTLE's `forcing_type = "linear"`, `famplitude = A`) — from
 the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-power law, this
 *unanchored* forcing neither reads the state nor pins the injection, so energy and dissipation are entirely outputs.
@@ -177,7 +177,7 @@ the *same* frozen handoff and the same ``10^4`` particles. Unlike the constant-p
 The third repetition changes the *integration machinery* instead of the forcing: the same frozen
 handoff, the same ``10^4`` particles, the same constant-power forcing — but this package advances
 with [`IFLowStorageRK4`](@ref) (the Carpenter–Kennedy fourth-order low-storage scheme) under its
-**adaptive CFL controller** rather than the fixed matched timestep. TurTLE's leg is the original
+adaptive CFL controller rather than the fixed matched timestep. TurTLE's leg is the original
 fixed-step reference. Trajectory-level identity is off the table by construction — the two runs
 share no time grid — so what this tests is statistical agreement under genuinely different
 discrete routes.
@@ -208,7 +208,7 @@ the comparison window; they are a natural extension, not a silent omission.
 ### Cost
 
 The identical leg — 18,400 steps with ``10^4`` tracers — took TurTLE 92 minutes (8 MPI ranks × 2
-threads on a 12-core CPU) and this package **265 seconds** on a single AMD RX 7900 XTX
+threads on a 12-core CPU) and this package 265 seconds on a single AMD RX 7900 XTX
 (14.4 ms/step, `Float64`).
 
 ## Reproducing the comparison

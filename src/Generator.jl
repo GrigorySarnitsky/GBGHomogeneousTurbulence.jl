@@ -240,7 +240,7 @@ through: the quadratic-product fields, any steady forcing rate, and — when the
 dealiases by [`PhaseShift`](@ref GBGHomogeneousTurbulence.SimulationDomain.PhaseShift) — the
 buffers for evaluating on the half-cell-shifted grid.
 
-That scratch is the **generator's own** storage, distinct from the run's
+That scratch is the generator's own storage, distinct from the run's
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache). The two
 do meet at one point: the physical quadratic products are formed *in place over the cache's arrays*,
 the negated Lamb vector ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}`` over the cached vorticity and the scalar flux over the
@@ -265,7 +265,7 @@ you.
     Under `PhaseShift`, `velocity_rhs!` leaves the stage's displaced velocity fresh for the same
     stage's `scalar_rhs!` to reuse. Neither verb's signature carries the handoff: the generator
     records which `û` the displaced velocity was taken of, and `scalar_rhs!` reuses the scratch only
-    when that record matches its own `û` **and** its caller promises through
+    when that record matches its own `û` and its caller promises through
     `displaced_velocity_current` that the scratch is still fresh. The record is opportunistic,
     never load-bearing — a
     mismatch only forces a redundant rebuild with the same value: a `scalar_rhs!` handed a different
@@ -289,7 +289,7 @@ you.
   other way, and `scalar_rate` also for a scalar-free generator.
 - `displaced_velocity_source` — the `û` whose displaced velocity `phase_shift.u_shifted` holds,
   left fresh by `velocity_rhs!` for the same stage's `scalar_rhs!` (`PhaseShift` only). Reuse takes
-  two conditions together: this record must match the caller's `û`, **and** the caller must promise
+  two conditions together: this record must match the caller's `û`, and the caller must promise
   through `displaced_velocity_current` that the scratch is still fresh. The record alone can only
   force a rebuild.
 - `velocity_forcing_state`, `scalar_forcing_state` — each forcing's evolving state for the step
@@ -463,13 +463,13 @@ generator's velocity forcing (its
 sign costs nothing: the product is formed as the negated Lamb vector
 ``\\boldsymbol{u}\\times\\boldsymbol{\\omega}``, operands in the order that carries the sign.
 
-A **mask**
+A mask
 strategy (`TwoThirds`, `HouLi`) forms the term once from `u`, `ω` and multiplies by the low-pass `domain.dealias`,
-leaving `û` unused; [`PhaseShift`](@ref) forms it **twice** — from `u`, `ω`, and from the fields
+leaving `û` unused; [`PhaseShift`](@ref) forms it twice — from `u`, `ω`, and from the fields
 recovered on a grid displaced by half a cell (using `û` and the generator's displaced-evaluation
 scratch) — averages the two to cancel the aliasing, then truncates spherically with `domain.dealias`.
 
-Two linear pieces are deliberately **not** in `N̂`: the viscous term and the exactly-linear part of a
+Two linear pieces are deliberately not in `N̂`: the viscous term and the exactly-linear part of a
 forcing are advanced exactly by the integrating factor ([`velocity_integrating_factor`](@ref)).
 
 The advective term's ``\\kappa = 0`` mode is zeroed exactly
@@ -485,7 +485,7 @@ Returns `N̂`.
     representation from existing at all; passing a copy instead would cost a resident ``N^{3}``
     vector (``N`` the grid points per axis), which the package's preference for the smallest working set forbids.
 
-    Which operand is consumed follows the **physics**, not the argument position: the negated Lamb
+    Which operand is consumed follows the physics, not the argument position: the negated Lamb
     vector forms over the vorticity here, and the scalar flux over the velocity in
     [`scalar_rhs!`](@ref) — which is why both name the consumed argument rather than leaving a caller
     to infer it. Only the spectral product scratch remains on the generator, and the operation
@@ -548,7 +548,7 @@ end
     velocity_integrating_factor(generator, δt)
 
 The function gives the velocity's exact linear subflow over a substep ``\\delta t`` (`δt`) as the
-**parameters of its exponential** rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
+parameters of its exponential rather than a materialized kernel. The `generator` (a [`ResolvedGenerator`](@ref))
 supplies the viscosity ``\\nu`` and the linear forcing rate; `δt` is the sub-interval the stage advances.
 
 The linear part of the momentum equation — the diffusion
@@ -622,20 +622,20 @@ The term is computed pseudospectrally as
 plus the per-stage additive source of the generator's scalar forcing (its
 [`add_forcing_source!`](@ref GBGHomogeneousTurbulence.Forcing.add_forcing_source!) hook).
 
-The dealiasing strategy controls the aliasing of the quadratic product. A **mask** strategy
+The dealiasing strategy controls the aliasing of the quadratic product. A mask strategy
 ([`TwoThirds`](@ref), [`HouLi`](@ref)) forms the flux once from `u_consumed`, `φ`, leaving `û` and
 `φ̂` unused. [`PhaseShift`](@ref) instead averages it with the flux recovered on a grid displaced
 half a cell — using `φ̂` and the generator's displaced-evaluation scratch, and reading the displaced
 velocity the same stage's [`velocity_rhs!`](@ref) left fresh there (a bare `scalar_rhs!` with no
 preceding velocity evaluation rebuilds it from `û` instead) — before the spherical truncation.
 
-The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are **not** in
+The diffusion ``\\varkappa\\nabla^{2}\\varphi`` and the exactly-linear part of a forcing are not in
 `N̂`: they are advanced exactly by [`scalar_integrating_factor`](@ref).
 
 Pass `displaced_velocity_current = true` only if nothing has changed since this generator's
 `velocity_rhs!` was called on the same `û` — a time-stepping scheme knows this because it evaluates
 both right-hand sides at one stage before updating either field; a hand-written caller generally
-does not. Reuse needs **both** the keyword and the generator's recorded source matching `û`. The
+does not. Reuse needs both the keyword and the generator's recorded source matching `û`. The
 record alone can only force a rebuild, never a wrong reuse; the keyword is the load-bearing half —
 containers are rewritten in place, so a false promise over the *same* container is quietly wrong,
 where the default merely rebuilds (one shift, three inverse transforms) and stays correct.

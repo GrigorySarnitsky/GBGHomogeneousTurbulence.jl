@@ -144,8 +144,8 @@ unit,words,longest_paragraph,admonitions
 "ARCHITECTURE.md § Specification and realization",226,107,0
 "ARCHITECTURE.md § The comparison machine",202,113,0
 "ARCHITECTURE.md § The foundation — one dynamics under a ladder of projections",231,114,0
-"Cache.jl :: Cache",348,103,0
-"Cache.jl :: ObservablesCache(domain; scalar = false, number_of_particles",709,220,1
+"Cache.jl :: Cache",370,103,0
+"Cache.jl :: ObservablesCache(domain; scalar = false, number_of_particles",715,220,1
 "Cache.jl :: fields_modified!(cache)",257,69,1
 "Cache.jl :: particles_modified!(cache)",252,74,0
 "Cache.jl :: scalar_physical(cache)",55,54,0
@@ -329,7 +329,7 @@ unit,words,longest_paragraph,admonitions
 "notation.md § Vocabulary",698,651,0
 "observables_cache.md § 1.1 What it is for",670,127,0
 "observables_cache.md § 1.2 What the cache holds",676,170,0
-"observables_cache.md § 1.3 When a cached value is valid",1099,223,0
+"observables_cache.md § 1.3 When a cached value is valid",1101,223,0
 "observables_cache.md § 1.4 What caching costs",414,141,0
 "observables_cache.md § 2. The system",89,89,0
 "observables_cache.md § 2.1 The equations",130,80,0

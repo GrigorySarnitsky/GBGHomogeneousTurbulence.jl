@@ -11,9 +11,10 @@
     Cache
 
 The observables cache — where the iteration leaves the observables it produces, for the run's own
-components and for any **observation** to read: a measurement the caller makes between iterations,
-from the values the run has already computed. Each value is **deposited** — written together with
-its **epoch**, a count of changes to the state.
+components and for any *observation* to read: a measurement the caller makes between iterations,
+from the values the run has already computed. Each value is *deposited*, written together with its
+*epoch*: the version of the state it was computed from, a number raised by one each time a step
+completes or a change made outside the iteration is announced.
 
 The cache's operations:
 - [`ObservablesCache`](@ref) — the cache itself: the slots, their epochs, and the two counters.
@@ -29,7 +30,7 @@ The cache's operations:
 
 The field slots are filled by [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!), which
 `Propagator` owns rather than this module because it needs the scheme's scratch to recover the
-fields. Each slot carries the value **and** the epoch that value belongs to, so a read can be refused
+fields. Each slot carries both the value and the epoch that value belongs to, so a read can be refused
 rather than served stale.
 
 The solver's side of the contract is that `deposit!` fills every field-derived slot at the
@@ -101,7 +102,7 @@ and seeds one for you; a hand-assembled run constructs it here.
 
 Read through the accessors — [`velocity_physical`](@ref), [`vorticity_physical`](@ref),
 [`scalar_physical`](@ref), and `max_speed` — each of which returns the deposited value or throws.
-Nothing in the cache is ever recomputed: a read that finds a slot stale, **taken** (in use as the
+Nothing in the cache is ever recomputed: a read that finds a slot stale, *taken* (in use as the
 step's own scratch mid-iteration), or never deposited throws an `ErrorException` naming the slot
 and its state — a scheduling error whose only repair is to fix the schedule that failed to
 deposit.
@@ -112,8 +113,8 @@ deposit.
     returned array as read-only — it is the storage the next iteration will work in.
 
 # Fields
-The word *epoch* names two things here, and these fields are of both kinds. The two **counters** tick
-as the state changes; every other `*_epoch` field records the counter's value at the moment its slot
+The word *epoch* names two things here, and these fields are of both kinds. The two counters, `fields_epoch` and
+`particles_epoch`, rise as the state and the positions change; every other `*_epoch` field records the counter's value at the moment its slot
 was filled. A slot is readable exactly while the epoch it records still equals the counter it
 depends on.
 
@@ -131,7 +132,7 @@ depends on.
 - `velocity_epoch`, `vorticity_epoch`, `scalar_epoch`, `max_speed_epoch` — the epoch each slot's
   value was deposited at, or a sentinel (never deposited / in use as scratch).
 - `velocity_at_particles_fields_epoch`, `velocity_at_particles_particles_epoch` — the velocity-at-particles slot's two epochs, against
-  **both** counters, since that sample is a function of the state and the positions together.
+  both counters, since that sample is a function of the state and the positions together.
 - `fields_epoch` — the resolved fields' counter: advanced by every completed step and by
   [`fields_modified!`](@ref), so it runs ahead of
   [`current_step`](@ref GBGHomogeneousTurbulence.SimulationRun.current_step). A
@@ -269,7 +270,7 @@ that instant: the genuine Lagrangian velocity, the input to the caller's statist
 read-only — it is the cache's own slot, and the tracer advance writes into it mid-iteration. This is
 the checked read of the [`ObservablesCache`](@ref) `cache`'s velocity-at-particles slot: it serves the
 deposited values or throws an `ErrorException`, like every cached read — the sample depends on the
-state **and** the positions, so it is current only when both counters match its own. Throws an
+state and the positions, so it is current only when both counters match its own. Throws an
 `ArgumentError` when the run advects no tracers.
 """
 function velocity_at_particles(cache::ObservablesCache)
@@ -356,7 +357,7 @@ re-deposit with the
 the timestep choice reads the cached maximum speed.
 
 Coefficients written by hand must respect the real-field layout's conjugate symmetry — a violation
-makes spectral diagnostics silently disagree with the physical images. The `sim` form **checks**
+makes spectral diagnostics silently disagree with the physical images. The `sim` form checks
 this: it measures the conjugate-symmetry residual on the planes that store both members of a pair
 and throws on an inconsistency beyond roundoff. The `cache` form cannot see the fields and trusts
 the caller; the package's own seeders satisfy the constraint by construction.
@@ -396,7 +397,7 @@ correction, any direct write to the tracer storage) — the particle counterpart
 [`fields_modified!`](@ref). Advances the particles epoch of `cache` (an [`ObservablesCache`](@ref)), so every
 trajectory-bound observable is stale and reads throw until the next deposit.
 
-It also discards the Lagrangian **sample history** this cache carries, so a multistep particle
+It also discards the Lagrangian sample history this cache carries, so a multistep particle
 integration scheme starts over from the new positions rather than integrating across the abandoned path. That is
 why the history lives here and not in the scheme's own per-step buffers: the object that owns the epoch owns
 the invalidation. The run's own tracer advance is not such a change and keeps its history.

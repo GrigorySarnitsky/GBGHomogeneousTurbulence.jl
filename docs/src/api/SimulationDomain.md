@@ -27,8 +27,8 @@ HouLi
 PhaseShift
 ```
 
-A strategy sets two band edges: the **retained** cutoff (the highest wavenumber kept energetic, which
-prices the advective-CFL step) and the **resolved** cutoff (the highest wavenumber whose dynamics is
+A strategy sets two band edges: the *retained* cutoff (the highest wavenumber kept energetic, which
+prices the advective-CFL step) and the *resolved* cutoff (the highest wavenumber whose dynamics is
 genuine Navier–Stokes — the ``\kappa_{\max}`` of the resolution criterion ``\kappa_{\max}\eta`` a
 run is built to meet, with ``\eta`` the Kolmogorov microscale). The two coincide for the sharp-cutoff strategies, `TwoThirds` and `PhaseShift`, and differ under `HouLi`.
 

@@ -66,7 +66,7 @@ export Tracers, AbstractParticleIntegrator, Heun, AdamsBashforth,
 
 A set of Lagrangian tracers, built on `domain`'s backend and element type.
 
-Give **exactly one** of the two. The `number_of_particles` form seeds that many tracers uniformly
+Give exactly one of the two. The `number_of_particles` form seeds that many tracers uniformly
 at random in the periodic box. The `positions` form supplies the tracer positions as a [`GBGPeriodicFields`](https://grigorysarnitsky.github.io/GBGPeriodicFields.jl/)
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet), copied to `domain`'s
 backend and element type. Supplying both, or neither, raises an `ArgumentError`, and so does a raw
@@ -139,7 +139,7 @@ state either way. The velocities are a *deposited observable*, not tracer state:
 of [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) writes them into the run's observables cache at the end of each iteration, and
 [`velocity_at_particles`](@ref GBGHomogeneousTurbulence.Cache.velocity_at_particles) reads them there.
 
-The particle integration scheme's own working storage is **not** here: it lives in a
+The particle integration scheme's own working storage is not here: it lives in a
 [`ParticleIntegratorBuffers`](@ref), whose docstring explains the split.
 
 # Fields
@@ -314,7 +314,7 @@ abstract type AbstractParticleIntegrator end
 """
     Heun()
 
-Second-order Heun-in-time on the velocity at the two **ends** of the step — the particle
+Second-order Heun-in-time on the velocity at the two ends of the step — the particle
 integration scheme a run uses by default. It advances the positions with the start-of-step Lagrangian
 velocity the previous iteration's closing particle
 [`deposit!`](@ref GBGHomogeneousTurbulence.Propagator.deposit!) left in the cache and the
@@ -393,7 +393,7 @@ in [`Tracers`](@ref). One type serves every scheme, because the storage sets nes
 scheme uses the predictor arrays for its [`Heun`](@ref) starting steps only, and adds two
 `order`-element host vectors for its weight solve.
 
-The past Lagrangian samples a multistep scheme integrates over are **not** held here. They are
+The past Lagrangian samples a multistep scheme integrates over are not held here. They are
 deposited observables — measurements of the velocity along the trajectory — so they live in the
 [`ObservablesCache`](@ref GBGHomogeneousTurbulence.Cache.ObservablesCache) beside the current sample
 they extend, which is what lets
@@ -451,7 +451,7 @@ restart!(::Heun, buffers::ParticleIntegratorBuffers) = buffers
 
 Variable-step Adams–Bashforth trajectory integration — the scheme TurTLE uses for its tracers, at
 its default order (Lalescu et al. 2022) — buying accuracy in
-time at **no extra field evaluation and no extra interpolation** per step.
+time at no extra field evaluation and no extra interpolation per step.
 
 Use it in place of [`Heun`](@ref) when trajectory accuracy in time limits a measurement. Heun
 buys its second order by interpolating a second time, at predicted positions; Adams–Bashforth instead
@@ -466,7 +466,7 @@ stored array per extra order against one interpolation per step. One step of [`a
 with ``K`` the order and the weights ``b_j`` re-solved each step by integrating the Lagrange basis
 on the recorded step history.
 
-The steps are **not** assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
+The steps are not assumed uniform: the advective-CFL loop changes ``\\Delta t`` every iteration,
 which classical fixed-step coefficients would silently get wrong, so the weights are recomputed each
 step from the actual step history. That is ``\\mathcal{O}(\\texttt{order}^2)`` host arithmetic per
 step, independent of the tracer count.
@@ -486,7 +486,7 @@ produce.
   is loud because the alternative is silently wrong weights. The cap is far above any useful order,
   since an Adams–Bashforth stability region shrinks with each step added — and the bootstrap makes
   high orders *worse*, not just useless: over a fixed window, `order = 6` and `order = 8` measure
-  the same third-order convergence as `order = 4` with **larger** errors (measured ``1.0`` and
+  the same third-order convergence as `order = 4` with larger errors (measured ``1.0`` and
   ``1.4`` against ``0.6``, in units of ``10^{-7}`` at 80 steps: the longer `Heun` bootstrap
   costs more than the extra history returns). The practical ceiling is `order = 4`.
 
@@ -495,7 +495,7 @@ produce.
     shrink with ``\\Delta t``: for a perturbation of size ``\\delta`` and a flow with Lipschitz
     constant ``\\Lambda`` over a span ``t``, Grönwall bounds the trajectory error by
     ``\\delta(\\mathrm{e}^{\\Lambda t} - 1)/\\Lambda`` however the time integration is done. Refining the step, or raising `order`, pays only until the time error reaches that floor.
-    Where `Heun`'s docstring reports a crossover in resolution, this scheme has **none**:
+    Where `Heun`'s docstring reports a crossover in resolution, this scheme has none:
     at third order under the advective-CFL loop the time error falls as ``\\Delta x^{3}`` — the
     same rate as the default `CatmullRom` floor's ``\\Delta x^{d+1}`` — so their ratio is set by
     prefactors alone, and measured on a band-limited field at ``N = 32``–``128`` the floor stays
@@ -503,15 +503,15 @@ produce.
     limits an Adams–Bashforth trajectory, and a wider stencil buys nothing; only a ``\\Delta t``
     cut well below the CFL value surfaces the floor.
 
-    The floor is set by the interpolant's **polynomial reproduction degree**, not its smoothness
+    The floor is set by the interpolant's polynomial reproduction degree, not its smoothness
     class — measured here, raising the degree at fixed ``C^1`` lowered it fifty-fold, while varying
     the smoothness at fixed degree left the time convergence unchanged. Raise the degree when the
     floor is what limits you; smoothness buys something different, namely readouts that
     *differentiate* the interpolant, such as acceleration (Lalescu, Teaca & Carati 2010).
 
 # References
-- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* **278**, 108406.
-- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* **229**(17), 5862–5869.
+- Lalescu, C. C., Bramas, B., Rampp, M. & Wilczek, M. (2022). [*An efficient particle tracking algorithm for large-scale parallel pseudo-spectral simulations of turbulence*](https://doi.org/10.1016/j.cpc.2022.108406). *Comput. Phys. Commun.* 278, 108406.
+- Lalescu, C. C., Teaca, B. & Carati, D. (2010). [*Implementation of high order spline interpolations for tracking test particles in discretized fields*](https://doi.org/10.1016/j.jcp.2010.04.006). *J. Comput. Phys.* 229(17), 5862–5869.
 
 # Fields
 The scheme stores no fields: `order` is carried as a type parameter, so the keyword constructor
@@ -693,7 +693,7 @@ Under [`Heun`](@ref), whose docstring gives the update, the scheme is Heun-in-ti
 at the two ends of the step — the start-of-step values the previous iteration's closing particle
 deposit stored, and `velocity_end`.
 
-Every push also advances the cache's particles epoch, its count of position changes, so a read of
+Every push also advances the cache's particles epoch, the version of the positions, so a read of
 the previous velocity sample throws as stale until the particle deposit closing the iteration
 refreshes it. A hand-run loop gets the same protection as a run.
 
@@ -768,7 +768,7 @@ end
 """
     unwrapped_positions(tracers)
 
-The **unwrapped** positions of the tracer set `tracers`, as a
+The *unwrapped* positions of the tracer set `tracers`, as a
 [`PointSet`](@extref GBGPeriodicFields GBGPeriodicFields.Points.PointSet) — the trajectory with its
 winding kept, each coordinate the literal sum of every displacement since seeding, never reduced to
 the periodic box. These are the positions a mean-square-displacement or dispersion diagnostic
