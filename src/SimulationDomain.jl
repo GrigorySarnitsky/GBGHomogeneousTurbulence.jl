@@ -368,7 +368,7 @@ function _build_dealias(strategy::HouLi, multipliers, N, L, ::Type{T}) where {T}
   kernel = radial_kernel(k2 -> exp(-strength * (sqrt(k2) * inverse_nyquist)^order), multipliers)
   # `materialized` trades one resident spectral scalar for the per-mode exp/power chain every
   # pass would otherwise re-evaluate (decision 84); the stored coefficients are the SAME closure
-  # evaluated once, so the two forms advance a run bit-identically.
+  # evaluated once, so the materialized and the lazy kernel advance a run bit-identically.
   return strategy.materialized ? materialize_kernel(kernel) : kernel
 end
 

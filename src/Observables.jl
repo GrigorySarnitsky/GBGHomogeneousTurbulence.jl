@@ -94,26 +94,27 @@ The mean kinetic-energy dissipation rate of a homogeneous flow — a single numb
 \\varepsilon = \\nu \\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = 2\\nu\\langle S_{ij}S_{ij}\\rangle,
 ```
 
-the two forms equal for a homogeneous, divergence-free flow (periodicity alone removes the
-boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\boldsymbol{u}``, zero for
+the vorticity form and the strain-rate form, equal for a homogeneous, divergence-free flow
+(periodicity alone removes the boundary terms; the remaining difference is the dilatation ``\\nabla\\cdot\\boldsymbol{u}``, zero for
 the Leray-projected state a run advances), with the strain-rate tensor
 ``S_{ij} = \\tfrac{1}{2}(\\partial_{x_j}u_i + \\partial_{x_i}u_j)``.
 
-Two routes reach the same rate; take the one whose input is already in hand. The first form measures
-from the vorticity as the normalized inner product (Parseval) — use it where
-``\\boldsymbol{\\omega}`` exists for its own sake, as the cached vorticity does. The second
-measures straight from the velocity, with no vorticity formed at all — use it to measure off the
-state, where a ``\\boldsymbol{\\omega}`` would be built only to be reduced away.
+Two methods measure the same rate; take the one whose input is already in hand. The vorticity
+method, `dissipation(ω, viscosity)`, reduces the vorticity as the normalized inner product
+(Parseval) — use it where ``\\boldsymbol{\\omega}`` exists for its own sake, as the cached vorticity
+does. The velocity method, `dissipation(û, domain, viscosity)`, measures straight from the
+velocity, with no vorticity formed at all — use it to measure off the state, where a
+``\\boldsymbol{\\omega}`` would be built only to be reduced away.
 
 # Arguments
-- `ω` — first form: a vorticity field, in either representation, or its point values (then
+- `ω` — the vorticity method: a vorticity field, in either representation, or its point values (then
   averaged over the points).
-- `û` — second form: the velocity in spectral representation.
-- `domain` — second form: the [`FixedDomain`](@ref) supplying the
+- `û` — the velocity method: the velocity in spectral representation.
+- `domain` — the velocity method: the [`FixedDomain`](@ref) supplying the
   ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` multiplier.
-- `viscosity` — both forms: the kinematic viscosity ``\\nu``.
+- `viscosity` — both methods: the kinematic viscosity ``\\nu``.
 
-The second route trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral
+The velocity method trades the curl for a ``\\lvert\\boldsymbol{\\kappa}\\rvert^{2}``-weighted spectral
 inner product against the `domain.squared_wavenumber_kernel` multiplier: from
 
 ```math
@@ -128,10 +129,10 @@ the mean-square vorticity of a divergence-free velocity is its *Dirichlet energy
 of its gradient, ``H^1`` in the Sobolev naming —
 ``\\langle\\lvert\\boldsymbol{\\omega}\\rvert^{2}\\rangle = \\langle\\hat{\\boldsymbol{u}},\\lvert\\boldsymbol{\\kappa}\\rvert^{2}\\hat{\\boldsymbol{u}}\\rangle``.
 
-!!! warning "The velocity route holds only for a divergence-free field"
-    The `û` route drops the ``\\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2}``
+!!! warning "The velocity method holds only for a divergence-free field"
+    The velocity method drops the ``\\lvert\\boldsymbol{\\kappa}\\cdot\\hat{\\boldsymbol{u}}\\rvert^{2}``
     term, so it holds only for a divergence-free velocity — exact for a state advanced by the
-    Leray-projected dynamics, wrong for an arbitrary vector field. The vorticity route carries no
+    Leray-projected dynamics, wrong for an arbitrary vector field. The vorticity method carries no
     such condition. (The scalar twin, [`scalar_dissipation`](@ref), is unconditional: a scalar has
     no solenoidal constraint to invoke.)
 """
@@ -160,7 +161,7 @@ of a spin-up or budget loop, which is how
 
 # Arguments
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
-  velocity route of `dissipation`, exact only for a solenoidal field (its docstring carries the
+  velocity method of `dissipation`, exact only for a solenoidal field (its docstring carries the
   condition).
 - `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) supplying the
   squared-wavenumber weights.
@@ -210,7 +211,7 @@ reduction minus the retained part, so its relative precision is lower by the rat
 
 # Arguments
 - `û` — the velocity in spectral representation, divergence-free: the dissipation is measured by the
-  velocity route of [`dissipation`](@ref), exact only for a solenoidal field.
+  velocity method of [`dissipation`](@ref), exact only for a solenoidal field.
 - `domain` — the [`FixedDomain`](@ref GBGHomogeneousTurbulence.SimulationDomain.FixedDomain) the
   velocity lives on, which fixes ``N``, ``L`` and the windows.
 - `viscosity` — the kinematic viscosity ``\\nu`` scaling the dissipation.
@@ -258,7 +259,7 @@ value is not current, like every cached read.
 
 !!! note "A grid maximum, not a continuum supremum"
     The reduction runs over grid points, so between them the flow can be faster than any sampled
-    value, which makes the sampled maximum an under-estimate — one of the two loosenesses
+    value, which makes the sampled maximum an under-estimate, which
     [`recommended_cfl`](@ref GBGHomogeneousTurbulence.Propagator.recommended_cfl) accounts for when it sets
     its margin. A CFL condition bounds the *stability* of the explicit advective term; it is not by
     itself a guarantee of accuracy.
@@ -342,8 +343,8 @@ scalar's gradient, the Dirichlet or ``H^{1}`` energy in the Sobolev naming — e
 `domain.squared_wavenumber_kernel` multiplier, formed straight from the spectral coefficients with
 no physical gradient ``\\nabla\\varphi`` materialized.
 
-It is the scalar twin of [`dissipation`](@ref)'s spectral route, and unconditional where that one
-needs a divergence-free velocity. This spectral route is the only form: ``\\nabla\\varphi`` is never
+It is the scalar twin of [`dissipation`](@ref)'s velocity method, and unconditional where that one
+needs a divergence-free velocity. It is the only method: ``\\nabla\\varphi`` is never
 recovered or cached, so there is no field-argument twin.
 """
 scalar_dissipation(φ̂, domain::FixedDomain, diffusivity::Real) =

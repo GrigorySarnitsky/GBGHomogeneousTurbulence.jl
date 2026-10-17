@@ -272,11 +272,11 @@ assembly scratch), the chosen field integration scheme, the [`ResolvedFields`](@
 [`ObservablesCache`](@ref) holding what the last iteration deposited, any [`Tracers`](@ref), and a
 clock.
 
-The two forms differ only in where the `FixedDomain` comes from. The first is
-*domain-building*: from `grid_points_per_axis` and `side_length` it builds the domain and every
-piece above it, seeds a divergence-free velocity (and, given a `scalar`, a mean-zero scalar
-``\\varphi``), and returns a `Simulation` at ``t = 0``. The second is
-*domain-taking*: the same assembly on a `FixedDomain` you built yourself.
+Its two forms differ only in where the `FixedDomain` comes from. The *domain-building* form,
+from `grid_points_per_axis` and `side_length`, builds the domain and every piece above it, seeds a
+divergence-free velocity (and, given a `scalar`, a mean-zero scalar ``\\varphi``), and returns a
+`Simulation` at ``t = 0``. The *domain-taking* form is the same assembly on a `FixedDomain` you
+built yourself.
 
 Advance it with [`advance!`](@ref) / [`run!`](@ref) / [`warmup!`](@ref). Read its measured state by
 applying the observables to `sim.state` (e.g. `kinetic_energy(sim.state.velocity_spectral)`) or
@@ -346,7 +346,7 @@ so, holds ``\\varepsilon``. The viscosity is then chosen from the grid rather th
 
 # Arguments
 
-All keyword except `domain`. The keywords split as the two forms do: the *domain group* is
+All keyword except `domain`. The keywords split as the forms do: the *domain group* is
 consumed by the domain-building form, and the domain-taking form replaces the whole group with its
 one positional argument; the *run group* is accepted by both.
 
@@ -432,7 +432,7 @@ The run group, `kwargs...` in both signatures
       starts from an energy other than the one it will hold.
 
 # Examples
-The two ways in, and the two ways to set the Reynolds number:
+The domain-building and domain-taking forms, with the viscosity derived or supplied:
 
 ```julia
 # Derived viscosity — a 128³ forced-stationary run, ν set from the resolution criterion:

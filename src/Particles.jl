@@ -159,7 +159,7 @@ struct Tracers{PSX, S, UP}
 end
 
 
-# The two forms are ONE method, not two: they are distinguished by which keyword is supplied, and
+# The two forms, given `positions` or a `number_of_particles` to seed, are ONE method, not two: they are distinguished by which keyword is supplied, and
 # Julia dispatches on positional arguments only. Hence the explicit either/or check, which also gives
 # a better error than a missing-keyword one would.
 function Tracers(domain::FixedDomain; interpolation_scheme, positions = nothing,

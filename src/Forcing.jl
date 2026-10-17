@@ -296,7 +296,8 @@ see `VarianceRescaling`.
 # Arguments
 - `forcing` — the strategy.
 - `advanced_field` — a velocity or scalar ``\\varphi`` field in spectral representation, as the step
-  has advanced it. Unlike the two hooks that read the start-of-step field, this one is handed the
+  has advanced it. Unlike [`prepare_forcing!`](@ref) and [`add_forcing_source!`](@ref), which read the start-of-step
+  field, this one is handed the
   field at that later instant, since a strategy that rescales toward a target must measure the state
   it is correcting, not the one it started from.
 - `domain` — the [`FixedDomain`](@ref).
