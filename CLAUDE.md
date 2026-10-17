@@ -20,16 +20,16 @@ its close. It waits for the owner only when `gbg run next` says the tree moved s
 
 # CLAUDE.md — GBGHomogeneousTurbulence
 
-Julia package: a small, focused **pseudospectral direct numerical simulation (DNS) of homogeneous
-isotropic turbulence** — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
+Julia package: a small, focused pseudospectral direct numerical simulation (DNS) of homogeneous
+isotropic turbulence — one incompressible velocity field ``\boldsymbol u`` and one passive scalar
 ``\varphi`` on a triple-periodic box, each optionally forced, advanced by interchangeable
 integrating-factor time-stepping, with Lagrangian particle tracking and field sampling along the
-trajectories (accumulating statistics over those values is the caller's analysis, not this package's). **GPU is the primary target**: the time loop is in-place and field-scale-allocation-free over
+trajectories (accumulating statistics over those values is the caller's analysis, not this package's). GPU is the primary target: the time loop is in-place and field-scale-allocation-free over
 preallocated buffers, backend-agnostic (CPU `Array`, CUDA, ROCm) through the field library.
 
-Built on two sibling backends: **GBGPeriodicFields** ("PF", the field mathematics) and
-**GBGStreamingStatistics** ("SS", the online statistics). The division is exact — **PF is all field
-mathematics, no physics; SS is all statistics, no physics; this package is the physics**: the
+Built on two sibling backends: GBGPeriodicFields ("PF", the field mathematics) and
+GBGStreamingStatistics ("SS", the online statistics). The division is exact — PF is all field
+mathematics, no physics; SS is all statistics, no physics; this package is the physics: the
 equations of motion, forcing, scalar transport, time integration, particle tracking, and the run
 layer. Reference clones of PF and SS live under the gitignored `inspiration/` (study-only), alongside
 the DNS references (TurTLE, GHOST, hit3d).
@@ -43,9 +43,9 @@ there.
 
 ## Modules and wiring
 
-Each concern is its own file (`docs/ARCHITECTURE.md` §4). **Physics** concerns take their names from
-the **Mori–Zwanzig lens** — the *dynamics* (the generator / RHS) and its *observables* (the measured
-functions of state); **realization / infrastructure** concerns are named by their job.
+Each concern is its own file (`docs/ARCHITECTURE.md` §4). Physics concerns take their names from
+the Mori–Zwanzig lens — the *dynamics* (the generator / RHS) and its *observables* (the measured
+functions of state); realization / infrastructure concerns are named by their job.
 
 - `SimulationDomain` — the discretised periodic box a run lives on: the reusable, read-only frame
   (`FixedDomain` — grid, transform plans, spectral multipliers, dealiasing strategy, scratch allocators).
@@ -99,19 +99,19 @@ the umbrella defines no `Phenomenology`, and the word appears in no file under `
    forcing, transport, run control. The numerics and statistics stay rich; the physics stays thin.
 2. **Belongs-in-PF / SS → raise, don't reimplement.** A general, physics-free field operation (a fused
    reduction, a differential or tensor operator) belongs in PF; an online statistic (a density, a
-   moment, a conditional expectation) in SS. When HT needs one, **raise it to the backend** — never
+   moment, a conditional expectation) in SS. When HT needs one, raise it to the backend — never
    reimplement field or statistics machinery here. A deferred backend feature is a *request*, not a
    local workaround.
 3. **Deferred ≠ missing.** A recorded coverage gap or a deferred capability is a *decision*, not an
    omission; "for symmetry", "for completeness", or "it's convenient" is never a valid justification (a
    missing capability encodes a decision — the PF / SS discipline).
-4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free AT FIELD SCALE over the
+4. **GPU-primary, minimal footprint.** The hot loop (`step!`) is in-place and allocation-free at field scale over the
    preallocated buffers (the state, the integrator's `IntegratorBuffers`, the generator's assembly
    scratch, and the observables cache's slots); storage is generic
    `AbstractArray` (no scalar indexing of device arrays).
-   **Minimal memory footprint trumps compute cost** — prefer low-storage integrators, and per-call
+   Minimal memory footprint trumps compute cost — prefer low-storage integrators, and per-call
    allocation of an *occasional* diagnostic over resident scratch. Precision (`Float32` / `Float64`)
-   and footprint are **studied fitness axes**, not afterthoughts.
+   and footprint are studied fitness axes, not afterthoughts.
 5. **Named from the Mori–Zwanzig lens** (see Modules) — physics concerns from the MZ reading,
    infrastructure by its job.
 
@@ -121,6 +121,7 @@ Two-space indentation; two blank lines between top-level definitions; section ba
 moderately long lines are fine. When unsure about Base / stdlib / package behavior, check the official
 docs — don't guess. For a linear solve use `\` / factorizations / `ldiv!`, never an explicit matrix
 inverse. Operators and extended Base functions are imported before being extended; no type piracy.
+
 **Every concrete struct type carries a `Base.show`** in the field library's convention (decision 87,
 adopting PF's decision 82): a one-line self-delimiting `Type(body)` carrying what the package
 refuses on, a `MIME"text/plain"` form only where that line abbreviates, an optional part printed
@@ -129,19 +130,19 @@ constructor call that round-trips, nothing reading an element. The gate is deriv
 `test/display.jl` enumerates the concrete types and fails on one without a display or a cited
 exemption — so a new type is caught by the suite, not by memory.
 
-**Naming — flow-field math variables are Unicode math symbols.** A field **math variable** (a function
+**Naming — flow-field math variables are Unicode math symbols.** A field *math variable* (a function
 parameter or a local) is named by its symbol: physical velocity / vorticity / scalar are `u` / `ω` /
-`φ`; their spectral representations `û` / `φ̂`. **Storage slots keep descriptive names** —
+`φ`; their spectral representations `û` / `φ̂`. Storage slots keep descriptive names —
 `cache.vorticity_physical`, `generator.product_spectral`, `state.velocity_spectral`,
 `cache.velocity_at_particles` — as do
-function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: **symbols for math
-variables, descriptive names for storage.** (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
+function names (`vorticity_physical!`, `velocity_rhs!`), `conditions.velocity_forcing`, and prose. The rule: symbols for math
+variables, descriptive names for storage. (Type `û` as `u\hat<tab>`, `φ̂` as `\varphi\hat<tab>`, `ω`
 as `\omega<tab>`.)
 
 **Naming — public API is user-facing, unambiguous, and precise.** Name a public type, function, or
-argument for **what it means to the user**, not how it is built at the backend, and make each name
+argument for what it means to the user, not how it is built at the backend, and make each name
 unambiguous (one reading) and precise (the exact thing, not an approximate cover word). The user is a
-**physicist** — hence also a mathematician and computer scientist, but *not* a software engineer fluent
+physicist — hence also a mathematician and computer scientist, but *not* a software engineer fluent
 in startup idiom — so names speak physics, mathematics, and computational science, preferring the precise
 meaningful word to a terse handle or an implementation term. Name the object the user reasons about, not
 the machinery inside it: `SimulationDomain` (the discretized box the run lives on), never
@@ -184,8 +185,8 @@ clean physical form: a spectral multiplier, said so briefly. Every diagnostic st
 quantity it measures before the numerical method.
 
 **Cross-referencing.** Never link the docstring's own binding, its argument names, option / `Symbol`
-tokens, or struct fields. A **family** of related built-ins is **one** catalogue destination, not five
-(a glossary table is the exception — it maps each symbol to its own object). **At-home test** — if a
+tokens, or struct fields. A family of related built-ins is one catalogue destination, not five
+(a glossary table is the exception — it maps each symbol to its own object). The *at-home test*: if a
 sentence would sit equally well in the *target's* own docstring, cut it and link.
 
 **No dead references** extends to a thrown error message, a decision-log entry and a repo path (`src/…`,
@@ -193,17 +194,17 @@ sentence would sit equally well in the *target's* own docstring, cut it and link
 
 **Template conventions.**
 
-- An admonition title is **plain text** — Documenter renders neither code spans nor math there.
+- An admonition title is plain text — Documenter renders neither code spans nor math there.
 - The `# Arguments` list is led by "The arguments are:". A lead-in qualifier ("All keyword, all
   required:") appears only where it carries information beyond the entries themselves.
-- An **`# Examples`** section appears where construction is non-obvious, not on every type — hence
+- An `# Examples` section appears where construction is non-obvious, not on every type — hence
   none on the types a run builds for the user, and one on `FixedDomain`, `Simulation`, `Tracers`,
   `FlowParameters`.
-- A **formula gets a display block** when it is the thing the docstring defines, and stays inline
+- A formula gets a display block when it is the thing the docstring defines, and stays inline
   when it is a fragment cited in passing.
-- A return whose **shape** is not evident from the name (a named tuple) is stated. A reduction
+- A return whose shape is not evident from the name (a named tuple) is stated. A reduction
   returning *the field's own* element type says so in prose rather than with an arrow; a mutator may
-  carry **`-> arg`**, naming the argument it returns, and then needs no `Returns` sentence.
+  carry `-> arg`, naming the argument it returns, and then needs no `Returns` sentence.
 
 **Rewrite, don't patch.** When a docstring has taken three or more rounds of patches, rewrite it whole
 rather than append again (`RULE.DOC.SHAPE` measures growth). Measured 2026-08-19: `VarianceRescaling`
@@ -218,7 +219,7 @@ concretes). `checkdocs = :exports` guards a dropped export.
 **Notation** (the glossary, `docs/src/notation.md`, is the single reference). The house rules: vectors
 and tensors are bold italic ``\boldsymbol{u}``; the wavenumber set is kept distinct —
 ``\boldsymbol{\kappa}`` the vector, ``\kappa`` its magnitude, ``k`` the turbulent kinetic energy,
-``\varkappa`` the scalar diffusivity; the passive scalar is ``\varphi``, **never ``\theta``**; the Leray
+``\varkappa`` the scalar diffusivity; the passive scalar is ``\varphi``, never ``\theta``; the Leray
 projection is ``\mathbb P``, a Mori–Zwanzig projection ``\mathcal P``; a conditional bar is ``\mid``.
 The Reynolds number is set through ``\nu`` (``\mathrm{Re} = 1/\nu``), never a field —
 ``\mathrm{Re}_\lambda`` is measured. Long docstring signatures hand-wrap with a hanging indent under the
@@ -233,7 +234,7 @@ never left implicit: `dissipation` (``\varepsilon``), `kinetic_energy` (``k``), 
 this codebase: the derivative-skewness "divergence" bug (a repeated index read as
 ``\nabla\cdot\boldsymbol{u} = 0``), and the coordinate-free skewness constant
 ``C = \tfrac{4}{7}\sqrt{15/2}`` (numerically verified, a competing value ruled out). The category
-errors this physics invites: a **field** with its **representation** (say "field in spectral
+errors this physics invites: a field with its representation (say "field in spectral
 representation", never "spectral field"); the rate ``\varepsilon``, a number, with a dissipation field;
 the kinetic energy ``k`` with the spectrum ``E(\kappa)``; the integrating factor ``\mathcal E`` with
 ``\nu``; ``\mathbb P`` with ``\mathcal P``; a per-unit-wavenumber density ``E(\kappa)`` with an
@@ -244,7 +245,9 @@ energy; a dimensionally incomplete law (a bare ``\kappa^{-5/3}`` slope vs
 word ("The `dissipation` reduction…").
 
 **Register.** A tunable may also be an *axis* or a post-hoc *choice*; keep a neutral tone on
-`@testset` names too. **No invented aliases for API objects** (owner-ruled 2026-08-24): `Simulation`
+`@testset` names too.
+
+**No invented aliases for API objects** (owner-ruled 2026-08-24): `Simulation`
 may be called *the front door* only in its own description — its docstring and its own api-page/§4.7
 sections, where the term is introduced — and every other surface names `Simulation` explicitly. The
 same rule covers any future metaphor: an alias lives where it is defined, nowhere else. (The glossary
@@ -268,14 +271,14 @@ current `export`s and method set. The enumeration of signature arguments exists 
 - Test: `julia --project -e 'using Pkg; Pkg.test()'` — keep it green. The suite includes three
   audits over the shared op model in `test/audit_ops.jl` (which owns the op lists, the cost model,
   and the shape-class decomposition with its reflective counter): `test/memory_audit.jl` and
-  `test/compute_audit.jl` **measure** — a deliberate footprint or
+  `test/compute_audit.jl` *measure* — a deliberate footprint or
   step-schedule change updates the frozen ledgers (and, on a structural `step!`/protocol change, the
   op lists — `AUDIT_PRINT=1` regenerates the compute cells for review) in the same commit, citing the
-  decision — while `test/optimality_audit.jl` **bounds**: every cell is held against a physical
+  decision — while `test/optimality_audit.jl` *bounds*: every cell is held against a physical
   floor, and residual distance must carry a named holder. Its register works in both directions, so
-  closing a gap means **retiring its holder in the same commit**; a holder left behind fails the
+  closing a gap means retiring its holder in the same commit; a holder left behind fails the
   suite just as an unclaimed gap does. The memory audit ledgers the working set and the read-only
-  frame (the `FixedDomain`) **separately**, joined by a completeness test requiring their sum to
+  frame (the `FixedDomain`) separately, joined by a completeness test requiring their sum to
   account for every field-scale array a live `Simulation` reaches — so new residency cannot hide by
   hanging off an unwalked owner (decision 36).
 - Docs build: `julia --project=docs docs/make.jl` (`checkdocs = :exports` and the rulebook's build
@@ -288,26 +291,26 @@ current `export`s and method set. The enumeration of signature arguments exists 
 
 ## Working agreements
 
-- Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are **study-only,
-  gitignored** — never copied into the package, only properly cited.
+- Reference clones under `inspiration/` (PF, SS, and TurTLE / GHOST / hit3d) are study-only,
+  gitignored — never copied into the package, only properly cited.
 - **`inspiration/OldCode` is not a reference clone and is not inspiration.** It is the previous
   generation of this work, kept only so the question *what was done before, and what came of it?* can
-  be answered from the record rather than from memory. **Do not follow it.** The current direction of
-  the GBG packages is to **replace it entirely**, because it was problematic — so its arrangements
+  be answered from the record rather than from memory. Do not follow it. The current direction of
+  the GBG packages is to replace it entirely, because it was problematic — so its arrangements
   carry no authority, and "the old code did it this way" is never a reason to do anything. Read it
-  **critically**: when it is consulted, the useful output is a diagnosis (what it did, why that
+  critically: when it is consulted, the useful output is a diagnosis (what it did, why that
   failed, what replaced it), never a pattern to copy. It is study-only and gitignored like the rest,
-  and it is **not** citable — a published method gets cited to its paper, not to this archive.
+  and it is not citable — a published method gets cited to its paper, not to this archive.
 
 ## Known weaknesses — self-guards
 
-Documented tendencies of mine the user has caught; treat each as a **live risk**, not a resolved one, and
+Documented tendencies of mine the user has caught; treat each as a live risk, not a resolved one, and
 actively check for it.
 
 - **Circular / self-referential justification.** I default to justifying a decision by the *existing state*
   or my *own prior decisions* — "it's already like that", "keeps it parallel with the current form", "for
   consistency / symmetry with what's there" — instead of arguing from first principles or the user's stated
-  direction. **Legacy is not evidence of correctness:** if the existing arrangement were wrong, "keep it
+  direction. Legacy is not evidence of correctness: if the existing arrangement were wrong, "keep it
   parallel" only propagates the error. When justifying a choice, lead with a first-principle reason or the
   user's preference; if the only reason is "that's how it is", it is not a reason — say so and find the real
   one, or flag that there isn't one. This is the decision-making sibling of invariant 3's "*for symmetry /
@@ -319,26 +322,26 @@ actively check for it.
 - **Asserting a shape instead of expanding it.** When mapping work onto a backend — a PF / SS request, a
   gap-register holder, a "this chain needs a new op" claim — I pattern-match over operation *names* and
   assert the algebraic shape, instead of writing the expression out and unifying it against the backend's
-  **current** method set. Both failure directions are live: requesting an operation whose composition is
+  *current* method set. Both failure directions are live: requesting an operation whose composition is
   already expressible (the 2026-07-19 shift-back∘average — expressible all along as the five-argument
   `convolve!` α/β form, verified in the clone and in use on a neighboring line), and proposing a consumer
   that is not an instance of the requested op (the phase-shift chain claimed for the two-operand combine —
-  a kernel on *one* operand is not `ĝ⊙(α·a + β·b)`). The rule: **before raising a request or naming a gap
-  holder, expand each candidate chain algebraically and check it against the existing exports** — `RULE.DOC.VERIFIED`'s
+  a kernel on *one* operand is not `ĝ⊙(α·a + β·b)`). The rule: before raising a request or naming a gap
+  holder, expand each candidate chain algebraically and check it against the existing exports — `RULE.DOC.VERIFIED`'s
   "a plausible 'X is just Y' is false until the expansion matches", applied to code shapes and
   backend surfaces, not only docstrings. Instances (2026-07-19, both caught by PF's triage): the missed
   free win at `Generator.jl` 253–254; the item-7 phase-shift consumer misclaim.
 - **Treating what is *in place* as evidence it should be so — dismissing a flagged cost instead of
   challenging it or asking.** When a finding surfaces a cost that is already *recorded* — a frozen audit
   delta, a decision-logged tradeoff, an existing buffer — I default to closing it as "deliberate /
-  accepted / off-axis," treating the record as the justification. But **a frozen audit cell measures
-  what *is*, not what *should be*:** a recorded cost with no *lower bound* held against it is an
+  accepted / off-axis," treating the record as the justification. But a frozen audit cell measures
+  what *is*, not what *should be*: a recorded cost with no *lower bound* held against it is an
   unexamined cost, not a minimal one. This is the audit-coverage sibling of the fusion-bound
   complacency — "achieved = bound" certified nothing because the bound was not the physical floor — and
-  of invariant 3. The rule: **before dismissing a finding as acceptable, either produce the lower bound
-  that proves it minimal, or ask the user** — never close it by pointing at the existing arrangement,
+  of invariant 3. The rule: before dismissing a finding as acceptable, either produce the lower bound
+  that proves it minimal, or ask the user — never close it by pointing at the existing arrangement,
   and never let "it's already recorded / it was done to get things working" stand as a reason. Instance
-  The sharpest form is **building the instrument out of the assumption it should test**: if a
+  The sharpest form is building the instrument out of the assumption it should test: if a
   projection needs an assumption to reach the achieved number, that assumption is a *holder*, not a
   modelling input, and a bound that consumes it certifies nothing (decision 37 — the liveness
   projection declared the observation charts live across the step, so `achieved == bound` held by
@@ -353,17 +356,17 @@ actively check for it.
 - **Fixing the instance, not the class — and being unable to see it from the inside.** This one is
   different in kind from the others: the rule is *already written down* ("a flagged instance is a
   sample of a class — fix the class, not the line"), I know it, I quote it, and I break it anyway. In
-  one measured round of `verify-fixes.js`, **eleven of thirteen deficiencies were `LINE-ONLY`** — the
+  one measured round of `verify-fixes.js`, eleven of thirteen deficiencies were `LINE-ONLY` — the
   flagged site fixed, the class alive on surfaces the finding had *already named*. The lesson is
-  therefore not another statement of the rule. It is that **stating it does not work and measuring it
-  does**: the class-sweep claim has to be *checked by something that is not me*, which is what the
+  therefore not another statement of the rule. It is that stating it does not work and measuring it
+  does: the class-sweep claim has to be *checked by something that is not me*, which is what the
   verifier pair exists for. Three shapes recur, none visible from inside the edit:
-  (a) **the sweep that skips its own surfaces** — every rename swept `src/` and `docs/` and stopped,
+  (a) *the sweep that skips its own surfaces* — every rename swept `src/` and `docs/` and stopped,
   leaving `CLAUDE.md` and `README.md` untouched for rounds, the latter holding the *worst* instance of
-  the very claim being fixed; (b) **the fix that creates the defect it closes** — a gloss defining
+  the very claim being fixed; (b) *the fix that creates the defect it closes* — a gloss defining
   "register" asserted a corpus-wide usage whose flagship example the same pass had deleted two commits
   earlier, and a rewrite that purged the banned "the run stands at ``t_n``" reintroduced the identical
-  construction three sentences later; (c) **the fix that contradicts itself** — a link sweep added the
+  construction three sentences later; (c) *the fix that contradicts itself* — a link sweep added the
   policy sentence "every Code entry naming a package object links" and left its own table disobeying
   it, because the regex required a cell to be exactly one backticked name. A class claimed swept but
   not re-measured is an instance fix wearing a class's name.
@@ -374,26 +377,26 @@ actively check for it.
 - **Writing the rule down instead of building the check — and the rule's presence then reading as
   compliance.** The generalisation of the entry above, and the one that explains why that entry
   keeps recurring despite being written. Over three days of cross-checking instruments against the
-  sibling PF session, six defects were found across the two trees, and in **every one the correct
-  behaviour was already written down in the same tree**: the class-sweep rule sat in the discipline
+  sibling PF session, six defects were found across the two trees, and in every one the correct
+  behaviour was already written down in the same tree: the class-sweep rule sat in the discipline
   section while eleven of thirteen fixes were `LINE-ONLY`; `hunt.js`'s "it must assert the RIGHT
   behaviour" sat three lines above code that accepted *any* failing test as proof; this file's
   doc-edit checklist then named `domain` as the argument an enumeration must not skip, while
-  `ResolvedFields(domain; …)` left `domain` unbound and `argcov.jl` reported `0` and **could not have
-  reported otherwise** — its parser discarded the last positional argument of every signature
+  `ResolvedFields(domain; …)` left `domain` unbound and `argcov.jl` reported `0` and could not have
+  reported otherwise — its parser discarded the last positional argument of every signature
   carrying a `;`. PF hit the mirror image the same day: its unbound argument was the *stencil width*,
   the example its own rulebook gives verbatim for that class.
 
   **The mechanism (PF's, and it is the useful part):** a rule is written by whoever has just fixed an
   instance, at the moment they are most confident the class is handled — which is precisely the
   moment nobody builds the check, because *the fix feels like the closure*. So the rule is written
-  **instead of** enforcement, not merely alongside it. Afterwards the rule reads as evidence of
+  instead of enforcement, not merely alongside it. Afterwards the rule reads as evidence of
   compliance rather than of intent, and from inside the tree you read it and believe the tree obeys.
   That is why this class is invisible from inside and obvious from outside, and why it needed a
   second package to surface: neither session found more than two instances in its own tree alone.
 
-  The rule: **when you write a rule down, name what would catch its next violation — and if the
-  answer is "someone remembering this rule", it is not enforced.** A rule and its check belong in the
+  The rule: when you write a rule down, name what would catch its next violation — and if the
+  answer is "someone remembering this rule", it is not enforced. A rule and its check belong in the
   same commit. And on the checks themselves, prefer a stated denominator to a
   bare verdict: "CLEAN over 98 bindings" is falsifiable where "CLEAN" is not.
   Instances (2026-08-25/27): the six above.
