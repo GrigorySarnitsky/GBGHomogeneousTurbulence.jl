@@ -1,4 +1,4 @@
-# reynolds_box, reynolds_taylor, taylor_microscale and the three Kolmogorov scales — plain functions of
+# reynolds_box, reynolds_taylor, taylor_length and the three Kolmogorov scales — plain functions of
 # measured scalars. Each is checked against its definition written out independently, against the
 # identities tying them to each other (Re_λ = u′λ/ν, η = u_η τ_η, Re_box = (L/η)^{4/3}), for element
 # type, and for its refusals.
@@ -66,25 +66,25 @@ end
   ε, k, ν = 0.37, 1.5, 0.011
   u′ = sqrt(2k / 3)
   # the definition, written out
-  @test taylor_microscale(k, ε, ν) ≈ sqrt(15ν * u′^2 / ε) rtol = 1e-14
+  @test taylor_length(k, ε, ν) ≈ sqrt(15ν * u′^2 / ε) rtol = 1e-14
   # the Reynolds number it is built into: Re_λ = u′λ/ν
-  @test u′ * taylor_microscale(k, ε, ν) / ν ≈ reynolds_taylor(k, ε, ν) rtol = 1e-13
+  @test u′ * taylor_length(k, ε, ν) / ν ≈ reynolds_taylor(k, ε, ν) rtol = 1e-13
   # a flow with no energy has no Taylor microscale to speak of, and the formula says zero
-  @test taylor_microscale(0, ε, ν) == 0
+  @test taylor_length(0, ε, ν) == 0
 
   # the arguments' own floating-point type; integers promote to Float64
-  @test taylor_microscale(1.5f0, 0.37f0, 0.011f0) isa Float32
-  @test taylor_microscale(1, 1, 1) === sqrt(10.0)
+  @test taylor_length(1.5f0, 0.37f0, 0.011f0) isa Float32
+  @test taylor_length(1, 1, 1) === sqrt(10.0)
 
   # refusals, by name
-  @test_throws ArgumentError taylor_microscale(-k, ε, ν)
-  @test_throws ArgumentError taylor_microscale(NaN, ε, ν)
-  @test_throws ArgumentError taylor_microscale(k, 0, ν)
-  @test_throws ArgumentError taylor_microscale(k, -ε, ν)
-  @test_throws ArgumentError taylor_microscale(k, Inf, ν)
-  @test_throws ArgumentError taylor_microscale(k, ε, 0)
-  @test_throws ArgumentError taylor_microscale(k, ε, -ν)
-  @test_throws ArgumentError taylor_microscale(k, ε, NaN)
+  @test_throws ArgumentError taylor_length(-k, ε, ν)
+  @test_throws ArgumentError taylor_length(NaN, ε, ν)
+  @test_throws ArgumentError taylor_length(k, 0, ν)
+  @test_throws ArgumentError taylor_length(k, -ε, ν)
+  @test_throws ArgumentError taylor_length(k, Inf, ν)
+  @test_throws ArgumentError taylor_length(k, ε, 0)
+  @test_throws ArgumentError taylor_length(k, ε, -ν)
+  @test_throws ArgumentError taylor_length(k, ε, NaN)
 end
 
 

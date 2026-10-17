@@ -140,7 +140,7 @@ module = "Forcing"
 
 [[generic]]
 set = "Observables"
-name = "integral_scale"
+name = "integral_length"
 count = 2  # +1 (2026-10-16): the method taking a measured spectrum (decision 114)
 module = "Observables"
 
@@ -164,7 +164,7 @@ module = "Observables"
 
 [[generic]]
 set = "Observables"
-name = "taylor_microscale"
+name = "taylor_length"
 count = 1
 module = "Observables"
 
@@ -512,7 +512,7 @@ module = "SimulationRun"
 
 [module]
 SimulationDomain = 25
-Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_scale(spectrum)`, `taylor_microscale`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
+Observables = 21  # +1 (2026-10-16): `scalar_variance_and_dissipation`, the scalar twin of the fused velocity pair; +4 the same day: `integral_length(spectrum)`, `taylor_length`, `kolmogorov_time`, `kolmogorov_velocity` (decision 114)
 State = 6
 Cache = 23
 Forcing = 77  # +3 (2026-10-14): the deferred display's `_run_filled` (6) and `_either_or` (2) replace `_design_keyword` (5)

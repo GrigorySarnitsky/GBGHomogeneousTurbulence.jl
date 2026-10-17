@@ -53,7 +53,7 @@ side) rather than from a field. The arguments run from the largest scale to the 
 ```@docs
 reynolds_box
 reynolds_taylor
-taylor_microscale
+taylor_length
 kolmogorov_length
 kolmogorov_time
 kolmogorov_velocity
@@ -92,5 +92,5 @@ The energy spectrum as a density per unit wavenumber, and the integral length sc
 
 ```@docs
 energy_spectrum
-integral_scale
+integral_length
 ```

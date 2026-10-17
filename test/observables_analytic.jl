@@ -64,13 +64,13 @@ end
   @test κ[2] == 1.0
   @test E[2] ≈ squares / 4 rtol = 1e-13                    # all of k in shell 1, Δκ = 1
   @test sum(E) ≈ E[2] rtol = 1e-13                         # and nothing elsewhere
-  @test integral_scale(û, d) ≈ 3π / 4 rtol = 1e-12
+  @test integral_length(û, d) ≈ 3π / 4 rtol = 1e-12
   # the spectrum method: the field method measures the spectrum and hands it on, so the two agree
   # exactly, and a spectrum written by hand gives L₁₁ = (3π/4) Σ(E/κ)/ΣE with the κ = 0 shell left out
-  @test integral_scale(energy_spectrum(û, d)) == integral_scale(û, d)
+  @test integral_length(energy_spectrum(û, d)) == integral_length(û, d)
   two_shells = (; wavenumbers = [0.0, 1.0, 2.0], energy = [5.0, 2.0, 1.0])
-  @test integral_scale(two_shells) ≈ 3π / 4 * (2.0 / 1.0 + 1.0 / 2.0) / (2.0 + 1.0) rtol = 1e-14
-  @test_throws ArgumentError integral_scale((; wavenumbers = [0.0, 1.0], energy = [5.0, 0.0]))
+  @test integral_length(two_shells) ≈ 3π / 4 * (2.0 / 1.0 + 1.0 / 2.0) / (2.0 + 1.0) rtol = 1e-14
+  @test_throws ArgumentError integral_length((; wavenumbers = [0.0, 1.0], energy = [5.0, 0.0]))
 
   u = new_vector_field_physical(d)
   to_physical!(u, û, d.transform_plans, new_vector_field_spectral(d))

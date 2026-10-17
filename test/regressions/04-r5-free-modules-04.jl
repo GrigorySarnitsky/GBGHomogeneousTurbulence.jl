@@ -1,6 +1,6 @@
-# Witness: `integral_scale`'s emptiness guard tests the wrong sum.
+# Witness: `integral_length`'s emptiness guard tests the wrong sum.
 #
-# `integral_scale` computes L₁₁ = (3π/4)·Σ(Eₙ/κₙ)/ΣEₙ, where the numerator deliberately drops the
+# `integral_length` computes L₁₁ = (3π/4)·Σ(Eₙ/κₙ)/ΣEₙ, where the numerator deliberately drops the
 # κ = 0 shell (`k > 0 ? e/k : zero(e)`) while the denominator `total = sum(E)` keeps it. The guard
 #
 #     total > 0 || throw(ArgumentError("this velocity field carries no energy, …"))
@@ -48,7 +48,7 @@ function mean_flow_spectral(amplitude = 1.0)
 end
 
 
-@testset "integral_scale guards the sum it actually divides by" begin
+@testset "integral_length guards the sum it actually divides by" begin
 
 @testset "a uniform mean flow does not get L₁₁ = 0" begin
   û = mean_flow_spectral()
@@ -62,7 +62,7 @@ end
   @test sum(E[2:end]) == 0.0   # … and nowhere else.
 
   # The claim under test: the guard is passed (total = 0.5 > 0) and a zero length comes back.
-  @test reported_length(attempt(() -> integral_scale(û, DOMAIN))) > 0
+  @test reported_length(attempt(() -> integral_length(û, DOMAIN))) > 0
 end
 
 
@@ -70,7 +70,7 @@ end
   # A solenoidal single-mode field at κ = 1: u = (0, sin(x), 0), the turbulent part.
   turbulent = new_vector_field_spectral(DOMAIN)
   field_data(turbulent)[2, 1, 1, 2] = -0.5im * N^3   # κ_x = 1, second component
-  L_turbulent = integral_scale(turbulent, DOMAIN)
+  L_turbulent = integral_length(turbulent, DOMAIN)
   @test L_turbulent > 0                              # the healthy reference value
 
   # The same field riding on a uniform mean flow. The mean flow contributes a constant u₀² to
@@ -79,12 +79,12 @@ end
   field_data(mixed) .+= field_data(turbulent)
   @test kinetic_energy(mixed) > kinetic_energy(turbulent)
 
-  @test integral_scale(mixed, DOMAIN) >= L_turbulent
+  @test integral_length(mixed, DOMAIN) >= L_turbulent
 end
 
 
 @testset "control: the existing guard still fires on a field with no energy at all" begin
-  @test_throws ArgumentError integral_scale(new_vector_field_spectral(DOMAIN), DOMAIN)
+  @test_throws ArgumentError integral_length(new_vector_field_spectral(DOMAIN), DOMAIN)
 end
 
 end  # outer testset

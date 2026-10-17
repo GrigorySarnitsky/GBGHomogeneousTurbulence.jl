@@ -198,7 +198,7 @@ unit,words,longest_paragraph,admonitions
 "Observables.jl :: derivative_skewness(û, domain)",410,94,1
 "Observables.jl :: dissipation(ω, viscosity)",288,78,1
 "Observables.jl :: energy_spectrum(û, domain)",171,59,0
-"Observables.jl :: integral_scale(û, domain)",263,90,0
+"Observables.jl :: integral_length(û, domain)",263,90,0
 "Observables.jl :: kinetic_energy(u)",155,67,0
 "Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,99,0
 "Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",509,82,1

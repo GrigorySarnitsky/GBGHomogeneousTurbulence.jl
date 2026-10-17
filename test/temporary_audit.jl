@@ -84,13 +84,13 @@ const ROWS = Dict{Symbol, Function}(
   :scalar_dissipation => c -> (() -> scalar_dissipation(c.φ̂, c.domain, 0.05), (c.sim,)),
   :scalar_variance_and_dissipation => c -> (() -> scalar_variance_and_dissipation(c.φ̂, c.domain, 0.05), (c.sim,)),
   :energy_spectrum => c -> (() -> energy_spectrum(c.û, c.domain), (c.sim,)),
-  :integral_scale => c -> (() -> integral_scale(c.û, c.domain), (c.sim,)),
+  :integral_length => c -> (() -> integral_length(c.û, c.domain), (c.sim,)),
   :derivative_skewness => c -> (() -> derivative_skewness(c.û, c.domain), (c.sim,)),
   :max_speed => c -> (() -> max_speed(velocity_physical(c.sim.cache)), (c.sim,)),
   :reynolds_box => c -> (() -> reynolds_box(2π, 0.1, 0.01), ()),
   :reynolds_taylor => c -> (() -> reynolds_taylor(1.5, 0.1, 0.01), ()),
   :kolmogorov_length => c -> (() -> kolmogorov_length(0.1, 0.01), ()),
-  :taylor_microscale => c -> (() -> taylor_microscale(1.5, 0.1, 0.01), ()),
+  :taylor_length => c -> (() -> taylor_length(1.5, 0.1, 0.01), ()),
   :kolmogorov_time => c -> (() -> kolmogorov_time(0.1, 0.01), ()),
   :kolmogorov_velocity => c -> (() -> kolmogorov_velocity(0.1, 0.01), ()),
   :kinetic_energy_in_box_units => c -> (() -> kinetic_energy_in_box_units(ConstantPower(); reynolds_box = 1000.0), ()),
@@ -266,7 +266,7 @@ below_field_scale(u) = u[end] < 0.05 || u[end - 1] >= 2 * u[end]
     # The skewness stays the largest temporary an observable takes — the run-phase peak an opted-in
     # warm-up pays (the stationarity gate is off by default).
     observables = (:kinetic_energy, :dissipation, :kinetic_energy_and_dissipation, :energy_spectrum,
-                   :integral_scale, :scalar_variance, :scalar_dissipation, :scalar_variance_and_dissipation,
+                   :integral_length, :scalar_variance, :scalar_dissipation, :scalar_variance_and_dissipation,
                    :kinetic_energy_and_dissipation_below_scale, :max_speed, :derivative_skewness)
     @test argmax(n -> units[n][end], observables) === :derivative_skewness
   end

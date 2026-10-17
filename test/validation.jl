@@ -16,7 +16,7 @@ end
   @test all(≥(0), E)                                          # a power spectrum is non-negative
   Δκ = 2π / SIM.domain.grid.domain_size[1]
   @test isapprox(sum(E) * Δκ, kinetic_energy(SIM.state.velocity_spectral); rtol = 1e-5)   # Σ E(κ)·Δκ = k
-  @test integral_scale(SIM.state.velocity_spectral, SIM.domain) > 0
+  @test integral_length(SIM.state.velocity_spectral, SIM.domain) > 0
 end
 
 
@@ -62,7 +62,7 @@ end
 
 # The module docstring promises every observable returns the field's own element type. That claim was
 # found false in a new place on three consecutive review rounds — kinetic_energy/derivative_skewness,
-# then dissipation/scalar_dissipation via their Real parameter, then energy_spectrum/integral_scale
+# then dissipation/scalar_dissipation via their Real parameter, then energy_spectrum/integral_length
 # via untyped literals. Each fix was verified against the functions the finding named. This pins the
 # CLAIM instead, over every exported observable, so the next leak fails a test rather than a review.
 @testset "every observable returns the field's own element type" begin
@@ -80,7 +80,7 @@ end
     @test typeof(scalar_variance(φ̂))           === T
     @test typeof(scalar_dissipation(φ̂, d, 0.001)) === T
     @test typeof(derivative_skewness(û, d))    === T
-    @test typeof(integral_scale(û, d))         === T
+    @test typeof(integral_length(û, d))         === T
     spec = energy_spectrum(û, d)
     @test eltype(spec.energy)      === T
     @test eltype(spec.wavenumbers) === T

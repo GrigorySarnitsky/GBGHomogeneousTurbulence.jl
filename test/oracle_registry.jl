@@ -13,7 +13,7 @@
 #   structural   returns metadata or storage, not a value
 # The classification is the moment to notice an operation with no independent oracle. Declaring the
 # registry found the core observables checked only against other package operations, against a trivial zero, or not at all —
-# `kinetic_energy`, `dissipation`, `energy_spectrum`, `integral_scale`, `max_speed`,
+# `kinetic_energy`, `dissipation`, `energy_spectrum`, `integral_length`, `max_speed`,
 # `derivative_skewness`, `max_resolved_wavenumber`, the two integrating factors and
 # `recommended_cfl` — and `observables_analytic.jl` supplies their closed forms.
 # The reference-law module parked under `parked/Phenomenology/` is not loaded, so not on the surface
@@ -36,14 +36,14 @@ const ORACLE_PROVENANCE = Dict{Symbol, Tuple{Symbol, String}}(
   :scalar_dissipation    => (:analytic, "observables_analytic.jl — ε_φ = ϰD²; and scalar.jl, 2ϰ⟨|∇φ|²⟩ from an explicit physical gradient"),
   :scalar_variance_and_dissipation => (:analytic, "observables_analytic.jl — the same ⟨φ²⟩ and ε_φ, as one pair"),
   :energy_spectrum       => (:analytic, "observables_analytic.jl — all of k in shell 1, nothing elsewhere"),
-  :integral_scale        => (:analytic, "observables_analytic.jl — L₁₁ = 3π/4 for a single shell"),
+  :integral_length        => (:analytic, "observables_analytic.jl — L₁₁ = 3π/4 for a single shell"),
   :max_speed             => (:analytic, "observables_analytic.jl — √(A² + B² + C²), sampled where every sine is ±1"),
   :derivative_skewness   => (:analytic, "observables_analytic.jl — S = 0 for the single-shell field, and odd under u → −u for any field"),
   :kinetic_energy_and_dissipation_below_scale => (:independent, "below_scale.jl — the spectral sums as host loops, and the box-mean definition on an 8× finer grid"),
   :reynolds_box          => (:independent, "reynolds.jl — through the Kolmogorov velocity of a box-sized eddy, and (L/η)^{4/3}"),
   :reynolds_taylor       => (:independent, "reynolds.jl — u′λ/ν with u′ and λ written out"),
   :kolmogorov_length     => (:independent, "reynolds.jl — (ν³/ε)^{1/4} written out, and Re_box = (L/η)^{4/3} through it"),
-  :taylor_microscale     => (:independent, "reynolds.jl — √(15νu′²/ε) written out, and Re_λ = u′λ/ν through it"),
+  :taylor_length     => (:independent, "reynolds.jl — √(15νu′²/ε) written out, and Re_λ = u′λ/ν through it"),
   :kolmogorov_time       => (:independent, "reynolds.jl — (ν/ε)^{1/2} written out, and η = u_η τ_η"),
   :kolmogorov_velocity   => (:independent, "reynolds.jl — (εν)^{1/4} written out, and u_η η/ν = 1"),
 

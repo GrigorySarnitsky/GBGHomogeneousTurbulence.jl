@@ -25,9 +25,9 @@ The measured functions of the flow state:
   state's spectral representation, the one field-valued observable
   (its cached read, [`vorticity_physical`](@ref GBGHomogeneousTurbulence.Cache.vorticity_physical),
   lives in `Cache`).
-- [`energy_spectrum`](@ref), [`integral_scale`](@ref) — the measured energy spectrum and the integral
+- [`energy_spectrum`](@ref), [`integral_length`](@ref) — the measured energy spectrum and the integral
   length scale read from it, by measuring the spectrum or from one already measured.
-- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref), [`taylor_microscale`](@ref),
+- [`reynolds_box`](@ref), [`reynolds_taylor`](@ref), [`taylor_length`](@ref),
   [`kolmogorov_length`](@ref), [`kolmogorov_time`](@ref), [`kolmogorov_velocity`](@ref) — the
   Reynolds numbers and the Taylor and Kolmogorov scales from measured scalars, not a field.
 
@@ -53,7 +53,7 @@ using ..SimulationDomain: FixedDomain, new_tensor_field_physical
 export kinetic_energy, dissipation, kinetic_energy_and_dissipation,
        kinetic_energy_and_dissipation_below_scale, max_speed, vorticity_physical!,
        scalar_variance, scalar_dissipation, scalar_variance_and_dissipation, derivative_skewness,
-       energy_spectrum, integral_scale, reynolds_box, reynolds_taylor, taylor_microscale,
+       energy_spectrum, integral_length, reynolds_box, reynolds_taylor, taylor_length,
        kolmogorov_length, kolmogorov_time, kolmogorov_velocity
 
 
@@ -515,8 +515,8 @@ end
 
 
 """
-    integral_scale(û, domain)
-    integral_scale(spectrum)
+    integral_length(û, domain)
+    integral_length(spectrum)
 
 The longitudinal integral length scale of the velocity field `û`, read from its spectral density
 ``E(\\kappa)``,
@@ -560,9 +560,9 @@ the isotropic average of the one longitudinal and two transverse contributions.
 Returns a number in the spectrum's element type. A spectrum with no energy outside the
 ``\\kappa = 0`` shell has no integral scale and throws an `ArgumentError`.
 """
-integral_scale(û, domain::FixedDomain) = integral_scale(energy_spectrum(û, domain))
+integral_length(û, domain::FixedDomain) = integral_length(energy_spectrum(û, domain))
 
-function integral_scale(spectrum::NamedTuple{(:wavenumbers, :energy)})
+function integral_length(spectrum::NamedTuple{(:wavenumbers, :energy)})
   κ, E = spectrum
   # Both sums run where the spectrum lives — no scalar indexing, so a spectrum left on a device
   # works unchanged. The κ = 0 shell is excluded from the numerator by the branch rather than by
@@ -654,7 +654,7 @@ end
 
 
 """
-    taylor_microscale(kinetic_energy, dissipation, viscosity)
+    taylor_length(kinetic_energy, dissipation, viscosity)
 
 The function computes the Taylor microscale ``\\lambda = \\sqrt{15\\nu u'^{2}/\\varepsilon}`` from
 three scalars, with ``u' = \\sqrt{2k/3}`` the root-mean-square velocity of one component, which gives
@@ -679,7 +679,7 @@ Returns a number in the floating-point type the arguments promote to. A negative
 `kinetic_energy`, or a non-positive or non-finite `dissipation` or `viscosity`, throws an
 `ArgumentError`.
 """
-function taylor_microscale(kinetic_energy::Real, dissipation::Real, viscosity::Real)
+function taylor_length(kinetic_energy::Real, dissipation::Real, viscosity::Real)
   k, ε, ν = promote(float(kinetic_energy), float(dissipation), float(viscosity))
   (isfinite(k) && k >= 0) || throw(ArgumentError("`kinetic_energy` must be finite and non-negative, got $kinetic_energy"))
   (isfinite(ε) && ε > 0) || throw(ArgumentError("`dissipation` must be finite and positive, got $dissipation"))

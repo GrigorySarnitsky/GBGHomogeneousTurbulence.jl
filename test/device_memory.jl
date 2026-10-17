@@ -210,7 +210,7 @@ const DEVICE_TOLERANCE = 0.4             # N³ elements: read_simulation's small
             velocity_forcing = StochasticOU(forcing_variance = 0.1, correlation_time_in_box_units = 0.5,
                                             highest_shell = 8)),
         "energy_spectrum" => () -> energy_spectrum(û, d),
-        "integral_scale" => () -> integral_scale(û, d),
+        "integral_length" => () -> integral_length(û, d),
         "dissipation" => () -> dissipation(û, d, 0.05),
         "scalar_dissipation" => () -> scalar_dissipation(φ̂, d, 0.05),
         "write_simulation" => () -> h5open(f -> write_simulation(f, "s", sim), tempname(), "w"),

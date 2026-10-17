@@ -91,7 +91,7 @@ pages use in prose, with no function of its own.
 | Symbol | Meaning | Code |
 |:---|:---|:---|
 | ``u'`` | root-mean-square velocity (one component), ``u' = \sqrt{2k/3}`` | — |
-| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_scale`](@ref GBGHomogeneousTurbulence.Observables.integral_scale) |
+| ``L_{11}`` | longitudinal (parallel) integral length scale, ``\tfrac{3\pi}{4}\int_0^\infty (E/\kappa)\,\mathrm{d}\kappa / \int_0^\infty E\,\mathrm{d}\kappa`` (the transverse is ``L_{22} = L_{11}/2``) | [`integral_length`](@ref GBGHomogeneousTurbulence.Observables.integral_length) |
 | ``\eta`` | Kolmogorov (dissipation) microscale, ``(\nu^3/\varepsilon)^{1/4}`` | [`kolmogorov_length`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_length) |
 | ``\tau_\eta`` | Kolmogorov time, ``(\nu/\varepsilon)^{1/2}``, the turnover time of an eddy of size ``\eta`` | [`kolmogorov_time`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_time) |
 | ``u_\eta`` | Kolmogorov velocity, ``(\varepsilon\nu)^{1/4}``, so that ``\eta = u_\eta\tau_\eta`` | [`kolmogorov_velocity`](@ref GBGHomogeneousTurbulence.Observables.kolmogorov_velocity) |
@@ -101,7 +101,7 @@ pages use in prose, with no function of its own.
 | ``\tau`` | eddy-turnover time, ``k/\varepsilon`` — the time scale of the energy-containing eddies, and the unit a run's length is counted in; ``t_\ell`` below is the same scale, normalized differently. Two unrelated quantities wear this glyph: in the integrating-factor row of *Spectral representation and operators* above, ``\tau`` is a Runge–Kutta stage substep, the argument of the integrating-factor functions | [`kinetic_energy_and_dissipation`](@ref GBGHomogeneousTurbulence.Observables.kinetic_energy_and_dissipation) |
 | ``t_\ell`` | large-eddy turnover time, ``2k/(3\varepsilon)`` — Bassenne et al.'s convention, the [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) default relaxation time; ``t_\ell = u'^{2}/\varepsilon = \tfrac{2}{3}\tau`` | [`VarianceController`](@ref GBGHomogeneousTurbulence.Forcing.VarianceController) |
 | ``\mathrm{Re}_\lambda`` | Taylor-microscale Reynolds number ``u'\lambda/\nu = \sqrt{20/3} k/\sqrt{\varepsilon\nu}``, measured from the flow state | [`reynolds_taylor`](@ref GBGHomogeneousTurbulence.Observables.reynolds_taylor) |
-| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon} = \sqrt{10\nu k/\varepsilon}`` | [`taylor_microscale`](@ref GBGHomogeneousTurbulence.Observables.taylor_microscale) |
+| ``\lambda`` | Taylor microscale, ``\sqrt{15 \nu u'^2/\varepsilon} = \sqrt{10\nu k/\varepsilon}`` | [`taylor_length`](@ref GBGHomogeneousTurbulence.Observables.taylor_length) |
 
 ## Numerics
 

@@ -364,7 +364,7 @@ states the physical quantity first, then the reduction that computes it:
   isotropy constant ``C_S = \tfrac{4}{7}\sqrt{15/2}`` (Betchov 1956; reproduces the classical longitudinal
   skewness);
 - ``\texttt{energy\_spectrum} \equiv E(\kappa)``, the halved `GBGPeriodicFields` radial spectrum
-  over the shell width — the *density*, the same object a model law gives — and `integral_scale`
+  over the shell width — the *density*, the same object a model law gives — and `integral_length`
   derived from it;
 - `kinetic_energy_and_dissipation_below_scale`, the kinetic energy ``k(l)`` and dissipation
   ``\varepsilon(l)`` held in scales below each box side ``l`` the grid offers — what a box of side ``l``
@@ -3408,6 +3408,14 @@ The log is append-only, and each entry stands on its own. Dates are given as `YY
     is exact, and ``\varepsilon`` read as ``2\nu\sum_n \kappa_n^2 E_n`` measured 6–14% low on
     ``32^3`` to ``128^3`` fields, so the fused `weighted_inner` reductions stay the home of every
     scalar, and ``L_{11}`` alone comes from the spectrum, with its quadrature caveat stated.
+
+115. **(2026-10-17, user-directed) The scale functions name the dimension: `integral_length` and
+    `taylor_length`.** They were `integral_scale` and `taylor_microscale`. Beside `kolmogorov_length`,
+    `kolmogorov_time` and `kolmogorov_velocity`, a scale is named by the person or the construction
+    and then by what it measures, so a time or a velocity of the same family can join without a
+    clash. "Microscale" also misplaced ``\lambda``, which lies between ``\eta`` and ``L_{11}``. The
+    docstrings keep the literature's terms, the integral scale and the Taylor microscale, in their
+    identity sentences; the formulas are unchanged.
 
 ## References
 
