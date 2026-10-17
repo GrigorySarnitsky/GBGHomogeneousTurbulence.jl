@@ -184,15 +184,31 @@ energy of what is left; averaged over every position of the box, that is ``k(l)`
 ``\\varepsilon(l)`` removes the box's mean vorticity instead, since removing the mean velocity leaves
 every gradient unchanged.
 
-With ``\\langle\\boldsymbol{u}\\rangle_l`` and ``\\langle\\boldsymbol{\\omega}\\rangle_l`` the box means of side ``l``
-centred at each point (fields), and ``\\langle\\cdot\\rangle`` the average over the whole box,
+With ``C_l(\\boldsymbol{x}) = \\boldsymbol{x} + [-l/2, l/2]^{3}`` the cube of side ``l`` centred at
+``\\boldsymbol{x}``, the box mean of the velocity is the field
+``\\langle\\boldsymbol{u}\\rangle_l(\\boldsymbol{x}) = l^{-3}\\int_{C_l(\\boldsymbol{x})} \\boldsymbol{u}(\\boldsymbol{y})\\,\\mathrm{d}^{3}y``,
+and ``\\langle\\boldsymbol{\\omega}\\rangle_l`` that of the vorticity likewise. Then
 
 ```math
 \\begin{aligned}
-k(l) &= k - \\tfrac{1}{2}\\langle\\lvert\\langle\\boldsymbol{u}\\rangle_l\\rvert^{2}\\rangle
-      = \\tfrac{1}{2}\\sum_{\\boldsymbol{\\kappa}} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2}, \\\\
-\\varepsilon(l) &= \\varepsilon - \\nu\\langle\\lvert\\langle\\boldsymbol{\\omega}\\rangle_l\\rvert^{2}\\rangle
-      = \\nu \\sum_{\\boldsymbol{\\kappa}} \\lvert\\boldsymbol{\\kappa}\\rvert^{2} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2},
+k(l) &= \\frac{1}{L^{3}} \\int_{\\Omega} \\biggl[\\frac{1}{l^{3}} \\int_{C_l(\\boldsymbol{x})}
+  \\tfrac{1}{2}\\bigl\\lvert\\boldsymbol{u}(\\boldsymbol{y}) - \\langle\\boldsymbol{u}\\rangle_l(\\boldsymbol{x})\\bigr\\rvert^{2}\\,\\mathrm{d}^{3}y\\biggr]\\,\\mathrm{d}^{3}x, \\\\
+\\varepsilon(l) &= \\frac{1}{L^{3}} \\int_{\\Omega} \\biggl[\\frac{1}{l^{3}} \\int_{C_l(\\boldsymbol{x})}
+  \\nu\\bigl\\lvert\\boldsymbol{\\omega}(\\boldsymbol{y}) - \\langle\\boldsymbol{\\omega}\\rangle_l(\\boldsymbol{x})\\bigr\\rvert^{2}\\,\\mathrm{d}^{3}y\\biggr]\\,\\mathrm{d}^{3}x,
+\\end{aligned}
+```
+
+over the periodic box ``\\Omega = [0, L)^{3}``. Within one cube the mean square about the mean is
+the mean square less the square of the mean, and periodicity makes the position average of a cube
+average the whole-box average ``\\langle\\cdot\\rangle``; so
+``k(l) = k - \\tfrac{1}{2}\\langle\\lvert\\langle\\boldsymbol{u}\\rangle_l\\rvert^{2}\\rangle`` and
+``\\varepsilon(l) = \\varepsilon - \\nu\\langle\\lvert\\langle\\boldsymbol{\\omega}\\rangle_l\\rvert^{2}\\rangle``.
+From the coefficients these are
+
+```math
+\\begin{aligned}
+k(l) &= \\tfrac{1}{2}\\sum_{\\boldsymbol{\\kappa}} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2}, \\\\
+\\varepsilon(l) &= \\nu \\sum_{\\boldsymbol{\\kappa}} \\lvert\\boldsymbol{\\kappa}\\rvert^{2} \\bigl[1 - W_l(\\boldsymbol{\\kappa})^{2}\\bigr] \\lvert\\hat{\\boldsymbol{u}}_{\\boldsymbol{\\kappa}}\\rvert^{2},
 \\end{aligned}
 ```
 

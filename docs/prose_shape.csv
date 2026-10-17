@@ -201,7 +201,7 @@ unit,words,longest_paragraph,admonitions
 "Observables.jl :: integral_scale(û, domain)",263,90,0
 "Observables.jl :: kinetic_energy(u)",155,67,0
 "Observables.jl :: kinetic_energy_and_dissipation(û, domain, viscosity)",185,99,0
-"Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",395,73,1
+"Observables.jl :: kinetic_energy_and_dissipation_below_scale(û, domain, viscos",448,73,1
 "Observables.jl :: max_speed(u)",316,143,2
 "Observables.jl :: reynolds_box(side_length, dissipation, viscosity)",162,62,0
 "Observables.jl :: reynolds_taylor(kinetic_energy, dissipation, viscosity)",126,41,0
