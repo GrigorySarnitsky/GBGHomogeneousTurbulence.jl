@@ -256,7 +256,7 @@ _fill(parameters, keyword, value) = merge(parameters, NamedTuple{(keyword,)}((va
     steady_linear_rate(forcing, domain)
 
 The per-mode rate ``A(\\boldsymbol{\\kappa})`` of a strategy `forcing` whose forcing is linear in the
-field and constant in time, ``f = A \\texttt{field}``, on the [`FixedDomain`](@ref) `domain`; `nothing`
+field and constant in time, ``f = A \\cdot \\texttt{field}``, on the [`FixedDomain`](@ref) `domain`; `nothing`
 for every other strategy, the default. The scheme folds the rate into the diffusive integrating factor
 ``\\mathcal{E}(\\boldsymbol{\\kappa})`` (see [`velocity_integrating_factor`](@ref GBGHomogeneousTurbulence.Generator.velocity_integrating_factor)),
 so the forced modes advance at the net linear rate
@@ -596,10 +596,8 @@ end
 """
     Linear(domain; rate, lowest_shell = 1, highest_shell = 2)
 
-Linear (negative-damping) forcing ``f = A \\texttt{field}`` in a low-wavenumber band (a band-limited
-variant of Lundgren (2003) — *Linearly forced isotropic turbulence*, *CTR Annual Research
-Briefs*, 461–473 (no DOI) — whose linear forcing
-acts at every wavenumber), built on the [`FixedDomain`](@ref) `domain`. The rate is folded into the
+Linear (negative-damping) forcing ``f = A \\cdot \\texttt{field}`` in a low-wavenumber band (a band-limited
+variant of the forcing of Lundgren (2003), which acts at every wavenumber), built on the [`FixedDomain`](@ref) `domain`. The rate is folded into the
 integrating factor, so the forced band modes grow at net rate
 ``A - D\\lvert\\boldsymbol{\\kappa}\\rvert^{2}`` (``D`` the field's diffusivity).
 
@@ -619,6 +617,9 @@ which makes it the cheapest forcing here, at no per-stage reduction and no host 
   dealiasing keeps those modes empty, so the forcing adds nothing there. `highest_shell = Inf` lifts
   the band limit: every retained mode but the mean is forced, on any grid, and this is Lundgren's
   forcing itself — the form a physical-space code applies.
+
+# References
+- Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI.)*
 
 # Fields
 - `band` — the band-pass kernel, evaluated per mode where used rather than stored, as is the rate
@@ -653,7 +654,7 @@ end
     ConstantPower(domain; injection_rate, lowest_shell = 1, highest_shell = 2)
 
 Constant-injection-rate forcing, built on the [`FixedDomain`](@ref) `domain`: a banded linear
-forcing ``f = A \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
+forcing ``f = A \\cdot \\texttt{field}`` on the integer shells `lowest_shell` to `highest_shell` (in units
 of the box's fundamental ``2\\pi/L``; default 1–2),
 whose rate ``A`` is re-solved at every stage so the injection rate holds the `injection_rate`. A
 linear rate injects at ``2 A k_{\\mathrm{band}}``, with ``k_{\\mathrm{band}}`` the band's own
@@ -685,9 +686,8 @@ rather than the integrating factor, where freezing it would cost the scheme its 
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, as integer shells in units of the box's
   fundamental ``2\\pi/L``. A finite band reaching past the dealias cutoff draws a warning: the
   dealiasing keeps those modes empty, so the forcing adds nothing there. `highest_shell = Inf` forces
-  every retained mode but the mean, on any grid: the band-free linear forcing of Lundgren (2003,
-  *Linearly forced isotropic turbulence*, *CTR Annual Research Briefs*, 461–473) that physical-space
-  codes apply, with its rate re-solved to hold the injection.
+  every retained mode but the mean, on any grid: the band-free linear forcing of Lundgren (2003)
+  that physical-space codes apply, with its rate re-solved to hold the injection.
 
 !!! note "An empty band is left alone, not driven infinitely hard"
     The rate ``A`` diverges as the band's own value goes to zero — its energy for the velocity, its
@@ -697,6 +697,9 @@ rather than the integrating factor, where freezing it would cost the scheme its 
     the test is invariant under a uniform rescaling of the field — the amplitude is set to zero,
     and an empty band stays empty rather than taking an unbounded kick; seed content in the band
     if a run needs the forcing to take hold.
+
+# References
+- Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI.)*
 
 # Fields
 - `band` — the band-pass kernel, evaluated per mode where used: the per-stage source both weights the band observable with it
@@ -779,8 +782,7 @@ in the band if the run depends on the controller taking hold.
 - `lowest_shell = 1`, `highest_shell = 2` — the forced band, in integer shells of ``2\\pi/L``. A
   finite band reaching past the dealias cutoff draws a warning: the dealiasing keeps those modes
   empty, so the forcing adds nothing there. `highest_shell = Inf` forces every retained mode but the
-  mean, on any grid: the band-free linear forcing of Lundgren (2003, *Linearly forced isotropic
-  turbulence*, *CTR Annual Research Briefs*, 461–473) that physical-space codes apply, where
+  mean, on any grid: the band-free linear forcing of Lundgren (2003) that physical-space codes apply, where
   ``k_{\\mathrm{band}} = k`` — the form Bassenne et al. designed the controller in.
 
 The molecular-dynamics thermostats map the design space exactly, and this controller is the
@@ -800,6 +802,7 @@ does not take.
 - Berendsen, H. J. C., Postma, J. P. M., van Gunsteren, W. F., DiNola, A. & Haak, J. R. (1984). [*Molecular dynamics with coupling to an external bath*](https://doi.org/10.1063/1.448118). *J. Chem. Phys.* 81, 3684–3690.
 - Nosé, S. (1984). [*A unified formulation of the constant temperature molecular dynamics methods*](https://doi.org/10.1063/1.447334). *J. Chem. Phys.* 81(1), 511–519.
 - Hoover, W. G. (1985). [*Canonical dynamics: Equilibrium phase-space distributions*](https://doi.org/10.1103/PhysRevA.31.1695). *Phys. Rev. A* 31(3), 1695–1697.
+- Lundgren, T. S. (2003). [*Linearly forced isotropic turbulence.*](https://web.stanford.edu/group/ctr/ResBriefs03/lundgren.pdf) *CTR Annual Research Briefs*, 461–473. *(No DOI.)*
 
 # Fields
 - `band` — the band-pass kernel, evaluated per mode where used; the controller convolves against it and stores nothing.
